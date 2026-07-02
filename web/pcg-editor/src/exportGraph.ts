@@ -17,7 +17,7 @@ function toGraphNode(node: Node): GraphNode {
     id: node.id,
     type: node.type as GraphNode['type'],
     position: { x: node.position.x, y: node.position.y },
-    data: node.data as NodeData,
+    data: node.data as unknown as NodeData,
   };
 }
 
@@ -42,4 +42,25 @@ export function downloadGraph(graph: GraphJson, filename = 'graph.pcg.json'): vo
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Writes graph JSON to schema/editor-export.pcg.json via Vite dev server.
+ * Requires `npm run dev` — not available in production build.
+ */
+export async function exportToSchema(graph: GraphJson): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/export-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(graph, null, 2),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? res.statusText };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 }

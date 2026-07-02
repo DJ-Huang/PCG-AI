@@ -16,3 +16,5 @@ web/pcg-editor/node_modules/
 web/pcg-editor/dist/
 
 # ── Unity Library/Temp (already in Unity/.gitignore) ──
+Unity/.vs/
+Unity/.vs/

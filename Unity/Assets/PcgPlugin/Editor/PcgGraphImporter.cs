@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text;
 using DJTechRuntime.PCG;
 using UnityEditor;
 using UnityEngine;
@@ -16,15 +15,15 @@ namespace DJTechEditor.PCG
         [MenuItem(MenuRoot + "Run Graph from File…")]
         public static void RunGraphFromFile()
         {
-            string path = EditorUtility.OpenFilePanel("Select Graph JSON", "", "json");
+            string path = EditorUtility.OpenFilePanel(
+                "Select Graph JSON",
+                PcgGraphRunner.DefaultSchemaDir,
+                "json");
+
             if (string.IsNullOrEmpty(path))
                 return;
 
-            var result = PcgGraphLoader.LoadAndExecute(path);
-            if (result != null)
-            {
-                Debug.Log($"[PCG] Result: {result}");
-            }
+            PcgGraphRunner.RunFileAndUpdatePreview(path);
         }
 
         [MenuItem(MenuRoot + "Print PcgCore Version")]

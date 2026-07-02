@@ -41,6 +41,24 @@
   background: #40916c !important;
 }
 
+.pcg-toolbar__unity {
+  background: #1d3557 !important;
+  border-color: #457b9d !important;
+}
+
+.pcg-toolbar__unity:hover {
+  background: #457b9d !important;
+}
+
+.pcg-toolbar__status {
+  font-size: 12px;
+  color: #aaa;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Node styles */
 .pcg-node {
   min-width: 180px;

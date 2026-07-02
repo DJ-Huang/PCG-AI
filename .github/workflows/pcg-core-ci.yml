@@ -1,0 +1,48 @@
+name: pcg-core CI
+
+on:
+  push:
+    paths:
+      - 'pcg-core/**'
+      - '.github/workflows/pcg-core-ci.yml'
+  pull_request:
+    paths:
+      - 'pcg-core/**'
+      - '.github/workflows/pcg-core-ci.yml'
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S pcg-core -B pcg-core/build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Release
+        run: cmake --build pcg-core/build --config Release
+
+      - name: Run tests
+        run: ctest --test-dir pcg-core/build -C Release --output-on-failure
+
+      - name: Verify artifacts
+        run: |
+          $dll = "pcg-core/build/Release/PcgCore.dll"
+          $lib = "pcg-core/build/Release/PcgCore.lib"
+          if (-not (Test-Path $dll)) { throw "Missing $dll" }
+          if (-not (Test-Path $lib)) { throw "Missing $lib" }
+          Write-Host "PcgCore.dll size: $((Get-Item $dll).Length)"
+          Write-Host "PcgCore.lib size: $((Get-Item $lib).Length)"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcg-core-win64
+          path: |
+            pcg-core/build/Release/PcgCore.dll
+            pcg-core/build/Release/PcgCore.lib
+            pcg-core/include/pcg_api.h

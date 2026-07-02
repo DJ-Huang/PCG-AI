@@ -42,7 +42,7 @@ PlayerSettings:
     height: 1
   m_SplashScreenLogos: []
   m_VirtualRealitySplashScreen: {fileID: 0}
-  expectedBundleIdentifier: 
+  expectedBundleIdentifier: com.Unity-Technologies.com.unity.template.urp-blank
   integrityHash: 
   m_HolographicTrackingLossScreen: {fileID: 0}
   defaultScreenWidth: 1024
@@ -940,8 +940,10 @@ PlayerSettings:
   scriptingDefineSymbols: {}
   additionalCompilerArguments: {}
   platformArchitecture: {}
-  scriptingBackend: {}
-  il2cppCompilerConfiguration: {}
+  scriptingBackend:
+    Standalone: 1
+  il2cppCompilerConfiguration:
+    Standalone: 1
   il2cppCodeGeneration: {}
   managedStrippingLevel:
     ArmLinux: 1
@@ -966,7 +968,7 @@ PlayerSettings:
   suppressCommonWarnings: 1
   allowUnsafeCode: 0
   useDeterministicCompilation: 1
-  additionalIl2CppArgs: 
+  additionalIl2CppArgs: --linker-flags="C:\Users\DONGJU~1.HUA\AppData\Local\Temp\PcgCoreIl2CppLink\PcgCore.lib"
   scriptingRuntimeVersion: 1
   monoAOTCompilation: 0
   gcIncremental: 0

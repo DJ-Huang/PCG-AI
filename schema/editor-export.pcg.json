@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "ParseConfig",
+      "position": {
+        "x": 49.2421417167448,
+        "y": 150
+      },
+      "data": {
+        "seed": 42,
+        "density": 1
+      }
+    },
+    {
+      "id": "n2",
+      "type": "SpawnPoints",
+      "position": {
+        "x": 381.05354291862005,
+        "y": 150.75785828325522
+      },
+      "data": {
+        "count": 100,
+        "radius": 10
+      }
+    },
+    {
+      "id": "n3",
+      "type": "PlaceInScene",
+      "position": {
+        "x": 750,
+        "y": 150
+      },
+      "data": {
+        "prefab": "",
+        "scale": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n2",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e2",
+      "source": "n2",
+      "target": "n3",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

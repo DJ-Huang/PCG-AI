@@ -52,3 +52,26 @@ npm run dev
 ## Milestone M0
 
 Unity Editor → menu `PCG > Print PcgCore Version` → Console prints `pcg-core 0.1.0`.
+
+## Milestone M2 — Editor loop
+
+See [docs/DEMO.md](docs/DEMO.md) §2: Web `Send to Unity` → `PCG > Reload Watched Graph` → Scene Gizmo.
+
+## Milestone M3 — IL2CPP release
+
+```powershell
+# Build + test + deploy native artifacts to Unity Plugins
+.\scripts\build-pcg-core.ps1 -CopyToUnity -RunTests
+
+# After Unity IL2CPP Windows build
+.\scripts\verify-release-package.ps1 -PlayerBuildPath "path\to\build\folder"
+```
+
+| Mode | Native artifact | PluginImporter |
+|------|-----------------|----------------|
+| Editor | `PcgCore.dll` | Editor: on, Standalone: off |
+| IL2CPP Player | `PcgCore.lib` | Editor: off, Standalone Win64: on |
+
+Player runtime: attach `PcgRuntimeRunner` + `PcgPreview`, graph at `StreamingAssets/pcg/demo.pcg.json`.
+
+CI: `.github/workflows/pcg-core-ci.yml` (Windows, Release, ctest).

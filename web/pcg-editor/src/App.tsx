@@ -4,13 +4,13 @@ import {
   Background,
   Controls,
   MiniMap,
+  ReactFlowProvider,
   addEdge,
   useNodesState,
   useEdgesState,
   type Connection,
   type Node,
   type Edge,
-  type NodeType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -18,10 +18,11 @@ import ParseConfigNode from './nodes/ParseConfigNode';
 import SpawnPointsNode from './nodes/SpawnPointsNode';
 import PlaceInSceneNode from './nodes/PlaceInSceneNode';
 import { defaultData, type NodeType as GraphNodeType } from './graphSchema';
-import { exportGraph, downloadGraph } from './exportGraph';
+import { exportGraph, downloadGraph, exportToSchema } from './exportGraph';
+import { isValidConnection } from './connectionValidation';
 import './App.css';
 
-const nodeTypes: Record<string, typeof ParseConfigNode> = {
+const nodeTypes = {
   ParseConfig: ParseConfigNode,
   SpawnPoints: SpawnPointsNode,
   PlaceInScene: PlaceInSceneNode,
@@ -55,13 +56,22 @@ const initialEdges: Edge[] = [
 
 let nodeCounter = 100;
 
-export default function App() {
+function PcgEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [status, setStatus] = useState('');
+
+  const validateConnection = useCallback(
+    (conn: Connection | Edge) => isValidConnection(conn, nodes, edges),
+    [nodes, edges],
+  );
 
   const onConnect = useCallback(
-    (conn: Connection) => setEdges((eds) => addEdge(conn, eds)),
-    [setEdges],
+    (conn: Connection) => {
+      if (!validateConnection(conn)) return;
+      setEdges((eds) => addEdge(conn, eds));
+    },
+    [setEdges, validateConnection],
   );
 
   const addNode = (type: GraphNodeType) => {
@@ -78,16 +88,29 @@ export default function App() {
   const handleExport = () => {
     const graph = exportGraph(nodes, edges);
     downloadGraph(graph);
+    setStatus('Downloaded graph.pcg.json');
+  };
+
+  const handleSendToUnity = async () => {
+    const graph = exportGraph(nodes, edges);
+    const result = await exportToSchema(graph);
+    if (result.ok) {
+      setStatus('Saved to schema/editor-export.pcg.json — use PCG → Reload Watched Graph in Unity');
+    } else {
+      setStatus(`Send failed: ${result.error ?? 'unknown error'} (is npm run dev running?)`);
+    }
   };
 
   return (
     <div className="pcg-app">
       <div className="pcg-toolbar">
-        <button onClick={() => addNode('ParseConfig')}>+ ParseConfig</button>
-        <button onClick={() => addNode('SpawnPoints')}>+ SpawnPoints</button>
-        <button onClick={() => addNode('PlaceInScene')}>+ PlaceInScene</button>
+        <button type="button" onClick={() => addNode('ParseConfig')}>+ ParseConfig</button>
+        <button type="button" onClick={() => addNode('SpawnPoints')}>+ SpawnPoints</button>
+        <button type="button" onClick={() => addNode('PlaceInScene')}>+ PlaceInScene</button>
         <span className="pcg-toolbar__spacer" />
-        <button className="pcg-toolbar__export" onClick={handleExport}>Export JSON</button>
+        <button type="button" className="pcg-toolbar__export" onClick={handleExport}>Export JSON</button>
+        <button type="button" className="pcg-toolbar__unity" onClick={handleSendToUnity}>Send to Unity</button>
+        {status && <span className="pcg-toolbar__status">{status}</span>}
       </div>
       <ReactFlow
         nodes={nodes}
@@ -95,6 +118,7 @@ export default function App() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={validateConnection}
         nodeTypes={nodeTypes}
         fitView
       >
@@ -103,5 +127,13 @@ export default function App() {
         <MiniMap />
       </ReactFlow>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <PcgEditor />
+    </ReactFlowProvider>
   );
 }
