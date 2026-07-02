@@ -1,0 +1,18 @@
+# >>> Codely setup.bat (synced rules — do not commit) >>>
+# Source: Codely main repo sync/ + CODELY.md — re-run setup.bat to refresh
+.codely-cli/rules/
+.cursor/rules/
+.trae/rules/
+.trae/user_rules/
+AGENTS.md
+CODELY.md
+# <<< Codely setup.bat <<<
+
+# ── pcg-core C++ build artifacts ──
+pcg-core/build/
+
+# ── Web editor ──
+web/pcg-editor/node_modules/
+web/pcg-editor/dist/
+
+# ── Unity Library/Temp (already in Unity/.gitignore) ──

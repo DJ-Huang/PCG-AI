@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "unity": {
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:/Users/dongjun.huang/.aisync/mcp/unity/unity-mcp-stdio.ps1",
+        "D:/Project/AI/PCG AI Block"
+      ],
+      "trust": true
+    }
+  }
+}

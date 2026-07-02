@@ -1,0 +1,86 @@
+.idea 
+DCC/.autosave 
+Library 
+Logs 
+obj 
+Temp 
+*.csproj 
+*.sln 
+UserSettings 
+Build 
+*.blend1 
+Assets/Lux URP Essentials 
+Assets/Lux URP Essentials.meta 
+DCC 
+MemoryCaptures 
+*.blend 
+Assets/Demos/Demo_CarInterior/Art 
+Assets/Demos/Demo_CarInterior/CarInter 
+Assets/Demos/Demo_CarInterior/Scene 
+Assets/Demos/Demo_CarInterior/Setting 
+Unreal 
+*.user 
+.DS_Store 
+AndroidProjects/ExportedUnityProject/ 
+AgentSpace 
+.com-unity-codely.json 
+screenshots 
+ECHO is off.
+# -- linked from UnityPackage --  
+CODELY.md  
+hmirp-path-mapping.yml  
+ECHO is off.
+# -- linked from UnityPackage --  
+CODELY.md  
+hmirp-path-mapping.yml  
+ECHO is off.
+# -- linked from UnityPackage --  
+CODELY.md  
+hmirp-path-mapping.yml  
+docs 
+research 
+.codelyignore 
+ECHO is off.
+# -- linked from UnityPackage --  
+.cursor  
+CODELY.md  
+hmirp-path-mapping.yml  
+tools 
+*.example 
+ECHO is off.
+# -- linked from UnityPackage --  
+.cursor  
+.clinerules  
+hmirp-path-mapping.yml  
+ECHO is off.
+# -- linked from UnityPackage --  
+.cursor  
+.clinerules  
+hmirp-path-mapping.yml  
+ECHO is off.
+# -- linked from UnityPackage --  
+.cursor  
+.clinerules  
+hmirp-path-mapping.yml  
+.roo
+.codely-cli
+
+# >>> Codely setup.bat (synced rules — do not commit) >>>
+# Source: Codely main repo sync/ + CODELY.md — re-run setup.bat to refresh
+.codely-cli/rules/
+.codely-link/rules/
+.cursor/rules/
+.trae/rules/
+.trae/user_rules/
+AGENTS.md
+CODELY.md
+# <<< Codely setup.bat >>>
+
+*.slnx
+.vscode
+*.txt
+.vscode
+.codely/clipboard
+.trae
+.codely
+TuanjieShaderCache

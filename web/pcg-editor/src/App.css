@@ -1,0 +1,104 @@
+.pcg-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.pcg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #1a1a2e;
+  border-bottom: 1px solid #333;
+}
+
+.pcg-toolbar button {
+  padding: 6px 12px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a4e;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.pcg-toolbar button:hover {
+  background: #3a3a5e;
+}
+
+.pcg-toolbar__spacer {
+  flex: 1;
+}
+
+.pcg-toolbar__export {
+  background: #2d6a4f !important;
+  border-color: #40916c !important;
+}
+
+.pcg-toolbar__export:hover {
+  background: #40916c !important;
+}
+
+/* Node styles */
+.pcg-node {
+  min-width: 180px;
+  border-radius: 6px;
+  border: 2px solid;
+  background: #fff;
+  font-size: 12px;
+}
+
+.pcg-node--config {
+  border-color: #4361ee;
+}
+
+.pcg-node--spawn {
+  border-color: #f77f00;
+}
+
+.pcg-node--place {
+  border-color: #06a77d;
+}
+
+.pcg-node__header {
+  padding: 6px 10px;
+  font-weight: 600;
+  color: #fff;
+  border-radius: 4px 4px 0 0;
+}
+
+.pcg-node--config .pcg-node__header {
+  background: #4361ee;
+}
+
+.pcg-node--spawn .pcg-node__header {
+  background: #f77f00;
+}
+
+.pcg-node--place .pcg-node__header {
+  background: #06a77d;
+}
+
+.pcg-node__body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pcg-node__body label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: #555;
+}
+
+.pcg-node__body input {
+  padding: 3px 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 12px;
+}

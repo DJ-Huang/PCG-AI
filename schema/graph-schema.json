@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcg.example.com/graph-schema-v1.json",
+  "title": "PCG Graph JSON v1",
+  "description": "Contract between Web editor, C++ core, and Unity plugin",
+  "type": "object",
+  "required": ["version", "nodes", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version"
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["id", "type", "position", "data"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique node identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ParseConfig", "SpawnPoints", "PlaceInScene"],
+          "description": "Node type determines which Block executes"
+        },
+        "position": {
+          "type": "object",
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        },
+        "data": {
+          "oneOf": [
+            { "$ref": "#/$defs/ParseConfigData" },
+            { "$ref": "#/$defs/SpawnPointsData" },
+            { "$ref": "#/$defs/PlaceInSceneData" }
+          ]
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "source", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "source": { "type": "string" },
+        "target": { "type": "string" },
+        "sourceHandle": { "type": "string" },
+        "targetHandle": { "type": "string" }
+      }
+    },
+    "ParseConfigData": {
+      "type": "object",
+      "title": "ParseConfig",
+      "properties": {
+        "seed": { "type": "integer", "default": 42 },
+        "density": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 }
+      }
+    },
+    "SpawnPointsData": {
+      "type": "object",
+      "title": "SpawnPoints",
+      "properties": {
+        "count": { "type": "integer", "default": 100, "minimum": 0 },
+        "radius": { "type": "number", "default": 10.0, "minimum": 0 }
+      }
+    },
+    "PlaceInSceneData": {
+      "type": "object",
+      "title": "PlaceInScene",
+      "properties": {
+        "prefab": { "type": "string", "default": "" },
+        "scale": { "type": "number", "default": 1.0 }
+      }
+    }
+  }
+}
