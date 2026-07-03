@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "grid",
+      "type": "CreatePointGrid",
+      "position": { "x": 0, "y": 0 },
+      "data": { "pointCountX": 5, "pointCountY": 5, "spacing": 3.0 }
+    },
+    {
+      "id": "connect",
+      "type": "ConnectNearest",
+      "position": { "x": 300, "y": 0 },
+      "data": { "k": 2, "maxDistance": -1 }
+    },
+    {
+      "id": "delaunay",
+      "type": "Delaunay",
+      "position": { "x": 300, "y": 200 },
+      "data": {}
+    },
+    {
+      "id": "mst",
+      "type": "MST",
+      "position": { "x": 600, "y": 0 },
+      "data": {}
+    },
+    {
+      "id": "path",
+      "type": "AStarPathfinding",
+      "position": { "x": 900, "y": 0 },
+      "data": { "startIndex": 0, "endIndex": 24 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "grid",
+      "target": "connect",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e2",
+      "source": "grid",
+      "target": "delaunay",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e3",
+      "source": "connect",
+      "target": "mst",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e4",
+      "source": "grid",
+      "target": "mst",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    },
+    {
+      "id": "e5",
+      "source": "mst",
+      "target": "path",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e6",
+      "source": "grid",
+      "target": "path",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    }
+  ]
+}

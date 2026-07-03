@@ -17,6 +17,11 @@ void PcgDataCollection::add_points(const std::string& tag, PcgPointData data)
     add(tag, PcgDataType::Point, data.to_json());
 }
 
+void PcgDataCollection::add_splines(const std::string& tag, PcgSplineData data)
+{
+    add(tag, PcgDataType::Spline, data.to_json());
+}
+
 const PcgTaggedData* PcgDataCollection::find(const std::string& tag) const
 {
     for (const auto& item : items_) {

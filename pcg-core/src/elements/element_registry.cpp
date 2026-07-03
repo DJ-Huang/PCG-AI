@@ -1,5 +1,6 @@
 #include "elements/pcg_element.hpp"
 #include "elements/primitive_elements.hpp"
+#include "elements/structural_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -140,6 +141,7 @@ void register_builtin_elements()
     map.emplace("SpawnPoints", std::make_unique<SpawnPointsElement>());
     map.emplace("PlaceInScene", std::make_unique<PlaceInSceneElement>());
     register_phase41_elements(map);
+    register_phase42_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

@@ -3,6 +3,7 @@
 #include "data/pcg_data_types.hpp"
 #include "data/pcg_param_data.hpp"
 #include "data/pcg_point_data.hpp"
+#include "data/pcg_spline_data.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -24,6 +25,7 @@ public:
     void add(const std::string& tag, PcgDataType type, nlohmann::json payload);
     void add_param(const std::string& tag, PcgParamData data);
     void add_points(const std::string& tag, PcgPointData data);
+    void add_splines(const std::string& tag, PcgSplineData data);
 
     const PcgTaggedData* find(const std::string& tag) const;
     const nlohmann::json* find_json(const std::string& tag) const;

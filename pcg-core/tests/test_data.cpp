@@ -2,6 +2,7 @@
 #include "data/pcg_metadata.hpp"
 #include "data/pcg_param_data.hpp"
 #include "data/pcg_point_data.hpp"
+#include "data/pcg_spline_data.hpp"
 
 #include <cassert>
 #include <cstdio>
@@ -37,6 +38,20 @@ int main()
     collection.add_points("points", round_trip);
     assert(collection.primary_json().contains("points"));
     std::printf("PASS: PcgDataCollection param + points\n");
+
+    PcgSplineData splines;
+    PcgSpline segment;
+    segment.points.push_back({0.0, 0.0, 0.0});
+    segment.points.push_back({1.0, 0.0, 1.0});
+    splines.add_spline(segment);
+    const nlohmann::json spline_json = splines.to_json();
+    assert(spline_json["splines"].size() == 1);
+    assert(spline_json["splines"][0]["points"].size() == 2);
+
+    const PcgSplineData spline_round_trip = PcgSplineData::from_json(spline_json);
+    assert(spline_round_trip.splines().size() == 1);
+    assert(spline_round_trip.splines()[0].points.size() == 2);
+    std::printf("PASS: PcgSplineData round-trip\n");
 
     return 0;
 }

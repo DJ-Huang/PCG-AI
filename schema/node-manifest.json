@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "description": "Node definitions for PCG Graph editors (Phase 4.1). Pin types align with UE EPCGDataType.",
+  "version": "1.2",
+  "description": "Node definitions for PCG Graph editors (Phase 4.2). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
       "type": "ParseConfig",
@@ -187,6 +187,66 @@
         "prefab": { "type": "string", "default": "" },
         "mesh": { "type": "string", "default": "" },
         "scale": { "type": "number", "default": 1.0 }
+      }
+    },
+    {
+      "type": "ConvexHull",
+      "displayName": "Convex Hull",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Hull", "pinType": "SpatialSpline" }],
+      "properties": {}
+    },
+    {
+      "type": "ConnectNearest",
+      "displayName": "Connect Nearest",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Edges", "pinType": "SpatialSpline" }],
+      "properties": {
+        "k": { "type": "integer", "default": 1, "minimum": 1 },
+        "maxDistance": { "type": "number", "default": -1 }
+      }
+    },
+    {
+      "type": "Delaunay",
+      "displayName": "Delaunay",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Edges", "pinType": "SpatialSpline" }],
+      "properties": {}
+    },
+    {
+      "type": "MST",
+      "displayName": "Minimum Spanning Tree",
+      "category": "Structural",
+      "inputs": [
+        { "id": "in", "label": "Edges", "pinType": "SpatialSpline" },
+        { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
+      ],
+      "outputs": [{ "id": "out", "label": "Tree", "pinType": "SpatialSpline" }],
+      "properties": {}
+    },
+    {
+      "type": "Voronoi",
+      "displayName": "Voronoi",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Cells", "pinType": "SpatialSpline" }],
+      "properties": {}
+    },
+    {
+      "type": "AStarPathfinding",
+      "displayName": "A* Pathfinding",
+      "category": "Structural",
+      "inputs": [
+        { "id": "in", "label": "Edges", "pinType": "SpatialSpline" },
+        { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
+      ],
+      "outputs": [{ "id": "out", "label": "Path", "pinType": "SpatialSpline" }],
+      "properties": {
+        "startIndex": { "type": "integer", "default": 0, "minimum": 0 },
+        "endIndex": { "type": "integer", "default": 0, "minimum": 0 }
       }
     }
   ]

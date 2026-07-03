@@ -29,10 +29,13 @@ set(PCG_CORE_SOURCES
     src/data/pcg_metadata.cpp
     src/data/pcg_point_data.cpp
     src/data/pcg_param_data.cpp
+    src/data/pcg_spline_data.cpp
     src/data/pcg_data_collection.cpp
     src/elements/element_registry.cpp
     src/elements/element_utils.cpp
     src/elements/primitive_elements.cpp
+    src/elements/structural_algorithms.cpp
+    src/elements/structural_elements.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
@@ -76,6 +79,10 @@ target_include_directories(test_data PRIVATE src)
 add_executable(test_phase41 tests/test_phase41.cpp)
 target_link_libraries(test_phase41 PRIVATE PcgCoreStatic)
 
+add_executable(test_phase42 tests/test_phase42.cpp)
+target_link_libraries(test_phase42 PRIVATE PcgCoreStatic)
+
 add_test(NAME test_executor COMMAND test_executor WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME test_data COMMAND test_data)
 add_test(NAME test_phase41 COMMAND test_phase41 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME test_phase42 COMMAND test_phase42 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
