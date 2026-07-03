@@ -1,5 +1,6 @@
 #include "graph_parser.hpp"
 
+#include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 
 #include <set>
@@ -11,7 +12,7 @@ namespace {
 
 bool is_known_node_type(const std::string& type)
 {
-    return type == "ParseConfig" || type == "SpawnPoints" || type == "PlaceInScene";
+    return elements::is_known_element_type(type);
 }
 
 PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const char* message)
@@ -91,6 +92,8 @@ PcgResultCode parse_graph(const char* json,
         edge.id = edge_json.value("id", "");
         edge.source = edge_json["source"].get<std::string>();
         edge.target = edge_json["target"].get<std::string>();
+        edge.source_handle = edge_json.value("sourceHandle", "out");
+        edge.target_handle = edge_json.value("targetHandle", "in");
         graph.edges.push_back(std::move(edge));
     }
 

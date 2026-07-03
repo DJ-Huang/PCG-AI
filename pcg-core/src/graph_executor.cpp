@@ -1,6 +1,7 @@
 #include "graph_executor.hpp"
 
-#include "blocks/blocks.hpp"
+#include "data/pcg_context.hpp"
+#include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 
 #include <queue>
@@ -59,36 +60,29 @@ std::vector<std::string> topological_order(const Graph& graph,
     return order;
 }
 
-const nlohmann::json* find_single_input(const Graph& graph,
-                                        const std::string& node_id,
-                                        const NodeOutputMap& outputs)
+void gather_inputs(const Graph& graph,
+                   const std::string& node_id,
+                   const NodeOutputMap& outputs,
+                   data::PcgDataCollection& inputs,
+                   char* err_buf,
+                   int err_buf_size,
+                   PcgResultCode& code)
 {
-    const GraphNode* node = nullptr;
-    for (const auto& candidate : graph.nodes) {
-        if (candidate.id == node_id) {
-            node = &candidate;
-            break;
-        }
-    }
-    if (!node)
-        return nullptr;
-
-    const nlohmann::json* input = nullptr;
     for (const auto& edge : graph.edges) {
         if (edge.target != node_id)
             continue;
 
         const auto it = outputs.find(edge.source);
-        if (it == outputs.end())
-            return nullptr;
+        if (it == outputs.end()) {
+            code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
+            return;
+        }
 
-        if (input != nullptr)
-            return nullptr;
-
-        input = &it->second;
+        const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
+        inputs.add(pin, data::PcgDataType::Unknown, it->second);
     }
 
-    return input;
+    code = PCG_OK;
 }
 
 } // namespace
@@ -99,6 +93,8 @@ PcgResultCode execute_graph(const Graph& graph,
                             char* err_buf,
                             int err_buf_size)
 {
+    elements::register_builtin_elements();
+
     PcgResultCode topo_code = PCG_OK;
     const auto order = topological_order(graph, err_buf, err_buf_size, topo_code);
     if (topo_code != PCG_OK)
@@ -111,31 +107,27 @@ PcgResultCode execute_graph(const Graph& graph,
     NodeOutputMap outputs;
     for (const auto& node_id : order) {
         const GraphNode* node = node_by_id[node_id];
-        nlohmann::json block_output;
-        PcgResultCode rc = PCG_OK;
-
-        if (node->type == "ParseConfig") {
-            rc = blocks::execute_parse_config(*node, seed, block_output, err_buf, err_buf_size);
-        } else if (node->type == "SpawnPoints") {
-            const nlohmann::json* config = find_single_input(graph, node_id, outputs);
-            if (!config)
-                return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "SpawnPoints missing config input");
-
-            rc = blocks::execute_spawn_points(*node, *config, seed, block_output, err_buf, err_buf_size);
-        } else if (node->type == "PlaceInScene") {
-            const nlohmann::json* points_payload = find_single_input(graph, node_id, outputs);
-            if (!points_payload)
-                return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "PlaceInScene missing points input");
-
-            rc = blocks::execute_place_in_scene(*node, *points_payload, block_output, err_buf, err_buf_size);
-        } else {
+        const elements::IPcgElement* element = elements::find_element(node->type);
+        if (!element)
             return fail(err_buf, err_buf_size, PCG_ERR_UNKNOWN_NODE, "Unknown node type");
-        }
 
+        PcgContext ctx;
+        ctx.graph_seed = seed;
+        ctx.graph = &graph;
+        ctx.node = node;
+        ctx.err_buf = err_buf;
+        ctx.err_buf_size = err_buf_size;
+
+        PcgResultCode input_code = PCG_OK;
+        gather_inputs(graph, node_id, outputs, ctx.inputs, err_buf, err_buf_size, input_code);
+        if (input_code != PCG_OK)
+            return input_code;
+
+        const PcgResultCode rc = element->execute(ctx);
         if (rc != PCG_OK)
             return rc;
 
-        outputs[node_id] = std::move(block_output);
+        outputs[node_id] = ctx.outputs.primary_json();
     }
 
     const GraphNode* sink = nullptr;

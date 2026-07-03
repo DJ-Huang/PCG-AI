@@ -32,6 +32,19 @@
   flex: 1;
 }
 
+.pcg-toolbar__file-input {
+  display: none;
+}
+
+.pcg-toolbar__import {
+  background: #5a4a78 !important;
+  border-color: #7b6b99 !important;
+}
+
+.pcg-toolbar__import:hover {
+  background: #7b6b99 !important;
+}
+
 .pcg-toolbar__export {
   background: #2d6a4f !important;
   border-color: #40916c !important;

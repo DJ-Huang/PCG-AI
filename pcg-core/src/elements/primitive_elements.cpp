@@ -1,0 +1,484 @@
+#include "elements/element_utils.hpp"
+#include "elements/pcg_element.hpp"
+#include "elements/primitive_elements.hpp"
+
+#include <cmath>
+#include <memory>
+#include <unordered_map>
+
+namespace pcg::internal::elements {
+namespace {
+
+int clamp_count(int value, int max_value = 10000)
+{
+    if (value < 0)
+        return 0;
+    if (value > max_value)
+        return max_value;
+    return value;
+}
+
+class CreatePointGridElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CreatePointGrid"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreatePointGrid missing node");
+
+        const int count_x = clamp_count(ctx.node->data.value("pointCountX", 10), 256);
+        const int count_y = clamp_count(ctx.node->data.value("pointCountY", 10), 256);
+        const double spacing = ctx.node->data.value("spacing", 2.0);
+        if (spacing < 0.0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreatePointGrid spacing must be >= 0");
+
+        data::PcgPointData points;
+        const double origin_x = -((count_x - 1) * spacing) * 0.5;
+        const double origin_z = -((count_y - 1) * spacing) * 0.5;
+        for (int y = 0; y < count_y; ++y) {
+            for (int x = 0; x < count_x; ++x) {
+                points.add_point(data::PcgPoint{
+                    origin_x + x * spacing,
+                    0.0,
+                    origin_z + y * spacing,
+                });
+            }
+        }
+
+        emit_points(ctx, std::move(points));
+        return PCG_OK;
+    }
+};
+
+class CreatePointsElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CreatePoints"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreatePoints missing node");
+
+        const double x = ctx.node->data.value("x", 0.0);
+        const double y = ctx.node->data.value("y", 0.0);
+        const double z = ctx.node->data.value("z", 0.0);
+        const int count = clamp_count(ctx.node->data.value("count", 1), 1000);
+        const double jitter = ctx.node->data.value("jitter", 0.0);
+
+        uint32_t rng = mix_seed(ctx.graph_seed, static_cast<int>(x * 17 + z * 31));
+        data::PcgPointData points;
+        for (int i = 0; i < count; ++i) {
+            const double jx = jitter > 0.0 ? ((next_rand(rng) % 1000) / 500.0 - 1.0) * jitter : 0.0;
+            const double jz = jitter > 0.0 ? ((next_rand(rng) % 1000) / 500.0 - 1.0) * jitter : 0.0;
+            points.add_point(data::PcgPoint{x + jx, y, z + jz});
+        }
+
+        emit_points(ctx, std::move(points));
+        return PCG_OK;
+    }
+};
+
+class SurfaceSamplerElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "SurfaceSampler"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SurfaceSampler missing node");
+
+        const int subdivisions = clamp_count(ctx.node->data.value("subdivisions", 8), 128);
+        const double extent = ctx.node->data.value("extent", 10.0);
+        if (extent < 0.0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SurfaceSampler extent must be >= 0");
+
+        data::PcgPointData points;
+        const double step = subdivisions <= 1 ? extent : extent / static_cast<double>(subdivisions - 1);
+        for (int iz = 0; iz < subdivisions; ++iz) {
+            for (int ix = 0; ix < subdivisions; ++ix) {
+                const double px = ix * step - extent * 0.5;
+                const double pz = iz * step - extent * 0.5;
+                points.add_point(data::PcgPoint{px, 0.0, pz});
+            }
+        }
+
+        emit_points(ctx, std::move(points));
+        return PCG_OK;
+    }
+};
+
+class CopyAttributesElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CopyAttributes"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CopyAttributes missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "CopyAttributes missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        data::PcgPointData points = parse_point_input(*input);
+        const auto names = parse_name_list(ctx.node->data, "attributeNames");
+        const nlohmann::json& source = ctx.node->data.contains("values") && ctx.node->data["values"].is_object()
+            ? ctx.node->data["values"]
+            : ctx.node->data;
+
+        for (auto& point : points.points_mut()) {
+            for (const auto& name : names) {
+                if (source.contains(name))
+                    point.attributes[name] = source[name];
+            }
+        }
+
+        emit_points(ctx, std::move(points));
+        return PCG_OK;
+    }
+};
+
+class DeleteAttributesElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "DeleteAttributes"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "DeleteAttributes missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "DeleteAttributes missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        data::PcgPointData points = parse_point_input(*input);
+        const auto names = parse_name_list(ctx.node->data, "attributeNames");
+
+        for (auto& point : points.points_mut()) {
+            for (const auto& name : names)
+                point.attributes.erase(name);
+        }
+
+        emit_points(ctx, std::move(points));
+        return PCG_OK;
+    }
+};
+
+class BreakAttributesElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "BreakAttributes"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "BreakAttributes missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "BreakAttributes missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        data::PcgPointData points = parse_point_input(*input);
+        const std::string name = ctx.node->data.value("attributeName", "");
+        if (name.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "BreakAttributes attributeName required");
+
+        nlohmann::json broken = nlohmann::json::array();
+        for (const auto& point : points.points()) {
+            if (point.attributes.contains(name))
+                broken.push_back(point.attributes[name]);
+            else
+                broken.push_back(nullptr);
+        }
+
+        points.metadata().set(name, broken);
+        emit_points(ctx, std::move(points));
+        return PCG_OK;
+    }
+};
+
+class DensityFilterElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "DensityFilter"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "DensityFilter missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "DensityFilter missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        const double density = ctx.node->data.value("density", 1.0);
+        if (density < 0.0 || density > 1.0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "DensityFilter density out of range");
+
+        data::PcgPointData source = parse_point_input(*input);
+        data::PcgPointData filtered;
+        uint32_t rng = mix_seed(ctx.graph_seed, 17);
+
+        for (const auto& point : source.points()) {
+            const double threshold = density >= 1.0 ? 0.0 : (next_rand(rng) % 10000) / 10000.0;
+            if (threshold <= density)
+                filtered.add_point(point);
+        }
+
+        emit_points(ctx, std::move(filtered));
+        return PCG_OK;
+    }
+};
+
+class AttributeFilterElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "AttributeFilter"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "AttributeFilter missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "AttributeFilter missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        const std::string name = ctx.node->data.value("attributeName", "");
+        const std::string match_value = ctx.node->data.value("matchValue", "");
+        if (name.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "AttributeFilter attributeName required");
+
+        data::PcgPointData source = parse_point_input(*input);
+        data::PcgPointData filtered;
+        for (const auto& point : source.points()) {
+            if (!point.attributes.contains(name))
+                continue;
+            if (point.attributes[name].is_string() && point.attributes[name].get<std::string>() == match_value)
+                filtered.add_point(point);
+            else if (point.attributes[name] == match_value)
+                filtered.add_point(point);
+        }
+
+        emit_points(ctx, std::move(filtered));
+        return PCG_OK;
+    }
+};
+
+class TransformPointsElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "TransformPoints"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformPoints missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "TransformPoints missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        const double tx = ctx.node->data.value("translateX", 0.0);
+        const double ty = ctx.node->data.value("translateY", 0.0);
+        const double tz = ctx.node->data.value("translateZ", 0.0);
+        const double scale = ctx.node->data.value("scale", 1.0);
+        const double rot_y = ctx.node->data.value("rotationY", 0.0) * (3.14159265358979323846 / 180.0);
+        const double cos_r = std::cos(rot_y);
+        const double sin_r = std::sin(rot_y);
+
+        data::PcgPointData source = parse_point_input(*input);
+        data::PcgPointData transformed;
+        for (const auto& point : source.points()) {
+            const double sx = point.x * scale;
+            const double sy = point.y * scale;
+            const double sz = point.z * scale;
+            transformed.add_point(data::PcgPoint{
+                sx * cos_r - sz * sin_r + tx,
+                sy + ty,
+                sx * sin_r + sz * cos_r + tz,
+                point.attributes,
+            });
+        }
+
+        emit_points(ctx, std::move(transformed));
+        return PCG_OK;
+    }
+};
+
+double sample_terrain_height(const nlohmann::json* terrain, double x, double z, int seed)
+{
+    if (terrain && terrain->contains("heights") && (*terrain)["heights"].is_array()) {
+        const auto& heights = (*terrain)["heights"];
+        const int grid = terrain->value("gridSize", 0);
+        const double cell = terrain->value("cellSize", 1.0);
+        if (grid > 0) {
+            const int ix = static_cast<int>(std::floor((x / cell) + grid * 0.5));
+            const int iz = static_cast<int>(std::floor((z / cell) + grid * 0.5));
+            if (ix >= 0 && ix < grid && iz >= 0 && iz < grid) {
+                const size_t index = static_cast<size_t>(iz * grid + ix);
+                if (index < heights.size())
+                    return heights[index].get<double>();
+            }
+        }
+    }
+
+    return simple_noise(x, z, seed);
+}
+
+class ProjectPointsElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "ProjectPoints"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ProjectPoints missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "ProjectPoints missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        const nlohmann::json* terrain = ctx.inputs.find_json("terrain");
+        const bool use_terrain = ctx.node->data.value("useTerrain", terrain != nullptr);
+        const double base_y = ctx.node->data.value("baseY", 0.0);
+
+        data::PcgPointData source = parse_point_input(*input);
+        data::PcgPointData projected;
+        for (const auto& point : source.points()) {
+            const double y = use_terrain
+                ? sample_terrain_height(terrain, point.x, point.z, ctx.graph_seed)
+                : base_y;
+            projected.add_point(data::PcgPoint{point.x, y, point.z, point.attributes});
+        }
+
+        emit_points(ctx, std::move(projected));
+        return PCG_OK;
+    }
+};
+
+class GetTerrainDataElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "GetTerrainData"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GetTerrainData missing node");
+
+        const int grid = clamp_count(ctx.node->data.value("gridSize", 32), 256);
+        const double cell = ctx.node->data.value("cellSize", 2.0);
+        const double amplitude = ctx.node->data.value("amplitude", 5.0);
+        const int seed = ctx.node->data.value("seed", ctx.graph_seed);
+
+        nlohmann::json heights = nlohmann::json::array();
+        for (int z = 0; z < grid; ++z) {
+            for (int x = 0; x < grid; ++x) {
+                const double wx = (x - grid * 0.5) * cell;
+                const double wz = (z - grid * 0.5) * cell;
+                heights.push_back(simple_noise(wx, wz, seed) * amplitude);
+            }
+        }
+
+        ctx.outputs.add_param("out", data::PcgParamData(nlohmann::json{
+            {"gridSize", grid},
+            {"cellSize", cell},
+            {"amplitude", amplitude},
+            {"seed", seed},
+            {"heights", std::move(heights)},
+        }));
+        return PCG_OK;
+    }
+};
+
+class SampleSurfaceElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "SampleSurface"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SampleSurface missing node");
+
+        const nlohmann::json* points_json = require_input_json(ctx, "in", "SampleSurface missing points input");
+        if (!points_json)
+            return PCG_ERR_EXECUTION;
+
+        const nlohmann::json* terrain = require_input_json(ctx, "terrain", "SampleSurface missing terrain input");
+        if (!terrain)
+            return PCG_ERR_EXECUTION;
+
+        const int seed = terrain->value("seed", ctx.graph_seed);
+        data::PcgPointData source = parse_point_input(*points_json);
+        data::PcgPointData sampled;
+        for (const auto& point : source.points()) {
+            sampled.add_point(data::PcgPoint{
+                point.x,
+                sample_terrain_height(terrain, point.x, point.z, seed),
+                point.z,
+                point.attributes,
+            });
+        }
+
+        emit_points(ctx, std::move(sampled));
+        return PCG_OK;
+    }
+};
+
+class StaticMeshSpawnerElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "StaticMeshSpawner"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing node");
+
+        const nlohmann::json* input = require_input_json(ctx, "in", "StaticMeshSpawner missing points input");
+        if (!input)
+            return PCG_ERR_EXECUTION;
+
+        if (!input->contains("points") || !(*input)["points"].is_array())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing points input");
+
+        const std::string prefab = ctx.node->data.value("prefab", "");
+        const std::string mesh = ctx.node->data.value("mesh", "");
+        const double scale = ctx.node->data.value("scale", 1.0);
+
+        data::PcgPointData points = parse_point_input(*input);
+        for (auto& point : points.points_mut()) {
+            if (!prefab.empty())
+                point.attributes["prefab"] = prefab;
+            if (!mesh.empty())
+                point.attributes["mesh"] = mesh;
+            point.attributes["scale"] = scale;
+        }
+
+        nlohmann::json out = point_data_to_json(points);
+        out["status"] = "ok";
+        out["prefab"] = prefab;
+        out["mesh"] = mesh;
+        out["scale"] = scale;
+        out["pointCount"] = out["points"].size();
+        ctx.outputs.add("out", data::PcgDataType::Point, std::move(out));
+        return PCG_OK;
+    }
+};
+
+} // namespace
+
+void register_phase41_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
+{
+    map.emplace("CreatePointGrid", std::make_unique<CreatePointGridElement>());
+    map.emplace("CreatePoints", std::make_unique<CreatePointsElement>());
+    map.emplace("SurfaceSampler", std::make_unique<SurfaceSamplerElement>());
+    map.emplace("CopyAttributes", std::make_unique<CopyAttributesElement>());
+    map.emplace("DeleteAttributes", std::make_unique<DeleteAttributesElement>());
+    map.emplace("BreakAttributes", std::make_unique<BreakAttributesElement>());
+    map.emplace("DensityFilter", std::make_unique<DensityFilterElement>());
+    map.emplace("AttributeFilter", std::make_unique<AttributeFilterElement>());
+    map.emplace("TransformPoints", std::make_unique<TransformPointsElement>());
+    map.emplace("ProjectPoints", std::make_unique<ProjectPointsElement>());
+    map.emplace("GetTerrainData", std::make_unique<GetTerrainDataElement>());
+    map.emplace("SampleSurface", std::make_unique<SampleSurfaceElement>());
+    map.emplace("StaticMeshSpawner", std::make_unique<StaticMeshSpawnerElement>());
+}
+
+} // namespace pcg::internal::elements

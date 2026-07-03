@@ -85,5 +85,13 @@ int main()
     assert(std::strstr(out, "\"prefab\":\"Tree\"") != nullptr || std::strstr(out, "\"prefab\": \"Tree\"") != nullptr);
     std::printf("PASS: mini graph prefab preserved\n");
 
+    const std::string roundtrip_graph = read_file("fixtures/roundtrip.pcg.json");
+    assert(!roundtrip_graph.empty());
+    expect_code(pcg_validate_graph(roundtrip_graph.c_str(), err, sizeof(err)), PCG_OK, "roundtrip graph validate");
+    expect_code(pcg_execute_graph(roundtrip_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "roundtrip graph execute");
+    assert(std::strstr(out, "\"prefab\":\"Rock\"") != nullptr || std::strstr(out, "\"prefab\": \"Rock\"") != nullptr);
+    assert(std::strstr(out, "\"pointCount\"") != nullptr);
+    std::printf("PASS: Unity/Web round-trip fixture executes\n");
+
     return 0;
 }

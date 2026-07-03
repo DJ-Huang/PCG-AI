@@ -26,7 +26,13 @@ set(PCG_CORE_SOURCES
     src/pcg_core.cpp
     src/graph_parser.cpp
     src/graph_executor.cpp
-    src/blocks/blocks.cpp
+    src/data/pcg_metadata.cpp
+    src/data/pcg_point_data.cpp
+    src/data/pcg_param_data.cpp
+    src/data/pcg_data_collection.cpp
+    src/elements/element_registry.cpp
+    src/elements/element_utils.cpp
+    src/elements/primitive_elements.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
@@ -40,6 +46,8 @@ set_target_properties(PcgCore PROPERTIES
 )
 if(MSVC)
     target_compile_options(PcgCore PRIVATE /W4)
+elseif(APPLE)
+    target_compile_options(PcgCore PRIVATE -Wall -Wextra -fvisibility=hidden)
 endif()
 
 # ── Static library (LIB) — for IL2CPP Player static linking ──
@@ -61,4 +69,13 @@ enable_testing()
 add_executable(test_executor tests/test_executor.cpp)
 target_link_libraries(test_executor PRIVATE PcgCoreStatic)
 
-add_test(NAME test_executor COMMAND test_executor)
+add_executable(test_data tests/test_data.cpp)
+target_link_libraries(test_data PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_data PRIVATE src)
+
+add_executable(test_phase41 tests/test_phase41.cpp)
+target_link_libraries(test_phase41 PRIVATE PcgCoreStatic)
+
+add_test(NAME test_executor COMMAND test_executor WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+add_test(NAME test_data COMMAND test_data)
+add_test(NAME test_phase41 COMMAND test_phase41 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)

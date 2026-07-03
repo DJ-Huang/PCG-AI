@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState, type ChangeEvent } from 'react';
 import {
   ReactFlow,
   Background,
@@ -19,6 +19,7 @@ import SpawnPointsNode from './nodes/SpawnPointsNode';
 import PlaceInSceneNode from './nodes/PlaceInSceneNode';
 import { defaultData, type NodeType as GraphNodeType } from './graphSchema';
 import { exportGraph, downloadGraph, exportToSchema } from './exportGraph';
+import { importGraphFromFile, syncNodeCounterFromNodes } from './importGraph';
 import { isValidConnection } from './connectionValidation';
 import './App.css';
 
@@ -60,6 +61,7 @@ function PcgEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [status, setStatus] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateConnection = useCallback(
     (conn: Connection | Edge) => isValidConnection(conn, nodes, edges),
@@ -101,6 +103,27 @@ function PcgEditor() {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    const result = await importGraphFromFile(file);
+    if (!result.ok) {
+      setStatus(`Import failed: ${result.error}`);
+      return;
+    }
+
+    nodeCounter = syncNodeCounterFromNodes(result.nodes);
+    setNodes(result.nodes);
+    setEdges(result.edges);
+    setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges)`);
+  };
+
   return (
     <div className="pcg-app">
       <div className="pcg-toolbar">
@@ -108,6 +131,14 @@ function PcgEditor() {
         <button type="button" onClick={() => addNode('SpawnPoints')}>+ SpawnPoints</button>
         <button type="button" onClick={() => addNode('PlaceInScene')}>+ PlaceInScene</button>
         <span className="pcg-toolbar__spacer" />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="pcg-toolbar__file-input"
+          onChange={handleImportFile}
+        />
+        <button type="button" className="pcg-toolbar__import" onClick={handleImportClick}>Import JSON</button>
         <button type="button" className="pcg-toolbar__export" onClick={handleExport}>Export JSON</button>
         <button type="button" className="pcg-toolbar__unity" onClick={handleSendToUnity}>Send to Unity</button>
         {status && <span className="pcg-toolbar__status">{status}</span>}

@@ -26,7 +26,19 @@ namespace DJTechEditor.PCG
                 return false;
             }
 
-            var result = PcgGraphLoader.LoadAndExecute(path, seed);
+            var json = File.ReadAllText(path);
+            return RunJsonAndUpdatePreview(json, seed);
+        }
+
+        public static bool RunJsonAndUpdatePreview(string json, int seed = 42)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                Debug.LogError("[PCG] Graph JSON is empty.");
+                return false;
+            }
+
+            var result = PcgGraphLoader.Execute(json, seed);
             if (result == null)
                 return false;
 

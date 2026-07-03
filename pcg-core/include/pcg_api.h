@@ -10,8 +10,14 @@
     /* Consuming the DLL — import symbols */
     #define PCG_API __declspec(dllimport)
   #endif
+#elif defined(__APPLE__) && !defined(PCG_STATIC)
+  #ifdef PCG_EXPORTS
+    #define PCG_API __attribute__((visibility("default")))
+  #else
+    #define PCG_API
+  #endif
 #else
-  /* Static build or non-Windows — no decoration */
+  /* Static build or other platforms — no decoration */
   #define PCG_API
 #endif
 

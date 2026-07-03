@@ -31,7 +31,7 @@ Web React Flow 编辑器 → Graph JSON → C++ 核心 → Unity 场景预览。
 | **CMake** | 3.20+ | 与 VS 2022 配合 |
 | **Unity** | 2022.3+ | 已用 Tuanjie 1.6.x 验证；**建议 Windows**（原生插件为 Win64） |
 
-> **macOS / Linux 用户**：可以正常启动 **Web 编辑器** 编辑并导出 JSON；C++ 编译与 Unity 原生插件联调需在 **Windows** 环境完成。
+> **macOS 用户**：可编译 `libPcgCore.dylib` 在 Unity Editor（Apple Silicon）联调 Run / 预览；IL2CPP Player 仍依赖 Windows 静态链。
 
 ---
 
@@ -45,8 +45,10 @@ PCG-AI/
 │   ├── tests/               冒烟测试
 │   └── build/               CMake 输出（gitignore）
 │
-├── schema/                Graph JSON v1 契约（Web / C++ / Unity 共用）
-│   ├── graph-schema.json    JSON Schema
+├── schema/                Graph JSON 契约（Web / C++ / Unity 共用）
+│   ├── graph-schema.json    JSON Schema v1
+│   ├── graph-schema-v2.json JSON Schema v2（UE PCG 对齐，Phase 4.0）
+│   ├── node-manifest.json   节点 Pin/参数定义（编辑器消费）
 │   ├── example.pcg.json     示例图
 │   └── editor-export.pcg.json   Web → Unity 热更新目标（运行后生成）
 │
@@ -122,6 +124,7 @@ npm run dev
 | **+ PlaceInScene** | 添加场景放置节点（`prefab`、`scale`） |
 | 拖拽连线 | 按节点 handle 连接；非法连接会被拒绝 |
 | **Export JSON** | 下载 `graph.pcg.json` 到本机（不依赖 dev server 写盘） |
+| **Import JSON** | 从本机加载 `.pcg.json`（Unity Graph **Export…** 或 **Export JSON** 产物） |
 | **Send to Unity** | 将当前图写入 `schema/editor-export.pcg.json`（**必须** `npm run dev` 运行中） |
 
 默认画布已包含一条三节点流水线：`ParseConfig → SpawnPoints → PlaceInScene`。
@@ -169,7 +172,9 @@ npm run lint     # oxlint 检查
 
 ---
 
-## C++ 核心编译（Windows）
+## C++ 核心编译
+
+### Windows（x64）
 
 原生库为 **Windows x64**；Unity Editor 使用 `PcgCore.dll`，IL2CPP Player 使用静态链接的 `PcgCore.lib`。
 
@@ -206,6 +211,25 @@ Copy-Item pcg-core\build\Release\PcgCore.dll Unity\Assets\PcgPlugin\Plugins\x86_
 |------|----------|----------------|
 | Unity Editor | `PcgCore.dll` | Editor: 开，Standalone: 关 |
 | IL2CPP Player | `PcgCore.lib` | Editor: 关，Standalone Win64: 开 |
+
+### macOS（Apple Silicon Editor）
+
+Unity Editor 使用 `libPcgCore.dylib`（`Plugins/macOS/`）；IL2CPP macOS Player 尚未接入。
+
+**前置**：Xcode Command Line Tools + CMake 3.20+（`brew install cmake`）。
+
+在仓库根目录：
+
+```bash
+./scripts/build-pcg-core.sh --copy-to-unity --run-tests
+```
+
+产物复制到 `Unity/Assets/PcgPlugin/Plugins/macOS/`。重启 Unity 后 **PCG → Print PcgCore Version** 应输出 `pcg-core 0.1.0`。
+
+| 模式 | 原生产物 | PluginImporter |
+|------|----------|----------------|
+| Unity Editor (macOS) | `libPcgCore.dylib` | Editor ARM64: 开 |
+| IL2CPP Player (macOS) | 未接入 | — |
 
 ---
 
@@ -291,7 +315,7 @@ npm run dev
 
 | 文件 | 用途 |
 |------|------|
-| `examples/demo.pcg.json` | M3 标准示例（可分发给 Player） |
+| `examples/phase41-demo.pcg.json` | Phase 4.1 地形采样 + 点阵 + Spawner 流水线 |
 | `schema/example.pcg.json` | 与 schema 对齐的参考图 |
 | `schema/editor-export.pcg.json` | Web **Send to Unity** 写入的热更新目标 |
 | `Unity/Assets/StreamingAssets/pcg/demo.pcg.json` | Player 运行时默认输入 |
@@ -334,7 +358,8 @@ Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 | 资源 | 说明 |
 |------|------|
 | `.github/workflows/pcg-core-ci.yml` | Windows `windows-latest`：Release 构建 + `ctest` |
-| `scripts/build-pcg-core.ps1` | 配置、编译、可选测试与拷贝到 Unity |
+| `scripts/build-pcg-core.ps1` | Windows：配置、编译、可选测试与拷贝到 Unity |
+| `scripts/build-pcg-core.sh` | macOS：配置、编译、可选测试与拷贝到 Unity |
 | `scripts/verify-release-package.ps1` | IL2CPP 构建产物校验 |
 
 ---
@@ -345,4 +370,6 @@ Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 |--------|----------|
 | **M0** | Unity：**PCG → Print PcgCore Version** → Console 输出 `pcg-core 0.1.0` |
 | **M2** | Web **Send to Unity** → Unity **Reload Watched Graph** → Scene Gizmo 更新 |
+| **M2.5** | Unity **Graph Editor** Run + JSON↔Web round-trip + `ctest` 绿 |
 | **M3** | IL2CPP Windows 构建 + `verify-release-package.ps1` 通过 + Player 日志正常 |
+| **M4** | Phase 4.1：13 UE 原语节点 + manifest 驱动 Unity Graph + `ctest` 绿 |

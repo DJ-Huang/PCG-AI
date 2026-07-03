@@ -18,6 +18,8 @@ struct GraphEdge {
     std::string id;
     std::string source;
     std::string target;
+    std::string source_handle = "out";
+    std::string target_handle = "in";
 };
 
 struct Graph {

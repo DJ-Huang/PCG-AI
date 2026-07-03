@@ -10,6 +10,8 @@ CODELY.md
 
 # ── pcg-core C++ build artifacts ──
 pcg-core/build/
+pcg-core/build-manual/
+pcg-core/.deps/
 
 # ── Web editor ──
 web/pcg-editor/node_modules/
