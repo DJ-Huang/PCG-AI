@@ -2,6 +2,7 @@
 
 #include "data/pcg_context.hpp"
 #include "data/pcg_point_data.hpp"
+#include "data/pcg_mesh_data.hpp"
 #include "data/pcg_spline_data.hpp"
 #include "pcg_api.h"
 
@@ -19,9 +20,11 @@ const nlohmann::json* require_input_json(PcgContext& ctx, const char* pin, const
 
 data::PcgPointData parse_point_input(const nlohmann::json& json);
 data::PcgSplineData parse_spline_input(const nlohmann::json& json);
+data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
 nlohmann::json point_data_to_json(const data::PcgPointData& data);
 void emit_points(PcgContext& ctx, data::PcgPointData data);
 void emit_splines(PcgContext& ctx, data::PcgSplineData data);
+void emit_mesh(PcgContext& ctx, data::PcgMeshData data);
 
 uint32_t mix_seed(int a, int b);
 uint32_t next_rand(uint32_t& state);

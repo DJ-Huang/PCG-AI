@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": { "width": 3.0, "height": 1.5, "depth": 2.0 }
+    },
+    {
+      "id": "subdiv",
+      "type": "SubdivideMesh",
+      "position": { "x": 320, "y": 0 },
+      "data": { "levels": 1 }
+    },
+    {
+      "id": "bevel",
+      "type": "BevelMesh",
+      "position": { "x": 640, "y": 0 },
+      "data": { "method": "edge", "amount": 0.08, "segments": 3 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "box",
+      "target": "subdiv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e2",
+      "source": "subdiv",
+      "target": "bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

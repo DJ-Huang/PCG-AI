@@ -30,6 +30,11 @@ data::PcgSplineData parse_spline_input(const nlohmann::json& json)
     return data::PcgSplineData::from_json(json);
 }
 
+data::PcgMeshData parse_mesh_input(const nlohmann::json& json)
+{
+    return data::PcgMeshData::from_json(json);
+}
+
 nlohmann::json point_data_to_json(const data::PcgPointData& data)
 {
     return data.to_json();
@@ -43,6 +48,11 @@ void emit_points(PcgContext& ctx, data::PcgPointData data)
 void emit_splines(PcgContext& ctx, data::PcgSplineData data)
 {
     ctx.outputs.add_splines("out", std::move(data));
+}
+
+void emit_mesh(PcgContext& ctx, data::PcgMeshData data)
+{
+    ctx.outputs.add_mesh("out", std::move(data));
 }
 
 uint32_t mix_seed(int a, int b)

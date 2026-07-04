@@ -225,6 +225,9 @@ namespace DJTechEditor.PCG.Graph
                 case "boolean":
                     sb.Append(Convert.ToBoolean(value) ? "true" : "false");
                     break;
+                case "enum":
+                    sb.Append(JsonString(value?.ToString() ?? ""));
+                    break;
                 default:
                     sb.Append(JsonString(value?.ToString() ?? ""));
                     break;

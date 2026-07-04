@@ -22,6 +22,11 @@ void PcgDataCollection::add_splines(const std::string& tag, PcgSplineData data)
     add(tag, PcgDataType::Spline, data.to_json());
 }
 
+void PcgDataCollection::add_mesh(const std::string& tag, PcgMeshData data)
+{
+    add(tag, PcgDataType::Mesh, data.to_json());
+}
+
 const PcgTaggedData* PcgDataCollection::find(const std::string& tag) const
 {
     for (const auto& item : items_) {

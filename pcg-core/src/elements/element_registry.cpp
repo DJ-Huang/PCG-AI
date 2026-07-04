@@ -1,5 +1,6 @@
 #include "elements/pcg_element.hpp"
 #include "elements/primitive_elements.hpp"
+#include "elements/mesh_elements.hpp"
 #include "elements/structural_elements.hpp"
 
 #include "internal/error_util.hpp"
@@ -22,7 +23,7 @@ class ParseConfigElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "ParseConfig"; }
 
-    PcgResultCode execute(PcgContext& ctx) const override
+    PcgResultCode execute(PcgContext& ctx) const override   
     {
         if (!ctx.node)
             return fail(ctx, PCG_ERR_EXECUTION, "ParseConfig missing node");
@@ -142,6 +143,7 @@ void register_builtin_elements()
     map.emplace("PlaceInScene", std::make_unique<PlaceInSceneElement>());
     register_phase41_elements(map);
     register_phase42_elements(map);
+    register_mesh_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

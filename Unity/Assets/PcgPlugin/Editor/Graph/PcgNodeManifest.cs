@@ -14,10 +14,17 @@ namespace DJTechEditor.PCG.Graph
         public string pinType;
     }
 
+    public class ManifestPropertyOption
+    {
+        public string value;
+        public string label;
+    }
+
     public class ManifestPropertyDef
     {
         public string type;
         public object defaultValue;
+        public List<ManifestPropertyOption> options = new();
     }
 
     public class ManifestNodeDef
@@ -171,11 +178,26 @@ namespace DJTechEditor.PCG.Graph
                 {
                     if (value is Dictionary<string, object> propObj)
                     {
-                        def.properties[key] = new ManifestPropertyDef
+                        var propDef = new ManifestPropertyDef
                         {
                             type = GetString(propObj, "type"),
                             defaultValue = ParseDefault(propObj),
                         };
+                        if (propObj.TryGetValue("options", out var optionsObj) &&
+                            optionsObj is List<object> optionsList)
+                        {
+                            foreach (var optionObj in optionsList)
+                            {
+                                if (optionObj is not Dictionary<string, object> optionDict)
+                                    continue;
+                                propDef.options.Add(new ManifestPropertyOption
+                                {
+                                    value = GetString(optionDict, "value"),
+                                    label = GetString(optionDict, "label", GetString(optionDict, "value")),
+                                });
+                            }
+                        }
+                        def.properties[key] = propDef;
                     }
                 }
             }
@@ -195,13 +217,14 @@ namespace DJTechEditor.PCG.Graph
             var type = GetString(prop, "type");
             if (!prop.TryGetValue("default", out var value) || value == null)
             {
-                return type switch
-                {
-                    "integer" => 0,
-                    "number" => 0f,
-                    "boolean" => false,
-                    _ => "",
-                };
+            return type switch
+            {
+                "integer" => 0,
+                "number" => 0f,
+                "boolean" => false,
+                "enum" => GetString(prop, "default", ""),
+                _ => "",
+            };
             }
 
             return type switch
@@ -209,6 +232,7 @@ namespace DJTechEditor.PCG.Graph
                 "integer" => Convert.ToInt32(value, CultureInfo.InvariantCulture),
                 "number" => Convert.ToSingle(value, CultureInfo.InvariantCulture),
                 "boolean" => Convert.ToBoolean(value, CultureInfo.InvariantCulture),
+                "enum" => value.ToString(),
                 _ => value.ToString(),
             };
         }

@@ -11,6 +11,7 @@ namespace DJTechEditor.PCG.Graph
     {
         private readonly ManifestNodeDef _def;
         private readonly Dictionary<string, VisualElement> _fields = new();
+        private readonly Dictionary<string, string> _enumValues = new();
         private readonly Dictionary<string, Port> _inputPorts = new();
 
         public override string NodeType => _def.type;
@@ -61,6 +62,7 @@ namespace DJTechEditor.PCG.Graph
                     "integer" => CreateIntField(key, prop.defaultValue),
                     "number" => CreateFloatField(key, prop.defaultValue),
                     "boolean" => CreateToggleField(key, prop.defaultValue),
+                    "enum" => CreateEnumField(key, prop),
                     _ => CreateTextField(key, prop.defaultValue),
                 };
                 _fields[key] = field;
@@ -89,6 +91,39 @@ namespace DJTechEditor.PCG.Graph
             return field;
         }
 
+        private VisualElement CreateEnumField(string key, ManifestPropertyDef prop)
+        {
+            var choices = new List<string>();
+            var labels = new List<string>();
+            var defaultValue = prop.defaultValue?.ToString() ?? "";
+            var selectedIndex = 0;
+
+            for (var i = 0; i < prop.options.Count; i++)
+            {
+                var option = prop.options[i];
+                choices.Add(option.value);
+                labels.Add(string.IsNullOrEmpty(option.label) ? option.value : option.label);
+                if (option.value == defaultValue)
+                    selectedIndex = i;
+            }
+
+            if (choices.Count == 0)
+            {
+                choices.Add(defaultValue);
+                labels.Add(defaultValue);
+            }
+
+            var popup = new PopupField<string>(key, labels, selectedIndex);
+            popup.RegisterValueChangedCallback(evt =>
+            {
+                var index = labels.IndexOf(evt.newValue);
+                if (index >= 0 && index < choices.Count)
+                    _enumValues[key] = choices[index];
+            });
+            _enumValues[key] = choices[Mathf.Clamp(selectedIndex, 0, choices.Count - 1)];
+            return popup;
+        }
+
         private TextField CreateTextField(string key, object defaultValue)
         {
             var field = new TextField(key) { value = defaultValue?.ToString() ?? "" };
@@ -102,6 +137,31 @@ namespace DJTechEditor.PCG.Graph
             port.portName = string.IsNullOrEmpty(label) ? portName : label;
             port.userData = portName;
             return port;
+        }
+
+        private void SetEnumPopup(string key, PopupField<string> popup, string value)
+        {
+            if (!_def.properties.TryGetValue(key, out var prop) || prop.options.Count == 0)
+            {
+                if (!string.IsNullOrEmpty(value))
+                    popup.SetValueWithoutNotify(value);
+                return;
+            }
+
+            var labels = new List<string>();
+            var choices = new List<string>();
+            var selectedIndex = 0;
+            for (var i = 0; i < prop.options.Count; i++)
+            {
+                var option = prop.options[i];
+                choices.Add(option.value);
+                labels.Add(string.IsNullOrEmpty(option.label) ? option.value : option.label);
+                if (option.value == value)
+                    selectedIndex = i;
+            }
+
+            popup.SetValueWithoutNotify(labels[selectedIndex]);
+            _enumValues[key] = choices[selectedIndex];
         }
 
         public override void ApplyData(PcgNodeData data)
@@ -119,6 +179,9 @@ namespace DJTechEditor.PCG.Graph
                         break;
                     case Toggle toggle:
                         toggle.SetValueWithoutNotify(Convert.ToBoolean(value ?? false));
+                        break;
+                    case PopupField<string> popup:
+                        SetEnumPopup(key, popup, value?.ToString());
                         break;
                     case TextField textField:
                         textField.SetValueWithoutNotify(value?.ToString() ?? "");
@@ -142,6 +205,10 @@ namespace DJTechEditor.PCG.Graph
                         break;
                     case Toggle toggle:
                         data.SetRaw(key, toggle.value);
+                        break;
+                    case PopupField<string>:
+                        if (_enumValues.TryGetValue(key, out var enumValue))
+                            data.SetRaw(key, enumValue);
                         break;
                     case TextField textField:
                         data.SetRaw(key, textField.value ?? "");

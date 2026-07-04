@@ -1,0 +1,351 @@
+#include "pcg_api.h"
+
+#include "data/pcg_mesh_data.hpp"
+#include "elements/mesh_algorithms.hpp"
+
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
+namespace {
+
+void expect_code(PcgResultCode actual, PcgResultCode expected, const char* label)
+{
+    if (actual != expected) {
+        std::printf("FAIL: %s expected %d got %d\n", label, static_cast<int>(expected), static_cast<int>(actual));
+        std::exit(1);
+    }
+}
+
+std::string read_file(const char* path)
+{
+    std::ifstream file(path);
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+bool expect_outward_normals(const pcg::internal::data::PcgMeshData& mesh)
+{
+    const auto& verts = mesh.vertices();
+    const auto& tris = mesh.triangles();
+    if (tris.size() < 3)
+        return false;
+
+    for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+        const int ia = tris[i];
+        const int ib = tris[i + 1];
+        const int ic = tris[i + 2];
+        if (ia < 0 || ib < 0 || ic < 0 || static_cast<size_t>(ia) >= verts.size() ||
+            static_cast<size_t>(ib) >= verts.size() || static_cast<size_t>(ic) >= verts.size())
+            return false;
+
+        const auto& a = verts[static_cast<size_t>(ia)];
+        const auto& b = verts[static_cast<size_t>(ib)];
+        const auto& c = verts[static_cast<size_t>(ic)];
+        const double abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
+        const double acx = c.x - a.x, acy = c.y - a.y, acz = c.z - a.z;
+        const double nx = aby * acz - abz * acy;
+        const double ny = abz * acx - abx * acz;
+        const double nz = abx * acy - aby * acx;
+        const double cx = (a.x + b.x + c.x) / 3.0;
+        const double cy = (a.y + b.y + c.y) / 3.0;
+        const double cz = (a.z + b.z + c.z) / 3.0;
+        if (nx * cx + ny * cy + nz * cz <= -1e-9)
+            return false;
+    }
+    return true;
+}
+
+bool expect_coincident_vertices_stay_welded(const pcg::internal::data::PcgMeshData& before,
+                                            const pcg::internal::data::PcgMeshData& after,
+                                            double eps = 1e-5)
+{
+    if (before.vertices().size() != after.vertices().size())
+        return false;
+
+    const auto& before_verts = before.vertices();
+    const auto& after_verts = after.vertices();
+    std::unordered_map<std::string, std::vector<size_t>> groups;
+    for (size_t i = 0; i < before_verts.size(); ++i) {
+        const auto& v = before_verts[i];
+        const auto quantize = [eps](double value) -> int64_t {
+            return static_cast<int64_t>(std::llround(value / eps));
+        };
+        const std::string key = std::to_string(quantize(v.x)) + ',' + std::to_string(quantize(v.y)) +
+                                ',' + std::to_string(quantize(v.z));
+        groups[key].push_back(i);
+    }
+
+    for (const auto& entry : groups) {
+        if (entry.second.size() <= 1)
+            continue;
+
+        const auto& ref = after_verts[entry.second.front()];
+        for (size_t i = 1; i < entry.second.size(); ++i) {
+            const auto& v = after_verts[entry.second[i]];
+            if (std::abs(v.x - ref.x) > eps || std::abs(v.y - ref.y) > eps || std::abs(v.z - ref.z) > eps)
+                return false;
+        }
+    }
+    return true;
+}
+
+bool expect_welded_coincident_vertices(const pcg::internal::data::PcgMeshData& mesh, double eps = 1e-5)
+{
+    std::unordered_map<std::string, std::vector<size_t>> groups;
+    const auto& verts = mesh.vertices();
+    for (size_t i = 0; i < verts.size(); ++i) {
+        const auto& v = verts[i];
+        const auto quantize = [eps](double value) -> int64_t {
+            return static_cast<int64_t>(std::llround(value / eps));
+        };
+        const std::string key = std::to_string(quantize(v.x)) + ',' + std::to_string(quantize(v.y)) +
+                                ',' + std::to_string(quantize(v.z));
+        groups[key].push_back(i);
+    }
+
+    for (const auto& entry : groups) {
+        if (entry.second.size() <= 1)
+            continue;
+        const auto& ref = verts[entry.second.front()];
+        for (size_t i = 1; i < entry.second.size(); ++i) {
+            const auto& v = verts[entry.second[i]];
+            if (std::abs(v.x - ref.x) > eps || std::abs(v.y - ref.y) > eps || std::abs(v.z - ref.z) > eps)
+                return false;
+        }
+    }
+    return true;
+}
+
+bool expect_no_duplicate_geo_triangles(const pcg::internal::data::PcgMeshData& mesh, double eps = 1e-5)
+{
+    const auto& verts = mesh.vertices();
+    const auto& tris = mesh.triangles();
+    auto pk = [eps](double x, double y, double z) {
+        const auto quantize = [eps](double value) -> int64_t {
+            return static_cast<int64_t>(std::llround(value / eps));
+        };
+        return std::to_string(quantize(x)) + ',' + std::to_string(quantize(y)) + ',' +
+               std::to_string(quantize(z));
+    };
+
+    std::unordered_map<std::string, int> geo_count;
+    for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+        std::array<std::string, 3> keys = {
+            pk(verts[static_cast<size_t>(tris[i])].x, verts[static_cast<size_t>(tris[i])].y,
+               verts[static_cast<size_t>(tris[i])].z),
+            pk(verts[static_cast<size_t>(tris[i + 1])].x, verts[static_cast<size_t>(tris[i + 1])].y,
+               verts[static_cast<size_t>(tris[i + 1])].z),
+            pk(verts[static_cast<size_t>(tris[i + 2])].x, verts[static_cast<size_t>(tris[i + 2])].y,
+               verts[static_cast<size_t>(tris[i + 2])].z),
+        };
+        std::sort(keys.begin(), keys.end());
+        const std::string geo_key = keys[0] + '|' + keys[1] + '|' + keys[2];
+        if (++geo_count[geo_key] > 1)
+            return false;
+    }
+    return true;
+}
+
+int count_cross_face_triangles(const pcg::internal::data::PcgMeshData& mesh, double eps = 1e-5)
+{
+    const auto& verts = mesh.vertices();
+    const auto& tris = mesh.triangles();
+    int count = 0;
+    for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+        const auto& a = verts[static_cast<size_t>(tris[i])];
+        const auto& b = verts[static_cast<size_t>(tris[i + 1])];
+        const auto& c = verts[static_cast<size_t>(tris[i + 2])];
+        const bool x_same = std::abs(a.x - b.x) < eps && std::abs(b.x - c.x) < eps;
+        const bool y_same = std::abs(a.y - b.y) < eps && std::abs(b.y - c.y) < eps;
+        const bool z_same = std::abs(a.z - b.z) < eps && std::abs(b.z - c.z) < eps;
+        if (!x_same && !y_same && !z_same)
+            ++count;
+    }
+    return count;
+}
+
+bool expect_closed_mesh(const pcg::internal::data::PcgMeshData& mesh)
+{
+    // A closed manifold mesh has every edge shared by exactly 2 triangles.
+    const auto& tris = mesh.triangles();
+    auto ek = [](int a, int b) -> int64_t {
+        return a < b ? static_cast<int64_t>(a) * 100000 + b
+                     : static_cast<int64_t>(b) * 100000 + a;
+    };
+    std::unordered_map<int64_t, int> edge_count;
+    for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+        const int t0 = tris[i], t1 = tris[i + 1], t2 = tris[i + 2];
+        edge_count[ek(t0, t1)]++;
+        edge_count[ek(t1, t2)]++;
+        edge_count[ek(t2, t0)]++;
+    }
+    for (const auto& [key, count] : edge_count) {
+        if (count != 2)
+            return false;
+    }
+    return true;
+}
+
+} // namespace
+
+int main()
+{
+    char err[512] = {};
+    char out[65536] = {};
+
+    const char* mesh_pipeline = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":0},
+         "data": {"width": 2.0, "height": 2.0, "depth": 2.0}},
+        {"id": "subdiv", "type": "SubdivideMesh", "position": {"x":0,"y":0},
+         "data": {"levels": 1}},
+        {"id": "bevel", "type": "BevelMesh", "position": {"x":0,"y":0},
+         "data": {"method": "edge", "amount": 0.05, "segments": 2}}
+      ],
+      "edges": [
+        {"id": "e1", "source": "box", "target": "subdiv", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e2", "source": "subdiv", "target": "bevel", "sourceHandle": "out", "targetHandle": "in"}
+      ]
+    })";
+
+    expect_code(pcg_validate_graph(mesh_pipeline, err, sizeof(err)), PCG_OK, "mesh pipeline validate");
+    expect_code(pcg_execute_graph(mesh_pipeline, 42, out, sizeof(out)), PCG_OK, "mesh pipeline execute");
+
+    const std::string result(out);
+    if (result.find("\"dataType\":\"mesh\"") == std::string::npos &&
+        result.find("\"dataType\": \"mesh\"") == std::string::npos) {
+        std::printf("FAIL: mesh pipeline missing dataType mesh\n");
+        return 1;
+    }
+    if (result.find("\"vertices\"") == std::string::npos || result.find("\"triangles\"") == std::string::npos) {
+        std::printf("FAIL: mesh pipeline missing vertices/triangles\n");
+        return 1;
+    }
+
+    const std::string demo_graph = read_file("../../examples/phase43-mesh-demo.pcg.json");
+    if (!demo_graph.empty()) {
+        expect_code(pcg_validate_graph(demo_graph.c_str(), err, sizeof(err)), PCG_OK, "phase43 demo validate");
+        expect_code(pcg_execute_graph(demo_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "phase43 demo execute");
+        std::printf("PASS: examples/phase43-mesh-demo.pcg.json\n");
+    }
+
+    const char* box_only = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":0},
+         "data": {"width": 2.0, "height": 2.0, "depth": 2.0}}
+      ],
+      "edges": []
+    })";
+    expect_code(pcg_execute_graph(box_only, 42, out, sizeof(out)), PCG_OK, "box only execute");
+
+    if (!expect_outward_normals(pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0))) {
+        std::printf("FAIL: box mesh triangle normals point inward\n");
+        return 1;
+    }
+
+    if (!expect_outward_normals(
+            pcg::internal::elements::subdivide_mesh(
+                pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1))) {
+        std::printf("FAIL: subdivided mesh triangle normals point inward\n");
+        return 1;
+    }
+
+    const auto subdivided = pcg::internal::elements::subdivide_mesh(
+        pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1);
+
+    const auto edge_beveled = pcg::internal::elements::bevel_mesh(
+        subdivided, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true);
+    if (edge_beveled.vertices().size() <= subdivided.vertices().size()) {
+        std::printf("FAIL: edge bevel should add geometry along hard edges\n");
+        return 1;
+    }
+    if (!expect_outward_normals(edge_beveled)) {
+        std::printf("FAIL: edge beveled mesh triangle normals point inward\n");
+        return 1;
+    }
+
+    const auto demo_beveled = pcg::internal::elements::bevel_mesh(
+        pcg::internal::elements::subdivide_mesh(
+            pcg::internal::elements::create_box_mesh(3.0, 1.5, 2.0), 1),
+        0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true);
+    if (!expect_outward_normals(demo_beveled)) {
+        std::printf("FAIL: phase43 demo bevel mesh triangle normals point inward\n");
+        return 1;
+    }
+
+    if (!expect_welded_coincident_vertices(edge_beveled)) {
+        std::printf("FAIL: edge beveled mesh has split vertices at shared positions\n");
+        return 1;
+    }
+    if (!expect_no_duplicate_geo_triangles(edge_beveled)) {
+        std::printf("FAIL: edge beveled mesh has duplicate coplanar triangles\n");
+        return 1;
+    }
+
+    const auto box = pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0);
+    const auto box_beveled = pcg::internal::elements::bevel_mesh(
+        box, 0.15, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true);
+    if (!expect_no_duplicate_geo_triangles(box_beveled)) {
+        std::printf("FAIL: box edge bevel has duplicate coplanar triangles\n");
+        return 1;
+    }
+    for (const auto& v : box_beveled.vertices()) {
+        if (std::abs(v.x) > 1.0 + 1e-4 || std::abs(v.y) > 1.0 + 1e-4 || std::abs(v.z) > 1.0 + 1e-4) {
+            std::printf("FAIL: edge bevel extrudes beyond original box bounds\n");
+            return 1;
+        }
+    }
+
+    // V14: verify 3-way corner VMesh generates cross-face triangles (inner cap per corner).
+    // A box has 8 corners, each with 3 hard edges → 8 inner cap triangles.
+    const int box_cross = count_cross_face_triangles(box_beveled);
+    if (box_cross < 8) {
+        std::printf("FAIL: box bevel has only %d cross-face triangles (expected >= 8 for 8 corners)\n",
+                    box_cross);
+        return 1;
+    }
+    // Also verify the subdivided+beveled mesh has cross-face triangles.
+    const int subdiv_cross = count_cross_face_triangles(edge_beveled);
+    if (subdiv_cross < 8) {
+        std::printf("FAIL: subdivided box bevel has only %d cross-face triangles (expected >= 8)\n",
+                    subdiv_cross);
+        return 1;
+    }
+
+    // V14: verify the beveled mesh is closed (no boundary edges = corners are properly sealed).
+    if (!expect_closed_mesh(box_beveled)) {
+        std::printf("FAIL: box bevel mesh is not closed (boundary edges exist = corners not sealed)\n");
+        return 1;
+    }
+    if (!expect_closed_mesh(edge_beveled)) {
+        std::printf("FAIL: subdivided box bevel mesh is not closed (boundary edges exist)\n");
+        return 1;
+    }
+
+    const auto vertex_beveled = pcg::internal::elements::bevel_mesh(
+        subdivided, 0.08, 3, pcg::internal::elements::BevelMethod::VertexPush);
+    if (!expect_coincident_vertices_stay_welded(subdivided, vertex_beveled)) {
+        std::printf("FAIL: vertex push bevel has split vertices at shared positions\n");
+        return 1;
+    }
+    if (!expect_outward_normals(vertex_beveled)) {
+        std::printf("FAIL: vertex push beveled mesh triangle normals point inward\n");
+        return 1;
+    }
+
+    std::printf("PASS: phase43 mesh pipeline\n");
+    return 0;
+}

@@ -28,17 +28,49 @@ namespace DJTechRuntime.PCG
             if (result == null)
                 return false;
 
-            if (!PcgResultParser.TryParse(result, out var parsed, out var parseError))
+            var preview = GetComponent<PcgPreview>();
+            var kind = PcgResultParser.DetectKind(result);
+
+            switch (kind)
             {
-                Debug.LogError($"[PCG] Failed to parse result JSON: {parseError}");
-                return false;
+                case PcgResultKind.Mesh:
+                    if (!PcgResultParser.TryParseMesh(result, out var mesh, out var meshError))
+                    {
+                        Debug.LogError($"[PCG] Failed to parse mesh result: {meshError}");
+                        return false;
+                    }
+                    if (preview != null)
+                        preview.SetMesh(mesh);
+                    Debug.Log($"[PCG] Runtime OK — mesh ({mesh.vertexCount} verts, {mesh.triangles.Length / 3} tris).");
+                    break;
+
+                case PcgResultKind.Splines:
+                    if (!PcgResultParser.TryParseSplines(result, out var splines, out var splineError))
+                    {
+                        Debug.LogError($"[PCG] Failed to parse spline result: {splineError}");
+                        return false;
+                    }
+                    if (preview != null)
+                        preview.SetSplines(splines);
+                    Debug.Log($"[PCG] Runtime OK — {splines.Count} splines.");
+                    break;
+
+                case PcgResultKind.Points:
+                    if (!PcgResultParser.TryParsePoints(result, out var parsed, out var parseError))
+                    {
+                        Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
+                        return false;
+                    }
+                    if (preview != null)
+                        preview.SetPoints(PcgResultParser.ToVector3List(parsed));
+                    Debug.Log($"[PCG] Runtime OK — {parsed.pointCount} points generated.");
+                    break;
+
+                default:
+                    Debug.LogError("[PCG] Unknown result JSON shape (expected points, splines, or mesh).");
+                    return false;
             }
 
-            var preview = GetComponent<PcgPreview>();
-            if (preview != null)
-                preview.SetPoints(PcgResultParser.ToVector3List(parsed));
-
-            Debug.Log($"[PCG] Runtime OK — {parsed.pointCount} points generated.");
             return true;
         }
     }

@@ -1,6 +1,6 @@
 {
-  "version": "1.2",
-  "description": "Node definitions for PCG Graph editors (Phase 4.2). Pin types align with UE EPCGDataType.",
+  "version": "1.3",
+  "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
       "type": "ParseConfig",
@@ -247,6 +247,56 @@
       "properties": {
         "startIndex": { "type": "integer", "default": 0, "minimum": 0 },
         "endIndex": { "type": "integer", "default": 0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "CreateBoxMesh",
+      "displayName": "Create Box Mesh",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "width": { "type": "number", "default": 2.0, "minimum": 0 },
+        "height": { "type": "number", "default": 2.0, "minimum": 0 },
+        "depth": { "type": "number", "default": 2.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "SubdivideMesh",
+      "displayName": "Subdivide Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "levels": { "type": "integer", "default": 1, "minimum": 0, "maximum": 4 }
+      }
+    },
+    {
+      "type": "BevelMesh",
+      "displayName": "Bevel Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "method": {
+          "type": "enum",
+          "default": "edge",
+          "options": [
+            { "value": "edge", "label": "Edge (Blender)" },
+            { "value": "vertexPush", "label": "Vertex Push" }
+          ]
+        },
+        "offsetType": {
+          "type": "enum",
+          "default": "offset",
+          "options": [
+            { "value": "offset", "label": "Offset" },
+            { "value": "width", "label": "Width" }
+          ]
+        },
+        "amount": { "type": "number", "default": 0.1, "minimum": 0 },
+        "segments": { "type": "integer", "default": 2, "minimum": 1, "maximum": 8 },
+        "clampOverlap": { "type": "boolean", "default": true }
       }
     }
   ]
