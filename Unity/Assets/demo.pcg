@@ -10,12 +10,12 @@
     {
       "id": "n103",
       "type": "SubdivideMesh",
-      "position": { "x": 334.5, "y": 295 },
+      "position": { "x": 316.5, "y": 330 },
       "data": {"levels": 1}
     }
   ],
   "edges": [
-    {"id": "e103", "source": "n101", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e104", "source": "n101", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},

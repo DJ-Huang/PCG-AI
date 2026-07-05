@@ -21,6 +21,7 @@ namespace DJTechEditor.PCG.Graph
         private bool m_SuppressUndo;
         private string m_PendingSnapshot;
         private string m_PendingAction;
+        private bool m_PendingCommit;
 
         public PcgGraphState State => m_State;
 
@@ -134,6 +135,7 @@ namespace DJTechEditor.PCG.Graph
 
         public void ShowSearchWindow(Vector2 panelMousePos)
         {
+            m_SearchWindow.ClearPortDragContext();
             var graphPos = PanelToGraphPosition(panelMousePos);
             m_SearchWindow.SetSpawnPosition(graphPos);
 
@@ -211,21 +213,17 @@ namespace DJTechEditor.PCG.Graph
             m_SuppressUndo = false;
         }
 
-        // ─── Pointer Events (drag / edge creation) ──────────────────
+        // ─── Pointer Events (node drag only; edge drag handled by EdgeConnector) ──
 
         private void OnPointerDown(PointerDownEvent evt)
         {
             if (m_SuppressUndo) return;
 
-            var isPort = evt.target is Port ||
-                         (evt.target is VisualElement pv && pv.GetFirstAncestorOfType<Port>() != null);
-            var isNode = evt.target is VisualElement ve &&
-                         ve.GetFirstAncestorOfType<PcgGraphNodeBase>() != null;
-
-            if (isPort)
-                BeginDrag("Connect Edge");
-            else if (isNode)
+            if (evt.target is VisualElement ve &&
+                ve.GetFirstAncestorOfType<PcgGraphNodeBase>() != null)
+            {
                 BeginDrag("Move Node");
+            }
         }
 
         private void OnPointerUp(PointerUpEvent evt)
@@ -267,14 +265,108 @@ namespace DJTechEditor.PCG.Graph
 
         public override EventPropagation DeleteSelection()
         {
-            if (!m_SuppressUndo && selection.Count > 0)
-            {
-                RecordUndo("Delete");
-                var result = base.DeleteSelection();
-                CommitState();
-                return result;
-            }
             return base.DeleteSelection();
+        }
+
+        // ─── Port drag → filtered search → create + connect ─────────
+
+        /// <summary>Called by PcgEdgeConnectorListener.OnDropOutsidePort.
+        /// position is in screen coordinates.</summary>
+        public void ShowPortDragSearchWindow(Edge edge, Vector2 screenPosition)
+        {
+            var port = edge.output ?? edge.input;
+            if (port == null) return;
+
+            var sourceNode = port.node as PcgGraphNodeBase;
+            if (sourceNode == null) return;
+
+            var handle = port.userData as string ?? port.portName;
+            bool isOutput = port.direction == Direction.Output;
+            var pinType = isOutput
+                ? PcgNodeManifest.GetOutputPinType(sourceNode.NodeType, handle)
+                : PcgNodeManifest.GetInputPinType(sourceNode.NodeType, handle);
+
+            var compatible = new HashSet<string>();
+            foreach (var type in PcgNodeTypes.All)
+            {
+                if (isOutput ? PcgNodeManifest.HasCompatibleInputPin(type, pinType)
+                              : PcgNodeManifest.HasCompatibleOutputPin(type, pinType))
+                    compatible.Add(type);
+            }
+            foreach (var def in PcgNodeManifest.All)
+            {
+                if (!PcgNodeManifest.IsManifestOnlyType(def.type))
+                    continue;
+                if (isOutput ? PcgNodeManifest.HasCompatibleInputPin(def.type, pinType)
+                              : PcgNodeManifest.HasCompatibleOutputPin(def.type, pinType))
+                    compatible.Add(def.type);
+            }
+
+            if (compatible.Count == 0)
+                return;
+
+            // Convert screen position to graph position for node spawn
+            Vector2 windowPos = m_HostWindow != null ? (Vector2)m_HostWindow.position.position : Vector2.zero;
+            Vector2 panelPos = screenPosition - windowPos;
+            Vector2 graphPos = PanelToGraphPosition(panelPos);
+
+            m_SearchWindow.SetSpawnPosition(graphPos);
+            m_SearchWindow.SetPortDragContext(port, compatible);
+
+            SearchWindow.Open(new SearchWindowContext(screenPosition), m_SearchWindow);
+        }
+
+        public void CreateNodeAndConnect(string type, Vector2 position, Port draggedPort)
+        {
+            RecordUndo("Create Node from Port");
+
+            m_SuppressUndo = true;
+
+            var node = PcgGraphNodeFactory.Create(type, PcgGraphNodeFactory.NextNodeId(), position);
+            AddElement(node);
+            ClearSelection();
+            AddToSelection(node);
+            node.BringToFront();
+
+            // Auto-connect: find first compatible port on the new node
+            bool isOutputDrag = draggedPort.direction == Direction.Output;
+            var sourceNode = draggedPort.node as PcgGraphNodeBase;
+            if (sourceNode != null)
+            {
+                var sourceHandle = draggedPort.userData as string ?? draggedPort.portName;
+                var pinType = isOutputDrag
+                    ? PcgNodeManifest.GetOutputPinType(sourceNode.NodeType, sourceHandle)
+                    : PcgNodeManifest.GetInputPinType(sourceNode.NodeType, sourceHandle);
+
+                if (isOutputDrag)
+                {
+                    foreach (var inputPort in node.inputContainer.Query<Port>().ToList())
+                    {
+                        var h = inputPort.userData as string ?? inputPort.portName;
+                        if (PcgNodeManifest.GetInputPinType(node.NodeType, h) == pinType)
+                        {
+                            AddElement(draggedPort.ConnectTo(inputPort));
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var outputPort in node.outputContainer.Query<Port>().ToList())
+                    {
+                        var h = outputPort.userData as string ?? outputPort.portName;
+                        if (PcgNodeManifest.GetOutputPinType(node.NodeType, h) == pinType)
+                        {
+                            AddElement(outputPort.ConnectTo(draggedPort));
+                            break;
+                        }
+                    }
+                }
+            }
+
+            node.RefreshPorts();
+            m_SuppressUndo = false;
+            CommitState();
         }
 
         public void LoadDocument(PcgGraphDocument doc, bool clearUndo = true)
@@ -388,6 +480,9 @@ namespace DJTechEditor.PCG.Graph
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
         {
+            if (m_SuppressUndo) return change;
+
+            // Filter valid edges to create
             if (change.edgesToCreate != null)
             {
                 var valid = new List<Edge>();
@@ -397,8 +492,36 @@ namespace DJTechEditor.PCG.Graph
                     if (PcgConnectionValidator.IsValidEdge(edge, others))
                         valid.Add(edge);
                 }
-
                 change.edgesToCreate = valid;
+            }
+
+            // Record undo for edge creation and/or element removal
+            // (movedElements are handled separately by BeginDrag/EndDrag)
+            if (m_PendingSnapshot == null && !m_PendingCommit)
+            {
+                bool hasEdgesToCreate = change.edgesToCreate != null && change.edgesToCreate.Count > 0;
+                bool hasElementsToRemove = change.elementsToRemove != null && change.elementsToRemove.Count > 0;
+
+                if (hasEdgesToCreate || hasElementsToRemove)
+                {
+                    string actionName;
+                    if (hasEdgesToCreate && hasElementsToRemove)
+                        actionName = "Reconnect Edge";
+                    else if (hasEdgesToCreate)
+                        actionName = "Connect Edge";
+                    else if (change.elementsToRemove.Any(e => e is Edge))
+                        actionName = "Disconnect Edge";
+                    else
+                        actionName = "Delete";
+
+                    RecordUndo(actionName);
+                    m_PendingCommit = true;
+                    schedule.Execute(() =>
+                    {
+                        CommitState();
+                        m_PendingCommit = false;
+                    });
+                }
             }
 
             return change;

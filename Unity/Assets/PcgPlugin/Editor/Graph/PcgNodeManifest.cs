@@ -108,6 +108,26 @@ namespace DJTechEditor.PCG.Graph
             return GetOutputPinType(sourceType, sourceHandle) == GetInputPinType(targetType, targetHandle);
         }
 
+        /// <summary>True if nodeType has an input pin matching the given pinType.</summary>
+        public static bool HasCompatibleInputPin(string nodeType, string pinType)
+        {
+            if (!TryGet(nodeType, out var def))
+                return GetInputPinType(nodeType) == pinType;
+            foreach (var input in def.inputs)
+                if (input.pinType == pinType) return true;
+            return false;
+        }
+
+        /// <summary>True if nodeType has an output pin matching the given pinType.</summary>
+        public static bool HasCompatibleOutputPin(string nodeType, string pinType)
+        {
+            if (!TryGet(nodeType, out var def))
+                return GetOutputPinType(nodeType) == pinType;
+            foreach (var output in def.outputs)
+                if (output.pinType == pinType) return true;
+            return false;
+        }
+
         public static PcgNodeData DefaultDataFor(string type)
         {
             if (!TryGet(type, out var def))

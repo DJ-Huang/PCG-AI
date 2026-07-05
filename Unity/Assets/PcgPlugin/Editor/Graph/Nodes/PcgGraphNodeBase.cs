@@ -53,7 +53,7 @@ namespace DJTechEditor.PCG.Graph
         protected Port CreatePort(Direction direction, string portName)
         {
             var capacity = direction == Direction.Input ? Port.Capacity.Single : Port.Capacity.Single;
-            var port = InstantiatePort(Orientation.Horizontal, direction, capacity, typeof(float));
+            var port = PcgPort.Create(Orientation.Horizontal, direction, capacity, typeof(float));
             port.portName = portName;
             return port;
         }

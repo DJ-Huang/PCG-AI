@@ -71,7 +71,7 @@ namespace DJTechEditor.PCG.Graph
         private Port CreatePort(Direction direction, string portName, string label)
         {
             var capacity = Port.Capacity.Single;
-            var port = InstantiatePort(Orientation.Horizontal, direction, capacity, typeof(float));
+            var port = PcgPort.Create(Orientation.Horizontal, direction, capacity, typeof(float));
             port.portName = string.IsNullOrEmpty(label) ? portName : label;
             port.userData = portName;
             return port;
