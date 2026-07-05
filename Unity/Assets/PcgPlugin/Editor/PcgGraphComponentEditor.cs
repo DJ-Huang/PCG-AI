@@ -11,7 +11,7 @@ namespace DJTechEditor.PCG
         private PcgGraphComponent m_Target;
         private SerializedProperty m_GraphAssetProp;
         private SerializedProperty m_SeedProp;
-        private SerializedProperty m_RunOnStartProp;
+        private SerializedProperty m_ExecutionModeProp;
         private SerializedProperty m_OverridesProp;
 
         private void OnEnable()
@@ -19,7 +19,7 @@ namespace DJTechEditor.PCG
             m_Target = target as PcgGraphComponent;
             m_GraphAssetProp = serializedObject.FindProperty("graphAsset");
             m_SeedProp = serializedObject.FindProperty("seed");
-            m_RunOnStartProp = serializedObject.FindProperty("runOnStart");
+            m_ExecutionModeProp = serializedObject.FindProperty("executionMode");
             m_OverridesProp = serializedObject.FindProperty("m_ParameterOverrides");
 
             m_Target.RefreshDocument();
@@ -40,7 +40,7 @@ namespace DJTechEditor.PCG
             }
 
             EditorGUILayout.PropertyField(m_SeedProp);
-            EditorGUILayout.PropertyField(m_RunOnStartProp);
+            EditorGUILayout.PropertyField(m_ExecutionModeProp);
 
             EditorGUILayout.Space();
 
@@ -142,11 +142,33 @@ namespace DJTechEditor.PCG
             {
                 case "integer":
                     var iProp = element.FindPropertyRelative("intValue");
-                    iProp.intValue = EditorGUILayout.IntField(param.name, iProp.intValue);
+                    if (param.hasRange)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.PrefixLabel(param.name);
+                        iProp.intValue = Mathf.RoundToInt(GUILayout.HorizontalSlider(
+                            iProp.intValue, param.minValue, param.maxValue));
+                        iProp.intValue = EditorGUILayout.IntField(
+                            iProp.intValue, GUILayout.Width(50));
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    else
+                        iProp.intValue = EditorGUILayout.IntField(param.name, iProp.intValue);
                     break;
                 case "number":
                     var fProp = element.FindPropertyRelative("floatValue");
-                    fProp.floatValue = EditorGUILayout.FloatField(param.name, fProp.floatValue);
+                    if (param.hasRange)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        EditorGUILayout.PrefixLabel(param.name);
+                        fProp.floatValue = GUILayout.HorizontalSlider(
+                            fProp.floatValue, param.minValue, param.maxValue);
+                        fProp.floatValue = EditorGUILayout.FloatField(
+                            fProp.floatValue, GUILayout.Width(50));
+                        EditorGUILayout.EndHorizontal();
+                    }
+                    else
+                        fProp.floatValue = EditorGUILayout.FloatField(param.name, fProp.floatValue);
                     break;
                 case "boolean":
                     var bProp = element.FindPropertyRelative("boolValue");

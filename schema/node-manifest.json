@@ -39,7 +39,7 @@
       "type": "CreatePointGrid",
       "displayName": "Create Point Grid",
       "category": "Generation",
-      "inputs": [],
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
       "properties": {
         "pointCountX": { "type": "integer", "default": 10, "minimum": 1 },
@@ -51,7 +51,7 @@
       "type": "CreatePoints",
       "displayName": "Create Points",
       "category": "Generation",
-      "inputs": [],
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
       "properties": {
         "x": { "type": "number", "default": 0 },
@@ -65,7 +65,7 @@
       "type": "SurfaceSampler",
       "displayName": "Surface Sampler",
       "category": "Generation",
-      "inputs": [],
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
       "properties": {
         "subdivisions": { "type": "integer", "default": 8, "minimum": 2 },
@@ -175,7 +175,10 @@
         { "id": "terrain", "label": "Terrain", "pinType": "Param" }
       ],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
-      "properties": {}
+      "properties": {
+        "offsetY": { "type": "number", "default": 0 },
+        "blend": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
+      }
     },
     {
       "type": "StaticMeshSpawner",
@@ -195,7 +198,9 @@
       "category": "Structural",
       "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
       "outputs": [{ "id": "out", "label": "Hull", "pinType": "SpatialSpline" }],
-      "properties": {}
+      "properties": {
+        "tolerance": { "type": "number", "default": 0.0, "minimum": 0 }
+      }
     },
     {
       "type": "ConnectNearest",
@@ -214,7 +219,9 @@
       "category": "Structural",
       "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
       "outputs": [{ "id": "out", "label": "Edges", "pinType": "SpatialSpline" }],
-      "properties": {}
+      "properties": {
+        "maxEdgeLength": { "type": "number", "default": -1 }
+      }
     },
     {
       "type": "MST",
@@ -225,7 +232,9 @@
         { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
       ],
       "outputs": [{ "id": "out", "label": "Tree", "pinType": "SpatialSpline" }],
-      "properties": {}
+      "properties": {
+        "maxEdgeLength": { "type": "number", "default": -1 }
+      }
     },
     {
       "type": "Voronoi",
@@ -233,7 +242,10 @@
       "category": "Structural",
       "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
       "outputs": [{ "id": "out", "label": "Cells", "pinType": "SpatialSpline" }],
-      "properties": {}
+      "properties": {
+        "offsetY": { "type": "number", "default": 0 },
+        "maxEdgeLength": { "type": "number", "default": -1 }
+      }
     },
     {
       "type": "AStarPathfinding",
@@ -253,7 +265,7 @@
       "type": "CreateBoxMesh",
       "displayName": "Create Box Mesh",
       "category": "Mesh",
-      "inputs": [],
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "properties": {
         "width": { "type": "number", "default": 2.0, "minimum": 0 },

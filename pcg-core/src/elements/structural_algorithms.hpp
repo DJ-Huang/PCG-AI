@@ -20,7 +20,7 @@ struct Vec2D {
 };
 
 std::vector<Vec2D> points_to_xz(const data::PcgPointData& points);
-data::PcgSplineData convex_hull_spline(const data::PcgPointData& points);
+data::PcgSplineData convex_hull_spline(const data::PcgPointData& points, double tolerance = 0.0);
 data::PcgSplineData connect_nearest_splines(const data::PcgPointData& points, int k, double max_distance);
 data::PcgSplineData delaunay_edge_splines(const data::PcgPointData& points);
 data::PcgSplineData mst_splines(const data::PcgSplineData& edges, const data::PcgPointData& points);

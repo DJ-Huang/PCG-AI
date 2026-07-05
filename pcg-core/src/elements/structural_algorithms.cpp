@@ -218,12 +218,14 @@ std::vector<Vec2D> points_to_xz(const data::PcgPointData& points)
     return out;
 }
 
-data::PcgSplineData convex_hull_spline(const data::PcgPointData& points)
+data::PcgSplineData convex_hull_spline(const data::PcgPointData& points, double tolerance)
 {
     data::PcgSplineData out;
     const auto& pts = points.points();
     if (pts.size() < 3)
         return out;
+
+    const double tol = std::max(tolerance, kEps);
 
     const std::vector<Vec2D> coords = points_to_xz(points);
     std::vector<int> order(coords.size());
@@ -239,7 +241,7 @@ data::PcgSplineData convex_hull_spline(const data::PcgPointData& points)
         while (hull.size() >= 2 &&
                cross(coords[static_cast<size_t>(hull[hull.size() - 2])],
                      coords[static_cast<size_t>(hull.back())],
-                     coords[static_cast<size_t>(idx)]) <= kEps)
+                     coords[static_cast<size_t>(idx)]) <= tol)
             hull.pop_back();
         hull.push_back(idx);
     }
@@ -250,7 +252,7 @@ data::PcgSplineData convex_hull_spline(const data::PcgPointData& points)
         while (hull.size() > lower_size &&
                cross(coords[static_cast<size_t>(hull[hull.size() - 2])],
                      coords[static_cast<size_t>(hull.back())],
-                     coords[static_cast<size_t>(idx)]) <= kEps)
+                     coords[static_cast<size_t>(idx)]) <= tol)
             hull.pop_back();
         hull.push_back(idx);
     }

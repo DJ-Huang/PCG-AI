@@ -86,5 +86,11 @@ namespace DJTechEditor.PCG.Graph
 
         public abstract void ApplyData(PcgNodeData data);
         public abstract PcgNodeData CollectData();
+
+        /// <summary>Set a single property value on this node (used by Inspector).</summary>
+        public virtual void SetPropertyValue(string key, object value)
+        {
+            // Default: no-op. Override in subclasses.
+        }
     }
 }

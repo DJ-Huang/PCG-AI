@@ -161,6 +161,9 @@ namespace DJTechRuntime.PCG
                             exposed = GetBool(paramDict, "exposed", true),
                             targetNode = GetString(paramDict, "targetNode"),
                             targetProperty = GetString(paramDict, "targetProperty"),
+                            hasRange = GetBool(paramDict, "hasRange", false),
+                            minValue = GetFloat(paramDict, "min", 0f),
+                            maxValue = GetFloat(paramDict, "max", 1f),
                         });
                     }
                 }
@@ -311,6 +314,9 @@ namespace DJTechRuntime.PCG
             sb.Append(", \"exposed\": ").Append(param.exposed ? "true" : "false");
             sb.Append(", \"targetNode\": ").Append(JsonString(param.targetNode));
             sb.Append(", \"targetProperty\": ").Append(JsonString(param.targetProperty));
+            sb.Append(", \"hasRange\": ").Append(param.hasRange ? "true" : "false");
+            sb.Append(", \"min\": ").Append(param.minValue.ToString(CultureInfo.InvariantCulture));
+            sb.Append(", \"max\": ").Append(param.maxValue.ToString(CultureInfo.InvariantCulture));
             sb.Append('}');
         }
 
@@ -368,6 +374,14 @@ namespace DJTechRuntime.PCG
         {
             if (!dict.TryGetValue(key, out var value) || value == null)
                 return 0f;
+
+            return Convert.ToSingle(value, CultureInfo.InvariantCulture);
+        }
+
+        private static float GetFloat(Dictionary<string, object> dict, string key, float fallback)
+        {
+            if (!dict.TryGetValue(key, out var value) || value == null)
+                return fallback;
 
             return Convert.ToSingle(value, CultureInfo.InvariantCulture);
         }

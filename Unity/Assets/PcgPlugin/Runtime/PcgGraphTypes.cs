@@ -30,6 +30,9 @@ namespace DJTechRuntime.PCG
         public bool exposed = true;
         public string targetNode = "";
         public string targetProperty = "";
+        public bool hasRange = false;
+        public float minValue = 0f;
+        public float maxValue = 1f;
     }
 
     [Serializable]

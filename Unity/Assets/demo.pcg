@@ -4,13 +4,23 @@
     {
       "id": "n101",
       "type": "CreateBoxMesh",
-      "position": { "x": 0, "y": 169 },
+      "position": { "x": -15, "y": 228 },
       "data": {"width": 2, "height": 2, "depth": 2}
+    },
+    {
+      "id": "n103",
+      "type": "SubdivideMesh",
+      "position": { "x": 185, "y": 360 },
+      "data": {"levels": 1}
     }
   ],
   "edges": [
+    {"id": "e103", "source": "n101", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
-    {"id": "p2", "name": "New Parameter", "type": "number", "default": 0, "exposed": true, "targetNode": "", "targetProperty": ""}
+    {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},
+    {"id": "p3", "name": "Height", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "height", "hasRange": true, "min": 1, "max": 4},
+    {"id": "p4", "name": "Depth", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "depth", "hasRange": true, "min": 1, "max": 4},
+    {"id": "p6", "name": "levels", "type": "integer", "default": 1, "exposed": true, "targetNode": "n103", "targetProperty": "levels", "hasRange": true, "min": 0, "max": 3}
   ]
 }

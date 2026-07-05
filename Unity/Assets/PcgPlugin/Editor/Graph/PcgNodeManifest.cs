@@ -27,6 +27,9 @@ namespace DJTechEditor.PCG.Graph
         public string type;
         public object defaultValue;
         public List<ManifestPropertyOption> options = new();
+        public bool hasRange = false;
+        public float minimum = 0f;
+        public float maximum = 1f;
     }
 
     public class ManifestNodeDef
@@ -206,6 +209,19 @@ namespace DJTechEditor.PCG.Graph
                             type = GetString(propObj, "type"),
                             defaultValue = ParseDefault(propObj),
                         };
+
+                        // Parse min/max for slider display
+                        if (propObj.TryGetValue("minimum", out var minVal) && minVal != null)
+                        {
+                            propDef.minimum = Convert.ToSingle(minVal, CultureInfo.InvariantCulture);
+                            propDef.hasRange = true;
+                        }
+                        if (propObj.TryGetValue("maximum", out var maxVal) && maxVal != null)
+                        {
+                            propDef.maximum = Convert.ToSingle(maxVal, CultureInfo.InvariantCulture);
+                            propDef.hasRange = true;
+                        }
+
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)
                         {

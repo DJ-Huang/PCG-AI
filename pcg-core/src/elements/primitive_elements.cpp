@@ -34,6 +34,12 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreatePointGrid spacing must be >= 0");
 
         data::PcgPointData points;
+
+        // Merge optional input points
+        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
+            for (const auto& p : parse_point_input(*input).points())
+                points.add_point(p);
+
         const double origin_x = -((count_x - 1) * spacing) * 0.5;
         const double origin_z = -((count_y - 1) * spacing) * 0.5;
         for (int y = 0; y < count_y; ++y) {
@@ -68,6 +74,12 @@ public:
 
         uint32_t rng = mix_seed(ctx.graph_seed, static_cast<int>(x * 17 + z * 31));
         data::PcgPointData points;
+
+        // Merge optional input points
+        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
+            for (const auto& p : parse_point_input(*input).points())
+                points.add_point(p);
+
         for (int i = 0; i < count; ++i) {
             const double jx = jitter > 0.0 ? ((next_rand(rng) % 1000) / 500.0 - 1.0) * jitter : 0.0;
             const double jz = jitter > 0.0 ? ((next_rand(rng) % 1000) / 500.0 - 1.0) * jitter : 0.0;
@@ -94,6 +106,12 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SurfaceSampler extent must be >= 0");
 
         data::PcgPointData points;
+
+        // Merge optional input points
+        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
+            for (const auto& p : parse_point_input(*input).points())
+                points.add_point(p);
+
         const double step = subdivisions <= 1 ? extent : extent / static_cast<double>(subdivisions - 1);
         for (int iz = 0; iz < subdivisions; ++iz) {
             for (int ix = 0; ix < subdivisions; ++ix) {
@@ -406,12 +424,18 @@ public:
             return PCG_ERR_EXECUTION;
 
         const int seed = terrain->value("seed", ctx.graph_seed);
+        const double offset_y = ctx.node->data.value("offsetY", 0.0);
+        double blend = ctx.node->data.value("blend", 1.0);
+        if (blend < 0.0) blend = 0.0;
+        if (blend > 1.0) blend = 1.0;
+
         data::PcgPointData source = parse_point_input(*points_json);
         data::PcgPointData sampled;
         for (const auto& point : source.points()) {
+            const double terrain_y = sample_terrain_height(terrain, point.x, point.z, seed);
             sampled.add_point(data::PcgPoint{
                 point.x,
-                sample_terrain_height(terrain, point.x, point.z, seed),
+                point.y * (1.0 - blend) + terrain_y * blend + offset_y,
                 point.z,
                 point.attributes,
             });

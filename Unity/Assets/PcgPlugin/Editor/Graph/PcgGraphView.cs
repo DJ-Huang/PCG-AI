@@ -16,11 +16,18 @@ namespace DJTechEditor.PCG.Graph
         private EditorWindow m_HostWindow;
         private Vector2 m_LastMousePos;
         private PcgGraphBlackboard m_Blackboard;
+        private PcgNodeInspector m_Inspector;
 
         public PcgGraphBlackboard Blackboard
         {
             get => m_Blackboard;
             set => m_Blackboard = value;
+        }
+
+        public PcgNodeInspector Inspector
+        {
+            get => m_Inspector;
+            set => m_Inspector = value;
         }
 
         public PcgGraphView()
@@ -64,6 +71,11 @@ namespace DJTechEditor.PCG.Graph
             else if (evt.keyCode == KeyCode.P)
             {
                 Blackboard?.ToggleVisible();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.I)
+            {
+                m_Inspector?.ToggleVisible();
                 evt.StopPropagation();
             }
             evt.StopPropagation();
@@ -136,6 +148,24 @@ namespace DJTechEditor.PCG.Graph
             return node;
         }
 
+        public override void AddToSelection(ISelectable selectable)
+        {
+            base.AddToSelection(selectable);
+            m_Inspector?.OnSelectionChanged();
+        }
+
+        public override void RemoveFromSelection(ISelectable selectable)
+        {
+            base.RemoveFromSelection(selectable);
+            m_Inspector?.OnSelectionChanged();
+        }
+
+        public override void ClearSelection()
+        {
+            base.ClearSelection();
+            m_Inspector?.OnSelectionChanged();
+        }
+
         public void LoadDocument(PcgGraphDocument doc)
         {
             DeleteElements(graphElements.ToList());
@@ -174,6 +204,8 @@ namespace DJTechEditor.PCG.Graph
 
             if (m_Blackboard != null)
                 m_Blackboard.LoadParameters(doc.parameters);
+
+            m_Inspector?.OnSelectionChanged();
         }
 
         public PcgGraphDocument ExportDocument()

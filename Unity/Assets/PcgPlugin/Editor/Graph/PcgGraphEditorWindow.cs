@@ -14,7 +14,9 @@ namespace DJTechEditor.PCG.Graph
 
         private PcgGraphView m_GraphView;
         private PcgGraphBlackboard m_Blackboard;
+        private PcgNodeInspector m_Inspector;
         private Button m_BlackboardToggle;
+        private Button m_InspectorToggle;
         private string m_CurrentFilePath;
 
         [MenuItem(MenuPath)]
@@ -74,6 +76,9 @@ namespace DJTechEditor.PCG.Graph
             m_BlackboardToggle = MakeButton("Parameters", ToggleBlackboard);
             toolbar.Add(m_BlackboardToggle);
 
+            m_InspectorToggle = MakeButton("Inspector", ToggleInspector);
+            toolbar.Add(m_InspectorToggle);
+
             toolbar.Add(MakeButton("Show in Project", LocateInProject));
 
             rootVisualElement.Add(toolbar);
@@ -100,8 +105,15 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView.Blackboard = m_Blackboard;
             m_Blackboard.style.display = DisplayStyle.None;
 
+            m_Inspector = new PcgNodeInspector(m_GraphView, m_Blackboard);
+            m_GraphView.Inspector = m_Inspector;
+
+            // Blackboard changes should trigger inspector refresh
+            m_Blackboard.OnParametersChanged += () => m_Inspector.OnSelectionChanged();
+
             contentRow.Add(m_Blackboard);
             contentRow.Add(m_GraphView);
+            contentRow.Add(m_Inspector);
 
             rootVisualElement.Add(contentRow);
         }
@@ -214,6 +226,11 @@ namespace DJTechEditor.PCG.Graph
         {
             var visible = m_Blackboard.style.display.value == DisplayStyle.Flex;
             m_Blackboard.style.display = visible ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        private void ToggleInspector()
+        {
+            m_Inspector.ToggleVisible();
         }
     }
 }

@@ -3,6 +3,8 @@
 #include "elements/structural_algorithms.hpp"
 #include "elements/structural_elements.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <unordered_map>
 
@@ -18,18 +20,51 @@ int clamp_int(int value, int min_value, int max_value)
     return value;
 }
 
+void filter_splines_by_max_length(data::PcgSplineData& data, double max_length)
+{
+    if (max_length < 0.0)
+        return;
+    auto& splines = data.splines_mut();
+    splines.erase(
+        std::remove_if(splines.begin(), splines.end(),
+            [&](const data::PcgSpline& s) {
+                if (s.points.size() < 2)
+                    return true;
+                const auto& p0 = s.points.front();
+                const auto& p1 = s.points.back();
+                const double dx = p1.x - p0.x;
+                const double dy = p1.y - p0.y;
+                const double dz = p1.z - p0.z;
+                return std::sqrt(dx * dx + dy * dy + dz * dz) > max_length;
+            }),
+        splines.end());
+}
+
+void apply_offset_y(data::PcgSplineData& data, double offset_y)
+{
+    if (offset_y == 0.0)
+        return;
+    for (auto& spline : data.splines_mut())
+        for (auto& pt : spline.points)
+            pt.y += offset_y;
+}
+
 class ConvexHullElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "ConvexHull"; }
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConvexHull missing node");
+
         const nlohmann::json* input = require_input_json(ctx, "in", "ConvexHull missing points input");
         const data::PcgPointData points = parse_point_input(*input);
         if (points.points().size() < 3)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConvexHull requires at least 3 points");
 
-        emit_splines(ctx, convex_hull_spline(points));
+        const double tolerance = ctx.node->data.value("tolerance", 0.0);
+        emit_splines(ctx, convex_hull_spline(points, tolerance));
         return PCG_OK;
     }
 };
@@ -59,12 +94,18 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Delaunay missing node");
+
         const nlohmann::json* input = require_input_json(ctx, "in", "Delaunay missing points input");
         const data::PcgPointData points = parse_point_input(*input);
         if (points.points().size() < 3)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Delaunay requires at least 3 points");
 
-        emit_splines(ctx, delaunay_edge_splines(points));
+        const double max_edge_length = ctx.node->data.value("maxEdgeLength", -1.0);
+        data::PcgSplineData splines = delaunay_edge_splines(points);
+        filter_splines_by_max_length(splines, max_edge_length);
+        emit_splines(ctx, std::move(splines));
         return PCG_OK;
     }
 };
@@ -75,12 +116,18 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MST missing node");
+
         const nlohmann::json* edge_input = require_input_json(ctx, "in", "MST missing edges input");
         const nlohmann::json* point_input = require_input_json(ctx, "points", "MST missing points input");
         const data::PcgSplineData edges = parse_spline_input(*edge_input);
         const data::PcgPointData points = parse_point_input(*point_input);
 
-        emit_splines(ctx, mst_splines(edges, points));
+        const double max_edge_length = ctx.node->data.value("maxEdgeLength", -1.0);
+        data::PcgSplineData splines = mst_splines(edges, points);
+        filter_splines_by_max_length(splines, max_edge_length);
+        emit_splines(ctx, std::move(splines));
         return PCG_OK;
     }
 };
@@ -91,12 +138,20 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Voronoi missing node");
+
         const nlohmann::json* input = require_input_json(ctx, "in", "Voronoi missing points input");
         const data::PcgPointData points = parse_point_input(*input);
         if (points.points().size() < 3)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Voronoi requires at least 3 points");
 
-        emit_splines(ctx, voronoi_edge_splines(points));
+        const double offset_y = ctx.node->data.value("offsetY", 0.0);
+        const double max_edge_length = ctx.node->data.value("maxEdgeLength", -1.0);
+        data::PcgSplineData splines = voronoi_edge_splines(points);
+        apply_offset_y(splines, offset_y);
+        filter_splines_by_max_length(splines, max_edge_length);
+        emit_splines(ctx, std::move(splines));
         return PCG_OK;
     }
 };

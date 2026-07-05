@@ -3,6 +3,13 @@ using UnityEngine;
 
 namespace DJTechRuntime.PCG
 {
+    public enum PcgExecutionMode
+    {
+        None = 0,
+        RunOnStart = 1,
+        EveryFrame = 2,
+    }
+
     /// <summary>
     /// Unified PCG component — binds a <see cref="PcgGraphAsset"/>, exposes its
     /// parameters in the Inspector, executes the graph, and renders the result.
@@ -13,7 +20,7 @@ namespace DJTechRuntime.PCG
     {
         [SerializeField] private PcgGraphAsset graphAsset;
         [SerializeField] private int seed = 42;
-        [SerializeField] private bool runOnStart = true;
+        [SerializeField] private PcgExecutionMode executionMode = PcgExecutionMode.RunOnStart;
 
         [SerializeField]
         private List<PcgParameterOverride> m_ParameterOverrides = new();
@@ -43,7 +50,13 @@ namespace DJTechRuntime.PCG
 
         private void Start()
         {
-            if (runOnStart && Application.isPlaying)
+            if (executionMode == PcgExecutionMode.RunOnStart && Application.isPlaying)
+                Run();
+        }
+
+        private void Update()
+        {
+            if (executionMode == PcgExecutionMode.EveryFrame)
                 Run();
         }
 

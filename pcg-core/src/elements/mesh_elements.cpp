@@ -21,7 +21,20 @@ public:
         if (width < 0.0 || height < 0.0 || depth < 0.0)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateBoxMesh dimensions must be >= 0");
 
-        emit_mesh(ctx, create_box_mesh(width, height, depth));
+        data::PcgMeshData mesh = create_box_mesh(width, height, depth);
+
+        // Merge optional input mesh
+        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
+        {
+            const data::PcgMeshData input_mesh = parse_mesh_input(*input);
+            const int vertex_offset = static_cast<int>(mesh.vertices().size());
+            for (const auto& v : input_mesh.vertices())
+                mesh.vertices_mut().push_back(v);
+            for (int idx : input_mesh.triangles())
+                mesh.triangles_mut().push_back(idx + vertex_offset);
+        }
+
+        emit_mesh(ctx, std::move(mesh));
         return PCG_OK;
     }
 };
