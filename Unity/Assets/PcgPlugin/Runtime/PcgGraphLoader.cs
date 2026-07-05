@@ -47,7 +47,8 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
-            Debug.Log($"[PCG] Graph executed successfully. Result: {resultJson}");
+            if (PcgProjectSettings.IsLogEnabled)
+                Debug.Log($"[PCG] Graph executed successfully. Result: {resultJson}");
             return resultJson;
         }
     }
