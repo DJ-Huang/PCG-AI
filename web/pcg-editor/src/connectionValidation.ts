@@ -1,20 +1,16 @@
-import type { Connection, Node, Edge } from '@xyflow/react';
-import type { NodeType } from './graphSchema';
+// Connection validation — manifest pinType-based, with "Any" wildcard support.
+// Replaces the old hardcoded SpawnPoints→PlaceInScene rule.
 
-/** Allowed downstream node types for each source type. */
-const ALLOWED_TARGETS: Record<NodeType, NodeType[]> = {
-  SpawnPoints: ['PlaceInScene'],
-  PlaceInScene: [],
-};
+import type { Connection, Edge, Node } from '@xyflow/react';
+import { canConnect } from './nodeManifest';
 
 type ConnectLike = Connection | Edge;
 
 /**
- * MVP connection rules:
+ * Validates a connection using manifest pinType matching:
  * - no self-loops
- * - pipeline types only (SpawnPoints → PlaceInScene)
- * - handles must be out → in
- * - one incoming edge per target handle
+ * - source pinType must be compatible with target pinType (incl. "Any")
+ * - no duplicate edges to the same target handle
  */
 export function isValidConnection(
   connection: ConnectLike,
@@ -29,18 +25,20 @@ export function isValidConnection(
   const targetNode = nodes.find((n) => n.id === target);
   if (!sourceNode?.type || !targetNode?.type) return false;
 
-  const sourceType = sourceNode.type as NodeType;
-  const targetType = targetNode.type as NodeType;
-  const allowed = ALLOWED_TARGETS[sourceType];
-  if (!allowed?.includes(targetType)) return false;
+  // Manifest-based pinType compatibility check
+  const sHandle = sourceHandle ?? 'out';
+  const tHandle = targetHandle ?? 'in';
+  if (!canConnect(sourceNode.type, sHandle, targetNode.type, tHandle)) return false;
 
-  if (sourceHandle && sourceHandle !== 'out') return false;
-  if (targetHandle && targetHandle !== 'in') return false;
-
-  const duplicateIn = edges.some(
-    (e) => e.target === target && (!targetHandle || e.targetHandle === targetHandle),
+  // Prevent duplicate edges to the same target + targetHandle
+  const duplicate = edges.some(
+    (e) =>
+      e.target === target &&
+      (e.targetHandle ?? 'in') === tHandle &&
+      e.source === source &&
+      (e.sourceHandle ?? 'out') === sHandle,
   );
-  if (duplicateIn) return false;
+  if (duplicate) return false;
 
   return true;
 }

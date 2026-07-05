@@ -1,0 +1,314 @@
+{
+  "version": "1.3",
+  "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh). Pin types align with UE EPCGDataType.",
+  "nodes": [
+    {
+      "type": "SpawnPoints",
+      "displayName": "Spawn Points",
+      "category": "Generation",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "count": { "type": "integer", "default": 100, "minimum": 0 },
+        "radius": { "type": "number", "default": 10.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "PlaceInScene",
+      "displayName": "Place In Scene",
+      "category": "Spawner",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Instances", "pinType": "SpatialPoint" }],
+      "properties": {
+        "prefab": { "type": "string", "default": "" },
+        "scale": { "type": "number", "default": 1.0 }
+      }
+    },
+    {
+      "type": "CreatePointGrid",
+      "displayName": "Create Point Grid",
+      "category": "Generation",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "pointCountX": { "type": "integer", "default": 10, "minimum": 1 },
+        "pointCountY": { "type": "integer", "default": 10, "minimum": 1 },
+        "spacing": { "type": "number", "default": 2.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "CreatePoints",
+      "displayName": "Create Points",
+      "category": "Generation",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "x": { "type": "number", "default": 0 },
+        "y": { "type": "number", "default": 0 },
+        "z": { "type": "number", "default": 0 },
+        "count": { "type": "integer", "default": 1, "minimum": 1 },
+        "jitter": { "type": "number", "default": 0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "SurfaceSampler",
+      "displayName": "Surface Sampler",
+      "category": "Generation",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "subdivisions": { "type": "integer", "default": 8, "minimum": 2 },
+        "extent": { "type": "number", "default": 10.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "CopyAttributes",
+      "displayName": "Copy Attributes",
+      "category": "Metadata",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "attributeNames": { "type": "string", "default": "prefab,scale" },
+        "prefab": { "type": "string", "default": "" },
+        "scale": { "type": "number", "default": 1.0 }
+      }
+    },
+    {
+      "type": "DeleteAttributes",
+      "displayName": "Delete Attributes",
+      "category": "Metadata",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "attributeNames": { "type": "string", "default": "tag" }
+      }
+    },
+    {
+      "type": "BreakAttributes",
+      "displayName": "Break Attributes",
+      "category": "Metadata",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "attributeName": { "type": "string", "default": "prefab" }
+      }
+    },
+    {
+      "type": "DensityFilter",
+      "displayName": "Density Filter",
+      "category": "Filter",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "density": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
+      }
+    },
+    {
+      "type": "AttributeFilter",
+      "displayName": "Attribute Filter",
+      "category": "Filter",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "attributeName": { "type": "string", "default": "tag" },
+        "matchValue": { "type": "string", "default": "" }
+      }
+    },
+    {
+      "type": "TransformPoints",
+      "displayName": "Transform Points",
+      "category": "Transform",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "translateX": { "type": "number", "default": 0 },
+        "translateY": { "type": "number", "default": 0 },
+        "translateZ": { "type": "number", "default": 0 },
+        "scale": { "type": "number", "default": 1.0 },
+        "rotationY": { "type": "number", "default": 0 }
+      }
+    },
+    {
+      "type": "ProjectPoints",
+      "displayName": "Project Points",
+      "category": "Transform",
+      "inputs": [
+        { "id": "in", "label": "Points", "pinType": "SpatialPoint" },
+        { "id": "terrain", "label": "Terrain", "pinType": "Param" }
+      ],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "useTerrain": { "type": "boolean", "default": true },
+        "baseY": { "type": "number", "default": 0 }
+      }
+    },
+    {
+      "type": "GetTerrainData",
+      "displayName": "Get Terrain Data",
+      "category": "Sampler",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Terrain", "pinType": "Param" }],
+      "properties": {
+        "gridSize": { "type": "integer", "default": 32, "minimum": 2 },
+        "cellSize": { "type": "number", "default": 2.0, "minimum": 0 },
+        "amplitude": { "type": "number", "default": 5.0 },
+        "seed": { "type": "integer", "default": 42 }
+      }
+    },
+    {
+      "type": "SampleSurface",
+      "displayName": "Sample Surface",
+      "category": "Sampler",
+      "inputs": [
+        { "id": "in", "label": "Points", "pinType": "SpatialPoint" },
+        { "id": "terrain", "label": "Terrain", "pinType": "Param" }
+      ],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "offsetY": { "type": "number", "default": 0 },
+        "blend": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
+      }
+    },
+    {
+      "type": "StaticMeshSpawner",
+      "displayName": "Static Mesh Spawner",
+      "category": "Spawner",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Instances", "pinType": "SpatialPoint" }],
+      "properties": {
+        "prefab": { "type": "string", "default": "" },
+        "mesh": { "type": "string", "default": "" },
+        "scale": { "type": "number", "default": 1.0 }
+      }
+    },
+    {
+      "type": "ConvexHull",
+      "displayName": "Convex Hull",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Hull", "pinType": "SpatialSpline" }],
+      "properties": {
+        "tolerance": { "type": "number", "default": 0.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "ConnectNearest",
+      "displayName": "Connect Nearest",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Edges", "pinType": "SpatialSpline" }],
+      "properties": {
+        "k": { "type": "integer", "default": 1, "minimum": 1 },
+        "maxDistance": { "type": "number", "default": -1 }
+      }
+    },
+    {
+      "type": "Delaunay",
+      "displayName": "Delaunay",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Edges", "pinType": "SpatialSpline" }],
+      "properties": {
+        "maxEdgeLength": { "type": "number", "default": -1 }
+      }
+    },
+    {
+      "type": "MST",
+      "displayName": "Minimum Spanning Tree",
+      "category": "Structural",
+      "inputs": [
+        { "id": "in", "label": "Edges", "pinType": "SpatialSpline" },
+        { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
+      ],
+      "outputs": [{ "id": "out", "label": "Tree", "pinType": "SpatialSpline" }],
+      "properties": {
+        "maxEdgeLength": { "type": "number", "default": -1 }
+      }
+    },
+    {
+      "type": "Voronoi",
+      "displayName": "Voronoi",
+      "category": "Structural",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Cells", "pinType": "SpatialSpline" }],
+      "properties": {
+        "offsetY": { "type": "number", "default": 0 },
+        "maxEdgeLength": { "type": "number", "default": -1 }
+      }
+    },
+    {
+      "type": "AStarPathfinding",
+      "displayName": "A* Pathfinding",
+      "category": "Structural",
+      "inputs": [
+        { "id": "in", "label": "Edges", "pinType": "SpatialSpline" },
+        { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
+      ],
+      "outputs": [{ "id": "out", "label": "Path", "pinType": "SpatialSpline" }],
+      "properties": {
+        "startIndex": { "type": "integer", "default": 0, "minimum": 0 },
+        "endIndex": { "type": "integer", "default": 0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "CreateBoxMesh",
+      "displayName": "Create Box Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "width": { "type": "number", "default": 2.0, "minimum": 0 },
+        "height": { "type": "number", "default": 2.0, "minimum": 0 },
+        "depth": { "type": "number", "default": 2.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "SubdivideMesh",
+      "displayName": "Subdivide Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "levels": { "type": "integer", "default": 1, "minimum": 0, "maximum": 4 }
+      }
+    },
+    {
+      "type": "BevelMesh",
+      "displayName": "Bevel Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "method": {
+          "type": "enum",
+          "default": "edge",
+          "options": [
+            { "value": "edge", "label": "Edge (Blender)" },
+            { "value": "vertexPush", "label": "Vertex Push" }
+          ]
+        },
+        "offsetType": {
+          "type": "enum",
+          "default": "offset",
+          "options": [
+            { "value": "offset", "label": "Offset" },
+            { "value": "width", "label": "Width" }
+          ]
+        },
+        "amount": { "type": "number", "default": 0.1, "minimum": 0 },
+        "segments": { "type": "integer", "default": 2, "minimum": 1, "maximum": 8 },
+        "clampOverlap": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "Output",
+      "displayName": "Output",
+      "category": "Output",
+      "inputs": [{ "id": "in", "label": "Input", "pinType": "Any" }],
+      "outputs": [],
+      "properties": {
+        "label": { "type": "string", "default": "Output" }
+      }
+    }
+  ]
+}

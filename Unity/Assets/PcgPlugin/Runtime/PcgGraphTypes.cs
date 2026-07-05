@@ -126,13 +126,6 @@ namespace DJTechRuntime.PCG
     [Serializable]
     public class PcgNodeData
     {
-        public int seed = 42;
-        public float density = 0.5f;
-        public int count = 100;
-        public float radius = 10f;
-        public string prefab = "";
-        public float scale = 1f;
-
         [SerializeField] private List<string> rawKeys = new();
         [SerializeField] private List<string> rawValues = new();
 
@@ -147,17 +140,12 @@ namespace DJTechRuntime.PCG
                 rawKeys.Add(key);
                 rawValues.Add(text);
             }
-
-            SyncLegacyFields(key, value);
         }
 
         public object GetRaw(string key)
         {
             var index = rawKeys.IndexOf(key);
-            if (index < 0)
-                return GetLegacyField(key);
-
-            return rawValues[index];
+            return index < 0 ? null : rawValues[index];
         }
 
         public IEnumerable<(string key, object value)> EnumerateRaw()
@@ -183,72 +171,23 @@ namespace DJTechRuntime.PCG
             _ => value.ToString(),
         };
 
-        private void SyncLegacyFields(string key, object value)
-        {
-            switch (key)
-            {
-                case "seed": seed = Convert.ToInt32(value); break;
-                case "density": density = Convert.ToSingle(value, CultureInfo.InvariantCulture); break;
-                case "count": count = Convert.ToInt32(value); break;
-                case "radius": radius = Convert.ToSingle(value, CultureInfo.InvariantCulture); break;
-                case "prefab": prefab = value?.ToString() ?? ""; break;
-                case "scale": scale = Convert.ToSingle(value, CultureInfo.InvariantCulture); break;
-            }
-        }
-
-        private object GetLegacyField(string key) => key switch
-        {
-            "seed" => seed,
-            "density" => density,
-            "count" => count,
-            "radius" => radius,
-            "prefab" => prefab,
-            "scale" => scale,
-            _ => null,
-        };
-
         public static PcgNodeData DefaultForType(string type)
         {
             var manifestProps = PcgGraphSerializer.ManifestLookup?.Invoke(type);
             if (manifestProps != null)
             {
-                var manifestData = new PcgNodeData();
+                var data = new PcgNodeData();
                 foreach (var (key, prop) in manifestProps)
-                    manifestData.SetRaw(key, prop.defaultValue ?? "");
-                return manifestData;
+                    data.SetRaw(key, prop.defaultValue ?? "");
+                return data;
             }
 
-            var data = new PcgNodeData();
-            switch (type)
-            {
-                case PcgNodeTypes.SpawnPoints:
-                    data.count = 100;
-                    data.radius = 10f;
-                    data.SetRaw("count", 100);
-                    data.SetRaw("radius", 10f);
-                    break;
-                case PcgNodeTypes.PlaceInScene:
-                    data.prefab = "";
-                    data.scale = 1f;
-                    data.SetRaw("prefab", "");
-                    data.SetRaw("scale", 1f);
-                    break;
-            }
-
-            return data;
+            return new PcgNodeData();
         }
 
         public PcgNodeData Clone()
         {
-            var clone = new PcgNodeData
-            {
-                seed = seed,
-                density = density,
-                count = count,
-                radius = radius,
-                prefab = prefab,
-                scale = scale,
-            };
+            var clone = new PcgNodeData();
             clone.rawKeys.AddRange(rawKeys);
             clone.rawValues.AddRange(rawValues);
             return clone;

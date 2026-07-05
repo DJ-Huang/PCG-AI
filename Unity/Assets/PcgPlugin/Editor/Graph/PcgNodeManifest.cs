@@ -81,14 +81,10 @@ namespace DJTechEditor.PCG.Graph
             return _byType.TryGetValue(type, out def);
         }
 
-        public static bool IsManifestOnlyType(string type) =>
-            type is not (PcgNodeTypes.SpawnPoints or PcgNodeTypes.PlaceInScene)
-            && TryGet(type, out _);
-
         public static string GetOutputPinType(string sourceType, string sourceHandle = "out")
         {
             if (!TryGet(sourceType, out var def))
-                return InferLegacyPinType(sourceType, isOutput: true);
+                return "SpatialPoint";
 
             var pin = def.outputs.FirstOrDefault(p => p.id == (sourceHandle ?? "out"));
             return pin?.pinType ?? "SpatialPoint";
@@ -97,7 +93,7 @@ namespace DJTechEditor.PCG.Graph
         public static string GetInputPinType(string targetType, string targetHandle = "in")
         {
             if (!TryGet(targetType, out var def))
-                return InferLegacyPinType(targetType, isOutput: false);
+                return "SpatialPoint";
 
             var pin = def.inputs.FirstOrDefault(p => p.id == (targetHandle ?? "in"));
             return pin?.pinType ?? "SpatialPoint";
@@ -133,20 +129,13 @@ namespace DJTechEditor.PCG.Graph
         public static PcgNodeData DefaultDataFor(string type)
         {
             if (!TryGet(type, out var def))
-                return PcgNodeData.DefaultForType(type);
+                return new PcgNodeData();
 
             var data = new PcgNodeData();
             foreach (var (key, prop) in def.properties)
                 data.SetRaw(key, prop.defaultValue);
             return data;
         }
-
-        private static string InferLegacyPinType(string type, bool isOutput) => type switch
-        {
-            PcgNodeTypes.SpawnPoints => "SpatialPoint",
-            PcgNodeTypes.PlaceInScene => "SpatialPoint",
-            _ => "SpatialPoint",
-        };
 
         private static void EnsureLoaded()
         {
@@ -156,17 +145,36 @@ namespace DJTechEditor.PCG.Graph
             _byType = new Dictionary<string, ManifestNodeDef>();
             _all = new List<ManifestNodeDef>();
 
-            var path = Path.GetFullPath(Path.Combine(Application.dataPath, "../../schema/node-manifest.json"));
-            if (!File.Exists(path))
+            // 1. Dev path — hot-reload during development (schema/ is repo sibling of Unity/)
+            var devPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../schema/node-manifest.json"));
+            if (File.Exists(devPath))
             {
-                Debug.LogWarning($"[PCG] node-manifest not found at {path}");
-                _loaded = true;
+                LoadFromString(File.ReadAllText(devPath));
                 return;
             }
 
+            // 2. Distribution — load from Editor assets (bundled with plugin, not in Resources)
+            var guids = AssetDatabase.FindAssets("node-manifest t:TextAsset");
+            if (guids.Length > 0)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+                if (textAsset != null)
+                {
+                    LoadFromString(textAsset.text);
+                    return;
+                }
+            }
+
+            Debug.LogWarning("[PCG] node-manifest not found in dev path or Editor assets");
+            _loaded = true;
+        }
+
+        private static void LoadFromString(string json)
+        {
             try
             {
-                var root = PcgMiniJson.Deserialize(File.ReadAllText(path)) as Dictionary<string, object>;
+                var root = PcgMiniJson.Deserialize(json) as Dictionary<string, object>;
                 if (root?.TryGetValue("nodes", out var nodesObj) != true || nodesObj is not List<object> nodesList)
                 {
                     _loaded = true;

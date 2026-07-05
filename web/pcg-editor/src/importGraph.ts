@@ -1,16 +1,17 @@
-import type { Node, Edge } from '@xyflow/react';
-import type { GraphNode, GraphEdge, NodeType, NodeData } from './graphSchema';
-import { defaultData } from './graphSchema';
+// importGraph.ts — Parse Graph JSON v1 (with parameters) into React Flow nodes/edges.
+// Node types validated against node-manifest.json (no hardcoded type set).
 
-const NODE_TYPES = new Set<NodeType>(['SpawnPoints', 'PlaceInScene']);
+import type { Node, Edge } from '@xyflow/react';
+import type { GraphNode, GraphEdge, NodeData, GraphParameter } from './graphSchema';
+import { defaultData } from './graphSchema';
+import { getNodeTypeDefs } from './nodeManifest';
 
 export type ImportResult =
-  | { ok: true; nodes: Node[]; edges: Edge[]; filename?: string }
+  | { ok: true; nodes: Node[]; edges: Edge[]; parameters: GraphParameter[]; filename?: string }
   | { ok: false; error: string };
 
 /**
- * Parses Graph JSON v1 text into React Flow nodes/edges.
- * Validation mirrors Unity PcgGraphSerializer.TryFromJson + schema/graph-schema.json.
+ * Parses Graph JSON v1 text into React Flow nodes/edges + parameters.
  */
 export function parseGraphJson(text: string): ImportResult {
   let parsed: unknown;
@@ -71,7 +72,17 @@ export function parseGraphJson(text: string): ImportResult {
     edges.push(toFlowEdge(edgeResult.edge));
   }
 
-  return { ok: true, nodes, edges };
+  // Parse parameters (optional)
+  const parameters: GraphParameter[] = [];
+  if (Array.isArray(root.parameters)) {
+    for (let i = 0; i < root.parameters.length; i++) {
+      const paramResult = toGraphParameter(root.parameters[i], i);
+      if (!paramResult.ok) return paramResult;
+      parameters.push(paramResult.param);
+    }
+  }
+
+  return { ok: true, nodes, edges, parameters };
 }
 
 export function importGraphFromFile(file: File): Promise<ImportResult> {
@@ -101,6 +112,7 @@ export function syncNodeCounterFromNodes(nodes: Node[]): number {
 
 type NodeParse = { ok: true; node: GraphNode } | { ok: false; error: string };
 type EdgeParse = { ok: true; edge: GraphEdge } | { ok: false; error: string };
+type ParamParse = { ok: true; param: GraphParameter } | { ok: false; error: string };
 
 function toGraphNode(item: unknown, index: number): NodeParse {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
@@ -114,21 +126,25 @@ function toGraphNode(item: unknown, index: number): NodeParse {
   }
 
   const type = raw.type;
-  if (typeof type !== 'string' || !NODE_TYPES.has(type as NodeType)) {
-    return { ok: false, error: `Node "${id}" has unsupported type "${String(type)}".` };
+  if (typeof type !== 'string') {
+    return { ok: false, error: `Node "${id}" is missing "type".` };
   }
 
-  const nodeType = type as NodeType;
+  // Validate against manifest (no hardcoded type set)
+  if (!getNodeTypeDefs(type)) {
+    return { ok: false, error: `Node "${id}" has unknown type "${type}".` };
+  }
+
   const position = parsePosition(raw.position, id);
   if (!position.ok) return position;
 
-  const data = mergeNodeData(nodeType, raw.data);
+  const data = mergeNodeData(type, raw.data);
 
   return {
     ok: true,
     node: {
       id,
-      type: nodeType,
+      type,
       position: position.value,
       data,
     },
@@ -148,8 +164,8 @@ function parsePosition(
   return { ok: true, value: { x, y } };
 }
 
-function mergeNodeData(type: NodeType, value: unknown): NodeData {
-  const defaults = defaultData[type];
+function mergeNodeData(type: string, value: unknown): NodeData {
+  const defaults = defaultData(type);
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { ...defaults };
   }
@@ -179,6 +195,42 @@ function toGraphEdge(item: unknown, index: number): EdgeParse {
       sourceHandle: typeof raw.sourceHandle === 'string' ? raw.sourceHandle : undefined,
       targetHandle: typeof raw.targetHandle === 'string' ? raw.targetHandle : undefined,
     },
+  };
+}
+
+function toGraphParameter(item: unknown, index: number): ParamParse {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return { ok: false, error: `Parameter at index ${index} is not an object.` };
+  }
+
+  const raw = item as Record<string, unknown>;
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  if (!id) {
+    return { ok: false, error: `Parameter at index ${index} is missing "id".` };
+  }
+
+  const name = typeof raw.name === 'string' ? raw.name : '';
+  const type = typeof raw.type === 'string' ? (raw.type as GraphParameter['type']) : 'number';
+  const exposed = typeof raw.exposed === 'boolean' ? raw.exposed : true;
+  const targetNode = typeof raw.targetNode === 'string' ? raw.targetNode : '';
+  const targetProperty = typeof raw.targetProperty === 'string' ? raw.targetProperty : '';
+  const hasRange = typeof raw.hasRange === 'boolean' ? raw.hasRange : false;
+  const min = typeof raw.min === 'number' ? raw.min : 0;
+  const max = typeof raw.max === 'number' ? raw.max : 1;
+
+  // Infer default value type
+  let defaultValue: number | boolean | string = 0;
+  if (type === 'boolean') {
+    defaultValue = typeof raw.default === 'boolean' ? raw.default : false;
+  } else if (type === 'string') {
+    defaultValue = typeof raw.default === 'string' ? raw.default : '';
+  } else {
+    defaultValue = typeof raw.default === 'number' ? raw.default : 0;
+  }
+
+  return {
+    ok: true,
+    param: { id, name, type, default: defaultValue, exposed, targetNode, targetProperty, hasRange, min, max },
   };
 }
 

@@ -40,12 +40,8 @@ namespace DJTechEditor.PCG.Graph
             if (_draggedPort != null && _compatibleTypes != null)
             {
                 // Filtered mode: only show compatible types
-                var legacyTypes = PcgNodeTypes.All.Where(t => _compatibleTypes.Contains(t));
-                if (legacyTypes.Any())
-                    AddGroup(tree, "Legacy MVP", legacyTypes);
-
                 var manifestGroups = PcgNodeManifest.All
-                    .Where(def => PcgNodeManifest.IsManifestOnlyType(def.type) && _compatibleTypes.Contains(def.type))
+                    .Where(def => _compatibleTypes.Contains(def.type))
                     .GroupBy(def => def.category ?? "Other")
                     .OrderBy(g => g.Key);
 
@@ -55,10 +51,7 @@ namespace DJTechEditor.PCG.Graph
             else
             {
                 // Unfiltered mode: show all types
-                AddGroup(tree, "Legacy MVP", PcgNodeTypes.All);
-
                 var manifestGroups = PcgNodeManifest.All
-                    .Where(def => PcgNodeManifest.IsManifestOnlyType(def.type))
                     .GroupBy(def => def.category ?? "Other")
                     .OrderBy(g => g.Key);
 

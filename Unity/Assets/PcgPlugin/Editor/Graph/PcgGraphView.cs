@@ -312,16 +312,8 @@ namespace DJTechEditor.PCG.Graph
                 : PcgNodeManifest.GetInputPinType(sourceNode.NodeType, handle);
 
             var compatible = new HashSet<string>();
-            foreach (var type in PcgNodeTypes.All)
-            {
-                if (isOutput ? PcgNodeManifest.HasCompatibleInputPin(type, pinType)
-                              : PcgNodeManifest.HasCompatibleOutputPin(type, pinType))
-                    compatible.Add(type);
-            }
             foreach (var def in PcgNodeManifest.All)
             {
-                if (!PcgNodeManifest.IsManifestOnlyType(def.type))
-                    continue;
                 if (isOutput ? PcgNodeManifest.HasCompatibleInputPin(def.type, pinType)
                               : PcgNodeManifest.HasCompatibleOutputPin(def.type, pinType))
                     compatible.Add(def.type);

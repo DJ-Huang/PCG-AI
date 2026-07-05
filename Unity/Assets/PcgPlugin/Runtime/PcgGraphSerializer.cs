@@ -181,22 +181,6 @@ namespace DJTechRuntime.PCG
         {
             foreach (var (key, value) in dict)
                 data.SetRaw(key, value);
-
-            switch (type)
-            {
-                case PcgNodeTypes.SpawnPoints:
-                    if (dict.TryGetValue("count", out var count))
-                        data.count = Convert.ToInt32(count, CultureInfo.InvariantCulture);
-                    if (dict.TryGetValue("radius", out var radius))
-                        data.radius = Convert.ToSingle(radius, CultureInfo.InvariantCulture);
-                    break;
-                case PcgNodeTypes.PlaceInScene:
-                    if (dict.TryGetValue("prefab", out var prefab))
-                        data.prefab = prefab?.ToString() ?? "";
-                    if (dict.TryGetValue("scale", out var scale))
-                        data.scale = Convert.ToSingle(scale, CultureInfo.InvariantCulture);
-                    break;
-            }
         }
 
         private static void AppendNode(StringBuilder sb, PcgGraphNodeRecord node, bool pretty, string indent)

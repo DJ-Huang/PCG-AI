@@ -35,20 +35,7 @@ namespace DJTechEditor.PCG.Graph
         public virtual Port FindInputPort(string handle = "in") => InputPort;
         public virtual Port FindOutputPort(string handle = "out") => OutputPort;
 
-        protected virtual void BuildPorts()
-        {
-            if (NodeType != PcgNodeTypes.SpawnPoints)
-            {
-                InputPort = CreatePort(Direction.Input, "in");
-                inputContainer.Add(InputPort);
-            }
-
-            if (NodeType != PcgNodeTypes.PlaceInScene)
-            {
-                OutputPort = CreatePort(Direction.Output, "out");
-                outputContainer.Add(OutputPort);
-            }
-        }
+        protected virtual void BuildPorts() { }
 
         protected Port CreatePort(Direction direction, string portName)
         {

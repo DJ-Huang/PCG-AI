@@ -27,23 +27,12 @@ namespace DJTechEditor.PCG.Graph
 
         public static PcgGraphNodeBase Create(string type, string id, Vector2 position, PcgNodeData data = null)
         {
-            if (PcgNodeManifest.TryGet(type, out var def) && PcgNodeManifest.IsManifestOnlyType(type))
-            {
-                var manifestNode = new PcgManifestNodeView(def);
-                manifestNode.Initialize(id, position);
-                manifestNode.ApplyData(data ?? PcgNodeManifest.DefaultDataFor(type));
-                return manifestNode;
-            }
+            if (!PcgNodeManifest.TryGet(type, out var def))
+                throw new ArgumentException($"Unknown node type: {type}");
 
-            PcgGraphNodeBase node = type switch
-            {
-                PcgNodeTypes.SpawnPoints => new PcgSpawnPointsNodeView(),
-                PcgNodeTypes.PlaceInScene => new PcgPlaceInSceneNodeView(),
-                _ => throw new ArgumentException($"Unknown node type: {type}"),
-            };
-
+            var node = new PcgManifestNodeView(def);
             node.Initialize(id, position);
-            node.ApplyData(data ?? PcgNodeData.DefaultForType(type));
+            node.ApplyData(data ?? PcgNodeManifest.DefaultDataFor(type));
             return node;
         }
     }

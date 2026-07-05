@@ -1,20 +1,16 @@
 // Graph JSON v1 types — shared contract between Web editor, C++ core, and Unity plugin.
+// Node types are manifest-driven (schema/node-manifest.json); this file defines
+// the wire format and parameter system types.
 
-export type NodeType = 'SpawnPoints' | 'PlaceInScene';
+import { defaultDataFor } from './nodeManifest';
 
-export interface Vec2 { x: number; y: number; }
+export type NodeType = string;
+export type NodeData = Record<string, unknown>;
 
-export interface SpawnPointsData {
-  count: number;
-  radius: number;
+export interface Vec2 {
+  x: number;
+  y: number;
 }
-
-export interface PlaceInSceneData {
-  prefab: string;
-  scale: number;
-}
-
-export type NodeData = SpawnPointsData | PlaceInSceneData;
 
 export interface GraphNode {
   id: string;
@@ -31,13 +27,35 @@ export interface GraphEdge {
   targetHandle?: string;
 }
 
+// ── Parameters ─────────────────────────────────────────
+
+export type ParameterType = 'integer' | 'number' | 'boolean' | 'string';
+
+export interface GraphParameter {
+  id: string;
+  name: string;
+  type: ParameterType;
+  default: number | boolean | string;
+  exposed: boolean;
+  targetNode: string;
+  targetProperty: string;
+  hasRange: boolean;
+  min: number;
+  max: number;
+}
+
+// ── Graph Document ─────────────────────────────────────
+
 export interface GraphJson {
   version: '1.0';
   nodes: GraphNode[];
   edges: GraphEdge[];
+  parameters?: GraphParameter[];
 }
 
-export const defaultData: Record<NodeType, NodeData> = {
-  SpawnPoints: { count: 100, radius: 10.0 },
-  PlaceInScene: { prefab: '', scale: 1.0 },
-};
+// ── Defaults ───────────────────────────────────────────
+
+/** Returns default node data for a type, sourced from node-manifest.json. */
+export function defaultData(type: NodeType): NodeData {
+  return defaultDataFor(type);
+}

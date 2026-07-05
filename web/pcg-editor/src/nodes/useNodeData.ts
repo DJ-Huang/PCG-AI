@@ -1,11 +1,10 @@
 import { useReactFlow, useNodeId } from '@xyflow/react';
-import type { NodeData } from '../graphSchema';
 
-export function useNodeData<T extends NodeData>() {
+export function useNodeData() {
   const id = useNodeId();
   const { updateNodeData } = useReactFlow();
 
-  const patch = (partial: Partial<T>) => {
+  const patch = (partial: Record<string, unknown>) => {
     if (id) updateNodeData(id, partial);
   };
 

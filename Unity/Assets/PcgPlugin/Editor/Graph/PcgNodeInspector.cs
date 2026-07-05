@@ -119,8 +119,6 @@ namespace DJTechEditor.PCG.Graph
 
             if (node is PcgManifestNodeView manifestNode)
                 ShowManifestProperties(manifestNode);
-            else
-                ShowLegacyProperties(node);
         }
 
         // ─── Manifest nodes ──────────────────────────────────────────
@@ -255,110 +253,6 @@ namespace DJTechEditor.PCG.Graph
             return wrapper;
         }
 
-        // ─── Legacy nodes ────────────────────────────────────────────
-
-        private void ShowLegacyProperties(PcgGraphNodeBase node)
-        {
-            var props = node.NodeType switch
-            {
-                PcgNodeTypes.SpawnPoints => new[] { ("count", "integer", "Count"), ("radius", "number", "Radius") },
-                PcgNodeTypes.PlaceInScene => new[] { ("prefab", "string", "Prefab"), ("scale", "number", "Scale") },
-                _ => Array.Empty<(string, string, string)>(),
-            };
-
-            if (props.Length == 0)
-            {
-                m_Body.Add(new Label("(no parameters)") { style = { color = new Color(0.5f, 0.5f, 0.5f) } });
-                return;
-            }
-
-            foreach (var (key, type, displayName) in props)
-                m_Body.Add(CreateLegacyPropertyRow(node, key, type, displayName));
-        }
-
-        private VisualElement CreateLegacyPropertyRow(PcgGraphNodeBase node, string key, string type, string displayName)
-        {
-            var container = new VisualElement { style = { marginBottom = 6 } };
-
-            var headerRow = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-
-            var label = new Label(displayName)
-            {
-                style = { flexGrow = 1, color = new Color(0.8f, 0.8f, 0.8f), unityFontStyleAndWeight = FontStyle.Bold },
-            };
-            headerRow.Add(label);
-
-            // Promote button
-            var promoteBtn = new Button(() => PromoteToParameterLegacy(node, key, type, displayName))
-            {
-                text = "+",
-                tooltip = "Promote to parameter",
-            };
-            promoteBtn.style.width = 22;
-            headerRow.Add(promoteBtn);
-
-            // Bind dropdown
-            var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, type);
-            var bindPopup = new PopupField<string>(bindOptions, currentIdx);
-            bindPopup.style.width = 90;
-            bindPopup.RegisterValueChangedCallback(evt =>
-            {
-                m_GraphView.WithUndo("Bind Parameter", () =>
-                {
-                    var idx = bindOptions.IndexOf(evt.newValue);
-                    var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
-                    if (string.IsNullOrEmpty(paramId))
-                        m_Blackboard.ClearBindingForNode(node.NodeId, key);
-                    else
-                        m_Blackboard.SetBinding(paramId, node.NodeId, key);
-                });
-                ShowNode(node);
-            });
-            headerRow.Add(bindPopup);
-            container.Add(headerRow);
-
-            // Value field or bound label
-            var binding = m_Blackboard.FindBinding(node.NodeId, key);
-            if (binding != null)
-            {
-                var wrapper = new VisualElement { style = { marginTop = 2 } };
-                if (binding.hasRange && (binding.type == "integer" || binding.type == "number"))
-                {
-                    var val = float.TryParse(binding.defaultValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var fv) ? fv : binding.minValue;
-                    var slider = new Slider(binding.minValue, binding.maxValue) { value = Mathf.Clamp(fv, binding.minValue, binding.maxValue) };
-                    var valLabel = new Label(binding.defaultValue) { style = { color = new Color(0.4f, 0.7f, 1.0f), fontSize = 10 } };
-                    slider.style.flexGrow = 1;
-                    var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-                    row.Add(slider);
-                    row.Add(valLabel);
-                    wrapper.Add(new Label($"→ {binding.name}") { style = { color = new Color(0.4f, 0.7f, 1.0f), unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 2 } });
-                    wrapper.Add(row);
-                }
-                else
-                {
-                    wrapper.Add(new Label($"→ {binding.name} ({binding.defaultValue})")
-                    {
-                        style = { color = new Color(0.4f, 0.7f, 1.0f), unityFontStyleAndWeight = FontStyle.Italic },
-                    });
-                }
-                container.Add(wrapper);
-            }
-            else
-            {
-                var currentVal = node.CollectData().GetRaw(key);
-                VisualElement field = type switch
-                {
-                    "integer" => MakeIntField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                    "number" => MakeFloatField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                    _ => MakeTextField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                };
-                field.style.marginTop = 2;
-                container.Add(field);
-            }
-
-            return container;
-        }
-
         // ─── Promote to parameter ────────────────────────────────────
 
         private void PromoteToParameter(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
@@ -389,24 +283,6 @@ namespace DJTechEditor.PCG.Graph
                     param.maxValue = prop.maximum;
                 }
 
-                m_Blackboard.SetBinding(param.id, node.NodeId, key);
-            });
-            ShowNode(node);
-        }
-
-        private void PromoteToParameterLegacy(PcgGraphNodeBase node, string key, string type, string displayName)
-        {
-            m_GraphView.WithUndo("Promote to Parameter", () =>
-            {
-                var currentVal = node.CollectData().GetRaw(key);
-                var defaultStr = type switch
-                {
-                    "integer" => Convert.ToInt32(currentVal ?? 0, CultureInfo.InvariantCulture).ToString(),
-                    "number" => Convert.ToSingle(currentVal ?? 0f, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
-                    _ => currentVal?.ToString() ?? "",
-                };
-
-                var param = m_Blackboard.CreateParameter(displayName, type, defaultStr);
                 m_Blackboard.SetBinding(param.id, node.NodeId, key);
             });
             ShowNode(node);
