@@ -4,13 +4,13 @@
     {
       "id": "n101",
       "type": "CreateBoxMesh",
-      "position": { "x": -15, "y": 228 },
+      "position": { "x": 50, "y": 266 },
       "data": {"width": 2, "height": 2, "depth": 2}
     },
     {
       "id": "n103",
       "type": "SubdivideMesh",
-      "position": { "x": 185, "y": 360 },
+      "position": { "x": 334.5, "y": 295 },
       "data": {"levels": 1}
     }
   ],

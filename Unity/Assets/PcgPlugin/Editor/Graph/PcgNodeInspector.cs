@@ -170,12 +170,15 @@ namespace DJTechEditor.PCG.Graph
             bindPopup.style.width = 90;
             bindPopup.RegisterValueChangedCallback(evt =>
             {
-                var idx = bindOptions.IndexOf(evt.newValue);
-                var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
-                if (string.IsNullOrEmpty(paramId))
-                    m_Blackboard.ClearBindingForNode(node.NodeId, key);
-                else
-                    m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                m_GraphView.WithUndo("Bind Parameter", () =>
+                {
+                    var idx = bindOptions.IndexOf(evt.newValue);
+                    var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
+                    if (string.IsNullOrEmpty(paramId))
+                        m_Blackboard.ClearBindingForNode(node.NodeId, key);
+                    else
+                        m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                });
                 ShowNode(node);
             });
             headerRow.Add(bindPopup);
@@ -226,11 +229,13 @@ namespace DJTechEditor.PCG.Graph
                 var slider = new Slider(prop.minimum, prop.maximum) { value = clamped };
                 var valLabel = new Label(clamped.ToString(CultureInfo.InvariantCulture)) { style = { color = new Color(0.8f, 0.8f, 0.8f), fontSize = 10, marginLeft = 4, minWidth = 40 } };
                 slider.style.flexGrow = 1;
+                slider.RegisterCallback<PointerDownEvent>(_ => m_GraphView.BeginDrag("Change Property"));
                 slider.RegisterValueChangedCallback(evt =>
                 {
                     node.SetPropertyValue(key, evt.newValue);
                     valLabel.text = evt.newValue.ToString(CultureInfo.InvariantCulture);
                 });
+                slider.RegisterCallback<PointerUpEvent>(_ => m_GraphView.EndDrag());
                 var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
                 row.Add(slider);
                 row.Add(valLabel);
@@ -299,12 +304,15 @@ namespace DJTechEditor.PCG.Graph
             bindPopup.style.width = 90;
             bindPopup.RegisterValueChangedCallback(evt =>
             {
-                var idx = bindOptions.IndexOf(evt.newValue);
-                var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
-                if (string.IsNullOrEmpty(paramId))
-                    m_Blackboard.ClearBindingForNode(node.NodeId, key);
-                else
-                    m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                m_GraphView.WithUndo("Bind Parameter", () =>
+                {
+                    var idx = bindOptions.IndexOf(evt.newValue);
+                    var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
+                    if (string.IsNullOrEmpty(paramId))
+                        m_Blackboard.ClearBindingForNode(node.NodeId, key);
+                    else
+                        m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                });
                 ShowNode(node);
             });
             headerRow.Add(bindPopup);
@@ -356,47 +364,52 @@ namespace DJTechEditor.PCG.Graph
 
         private void PromoteToParameter(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
         {
-            var currentVal = node.CollectData().GetRaw(key);
-            var defaultStr = prop.type switch
+            m_GraphView.WithUndo("Promote to Parameter", () =>
             {
-                "integer" => Convert.ToInt32(currentVal ?? prop.defaultValue ?? 0, CultureInfo.InvariantCulture).ToString(),
-                "number" => Convert.ToSingle(currentVal ?? prop.defaultValue ?? 0f, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
-                "boolean" => currentVal switch
+                var currentVal = node.CollectData().GetRaw(key);
+                var defaultStr = prop.type switch
                 {
-                    bool b => b ? "true" : "false",
-                    string s => s,
-                    _ => "false",
-                },
-                _ => currentVal?.ToString() ?? prop.defaultValue?.ToString() ?? "",
-            };
+                    "integer" => Convert.ToInt32(currentVal ?? prop.defaultValue ?? 0, CultureInfo.InvariantCulture).ToString(),
+                    "number" => Convert.ToSingle(currentVal ?? prop.defaultValue ?? 0f, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
+                    "boolean" => currentVal switch
+                    {
+                        bool b => b ? "true" : "false",
+                        string s => s,
+                        _ => "false",
+                    },
+                    _ => currentVal?.ToString() ?? prop.defaultValue?.ToString() ?? "",
+                };
 
-            var paramType = prop.type == "enum" ? "string" : prop.type;
-            var param = m_Blackboard.CreateParameter(key, paramType, defaultStr);
+                var paramType = prop.type == "enum" ? "string" : prop.type;
+                var param = m_Blackboard.CreateParameter(key, paramType, defaultStr);
 
-            // Carry over range from manifest property
-            if (prop.hasRange)
-            {
-                param.hasRange = true;
-                param.minValue = prop.minimum;
-                param.maxValue = prop.maximum;
-            }
+                if (prop.hasRange)
+                {
+                    param.hasRange = true;
+                    param.minValue = prop.minimum;
+                    param.maxValue = prop.maximum;
+                }
 
-            m_Blackboard.SetBinding(param.id, node.NodeId, key);
+                m_Blackboard.SetBinding(param.id, node.NodeId, key);
+            });
             ShowNode(node);
         }
 
         private void PromoteToParameterLegacy(PcgGraphNodeBase node, string key, string type, string displayName)
         {
-            var currentVal = node.CollectData().GetRaw(key);
-            var defaultStr = type switch
+            m_GraphView.WithUndo("Promote to Parameter", () =>
             {
-                "integer" => Convert.ToInt32(currentVal ?? 0, CultureInfo.InvariantCulture).ToString(),
-                "number" => Convert.ToSingle(currentVal ?? 0f, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
-                _ => currentVal?.ToString() ?? "",
-            };
+                var currentVal = node.CollectData().GetRaw(key);
+                var defaultStr = type switch
+                {
+                    "integer" => Convert.ToInt32(currentVal ?? 0, CultureInfo.InvariantCulture).ToString(),
+                    "number" => Convert.ToSingle(currentVal ?? 0f, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
+                    _ => currentVal?.ToString() ?? "",
+                };
 
-            var param = m_Blackboard.CreateParameter(displayName, type, defaultStr);
-            m_Blackboard.SetBinding(param.id, node.NodeId, key);
+                var param = m_Blackboard.CreateParameter(displayName, type, defaultStr);
+                m_Blackboard.SetBinding(param.id, node.NodeId, key);
+            });
             ShowNode(node);
         }
 
@@ -442,21 +455,23 @@ namespace DJTechEditor.PCG.Graph
 
         // ─── Field factories ────────────────────────────────────────
 
-        private static IntegerField MakeIntField(string key, object val, Action<int> onSet)
+        private IntegerField MakeIntField(string key, object val, Action<int> onSet)
         {
             var field = new IntegerField { value = Convert.ToInt32(val ?? 0, CultureInfo.InvariantCulture) };
-            field.RegisterValueChangedCallback(evt => onSet(evt.newValue));
+            field.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
             return field;
         }
 
-        private static FloatField MakeFloatField(string key, object val, Action<float> onSet)
+        private FloatField MakeFloatField(string key, object val, Action<float> onSet)
         {
             var field = new FloatField { value = Convert.ToSingle(val ?? 0f, CultureInfo.InvariantCulture) };
-            field.RegisterValueChangedCallback(evt => onSet(evt.newValue));
+            field.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
             return field;
         }
 
-        private static Toggle MakeToggleField(string key, object val, Action<bool> onSet)
+        private Toggle MakeToggleField(string key, object val, Action<bool> onSet)
         {
             var b = val switch
             {
@@ -465,11 +480,12 @@ namespace DJTechEditor.PCG.Graph
                 _ => false,
             };
             var field = new Toggle { value = b };
-            field.RegisterValueChangedCallback(evt => onSet(evt.newValue));
+            field.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
             return field;
         }
 
-        private static VisualElement MakeEnumField(string key, ManifestPropertyDef prop, object val, Action<string> onSet)
+        private VisualElement MakeEnumField(string key, ManifestPropertyDef prop, object val, Action<string> onSet)
         {
             var labels = new List<string>();
             var values = new List<string>();
@@ -493,17 +509,21 @@ namespace DJTechEditor.PCG.Graph
             var popup = new PopupField<string>(labels, selectedIdx);
             popup.RegisterValueChangedCallback(evt =>
             {
-                var idx = labels.IndexOf(evt.newValue);
-                if (idx >= 0 && idx < values.Count)
-                    onSet(values[idx]);
+                m_GraphView.WithUndo("Change Property", () =>
+                {
+                    var idx = labels.IndexOf(evt.newValue);
+                    if (idx >= 0 && idx < values.Count)
+                        onSet(values[idx]);
+                });
             });
             return popup;
         }
 
-        private static TextField MakeTextField(string key, object val, Action<string> onSet)
+        private TextField MakeTextField(string key, object val, Action<string> onSet)
         {
             var field = new TextField { value = val?.ToString() ?? "" };
-            field.RegisterValueChangedCallback(evt => onSet(evt.newValue));
+            field.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
             return field;
         }
     }

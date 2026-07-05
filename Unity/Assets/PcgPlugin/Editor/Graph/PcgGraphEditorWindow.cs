@@ -52,6 +52,12 @@ namespace DJTechEditor.PCG.Graph
                 LoadDefaultGraph();
         }
 
+        private void Update()
+        {
+            if (m_GraphView != null && m_GraphView.State != null && m_GraphView.State.WasUndoRedoPerformed)
+                m_GraphView.RestoreFromUndoState();
+        }
+
         private void ConstructToolbar()
         {
             var toolbar = new VisualElement
