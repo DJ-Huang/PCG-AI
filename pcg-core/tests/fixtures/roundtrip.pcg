@@ -2,15 +2,9 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "n1",
-      "type": "ParseConfig",
-      "position": { "x": 38, "y": 118.5 },
-      "data": { "seed": 15, "density": 0.5 }
-    },
-    {
       "id": "n2",
       "type": "SpawnPoints",
-      "position": { "x": 322, "y": 118.5 },
+      "position": { "x": 38, "y": 118.5 },
       "data": { "count": 300, "radius": 10 }
     },
     {
@@ -21,7 +15,6 @@
     }
   ],
   "edges": [
-    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "out", "targetHandle": "in" },
     { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "out", "targetHandle": "in" }
   ]
 }

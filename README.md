@@ -119,7 +119,6 @@ npm run dev
 
 | 操作 | 说明 |
 |------|------|
-| **+ ParseConfig** | 添加配置解析节点（`seed`、`density`） |
 | **+ SpawnPoints** | 添加点生成节点（`count`、`radius`） |
 | **+ PlaceInScene** | 添加场景放置节点（`prefab`、`scale`） |
 | 拖拽连线 | 按节点 handle 连接；非法连接会被拒绝 |
@@ -127,7 +126,7 @@ npm run dev
 | **Import JSON** | 从本机加载 `.pcg`（Unity Graph **Export…** 或 **Export JSON** 产物） |
 | **Send to Unity** | 将当前图写入 `schema/editor-export.pcg`（**必须** `npm run dev` 运行中） |
 
-默认画布已包含一条三节点流水线：`ParseConfig → SpawnPoints → PlaceInScene`。
+默认画布已包含一条二节点流水线：`SpawnPoints → PlaceInScene`。
 
 ### 其他 npm 命令
 

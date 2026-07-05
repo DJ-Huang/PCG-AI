@@ -94,6 +94,31 @@ namespace DJTechEditor.PCG.Graph
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             base.BuildContextualMenu(evt);
+
+            if (evt.target is VisualElement ve)
+            {
+                var nodeView = ve.GetFirstAncestorOfType<PcgGraphNodeBase>()
+                             ?? (ve as PcgGraphNodeBase);
+                if (nodeView != null)
+                {
+                    evt.menu.AppendAction(
+                        "Copy Raw Data",
+                        _ =>
+                        {
+                            var doc = new PcgGraphDocument { version = "1.0" };
+                            var rect = nodeView.GetPosition();
+                            doc.nodes.Add(new PcgGraphNodeRecord
+                            {
+                                id = nodeView.NodeId,
+                                type = nodeView.NodeType,
+                                position = PcgGraphPosition.FromVector2(rect.position),
+                                data = nodeView.CollectData(),
+                            });
+                            var json = PcgGraphSerializer.ToJson(doc, pretty: true);
+                            GUIUtility.systemCopyBuffer = json;
+                        });
+                }
+            }
         }
 
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)

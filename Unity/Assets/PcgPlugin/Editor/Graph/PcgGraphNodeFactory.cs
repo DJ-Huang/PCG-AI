@@ -37,7 +37,6 @@ namespace DJTechEditor.PCG.Graph
 
             PcgGraphNodeBase node = type switch
             {
-                PcgNodeTypes.ParseConfig => new PcgParseConfigNodeView(),
                 PcgNodeTypes.SpawnPoints => new PcgSpawnPointsNodeView(),
                 PcgNodeTypes.PlaceInScene => new PcgPlaceInSceneNodeView(),
                 _ => throw new ArgumentException($"Unknown node type: {type}"),

@@ -261,7 +261,6 @@ namespace DJTechEditor.PCG.Graph
         {
             var props = node.NodeType switch
             {
-                PcgNodeTypes.ParseConfig => new[] { ("seed", "integer", "Seed"), ("density", "number", "Density") },
                 PcgNodeTypes.SpawnPoints => new[] { ("count", "integer", "Count"), ("radius", "number", "Radius") },
                 PcgNodeTypes.PlaceInScene => new[] { ("prefab", "string", "Prefab"), ("scale", "number", "Scale") },
                 _ => Array.Empty<(string, string, string)>(),

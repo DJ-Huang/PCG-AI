@@ -130,7 +130,10 @@ PcgResultCode execute_graph(const Graph& graph,
         outputs[node_id] = ctx.outputs.primary_json();
     }
 
+    // Prefer Output-type sink nodes (Houdini-style terminal).
+    // Fall back to any sink if no Output node exists.
     const GraphNode* sink = nullptr;
+    const GraphNode* fallback_sink = nullptr;
     for (const auto& node : graph.nodes) {
         bool has_outgoing = false;
         for (const auto& edge : graph.edges) {
@@ -139,9 +142,16 @@ PcgResultCode execute_graph(const Graph& graph,
                 break;
             }
         }
-        if (!has_outgoing)
-            sink = &node;
+        if (!has_outgoing) {
+            if (node.type == "Output" && !sink)
+                sink = &node;
+            if (!fallback_sink)
+                fallback_sink = &node;
+        }
     }
+
+    if (!sink)
+        sink = fallback_sink;
 
     if (!sink)
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Graph has no sink node");

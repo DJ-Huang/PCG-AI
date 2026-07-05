@@ -14,7 +14,6 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import ParseConfigNode from './nodes/ParseConfigNode';
 import SpawnPointsNode from './nodes/SpawnPointsNode';
 import PlaceInSceneNode from './nodes/PlaceInSceneNode';
 import { defaultData, type NodeType as GraphNodeType } from './graphSchema';
@@ -24,7 +23,6 @@ import { isValidConnection } from './connectionValidation';
 import './App.css';
 
 const nodeTypes = {
-  ParseConfig: ParseConfigNode,
   SpawnPoints: SpawnPointsNode,
   PlaceInScene: PlaceInSceneNode,
 };
@@ -32,27 +30,20 @@ const nodeTypes = {
 const initialNodes: Node[] = [
   {
     id: 'n1',
-    type: 'ParseConfig',
-    position: { x: 50, y: 150 },
-    data: { ...defaultData.ParseConfig },
-  },
-  {
-    id: 'n2',
     type: 'SpawnPoints',
-    position: { x: 400, y: 150 },
+    position: { x: 50, y: 150 },
     data: { ...defaultData.SpawnPoints },
   },
   {
-    id: 'n3',
+    id: 'n2',
     type: 'PlaceInScene',
-    position: { x: 750, y: 150 },
+    position: { x: 400, y: 150 },
     data: { ...defaultData.PlaceInScene },
   },
 ];
 
 const initialEdges: Edge[] = [
   { id: 'e1', source: 'n1', target: 'n2', sourceHandle: 'out', targetHandle: 'in' },
-  { id: 'e2', source: 'n2', target: 'n3', sourceHandle: 'out', targetHandle: 'in' },
 ];
 
 let nodeCounter = 100;
@@ -127,7 +118,6 @@ function PcgEditor() {
   return (
     <div className="pcg-app">
       <div className="pcg-toolbar">
-        <button type="button" onClick={() => addNode('ParseConfig')}>+ ParseConfig</button>
         <button type="button" onClick={() => addNode('SpawnPoints')}>+ SpawnPoints</button>
         <button type="button" onClick={() => addNode('PlaceInScene')}>+ PlaceInScene</button>
         <span className="pcg-toolbar__spacer" />

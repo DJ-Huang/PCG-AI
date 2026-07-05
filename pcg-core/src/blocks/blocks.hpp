@@ -5,14 +5,7 @@
 
 namespace pcg::internal::blocks {
 
-PcgResultCode execute_parse_config(const GraphNode& node,
-                                   int graph_seed,
-                                   nlohmann::json& out,
-                                   char* err_buf,
-                                   int err_buf_size);
-
 PcgResultCode execute_spawn_points(const GraphNode& node,
-                                   const nlohmann::json& config,
                                    int graph_seed,
                                    nlohmann::json& out,
                                    char* err_buf,

@@ -82,7 +82,7 @@ namespace DJTechEditor.PCG.Graph
         }
 
         public static bool IsManifestOnlyType(string type) =>
-            type is not (PcgNodeTypes.ParseConfig or PcgNodeTypes.SpawnPoints or PcgNodeTypes.PlaceInScene)
+            type is not (PcgNodeTypes.SpawnPoints or PcgNodeTypes.PlaceInScene)
             && TryGet(type, out _);
 
         public static string GetOutputPinType(string sourceType, string sourceHandle = "out")
@@ -105,7 +105,9 @@ namespace DJTechEditor.PCG.Graph
 
         public static bool CanConnect(string sourceType, string targetType, string sourceHandle, string targetHandle)
         {
-            return GetOutputPinType(sourceType, sourceHandle) == GetInputPinType(targetType, targetHandle);
+            var sourcePin = GetOutputPinType(sourceType, sourceHandle);
+            var targetPin = GetInputPinType(targetType, targetHandle);
+            return sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any";
         }
 
         /// <summary>True if nodeType has an input pin matching the given pinType.</summary>
@@ -114,7 +116,7 @@ namespace DJTechEditor.PCG.Graph
             if (!TryGet(nodeType, out var def))
                 return GetInputPinType(nodeType) == pinType;
             foreach (var input in def.inputs)
-                if (input.pinType == pinType) return true;
+                if (input.pinType == pinType || input.pinType == "Any") return true;
             return false;
         }
 
@@ -124,7 +126,7 @@ namespace DJTechEditor.PCG.Graph
             if (!TryGet(nodeType, out var def))
                 return GetOutputPinType(nodeType) == pinType;
             foreach (var output in def.outputs)
-                if (output.pinType == pinType) return true;
+                if (output.pinType == pinType || output.pinType == "Any") return true;
             return false;
         }
 
@@ -141,8 +143,7 @@ namespace DJTechEditor.PCG.Graph
 
         private static string InferLegacyPinType(string type, bool isOutput) => type switch
         {
-            PcgNodeTypes.ParseConfig => "Param",
-            PcgNodeTypes.SpawnPoints => isOutput ? "SpatialPoint" : "Param",
+            PcgNodeTypes.SpawnPoints => "SpatialPoint",
             PcgNodeTypes.PlaceInScene => "SpatialPoint",
             _ => "SpatialPoint",
         };

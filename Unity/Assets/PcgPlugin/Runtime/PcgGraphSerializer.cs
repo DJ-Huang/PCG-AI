@@ -184,12 +184,6 @@ namespace DJTechRuntime.PCG
 
             switch (type)
             {
-                case PcgNodeTypes.ParseConfig:
-                    if (dict.TryGetValue("seed", out var seed))
-                        data.seed = Convert.ToInt32(seed, CultureInfo.InvariantCulture);
-                    if (dict.TryGetValue("density", out var density))
-                        data.density = Convert.ToSingle(density, CultureInfo.InvariantCulture);
-                    break;
                 case PcgNodeTypes.SpawnPoints:
                     if (dict.TryGetValue("count", out var count))
                         data.count = Convert.ToInt32(count, CultureInfo.InvariantCulture);

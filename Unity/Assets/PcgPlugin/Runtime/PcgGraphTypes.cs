@@ -8,13 +8,11 @@ namespace DJTechRuntime.PCG
 {
     public static class PcgNodeTypes
     {
-        public const string ParseConfig = "ParseConfig";
         public const string SpawnPoints = "SpawnPoints";
         public const string PlaceInScene = "PlaceInScene";
 
         public static readonly string[] All =
         {
-            ParseConfig,
             SpawnPoints,
             PlaceInScene,
         };
@@ -223,12 +221,6 @@ namespace DJTechRuntime.PCG
             var data = new PcgNodeData();
             switch (type)
             {
-                case PcgNodeTypes.ParseConfig:
-                    data.seed = 42;
-                    data.density = 0.5f;
-                    data.SetRaw("seed", 42);
-                    data.SetRaw("density", 0.5f);
-                    break;
                 case PcgNodeTypes.SpawnPoints:
                     data.count = 100;
                     data.radius = 10f;
@@ -275,29 +267,21 @@ namespace DJTechRuntime.PCG
                     new()
                     {
                         id = "n1",
-                        type = PcgNodeTypes.ParseConfig,
-                        position = PcgGraphPosition.FromVector2(new Vector2(50, 150)),
-                        data = PcgNodeData.DefaultForType(PcgNodeTypes.ParseConfig),
-                    },
-                    new()
-                    {
-                        id = "n2",
                         type = PcgNodeTypes.SpawnPoints,
-                        position = PcgGraphPosition.FromVector2(new Vector2(400, 150)),
+                        position = PcgGraphPosition.FromVector2(new Vector2(50, 150)),
                         data = PcgNodeData.DefaultForType(PcgNodeTypes.SpawnPoints),
                     },
                     new()
                     {
-                        id = "n3",
+                        id = "n2",
                         type = PcgNodeTypes.PlaceInScene,
-                        position = PcgGraphPosition.FromVector2(new Vector2(750, 150)),
+                        position = PcgGraphPosition.FromVector2(new Vector2(400, 150)),
                         data = PcgNodeData.DefaultForType(PcgNodeTypes.PlaceInScene),
                     },
                 },
                 edges = new List<PcgGraphEdgeRecord>
                 {
                     new() { id = "e1", source = "n1", target = "n2", sourceHandle = "out", targetHandle = "in" },
-                    new() { id = "e2", source = "n2", target = "n3", sourceHandle = "out", targetHandle = "in" },
                 },
             };
         }
@@ -306,8 +290,8 @@ namespace DJTechRuntime.PCG
         {
             foreach (var node in doc.nodes)
             {
-                if (node.type == PcgNodeTypes.ParseConfig)
-                    return node.data.seed;
+                if (node.type == "GetTerrainData")
+                    return node.data.GetRaw("seed") as int? ?? 42;
             }
 
             return 42;

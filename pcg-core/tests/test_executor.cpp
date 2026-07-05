@@ -40,8 +40,8 @@ int main()
     const char* cycle_graph = R"({
       "version": "1.0",
       "nodes": [
-        {"id": "a", "type": "ParseConfig", "position": {"x":0,"y":0}, "data": {}},
-        {"id": "b", "type": "SpawnPoints", "position": {"x":0,"y":0}, "data": {"count": 1, "radius": 1}}
+        {"id": "a", "type": "SpawnPoints", "position": {"x":0,"y":0}, "data": {"count": 1, "radius": 1}},
+        {"id": "b", "type": "PlaceInScene", "position": {"x":0,"y":0}, "data": {"prefab": "x", "scale": 1}}
       ],
       "edges": [
         {"id": "e1", "source": "a", "target": "b"},
@@ -72,13 +72,11 @@ int main()
     const char* mini_graph = R"({
       "version": "1.0",
       "nodes": [
-        {"id": "n1", "type": "ParseConfig", "position": {"x":0,"y":0}, "data": {"seed": 7, "density": 1.0}},
-        {"id": "n2", "type": "SpawnPoints", "position": {"x":0,"y":0}, "data": {"count": 3, "radius": 2.0}},
-        {"id": "n3", "type": "PlaceInScene", "position": {"x":0,"y":0}, "data": {"prefab": "Tree", "scale": 2.0}}
+        {"id": "n1", "type": "SpawnPoints", "position": {"x":0,"y":0}, "data": {"count": 3, "radius": 2.0}},
+        {"id": "n2", "type": "PlaceInScene", "position": {"x":0,"y":0}, "data": {"prefab": "Tree", "scale": 2.0}}
       ],
       "edges": [
-        {"id": "e1", "source": "n1", "target": "n2"},
-        {"id": "e2", "source": "n2", "target": "n3"}
+        {"id": "e1", "source": "n1", "target": "n2"}
       ]
     })";
     expect_code(pcg_execute_graph(mini_graph, 99, out, sizeof(out)), PCG_OK, "mini graph execute");

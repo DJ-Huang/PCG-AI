@@ -2,7 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import type { GraphNode, GraphEdge, NodeType, NodeData } from './graphSchema';
 import { defaultData } from './graphSchema';
 
-const NODE_TYPES = new Set<NodeType>(['ParseConfig', 'SpawnPoints', 'PlaceInScene']);
+const NODE_TYPES = new Set<NodeType>(['SpawnPoints', 'PlaceInScene']);
 
 export type ImportResult =
   | { ok: true; nodes: Node[]; edges: Edge[]; filename?: string }

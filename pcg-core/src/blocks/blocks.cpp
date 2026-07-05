@@ -33,42 +33,19 @@ int clamp_count(int value)
 
 } // namespace
 
-PcgResultCode execute_parse_config(const GraphNode& node,
-                                   int graph_seed,
-                                   nlohmann::json& out,
-                                   char* err_buf,
-                                   int err_buf_size)
-{
-    const int seed = node.data.value("seed", graph_seed);
-    const double density = node.data.value("density", 0.5);
-
-    if (density < 0.0 || density > 1.0)
-        return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "ParseConfig density out of range");
-
-    out = nlohmann::json{
-        {"seed", seed},
-        {"density", density},
-    };
-    return PCG_OK;
-}
-
 PcgResultCode execute_spawn_points(const GraphNode& node,
-                                   const nlohmann::json& config,
                                    int graph_seed,
                                    nlohmann::json& out,
                                    char* err_buf,
                                    int err_buf_size)
 {
-    const int base_count = node.data.value("count", 100);
+    const int count = clamp_count(node.data.value("count", 100));
     const double radius = node.data.value("radius", 10.0);
-    const double density = config.value("density", 0.5);
-    const int config_seed = config.value("seed", graph_seed);
 
     if (radius < 0.0)
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "SpawnPoints radius must be >= 0");
 
-    const int count = clamp_count(static_cast<int>(std::lround(base_count * density)));
-    uint32_t rng = static_cast<uint32_t>(config_seed) ^ static_cast<uint32_t>(graph_seed * 2654435761u);
+    uint32_t rng = static_cast<uint32_t>(graph_seed) ^ static_cast<uint32_t>(graph_seed * 2654435761u);
 
     nlohmann::json points = nlohmann::json::array();
     for (int i = 0; i < count; ++i) {

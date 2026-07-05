@@ -37,7 +37,7 @@ namespace DJTechEditor.PCG.Graph
 
         protected virtual void BuildPorts()
         {
-            if (NodeType != PcgNodeTypes.ParseConfig)
+            if (NodeType != PcgNodeTypes.SpawnPoints)
             {
                 InputPort = CreatePort(Direction.Input, "in");
                 inputContainer.Add(InputPort);

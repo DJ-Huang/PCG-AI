@@ -3,21 +3,10 @@
   "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
-      "type": "ParseConfig",
-      "displayName": "Parse Config",
-      "category": "Input",
-      "inputs": [],
-      "outputs": [{ "id": "out", "label": "Config", "pinType": "Param" }],
-      "properties": {
-        "seed": { "type": "integer", "default": 42 },
-        "density": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 }
-      }
-    },
-    {
       "type": "SpawnPoints",
       "displayName": "Spawn Points",
       "category": "Generation",
-      "inputs": [{ "id": "in", "label": "Config", "pinType": "Param" }],
+      "inputs": [],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
       "properties": {
         "count": { "type": "integer", "default": 100, "minimum": 0 },
@@ -309,6 +298,16 @@
         "amount": { "type": "number", "default": 0.1, "minimum": 0 },
         "segments": { "type": "integer", "default": 2, "minimum": 1, "maximum": 8 },
         "clampOverlap": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "Output",
+      "displayName": "Output",
+      "category": "Output",
+      "inputs": [{ "id": "in", "label": "Input", "pinType": "Any" }],
+      "outputs": [],
+      "properties": {
+        "label": { "type": "string", "default": "Output" }
       }
     }
   ]

@@ -3,7 +3,6 @@ import type { NodeType } from './graphSchema';
 
 /** Allowed downstream node types for each source type. */
 const ALLOWED_TARGETS: Record<NodeType, NodeType[]> = {
-  ParseConfig: ['SpawnPoints'],
   SpawnPoints: ['PlaceInScene'],
   PlaceInScene: [],
 };
@@ -13,7 +12,7 @@ type ConnectLike = Connection | Edge;
 /**
  * MVP connection rules:
  * - no self-loops
- * - pipeline types only (ParseConfig → SpawnPoints → PlaceInScene)
+ * - pipeline types only (SpawnPoints → PlaceInScene)
  * - handles must be out → in
  * - one incoming edge per target handle
  */

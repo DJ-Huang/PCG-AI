@@ -19,29 +19,6 @@ PcgResultCode fail(PcgContext& ctx, PcgResultCode code, const char* message)
     return code;
 }
 
-class ParseConfigElement final : public IPcgElement {
-public:
-    const char* type_name() const override { return "ParseConfig"; }
-
-    PcgResultCode execute(PcgContext& ctx) const override   
-    {
-        if (!ctx.node)
-            return fail(ctx, PCG_ERR_EXECUTION, "ParseConfig missing node");
-
-        const int seed = ctx.node->data.value("seed", ctx.graph_seed);
-        const double density = ctx.node->data.value("density", 0.5);
-
-        if (density < 0.0 || density > 1.0)
-            return fail(ctx, PCG_ERR_EXECUTION, "ParseConfig density out of range");
-
-        ctx.outputs.add_param("out", data::PcgParamData(nlohmann::json{
-            {"seed", seed},
-            {"density", density},
-        }));
-        return PCG_OK;
-    }
-};
-
 class SpawnPointsElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "SpawnPoints"; }
@@ -51,25 +28,17 @@ public:
         if (!ctx.node)
             return fail(ctx, PCG_ERR_EXECUTION, "SpawnPoints missing node");
 
-        const nlohmann::json* config = ctx.inputs.find_json("in");
-        if (!config)
-            return fail(ctx, PCG_ERR_EXECUTION, "SpawnPoints missing config input");
-
-        const int base_count = ctx.node->data.value("count", 100);
-        const double radius = ctx.node->data.value("radius", 10.0);
-        const double density = config->value("density", 0.5);
-        const int config_seed = config->value("seed", ctx.graph_seed);
-
-        if (radius < 0.0)
-            return fail(ctx, PCG_ERR_EXECUTION, "SpawnPoints radius must be >= 0");
-
-        int count = static_cast<int>(std::lround(base_count * density));
+        int count = ctx.node->data.value("count", 100);
         if (count < 0)
             count = 0;
         if (count > 10000)
             count = 10000;
+        const double radius = ctx.node->data.value("radius", 10.0);
 
-        uint32_t rng = static_cast<uint32_t>(config_seed) ^
+        if (radius < 0.0)
+            return fail(ctx, PCG_ERR_EXECUTION, "SpawnPoints radius must be >= 0");
+
+        uint32_t rng = static_cast<uint32_t>(ctx.graph_seed) ^
                        static_cast<uint32_t>(ctx.graph_seed * 2654435761u);
 
         data::PcgPointData points;
@@ -124,6 +93,23 @@ public:
     }
 };
 
+/// Houdini-style terminal node. Passes input through to output unchanged.
+/// The execution engine prefers Output nodes as the graph's sink.
+class OutputElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "Output"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        const nlohmann::json* input = ctx.inputs.find_json("in");
+        if (!input)
+            return fail(ctx, PCG_ERR_EXECUTION, "Output missing input");
+
+        ctx.outputs.add("out", data::PcgDataType::Unknown, *input);
+        return PCG_OK;
+    }
+};
+
 std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& registry()
 {
     static std::unordered_map<std::string, std::unique_ptr<IPcgElement>> instance;
@@ -138,9 +124,9 @@ void register_builtin_elements()
     if (!map.empty())
         return;
 
-    map.emplace("ParseConfig", std::make_unique<ParseConfigElement>());
     map.emplace("SpawnPoints", std::make_unique<SpawnPointsElement>());
     map.emplace("PlaceInScene", std::make_unique<PlaceInSceneElement>());
+    map.emplace("Output", std::make_unique<OutputElement>());
     register_phase41_elements(map);
     register_phase42_elements(map);
     register_mesh_elements(map);
