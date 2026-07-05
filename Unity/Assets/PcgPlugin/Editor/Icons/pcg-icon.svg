@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Background: rounded square -->
+  <rect x="1" y="1" width="14" height="14" rx="3" fill="#2D2D2D" stroke="#5A5A5A" stroke-width="0.5"/>
+
+  <!-- Node 1 (top-left) -->
+  <rect x="2.5" y="3" width="4" height="2.5" rx="0.5" fill="#4A9EFF"/>
+
+  <!-- Node 2 (top-right) -->
+  <rect x="9.5" y="3" width="4" height="2.5" rx="0.5" fill="#61D8A0"/>
+
+  <!-- Node 3 (bottom-center) -->
+  <rect x="6" y="10.5" width="4" height="2.5" rx="0.5" fill="#FFB74A"/>
+
+  <!-- Edges -->
+  <path d="M6.5,4.25 L9.5,4.25" stroke="#999" stroke-width="0.75" fill="none"/>
+  <path d="M8,5.5 L8,10.5" stroke="#999" stroke-width="0.75" fill="none"/>
+  <!-- Connector dots -->
+  <circle cx="6.5" cy="4.25" r="0.5" fill="#CCC"/>
+  <circle cx="9.5" cy="4.25" r="0.5" fill="#CCC"/>
+  <circle cx="8" cy="5.5" r="0.5" fill="#CCC"/>
+  <circle cx="8" cy="10.5" r="0.5" fill="#CCC"/>
+</svg>

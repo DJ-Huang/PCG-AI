@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using UnityEngine;
 
-namespace DJTechEditor.PCG.Graph
+namespace DJTechRuntime.PCG
 {
     public static class PcgNodeTypes
     {
@@ -18,6 +18,69 @@ namespace DJTechEditor.PCG.Graph
             SpawnPoints,
             PlaceInScene,
         };
+    }
+
+    [Serializable]
+    public class PcgGraphParameter
+    {
+        public string id;
+        public string name;
+        public string type = "number";
+        public string defaultValue = "";
+        public bool exposed = true;
+        public string targetNode = "";
+        public string targetProperty = "";
+    }
+
+    [Serializable]
+    public class PcgParameterOverride
+    {
+        public string parameterId;
+        public string name;
+        public string type = "number";
+        public float floatValue;
+        public int intValue;
+        public bool boolValue;
+        public string stringValue = "";
+
+        public static PcgParameterOverride FromParameter(PcgGraphParameter param)
+        {
+            var o = new PcgParameterOverride
+            {
+                parameterId = param.id,
+                name = param.name,
+                type = param.type,
+            };
+
+            switch (param.type)
+            {
+                case "integer":
+                    int.TryParse(param.defaultValue, out o.intValue);
+                    break;
+                case "number":
+                    float.TryParse(param.defaultValue, out o.floatValue);
+                    break;
+                case "boolean":
+                    bool.TryParse(param.defaultValue, out o.boolValue);
+                    break;
+                default:
+                    o.stringValue = param.defaultValue;
+                    break;
+            }
+
+            return o;
+        }
+
+        public object GetValue()
+        {
+            return type switch
+            {
+                "integer" => intValue,
+                "number" => floatValue,
+                "boolean" => boolValue,
+                _ => stringValue,
+            };
+        }
     }
 
     [Serializable]
@@ -56,6 +119,7 @@ namespace DJTechEditor.PCG.Graph
         public string version = "1.0";
         public List<PcgGraphNodeRecord> nodes = new();
         public List<PcgGraphEdgeRecord> edges = new();
+        public List<PcgGraphParameter> parameters = new();
     }
 
     [Serializable]
@@ -144,8 +208,14 @@ namespace DJTechEditor.PCG.Graph
 
         public static PcgNodeData DefaultForType(string type)
         {
-            if (PcgNodeManifest.TryGet(type, out _))
-                return PcgNodeManifest.DefaultDataFor(type);
+            var manifestProps = PcgGraphSerializer.ManifestLookup?.Invoke(type);
+            if (manifestProps != null)
+            {
+                var manifestData = new PcgNodeData();
+                foreach (var (key, prop) in manifestProps)
+                    manifestData.SetRaw(key, prop.defaultValue ?? "");
+                return manifestData;
+            }
 
             var data = new PcgNodeData();
             switch (type)

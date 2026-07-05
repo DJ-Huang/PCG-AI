@@ -44,7 +44,7 @@ namespace DJTechEditor.PCG
                 _graphPath = EditorUtility.OpenFilePanel(
                     "Select Graph JSON",
                     PcgGraphRunner.DefaultSchemaDir,
-                    "json");
+                    "pcg");
             }
 
             if (GUILayout.Button("Run Graph"))
@@ -67,7 +67,7 @@ namespace DJTechEditor.PCG
                 var picked = EditorUtility.OpenFilePanel(
                     "Select Watched Graph JSON",
                     PcgGraphRunner.DefaultSchemaDir,
-                    "json");
+                    "pcg");
                 if (!string.IsNullOrEmpty(picked))
                     _watchedPath = picked;
             }
@@ -88,7 +88,7 @@ namespace DJTechEditor.PCG
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Core Version", PcgNative.GetVersion());
             EditorGUILayout.HelpBox(
-                "Workflow: Web editor → Send to Unity → schema/editor-export.pcg.json → Reload Watched Graph (or enable Auto Reload).",
+                "Workflow: Web editor → Send to Unity → schema/editor-export.pcg → Reload Watched Graph (or enable Auto Reload).",
                 MessageType.Info);
         }
 

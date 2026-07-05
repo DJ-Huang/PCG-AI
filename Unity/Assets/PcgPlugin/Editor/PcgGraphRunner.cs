@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using DJTechRuntime.PCG;
 using UnityEditor;
@@ -16,7 +17,7 @@ namespace DJTechEditor.PCG
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "schema"));
 
         public static string DefaultWatchedGraphPath =>
-            Path.Combine(DefaultSchemaDir, "editor-export.pcg.json");
+            Path.Combine(DefaultSchemaDir, "editor-export.pcg");
 
         public static bool RunFileAndUpdatePreview(string path, int seed = 42)
         {
@@ -32,11 +33,19 @@ namespace DJTechEditor.PCG
 
         public static bool RunJsonAndUpdatePreview(string json, int seed = 42)
         {
+            return RunJsonAndUpdatePreview(json, seed, null);
+        }
+
+        public static bool RunJsonAndUpdatePreview(string json, int seed, List<PcgParameterOverride> overrides)
+        {
             if (string.IsNullOrWhiteSpace(json))
             {
                 Debug.LogError("[PCG] Graph JSON is empty.");
                 return false;
             }
+
+            if (overrides != null && overrides.Count > 0)
+                json = PcgParameterApplicator.ApplyOverrides(json, overrides);
 
             var result = PcgGraphLoader.Execute(json, seed);
             if (result == null)

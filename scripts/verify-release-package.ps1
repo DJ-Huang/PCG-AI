@@ -41,12 +41,12 @@ else {
 
 $dataDir = Join-Path $PlayerBuildPath "*_Data"
 if (Test-Path $dataDir) {
-    $streamingGraph = Get-ChildItem -Path $dataDir -Recurse -Filter "demo.pcg.json" -File -ErrorAction SilentlyContinue
+    $streamingGraph = Get-ChildItem -Path $dataDir -Recurse -Filter "demo.pcg" -File -ErrorAction SilentlyContinue
     if ($streamingGraph) {
         Write-Host "Found demo graph in StreamingAssets: $($streamingGraph.FullName)"
     }
     else {
-        Write-Warning "demo.pcg.json not found under StreamingAssets (optional for M3 demo)"
+        Write-Warning "demo.pcg not found under StreamingAssets (optional for M3 demo)"
     }
 }
 

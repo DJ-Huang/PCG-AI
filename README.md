@@ -49,8 +49,8 @@ PCG-AI/
 │   ├── graph-schema.json    JSON Schema v1
 │   ├── graph-schema-v2.json JSON Schema v2（UE PCG 对齐，Phase 4.0）
 │   ├── node-manifest.json   节点 Pin/参数定义（编辑器消费）
-│   ├── example.pcg.json     示例图
-│   └── editor-export.pcg.json   Web → Unity 热更新目标（运行后生成）
+│   ├── example.pcg     示例图
+│   └── editor-export.pcg   Web → Unity 热更新目标（运行后生成）
 │
 ├── web/pcg-editor/        Vite + React + @xyflow/react（Web 编辑器）
 │   ├── package.json         ← npm 命令在此目录执行
@@ -123,9 +123,9 @@ npm run dev
 | **+ SpawnPoints** | 添加点生成节点（`count`、`radius`） |
 | **+ PlaceInScene** | 添加场景放置节点（`prefab`、`scale`） |
 | 拖拽连线 | 按节点 handle 连接；非法连接会被拒绝 |
-| **Export JSON** | 下载 `graph.pcg.json` 到本机（不依赖 dev server 写盘） |
-| **Import JSON** | 从本机加载 `.pcg.json`（Unity Graph **Export…** 或 **Export JSON** 产物） |
-| **Send to Unity** | 将当前图写入 `schema/editor-export.pcg.json`（**必须** `npm run dev` 运行中） |
+| **Export JSON** | 下载 `graph.pcg` 到本机（不依赖 dev server 写盘） |
+| **Import JSON** | 从本机加载 `.pcg`（Unity Graph **Export…** 或 **Export JSON** 产物） |
+| **Send to Unity** | 将当前图写入 `schema/editor-export.pcg`（**必须** `npm run dev` 运行中） |
 
 默认画布已包含一条三节点流水线：`ParseConfig → SpawnPoints → PlaceInScene`。
 
@@ -139,7 +139,7 @@ npm run lint     # oxlint 检查
 
 ### Send to Unity 原理
 
-开发模式下，Vite 插件暴露 `POST /api/export-graph`，将 JSON 写入仓库内 `schema/editor-export.pcg.json`。  
+开发模式下，Vite 插件暴露 `POST /api/export-graph`，将 JSON 写入仓库内 `schema/editor-export.pcg`。  
 **生产构建（`npm run build`）不包含此 API**；离线场景请用 **Export JSON** 手动保存，再在 Unity 中 **Run Graph from File…** 加载。
 
 ---
@@ -156,7 +156,7 @@ npm run lint     # oxlint 检查
 |------|------|
 | **PCG → Print PcgCore Version** | 验证原生库已加载；Console 应输出 `pcg-core 0.1.0`（M0 里程碑） |
 | **PCG → Settings** | 配置监视路径、自动重载等 |
-| **PCG → Set Watched Graph…** | 选择要监视的 `.pcg.json` 文件 |
+| **PCG → Set Watched Graph…** | 选择要监视的 `.pcg` 文件 |
 | **PCG → Reload Watched Graph** | 手动重新执行监视中的图并更新预览 |
 | **PCG → Run Graph from File…** | 从任意路径选择 JSON 执行（不依赖 Web） |
 
@@ -250,13 +250,13 @@ npm run dev
 1. 打开 http://localhost:5173
 2. 调整节点参数（如 `seed`、`count`、`radius`）
 3. 点击 **Send to Unity**  
-   - 成功提示：`Saved to schema/editor-export.pcg.json`  
+   - 成功提示：`Saved to schema/editor-export.pcg`  
    - 失败常见原因：未运行 `npm run dev`，或不在 `web/pcg-editor` 目录启动
 
 ### 步骤 3：Unity 加载并预览
 
 1. 打开 `Unity/` 工程
-2. **PCG → Set Watched Graph…** → 选择 `schema/editor-export.pcg.json`  
+2. **PCG → Set Watched Graph…** → 选择 `schema/editor-export.pcg`  
    （也可在 **PCG → Settings** 中配置同一路径）
 3. 开启 **Auto Reload**，或手动 **PCG → Reload Watched Graph**
 4. Scene 视图中 **PCG Preview** 上的青色球体应随参数变化
@@ -281,7 +281,7 @@ npm run dev
 
 1. 创建空物体 `PCG Runtime`
 2. 添加：`PcgPreview`、`PcgRuntimeRunner`
-3. `PcgRuntimeRunner` 在 `Start` 时加载 `StreamingAssets/pcg/demo.pcg.json`
+3. `PcgRuntimeRunner` 在 `Start` 时加载 `StreamingAssets/pcg/demo.pcg`
 
 ### 构建前确保 lib 就绪
 
@@ -298,7 +298,7 @@ npm run dev
 **预期 Player 日志：**
 
 ```
-[PCG] Runtime executing graph: .../StreamingAssets/pcg/demo.pcg.json (core pcg-core 0.1.0)
+[PCG] Runtime executing graph: .../StreamingAssets/pcg/demo.pcg (core pcg-core 0.1.0)
 [PCG] Runtime OK — 100 points generated.
 ```
 
@@ -315,10 +315,10 @@ npm run dev
 
 | 文件 | 用途 |
 |------|------|
-| `examples/phase41-demo.pcg.json` | Phase 4.1 地形采样 + 点阵 + Spawner 流水线 |
-| `schema/example.pcg.json` | 与 schema 对齐的参考图 |
-| `schema/editor-export.pcg.json` | Web **Send to Unity** 写入的热更新目标 |
-| `Unity/Assets/StreamingAssets/pcg/demo.pcg.json` | Player 运行时默认输入 |
+| `examples/phase41-demo.pcg` | Phase 4.1 地形采样 + 点阵 + Spawner 流水线 |
+| `schema/example.pcg` | 与 schema 对齐的参考图 |
+| `schema/editor-export.pcg` | Web **Send to Unity** 写入的热更新目标 |
+| `Unity/Assets/StreamingAssets/pcg/demo.pcg` | Player 运行时默认输入 |
 
 Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 
@@ -340,7 +340,7 @@ Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 |------|------|
 | `DllNotFoundException` | 重新运行 `build-pcg-core.ps1 -CopyToUnity`；关闭 Unity 后重拷 DLL |
 | 没有 **PCG** 菜单 | 查看 Console 中 `PcgPlugin.Editor` 编译错误 |
-| 预览无变化 | 确认监视路径指向正确的 `.pcg.json`；手动 **Reload Watched Graph** |
+| 预览无变化 | 确认监视路径指向正确的 `.pcg`；手动 **Reload Watched Graph** |
 | `Copy-Item` 失败 | Unity 锁定 DLL；脚本会写 `.dll.new`，关 Unity 后手动替换 |
 
 ### IL2CPP

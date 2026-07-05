@@ -4,6 +4,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using DJTechRuntime.PCG;
+using UnityEditor;
 
 namespace DJTechEditor.PCG.Graph
 {
@@ -38,11 +40,32 @@ namespace DJTechEditor.PCG.Graph
     }
 
     /// <summary>Loads schema/node-manifest.json for manifest-driven GraphView nodes.</summary>
+    [InitializeOnLoad]
     public static class PcgNodeManifest
     {
         private static Dictionary<string, ManifestNodeDef> _byType = new();
         private static List<ManifestNodeDef> _all = new();
         private static bool _loaded;
+
+        static PcgNodeManifest()
+        {
+            PcgGraphSerializer.ManifestLookup = type =>
+            {
+                if (!TryGet(type, out var def))
+                    return null;
+
+                var dict = new Dictionary<string, ManifestPropertyInfo>();
+                foreach (var (key, prop) in def.properties)
+                {
+                    dict[key] = new ManifestPropertyInfo
+                    {
+                        type = prop.type,
+                        defaultValue = prop.defaultValue,
+                    };
+                }
+                return dict;
+            };
+        }
 
         public static IReadOnlyList<ManifestNodeDef> All
         {

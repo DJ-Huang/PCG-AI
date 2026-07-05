@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -9,9 +10,12 @@ namespace DJTechRuntime.PCG
     /// </summary>
     public class PcgRuntimeRunner : MonoBehaviour
     {
-        [SerializeField] private string graphFileName = "demo.pcg.json";
+        [SerializeField] private string graphFileName = "demo.pcg";
         [SerializeField] private int seed = 42;
         [SerializeField] private bool runOnStart = true;
+        [SerializeField] private List<PcgParameterOverride> m_ParameterOverrides = new();
+
+        public List<PcgParameterOverride> ParameterOverrides => m_ParameterOverrides;
 
         private void Start()
         {
@@ -24,7 +28,12 @@ namespace DJTechRuntime.PCG
             var path = Path.Combine(Application.streamingAssetsPath, "pcg", graphFileName);
             Debug.Log($"[PCG] Runtime executing graph: {path} (core {PcgNative.GetVersion()})");
 
-            var result = PcgGraphLoader.LoadAndExecute(path, seed);
+            string json = File.ReadAllText(path);
+
+            if (m_ParameterOverrides != null && m_ParameterOverrides.Count > 0)
+                json = PcgParameterApplicator.ApplyOverrides(json, m_ParameterOverrides);
+
+            var result = PcgGraphLoader.Execute(json, seed);
             if (result == null)
                 return false;
 

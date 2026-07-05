@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "n101",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 169 },
+      "data": {"width": 2, "height": 2, "depth": 2}
+    }
+  ],
+  "edges": [
+  ],
+  "parameters": [
+    {"id": "p2", "name": "New Parameter", "type": "number", "default": 0, "exposed": true, "targetNode": "", "targetProperty": ""}
+  ]
+}

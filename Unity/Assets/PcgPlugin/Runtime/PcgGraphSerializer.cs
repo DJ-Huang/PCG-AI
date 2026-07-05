@@ -4,13 +4,29 @@ using System.Globalization;
 using System.Text;
 using UnityEngine;
 
-namespace DJTechEditor.PCG.Graph
+namespace DJTechRuntime.PCG
 {
+    /// <summary>
+    /// Manifest property info for editor-driven serialization.
+    /// Set by Editor code via <see cref="PcgGraphSerializer.ManifestLookup"/>.
+    /// </summary>
+    public sealed class ManifestPropertyInfo
+    {
+        public string type;
+        public object defaultValue;
+    }
+
     /// <summary>
     /// Serializes Graph JSON v1 aligned with schema/graph-schema.json and Web exportGraph.ts.
     /// </summary>
     public static class PcgGraphSerializer
     {
+        /// <summary>
+        /// Editor-side callback: returns manifest properties for a node type, or null if unknown.
+        /// Runtime leaves this null — serialization falls back to type inference.
+        /// </summary>
+        public static Func<string, Dictionary<string, ManifestPropertyInfo>> ManifestLookup;
+
         public static string ToJson(PcgGraphDocument doc, bool pretty = true)
         {
             var indent = pretty ? "  " : "";
@@ -33,6 +49,17 @@ namespace DJTechEditor.PCG.Graph
             {
                 AppendEdge(sb, doc.edges[i], pretty, indent);
                 if (i < doc.edges.Count - 1)
+                    sb.Append(',');
+                sb.Append(nl);
+            }
+
+            sb.Append(indent).Append(']').Append(',').Append(nl);
+
+            sb.Append(indent).Append("\"parameters\": [").Append(nl);
+            for (var i = 0; i < doc.parameters.Count; i++)
+            {
+                AppendParameter(sb, doc.parameters[i], pretty, indent);
+                if (i < doc.parameters.Count - 1)
                     sb.Append(',');
                 sb.Append(nl);
             }
@@ -118,6 +145,26 @@ namespace DJTechEditor.PCG.Graph
                     }
                 }
 
+                if (root.TryGetValue("parameters", out var paramsObj) && paramsObj is List<object> paramsList)
+                {
+                    foreach (var paramObj in paramsList)
+                    {
+                        if (paramObj is not Dictionary<string, object> paramDict)
+                            continue;
+
+                        doc.parameters.Add(new PcgGraphParameter
+                        {
+                            id = GetString(paramDict, "id"),
+                            name = GetString(paramDict, "name"),
+                            type = GetString(paramDict, "type", "number"),
+                            defaultValue = GetString(paramDict, "default"),
+                            exposed = GetBool(paramDict, "exposed", true),
+                            targetNode = GetString(paramDict, "targetNode"),
+                            targetProperty = GetString(paramDict, "targetProperty"),
+                        });
+                    }
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -129,12 +176,8 @@ namespace DJTechEditor.PCG.Graph
 
         private static void MergeData(string type, PcgNodeData data, Dictionary<string, object> dict)
         {
-            if (PcgNodeManifest.TryGet(type, out _))
-            {
-                foreach (var (key, value) in dict)
-                    data.SetRaw(key, value);
-                return;
-            }
+            foreach (var (key, value) in dict)
+                data.SetRaw(key, value);
 
             switch (type)
             {
@@ -178,37 +221,46 @@ namespace DJTechEditor.PCG.Graph
         private static void AppendData(StringBuilder sb, string type, PcgNodeData data)
         {
             sb.Append('{');
-            if (PcgNodeManifest.TryGet(type, out var def))
+
+            var manifestProps = ManifestLookup?.Invoke(type);
+            if (manifestProps != null)
             {
                 var first = true;
-                foreach (var key in def.properties.Keys)
+                foreach (var (key, propInfo) in manifestProps)
                 {
                     if (!first) sb.Append(", ");
                     first = false;
-                    var value = data.GetRaw(key) ?? def.properties[key].defaultValue;
-                    AppendJsonProperty(sb, key, value, def.properties[key].type);
+                    var value = data.GetRaw(key) ?? propInfo.defaultValue;
+                    AppendJsonProperty(sb, key, value, propInfo.type);
                 }
                 sb.Append('}');
                 return;
             }
 
-            switch (type)
+            // Fallback: serialize raw key-values with type inference
+            var firstRaw = true;
+            foreach (var (key, value) in data.EnumerateRaw())
             {
-                case PcgNodeTypes.ParseConfig:
-                    sb.Append("\"seed\": ").Append(data.seed)
-                        .Append(", \"density\": ").Append(data.density.ToString(CultureInfo.InvariantCulture));
-                    break;
-                case PcgNodeTypes.SpawnPoints:
-                    sb.Append("\"count\": ").Append(data.count)
-                        .Append(", \"radius\": ").Append(data.radius.ToString(CultureInfo.InvariantCulture));
-                    break;
-                case PcgNodeTypes.PlaceInScene:
-                    sb.Append("\"prefab\": ").Append(JsonString(data.prefab ?? ""))
-                        .Append(", \"scale\": ").Append(data.scale.ToString(CultureInfo.InvariantCulture));
-                    break;
+                if (!firstRaw) sb.Append(", ");
+                firstRaw = false;
+                sb.Append('"').Append(key).Append("\": ");
+                AppendInferredValue(sb, value);
             }
 
             sb.Append('}');
+        }
+
+        private static void AppendInferredValue(StringBuilder sb, object value)
+        {
+            var str = value?.ToString() ?? "";
+            if (int.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                sb.Append(str);
+            else if (float.TryParse(str, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                sb.Append(str);
+            else if (str == "true" || str == "false")
+                sb.Append(str);
+            else
+                sb.Append(JsonString(str));
         }
 
         private static void AppendJsonProperty(StringBuilder sb, string key, object value, string type)
@@ -248,6 +300,31 @@ namespace DJTechEditor.PCG.Graph
             sb.Append('}');
         }
 
+        private static void AppendParameter(StringBuilder sb, PcgGraphParameter param, bool pretty, string indent)
+        {
+            var inner = pretty ? indent + "  " : "";
+            sb.Append(inner).Append('{');
+            sb.Append("\"id\": ").Append(JsonString(param.id));
+            sb.Append(", \"name\": ").Append(JsonString(param.name));
+            sb.Append(", \"type\": ").Append(JsonString(param.type));
+            sb.Append(", \"default\": ").Append(InferredJsonValue(param.defaultValue, param.type));
+            sb.Append(", \"exposed\": ").Append(param.exposed ? "true" : "false");
+            sb.Append(", \"targetNode\": ").Append(JsonString(param.targetNode));
+            sb.Append(", \"targetProperty\": ").Append(JsonString(param.targetProperty));
+            sb.Append('}');
+        }
+
+        private static string InferredJsonValue(string str, string type)
+        {
+            return type switch
+            {
+                "integer" => str,
+                "number" => str,
+                "boolean" => str,
+                _ => JsonString(str),
+            };
+        }
+
         private static string JsonString(string value)
         {
             var sb = new StringBuilder(value.Length + 2);
@@ -272,6 +349,19 @@ namespace DJTechEditor.PCG.Graph
         private static string GetString(Dictionary<string, object> dict, string key, string fallback = "")
         {
             return dict.TryGetValue(key, out var value) ? value?.ToString() ?? fallback : fallback;
+        }
+
+        private static bool GetBool(Dictionary<string, object> dict, string key, bool fallback = false)
+        {
+            if (!dict.TryGetValue(key, out var value) || value == null)
+                return fallback;
+
+            return value switch
+            {
+                bool b => b,
+                string s => string.Equals(s, "true", StringComparison.OrdinalIgnoreCase),
+                _ => fallback,
+            };
         }
 
         private static float GetFloat(Dictionary<string, object> dict, string key)

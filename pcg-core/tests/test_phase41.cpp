@@ -80,11 +80,11 @@ int main()
     assert(std::strstr(out, "\"points\"") != nullptr);
     std::printf("PASS: metadata + filter pipeline\n");
 
-    const std::string demo_graph = read_file("../../examples/phase41-demo.pcg.json");
+    const std::string demo_graph = read_file("../../examples/phase41-demo.pcg");
     assert(!demo_graph.empty());
     expect_code(pcg_validate_graph(demo_graph.c_str(), err, sizeof(err)), PCG_OK, "phase41 demo validate");
     expect_code(pcg_execute_graph(demo_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "phase41 demo execute");
-    std::printf("PASS: examples/phase41-demo.pcg.json\n");
+    std::printf("PASS: examples/phase41-demo.pcg\n");
 
     return 0;
 }

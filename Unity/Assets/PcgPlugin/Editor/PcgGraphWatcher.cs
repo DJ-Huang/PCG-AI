@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG
 {
@@ -62,7 +63,7 @@ namespace DJTechEditor.PCG
             var path = EditorUtility.OpenFilePanel(
                 "Select Watched Graph JSON",
                 PcgGraphRunner.DefaultSchemaDir,
-                "json");
+                "pcg");
 
             if (string.IsNullOrEmpty(path))
                 return;

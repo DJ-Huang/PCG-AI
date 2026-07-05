@@ -5,18 +5,28 @@ using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
+using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
 {
     public sealed class PcgGraphView : GraphView
     {
-        private readonly PcgGraphSearchWindow _searchWindow;
-        private int _edgeCounter = 100;
+        private readonly PcgGraphSearchWindow m_SearchWindow;
+        private int m_EdgeCounter = 100;
+        private EditorWindow m_HostWindow;
+        private Vector2 m_LastMousePos;
+        private PcgGraphBlackboard m_Blackboard;
+
+        public PcgGraphBlackboard Blackboard
+        {
+            get => m_Blackboard;
+            set => m_Blackboard = value;
+        }
 
         public PcgGraphView()
         {
-            _searchWindow = ScriptableObject.CreateInstance<PcgGraphSearchWindow>();
-            _searchWindow.Initialize(this);
+            m_SearchWindow = ScriptableObject.CreateInstance<PcgGraphSearchWindow>();
+            m_SearchWindow.Initialize(this);
 
             style.flexGrow = 1;
             SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
@@ -29,12 +39,39 @@ namespace DJTechEditor.PCG.Graph
             grid.StretchToParentSize();
 
             graphViewChanged = OnGraphViewChanged;
+
+            RegisterCallback<MouseMoveEvent>(evt => m_LastMousePos = evt.mousePosition);
+            RegisterCallback<KeyDownEvent>(OnKeyDown);
+        }
+
+        public void SetHostWindow(EditorWindow window) => m_HostWindow = window;
+
+        private void OnKeyDown(KeyDownEvent evt)
+        {
+            if (evt.target is not PcgGraphView)
+                return;
+
+            if (evt.keyCode == KeyCode.Space)
+            {
+                ShowSearchWindow(m_LastMousePos);
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.F)
+            {
+                FrameAll();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.P)
+            {
+                Blackboard?.ToggleVisible();
+                evt.StopPropagation();
+            }
+            evt.StopPropagation();
         }
 
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             base.BuildContextualMenu(evt);
-            evt.menu.AppendAction("Create Node", _ => ShowSearchWindow(evt));
         }
 
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)
@@ -46,24 +83,41 @@ namespace DJTechEditor.PCG.Graph
                     return;
                 if (startPort.direction == port.direction)
                     return;
+
+                if (startPort.node is PcgGraphNodeBase srcNode && port.node is PcgGraphNodeBase tgtNode)
+                {
+                    string outType, inType, outHandle, inHandle;
+                    if (startPort.direction == Direction.Output)
+                    {
+                        outType = srcNode.NodeType;
+                        inType = tgtNode.NodeType;
+                        outHandle = startPort.userData as string ?? startPort.portName;
+                        inHandle = port.userData as string ?? port.portName;
+                    }
+                    else
+                    {
+                        outType = tgtNode.NodeType;
+                        inType = srcNode.NodeType;
+                        outHandle = port.userData as string ?? port.portName;
+                        inHandle = startPort.userData as string ?? startPort.portName;
+                    }
+
+                    if (!PcgNodeManifest.CanConnect(outType, inType, outHandle, inHandle))
+                        return;
+                }
+
                 compatible.Add(port);
             });
             return compatible;
         }
 
-        public void ShowSearchWindow(ContextualMenuPopulateEvent evt = null)
+        public void ShowSearchWindow(Vector2 panelMousePos)
         {
-            var graphPos = evt != null
-                ? PanelToGraphPosition(evt.mousePosition)
-                : new Vector2(100f, 100f);
+            var graphPos = PanelToGraphPosition(panelMousePos);
+            m_SearchWindow.SetSpawnPosition(graphPos);
 
-            _searchWindow.SetSpawnPosition(graphPos);
-
-            var screenPos = evt != null
-                ? evt.mousePosition
-                : GUIUtility.GUIToScreenPoint(Event.current.mousePosition);
-
-            SearchWindow.Open(new SearchWindowContext(screenPos), _searchWindow);
+            var screenPos = this.LocalToWorld(panelMousePos) + (Vector2)m_HostWindow.position.position;
+            SearchWindow.Open(new SearchWindowContext(screenPos), m_SearchWindow);
         }
 
         private Vector2 PanelToGraphPosition(Vector2 panelPosition)
@@ -76,6 +130,9 @@ namespace DJTechEditor.PCG.Graph
         {
             var node = PcgGraphNodeFactory.Create(type, PcgGraphNodeFactory.NextNodeId(), position);
             AddElement(node);
+            ClearSelection();
+            AddToSelection(node);
+            node.BringToFront();
             return node;
         }
 
@@ -114,6 +171,9 @@ namespace DJTechEditor.PCG.Graph
                 edge.userData = edgeRecord.id;
                 AddElement(edge);
             }
+
+            if (m_Blackboard != null)
+                m_Blackboard.LoadParameters(doc.parameters);
         }
 
         public PcgGraphDocument ExportDocument()
@@ -142,7 +202,7 @@ namespace DJTechEditor.PCG.Graph
 
                 var id = edge.userData as string;
                 if (string.IsNullOrEmpty(id))
-                    id = $"e{++_edgeCounter}";
+                    id = $"e{++m_EdgeCounter}";
 
                 doc.edges.Add(new PcgGraphEdgeRecord
                 {
@@ -153,6 +213,9 @@ namespace DJTechEditor.PCG.Graph
                     targetHandle = edge.input.userData as string ?? edge.input.portName,
                 });
             }
+
+            if (m_Blackboard != null)
+                doc.parameters = m_Blackboard.CollectParameters();
 
             return doc;
         }
@@ -169,7 +232,7 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
 
-            _edgeCounter = max;
+            m_EdgeCounter = max;
         }
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)

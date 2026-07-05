@@ -90,14 +90,14 @@ function PcgEditor() {
   const handleExport = () => {
     const graph = exportGraph(nodes, edges);
     downloadGraph(graph);
-    setStatus('Downloaded graph.pcg.json');
+    setStatus('Downloaded graph.pcg');
   };
 
   const handleSendToUnity = async () => {
     const graph = exportGraph(nodes, edges);
     const result = await exportToSchema(graph);
     if (result.ok) {
-      setStatus('Saved to schema/editor-export.pcg.json — use PCG → Reload Watched Graph in Unity');
+      setStatus('Saved to schema/editor-export.pcg — use PCG → Reload Watched Graph in Unity');
     } else {
       setStatus(`Send failed: ${result.error ?? 'unknown error'} (is npm run dev running?)`);
     }
@@ -134,7 +134,7 @@ function PcgEditor() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".json,application/json"
+          accept=".pcg,.json,application/json"
           className="pcg-toolbar__file-input"
           onChange={handleImportFile}
         />

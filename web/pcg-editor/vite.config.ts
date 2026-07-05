@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg.json');
+const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
 
 function exportGraphPlugin(): Plugin {
   return {

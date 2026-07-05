@@ -34,7 +34,7 @@ function toGraphEdge(edge: Edge): GraphEdge {
 /**
  * Triggers a browser download of the graph as a .json file.
  */
-export function downloadGraph(graph: GraphJson, filename = 'graph.pcg.json'): void {
+export function downloadGraph(graph: GraphJson, filename = 'graph.pcg'): void {
   const blob = new Blob([JSON.stringify(graph, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -45,7 +45,7 @@ export function downloadGraph(graph: GraphJson, filename = 'graph.pcg.json'): vo
 }
 
 /**
- * Writes graph JSON to schema/editor-export.pcg.json via Vite dev server.
+ * Writes graph JSON to schema/editor-export.pcg via Vite dev server.
  * Requires `npm run dev` — not available in production build.
  */
 export async function exportToSchema(graph: GraphJson): Promise<{ ok: boolean; error?: string }> {

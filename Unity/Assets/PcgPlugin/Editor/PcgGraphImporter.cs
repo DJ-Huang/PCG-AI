@@ -18,7 +18,7 @@ namespace DJTechEditor.PCG
             string path = EditorUtility.OpenFilePanel(
                 "Select Graph JSON",
                 PcgGraphRunner.DefaultSchemaDir,
-                "json");
+                "pcg");
 
             if (string.IsNullOrEmpty(path))
                 return;

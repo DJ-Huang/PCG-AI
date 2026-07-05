@@ -59,7 +59,7 @@ int main()
     })";
     expect_code(pcg_validate_graph(unknown_graph, err, sizeof(err)), PCG_ERR_UNKNOWN_NODE, "unknown node");
 
-    const std::string example_graph = read_file("../../schema/example.pcg.json");
+    const std::string example_graph = read_file("../../schema/example.pcg");
     assert(!example_graph.empty());
     expect_code(pcg_validate_graph(example_graph.c_str(), err, sizeof(err)), PCG_OK, "example graph validate");
 
@@ -85,7 +85,7 @@ int main()
     assert(std::strstr(out, "\"prefab\":\"Tree\"") != nullptr || std::strstr(out, "\"prefab\": \"Tree\"") != nullptr);
     std::printf("PASS: mini graph prefab preserved\n");
 
-    const std::string roundtrip_graph = read_file("fixtures/roundtrip.pcg.json");
+    const std::string roundtrip_graph = read_file("fixtures/roundtrip.pcg");
     assert(!roundtrip_graph.empty());
     expect_code(pcg_validate_graph(roundtrip_graph.c_str(), err, sizeof(err)), PCG_OK, "roundtrip graph validate");
     expect_code(pcg_execute_graph(roundtrip_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "roundtrip graph execute");

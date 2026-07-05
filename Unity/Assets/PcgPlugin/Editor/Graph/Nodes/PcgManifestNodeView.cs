@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
+using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
 {

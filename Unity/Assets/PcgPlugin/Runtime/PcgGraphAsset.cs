@@ -1,8 +1,11 @@
 using UnityEngine;
 
-namespace DJTechEditor.PCG.Graph
+namespace DJTechRuntime.PCG
 {
-    [CreateAssetMenu(fileName = "PcgGraph", menuName = "PCG/Graph Asset", order = 1)]
+    /// <summary>
+    /// ScriptableObject wrapper for a PCG graph JSON document.
+    /// Created at import time by PcgAssetImporter (Editor) for .pcg files.
+    /// </summary>
     public sealed class PcgGraphAsset : ScriptableObject
     {
         [TextArea(8, 24)]

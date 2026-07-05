@@ -33,12 +33,12 @@ npm run dev
 
 1. Open http://localhost:5173
 2. Edit the 3-node graph (seed, count, radius, etc.)
-3. Click **Send to Unity** → writes `schema/editor-export.pcg.json`
+3. Click **Send to Unity** → writes `schema/editor-export.pcg`
 
 ### Unity Editor
 
 1. Open `Unity/` project
-2. Menu **PCG → Set Watched Graph…** (or Settings) → point to `schema/editor-export.pcg.json`
+2. Menu **PCG → Set Watched Graph…** (or Settings) → point to `schema/editor-export.pcg`
 3. Enable **Auto Reload** or click **PCG → Reload Watched Graph**
 4. Scene view shows cyan spheres on the `PCG Preview` object
 
@@ -56,7 +56,7 @@ npm run dev
 
 1. Create empty GameObject `PCG Runtime`
 2. Add components: `PcgPreview`, `PcgRuntimeRunner`
-3. `PcgRuntimeRunner` loads `StreamingAssets/pcg/demo.pcg.json` on Start
+3. `PcgRuntimeRunner` loads `StreamingAssets/pcg/demo.pcg` on Start
 
 ### Build & verify
 
@@ -68,7 +68,7 @@ npm run dev
 **Expected Player console log:**
 
 ```
-[PCG] Runtime executing graph: .../StreamingAssets/pcg/demo.pcg.json (core pcg-core 0.1.0)
+[PCG] Runtime executing graph: .../StreamingAssets/pcg/demo.pcg (core pcg-core 0.1.0)
 [PCG] Runtime OK — 100 points generated.
 ```
 
@@ -83,10 +83,10 @@ Static symbols are linked into `GameAssembly.dll` via `PcgCore.lib`.
 
 | File | Purpose |
 |------|---------|
-| `examples/demo.pcg.json` | Canonical M3 demo (copy for distribution) |
-| `schema/example.pcg.json` | Schema reference |
-| `schema/editor-export.pcg.json` | Web → Unity hot-reload target |
-| `Unity/Assets/StreamingAssets/pcg/demo.pcg.json` | Player runtime input |
+| `examples/demo.pcg` | Canonical M3 demo (copy for distribution) |
+| `schema/example.pcg` | Schema reference |
+| `schema/editor-export.pcg` | Web → Unity hot-reload target |
+| `Unity/Assets/StreamingAssets/pcg/demo.pcg` | Player runtime input |
 
 ## Troubleshooting
 

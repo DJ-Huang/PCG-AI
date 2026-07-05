@@ -19,6 +19,11 @@
     "edges": {
       "type": "array",
       "items": { "$ref": "#/$defs/edge" }
+    },
+    "parameters": {
+      "type": "array",
+      "description": "Graph-level parameters exposed to the runtime Inspector",
+      "items": { "$ref": "#/$defs/parameter" }
     }
   },
   "$defs": {
@@ -87,6 +92,20 @@
       "properties": {
         "prefab": { "type": "string", "default": "" },
         "scale": { "type": "number", "default": 1.0 }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["id", "name", "type", "default", "exposed", "targetNode", "targetProperty"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Unique parameter identifier" },
+        "name": { "type": "string", "description": "Display name shown in Inspector" },
+        "type": { "type": "string", "enum": ["integer", "number", "boolean", "string"] },
+        "default": { "description": "Default value (type depends on 'type' field)" },
+        "exposed": { "type": "boolean", "default": true, "description": "Whether to show on runtime Inspector" },
+        "targetNode": { "type": "string", "description": "Node ID whose property this parameter overrides" },
+        "targetProperty": { "type": "string", "description": "Property key in the target node's data" }
       }
     }
   }

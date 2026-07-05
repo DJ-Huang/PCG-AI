@@ -231,11 +231,11 @@ int main()
         return 1;
     }
 
-    const std::string demo_graph = read_file("../../examples/phase43-mesh-demo.pcg.json");
+    const std::string demo_graph = read_file("../../examples/phase43-mesh-demo.pcg");
     if (!demo_graph.empty()) {
         expect_code(pcg_validate_graph(demo_graph.c_str(), err, sizeof(err)), PCG_OK, "phase43 demo validate");
         expect_code(pcg_execute_graph(demo_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "phase43 demo execute");
-        std::printf("PASS: examples/phase43-mesh-demo.pcg.json\n");
+        std::printf("PASS: examples/phase43-mesh-demo.pcg\n");
     }
 
     const char* box_only = R"({

@@ -13,6 +13,8 @@ namespace DJTechRuntime.PCG
     {
 #if UNITY_EDITOR
         private const string Lib = "PcgCore";
+#elif UNITY_ANDROID
+        private const string Lib = "PcgCore";
 #else
         private const string Lib = "__Internal";
 #endif
