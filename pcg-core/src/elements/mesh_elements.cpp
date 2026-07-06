@@ -2,6 +2,7 @@
 
 #include "elements/element_utils.hpp"
 #include "elements/mesh_algorithms.hpp"
+#include "texture_runtime.hpp"
 
 namespace pcg::internal::elements {
 namespace {
@@ -121,13 +122,63 @@ public:
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing mesh input");
 
-        const double intensity = ctx.node->data.value("intensity", 0.02);
-        const double noise_scale = ctx.node->data.value("scale", 2.0);
-        const std::string noise_type_str = ctx.node->data.value("noiseType", std::string("perlin"));
-        const NoiseDeformType noise_type =
-            noise_type_str == "perlin" ? NoiseDeformType::Perlin : NoiseDeformType::Perlin;
+        NoiseDeformOptions opts;
+        opts.intensity = ctx.node->data.value("intensity", 0.02);
+        opts.noise_scale = ctx.node->data.value("scale", 2.0);
+        opts.mid_level = ctx.node->data.value("midLevel", 0.5);
+        opts.seed = ctx.graph_seed;
 
-        emit_mesh(ctx, noise_deform_mesh(mesh, intensity, noise_scale, noise_type, ctx.graph_seed));
+        const std::string noise_type_str = ctx.node->data.value("noiseType", std::string("perlin"));
+        opts.noise_type =
+            noise_type_str == "texture" ? NoiseDeformType::Texture : NoiseDeformType::Perlin;
+
+        const std::string coords_str = ctx.node->data.value("textureCoords", std::string("local"));
+        if (coords_str == "local")
+            opts.texture_coords = TextureCoordsMode::Local;
+
+        if (const nlohmann::json* tex_desc = ctx.inputs.find_json("texture")) {
+            if (tex_desc->value("kind", "") == "texture") {
+                opts.noise_type = NoiseDeformType::Texture;
+                const std::string slot_id = tex_desc->value("slotId", "");
+                opts.repeat_x = tex_desc->value("repeatX", 1.0);
+                opts.repeat_y = tex_desc->value("repeatY", 1.0);
+                if (!ctx.textures || slot_id.empty())
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                    "MeshNoiseDeform texture input missing runtime pixels");
+                opts.texture = ctx.textures->find(slot_id);
+                if (!opts.texture)
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                    "MeshNoiseDeform texture slot not uploaded");
+            }
+        }
+
+        if (opts.noise_type == NoiseDeformType::Texture && !opts.texture)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform requires a connected ImageTexture");
+
+        emit_mesh(ctx, noise_deform_mesh(mesh, opts));
+        return PCG_OK;
+    }
+};
+
+class ImageTextureElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "ImageTexture"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ImageTexture missing node");
+
+        const double repeat_x = ctx.node->data.value("repeatX", 1.0);
+        const double repeat_y = ctx.node->data.value("repeatY", 1.0);
+
+        nlohmann::json out{
+            {"kind", "texture"},
+            {"slotId", ctx.node->id},
+            {"repeatX", repeat_x},
+            {"repeatY", repeat_y},
+        };
+        ctx.outputs.add("out", data::PcgDataType::Param, std::move(out));
         return PCG_OK;
     }
 };
@@ -140,6 +191,7 @@ void register_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcg
     map.emplace("SubdivideMesh", std::make_unique<SubdivideMeshElement>());
     map.emplace("BevelMesh", std::make_unique<BevelMeshElement>());
     map.emplace("MeshNoiseDeform", std::make_unique<MeshNoiseDeformElement>());
+    map.emplace("ImageTexture", std::make_unique<ImageTextureElement>());
 }
 
 } // namespace pcg::internal::elements

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
@@ -42,6 +43,32 @@ namespace DJTechRuntime.PCG
             StringBuilder errBuf,
             int errBufSize);
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct NativeTextureSlot
+        {
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string slot_id;
+            public int width;
+            public int height;
+            public IntPtr rgba;
+        }
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v3(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            out int outVertexCount,
+            out int outIndexCount,
+            StringBuilder errBuf,
+            int errBufSize);
+
         public const int ErrBufSize = 1024;
         public const int OutJsonBufSize = 256 * 1024;
         public const int OutMeshBufSize = 8 * 1024 * 1024;
@@ -60,22 +87,77 @@ namespace DJTechRuntime.PCG
 
         public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(string json, int seed)
         {
+            return ExecuteGraph(json, seed, null);
+        }
+
+        public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
+            string json, int seed, IReadOnlyList<PcgTextureUpload> textures)
+        {
             var errBuf = new StringBuilder(ErrBufSize);
             var jsonBuf = new byte[OutJsonBufSize];
             var meshBuf = new byte[OutMeshBufSize];
 
-            var rc = (PcgResultCode)pcg_execute_graph_v2(
-                json,
-                seed,
-                out var kind,
-                jsonBuf,
-                jsonBuf.Length,
-                meshBuf,
-                meshBuf.Length,
-                out var vertexCount,
-                out var indexCount,
-                errBuf,
-                ErrBufSize);
+            PcgResultCode rc;
+            int kind;
+            int vertexCount;
+            int indexCount;
+
+            if (textures != null && textures.Count > 0)
+            {
+                var nativeSlots = new NativeTextureSlot[textures.Count];
+                var handles = new List<GCHandle>(textures.Count);
+                try
+                {
+                    for (var i = 0; i < textures.Count; i++)
+                    {
+                        var upload = textures[i];
+                        var pin = GCHandle.Alloc(upload.Rgba, GCHandleType.Pinned);
+                        handles.Add(pin);
+                        nativeSlots[i] = new NativeTextureSlot
+                        {
+                            slot_id = upload.SlotId,
+                            width = upload.Width,
+                            height = upload.Height,
+                            rgba = pin.AddrOfPinnedObject(),
+                        };
+                    }
+
+                    rc = (PcgResultCode)pcg_execute_graph_v3(
+                        json,
+                        seed,
+                        nativeSlots,
+                        nativeSlots.Length,
+                        out kind,
+                        jsonBuf,
+                        jsonBuf.Length,
+                        meshBuf,
+                        meshBuf.Length,
+                        out vertexCount,
+                        out indexCount,
+                        errBuf,
+                        ErrBufSize);
+                }
+                finally
+                {
+                    foreach (var handle in handles)
+                        handle.Free();
+                }
+            }
+            else
+            {
+                rc = (PcgResultCode)pcg_execute_graph_v2(
+                    json,
+                    seed,
+                    out kind,
+                    jsonBuf,
+                    jsonBuf.Length,
+                    meshBuf,
+                    meshBuf.Length,
+                    out vertexCount,
+                    out indexCount,
+                    errBuf,
+                    ErrBufSize);
+            }
 
             if (rc != PcgResultCode.Ok)
             {

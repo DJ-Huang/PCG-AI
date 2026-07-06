@@ -48,6 +48,11 @@ namespace DJTechRuntime.PCG
         public PcgGraphDocument Document => m_Document;
         public bool HasGraph => graphAsset != null && !string.IsNullOrEmpty(graphAsset.GraphJson);
 
+#if UNITY_EDITOR
+        /// <summary>Set by Editor bridge to include live Graph Editor node data when Run is pressed.</summary>
+        public static System.Func<PcgGraphComponent, string> EditorBuildExecutionJson;
+#endif
+
         private void Start()
         {
             if (executionMode == PcgExecutionMode.RunOnStart && Application.isPlaying)
@@ -65,10 +70,14 @@ namespace DJTechRuntime.PCG
             m_Document = null;
             m_GraphParameters = null;
 
-            if (!HasGraph)
+            if (graphAsset == null)
                 return;
 
-            if (!PcgGraphSerializer.TryFromJson(graphAsset.GraphJson, out m_Document, out var error))
+            var json = PcgGraphAssetUtility.ReadLatestJson(graphAsset);
+            if (string.IsNullOrWhiteSpace(json))
+                return;
+
+            if (!PcgGraphSerializer.TryFromJson(json, out m_Document, out var error))
             {
                 Debug.LogError($"[PCG] Failed to parse graph JSON: {error}", this);
                 return;
@@ -101,7 +110,12 @@ namespace DJTechRuntime.PCG
 
         private void ApplyOverridesToDocument()
         {
-            if (m_Document == null || m_ParameterOverrides == null || m_GraphParameters == null)
+            ApplyOverridesToDocument(m_Document);
+        }
+
+        public void ApplyOverridesToDocument(PcgGraphDocument doc)
+        {
+            if (doc == null || m_ParameterOverrides == null || m_GraphParameters == null)
                 return;
 
             var byId = new Dictionary<string, PcgParameterOverride>();
@@ -122,7 +136,7 @@ namespace DJTechRuntime.PCG
                 if (string.IsNullOrEmpty(param.targetNode) || string.IsNullOrEmpty(param.targetProperty))
                     continue;
 
-                var node = FindNode(m_Document, param.targetNode);
+                var node = FindNode(doc, param.targetNode);
                 if (node != null)
                     node.data.SetRaw(param.targetProperty, ov.GetValue());
             }
@@ -144,8 +158,7 @@ namespace DJTechRuntime.PCG
 
         public bool Run()
         {
-            if (m_Document == null)
-                RefreshDocument();
+            RefreshDocument();
 
             if (m_Document == null)
             {
@@ -153,10 +166,17 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
-            ApplyOverridesToDocument();
+            string json = null;
+#if UNITY_EDITOR
+            json = EditorBuildExecutionJson?.Invoke(this);
+#endif
+            if (string.IsNullOrEmpty(json))
+            {
+                ApplyOverridesToDocument();
+                json = PcgGraphSerializer.ToJson(m_Document, pretty: false);
+            }
 
-            var json = PcgGraphSerializer.ToJson(m_Document, pretty: false);
-            var result = PcgGraphLoader.Execute(json, seed);
+            var result = PcgGraphLoader.ExecuteWithResolvedTextures(json, seed);
             if (result == null)
                 return false;
 

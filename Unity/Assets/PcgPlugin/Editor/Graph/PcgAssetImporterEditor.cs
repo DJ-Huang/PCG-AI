@@ -12,7 +12,7 @@ namespace DJTechEditor.PCG.Graph
             if (GUILayout.Button("Open in Graph Editor"))
             {
                 var path = AssetDatabase.GetAssetPath(((ScriptedImporter)target));
-                PcgGraphEditorWindow.OpenWithFile(path);
+                PcgGraphEditorWindow.ShowGraphEditWindow(path);
             }
 
             EditorGUILayout.Space();

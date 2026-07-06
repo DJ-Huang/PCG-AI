@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using DJTechRuntime.PCG;
 using UnityEngine;
@@ -29,9 +30,32 @@ namespace DJTechRuntime.PCG
         }
 
         /// <summary>
+        /// Executes a graph JSON with ImageTexture nodes resolved in the Editor.
+        /// </summary>
+        public static PcgGraphExecuteResult ExecuteWithResolvedTextures(string json, int seed = 42)
+        {
+            var textures = PcgTextureResolver.CollectFromGraphJson(json);
+            if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
+            {
+                Debug.LogError($"[PCG] {textureError}");
+                return null;
+            }
+
+            return textures.Count > 0 ? Execute(json, seed, textures) : Execute(json, seed);
+        }
+
+        /// <summary>
         /// Executes a graph JSON string directly.
         /// </summary>
         public static PcgGraphExecuteResult Execute(string json, int seed = 42)
+        {
+            return Execute(json, seed, null);
+        }
+
+        /// <summary>
+        /// Executes a graph JSON with optional runtime texture uploads (ImageTexture nodes).
+        /// </summary>
+        public static PcgGraphExecuteResult Execute(string json, int seed, IReadOnlyList<PcgTextureUpload> textures)
         {
             var (validateCode, error) = PcgNative.ValidateGraph(json);
             if (validateCode != PcgResultCode.Ok)
@@ -40,7 +64,7 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
-            var (execCode, result) = PcgNative.ExecuteGraph(json, seed);
+            var (execCode, result) = PcgNative.ExecuteGraph(json, seed, textures);
             if (execCode != PcgResultCode.Ok)
             {
                 Debug.LogError($"[PCG] Execution failed ({execCode}): {result?.Error}");

@@ -41,7 +41,7 @@ namespace DJTechEditor.PCG
             Event.current.Use();
             GUIUtility.hotControl = 0;
             var capturedPath = path;
-            EditorApplication.delayCall += () => Graph.PcgGraphEditorWindow.OpenWithFile(capturedPath);
+            EditorApplication.delayCall += () => Graph.PcgGraphEditorWindow.ShowGraphEditWindow(capturedPath);
         }
 
         private static bool IsValidPcgGraph(string assetPath)

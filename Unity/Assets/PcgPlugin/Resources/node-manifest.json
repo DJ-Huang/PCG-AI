@@ -329,19 +329,41 @@
       }
     },
     {
+      "type": "ImageTexture",
+      "displayName": "Image Texture",
+      "category": "Texture",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Texture", "pinType": "Texture" }],
+      "properties": {
+        "texture": { "type": "texture2d", "default": "" },
+        "repeatX": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 64.0 },
+        "repeatY": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 64.0 }
+      }
+    },
+    {
       "type": "MeshNoiseDeform",
       "displayName": "Mesh Noise Deform",
       "category": "Mesh",
-      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "inputs": [
+        { "id": "in", "label": "Mesh", "pinType": "SpatialMesh" },
+        { "id": "texture", "label": "Texture", "pinType": "Texture" }
+      ],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "properties": {
         "intensity": { "type": "number", "default": 0.02, "minimum": 0, "maximum": 1.0 },
         "scale": { "type": "number", "default": 2.0, "minimum": 0.01, "maximum": 64.0 },
+        "midLevel": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1.0 },
+        "textureCoords": {
+          "type": "enum",
+          "default": "local",
+          "options": [{ "value": "local", "label": "Local" }]
+        },
         "noiseType": {
           "type": "enum",
           "default": "perlin",
           "options": [
-            { "value": "perlin", "label": "Perlin (Built-in)" }
+            { "value": "perlin", "label": "Perlin (Built-in)" },
+            { "value": "texture", "label": "Texture (requires input)" }
           ]
         }
       }

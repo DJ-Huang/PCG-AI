@@ -261,6 +261,9 @@ namespace DJTechRuntime.PCG
                 case "enum":
                     sb.Append(JsonString(value?.ToString() ?? ""));
                     break;
+                case "texture2d":
+                    sb.Append(JsonString(value?.ToString() ?? ""));
+                    break;
                 default:
                     sb.Append(JsonString(value?.ToString() ?? ""));
                     break;

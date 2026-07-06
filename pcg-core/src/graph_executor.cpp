@@ -3,6 +3,7 @@
 #include "data/pcg_context.hpp"
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
+#include "texture_runtime.hpp"
 
 #include <queue>
 #include <unordered_map>
@@ -113,7 +114,8 @@ PcgResultCode execute_graph(const Graph& graph,
                             int seed,
                             GraphExecutionResult& out_result,
                             char* err_buf,
-                            int err_buf_size)
+                            int err_buf_size,
+                            const TextureRuntime* textures)
 {
     elements::register_builtin_elements();
 
@@ -137,6 +139,7 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.graph_seed = seed;
         ctx.graph = &graph;
         ctx.node = node;
+        ctx.textures = textures;
         ctx.err_buf = err_buf;
         ctx.err_buf_size = err_buf_size;
 

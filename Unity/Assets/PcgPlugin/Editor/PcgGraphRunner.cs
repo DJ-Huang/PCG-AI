@@ -47,7 +47,7 @@ namespace DJTechEditor.PCG
             if (overrides != null && overrides.Count > 0)
                 json = PcgParameterApplicator.ApplyOverrides(json, overrides);
 
-            var result = PcgGraphLoader.Execute(json, seed);
+            var result = PcgGraphLoader.ExecuteWithResolvedTextures(json, seed);
             if (result == null)
                 return false;
 

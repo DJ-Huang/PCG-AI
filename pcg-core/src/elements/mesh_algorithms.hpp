@@ -1,6 +1,7 @@
 #pragma once
 
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_texture_data.hpp"
 
 namespace pcg::internal::elements {
 
@@ -27,10 +28,28 @@ enum class BevelVMeshMethod {
 
 enum class NoiseDeformType {
     Perlin,
+    Texture,
+};
+
+enum class TextureCoordsMode {
+    Local,
+};
+
+struct NoiseDeformOptions {
+    double intensity = 0.02;
+    double noise_scale = 2.0;
+    double mid_level = 0.5;
+    NoiseDeformType noise_type = NoiseDeformType::Perlin;
+    TextureCoordsMode texture_coords = TextureCoordsMode::Local;
+    int seed = 0;
+    const data::PcgTextureData* texture = nullptr;
+    double repeat_x = 1.0;
+    double repeat_y = 1.0;
 };
 
 data::PcgMeshData create_box_mesh(double width, double height, double depth);
 data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels);
+data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, const NoiseDeformOptions& options);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,
                                     NoiseDeformType noise_type, int seed);
 data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int segments,

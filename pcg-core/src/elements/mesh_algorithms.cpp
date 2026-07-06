@@ -174,30 +174,28 @@ data::PcgMeshData bevel_mesh_vertex_push(const data::PcgMeshData& mesh, double a
 
 } // namespace
 
-data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,
-                                    NoiseDeformType noise_type, int seed)
+data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, const NoiseDeformOptions& options)
 {
     if (mesh.vertices().empty() || mesh.triangles().size() < 3)
         return mesh;
 
-    intensity = std::max(intensity, 0.0);
-    noise_scale = std::max(noise_scale, 1e-6);
-    if (intensity <= 1e-9)
+    NoiseDeformOptions opts = options;
+    opts.intensity = std::max(opts.intensity, 0.0);
+    opts.noise_scale = std::max(opts.noise_scale, 1e-6);
+    opts.repeat_x = std::max(opts.repeat_x, 1e-6);
+    opts.repeat_y = std::max(opts.repeat_y, 1e-6);
+    if (opts.intensity <= 1e-9)
+        return mesh;
+
+    if (opts.noise_type == NoiseDeformType::Texture &&
+        (opts.texture == nullptr || opts.texture->empty()))
         return mesh;
 
     data::PcgMeshData out = mesh;
     std::vector<Vec3> accum;
     accumulate_vertex_normals(out, accum);
 
-    const auto sample_noise = [&](double x, double y, double z) -> double {
-        switch (noise_type) {
-        case NoiseDeformType::Perlin:
-        default:
-            return perlin_noise_3d(x, y, z, seed);
-        }
-    };
-
-    const double seed_offset = static_cast<double>(seed) * 0.137;
+    const double seed_offset = static_cast<double>(opts.seed) * 0.137;
     auto& verts_mut = out.vertices_mut();
     for (size_t i = 0; i < verts_mut.size(); ++i) {
         Vec3 n = normalize(accum[i]);
@@ -205,14 +203,34 @@ data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intens
             continue;
 
         const Vec3 p = to_vec3(verts_mut[i]);
-        const double nx = (p.x + seed_offset) * noise_scale;
-        const double ny = (p.y + seed_offset * 1.3) * noise_scale;
-        const double nz = (p.z + seed_offset * 1.7) * noise_scale;
-        const double displacement = sample_noise(nx, ny, nz) * intensity;
+        double displacement = 0.0;
+        if (opts.noise_type == NoiseDeformType::Texture && opts.texture) {
+            const double tin = opts.texture->sample_grayscale_local(
+                p.x, p.y, p.z, opts.noise_scale, opts.repeat_x, opts.repeat_y);
+            displacement = (tin - opts.mid_level) * opts.intensity;
+        }
+        else {
+            const double nx = (p.x + seed_offset) * opts.noise_scale;
+            const double ny = (p.y + seed_offset * 1.3) * opts.noise_scale;
+            const double nz = (p.z + seed_offset * 1.7) * opts.noise_scale;
+            displacement = perlin_noise_3d(nx, ny, nz, opts.seed) * opts.intensity;
+        }
+
         verts_mut[i] = to_vertex(add(p, scale(n, displacement)));
     }
 
     return out;
+}
+
+data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,
+                                    NoiseDeformType noise_type, int seed)
+{
+    NoiseDeformOptions opts;
+    opts.intensity = intensity;
+    opts.noise_scale = noise_scale;
+    opts.noise_type = noise_type;
+    opts.seed = seed;
+    return noise_deform_mesh(mesh, opts);
 }
 
 data::PcgMeshData create_box_mesh(double width, double height, double depth)

@@ -224,11 +224,30 @@ bool expect_no_aabb_expansion(const pcg::internal::data::PcgMeshData& mesh, doub
     return true;
 }
 
+bool execute_mesh_graph_with_textures(const char* graph_json,
+                                      int seed,
+                                      const PcgTextureSlot* textures,
+                                      int texture_count,
+                                      pcg::internal::data::PcgMeshData& mesh,
+                                      char* err,
+                                      int err_size);
+
 bool execute_mesh_graph(const char* graph_json,
                         int seed,
                         pcg::internal::data::PcgMeshData& mesh,
                         char* err,
                         int err_size)
+{
+    return execute_mesh_graph_with_textures(graph_json, seed, nullptr, 0, mesh, err, err_size);
+}
+
+bool execute_mesh_graph_with_textures(const char* graph_json,
+                                      int seed,
+                                      const PcgTextureSlot* textures,
+                                      int texture_count,
+                                      pcg::internal::data::PcgMeshData& mesh,
+                                      char* err,
+                                      int err_size)
 {
     int kind = PCG_RESULT_KIND_NONE;
     int vertex_count = 0;
@@ -236,9 +255,10 @@ bool execute_mesh_graph(const char* graph_json,
     std::vector<uint8_t> mesh_buf(8 * 1024 * 1024);
     char json_out[256] = {};
 
-    const PcgResultCode rc = pcg_execute_graph_v2(
-        graph_json, seed, &kind, json_out, sizeof(json_out), mesh_buf.data(),
-        static_cast<int>(mesh_buf.size()), &vertex_count, &index_count, err, err_size);
+    const PcgResultCode rc = pcg_execute_graph_v3(
+        graph_json, seed, textures, texture_count, &kind, json_out, sizeof(json_out),
+        mesh_buf.data(), static_cast<int>(mesh_buf.size()), &vertex_count, &index_count, err,
+        err_size);
     if (rc != PCG_OK)
         return false;
     if (kind != PCG_RESULT_KIND_MESH)
@@ -519,6 +539,39 @@ int main()
     pcg::internal::data::PcgMeshData noise_mesh;
     if (!execute_mesh_graph(noise_graph, 42, noise_mesh, err, sizeof(err))) {
         std::printf("FAIL: noise deform graph execute (%s)\n", err);
+        return 1;
+    }
+
+    const float checker_rgba[] = {
+        1.f, 1.f, 1.f, 1.f, 0.f, 0.f, 0.f, 1.f,
+        0.f, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f, 1.f,
+    };
+    const PcgTextureSlot tex_slot{"tex1", 2, 2, checker_rgba};
+    const char* texture_noise_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":0},
+         "data": {"width": 2.0, "height": 2.0, "depth": 2.0}},
+        {"id": "tex1", "type": "ImageTexture", "position": {"x":0,"y":0},
+         "data": {"repeatX": 1.0, "repeatY": 1.0}},
+        {"id": "noise", "type": "MeshNoiseDeform", "position": {"x":0,"y":0},
+         "data": {"intensity": 0.1, "scale": 1.0, "midLevel": 0.5, "noiseType": "texture"}}
+      ],
+      "edges": [
+        {"id": "e1", "source": "box", "target": "noise", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e2", "source": "tex1", "target": "noise", "sourceHandle": "out", "targetHandle": "texture"}
+      ]
+    })";
+    expect_code(pcg_validate_graph(texture_noise_graph, err, sizeof(err)), PCG_OK,
+                "texture noise graph validate");
+    pcg::internal::data::PcgMeshData texture_noise_mesh;
+    if (!execute_mesh_graph_with_textures(texture_noise_graph, 42, &tex_slot, 1, texture_noise_mesh,
+                                          err, sizeof(err))) {
+        std::printf("FAIL: texture noise graph execute (%s)\n", err);
+        return 1;
+    }
+    if (!meshes_have_different_positions(box_for_noise, texture_noise_mesh)) {
+        std::printf("FAIL: texture noise deform should offset vertices\n");
         return 1;
     }
 

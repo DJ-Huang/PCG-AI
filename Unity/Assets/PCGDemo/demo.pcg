@@ -11,25 +11,39 @@
       "id": "n105",
       "type": "BevelMesh",
       "position": { "x": 279.5, "y": 266 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.08, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
-    },
-    {
-      "id": "n106",
-      "type": "MeshNoiseDeform",
-      "position": { "x": 570.5, "y": 397 },
-      "data": {"intensity": 0.227, "scale": 53.5, "noiseType": "perlin"}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.4529412, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     },
     {
       "id": "n107",
       "type": "SubdivideMesh",
       "position": { "x": 498, "y": 189 },
-      "data": {"levels": 2}
+      "data": {"levels": 3}
+    },
+    {
+      "id": "n109",
+      "type": "Output",
+      "position": { "x": 976.5, "y": 387 },
+      "data": {"label": "Output"}
+    },
+    {
+      "id": "n108",
+      "type": "ImageTexture",
+      "position": { "x": 413.5, "y": 449.5 },
+      "data": {"texture": "Resources/tuanjie_builtin_extra/Default-Particle", "repeatX": 1, "repeatY": 1}
+    },
+    {
+      "id": "n106",
+      "type": "MeshNoiseDeform",
+      "position": { "x": 732, "y": 387 },
+      "data": {"intensity": 0.05, "scale": 13.18441, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
     }
   ],
   "edges": [
     {"id": "e105", "source": "n101", "target": "n105", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e170", "source": "n105", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e171", "source": "n107", "target": "n106", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e171", "source": "n107", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e175", "source": "n106", "target": "n109", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e177", "source": "n108", "target": "n106", "sourceHandle": "out", "targetHandle": "texture"}
   ],
   "parameters": [
     {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},

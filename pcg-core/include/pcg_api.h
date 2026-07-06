@@ -114,6 +114,36 @@ PCG_API PcgResultCode pcg_mesh_binary_size_for_counts(int vertex_count,
                                                       int index_count,
                                                       int* out_size);
 
+/**
+ * Runtime texture slot uploaded by the host (Unity) before graph execution.
+ * slot_id must match the ImageTexture node id in the graph JSON.
+ * rgba is width*height*4 floats in [0,1] (linear RGBA).
+ */
+typedef struct {
+    const char* slot_id;
+    int width;
+    int height;
+    const float* rgba;
+} PcgTextureSlot;
+
+/**
+ * Executes a Graph JSON with optional runtime texture pixel uploads.
+ * Falls back to pcg_execute_graph_v2 when textures is null or texture_count is 0.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v3(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           char* err_buf,
+                                           int err_buf_size);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

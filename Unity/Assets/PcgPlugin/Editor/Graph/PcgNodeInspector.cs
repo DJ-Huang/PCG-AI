@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using UnityEditor;
 using UnityEditor.Experimental.GraphView;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 using DJTechRuntime.PCG;
@@ -316,6 +318,7 @@ namespace DJTechEditor.PCG.Graph
                 "number" => MakeFloatField(key, currentVal, v => node.SetPropertyValue(key, v)),
                 "boolean" => MakeToggleField(key, currentVal, v => node.SetPropertyValue(key, v)),
                 "enum" => MakeEnumField(key, prop, currentVal, v => node.SetPropertyValue(key, v)),
+                "texture2d" => MakeTextureField(key, currentVal, v => node.SetPropertyValue(key, v)),
                 _ => MakeTextField(key, currentVal, v => node.SetPropertyValue(key, v)),
             };
             wrapper.Add(field);
@@ -461,6 +464,33 @@ namespace DJTechEditor.PCG.Graph
                 });
             });
             return popup;
+        }
+
+        private VisualElement MakeTextureField(string key, object val, Action<string> onSet)
+        {
+            var stored = val?.ToString() ?? "";
+            var tex = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
+
+            var field = new ObjectField
+            {
+                objectType = typeof(Texture2D),
+                allowSceneObjects = false,
+                value = tex,
+            };
+            field.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Change Property", () =>
+                {
+                    var t = evt.newValue as Texture2D;
+                    var path = PcgTextureAssetUtil.TextureToStorageValue(t);
+                    onSet(path);
+                    if (t != null && string.IsNullOrEmpty(path))
+                        Debug.LogWarning("[PCG] ImageTexture: could not bind texture — use a Project asset.");
+                    else if (!string.IsNullOrEmpty(path))
+                        Debug.Log($"[PCG] ImageTexture '{key}' bound to {path}");
+                });
+            });
+            return field;
         }
 
         private TextField MakeTextField(string key, object val, Action<string> onSet)
