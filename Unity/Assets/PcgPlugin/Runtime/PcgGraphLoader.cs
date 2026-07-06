@@ -43,7 +43,10 @@ namespace DJTechRuntime.PCG
             var (execCode, resultJson) = PcgNative.ExecuteGraph(json, seed);
             if (execCode != PcgResultCode.Ok)
             {
-                Debug.LogError($"[PCG] Execution failed ({execCode})");
+                var hint = execCode == PcgResultCode.Execution
+                    ? " (mesh result may exceed output buffer — try lowering bevel segments or subdiv levels)"
+                    : string.Empty;
+                Debug.LogError($"[PCG] Execution failed ({execCode}){hint}");
                 return null;
             }
 

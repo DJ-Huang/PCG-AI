@@ -19,17 +19,19 @@ namespace DJTechRuntime.PCG
         private const string Lib = "__Internal";
 #endif
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern IntPtr pcg_get_version();
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int pcg_validate_graph(string json, StringBuilder errBuf, int errBufSize);
 
-        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int pcg_execute_graph(string json, int seed, StringBuilder outJson, int outJsonSize);
+        // byte[] marshals as a writable char buffer — safer than StringBuilder for large mesh JSON on macOS.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph(string json, int seed, byte[] outJson, int outJsonSize);
 
         public const int ErrBufSize = 1024;
-        public const int OutBufSize = 65536;
+        // Bevel mesh JSON can exceed 64 KB (segments=8 ≈ 56 KB; subdiv+bevel worst case > 200 KB).
+        public const int OutBufSize = 512 * 1024;
 
         public static string GetVersion()
         {
@@ -45,9 +47,14 @@ namespace DJTechRuntime.PCG
 
         public static (PcgResultCode code, string resultJson) ExecuteGraph(string json, int seed)
         {
-            var outBuf = new StringBuilder(OutBufSize);
-            var rc = (PcgResultCode)pcg_execute_graph(json, seed, outBuf, OutBufSize);
-            return (rc, outBuf.ToString());
+            var outBytes = new byte[OutBufSize];
+            var rc = (PcgResultCode)pcg_execute_graph(json, seed, outBytes, outBytes.Length);
+            if (rc != PcgResultCode.Ok)
+                return (rc, string.Empty);
+
+            var zero = Array.IndexOf(outBytes, (byte)0);
+            var length = zero >= 0 ? zero : outBytes.Length;
+            return (rc, Encoding.UTF8.GetString(outBytes, 0, length));
         }
     }
 

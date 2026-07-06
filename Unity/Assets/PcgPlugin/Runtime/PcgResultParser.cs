@@ -187,6 +187,17 @@ namespace DJTechRuntime.PCG
                     return false;
                 }
 
+                var maxVertex = payload.vertices.Length - 1;
+                for (var i = 0; i < payload.triangles.Length; i++)
+                {
+                    var idx = payload.triangles[i];
+                    if (idx < 0 || idx > maxVertex)
+                    {
+                        error = $"Invalid triangle index {idx} (vertex count {payload.vertices.Length}).";
+                        return false;
+                    }
+                }
+
                 var vertices = new Vector3[payload.vertices.Length];
                 for (var i = 0; i < payload.vertices.Length; i++)
                 {
@@ -195,6 +206,8 @@ namespace DJTechRuntime.PCG
                 }
 
                 mesh = new Mesh { name = "PCG Generated Mesh" };
+                if (vertices.Length > 65535)
+                    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
                 mesh.vertices = vertices;
                 mesh.triangles = payload.triangles;
                 mesh.RecalculateNormals();

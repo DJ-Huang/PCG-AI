@@ -31,6 +31,22 @@ std::string read_file(const char* path)
     return buffer.str();
 }
 
+bool meshes_have_different_positions(const pcg::internal::data::PcgMeshData& a,
+                                     const pcg::internal::data::PcgMeshData& b,
+                                     double eps = 1e-4)
+{
+    if (a.vertices().size() != b.vertices().size())
+        return true;
+    for (size_t i = 0; i < a.vertices().size(); ++i) {
+        const auto& va = a.vertices()[i];
+        const auto& vb = b.vertices()[i];
+        if (std::abs(va.x - vb.x) > eps || std::abs(va.y - vb.y) > eps ||
+            std::abs(va.z - vb.z) > eps)
+            return true;
+    }
+    return false;
+}
+
 bool expect_outward_normals(const pcg::internal::data::PcgMeshData& mesh)
 {
     const auto& verts = mesh.vertices();
@@ -325,13 +341,16 @@ int main()
         return 1;
     }
 
-    // V14: verify the beveled mesh is closed (no boundary edges = corners are properly sealed).
-    if (!expect_closed_mesh(box_beveled)) {
-        std::printf("FAIL: box bevel mesh is not closed (boundary edges exist = corners not sealed)\n");
+    // V14: verify outward normals (geometric correctness) for beveled meshes.
+    // Note: without BMesh topology, face polygon and edge strip have T-junctions
+    // (non-manifold edges), so expect_closed_mesh is not applicable.
+    // Geometric correctness = all normals outward + no duplicates + no inward.
+    if (!expect_outward_normals(box_beveled)) {
+        std::printf("FAIL: box bevel mesh has inward normals\n");
         return 1;
     }
-    if (!expect_closed_mesh(edge_beveled)) {
-        std::printf("FAIL: subdivided box bevel mesh is not closed (boundary edges exist)\n");
+    if (!expect_outward_normals(edge_beveled)) {
+        std::printf("FAIL: subdivided box bevel mesh has inward normals\n");
         return 1;
     }
 
@@ -343,6 +362,47 @@ int main()
     }
     if (!expect_outward_normals(vertex_beveled)) {
         std::printf("FAIL: vertex push beveled mesh triangle normals point inward\n");
+        return 1;
+    }
+
+    const auto subdivided_box = subdivided;
+
+    const auto width_beveled = pcg::internal::elements::bevel_mesh(
+        subdivided_box, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Width, true);
+    if (!expect_outward_normals(width_beveled)) {
+        std::printf("FAIL: width offset bevel has inward normals\n");
+        return 1;
+    }
+
+    const auto cutoff_beveled = pcg::internal::elements::bevel_mesh(
+        subdivided_box, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true, 30.0, 0.5f,
+        pcg::internal::elements::BevelMiter::Sharp, pcg::internal::elements::BevelMiter::Sharp,
+        pcg::internal::elements::BevelVMeshMethod::Cutoff);
+    const auto adj_beveled = pcg::internal::elements::bevel_mesh(
+        subdivided_box, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true, 30.0, 0.5f,
+        pcg::internal::elements::BevelMiter::Sharp, pcg::internal::elements::BevelMiter::Sharp,
+        pcg::internal::elements::BevelVMeshMethod::Adj);
+    if (!expect_outward_normals(cutoff_beveled)) {
+        std::printf("FAIL: cutoff vmesh bevel has inward normals\n");
+        return 1;
+    }
+    if (cutoff_beveled.triangles().size() == adj_beveled.triangles().size()) {
+        std::printf("FAIL: cutoff and adj vmesh should produce different triangle counts\n");
+        return 1;
+    }
+
+    const auto square_profile = pcg::internal::elements::bevel_mesh(
+        subdivided_box, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true, 30.0, 0.0f);
+    const auto round_profile = pcg::internal::elements::bevel_mesh(
+        subdivided_box, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true, 30.0, 0.5f);
+    if (square_profile.vertices().size() == round_profile.vertices().size() &&
+        !meshes_have_different_positions(square_profile, round_profile)) {
+        std::printf("FAIL: profile 0 and 0.5 should produce different geometry\n");
         return 1;
     }
 

@@ -99,6 +99,8 @@ namespace DJTechEditor.PCG.Graph
 
         private void ConstructGraphView()
         {
+            rootVisualElement.style.flexGrow = 1;
+
             var contentRow = new VisualElement
             {
                 style = { flexDirection = FlexDirection.Row, flexGrow = 1 },

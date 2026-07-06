@@ -18,8 +18,9 @@ namespace DJTechEditor.PCG.Graph
     {
         private readonly PcgGraphView m_GraphView;
         private readonly PcgGraphBlackboard m_Blackboard;
-        private VisualElement m_Body;
+        private ScrollView m_Body;
         private PcgGraphNodeBase m_CurrentNode;
+        private bool m_IsRebuilding;
 
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
         {
@@ -35,12 +36,14 @@ namespace DJTechEditor.PCG.Graph
             style.borderLeftWidth = 1;
             style.borderLeftColor = new Color(0.15f, 0.15f, 0.15f);
             style.backgroundColor = new Color(0.22f, 0.22f, 0.22f);
+            style.flexDirection = FlexDirection.Column;
             style.flexShrink = 0;
 
             var header = new Label("Inspector")
             {
                 style =
                 {
+                    flexShrink = 0,
                     paddingLeft = 8,
                     paddingRight = 8,
                     paddingTop = 6,
@@ -51,12 +54,14 @@ namespace DJTechEditor.PCG.Graph
             };
             Add(header);
 
-            m_Body = new VisualElement
+            m_Body = new ScrollView(ScrollViewMode.Vertical)
             {
                 style =
                 {
+                    flexGrow = 1,
+                    flexShrink = 1,
                     paddingLeft = 6,
-                    paddingRight = 6,
+                    paddingRight = 8,
                     paddingBottom = 6,
                 },
             };
@@ -93,32 +98,43 @@ namespace DJTechEditor.PCG.Graph
 
         private void ShowNode(PcgGraphNodeBase node)
         {
-            m_CurrentNode = node;
-            m_Body.Clear();
-            style.display = DisplayStyle.Flex;
+            if (m_IsRebuilding)
+                return;
 
-            var titleLabel = new Label(node.title)
+            m_IsRebuilding = true;
+            try
             {
-                style =
+                m_CurrentNode = node;
+                m_Body.Clear();
+                style.display = DisplayStyle.Flex;
+
+                var titleLabel = new Label(node.title)
                 {
-                    unityFontStyleAndWeight = FontStyle.Bold,
-                    color = new Color(0.85f, 0.85f, 0.85f),
-                    paddingBottom = 4,
-                    borderBottomWidth = 1,
-                    borderBottomColor = new Color(0.3f, 0.3f, 0.3f),
-                    marginBottom = 4,
-                },
-            };
-            m_Body.Add(titleLabel);
+                    style =
+                    {
+                        unityFontStyleAndWeight = FontStyle.Bold,
+                        color = new Color(0.85f, 0.85f, 0.85f),
+                        paddingBottom = 4,
+                        borderBottomWidth = 1,
+                        borderBottomColor = new Color(0.3f, 0.3f, 0.3f),
+                        marginBottom = 4,
+                    },
+                };
+                m_Body.Add(titleLabel);
 
-            var typeLabel = new Label($"Type: {node.NodeType}")
+                var typeLabel = new Label($"Type: {node.NodeType}")
+                {
+                    style = { color = new Color(0.6f, 0.6f, 0.6f), fontSize = 10, marginBottom = 6 },
+                };
+                m_Body.Add(typeLabel);
+
+                if (node is PcgManifestNodeView manifestNode)
+                    ShowManifestProperties(manifestNode);
+            }
+            finally
             {
-                style = { color = new Color(0.6f, 0.6f, 0.6f), fontSize = 10, marginBottom = 6 },
-            };
-            m_Body.Add(typeLabel);
-
-            if (node is PcgManifestNodeView manifestNode)
-                ShowManifestProperties(manifestNode);
+                m_IsRebuilding = false;
+            }
         }
 
         // ─── Manifest nodes ──────────────────────────────────────────
@@ -137,16 +153,32 @@ namespace DJTechEditor.PCG.Graph
 
         private VisualElement CreatePropertyRow(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
         {
-            var container = new VisualElement { style = { marginBottom = 6 } };
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginBottom = 8,
+                    flexShrink = 0,
+                },
+            };
 
             // Row 1: label + promote button + bind dropdown
-            var headerRow = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            var headerRow = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                },
+            };
 
             var label = new Label(key)
             {
                 style =
                 {
                     flexGrow = 1,
+                    flexShrink = 1,
+                    overflow = Overflow.Hidden,
                     color = new Color(0.8f, 0.8f, 0.8f),
                     unityFontStyleAndWeight = FontStyle.Bold,
                 },
@@ -160,24 +192,37 @@ namespace DJTechEditor.PCG.Graph
                 tooltip = "Promote to parameter",
             };
             promoteBtn.style.width = 22;
+            promoteBtn.style.flexShrink = 0;
             headerRow.Add(promoteBtn);
 
             // Bind dropdown
             var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
             var bindPopup = new PopupField<string>(bindOptions, currentIdx);
             bindPopup.style.width = 90;
+            bindPopup.style.flexShrink = 0;
+            bindPopup.style.marginLeft = 4;
             bindPopup.RegisterValueChangedCallback(evt =>
             {
+                var idx = bindOptions.IndexOf(evt.newValue);
+                var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
+                var currentBinding = m_Blackboard.FindBinding(node.NodeId, key);
+                var currentId = currentBinding?.id ?? "";
+                if (paramId == currentId)
+                    return;
+
                 m_GraphView.WithUndo("Bind Parameter", () =>
                 {
-                    var idx = bindOptions.IndexOf(evt.newValue);
-                    var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
                     if (string.IsNullOrEmpty(paramId))
                         m_Blackboard.ClearBindingForNode(node.NodeId, key);
                     else
                         m_Blackboard.SetBinding(paramId, node.NodeId, key);
                 });
-                ShowNode(node);
+
+                // Refresh value row only — full ShowNode() on BevelMesh retriggers PopupFields and can stack-overflow.
+                if (container.childCount > 1)
+                    container.RemoveAt(container.childCount - 1);
+                var binding = m_Blackboard.FindBinding(node.NodeId, key);
+                container.Add(CreateValueField(key, prop, node, binding));
             });
             headerRow.Add(bindPopup);
             container.Add(headerRow);
@@ -194,24 +239,39 @@ namespace DJTechEditor.PCG.Graph
 
             if (binding != null)
             {
+                wrapper.Add(new Label($"→ {binding.name}")
+                {
+                    style = { color = new Color(0.4f, 0.7f, 1.0f), unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 2 },
+                });
+
                 if (binding.hasRange && (binding.type == "integer" || binding.type == "number"))
                 {
-                    var val = float.TryParse(binding.defaultValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var fv) ? fv : binding.minValue;
-                    var slider = new Slider(binding.minValue, binding.maxValue) { value = Mathf.Clamp(val, binding.minValue, binding.maxValue) };
-                    var valLabel = new Label(binding.defaultValue) { style = { color = new Color(0.4f, 0.7f, 1.0f), fontSize = 10 } };
-                    slider.RegisterValueChangedCallback(_ => { });
-                    var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-                    slider.style.flexGrow = 1;
-                    row.Add(slider);
-                    row.Add(valLabel);
-                    wrapper.Add(new Label($"→ {binding.name}") { style = { color = new Color(0.4f, 0.7f, 1.0f), unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 2 } });
-                    wrapper.Add(row);
+                    var isInteger = binding.type == "integer";
+                    var current = isInteger
+                        ? (float.TryParse(binding.defaultValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var iv) ? iv : binding.minValue)
+                        : (float.TryParse(binding.defaultValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var fv) ? fv : binding.minValue);
+
+                    wrapper.Add(PcgInspectorWidgets.CreateSliderRow(
+                        isInteger,
+                        binding.minValue,
+                        binding.maxValue,
+                        current,
+                        newValue =>
+                        {
+                            var text = isInteger
+                                ? Mathf.RoundToInt(newValue).ToString(CultureInfo.InvariantCulture)
+                                : PcgInspectorWidgets.FormatFloat(newValue);
+                            m_GraphView.WithUndo("Change Parameter", () =>
+                                m_Blackboard.SetParameterDefault(binding.id, text));
+                        },
+                        onDragBegin: () => m_GraphView.BeginDrag("Change Parameter"),
+                        onDragEnd: () => m_GraphView.EndDrag()));
                 }
                 else
                 {
-                    wrapper.Add(new Label($"→ {binding.name} ({binding.defaultValue})")
+                    wrapper.Add(new Label(binding.defaultValue)
                     {
-                        style = { color = new Color(0.4f, 0.7f, 1.0f), unityFontStyleAndWeight = FontStyle.Italic, paddingTop = 2, paddingBottom = 2 },
+                        style = { color = new Color(0.4f, 0.7f, 1.0f), paddingTop = 2, paddingBottom = 2 },
                     });
                 }
                 return wrapper;
@@ -219,25 +279,34 @@ namespace DJTechEditor.PCG.Graph
 
             var currentVal = node.CollectData().GetRaw(key);
 
-            // Use slider if property or manifest defines range
             if (prop.hasRange && (prop.type == "integer" || prop.type == "number"))
             {
+                var isInteger = prop.type == "integer";
                 var val = Convert.ToSingle(currentVal ?? prop.defaultValue ?? 0f, CultureInfo.InvariantCulture);
-                var clamped = Mathf.Clamp(val, prop.minimum, prop.maximum);
-                var slider = new Slider(prop.minimum, prop.maximum) { value = clamped };
-                var valLabel = new Label(clamped.ToString(CultureInfo.InvariantCulture)) { style = { color = new Color(0.8f, 0.8f, 0.8f), fontSize = 10, marginLeft = 4, minWidth = 40 } };
-                slider.style.flexGrow = 1;
-                slider.RegisterCallback<PointerDownEvent>(_ => m_GraphView.BeginDrag("Change Property"));
-                slider.RegisterValueChangedCallback(evt =>
-                {
-                    node.SetPropertyValue(key, evt.newValue);
-                    valLabel.text = evt.newValue.ToString(CultureInfo.InvariantCulture);
-                });
-                slider.RegisterCallback<PointerUpEvent>(_ => m_GraphView.EndDrag());
-                var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
-                row.Add(slider);
-                row.Add(valLabel);
-                wrapper.Add(row);
+                wrapper.Add(PcgInspectorWidgets.CreateSliderRow(
+                    isInteger,
+                    prop.minimum,
+                    prop.maximum,
+                    val,
+                    newValue =>
+                    {
+                        if (isInteger)
+                            node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
+                        else
+                            node.SetPropertyValue(key, newValue);
+                    },
+                    onDragBegin: () => m_GraphView.BeginDrag("Change Property"),
+                    onDragEnd: () => m_GraphView.EndDrag(),
+                    onFieldCommit: newValue =>
+                    {
+                        m_GraphView.WithUndo("Change Property", () =>
+                        {
+                            if (isInteger)
+                                node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
+                            else
+                                node.SetPropertyValue(key, newValue);
+                        });
+                    }));
                 return wrapper;
             }
 

@@ -8,14 +8,14 @@
       "data": {"width": 2, "height": 2, "depth": 2}
     },
     {
-      "id": "n103",
-      "type": "SubdivideMesh",
-      "position": { "x": 286.5, "y": 282 },
-      "data": {"levels": 1}
+      "id": "n105",
+      "type": "BevelMesh",
+      "position": { "x": 310.5, "y": 189 },
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.08, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     }
   ],
   "edges": [
-    {"id": "e104", "source": "n101", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e105", "source": "n101", "target": "n105", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},

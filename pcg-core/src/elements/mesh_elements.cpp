@@ -82,7 +82,22 @@ public:
         const BevelOffsetType offset_type =
             offset_type_str == "width" ? BevelOffsetType::Width : BevelOffsetType::Offset;
         const bool clamp_overlap = ctx.node->data.value("clampOverlap", true);
-        emit_mesh(ctx, bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap));
+        const double angle_limit = ctx.node->data.value("angleLimit", 30.0);
+        const float profile = static_cast<float>(ctx.node->data.value("profile", 0.5));
+        const auto parse_miter = [](const std::string& s) {
+            if (s == "patch") return BevelMiter::Patch;
+            if (s == "arc") return BevelMiter::Arc;
+            return BevelMiter::Sharp;
+        };
+        const BevelMiter miter_outer =
+            parse_miter(ctx.node->data.value("miterOuter", std::string("sharp")));
+        const BevelMiter miter_inner =
+            parse_miter(ctx.node->data.value("miterInner", std::string("sharp")));
+        const std::string vmesh_str = ctx.node->data.value("vmeshMethod", std::string("adj"));
+        const BevelVMeshMethod vmesh_method =
+            vmesh_str == "cutoff" ? BevelVMeshMethod::Cutoff : BevelVMeshMethod::Adj;
+        emit_mesh(ctx, bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap,
+                                  angle_limit, profile, miter_outer, miter_inner, vmesh_method));
         return PCG_OK;
     }
 };

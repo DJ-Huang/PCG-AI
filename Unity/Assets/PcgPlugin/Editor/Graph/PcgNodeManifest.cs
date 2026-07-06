@@ -239,17 +239,14 @@ namespace DJTechEditor.PCG.Graph
                             defaultValue = ParseDefault(propObj),
                         };
 
-                        // Parse min/max for slider display
-                        if (propObj.TryGetValue("minimum", out var minVal) && minVal != null)
-                        {
+                        // Parse min/max for slider display (both required for ranged UI)
+                        var hasMin = propObj.TryGetValue("minimum", out var minVal) && minVal != null;
+                        var hasMax = propObj.TryGetValue("maximum", out var maxVal) && maxVal != null;
+                        if (hasMin)
                             propDef.minimum = Convert.ToSingle(minVal, CultureInfo.InvariantCulture);
-                            propDef.hasRange = true;
-                        }
-                        if (propObj.TryGetValue("maximum", out var maxVal) && maxVal != null)
-                        {
+                        if (hasMax)
                             propDef.maximum = Convert.ToSingle(maxVal, CultureInfo.InvariantCulture);
-                            propDef.hasRange = true;
-                        }
+                        propDef.hasRange = hasMin && hasMax;
 
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)

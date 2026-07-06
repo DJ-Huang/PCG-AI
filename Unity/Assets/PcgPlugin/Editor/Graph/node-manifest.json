@@ -295,9 +295,37 @@
             { "value": "width", "label": "Width" }
           ]
         },
-        "amount": { "type": "number", "default": 0.1, "minimum": 0 },
+        "amount": { "type": "number", "default": 0.1, "minimum": 0, "maximum": 1.0 },
         "segments": { "type": "integer", "default": 2, "minimum": 1, "maximum": 8 },
-        "clampOverlap": { "type": "boolean", "default": true }
+        "clampOverlap": { "type": "boolean", "default": true },
+        "angleLimit": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
+        "profile": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 },
+        "miterOuter": {
+          "type": "enum",
+          "default": "sharp",
+          "options": [
+            { "value": "sharp", "label": "Sharp" },
+            { "value": "patch", "label": "Patch" },
+            { "value": "arc", "label": "Arc" }
+          ]
+        },
+        "miterInner": {
+          "type": "enum",
+          "default": "sharp",
+          "options": [
+            { "value": "sharp", "label": "Sharp" },
+            { "value": "patch", "label": "Patch" },
+            { "value": "arc", "label": "Arc" }
+          ]
+        },
+        "vmeshMethod": {
+          "type": "enum",
+          "default": "adj",
+          "options": [
+            { "value": "adj", "label": "ADJ (Catmull-Clark)" },
+            { "value": "cutoff", "label": "Cutoff" }
+          ]
+        }
       }
     },
     {
