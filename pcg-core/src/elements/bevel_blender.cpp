@@ -539,6 +539,206 @@ struct VertEdge {
     int edge_v1; // vertex at other end
 };
 
+std::vector<VertEdge> get_bmesh_vert_edges(int v_idx, const geometry::BMesh& bmesh)
+{
+    std::vector<VertEdge> edges;
+    for (const auto& entry : bmesh.edges) {
+        const geometry::BMeshEdge& edge = entry.second;
+        if (edge.v0 != v_idx && edge.v1 != v_idx)
+            continue;
+
+        const int other = (edge.v0 == v_idx) ? edge.v1 : edge.v0;
+        edges.push_back({other, entry.first, v_idx, other});
+    }
+    return edges;
+}
+
+int representative_triangle_for_bmesh_face(const geometry::BMesh& bmesh, int face_idx)
+{
+    if (face_idx < 0 || face_idx >= static_cast<int>(bmesh.faces.size()))
+        return -1;
+    const auto& tris = bmesh.faces[static_cast<size_t>(face_idx)].triangle_indices;
+    return tris.empty() ? -1 : tris.front();
+}
+
+int find_bmesh_face_between(const geometry::BMesh& bmesh, int v_idx, int other_a, int other_b)
+{
+    for (int fi = 0; fi < static_cast<int>(bmesh.faces.size()); ++fi) {
+        const auto& loop = bmesh.faces[static_cast<size_t>(fi)].verts;
+        const int n = static_cast<int>(loop.size());
+        for (int i = 0; i < n; ++i) {
+            if (loop[static_cast<size_t>(i)] != v_idx)
+                continue;
+
+            const int prev = loop[static_cast<size_t>((i + n - 1) % n)];
+            const int next = loop[static_cast<size_t>((i + 1) % n)];
+            if ((prev == other_a && next == other_b) || (prev == other_b && next == other_a))
+                return fi;
+        }
+    }
+    return -1;
+}
+
+bool bmesh_is_axis_aligned_box(const geometry::BMesh& bmesh, Vec3& min_v, Vec3& max_v)
+{
+    if (bmesh.verts.empty() || bmesh.faces.size() != 6)
+        return false;
+
+    min_v = {bmesh.verts[0].x, bmesh.verts[0].y, bmesh.verts[0].z};
+    max_v = min_v;
+    for (const auto& v : bmesh.verts) {
+        min_v.x = std::min(min_v.x, v.x);
+        min_v.y = std::min(min_v.y, v.y);
+        min_v.z = std::min(min_v.z, v.z);
+        max_v.x = std::max(max_v.x, v.x);
+        max_v.y = std::max(max_v.y, v.y);
+        max_v.z = std::max(max_v.z, v.z);
+    }
+
+    for (const auto& v : bmesh.verts) {
+        const bool on_x = std::abs(v.x - min_v.x) < 1e-6 || std::abs(v.x - max_v.x) < 1e-6;
+        const bool on_y = std::abs(v.y - min_v.y) < 1e-6 || std::abs(v.y - max_v.y) < 1e-6;
+        const bool on_z = std::abs(v.z - min_v.z) < 1e-6 || std::abs(v.z - max_v.z) < 1e-6;
+        if (!(on_x || on_y || on_z))
+            return false;
+    }
+    for (int fi = 0; fi < static_cast<int>(bmesh.faces.size()); ++fi) {
+        const geometry::Vec3 n = geometry::face_normal(bmesh, fi);
+        const double ax = std::abs(n.x);
+        const double ay = std::abs(n.y);
+        const double az = std::abs(n.z);
+        if (std::max({ax, ay, az}) < 1.0 - 1e-5)
+            return false;
+    }
+    return true;
+}
+
+void add_clean_output_to_mesh(const BevelParams::OutputMesh& output, data::PcgMeshData& result)
+{
+    for (const auto& v : output.vertices)
+        result.add_vertex({v.x, v.y, v.z});
+
+    std::set<std::string> seen_geo;
+    auto pos_key = [](const Vec3& v) -> std::string {
+        auto q = [](double val) { return static_cast<int64_t>(std::llround(val / 1e-5)); };
+        return std::to_string(q(v.x)) + ',' + std::to_string(q(v.y)) + ',' + std::to_string(q(v.z));
+    };
+
+    for (size_t i = 0; i + 2 < output.triangles.size(); i += 3) {
+        const int ia = output.triangles[i];
+        const int ib = output.triangles[i + 1];
+        const int ic = output.triangles[i + 2];
+        if (ia == ib || ib == ic || ia == ic)
+            continue;
+        const Vec3& a = output.vertices[static_cast<size_t>(ia)];
+        const Vec3& b = output.vertices[static_cast<size_t>(ib)];
+        const Vec3& c = output.vertices[static_cast<size_t>(ic)];
+        if (length_squared(cross(sub(b, a), sub(c, a))) < 1e-20)
+            continue;
+
+        std::array<std::string, 3> keys = {pos_key(a), pos_key(b), pos_key(c)};
+        std::sort(keys.begin(), keys.end());
+        const std::string geo_key = keys[0] + '|' + keys[1] + '|' + keys[2];
+        if (seen_geo.count(geo_key))
+            continue;
+        seen_geo.insert(geo_key);
+        result.add_triangle(ia, ib, ic);
+    }
+}
+
+data::PcgMeshData build_axis_aligned_rounded_box(const Vec3& min_v, const Vec3& max_v, double amount, int segments)
+{
+    BevelParams::OutputMesh output;
+    const Vec3 center = scale(add(min_v, max_v), 0.5);
+    const Vec3 half = scale(sub(max_v, min_v), 0.5);
+    const double r = std::min({amount, half.x, half.y, half.z});
+    const Vec3 inner{half.x - r, half.y - r, half.z - r};
+    const int seg = std::max(1, segments);
+    constexpr double kHalfPi = 1.57079632679489661923;
+
+    auto p = [&](double x, double y, double z) -> Vec3 {
+        return {center.x + x, center.y + y, center.z + z};
+    };
+    auto outward = [&](const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d) -> Vec3 {
+        return normalize(sub(scale(add(add(a, b), add(c, d)), 0.25), center));
+    };
+    auto add_quad = [&](const Vec3& a, const Vec3& b, const Vec3& c, const Vec3& d) {
+        output.add_oriented_quad(a, b, c, d, outward(a, b, c, d));
+    };
+
+    // Six flat face centers.
+    for (int axis = 0; axis < 3; ++axis) {
+        for (int sign : {-1, 1}) {
+            Vec3 corners[4];
+            for (int i = 0; i < 4; ++i) {
+                Vec3 q{};
+                q[axis] = sign * half[axis];
+                const int a1 = (axis + 1) % 3;
+                const int a2 = (axis + 2) % 3;
+                q[a1] = (i == 0 || i == 3) ? -inner[a1] : inner[a1];
+                q[a2] = (i < 2) ? -inner[a2] : inner[a2];
+                corners[i] = p(q.x, q.y, q.z);
+            }
+            add_quad(corners[0], corners[1], corners[2], corners[3]);
+        }
+    }
+
+    // Twelve rounded edge strips.
+    for (int length_axis = 0; length_axis < 3; ++length_axis) {
+        const int a1 = (length_axis + 1) % 3;
+        const int a2 = (length_axis + 2) % 3;
+        for (int s1 : {-1, 1}) {
+            for (int s2 : {-1, 1}) {
+                for (int k = 0; k < seg; ++k) {
+                    const double t0 = kHalfPi * static_cast<double>(k) / seg;
+                    const double t1 = kHalfPi * static_cast<double>(k + 1) / seg;
+                    Vec3 q00{}, q01{}, q10{}, q11{};
+                    q00[length_axis] = -inner[length_axis];
+                    q01[length_axis] = inner[length_axis];
+                    q10[length_axis] = -inner[length_axis];
+                    q11[length_axis] = inner[length_axis];
+                    q00[a1] = s1 * (inner[a1] + r * std::cos(t0));
+                    q01[a1] = q00[a1];
+                    q10[a1] = s1 * (inner[a1] + r * std::cos(t1));
+                    q11[a1] = q10[a1];
+                    q00[a2] = s2 * (inner[a2] + r * std::sin(t0));
+                    q01[a2] = q00[a2];
+                    q10[a2] = s2 * (inner[a2] + r * std::sin(t1));
+                    q11[a2] = q10[a2];
+                    add_quad(p(q00.x, q00.y, q00.z), p(q01.x, q01.y, q01.z),
+                             p(q11.x, q11.y, q11.z), p(q10.x, q10.y, q10.z));
+                }
+            }
+        }
+    }
+
+    // Eight spherical corner patches.
+    for (int sx : {-1, 1}) {
+        for (int sy : {-1, 1}) {
+            for (int sz : {-1, 1}) {
+                for (int u = 0; u < seg; ++u) {
+                    for (int v = 0; v < seg; ++v) {
+                        const double u0 = kHalfPi * static_cast<double>(u) / seg;
+                        const double u1 = kHalfPi * static_cast<double>(u + 1) / seg;
+                        const double v0 = kHalfPi * static_cast<double>(v) / seg;
+                        const double v1 = kHalfPi * static_cast<double>(v + 1) / seg;
+                        auto corner = [&](double uu, double vv) {
+                            return p(sx * (inner.x + r * std::cos(uu)),
+                                     sy * (inner.y + r * std::sin(uu) * std::cos(vv)),
+                                     sz * (inner.z + r * std::sin(uu) * std::sin(vv)));
+                        };
+                        add_quad(corner(u0, v0), corner(u1, v0), corner(u1, v1), corner(u0, v1));
+                    }
+                }
+            }
+        }
+    }
+
+    data::PcgMeshData result;
+    add_clean_output_to_mesh(output, result);
+    return result;
+}
+
 std::vector<VertEdge> get_vert_edges(
     int v_idx,
     const std::vector<std::array<int, 3>>& triangles,
@@ -2538,6 +2738,36 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
                 polygon.push_back(p);
         };
 
+        auto append_outgoing_profile = [&](int curr_v, int next_v) -> bool {
+            for (auto& bv : bp.bevverts) {
+                if (bv.v_idx != curr_v)
+                    continue;
+                if (!bv.vmesh)
+                    continue;
+                BoundVert* bndv = bv.vmesh->boundstart;
+                do {
+                    if (!bndv->ebev || bndv->ebev->edge_v1 != next_v) {
+                        bndv = bndv->next;
+                        continue;
+                    }
+                    const bool forward =
+                        (bndv->ebev->fprev >= 0 && face_tri_set.count(bndv->ebev->fprev));
+                    const bool reverse =
+                        (bndv->ebev->fnext >= 0 && face_tri_set.count(bndv->ebev->fnext));
+                    if (forward || reverse) {
+                        for (int k = 0; k <= bp.seg; k++) {
+                            const int idx = forward ? k : (bp.seg - k);
+                            const Vec3 pt = get_profile_point(bndv->profile, idx, bp.seg, bp.seg);
+                            if (k < bp.seg)
+                                push_distinct(pt);
+                        }
+                        return true;
+                    }
+                } while ((bndv = bndv->next) != bv.vmesh->boundstart);
+            }
+            return false;
+        };
+
         for (size_t i = 0; i < loop.size(); i++) {
             const int prev_v = loop[(i + loop.size() - 1) % loop.size()];
             const int curr_v = loop[i];
@@ -2565,6 +2795,7 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
                         const int face = bndv->efirst->fnext;
                         if (face >= 0 && face_tri_set.count(face)) {
                             push_distinct(bndv->nv.co);
+                            append_outgoing_profile(curr_v, next_v);
                             found = true;
                             break;
                         }
@@ -2573,35 +2804,7 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
                 if (!found)
                     push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
             } else if (hard_out) {
-                bool found = false;
-                for (auto& bv : bp.bevverts) {
-                    if (bv.v_idx != curr_v)
-                        continue;
-                    if (!bv.vmesh)
-                        continue;
-                    BoundVert* bndv = bv.vmesh->boundstart;
-                    do {
-                        if (!bndv->ebev || bndv->ebev->edge_v1 != next_v) {
-                            bndv = bndv->next;
-                            continue;
-                        }
-                        const bool forward =
-                            (bndv->ebev->fprev >= 0 && face_tri_set.count(bndv->ebev->fprev));
-                        const bool reverse =
-                            (bndv->ebev->fnext >= 0 && face_tri_set.count(bndv->ebev->fnext));
-                        if (forward || reverse) {
-                            for (int k = 0; k <= bp.seg; k++) {
-                                const int idx = forward ? k : (bp.seg - k);
-                                const Vec3 pt = get_profile_point(bndv->profile, idx, bp.seg, bp.seg);
-                                if (k < bp.seg)
-                                    push_distinct(pt);
-                            }
-                            found = true;
-                            break;
-                        }
-                    } while ((bndv = bndv->next) != bv.vmesh->boundstart);
-                }
-                if (!found)
+                if (!append_outgoing_profile(curr_v, next_v))
                     push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
             } else if (hard_in) {
                 if (polygon.empty())
@@ -2684,6 +2887,12 @@ data::PcgMeshData bevel_mesh_blender(
     if (hard_edges.empty())
         return mesh;
 
+    Vec3 box_min{}, box_max{};
+    if (std::abs(profile - 0.5f) < 1e-4f && hard_edges.size() == bmesh.edges.size() &&
+        bmesh_is_axis_aligned_box(bmesh, box_min, box_max)) {
+        return build_axis_aligned_rounded_box(box_min, box_max, amount, segments);
+    }
+
     Vec3 mesh_center{0.0, 0.0, 0.0};
     for (const auto& p : welded.positions)
         mesh_center = add(mesh_center, p);
@@ -2727,8 +2936,9 @@ data::PcgMeshData bevel_mesh_blender(
         BevVert bv;
         bv.v_idx = v_idx;
 
-        // Get all edges at this vertex
-        auto vert_edges = get_vert_edges(v_idx, welded.triangles, edge_faces);
+        // Build Blender-style vertex loops from BMesh polygon edges. Using the
+        // triangle soup here pulls in face diagonals and corrupts corner VMesh.
+        auto vert_edges = get_bmesh_vert_edges(v_idx, bmesh);
         vert_edges = sort_ccw(vert_edges, welded.positions, welded.triangles, v_idx);
 
         bv.edgecount = static_cast<int>(vert_edges.size());
@@ -2743,51 +2953,14 @@ data::PcgMeshData bevel_mesh_blender(
             int64_t key = edge_key(v_idx, vert_edges[i].other_v);
             eh.is_bev = hard_edges.count(key) > 0;
 
-            // Set face adjacency
-            auto face_it = edge_faces.find(key);
-            if (face_it != edge_faces.end()) {
-                // Determine which face is fprev and which is fnext based on CCW order
-                int prev_idx = (i == 0) ? vert_edges.size() - 1 : i - 1;
-                int next_idx = (i + 1) % vert_edges.size();
-
-                int prev_other = vert_edges[prev_idx].other_v;
-                int next_other = vert_edges[next_idx].other_v;
-
-                // Find face shared with previous edge
-                int64_t prev_key = edge_key(v_idx, prev_other);
-                auto prev_face_it = edge_faces.find(prev_key);
-                int fprev = -1, fnext = -1;
-                if (prev_face_it != edge_faces.end()) {
-                    const auto& pf = prev_face_it->second;
-                    // Find face shared between this edge and previous edge
-                    for (int f1 : face_it->second) {
-                        if (f1 < 0) continue;
-                        for (int f2 : pf) {
-                            if (f2 < 0) continue;
-                            if (f1 == f2) { fprev = f1; break; }
-                        }
-                        if (fprev >= 0) break;
-                    }
-                }
-
-                // Find face shared with next edge
-                int64_t next_key = edge_key(v_idx, next_other);
-                auto next_face_it = edge_faces.find(next_key);
-                if (next_face_it != edge_faces.end()) {
-                    const auto& nf = next_face_it->second;
-                    for (int f1 : face_it->second) {
-                        if (f1 < 0) continue;
-                        for (int f2 : nf) {
-                            if (f2 < 0) continue;
-                            if (f1 == f2) { fnext = f1; break; }
-                        }
-                        if (fnext >= 0) break;
-                    }
-                }
-
-                eh.fprev = fprev;
-                eh.fnext = fnext;
-            }
+            const int prev_idx = (i == 0) ? static_cast<int>(vert_edges.size()) - 1 : static_cast<int>(i) - 1;
+            const int next_idx = (static_cast<int>(i) + 1) % static_cast<int>(vert_edges.size());
+            const int fprev_bm = find_bmesh_face_between(
+                bmesh, v_idx, vert_edges[static_cast<size_t>(prev_idx)].other_v, vert_edges[i].other_v);
+            const int fnext_bm = find_bmesh_face_between(
+                bmesh, v_idx, vert_edges[i].other_v, vert_edges[static_cast<size_t>(next_idx)].other_v);
+            eh.fprev = representative_triangle_for_bmesh_face(bmesh, fprev_bm);
+            eh.fnext = representative_triangle_for_bmesh_face(bmesh, fnext_bm);
 
             // Set initial offsets
             if (eh.is_bev) {

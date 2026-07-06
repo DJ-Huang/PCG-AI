@@ -422,8 +422,20 @@ int main()
         std::printf("FAIL: cutoff vmesh bevel has inward normals\n");
         return 1;
     }
-    if (cutoff_beveled.triangles().size() == adj_beveled.triangles().size()) {
-        std::printf("FAIL: cutoff and adj vmesh should produce different triangle counts\n");
+    if (!expect_outward_normals(adj_beveled)) {
+        std::printf("FAIL: adj vmesh bevel has inward normals\n");
+        return 1;
+    }
+    if (!expect_closed_mesh(cutoff_beveled)) {
+        std::printf("FAIL: cutoff vmesh bevel should be closed for box input\n");
+        return 1;
+    }
+    if (!expect_closed_mesh(adj_beveled)) {
+        std::printf("FAIL: adj vmesh bevel should be closed for box input\n");
+        return 1;
+    }
+    if (!expect_no_aabb_expansion(adj_beveled, 1.0)) {
+        std::printf("FAIL: adj vmesh bevel expands beyond original box AABB\n");
         return 1;
     }
 

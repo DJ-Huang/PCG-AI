@@ -11,7 +11,7 @@ const char* pcg_get_version(void)
 {
     static char buf[64];
     std::snprintf(buf, sizeof(buf),
-                  "pcg-core %d.%d.%d",
+                  "pcg-core %d.%d.%d (bmesh-tier1)",
                   PCG_API_VERSION_MAJOR,
                   PCG_API_VERSION_MINOR,
                   PCG_API_VERSION_PATCH);

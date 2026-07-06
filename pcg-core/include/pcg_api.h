@@ -29,7 +29,7 @@ extern "C" {
 
 #define PCG_API_VERSION_MAJOR 0
 #define PCG_API_VERSION_MINOR 1
-#define PCG_API_VERSION_PATCH 0
+#define PCG_API_VERSION_PATCH 1
 
 /**
  * Returns a static version string, e.g. "pcg-core 0.1.0".
