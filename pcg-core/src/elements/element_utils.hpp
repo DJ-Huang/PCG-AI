@@ -21,6 +21,7 @@ const nlohmann::json* require_input_json(PcgContext& ctx, const char* pin, const
 data::PcgPointData parse_point_input(const nlohmann::json& json);
 data::PcgSplineData parse_spline_input(const nlohmann::json& json);
 data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
+data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* label);
 nlohmann::json point_data_to_json(const data::PcgPointData& data);
 void emit_points(PcgContext& ctx, data::PcgPointData data);
 void emit_splines(PcgContext& ctx, data::PcgSplineData data);

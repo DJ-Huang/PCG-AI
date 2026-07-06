@@ -1,5 +1,7 @@
 #include "data/pcg_data_collection.hpp"
 #include "data/pcg_metadata.hpp"
+#include "data/pcg_mesh_binary.hpp"
+#include "data/pcg_mesh_data.hpp"
 #include "data/pcg_param_data.hpp"
 #include "data/pcg_point_data.hpp"
 #include "data/pcg_spline_data.hpp"
@@ -52,6 +54,27 @@ int main()
     assert(spline_round_trip.splines().size() == 1);
     assert(spline_round_trip.splines()[0].points.size() == 2);
     std::printf("PASS: PcgSplineData round-trip\n");
+
+    PcgMeshData box_mesh;
+    box_mesh.add_vertex({0.0, 0.0, 0.0});
+    box_mesh.add_vertex({1.0, 0.0, 0.0});
+    box_mesh.add_vertex({0.0, 1.0, 0.0});
+    box_mesh.add_triangle(0, 1, 2);
+
+    std::vector<uint8_t> mesh_buf(static_cast<size_t>(mesh_binary_size(box_mesh)));
+    assert(write_mesh_binary(box_mesh, mesh_buf.data(), static_cast<int>(mesh_buf.size())));
+
+    PcgMeshData mesh_round_trip;
+    assert(read_mesh_binary(mesh_buf.data(), static_cast<int>(mesh_buf.size()), mesh_round_trip));
+    assert(mesh_round_trip.vertices().size() == 3);
+    assert(mesh_round_trip.triangles().size() == 3);
+
+    PcgDataCollection mesh_collection;
+    mesh_collection.add_mesh("out", box_mesh);
+    assert(mesh_collection.find_mesh("out") != nullptr);
+    assert(mesh_collection.find_json("out") == nullptr);
+    assert(mesh_collection.primary_mesh() != nullptr);
+    std::printf("PASS: PcgMeshData binary + typed collection\n");
 
     return 0;
 }

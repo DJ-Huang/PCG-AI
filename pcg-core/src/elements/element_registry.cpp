@@ -101,6 +101,11 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (const data::PcgMeshData* mesh = ctx.inputs.find_mesh("in")) {
+            ctx.outputs.add_mesh("out", *mesh);
+            return PCG_OK;
+        }
+
         const nlohmann::json* input = ctx.inputs.find_json("in");
         if (!input)
             return fail(ctx, PCG_ERR_EXECUTION, "Output missing input");

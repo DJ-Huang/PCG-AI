@@ -31,6 +31,7 @@ set(PCG_CORE_SOURCES
     src/data/pcg_param_data.cpp
     src/data/pcg_spline_data.cpp
     src/data/pcg_mesh_data.cpp
+    src/data/pcg_mesh_binary.cpp
     src/elements/mesh_algorithms.cpp
     src/elements/bevel_blender.cpp
     src/geometry/bmesh.cpp

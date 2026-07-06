@@ -14,9 +14,9 @@ namespace DJTechRuntime.PCG
 
         /// <summary>
         /// Loads and executes a graph JSON file.
-        /// Returns the result JSON string on success.
+        /// Returns the execution result on success.
         /// </summary>
-        public static string LoadAndExecute(string jsonPath, int seed = 42)
+        public static PcgGraphExecuteResult LoadAndExecute(string jsonPath, int seed = 42)
         {
             if (!File.Exists(jsonPath))
             {
@@ -31,7 +31,7 @@ namespace DJTechRuntime.PCG
         /// <summary>
         /// Executes a graph JSON string directly.
         /// </summary>
-        public static string Execute(string json, int seed = 42)
+        public static PcgGraphExecuteResult Execute(string json, int seed = 42)
         {
             var (validateCode, error) = PcgNative.ValidateGraph(json);
             if (validateCode != PcgResultCode.Ok)
@@ -40,19 +40,27 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
-            var (execCode, resultJson) = PcgNative.ExecuteGraph(json, seed);
+            var (execCode, result) = PcgNative.ExecuteGraph(json, seed);
             if (execCode != PcgResultCode.Ok)
             {
-                var hint = execCode == PcgResultCode.Execution
-                    ? " (mesh result may exceed output buffer — try lowering bevel segments or subdiv levels)"
-                    : string.Empty;
-                Debug.LogError($"[PCG] Execution failed ({execCode}){hint}");
+                Debug.LogError($"[PCG] Execution failed ({execCode}): {result?.Error}");
                 return null;
             }
 
             if (PcgProjectSettings.IsLogEnabled)
-                Debug.Log($"[PCG] Graph executed successfully. Result: {resultJson}");
-            return resultJson;
+            {
+                if (result.Kind == PcgExecuteKind.Mesh)
+                {
+                    Debug.Log(
+                        $"[PCG] Graph executed successfully. Mesh binary: {result.VertexCount} verts, {result.IndexCount} indices.");
+                }
+                else
+                {
+                    Debug.Log($"[PCG] Graph executed successfully. Result: {result.Json}");
+                }
+            }
+
+            return result;
         }
     }
 }

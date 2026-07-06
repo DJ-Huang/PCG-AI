@@ -89,6 +89,83 @@ namespace DJTechRuntime.PCG
             return PcgResultKind.Unknown;
         }
 
+        public static PcgResultKind DetectKind(PcgGraphExecuteResult result)
+        {
+            if (result == null)
+                return PcgResultKind.Unknown;
+
+            if (result.Kind == PcgExecuteKind.Mesh)
+                return PcgResultKind.Mesh;
+
+            return DetectKind(result.Json);
+        }
+
+        public static bool TryParseMeshBinary(byte[] data, out Mesh mesh, out string error)
+        {
+            mesh = null;
+            error = null;
+
+            if (data == null || data.Length < PcgNative.MeshBinaryHeaderSize)
+            {
+                error = "Mesh binary payload is too small.";
+                return false;
+            }
+
+            try
+            {
+                var magic = BitConverter.ToUInt32(data, 0);
+                if (magic != PcgNative.MeshBinaryMagic)
+                {
+                    error = $"Invalid mesh binary magic: 0x{magic:X8}";
+                    return false;
+                }
+
+                var vertexCount = BitConverter.ToInt32(data, 8);
+                var indexCount = BitConverter.ToInt32(data, 12);
+                var required = PcgNative.MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+                if (data.Length < required)
+                {
+                    error = $"Mesh binary truncated (need {required} bytes, got {data.Length}).";
+                    return false;
+                }
+
+                var vertices = new Vector3[vertexCount];
+                var offset = PcgNative.MeshBinaryHeaderSize;
+                for (var i = 0; i < vertexCount; i++)
+                {
+                    var x = BitConverter.ToSingle(data, offset);
+                    offset += 4;
+                    var y = BitConverter.ToSingle(data, offset);
+                    offset += 4;
+                    var z = BitConverter.ToSingle(data, offset);
+                    offset += 4;
+                    vertices[i] = new Vector3(x, y, z);
+                }
+
+                var triangles = new int[indexCount];
+                for (var i = 0; i < indexCount; i++)
+                {
+                    triangles[i] = (int)BitConverter.ToUInt32(data, offset);
+                    offset += 4;
+                }
+
+                mesh = new Mesh { name = "PCG Generated Mesh" };
+                if (vertices.Length > 65535)
+                    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                mesh.vertices = vertices;
+                mesh.triangles = triangles;
+                mesh.RecalculateNormals();
+                mesh.RecalculateTangents();
+                mesh.RecalculateBounds();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
         public static bool TryParsePoints(string resultJson, out PcgExecutionResult result, out string error)
         {
             result = null;

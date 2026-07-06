@@ -18,6 +18,7 @@ struct PcgTaggedData {
     std::string tag;
     PcgDataType type = PcgDataType::Unknown;
     nlohmann::json payload;
+    std::optional<PcgMeshData> mesh;
 };
 
 /** Node input/output bus (UE PCGDataCollection analogue). */
@@ -31,7 +32,10 @@ public:
 
     const PcgTaggedData* find(const std::string& tag) const;
     const nlohmann::json* find_json(const std::string& tag) const;
+    const PcgMeshData* find_mesh(const std::string& tag) const;
     nlohmann::json primary_json() const;
+    const PcgMeshData* primary_mesh() const;
+    PcgDataType primary_type() const;
 
     const std::vector<PcgTaggedData>& items() const { return items_; }
 

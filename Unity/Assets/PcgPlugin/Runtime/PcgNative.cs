@@ -19,19 +19,32 @@ namespace DJTechRuntime.PCG
         private const string Lib = "__Internal";
 #endif
 
+        public const uint MeshBinaryMagic = 0x4D474350u;
+        public const int MeshBinaryHeaderSize = 16;
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern IntPtr pcg_get_version();
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int pcg_validate_graph(string json, StringBuilder errBuf, int errBufSize);
 
-        // byte[] marshals as a writable char buffer — safer than StringBuilder for large mesh JSON on macOS.
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        private static extern int pcg_execute_graph(string json, int seed, byte[] outJson, int outJsonSize);
+        private static extern int pcg_execute_graph_v2(
+            string json,
+            int seed,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            out int outVertexCount,
+            out int outIndexCount,
+            StringBuilder errBuf,
+            int errBufSize);
 
         public const int ErrBufSize = 1024;
-        // Bevel mesh JSON can exceed 64 KB (segments=8 ≈ 56 KB; subdiv+bevel worst case > 200 KB).
-        public const int OutBufSize = 512 * 1024;
+        public const int OutJsonBufSize = 256 * 1024;
+        public const int OutMeshBufSize = 8 * 1024 * 1024;
 
         public static string GetVersion()
         {
@@ -45,16 +58,57 @@ namespace DJTechRuntime.PCG
             return (rc, errBuf.ToString());
         }
 
-        public static (PcgResultCode code, string resultJson) ExecuteGraph(string json, int seed)
+        public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(string json, int seed)
         {
-            var outBytes = new byte[OutBufSize];
-            var rc = (PcgResultCode)pcg_execute_graph(json, seed, outBytes, outBytes.Length);
-            if (rc != PcgResultCode.Ok)
-                return (rc, string.Empty);
+            var errBuf = new StringBuilder(ErrBufSize);
+            var jsonBuf = new byte[OutJsonBufSize];
+            var meshBuf = new byte[OutMeshBufSize];
 
-            var zero = Array.IndexOf(outBytes, (byte)0);
-            var length = zero >= 0 ? zero : outBytes.Length;
-            return (rc, Encoding.UTF8.GetString(outBytes, 0, length));
+            var rc = (PcgResultCode)pcg_execute_graph_v2(
+                json,
+                seed,
+                out var kind,
+                jsonBuf,
+                jsonBuf.Length,
+                meshBuf,
+                meshBuf.Length,
+                out var vertexCount,
+                out var indexCount,
+                errBuf,
+                ErrBufSize);
+
+            if (rc != PcgResultCode.Ok)
+            {
+                return (rc, new PcgGraphExecuteResult
+                {
+                    Error = string.IsNullOrEmpty(errBuf.ToString())
+                        ? rc.ToString()
+                        : errBuf.ToString(),
+                });
+            }
+
+            var executeKind = (PcgExecuteKind)kind;
+            if (executeKind == PcgExecuteKind.Mesh)
+            {
+                var required = MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+                var meshBinary = new byte[required];
+                Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, required);
+                return (rc, new PcgGraphExecuteResult
+                {
+                    Kind = executeKind,
+                    MeshBinary = meshBinary,
+                    VertexCount = vertexCount,
+                    IndexCount = indexCount,
+                });
+            }
+
+            var zero = Array.IndexOf(jsonBuf, (byte)0);
+            var length = zero >= 0 ? zero : jsonBuf.Length;
+            return (rc, new PcgGraphExecuteResult
+            {
+                Kind = executeKind,
+                Json = Encoding.UTF8.GetString(jsonBuf, 0, length),
+            });
         }
     }
 
@@ -65,5 +119,22 @@ namespace DJTechRuntime.PCG
         CycleDetected = 2,
         UnknownNode = 3,
         Execution = 4,
+    }
+
+    public enum PcgExecuteKind
+    {
+        None = 0,
+        Json = 1,
+        Mesh = 2,
+    }
+
+    public sealed class PcgGraphExecuteResult
+    {
+        public PcgExecuteKind Kind = PcgExecuteKind.None;
+        public string Json;
+        public byte[] MeshBinary;
+        public int VertexCount;
+        public int IndexCount;
+        public string Error;
     }
 }

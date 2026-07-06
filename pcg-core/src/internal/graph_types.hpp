@@ -1,5 +1,7 @@
 #pragma once
 
+#include "data/pcg_data_collection.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <string>
@@ -28,6 +30,6 @@ struct Graph {
     std::vector<GraphEdge> edges;
 };
 
-using NodeOutputMap = std::unordered_map<std::string, nlohmann::json>;
+using NodeOutputMap = std::unordered_map<std::string, data::PcgDataCollection>;
 
 } // namespace pcg::internal

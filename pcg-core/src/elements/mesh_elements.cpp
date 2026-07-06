@@ -24,7 +24,15 @@ public:
         data::PcgMeshData mesh = create_box_mesh(width, height, depth);
 
         // Merge optional input mesh
-        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
+        if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in"))
+        {
+            const int vertex_offset = static_cast<int>(mesh.vertices().size());
+            for (const auto& v : input->vertices())
+                mesh.vertices_mut().push_back(v);
+            for (int idx : input->triangles())
+                mesh.triangles_mut().push_back(idx + vertex_offset);
+        }
+        else if (const nlohmann::json* input = ctx.inputs.find_json("in"))
         {
             const data::PcgMeshData input_mesh = parse_mesh_input(*input);
             const int vertex_offset = static_cast<int>(mesh.vertices().size());
@@ -48,8 +56,7 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "SubdivideMesh missing mesh input");
-        const data::PcgMeshData mesh = parse_mesh_input(*input);
+        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "SubdivideMesh missing mesh input");
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing mesh input");
 
@@ -68,8 +75,7 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BevelMesh missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "BevelMesh missing mesh input");
-        const data::PcgMeshData mesh = parse_mesh_input(*input);
+        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "BevelMesh missing mesh input");
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BevelMesh missing mesh input");
 
@@ -111,9 +117,7 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing node");
 
-        const nlohmann::json* input =
-            require_input_json(ctx, "in", "MeshNoiseDeform missing mesh input");
-        const data::PcgMeshData mesh = parse_mesh_input(*input);
+        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "MeshNoiseDeform missing mesh input");
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing mesh input");
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "graph_execution_result.hpp"
 #include "internal/graph_types.hpp"
 #include "pcg_api.h"
 
@@ -7,7 +8,7 @@ namespace pcg::internal {
 
 PcgResultCode execute_graph(const Graph& graph,
                             int seed,
-                            nlohmann::json& out_result,
+                            GraphExecutionResult& out_result,
                             char* err_buf,
                             int err_buf_size);
 

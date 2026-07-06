@@ -57,7 +57,7 @@ namespace DJTechEditor.PCG
             switch (kind)
             {
                 case PcgResultKind.Mesh:
-                    if (!PcgResultParser.TryParseMesh(result, out var mesh, out var meshError))
+                    if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out var meshError))
                     {
                         Debug.LogError($"[PCG] Failed to parse mesh result: {meshError}");
                         return false;
@@ -67,7 +67,7 @@ namespace DJTechEditor.PCG
                     break;
 
                 case PcgResultKind.Splines:
-                    if (!PcgResultParser.TryParseSplines(result, out var splines, out var splineError))
+                    if (!PcgResultParser.TryParseSplines(result.Json, out var splines, out var splineError))
                     {
                         Debug.LogError($"[PCG] Failed to parse spline result: {splineError}");
                         return false;
@@ -77,7 +77,7 @@ namespace DJTechEditor.PCG
                     break;
 
                 case PcgResultKind.Points:
-                    if (!PcgResultParser.TryParsePoints(result, out var parsed, out var parseError))
+                    if (!PcgResultParser.TryParsePoints(result.Json, out var parsed, out var parseError))
                     {
                         Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
                         return false;

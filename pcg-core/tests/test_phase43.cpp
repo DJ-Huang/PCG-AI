@@ -1,6 +1,7 @@
 #include "pcg_api.h"
 
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_mesh_binary.hpp"
 #include "elements/mesh_algorithms.hpp"
 #include "geometry/bmesh.hpp"
 
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
@@ -222,6 +224,30 @@ bool expect_no_aabb_expansion(const pcg::internal::data::PcgMeshData& mesh, doub
     return true;
 }
 
+bool execute_mesh_graph(const char* graph_json,
+                        int seed,
+                        pcg::internal::data::PcgMeshData& mesh,
+                        char* err,
+                        int err_size)
+{
+    int kind = PCG_RESULT_KIND_NONE;
+    int vertex_count = 0;
+    int index_count = 0;
+    std::vector<uint8_t> mesh_buf(8 * 1024 * 1024);
+    char json_out[256] = {};
+
+    const PcgResultCode rc = pcg_execute_graph_v2(
+        graph_json, seed, &kind, json_out, sizeof(json_out), mesh_buf.data(),
+        static_cast<int>(mesh_buf.size()), &vertex_count, &index_count, err, err_size);
+    if (rc != PCG_OK)
+        return false;
+    if (kind != PCG_RESULT_KIND_MESH)
+        return false;
+
+    return pcg::internal::data::read_mesh_binary(mesh_buf.data(),
+                                                  static_cast<int>(mesh_buf.size()), mesh);
+}
+
 } // namespace
 
 int main()
@@ -246,23 +272,25 @@ int main()
     })";
 
     expect_code(pcg_validate_graph(mesh_pipeline, err, sizeof(err)), PCG_OK, "mesh pipeline validate");
-    expect_code(pcg_execute_graph(mesh_pipeline, 42, out, sizeof(out)), PCG_OK, "mesh pipeline execute");
 
-    const std::string result(out);
-    if (result.find("\"dataType\":\"mesh\"") == std::string::npos &&
-        result.find("\"dataType\": \"mesh\"") == std::string::npos) {
-        std::printf("FAIL: mesh pipeline missing dataType mesh\n");
+    pcg::internal::data::PcgMeshData pipeline_mesh;
+    if (!execute_mesh_graph(mesh_pipeline, 42, pipeline_mesh, err, sizeof(err))) {
+        std::printf("FAIL: mesh pipeline execute (%s)\n", err);
         return 1;
     }
-    if (result.find("\"vertices\"") == std::string::npos || result.find("\"triangles\"") == std::string::npos) {
-        std::printf("FAIL: mesh pipeline missing vertices/triangles\n");
+    if (pipeline_mesh.vertices().empty() || pipeline_mesh.triangles().size() < 3) {
+        std::printf("FAIL: mesh pipeline produced empty mesh\n");
         return 1;
     }
 
     const std::string demo_graph = read_file("../../examples/phase43-mesh-demo.pcg");
     if (!demo_graph.empty()) {
         expect_code(pcg_validate_graph(demo_graph.c_str(), err, sizeof(err)), PCG_OK, "phase43 demo validate");
-        expect_code(pcg_execute_graph(demo_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "phase43 demo execute");
+        pcg::internal::data::PcgMeshData demo_mesh;
+        if (!execute_mesh_graph(demo_graph.c_str(), 42, demo_mesh, err, sizeof(err))) {
+            std::printf("FAIL: phase43 demo execute (%s)\n", err);
+            return 1;
+        }
         std::printf("PASS: examples/phase43-mesh-demo.pcg\n");
     }
 
@@ -274,7 +302,11 @@ int main()
       ],
       "edges": []
     })";
-    expect_code(pcg_execute_graph(box_only, 42, out, sizeof(out)), PCG_OK, "box only execute");
+    pcg::internal::data::PcgMeshData box_mesh;
+    if (!execute_mesh_graph(box_only, 42, box_mesh, err, sizeof(err))) {
+        std::printf("FAIL: box only execute (%s)\n", err);
+        return 1;
+    }
 
     if (!expect_outward_normals(pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0))) {
         std::printf("FAIL: box mesh triangle normals point inward\n");
@@ -484,7 +516,29 @@ int main()
       ]
     })";
     expect_code(pcg_validate_graph(noise_graph, err, sizeof(err)), PCG_OK, "noise deform graph validate");
-    expect_code(pcg_execute_graph(noise_graph, 42, out, sizeof(out)), PCG_OK, "noise deform graph execute");
+    pcg::internal::data::PcgMeshData noise_mesh;
+    if (!execute_mesh_graph(noise_graph, 42, noise_mesh, err, sizeof(err))) {
+        std::printf("FAIL: noise deform graph execute (%s)\n", err);
+        return 1;
+    }
+
+    const std::string unity_demo = read_file("../../../Unity/Assets/PCGDemo/demo.pcg");
+    if (!unity_demo.empty()) {
+        std::string demo_levels3 = unity_demo;
+        const std::string levels_token = "\"levels\": 2";
+        const auto pos = demo_levels3.find(levels_token);
+        if (pos != std::string::npos)
+            demo_levels3.replace(pos, levels_token.size(), "\"levels\": 3");
+
+        expect_code(pcg_validate_graph(demo_levels3.c_str(), err, sizeof(err)), PCG_OK,
+                    "unity demo levels=3 validate");
+        pcg::internal::data::PcgMeshData heavy_mesh;
+        if (!execute_mesh_graph(demo_levels3.c_str(), 42, heavy_mesh, err, sizeof(err))) {
+            std::printf("FAIL: unity demo levels=3 binary execute (%s)\n", err);
+            return 1;
+        }
+        std::printf("PASS: Unity demo.pcg levels=3 via binary mesh transport\n");
+    }
 
     std::printf("PASS: phase43 mesh pipeline\n");
     return 0;

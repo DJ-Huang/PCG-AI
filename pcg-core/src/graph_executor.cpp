@@ -79,7 +79,29 @@ void gather_inputs(const Graph& graph,
         }
 
         const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
-        inputs.add(pin, data::PcgDataType::Unknown, it->second);
+        const data::PcgDataCollection& upstream = it->second;
+
+        if (const data::PcgMeshData* mesh = upstream.find_mesh("out")) {
+            inputs.add_mesh(pin, *mesh);
+            continue;
+        }
+        if (const data::PcgMeshData* mesh = upstream.primary_mesh()) {
+            inputs.add_mesh(pin, *mesh);
+            continue;
+        }
+
+        const nlohmann::json* payload = upstream.find_json("out");
+        if (!payload) {
+            const nlohmann::json primary = upstream.primary_json();
+            if (!primary.is_object() || primary.empty()) {
+                code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
+                return;
+            }
+            inputs.add(pin, data::PcgDataType::Unknown, primary);
+            continue;
+        }
+
+        inputs.add(pin, data::PcgDataType::Unknown, *payload);
     }
 
     code = PCG_OK;
@@ -89,7 +111,7 @@ void gather_inputs(const Graph& graph,
 
 PcgResultCode execute_graph(const Graph& graph,
                             int seed,
-                            nlohmann::json& out_result,
+                            GraphExecutionResult& out_result,
                             char* err_buf,
                             int err_buf_size)
 {
@@ -127,11 +149,9 @@ PcgResultCode execute_graph(const Graph& graph,
         if (rc != PCG_OK)
             return rc;
 
-        outputs[node_id] = ctx.outputs.primary_json();
+        outputs[node_id] = std::move(ctx.outputs);
     }
 
-    // Prefer Output-type sink nodes (Houdini-style terminal).
-    // Fall back to any sink if no Output node exists.
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
     for (const auto& node : graph.nodes) {
@@ -160,7 +180,17 @@ PcgResultCode execute_graph(const Graph& graph,
     if (sink_it == outputs.end())
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Sink node produced no output");
 
-    out_result = sink_it->second;
+    const data::PcgDataCollection& sink_output = sink_it->second;
+    if (const data::PcgMeshData* mesh = sink_output.primary_mesh()) {
+        out_result.kind = GraphResultKind::Mesh;
+        out_result.mesh = *mesh;
+        out_result.json = nlohmann::json::object();
+        return PCG_OK;
+    }
+
+    out_result.kind = GraphResultKind::Json;
+    out_result.json = sink_output.primary_json();
+    out_result.mesh = data::PcgMeshData{};
     return PCG_OK;
 }
 
