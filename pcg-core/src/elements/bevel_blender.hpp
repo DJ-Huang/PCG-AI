@@ -263,6 +263,7 @@ struct BevelParams {
     BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj;
     ProfileSpacing pro_spacing;
     float spread = 0.1f;
+    Vec3 mesh_center{0.0, 0.0, 0.0};
 
     // Input mesh data (welded)
     const std::vector<Vec3>* positions = nullptr;

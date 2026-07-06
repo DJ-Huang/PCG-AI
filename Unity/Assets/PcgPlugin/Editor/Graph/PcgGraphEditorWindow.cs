@@ -42,6 +42,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void OnEnable()
         {
+            rootVisualElement.Clear();
             ConstructToolbar();
             ConstructGraphView();
 
@@ -50,6 +51,11 @@ namespace DJTechEditor.PCG.Graph
                 ImportFromPath(persistedPath);
             else
                 LoadDefaultGraph();
+        }
+
+        private void OnDisable()
+        {
+            m_GraphView?.DestroyUndoState();
         }
 
         private void Update()

@@ -2,6 +2,7 @@
 
 #include "data/pcg_mesh_data.hpp"
 #include "elements/mesh_algorithms.hpp"
+#include "geometry/bmesh.hpp"
 
 #include <array>
 #include <cmath>
@@ -210,6 +211,17 @@ bool expect_closed_mesh(const pcg::internal::data::PcgMeshData& mesh)
     return true;
 }
 
+bool expect_no_aabb_expansion(const pcg::internal::data::PcgMeshData& mesh, double half_extent,
+                              double slack = 1e-4)
+{
+    for (const auto& v : mesh.vertices()) {
+        if (std::abs(v.x) > half_extent + slack || std::abs(v.y) > half_extent + slack ||
+            std::abs(v.z) > half_extent + slack)
+            return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int main()
@@ -311,6 +323,27 @@ int main()
     }
 
     const auto box = pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0);
+
+    const auto box_bmesh = pcg::internal::geometry::bmesh_from_mesh(box);
+    if (box_bmesh.faces.size() != 6) {
+        std::printf("FAIL: BMesh box should merge to 6 quad faces (got %zu)\n", box_bmesh.faces.size());
+        return 1;
+    }
+
+    const auto cutoff_demo = pcg::internal::elements::bevel_mesh(
+        box, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+        pcg::internal::elements::BevelOffsetType::Offset, true, 30.0, 0.5f,
+        pcg::internal::elements::BevelMiter::Sharp, pcg::internal::elements::BevelMiter::Sharp,
+        pcg::internal::elements::BevelVMeshMethod::Cutoff);
+    if (!expect_no_aabb_expansion(cutoff_demo, 1.0)) {
+        std::printf("FAIL: cutoff bevel (demo params) expands beyond original box AABB\n");
+        return 1;
+    }
+    if (!expect_outward_normals(cutoff_demo)) {
+        std::printf("FAIL: cutoff bevel (demo params) has inward normals\n");
+        return 1;
+    }
+
     const auto box_beveled = pcg::internal::elements::bevel_mesh(
         box, 0.15, 3, pcg::internal::elements::BevelMethod::Edge,
         pcg::internal::elements::BevelOffsetType::Offset, true);

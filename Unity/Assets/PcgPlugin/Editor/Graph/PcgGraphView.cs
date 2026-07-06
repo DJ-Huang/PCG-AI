@@ -12,7 +12,7 @@ namespace DJTechEditor.PCG.Graph
     public sealed class PcgGraphView : GraphView
     {
         private readonly PcgGraphSearchWindow m_SearchWindow;
-        private readonly PcgGraphState m_State;
+        private PcgGraphState m_State;
         private int m_EdgeCounter = 100;
         private EditorWindow m_HostWindow;
         private Vector2 m_LastMousePos;
@@ -59,7 +59,27 @@ namespace DJTechEditor.PCG.Graph
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<PointerDownEvent>(OnPointerDown, TrickleDown.TrickleDown);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
-            RegisterCallback<DetachFromPanelEvent>(_ => m_State?.Destroy());
+        }
+
+        /// <summary>Ensure the undo proxy exists. Recreated if it was destroyed
+        /// (e.g. after a prior editor window teardown).</summary>
+        private PcgGraphState EnsureUndoState()
+        {
+            if (!m_State)
+            {
+                m_State = PcgGraphState.Create();
+                m_State.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
+            }
+            return m_State;
+        }
+
+        /// <summary>Release undo entries and destroy the proxy (editor window shutdown).</summary>
+        public void DestroyUndoState()
+        {
+            if (!m_State)
+                return;
+            m_State.Destroy();
+            m_State = null;
         }
 
         public void SetHostWindow(EditorWindow window) => m_HostWindow = window;
@@ -181,8 +201,9 @@ namespace DJTechEditor.PCG.Graph
         public void RecordUndo(string actionName)
         {
             if (m_SuppressUndo) return;
-            m_State.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
-            m_State.RegisterCompleteObjectUndo(actionName);
+            var state = EnsureUndoState();
+            state.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
+            state.RegisterCompleteObjectUndo(string.IsNullOrEmpty(actionName) ? "Graph Change" : actionName);
         }
 
         /// <summary>Update the proxy with the post-mutation state.
@@ -190,7 +211,7 @@ namespace DJTechEditor.PCG.Graph
         public void CommitState()
         {
             if (m_SuppressUndo) return;
-            m_State.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
+            EnsureUndoState().SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
         }
 
         /// <summary>Convenience wrapper: record, apply, commit in one call.</summary>
@@ -219,9 +240,10 @@ namespace DJTechEditor.PCG.Graph
             var currentJson = PcgGraphSerializer.ToJson(ExportDocument(), pretty: false);
             if (currentJson != m_PendingSnapshot)
             {
-                m_State.SetGraphJson(m_PendingSnapshot);
-                m_State.RegisterCompleteObjectUndo(m_PendingAction);
-                m_State.SetGraphJson(currentJson);
+                var state = EnsureUndoState();
+                state.SetGraphJson(m_PendingSnapshot);
+                state.RegisterCompleteObjectUndo(string.IsNullOrEmpty(m_PendingAction) ? "Graph Change" : m_PendingAction);
+                state.SetGraphJson(currentJson);
             }
             m_PendingSnapshot = null;
             m_PendingAction = null;
@@ -232,9 +254,10 @@ namespace DJTechEditor.PCG.Graph
         public void RestoreFromUndoState()
         {
             m_SuppressUndo = true;
-            if (PcgGraphSerializer.TryFromJson(m_State.GraphJson, out var doc, out _))
+            var state = EnsureUndoState();
+            if (PcgGraphSerializer.TryFromJson(state.GraphJson, out var doc, out _))
                 LoadDocument(doc, clearUndo: false);
-            m_State.HandleUndoRedo();
+            state.HandleUndoRedo();
             m_SuppressUndo = false;
         }
 
@@ -430,8 +453,9 @@ namespace DJTechEditor.PCG.Graph
             m_SuppressUndo = false;
             if (clearUndo)
             {
-                m_State.ClearUndo();
-                m_State.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
+                var state = EnsureUndoState();
+                state.ClearUndo();
+                state.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
             }
             m_Inspector?.OnSelectionChanged();
         }

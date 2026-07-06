@@ -1,4 +1,5 @@
 #include "elements/bevel_blender.hpp"
+#include "geometry/bmesh.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -2066,6 +2067,9 @@ void bevel_build_cutoff(BevelParams& bp, BevVert* bv) {
             down_dir = vert_normal;
         else if (dot(down_dir, vert_normal) > 0.0)
             down_dir = negate(down_dir);
+        Vec3 to_center = sub(bp.mesh_center, bndv->nv.co);
+        if (length_squared(to_center) > 1e-18 && dot(down_dir, to_center) < 0.0)
+            down_dir = negate(down_dir);
         down_dir = normalize(down_dir);
 
         float corner_len = (bndv->profile.height / std::sqrt(2.0f) +
@@ -2516,6 +2520,108 @@ void rebuild_faces(BevelParams& bp, const WeldedMesh& welded) {
     }
 }
 
+/// Reconstruct original faces using explicit BMesh n-gon boundaries.
+void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const WeldedMesh& welded) {
+    for (const auto& bface : bmesh.faces) {
+        if (bface.verts.size() < 3)
+            continue;
+
+        const std::vector<int>& loop = bface.verts;
+        const geometry::Vec3 gn = geometry::face_normal_from_loop(bmesh, loop);
+        const Vec3 face_normal = {gn.x, gn.y, gn.z};
+
+        std::set<int> face_tri_set(bface.triangle_indices.begin(), bface.triangle_indices.end());
+
+        std::vector<Vec3> polygon;
+        auto push_distinct = [&](const Vec3& p) {
+            if (polygon.empty() || length_squared(sub(p, polygon.back())) > 1e-18)
+                polygon.push_back(p);
+        };
+
+        for (size_t i = 0; i < loop.size(); i++) {
+            const int prev_v = loop[(i + loop.size() - 1) % loop.size()];
+            const int curr_v = loop[i];
+            const int next_v = loop[(i + 1) % loop.size()];
+
+            const int64_t edge_in = edge_key(prev_v, curr_v);
+            const int64_t edge_out = edge_key(curr_v, next_v);
+
+            const bool hard_in = bp.hard_edges.count(edge_in) > 0;
+            const bool hard_out = bp.hard_edges.count(edge_out) > 0;
+
+            if (hard_in && hard_out) {
+                bool found = false;
+                for (auto& bv : bp.bevverts) {
+                    if (bv.v_idx != curr_v)
+                        continue;
+                    if (!bv.vmesh)
+                        continue;
+                    BoundVert* bndv = bv.vmesh->boundstart;
+                    do {
+                        if (!bndv->efirst || !bndv->elast) {
+                            bndv = bndv->next;
+                            continue;
+                        }
+                        const int face = bndv->efirst->fnext;
+                        if (face >= 0 && face_tri_set.count(face)) {
+                            push_distinct(bndv->nv.co);
+                            found = true;
+                            break;
+                        }
+                    } while ((bndv = bndv->next) != bv.vmesh->boundstart);
+                }
+                if (!found)
+                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+            } else if (hard_out) {
+                bool found = false;
+                for (auto& bv : bp.bevverts) {
+                    if (bv.v_idx != curr_v)
+                        continue;
+                    if (!bv.vmesh)
+                        continue;
+                    BoundVert* bndv = bv.vmesh->boundstart;
+                    do {
+                        if (!bndv->ebev || bndv->ebev->edge_v1 != next_v) {
+                            bndv = bndv->next;
+                            continue;
+                        }
+                        const bool forward =
+                            (bndv->ebev->fprev >= 0 && face_tri_set.count(bndv->ebev->fprev));
+                        const bool reverse =
+                            (bndv->ebev->fnext >= 0 && face_tri_set.count(bndv->ebev->fnext));
+                        if (forward || reverse) {
+                            for (int k = 0; k <= bp.seg; k++) {
+                                const int idx = forward ? k : (bp.seg - k);
+                                const Vec3 pt = get_profile_point(bndv->profile, idx, bp.seg, bp.seg);
+                                if (k < bp.seg)
+                                    push_distinct(pt);
+                            }
+                            found = true;
+                            break;
+                        }
+                    } while ((bndv = bndv->next) != bv.vmesh->boundstart);
+                }
+                if (!found)
+                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+            } else if (hard_in) {
+                if (polygon.empty())
+                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+            } else {
+                push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+            }
+        }
+
+        if (polygon.size() >= 3 && length_squared(sub(polygon.front(), polygon.back())) < 1e-18)
+            polygon.pop_back();
+
+        if (polygon.size() >= 3) {
+            for (size_t i = 1; i + 1 < polygon.size(); i++) {
+                bp.output.add_oriented_triangle(polygon[0], polygon[i], polygon[i + 1], face_normal);
+            }
+        }
+    }
+}
+
 } // anonymous namespace
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2555,32 +2661,36 @@ data::PcgMeshData bevel_mesh_blender(
         else if (std::abs(super_r - PRO_LINE_R) < 1e-4) super_r = PRO_LINE_R;
     }
 
-    // 1. Weld mesh
+    // 1. Build BMesh (weld + coplanar merge + sharp edges)
+    geometry::BMeshBuildOptions bmesh_opts;
+    bmesh_opts.sharp_angle_deg = angle_limit_deg;
+    const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh, bmesh_opts);
+
+    // 2. Weld mesh for bevel internals
     WeldedMesh welded = weld_mesh(mesh);
     if (welded.triangles.empty())
         return mesh;
 
-    // 2. Build edge→face adjacency
+    // 3. Build edge→face adjacency
     auto edge_faces = build_edge_faces(welded);
 
-    // 3. Find hard edges
-    double cos_limit = std::cos(angle_limit_deg * M_PI / 180.0);
+    // 4. Hard edges from BMesh topology
     std::unordered_set<int64_t> hard_edges;
-    for (const auto& [key, faces] : edge_faces) {
-        if (faces[0] < 0 || faces[1] < 0) {
-            hard_edges.insert(key);
-            continue;
-        }
-        Vec3 n0 = tri_normal(welded, faces[0]);
-        Vec3 n1 = tri_normal(welded, faces[1]);
-        if (dot(n0, n1) < cos_limit)
-            hard_edges.insert(key);
+    for (const auto& entry : bmesh.edges) {
+        if (entry.second.sharp)
+            hard_edges.insert(entry.first);
     }
 
     if (hard_edges.empty())
         return mesh;
 
-    // 4. Setup BevelParams
+    Vec3 mesh_center{0.0, 0.0, 0.0};
+    for (const auto& p : welded.positions)
+        mesh_center = add(mesh_center, p);
+    if (!welded.positions.empty())
+        mesh_center = scale(mesh_center, 1.0 / static_cast<double>(welded.positions.size()));
+
+    // 5. Setup BevelParams
     BevelParams bp;
     bp.offset = amount;
     bp.offset_type = offset_type;
@@ -2593,6 +2703,7 @@ data::PcgMeshData bevel_mesh_blender(
     bp.miter_outer = miter_outer;
     bp.miter_inner = miter_inner;
     bp.vmesh_method = vmesh_method;
+    bp.mesh_center = mesh_center;
     bp.positions = &welded.positions;
     bp.triangles = &welded.triangles;
     bp.edge_faces = edge_faces;
@@ -2762,22 +2873,13 @@ data::PcgMeshData bevel_mesh_blender(
         }
     }
 
-    // 10. Reconstruct original faces
-    rebuild_faces(bp, welded);
+    // 11. Reconstruct original faces from BMesh n-gons
+    rebuild_faces_bmesh(bp, bmesh, welded);
 
-    // 11. Fix winding: ensure all triangle normals point outward.
+    // 12. Fix winding: ensure all triangle normals point outward.
     // For a closed mesh centered at origin, the centroid of each triangle
     // should be on the same side as the face normal.
     // Use the original input mesh centroid as the outward reference.
-    Vec3 mesh_center{0, 0, 0};
-    int mesh_center_count = 0;
-    for (const auto& v : welded.positions) {
-        mesh_center = add(mesh_center, v);
-        mesh_center_count++;
-    }
-    if (mesh_center_count > 0)
-        mesh_center = scale(mesh_center, 1.0 / mesh_center_count);
-
     for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
         const auto& a = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i])];
         const auto& b = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i + 1])];
@@ -2787,7 +2889,7 @@ data::PcgMeshData bevel_mesh_blender(
         if (length_squared(n) < 1e-20)
             continue;
         Vec3 centroid = scale(add(add({a.x, a.y, a.z}, {b.x, b.y, b.z}), {c.x, c.y, c.z}), 1.0 / 3.0);
-        Vec3 outward = sub(centroid, mesh_center);
+        Vec3 outward = sub(centroid, bp.mesh_center);
         if (dot(n, outward) < 0.0) {
             std::swap(bp.output.triangles[i + 1], bp.output.triangles[i + 2]);
         }
