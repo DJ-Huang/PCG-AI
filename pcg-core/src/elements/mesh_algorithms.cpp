@@ -1,5 +1,6 @@
 #include "elements/mesh_algorithms.hpp"
 #include "elements/bevel_blender.hpp"
+#include "elements/element_utils.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -171,8 +172,48 @@ data::PcgMeshData bevel_mesh_vertex_push(const data::PcgMeshData& mesh, double a
     return out;
 }
 
-
 } // namespace
+
+data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,
+                                    NoiseDeformType noise_type, int seed)
+{
+    if (mesh.vertices().empty() || mesh.triangles().size() < 3)
+        return mesh;
+
+    intensity = std::max(intensity, 0.0);
+    noise_scale = std::max(noise_scale, 1e-6);
+    if (intensity <= 1e-9)
+        return mesh;
+
+    data::PcgMeshData out = mesh;
+    std::vector<Vec3> accum;
+    accumulate_vertex_normals(out, accum);
+
+    const auto sample_noise = [&](double x, double y, double z) -> double {
+        switch (noise_type) {
+        case NoiseDeformType::Perlin:
+        default:
+            return perlin_noise_3d(x, y, z, seed);
+        }
+    };
+
+    const double seed_offset = static_cast<double>(seed) * 0.137;
+    auto& verts_mut = out.vertices_mut();
+    for (size_t i = 0; i < verts_mut.size(); ++i) {
+        Vec3 n = normalize(accum[i]);
+        if (length(n) <= 1e-9)
+            continue;
+
+        const Vec3 p = to_vec3(verts_mut[i]);
+        const double nx = (p.x + seed_offset) * noise_scale;
+        const double ny = (p.y + seed_offset * 1.3) * noise_scale;
+        const double nz = (p.z + seed_offset * 1.7) * noise_scale;
+        const double displacement = sample_noise(nx, ny, nz) * intensity;
+        verts_mut[i] = to_vertex(add(p, scale(n, displacement)));
+    }
+
+    return out;
+}
 
 data::PcgMeshData create_box_mesh(double width, double height, double depth)
 {

@@ -451,6 +451,41 @@ int main()
         return 1;
     }
 
+    const auto box_for_noise = pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0);
+    const auto noise_zero = pcg::internal::elements::noise_deform_mesh(
+        box_for_noise, 0.0, 2.0, pcg::internal::elements::NoiseDeformType::Perlin, 42);
+    if (meshes_have_different_positions(box_for_noise, noise_zero)) {
+        std::printf("FAIL: zero intensity noise deform should preserve vertex positions\n");
+        return 1;
+    }
+
+    const auto noise_deformed = pcg::internal::elements::noise_deform_mesh(
+        box_for_noise, 0.05, 3.0, pcg::internal::elements::NoiseDeformType::Perlin, 42);
+    if (!meshes_have_different_positions(box_for_noise, noise_deformed)) {
+        std::printf("FAIL: noise deform should offset vertices along normals\n");
+        return 1;
+    }
+    if (noise_deformed.vertices().size() != box_for_noise.vertices().size() ||
+        noise_deformed.triangles().size() != box_for_noise.triangles().size()) {
+        std::printf("FAIL: noise deform should preserve mesh topology\n");
+        return 1;
+    }
+
+    const char* noise_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":0},
+         "data": {"width": 2.0, "height": 2.0, "depth": 2.0}},
+        {"id": "noise", "type": "MeshNoiseDeform", "position": {"x":0,"y":0},
+         "data": {"intensity": 0.03, "scale": 2.5, "noiseType": "perlin"}}
+      ],
+      "edges": [
+        {"id": "e1", "source": "box", "target": "noise", "sourceHandle": "out", "targetHandle": "in"}
+      ]
+    })";
+    expect_code(pcg_validate_graph(noise_graph, err, sizeof(err)), PCG_OK, "noise deform graph validate");
+    expect_code(pcg_execute_graph(noise_graph, 42, out, sizeof(out)), PCG_OK, "noise deform graph execute");
+
     std::printf("PASS: phase43 mesh pipeline\n");
     return 0;
 }

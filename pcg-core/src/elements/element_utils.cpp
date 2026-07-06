@@ -3,8 +3,85 @@
 #include "internal/error_util.hpp"
 
 #include <cmath>
+#include <cstdint>
 
 namespace pcg::internal::elements {
+namespace {
+
+constexpr int kPerlinPermSize = 256;
+
+void build_perlin_perm(int seed, int perm[kPerlinPermSize * 2])
+{
+    int base[kPerlinPermSize];
+    for (int i = 0; i < kPerlinPermSize; ++i)
+        base[i] = i;
+
+    uint32_t state = static_cast<uint32_t>(seed) * 1664525u + 1013904223u;
+    for (int i = kPerlinPermSize - 1; i > 0; --i) {
+        state = state * 1664525u + 1013904223u;
+        const int j = static_cast<int>(state % static_cast<uint32_t>(i + 1));
+        const int tmp = base[i];
+        base[i] = base[j];
+        base[j] = tmp;
+    }
+
+    for (int i = 0; i < kPerlinPermSize; ++i) {
+        perm[i] = base[i];
+        perm[i + kPerlinPermSize] = base[i];
+    }
+}
+
+double fade(double t)
+{
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+double lerp(double a, double b, double t)
+{
+    return a + t * (b - a);
+}
+
+double grad(int hash, double x, double y, double z)
+{
+    const int h = hash & 15;
+    const double u = h < 8 ? x : y;
+    const double v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
+    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+}
+
+} // namespace
+
+double perlin_noise_3d(double x, double y, double z, int seed)
+{
+    int perm[kPerlinPermSize * 2];
+    build_perlin_perm(seed, perm);
+
+    const int xi = static_cast<int>(std::floor(x)) & (kPerlinPermSize - 1);
+    const int yi = static_cast<int>(std::floor(y)) & (kPerlinPermSize - 1);
+    const int zi = static_cast<int>(std::floor(z)) & (kPerlinPermSize - 1);
+    const double xf = x - std::floor(x);
+    const double yf = y - std::floor(y);
+    const double zf = z - std::floor(z);
+    const double u = fade(xf);
+    const double v = fade(yf);
+    const double w = fade(zf);
+
+    const int a = perm[xi] + yi;
+    const int aa = perm[a] + zi;
+    const int ab = perm[a + 1] + zi;
+    const int b = perm[xi + 1] + yi;
+    const int ba = perm[b] + zi;
+    const int bb = perm[b + 1] + zi;
+
+    const double x1 = lerp(grad(perm[aa], xf, yf, zf), grad(perm[ba], xf - 1.0, yf, zf), u);
+    const double x2 = lerp(grad(perm[ab], xf, yf - 1.0, zf), grad(perm[bb], xf - 1.0, yf - 1.0, zf), u);
+    const double y1 = lerp(x1, x2, v);
+    const double x3 = lerp(grad(perm[aa + 1], xf, yf, zf - 1.0), grad(perm[ba + 1], xf - 1.0, yf, zf - 1.0), u);
+    const double x4 = lerp(grad(perm[ab + 1], xf, yf - 1.0, zf - 1.0),
+                          grad(perm[bb + 1], xf - 1.0, yf - 1.0, zf - 1.0), u);
+    const double y2 = lerp(x3, x4, v);
+    return lerp(y1, y2, w);
+}
 
 PcgResultCode fail_ctx(PcgContext& ctx, PcgResultCode code, const char* message)
 {

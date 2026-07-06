@@ -29,6 +29,7 @@ void emit_mesh(PcgContext& ctx, data::PcgMeshData data);
 uint32_t mix_seed(int a, int b);
 uint32_t next_rand(uint32_t& state);
 double simple_noise(double x, double z, int seed);
+double perlin_noise_3d(double x, double y, double z, int seed);
 
 std::vector<std::string> parse_name_list(const nlohmann::json& data, const char* key);
 

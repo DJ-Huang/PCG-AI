@@ -329,6 +329,24 @@
       }
     },
     {
+      "type": "MeshNoiseDeform",
+      "displayName": "Mesh Noise Deform",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "intensity": { "type": "number", "default": 0.02, "minimum": 0, "maximum": 1.0 },
+        "scale": { "type": "number", "default": 2.0, "minimum": 0.01, "maximum": 64.0 },
+        "noiseType": {
+          "type": "enum",
+          "default": "perlin",
+          "options": [
+            { "value": "perlin", "label": "Perlin (Built-in)" }
+          ]
+        }
+      }
+    },
+    {
       "type": "Output",
       "displayName": "Output",
       "category": "Output",

@@ -102,6 +102,32 @@ public:
     }
 };
 
+class MeshNoiseDeformElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "MeshNoiseDeform"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing node");
+
+        const nlohmann::json* input =
+            require_input_json(ctx, "in", "MeshNoiseDeform missing mesh input");
+        const data::PcgMeshData mesh = parse_mesh_input(*input);
+        if (mesh.vertices().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing mesh input");
+
+        const double intensity = ctx.node->data.value("intensity", 0.02);
+        const double noise_scale = ctx.node->data.value("scale", 2.0);
+        const std::string noise_type_str = ctx.node->data.value("noiseType", std::string("perlin"));
+        const NoiseDeformType noise_type =
+            noise_type_str == "perlin" ? NoiseDeformType::Perlin : NoiseDeformType::Perlin;
+
+        emit_mesh(ctx, noise_deform_mesh(mesh, intensity, noise_scale, noise_type, ctx.graph_seed));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
@@ -109,6 +135,7 @@ void register_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcg
     map.emplace("CreateBoxMesh", std::make_unique<CreateBoxMeshElement>());
     map.emplace("SubdivideMesh", std::make_unique<SubdivideMeshElement>());
     map.emplace("BevelMesh", std::make_unique<BevelMeshElement>());
+    map.emplace("MeshNoiseDeform", std::make_unique<MeshNoiseDeformElement>());
 }
 
 } // namespace pcg::internal::elements
