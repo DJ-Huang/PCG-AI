@@ -227,6 +227,8 @@ PCG_API PcgResultCode pcg_execute_graph_v5(const char* json,
 /**
  * Executes graph and returns points as binary when sink is point payload.
  * Falls back to v5 semantics for non-point outputs.
+ * When sink payload includes spawnMesh, v6 also writes mesh binary to out_mesh_buf
+ * and fills out_vertex_count/out_index_count (while out_kind remains POINTS).
  */
 PCG_API PcgResultCode pcg_execute_graph_v6(const char* json,
                                            int seed,

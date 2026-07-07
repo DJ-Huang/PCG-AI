@@ -482,8 +482,6 @@ public:
                 point.attributes["prefab"] = prefab;
             if (!mesh.empty())
                 point.attributes["mesh"] = mesh;
-            if (has_spawn_mesh)
-                point.attributes["spawnMesh"] = "__connected__";
             point.attributes["scale"] = scale;
         }
 
@@ -494,7 +492,7 @@ public:
         out["scale"] = scale;
         out["pointCount"] = out["points"].size();
         if (has_spawn_mesh)
-            out["spawnMesh"] = spawn_mesh.to_json();
+            ctx.outputs.add_mesh("spawnMesh", spawn_mesh);
         ctx.outputs.add("out", data::PcgDataType::Point, std::move(out));
         return PCG_OK;
     }

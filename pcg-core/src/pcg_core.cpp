@@ -206,16 +206,40 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
             }
         }
 
+        bool wrote_spawn_mesh_binary = false;
+        if (out_mesh_buf && out_mesh_buf_size > 0) {
+            const auto& spawn_mesh = result.spawn_mesh;
+            if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3) {
+                if (!pcg::internal::data::write_mesh_binary(
+                        spawn_mesh, out_mesh_buf, out_mesh_buf_size)) {
+                    const int required = pcg::internal::data::mesh_binary_size(spawn_mesh);
+                    char message[256];
+                    std::snprintf(message, sizeof(message),
+                                  "Spawn mesh binary buffer too small (need %d bytes, got %d)",
+                                  required, out_mesh_buf_size);
+                    pcg::internal::write_error(err_buf, err_buf_size, message);
+                    return PCG_ERR_EXECUTION;
+                }
+                if (out_vertex_count)
+                    *out_vertex_count = static_cast<int>(spawn_mesh.vertices().size());
+                if (out_index_count)
+                    *out_index_count = static_cast<int>(spawn_mesh.triangles().size());
+                wrote_spawn_mesh_binary = true;
+            }
+        }
+
         if (out_kind)
             *out_kind = PCG_RESULT_KIND_POINTS;
         if (out_point_count)
             *out_point_count = point_count;
         if (out_point_attr_flags)
             *out_point_attr_flags = flags;
-        if (out_vertex_count)
-            *out_vertex_count = 0;
-        if (out_index_count)
-            *out_index_count = 0;
+        if (!wrote_spawn_mesh_binary) {
+            if (out_vertex_count)
+                *out_vertex_count = 0;
+            if (out_index_count)
+                *out_index_count = 0;
+        }
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
         return PCG_OK;

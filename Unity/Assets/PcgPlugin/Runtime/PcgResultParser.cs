@@ -67,7 +67,6 @@ namespace DJTechRuntime.PCG
         public float scale = 1f;
         public int pointCount;
         public PcgPoint[] points;
-        public PcgMeshPayload spawnMesh;
     }
 
     public struct PcgScatterPoint

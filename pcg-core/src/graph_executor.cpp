@@ -243,6 +243,11 @@ PcgResultCode execute_graph(const Graph& graph,
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Sink node produced no output");
 
     const data::PcgDataCollection& sink_output = sink_it->second;
+    if (const data::PcgMeshData* spawn_mesh = sink_output.find_mesh("spawnMesh"))
+        out_result.spawn_mesh = *spawn_mesh;
+    else
+        out_result.spawn_mesh = data::PcgMeshData{};
+
     if (const data::PcgMeshData* mesh = sink_output.primary_mesh()) {
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = *mesh;

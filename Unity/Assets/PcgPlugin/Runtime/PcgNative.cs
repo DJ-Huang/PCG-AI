@@ -422,12 +422,22 @@ namespace DJTechRuntime.PCG
 
                 var pointBinary = new byte[required];
                 Buffer.BlockCopy(pointsBuf, 0, pointBinary, 0, required);
+                byte[] meshBinary = null;
+                if (vertexCount > 0 && indexCount > 0)
+                {
+                    var meshRequired = MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+                    meshBinary = new byte[meshRequired];
+                    Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, meshRequired);
+                }
                 return (rc, new PcgGraphExecuteResult
                 {
                     Kind = executeKind,
                     PointBinary = pointBinary,
                     PointCount = pointCount,
                     PointAttrFlags = pointAttrFlags,
+                    MeshBinary = meshBinary,
+                    VertexCount = vertexCount,
+                    IndexCount = indexCount,
                     CookNodesExecuted = cookStats.nodes_executed,
                     CookNodesSkipped = cookStats.nodes_skipped,
                 });

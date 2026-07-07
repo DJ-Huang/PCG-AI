@@ -15,6 +15,7 @@ struct GraphExecutionResult {
     GraphResultKind kind = GraphResultKind::Json;
     nlohmann::json json;
     data::PcgMeshData mesh;
+    data::PcgMeshData spawn_mesh;
 };
 
 } // namespace pcg::internal

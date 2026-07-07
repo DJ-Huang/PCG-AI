@@ -449,7 +449,7 @@ namespace DJTechRuntime.PCG
                             Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
                             return false;
                         }
-                        ApplyPoints(points, null);
+                        ApplyPoints(points, BuildSpawnPrototypeMesh(result));
                     }
                     else
                     {
@@ -458,7 +458,7 @@ namespace DJTechRuntime.PCG
                             Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
                             return false;
                         }
-                        ApplyPoints(PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)), BuildSpawnPrototypeMesh(parsed));
+                        ApplyPoints(PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)), BuildSpawnPrototypeMesh(result));
                     }
                     break;
 
@@ -749,28 +749,15 @@ namespace DJTechRuntime.PCG
             return mesh;
         }
 
-        private static Mesh BuildSpawnPrototypeMesh(PcgExecutionResult parsed)
+        private static Mesh BuildSpawnPrototypeMesh(PcgGraphExecuteResult result)
         {
-            if (parsed?.spawnMesh?.vertices == null || parsed.spawnMesh.vertices.Length == 0)
-                return null;
-            if (parsed.spawnMesh.triangles == null || parsed.spawnMesh.triangles.Length < 3)
+            if (result?.MeshBinary == null || result.MeshBinary.Length < PcgNative.MeshBinaryHeaderSize)
                 return null;
 
-            var vertices = new Vector3[parsed.spawnMesh.vertices.Length];
-            for (var i = 0; i < parsed.spawnMesh.vertices.Length; i++)
-            {
-                var v = parsed.spawnMesh.vertices[i];
-                vertices[i] = new Vector3(v.x, v.y, v.z);
-            }
+            if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out _))
+                return null;
 
-            var mesh = new Mesh { name = "PCG Spawn Prototype Mesh" };
-            if (vertices.Length > 65535)
-                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            mesh.vertices = vertices;
-            mesh.triangles = parsed.spawnMesh.triangles;
-            mesh.RecalculateBounds();
-            mesh.RecalculateNormals();
-            mesh.RecalculateTangents();
+            mesh.name = "PCG Spawn Prototype Mesh";
             return mesh;
         }
 
