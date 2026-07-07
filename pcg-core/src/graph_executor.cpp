@@ -83,29 +83,32 @@ void gather_inputs(const Graph& graph,
         }
 
         const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
+        const std::string source_pin = edge.source_handle.empty() ? "out" : edge.source_handle;
         const data::PcgDataCollection& upstream = it->second;
 
-        if (const data::PcgMeshData* mesh = upstream.find_mesh("out")) {
-            inputs.add_mesh(pin, *mesh);
+        if (const nlohmann::json* payload = upstream.find_json(source_pin)) {
+            inputs.add(pin, data::PcgDataType::Unknown, *payload);
+            if (const data::PcgMeshData* spawn_mesh = upstream.find_mesh("spawnMesh"))
+                inputs.add_mesh("spawnMesh", *spawn_mesh);
             continue;
         }
-        if (const data::PcgMeshData* mesh = upstream.primary_mesh()) {
+
+        if (const data::PcgMeshData* mesh = upstream.find_mesh(source_pin)) {
             inputs.add_mesh(pin, *mesh);
             continue;
         }
 
-        const nlohmann::json* payload = upstream.find_json("out");
-        if (!payload) {
-            const nlohmann::json primary = upstream.primary_json();
-            if (!primary.is_object() || primary.empty()) {
-                code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
-                return;
+        const nlohmann::json primary = upstream.primary_json();
+        if (!primary.is_object() || primary.empty()) {
+            if (const data::PcgMeshData* mesh = upstream.primary_mesh()) {
+                inputs.add_mesh(pin, *mesh);
+                continue;
             }
-            inputs.add(pin, data::PcgDataType::Unknown, primary);
-            continue;
+            code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
+            return;
         }
 
-        inputs.add(pin, data::PcgDataType::Unknown, *payload);
+        inputs.add(pin, data::PcgDataType::Unknown, primary);
     }
 
     code = PCG_OK;
@@ -243,10 +246,33 @@ PcgResultCode execute_graph(const Graph& graph,
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Sink node produced no output");
 
     const data::PcgDataCollection& sink_output = sink_it->second;
-    if (const data::PcgMeshData* spawn_mesh = sink_output.find_mesh("spawnMesh"))
+    if (const data::PcgMeshData* spawn_mesh = sink_output.find_mesh("spawnMesh")) {
         out_result.spawn_mesh = *spawn_mesh;
-    else
+    } else {
         out_result.spawn_mesh = data::PcgMeshData{};
+        for (const auto& [node_id, collection] : outputs) {
+            (void)node_id;
+            if (const data::PcgMeshData* upstream_spawn = collection.find_mesh("spawnMesh")) {
+                out_result.spawn_mesh = *upstream_spawn;
+                break;
+            }
+        }
+    }
+
+    const nlohmann::json primary = sink_output.primary_json();
+    if (primary.is_object() && primary.contains("points") && primary["points"].is_array()) {
+        out_result.kind = GraphResultKind::Json;
+        out_result.json = primary;
+        out_result.mesh = data::PcgMeshData{};
+        return PCG_OK;
+    }
+
+    if (const data::PcgMeshData* mesh = sink_output.find_mesh("out")) {
+        out_result.kind = GraphResultKind::Mesh;
+        out_result.mesh = *mesh;
+        out_result.json = nlohmann::json::object();
+        return PCG_OK;
+    }
 
     if (const data::PcgMeshData* mesh = sink_output.primary_mesh()) {
         out_result.kind = GraphResultKind::Mesh;

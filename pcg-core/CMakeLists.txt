@@ -116,3 +116,9 @@ target_link_libraries(test_cook_cache PRIVATE PcgCoreStatic nlohmann_json::nlohm
 target_include_directories(test_cook_cache PRIVATE src)
 
 add_test(NAME test_cook_cache COMMAND test_cook_cache WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_spawn_mesh_binary tests/test_spawn_mesh_binary.cpp)
+target_link_libraries(test_spawn_mesh_binary PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_spawn_mesh_binary PRIVATE src)
+
+add_test(NAME test_spawn_mesh_binary COMMAND test_spawn_mesh_binary WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)

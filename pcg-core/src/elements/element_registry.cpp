@@ -112,6 +112,8 @@ public:
             return fail(ctx, PCG_ERR_EXECUTION, "Output missing input");
 
         ctx.outputs.add("out", data::PcgDataType::Unknown, *input);
+        if (const data::PcgMeshData* spawn_mesh = ctx.inputs.find_mesh("spawnMesh"))
+            ctx.outputs.add_mesh("spawnMesh", *spawn_mesh);
         return PCG_OK;
     }
 };
