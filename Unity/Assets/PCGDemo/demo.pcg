@@ -5,19 +5,19 @@
       "id": "n101",
       "type": "CreateBoxMesh",
       "position": { "x": 50, "y": 266 },
-      "data": {"width": 2.464706, "height": 2, "depth": 2}
+      "data": {"width": 2.652941, "height": 2, "depth": 2}
     },
     {
       "id": "n105",
       "type": "BevelMesh",
       "position": { "x": 279.5, "y": 266 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.4529412, "segments": 1, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.3470588, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     },
     {
       "id": "n107",
       "type": "SubdivideMesh",
       "position": { "x": 498, "y": 189 },
-      "data": {"levels": 1}
+      "data": {"levels": 4}
     },
     {
       "id": "n108",
@@ -26,22 +26,28 @@
       "data": {"texture": "Resources/tuanjie_builtin_extra/Default-Particle", "repeatX": 1, "repeatY": 1}
     },
     {
+      "id": "n109",
+      "type": "Output",
+      "position": { "x": 1418.5, "y": 411 },
+      "data": {"label": "Output"}
+    },
+    {
       "id": "n106",
       "type": "MeshNoiseDeform",
       "position": { "x": 732, "y": 387 },
       "data": {"intensity": 0.02, "scale": 14.31365, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
     },
     {
-      "id": "n109",
-      "type": "Output",
-      "position": { "x": 1357.5, "y": 388 },
-      "data": {"label": "Output"}
-    },
-    {
       "id": "n110",
       "type": "SampleMeshSurface",
       "position": { "x": 1011.5, "y": 411 },
-      "data": {"count": 100, "seed": 0, "normalOffset": 0, "looseness": 0}
+      "data": {"count": 200, "seed": 0, "normalOffset": 0, "looseness": 0}
+    },
+    {
+      "id": "n111",
+      "type": "GetMeshData",
+      "position": { "x": 749.5, "y": 531.5 },
+      "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
     }
   ],
   "edges": [
@@ -49,8 +55,8 @@
     {"id": "e170", "source": "n105", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e171", "source": "n107", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e177", "source": "n108", "target": "n106", "sourceHandle": "out", "targetHandle": "texture"},
-    {"id": "e195", "source": "n106", "target": "n110", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e196", "source": "n110", "target": "n109", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e196", "source": "n110", "target": "n109", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e235", "source": "n111", "target": "n110", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},
@@ -60,6 +66,7 @@
     {"id": "p7", "name": "amount", "type": "number", "default": 0.08, "exposed": true, "targetNode": "n105", "targetProperty": "amount", "hasRange": true, "min": 0, "max": 1},
     {"id": "p8", "name": "segments", "type": "integer", "default": 3, "exposed": true, "targetNode": "n105", "targetProperty": "segments", "hasRange": true, "min": 1, "max": 8},
     {"id": "p9", "name": "intensity", "type": "number", "default": 0.227, "exposed": true, "targetNode": "n106", "targetProperty": "intensity", "hasRange": true, "min": 0, "max": 1},
-    {"id": "p10", "name": "scale", "type": "number", "default": 53.5, "exposed": true, "targetNode": "n106", "targetProperty": "scale", "hasRange": true, "min": 0.01, "max": 64}
+    {"id": "p10", "name": "scale", "type": "number", "default": 53.5, "exposed": true, "targetNode": "n106", "targetProperty": "scale", "hasRange": true, "min": 0.01, "max": 64},
+    {"id": "p11", "name": "count", "type": "integer", "default": 100, "exposed": true, "targetNode": "n110", "targetProperty": "count", "hasRange": true, "min": 0, "max": 1000000}
   ]
 }

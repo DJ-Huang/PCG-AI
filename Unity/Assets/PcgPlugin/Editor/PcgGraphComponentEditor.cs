@@ -136,7 +136,38 @@ namespace DJTechEditor.PCG
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Mesh Bindings", EditorStyles.boldLabel);
+
+            if (GraphHasGetMeshData())
+            {
+                EditorGUILayout.HelpBox(
+                    "GetMeshData needs a mesh source. Add a binding:\n" +
+                    "bindingKey = targetMesh · Source = Scene Object · Scene Object = your mesh in hierarchy.",
+                    MessageType.Info);
+
+                if (m_MeshBindingsProp.arraySize == 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No Mesh Bindings configured — cook will fail until you add one.",
+                        MessageType.Warning);
+                }
+            }
+
             EditorGUILayout.PropertyField(m_MeshBindingsProp, includeChildren: true);
+        }
+
+        private bool GraphHasGetMeshData()
+        {
+            var doc = m_Target.Document;
+            if (doc?.nodes == null)
+                return false;
+
+            foreach (var node in doc.nodes)
+            {
+                if (node?.type == "GetMeshData")
+                    return true;
+            }
+
+            return false;
         }
 
         private void DrawParameters()

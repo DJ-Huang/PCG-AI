@@ -30,26 +30,10 @@ namespace DJTechRuntime.PCG
                 if (node.type != "GetMeshData" || string.IsNullOrEmpty(node.id))
                     continue;
 
-                var sourceText = node.data?.GetRaw("source")?.ToString() ?? "Binding";
-                var bindingKey = node.data?.GetRaw("bindingKey")?.ToString() ?? "targetMesh";
-                var meshAsset = node.data?.GetRaw("meshAsset")?.ToString() ?? "";
-
-                if (!System.Enum.TryParse<PcgMeshBindingSource>(sourceText, true, out var source))
-                    source = PcgMeshBindingSource.Binding;
-
-                var mesh = PcgMeshBindingTable.ResolveMesh(
-                    bindingKey,
-                    source,
-                    meshAsset,
-                    componentBindings,
-                    previewBindings,
-                    componentHost);
-
+                var mesh = TryResolveGetMeshData(
+                    node.data, componentHost, componentBindings, previewBindings);
                 if (mesh == null)
-                {
-                    Debug.LogWarning($"[PCG] GetMeshData '{node.id}': could not resolve mesh (bindingKey='{bindingKey}').");
                     continue;
-                }
 
                 var upload = BuildUpload(node.id, mesh);
                 if (upload != null)
@@ -57,6 +41,28 @@ namespace DJTechRuntime.PCG
             }
 
             return uploads;
+        }
+
+        public static Mesh TryResolveGetMeshData(
+            PcgNodeData nodeData,
+            GameObject componentHost,
+            IReadOnlyList<PcgMeshBinding> componentBindings,
+            IReadOnlyList<PcgPreviewMeshBinding> previewBindings)
+        {
+            var sourceText = nodeData?.GetRaw("source")?.ToString() ?? "Binding";
+            var bindingKey = nodeData?.GetRaw("bindingKey")?.ToString() ?? "targetMesh";
+            var meshAsset = nodeData?.GetRaw("meshAsset")?.ToString() ?? "";
+
+            if (!System.Enum.TryParse<PcgMeshBindingSource>(sourceText, true, out var source))
+                source = PcgMeshBindingSource.Binding;
+
+            return PcgMeshBindingTable.ResolveMesh(
+                bindingKey,
+                source,
+                meshAsset,
+                componentBindings,
+                previewBindings,
+                componentHost);
         }
 
         public static void ClearCache()

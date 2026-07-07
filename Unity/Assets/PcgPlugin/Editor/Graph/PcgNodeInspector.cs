@@ -383,11 +383,14 @@ namespace DJTechEditor.PCG.Graph
                 style = { color = new Color(0.75f, 0.75f, 0.75f), fontSize = 10, marginBottom = 2 },
             });
 
-            var bindingKey = node.CollectData().GetRaw("bindingKey")?.ToString() ?? "targetMesh";
+            var nodeData = node.CollectData();
+            var bindingKey = nodeData.GetRaw("bindingKey")?.ToString() ?? "targetMesh";
             MeshFilter current = null;
-            if (m_GraphView.HostWindow is PcgGraphEditorWindow editorWindow)
+            PcgGraphEditorWindow editorWindow = null;
+            if (m_GraphView.HostWindow is PcgGraphEditorWindow window)
             {
-                foreach (var binding in editorWindow.PreviewMeshBindings)
+                editorWindow = window;
+                foreach (var binding in window.PreviewMeshBindings)
                 {
                     if (binding != null && binding.bindingKey == bindingKey)
                     {
@@ -404,12 +407,73 @@ namespace DJTechEditor.PCG.Graph
             };
             field.RegisterValueChangedCallback(evt =>
             {
-                if (m_GraphView.HostWindow is PcgGraphEditorWindow window)
-                    window.SetPreviewMeshFilter(bindingKey, evt.newValue as MeshFilter);
+                if (m_GraphView.HostWindow is PcgGraphEditorWindow w)
+                    w.SetPreviewMeshFilter(bindingKey, evt.newValue as MeshFilter);
                 NotifyGraphChanged();
+                ShowNode(node);
             });
             container.Add(field);
+
+            TryFindSceneComponentBindings(editorWindow?.CurrentAssetPath, out var host, out var componentBindings);
+            var previewBindings = editorWindow?.PreviewMeshBindings;
+            var mesh = PcgMeshResolver.TryResolveGetMeshData(
+                nodeData, host, componentBindings, previewBindings);
+
+            if (mesh == null)
+            {
+                container.Add(new Label(
+                    "No mesh resolved. Assign MeshFilter above, or configure Mesh Bindings " +
+                    "(bindingKey = targetMesh, Scene Object) on a scene PcgGraphComponent.")
+                {
+                    style =
+                    {
+                        color = new Color(1f, 0.72f, 0.25f),
+                        fontSize = 10,
+                        whiteSpace = WhiteSpace.Normal,
+                        marginTop = 4,
+                    },
+                });
+            }
+            else
+            {
+                container.Add(new Label($"Resolved: {mesh.name} ({mesh.vertexCount} verts)")
+                {
+                    style =
+                    {
+                        color = new Color(0.55f, 0.85f, 0.55f),
+                        fontSize = 10,
+                        marginTop = 4,
+                    },
+                });
+            }
+
             return container;
+        }
+
+        private static void TryFindSceneComponentBindings(
+            string graphAssetPath,
+            out GameObject host,
+            out IReadOnlyList<PcgMeshBinding> bindings)
+        {
+            host = null;
+            bindings = null;
+            if (string.IsNullOrEmpty(graphAssetPath))
+                return;
+
+            var graphAsset = AssetDatabase.LoadAssetAtPath<PcgGraphAsset>(graphAssetPath);
+            if (graphAsset == null)
+                return;
+
+            foreach (var component in UnityEngine.Object.FindObjectsByType<PcgGraphComponent>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (component == null || component.GraphAsset != graphAsset)
+                    continue;
+
+                host = component.gameObject;
+                bindings = component.MeshBindings;
+                return;
+            }
         }
 
         private void NotifyGraphChanged() => m_GraphView?.NotifyDocumentChanged();

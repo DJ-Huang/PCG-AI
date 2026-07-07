@@ -24,7 +24,7 @@ namespace DJTechRuntime.PCG
     public class PcgMeshBinding
     {
         public string bindingKey = "targetMesh";
-        public PcgMeshBindingSource source = PcgMeshBindingSource.Asset;
+        public PcgMeshBindingSource source = PcgMeshBindingSource.SceneObject;
         public GameObject sceneObject;
         public Mesh meshAsset;
     }

@@ -41,11 +41,8 @@ namespace DJTechRuntime.PCG
 
             var meshes = PcgMeshResolver.CollectFromGraphJson(
                 json, componentHost, meshBindings, previewBindings);
-            if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out var meshError))
-            {
-                Debug.LogError($"[PCG] {meshError}");
+            if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out _))
                 return null;
-            }
 
             return Execute(json, seed, textures, meshes, quality);
         }
