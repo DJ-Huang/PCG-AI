@@ -13,3 +13,4 @@ MonoBehaviour:
   m_Name: PcgProjectSettings
   m_EditorClassIdentifier: 
   enableLogging: 0
+  defaultScatterDisplayMode: 1

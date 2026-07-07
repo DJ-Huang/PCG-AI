@@ -16,6 +16,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_MeshBindingsProp;
         private SerializedProperty m_ScatterPointScaleProp;
         private SerializedProperty m_ScatterPointMeshProp;
+        private SerializedProperty m_ScatterDisplayModeProp;
         private SerializedProperty m_EnableAsyncCookInEditorProp;
         private bool m_SliderReleasedThisFrame;
 
@@ -29,6 +30,7 @@ namespace DJTechEditor.PCG
             m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
             m_ScatterPointScaleProp = serializedObject.FindProperty("scatterPointScale");
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
+            m_ScatterDisplayModeProp = serializedObject.FindProperty("scatterDisplayMode");
             m_EnableAsyncCookInEditorProp = serializedObject.FindProperty("enableAsyncCookInEditor");
 
             m_Target.RefreshDocument();
@@ -107,8 +109,8 @@ namespace DJTechEditor.PCG
             if (!Application.isPlaying && GUILayout.Button("Cancel Preview Cook (Esc)"))
                 PcgGraphComponent.CancelAllEditModeAsyncCooks();
 
-            DrawMeshBindings();
             DrawScatterSettings();
+            DrawMeshBindings();
             DrawParameters();
 
             if (m_SliderReleasedThisFrame && m_Target.SupportsEditModePreview())
@@ -126,12 +128,38 @@ namespace DJTechEditor.PCG
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Scatter Rendering", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+
+            if (m_ScatterDisplayModeProp != null)
+            {
+                EditorGUILayout.PropertyField(
+                    m_ScatterDisplayModeProp,
+                    new GUIContent(
+                        "Display Mode",
+                        "Merged Mesh: combine instances into one MeshFilter (default). " +
+                        "GPU Instancing: draw scatter with Graphics.DrawMeshInstanced (faster for many points)."));
+            }
+            else
+            {
+                EditorGUILayout.HelpBox(
+                    "Scatter Display Mode is unavailable until scripts recompile. " +
+                    "Use Graph Editor toolbar «Scatter Display» or PCG → Settings.",
+                    MessageType.Warning);
+            }
+
             EditorGUILayout.PropertyField(
                 m_ScatterPointScaleProp,
                 new GUIContent("Point Scale", "Scale of each generated scatter instance mesh."));
             EditorGUILayout.PropertyField(
                 m_ScatterPointMeshProp,
                 new GUIContent("Point Mesh", "Mesh used for each point instance. Empty = built-in Sphere/Cube fallback."));
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                if (m_Target.SupportsEditModePreview())
+                    m_Target.RequestPreviewCook(immediate: true);
+                serializedObject.Update();
+            }
         }
 
         private void DrawCookModeHelp()

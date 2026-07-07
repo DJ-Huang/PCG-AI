@@ -5,7 +5,7 @@
       "id": "n107",
       "type": "SubdivideMesh",
       "position": { "x": 103.5, "y": 417.5 },
-      "data": {"levels": 1}
+      "data": {"levels": 2}
     },
     {
       "id": "n106",
@@ -23,7 +23,7 @@
       "id": "n105",
       "type": "BevelMesh",
       "position": { "x": 103.5, "y": 322.5 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1652893, "segments": 1, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1652893, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     },
     {
       "id": "n101",

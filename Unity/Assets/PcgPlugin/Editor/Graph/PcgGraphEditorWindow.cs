@@ -3,6 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using DJTechEditor.PCG;
 using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
@@ -22,6 +23,7 @@ namespace DJTechEditor.PCG.Graph
         private PcgNodeInspector m_Inspector;
         private Button m_BlackboardToggle;
         private Button m_InspectorToggle;
+        private EnumField m_ScatterDisplayField;
         private string m_CurrentFilePath;
         private bool m_GraphLoaded;
 
@@ -216,6 +218,18 @@ namespace DJTechEditor.PCG.Graph
             var spacer = new VisualElement { style = { flexGrow = 1 } };
             toolbar.Add(spacer);
 
+            m_ScatterDisplayField = new EnumField(
+                "Scatter Display",
+                PcgScatterDisplayMode.MergedMesh);
+            m_ScatterDisplayField.tooltip =
+                "How scatter points render on scene PcgGraphComponent(s) using this graph. " +
+                "GPU Instancing is faster for many instances.";
+            m_ScatterDisplayField.style.marginRight = 8;
+            m_ScatterDisplayField.style.minWidth = 220;
+            m_ScatterDisplayField.RegisterValueChangedCallback(OnScatterDisplayChanged);
+            toolbar.Add(m_ScatterDisplayField);
+            RefreshScatterDisplayField();
+
             m_BlackboardToggle = MakeButton("Parameters", ToggleBlackboard);
             toolbar.Add(m_BlackboardToggle);
 
@@ -225,6 +239,20 @@ namespace DJTechEditor.PCG.Graph
             toolbar.Add(MakeButton("Show in Project", LocateInProject));
 
             rootVisualElement.Add(toolbar);
+        }
+
+        private void OnScatterDisplayChanged(ChangeEvent<System.Enum> evt)
+        {
+            if (evt.newValue is PcgScatterDisplayMode mode)
+                PcgGraphEditorScatterUtil.SetDisplayMode(this, mode);
+        }
+
+        internal void RefreshScatterDisplayField()
+        {
+            if (m_ScatterDisplayField == null)
+                return;
+
+            m_ScatterDisplayField.SetValueWithoutNotify(PcgGraphEditorScatterUtil.GetDisplayMode(this));
         }
 
         private static Button MakeButton(string text, System.Action onClick)
@@ -273,6 +301,7 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView.viewDataKey = "PCG.DefaultGraph";
             UpdateTitle();
             SetStatus("Ready — default 3-node pipeline loaded.");
+            RefreshScatterDisplayField();
         }
 
         private void NewGraph()
@@ -306,6 +335,7 @@ namespace DJTechEditor.PCG.Graph
             m_GraphLoaded = true;
             UpdateTitle();
             SetStatus($"Imported: {path}");
+            RefreshScatterDisplayField();
             return true;
         }
 

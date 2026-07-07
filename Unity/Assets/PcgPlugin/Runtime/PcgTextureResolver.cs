@@ -91,15 +91,21 @@ namespace DJTechRuntime.PCG
                 return source;
 
             var rt = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
-            Graphics.Blit(source, rt);
             var prev = RenderTexture.active;
-            RenderTexture.active = rt;
-            var copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
-            copy.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
-            copy.Apply();
-            RenderTexture.active = prev;
-            RenderTexture.ReleaseTemporary(rt);
-            return copy;
+            try
+            {
+                Graphics.Blit(source, rt);
+                RenderTexture.active = rt;
+                var copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+                copy.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+                copy.Apply();
+                return copy;
+            }
+            finally
+            {
+                RenderTexture.active = prev;
+                RenderTexture.ReleaseTemporary(rt);
+            }
         }
 #endif
     }

@@ -11,6 +11,7 @@ namespace DJTechRuntime.PCG
     public sealed class PcgProjectSettings : ScriptableObject
     {
         [SerializeField] private bool enableLogging = false;
+        [SerializeField] private PcgScatterDisplayMode defaultScatterDisplayMode = PcgScatterDisplayMode.MergedMesh;
 
         public bool EnableLogging => enableLogging;
 
@@ -25,6 +26,18 @@ namespace DJTechRuntime.PCG
                 return GetOrCreateInstance().enableLogging;
 #else
                 return false;
+#endif
+            }
+        }
+
+        public static PcgScatterDisplayMode DefaultScatterDisplayMode
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return GetOrCreateInstance().defaultScatterDisplayMode;
+#else
+                return PcgScatterDisplayMode.MergedMesh;
 #endif
             }
         }
@@ -52,6 +65,14 @@ namespace DJTechRuntime.PCG
         {
             var settings = GetOrCreateInstance();
             settings.enableLogging = enabled;
+            EditorUtility.SetDirty(settings);
+            AssetDatabase.SaveAssets();
+        }
+
+        public static void SetDefaultScatterDisplayMode(PcgScatterDisplayMode mode)
+        {
+            var settings = GetOrCreateInstance();
+            settings.defaultScatterDisplayMode = mode;
             EditorUtility.SetDirty(settings);
             AssetDatabase.SaveAssets();
         }

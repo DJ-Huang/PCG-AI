@@ -42,6 +42,8 @@ namespace DJTechRuntime.PCG
         private Task<AsyncCookResult> m_AsyncCookTask;
         private int m_AsyncCookGeneration;
         private string m_LastAsyncCookStatus = "idle";
+        private string m_LastCookKey;
+        private bool m_HasAppliedCookResult;
 
 #if UNITY_EDITOR
         private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
@@ -52,6 +54,7 @@ namespace DJTechRuntime.PCG
 
         [SerializeField, Min(0.001f)] private float scatterPointScale = 0.2f;
         [SerializeField] private Mesh scatterPointMesh;
+        [SerializeField] private PcgScatterDisplayMode scatterDisplayMode = PcgScatterDisplayMode.MergedMesh;
         [SerializeField] private Material meshMaterial;
 
         private PcgGraphDocument m_Document;
@@ -71,6 +74,21 @@ namespace DJTechRuntime.PCG
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
         public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
         public PcgCookMode CookMode => cookMode;
+        public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
+
+        public void SetScatterDisplayMode(PcgScatterDisplayMode mode, bool requestCook = true)
+        {
+            if (scatterDisplayMode == mode)
+                return;
+
+            scatterDisplayMode = mode;
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            if (requestCook && SupportsEditModePreview())
+                RequestPreviewCook(immediate: true);
+        }
+
         public bool IsAsyncCookInProgress => m_AsyncCookInProgress;
         public string LastAsyncCookStatus => m_LastAsyncCookStatus;
 
@@ -94,6 +112,13 @@ namespace DJTechRuntime.PCG
         public static System.Action EditorAfterPreviewCookApplied;
 #endif
 
+#if UNITY_EDITOR
+        private void Reset()
+        {
+            scatterDisplayMode = PcgProjectSettings.DefaultScatterDisplayMode;
+        }
+#endif
+
         private void OnEnable()
         {
 #if UNITY_EDITOR
@@ -108,6 +133,7 @@ namespace DJTechRuntime.PCG
 #if UNITY_EDITOR
             s_EditModePreviewCooks.Remove(this);
 #endif
+            PcgScatterRenderBridge.Unregister(this);
             CancelAsyncCook(null, log: false);
         }
 
@@ -124,6 +150,14 @@ namespace DJTechRuntime.PCG
 
             if (cookMode == PcgCookMode.EveryFrame)
                 Run(skipDocumentRefresh: true);
+        }
+
+        internal void DrawScatterGpu(Camera camera)
+        {
+            if (scatterDisplayMode != PcgScatterDisplayMode.GpuInstancing)
+                return;
+
+            m_GpuInstancer.Draw(camera);
         }
 
 #if UNITY_EDITOR
@@ -231,6 +265,7 @@ namespace DJTechRuntime.PCG
         {
             m_Document = null;
             m_GraphParameters = null;
+            InvalidateCookResult();
 
             if (graphAsset == null)
                 return;
@@ -373,6 +408,10 @@ namespace DJTechRuntime.PCG
                     return false;
             }
 
+            var cookKey = PcgGraphCookCache.BuildKey(json, seed, quality);
+            if (TryReuseCachedCook(cookKey))
+                return true;
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {
@@ -396,7 +435,37 @@ namespace DJTechRuntime.PCG
             if (result == null)
                 return false;
 
-            return ApplyExecutionResult(result);
+            PcgGraphCookCache.Store(cookKey, result);
+            return CommitCookResult(cookKey, result);
+        }
+
+        private bool TryReuseCachedCook(string cookKey)
+        {
+            if (Application.isPlaying &&
+                cookMode == PcgCookMode.EveryFrame &&
+                cookKey == m_LastCookKey &&
+                m_HasAppliedCookResult)
+            {
+                return true;
+            }
+
+            return PcgGraphCookCache.TryGet(cookKey, out var cached) && CommitCookResult(cookKey, cached);
+        }
+
+        private bool CommitCookResult(string cookKey, PcgGraphExecuteResult result)
+        {
+            if (!ApplyExecutionResult(result))
+                return false;
+
+            m_LastCookKey = cookKey;
+            m_HasAppliedCookResult = true;
+            return true;
+        }
+
+        private void InvalidateCookResult()
+        {
+            m_LastCookKey = null;
+            m_HasAppliedCookResult = false;
         }
 
         private bool TryBuildExecutionJson(PcgPreviewQuality quality, out string json)
@@ -637,6 +706,7 @@ namespace DJTechRuntime.PCG
 
         public void ClearResults()
         {
+            InvalidateCookResult();
             ClearGeneratedMesh();
         }
 
@@ -644,7 +714,27 @@ namespace DJTechRuntime.PCG
 
         private void ApplyPoints(List<PcgScatterPoint> points, Mesh pointPrototypeMesh = null)
         {
-            var scatterMesh = BuildScatterMesh(points, pointPrototypeMesh);
+            var prototypeMesh = pointPrototypeMesh != null ? pointPrototypeMesh : ResolveScatterPointMesh();
+            if (!PcgInstanceList.TryBuild(points, prototypeMesh, scatterPointScale, out var instanceList))
+            {
+                ClearScatterDisplay();
+                return;
+            }
+
+            if (scatterDisplayMode == PcgScatterDisplayMode.GpuInstancing)
+            {
+                ClearMergedMeshOnly();
+                SetOwnedSpawnPrototype(pointPrototypeMesh);
+                var material = ResolveMeshMaterial();
+                m_GpuInstancer.Set(instanceList, material, gameObject.layer, transform.localToWorldMatrix);
+                PcgScatterRenderBridge.Register(this);
+                if (m_MeshRenderer != null)
+                    m_MeshRenderer.enabled = false;
+                return;
+            }
+
+            ClearGpuInstancingOnly();
+            var scatterMesh = BuildScatterMesh(instanceList);
             ApplyMesh(scatterMesh);
         }
 
@@ -656,10 +746,25 @@ namespace DJTechRuntime.PCG
         }
 
         private Mesh m_GeneratedMesh;
+        private Mesh m_OwnedSpawnPrototypeMesh;
         private MeshFilter m_MeshFilter;
         private MeshRenderer m_MeshRenderer;
+        private readonly PcgScatterGpuInstancer m_GpuInstancer = new();
 
-        private void ClearGeneratedMesh()
+        private void ClearScatterDisplay()
+        {
+            ClearGpuInstancingOnly();
+            ClearMergedMeshOnly();
+        }
+
+        private void ClearGpuInstancingOnly()
+        {
+            PcgScatterRenderBridge.Unregister(this);
+            m_GpuInstancer.Clear();
+            DestroyOwnedSpawnPrototype();
+        }
+
+        private void ClearMergedMeshOnly()
         {
             if (m_GeneratedMesh != null)
             {
@@ -671,15 +776,21 @@ namespace DJTechRuntime.PCG
                 m_GeneratedMesh = null;
             }
 
-            EnsureMeshComponents();
             if (m_MeshFilter != null)
                 m_MeshFilter.sharedMesh = null;
             if (m_MeshRenderer != null)
                 m_MeshRenderer.enabled = false;
         }
 
+        private void ClearGeneratedMesh()
+        {
+            ClearScatterDisplay();
+        }
+
         private void ApplyMesh(Mesh mesh)
         {
+            ClearGpuInstancingOnly();
+
             if (m_GeneratedMesh != null && m_GeneratedMesh != mesh)
             {
 #if UNITY_EDITOR
@@ -713,34 +824,24 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private Mesh BuildScatterMesh(List<PcgScatterPoint> points, Mesh prototypeMesh = null)
+        private Mesh BuildScatterMesh(PcgInstanceList instanceList)
         {
-            if (points == null || points.Count == 0)
+            if (instanceList == null || instanceList.Count == 0 || instanceList.PrototypeMesh == null)
                 return null;
 
-            var sourceMesh = prototypeMesh != null ? prototypeMesh : ResolveScatterPointMesh();
-            if (sourceMesh == null)
-                return null;
-
-            var combines = new CombineInstance[points.Count];
-            for (var i = 0; i < points.Count; i++)
+            var sourceMesh = instanceList.PrototypeMesh;
+            var combines = new CombineInstance[instanceList.Count];
+            for (var i = 0; i < instanceList.Count; i++)
             {
-                var point = points[i];
-                var rotation = Quaternion.identity;
-                if (point.HasNormal && point.Normal.sqrMagnitude > 1e-8f)
-                    rotation = Quaternion.FromToRotation(Vector3.up, point.Normal.normalized);
-
-                var perPointScale = point.HasScale ? point.Scale : 1f;
-                var uniformScale = Vector3.one * (scatterPointScale * perPointScale);
                 combines[i] = new CombineInstance
                 {
                     mesh = sourceMesh,
-                    transform = Matrix4x4.TRS(point.Position, rotation, uniformScale)
+                    transform = instanceList.LocalMatrices[i]
                 };
             }
 
             var mesh = new Mesh { name = "PCG Scatter Points Mesh" };
-            if (points.Count * sourceMesh.vertexCount > 65535)
+            if (instanceList.Count * sourceMesh.vertexCount > 65535)
                 mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.CombineMeshes(combines, true, true, false);
             mesh.RecalculateBounds();
@@ -772,6 +873,46 @@ namespace DJTechRuntime.PCG
 
             var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
             return cube;
+        }
+
+        private Material ResolveMeshMaterial()
+        {
+            EnsureMeshComponents();
+            if (m_MeshRenderer == null)
+                return null;
+
+            var material = m_MeshRenderer.sharedMaterial;
+            if (material != null)
+                material.enableInstancing = true;
+            return material;
+        }
+
+        private void SetOwnedSpawnPrototype(Mesh spawnPrototypeMesh)
+        {
+            if (spawnPrototypeMesh == null || spawnPrototypeMesh == scatterPointMesh)
+            {
+                DestroyOwnedSpawnPrototype();
+                return;
+            }
+
+            if (m_OwnedSpawnPrototypeMesh == spawnPrototypeMesh)
+                return;
+
+            DestroyOwnedSpawnPrototype();
+            m_OwnedSpawnPrototypeMesh = spawnPrototypeMesh;
+        }
+
+        private void DestroyOwnedSpawnPrototype()
+        {
+            if (m_OwnedSpawnPrototypeMesh == null)
+                return;
+
+#if UNITY_EDITOR
+            DestroyImmediate(m_OwnedSpawnPrototypeMesh);
+#else
+            Destroy(m_OwnedSpawnPrototypeMesh);
+#endif
+            m_OwnedSpawnPrototypeMesh = null;
         }
     }
 }

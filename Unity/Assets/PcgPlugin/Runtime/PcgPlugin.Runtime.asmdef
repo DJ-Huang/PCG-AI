@@ -1,7 +1,10 @@
 {
     "name": "PcgPlugin.Runtime",
     "rootNamespace": "DJTechRuntime.PCG",
-    "references": [],
+    "references": [
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

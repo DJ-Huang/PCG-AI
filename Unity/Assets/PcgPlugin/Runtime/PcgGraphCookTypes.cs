@@ -20,6 +20,13 @@ namespace DJTechRuntime.PCG
         Full = 1,
     }
 
+    /// <summary>How scatter point results are drawn — independent of <see cref="PcgPreviewQuality"/>.</summary>
+    public enum PcgScatterDisplayMode
+    {
+        MergedMesh = 0,
+        GpuInstancing = 1,
+    }
+
     [Serializable]
     public class PcgMeshBinding
     {

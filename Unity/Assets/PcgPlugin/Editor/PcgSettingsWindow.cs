@@ -14,6 +14,7 @@ namespace DJTechEditor.PCG
         private string _graphPath = "";
         private string _watchedPath = "";
         private bool _autoReload = true;
+        private PcgScatterDisplayMode _defaultScatterDisplayMode = PcgScatterDisplayMode.MergedMesh;
 
         [MenuItem("PCG/Settings")]
         public static void ShowWindow()
@@ -27,6 +28,7 @@ namespace DJTechEditor.PCG
             _watchedPath = PcgGraphWatcher.WatchedPath;
             _autoReload = PcgGraphWatcher.AutoReload;
             _graphPath = _watchedPath;
+            _defaultScatterDisplayMode = PcgProjectSettings.DefaultScatterDisplayMode;
         }
 
         private void OnGUI()
@@ -84,6 +86,32 @@ namespace DJTechEditor.PCG
 
             if (GUILayout.Button("Apply Watch Settings"))
                 ApplyWatchSettings();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Scatter Rendering", EditorStyles.boldLabel);
+            _defaultScatterDisplayMode = (PcgScatterDisplayMode)EditorGUILayout.EnumPopup(
+                new GUIContent(
+                    "Default Display Mode",
+                    "Default for new PcgGraphComponent instances. " +
+                    "Per-component override: Inspector or Graph Editor toolbar."),
+                _defaultScatterDisplayMode);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Apply Default To New Components"))
+                PcgProjectSettings.SetDefaultScatterDisplayMode(_defaultScatterDisplayMode);
+
+            if (GUILayout.Button("Set All Scene Components"))
+            {
+                PcgProjectSettings.SetDefaultScatterDisplayMode(_defaultScatterDisplayMode);
+                foreach (var component in Object.FindObjectsOfType<PcgGraphComponent>())
+                {
+                    if (component == null)
+                        continue;
+                    Undo.RecordObject(component, "Set Scatter Display Mode");
+                    component.SetScatterDisplayMode(_defaultScatterDisplayMode);
+                }
+            }
+            EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Core Version", PcgNative.GetVersion());

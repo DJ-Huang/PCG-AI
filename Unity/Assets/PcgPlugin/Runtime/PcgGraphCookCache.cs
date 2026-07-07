@@ -59,8 +59,13 @@ namespace DJTechRuntime.PCG
                 Json = source.Json,
                 VertexCount = source.VertexCount,
                 IndexCount = source.IndexCount,
+                PointCount = source.PointCount,
+                PointAttrFlags = source.PointAttrFlags,
                 Error = source.Error,
+                CookNodesExecuted = source.CookNodesExecuted,
+                CookNodesSkipped = source.CookNodesSkipped,
                 MeshBinary = source.MeshBinary != null ? (byte[])source.MeshBinary.Clone() : null,
+                PointBinary = source.PointBinary != null ? (byte[])source.PointBinary.Clone() : null,
             };
         }
     }
