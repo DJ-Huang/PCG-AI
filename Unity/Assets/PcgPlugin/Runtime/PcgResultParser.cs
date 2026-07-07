@@ -97,6 +97,8 @@ namespace DJTechRuntime.PCG
 
             if (result.Kind == PcgExecuteKind.Mesh)
                 return PcgResultKind.Mesh;
+            if (result.Kind == PcgExecuteKind.Points)
+                return PcgResultKind.Points;
 
             return DetectKind(result.Json);
         }
@@ -158,6 +160,68 @@ namespace DJTechRuntime.PCG
                 mesh.RecalculateNormals();
                 mesh.RecalculateTangents();
                 mesh.RecalculateBounds();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        public static bool TryParsePointBinary(byte[] data, out List<Vector3> points, out string error)
+        {
+            points = new List<Vector3>();
+            error = null;
+
+            if (data == null || data.Length < PcgNative.PointBinaryHeaderSize)
+            {
+                error = "Point binary payload is too small.";
+                return false;
+            }
+
+            try
+            {
+                var magic = BitConverter.ToUInt32(data, 0);
+                if (magic != PcgNative.PointBinaryMagic)
+                {
+                    error = $"Invalid point binary magic: 0x{magic:X8}";
+                    return false;
+                }
+
+                var pointCount = BitConverter.ToInt32(data, 8);
+                var flags = (PcgPointAttrFlags)BitConverter.ToUInt32(data, 12);
+                var required = PcgNative.PointBinaryHeaderSize + pointCount * 12;
+                if (flags.HasFlag(PcgPointAttrFlags.Normal))
+                    required += pointCount * 12;
+                if (flags.HasFlag(PcgPointAttrFlags.Uv))
+                    required += pointCount * 8;
+                if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
+                    required += pointCount * 4;
+                if (flags.HasFlag(PcgPointAttrFlags.Scale))
+                    required += pointCount * 4;
+                if (flags.HasFlag(PcgPointAttrFlags.Rotation))
+                    required += pointCount * 16;
+
+                if (data.Length < required)
+                {
+                    error = $"Point binary truncated (need {required} bytes, got {data.Length}).";
+                    return false;
+                }
+
+                var offset = PcgNative.PointBinaryHeaderSize;
+                points.Capacity = pointCount;
+                for (var i = 0; i < pointCount; i++)
+                {
+                    var x = BitConverter.ToSingle(data, offset);
+                    offset += 4;
+                    var y = BitConverter.ToSingle(data, offset);
+                    offset += 4;
+                    var z = BitConverter.ToSingle(data, offset);
+                    offset += 4;
+                    points.Add(new Vector3(x, y, z));
+                }
+
                 return true;
             }
             catch (Exception ex)

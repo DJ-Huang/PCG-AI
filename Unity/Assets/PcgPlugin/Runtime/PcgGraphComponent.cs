@@ -442,12 +442,24 @@ namespace DJTechRuntime.PCG
                     break;
 
                 case PcgResultKind.Points:
-                    if (!PcgResultParser.TryParsePoints(result.Json, out var parsed, out var parseError))
+                    if (result.Kind == PcgExecuteKind.Points)
                     {
-                        Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
-                        return false;
+                        if (!PcgResultParser.TryParsePointBinary(result.PointBinary, out var points, out var binaryError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
+                            return false;
+                        }
+                        ApplyPoints(points, null);
                     }
-                    ApplyPoints(PcgResultParser.ToVector3List(parsed), BuildSpawnPrototypeMesh(parsed));
+                    else
+                    {
+                        if (!PcgResultParser.TryParsePoints(result.Json, out var parsed, out var parseError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
+                            return false;
+                        }
+                        ApplyPoints(PcgResultParser.ToVector3List(parsed), BuildSpawnPrototypeMesh(parsed));
+                    }
                     break;
 
                 default:

@@ -104,7 +104,10 @@ public:
         const BevelVMeshMethod vmesh_method =
             vmesh_str == "cutoff" ? BevelVMeshMethod::Cutoff : BevelVMeshMethod::Adj;
         emit_mesh(ctx, bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap,
-                                  angle_limit, profile, miter_outer, miter_inner, vmesh_method));
+                                  angle_limit, profile, miter_outer, miter_inner, vmesh_method,
+                                  ctx.is_cancel_requested));
+        if (ctx.is_cancel_requested && ctx.is_cancel_requested())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Execution cancelled");
         return PCG_OK;
     }
 };

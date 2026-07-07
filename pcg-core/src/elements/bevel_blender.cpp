@@ -407,6 +407,11 @@ Vec3 get_profile_point(const Profile& pro, int i, int nseg, int bp_seg) {
 
 namespace {
 
+bool bevel_cancel_requested(const BevelParams& bp)
+{
+    return bp.is_cancel_requested && bp.is_cancel_requested();
+}
+
 int64_t edge_key(int a, int b) {
     return a < b ? static_cast<int64_t>(a) * 1000000 + b
                  : static_cast<int64_t>(b) * 1000000 + a;
@@ -2841,7 +2846,8 @@ data::PcgMeshData bevel_mesh_blender(
     float profile,
     BevelMiter miter_outer,
     BevelMiter miter_inner,
-    BevelVMeshMethod vmesh_method)
+    BevelVMeshMethod vmesh_method,
+    bool (*is_cancel_requested)())
 {
     amount = std::max(amount, 0.0);
     segments = std::clamp(segments, 1, 8);
@@ -2912,6 +2918,7 @@ data::PcgMeshData bevel_mesh_blender(
     bp.miter_outer = miter_outer;
     bp.miter_inner = miter_inner;
     bp.vmesh_method = vmesh_method;
+    bp.is_cancel_requested = is_cancel_requested;
     bp.mesh_center = mesh_center;
     bp.positions = &welded.positions;
     bp.triangles = &welded.triangles;
@@ -2933,6 +2940,8 @@ data::PcgMeshData bevel_mesh_blender(
 
     // For each beveled vertex, build EdgeHalf array
     for (int v_idx : bevel_verts) {
+        if (bevel_cancel_requested(bp))
+            return mesh;
         BevVert bv;
         bv.v_idx = v_idx;
 
@@ -2996,6 +3005,8 @@ data::PcgMeshData bevel_mesh_blender(
 
     // 6. Build boundaries (first pass: construct=true)
     for (auto& bv : bp.bevverts) {
+        if (bevel_cancel_requested(bp))
+            return mesh;
         bv.vmesh = std::make_unique<VMesh>();
         bv.vmesh->seg = segments;
         build_boundary(bp, &bv, true);
@@ -3005,6 +3016,8 @@ data::PcgMeshData bevel_mesh_blender(
     if (clamp_overlap) {
         bevel_limit_offset(bp);
         for (auto& bv : bp.bevverts) {
+            if (bevel_cancel_requested(bp))
+                return mesh;
             build_boundary(bp, &bv, false);
         }
     }
@@ -3015,6 +3028,8 @@ data::PcgMeshData bevel_mesh_blender(
 
     // 8. Build VMesh (corner meshes)
     for (auto& bv : bp.bevverts) {
+        if (bevel_cancel_requested(bp))
+            return mesh;
         if (bv.selcount == 0) continue;
         build_vmesh(bp, &bv);
     }
@@ -3022,6 +3037,8 @@ data::PcgMeshData bevel_mesh_blender(
     // 9. Build edge polygons (bevel strips) — each edge only once
     std::set<std::pair<int, int>> processed_edges;
     for (auto& bv : bp.bevverts) {
+        if (bevel_cancel_requested(bp))
+            return mesh;
         for (auto& e : bv.edges) {
             if (!e.is_bev) continue;
 
@@ -3041,12 +3058,16 @@ data::PcgMeshData bevel_mesh_blender(
             }
 
             if (bv2) {
+                if (bevel_cancel_requested(bp))
+                    return mesh;
                 build_edge_polygons(bp, &bv, bv2, &e);
             }
         }
     }
 
     // 11. Reconstruct original faces from BMesh n-gons
+    if (bevel_cancel_requested(bp))
+        return mesh;
     rebuild_faces_bmesh(bp, bmesh, welded);
 
     // 12. Fix winding: ensure all triangle normals point outward.
@@ -3054,6 +3075,8 @@ data::PcgMeshData bevel_mesh_blender(
     // should be on the same side as the face normal.
     // Use the original input mesh centroid as the outward reference.
     for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
+        if (bevel_cancel_requested(bp))
+            return mesh;
         const auto& a = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i])];
         const auto& b = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i + 1])];
         const auto& c = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i + 2])];
@@ -3084,6 +3107,8 @@ data::PcgMeshData bevel_mesh_blender(
         std::set<std::string> seen_geo;
 
         for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
+            if (bevel_cancel_requested(bp))
+                return mesh;
             int ia = bp.output.triangles[i];
             int ib = bp.output.triangles[i + 1];
             int ic = bp.output.triangles[i + 2];

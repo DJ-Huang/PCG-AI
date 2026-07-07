@@ -338,6 +338,7 @@ struct BevelParams {
                 add_triangle(i0, i2, i3);
         }
     } output;
+    bool (*is_cancel_requested)() = nullptr;
 };
 
 // ── Public API ──────────────────────────────────────────────────────────────
@@ -353,6 +354,7 @@ data::PcgMeshData bevel_mesh_blender(
     float profile = 0.5f,
     BevelMiter miter_outer = BevelMiter::Sharp,
     BevelMiter miter_inner = BevelMiter::Sharp,
-    BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj);
+    BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
+    bool (*is_cancel_requested)() = nullptr);
 
 } // namespace pcg::internal::elements::bevel

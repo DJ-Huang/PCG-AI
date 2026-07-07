@@ -59,6 +59,7 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
                              float profile = 0.5f,
                              BevelMiter miter_outer = BevelMiter::Sharp,
                              BevelMiter miter_inner = BevelMiter::Sharp,
-                             BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj);
+                             BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
+                             bool (*is_cancel_requested)() = nullptr);
 
 } // namespace pcg::internal::elements

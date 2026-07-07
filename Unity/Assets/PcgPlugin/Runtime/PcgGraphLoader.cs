@@ -91,6 +91,11 @@ namespace DJTechRuntime.PCG
                     Debug.Log(
                         $"[PCG] Graph executed ({quality}). Mesh binary: {result.VertexCount} verts, {result.IndexCount} indices.");
                 }
+                else if (result.Kind == PcgExecuteKind.Points)
+                {
+                    Debug.Log(
+                        $"[PCG] Graph executed ({quality}). Point binary: {result.PointCount} points, flags=0x{result.PointAttrFlags:X}.");
+                }
                 else
                 {
                     Debug.Log($"[PCG] Graph executed ({quality}). Result: {result.Json}");

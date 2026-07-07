@@ -312,7 +312,8 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
                              BevelMethod method, BevelOffsetType offset_type, bool clamp_overlap,
                              double angle_limit_deg, float profile,
                              BevelMiter miter_outer, BevelMiter miter_inner,
-                             BevelVMeshMethod vmesh_method)
+                             BevelVMeshMethod vmesh_method,
+                             bool (*is_cancel_requested)())
 {
     switch (method) {
     case BevelMethod::VertexPush:
@@ -325,7 +326,8 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
             clamp_overlap, angle_limit_deg, profile,
             bevel::BevelMiter(miter_outer),
             bevel::BevelMiter(miter_inner),
-            bevel::BevelVMeshMethod(vmesh_method));
+            bevel::BevelVMeshMethod(vmesh_method),
+            is_cancel_requested);
     }
 }
 

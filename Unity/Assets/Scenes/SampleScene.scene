@@ -543,7 +543,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!43 &1107120802
+--- !u!43 &1576774332
 Mesh:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -781,7 +781,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1652304272}
-  m_Mesh: {fileID: 1107120802}
+  m_Mesh: {fileID: 1576774332}
 --- !u!4 &1652304276
 Transform:
   m_ObjectHideFlags: 0
@@ -814,11 +814,12 @@ MonoBehaviour:
   seed: 42
   cookMode: 3
   editModeCookInterval: 0.25
+  enableAsyncCookInEditor: 1
   m_ParameterOverrides:
   - parameterId: p2
     name: Width
     type: number
-    floatValue: 2.6529412
+    floatValue: 2
     intValue: 0
     boolValue: 0
     stringValue: 
@@ -876,13 +877,6 @@ MonoBehaviour:
     type: integer
     floatValue: 0
     intValue: 200
-    boolValue: 0
-    stringValue: 
-  - parameterId: p12
-    name: prefab
-    type: string
-    floatValue: 0
-    intValue: 0
     boolValue: 0
     stringValue: 
   m_MeshBindings:

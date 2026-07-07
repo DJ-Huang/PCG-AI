@@ -52,7 +52,8 @@ typedef enum {
 typedef enum {
     PCG_RESULT_KIND_NONE = 0,
     PCG_RESULT_KIND_JSON = 1,
-    PCG_RESULT_KIND_MESH = 2
+    PCG_RESULT_KIND_MESH = 2,
+    PCG_RESULT_KIND_POINTS = 3
 } PcgResultKind;
 
 /* Mesh binary header: magic 'PCGM', version, vertex_count, index_count (16 bytes),
@@ -60,6 +61,24 @@ typedef enum {
 #define PCG_MESH_BINARY_MAGIC 0x4D474350u
 #define PCG_MESH_BINARY_VERSION 1u
 #define PCG_MESH_BINARY_HEADER_SIZE 16
+
+/* Point binary header (v6 data-plane target):
+ * [magic|version|point_count|flags] (16 bytes)
+ * payload always starts with float32 xyz positions [point_count * 3].
+ * optional payload blocks are appended when flags are set.
+ */
+#define PCG_POINT_BINARY_MAGIC 0x50544750u /* 'PGTP' little-endian */
+#define PCG_POINT_BINARY_VERSION 1u
+#define PCG_POINT_BINARY_HEADER_SIZE 16
+
+typedef enum {
+    PCG_POINT_ATTR_NONE = 0,
+    PCG_POINT_ATTR_NORMAL = 1 << 0,  /* float32 nx,ny,nz */
+    PCG_POINT_ATTR_UV = 1 << 1,      /* float32 u,v */
+    PCG_POINT_ATTR_TRI_INDEX = 1 << 2, /* uint32 triIndex */
+    PCG_POINT_ATTR_SCALE = 1 << 3,   /* float32 scale */
+    PCG_POINT_ATTR_ROTATION = 1 << 4 /* float32 quaternion xyzw */
+} PcgPointAttrFlags;
 
 /* ── Graph API ──────────────────────────────────────── */
 
@@ -115,6 +134,11 @@ PCG_API PcgResultCode pcg_execute_graph_v2(const char* json,
 PCG_API PcgResultCode pcg_mesh_binary_size_for_counts(int vertex_count,
                                                       int index_count,
                                                       int* out_size);
+
+/** Computes required bytes for point binary payload with optional attributes. */
+PCG_API PcgResultCode pcg_point_binary_size_for_counts(int point_count,
+                                                       uint32_t attr_flags,
+                                                       int* out_size);
 
 /**
  * Runtime texture slot uploaded by the host (Unity) before graph execution.
@@ -194,6 +218,31 @@ PCG_API PcgResultCode pcg_execute_graph_v5(const char* json,
                                            int out_json_size,
                                            void* out_mesh_buf,
                                            int out_mesh_buf_size,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           PcgCookStats* out_stats,
+                                           char* err_buf,
+                                           int err_buf_size);
+
+/**
+ * Executes graph and returns points as binary when sink is point payload.
+ * Falls back to v5 semantics for non-point outputs.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v6(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           void* out_points_buf,
+                                           int out_points_buf_size,
+                                           int* out_point_count,
+                                           uint32_t* out_point_attr_flags,
                                            int* out_vertex_count,
                                            int* out_index_count,
                                            PcgCookStats* out_stats,
