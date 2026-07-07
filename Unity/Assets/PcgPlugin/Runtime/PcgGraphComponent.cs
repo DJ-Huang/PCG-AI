@@ -44,6 +44,7 @@ namespace DJTechRuntime.PCG
         private string m_LastAsyncCookStatus = "idle";
         private string m_LastCookKey;
         private bool m_HasAppliedCookResult;
+        private ulong m_LastMeshBinaryHash;
 
 #if UNITY_EDITOR
         private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
@@ -466,6 +467,7 @@ namespace DJTechRuntime.PCG
         {
             m_LastCookKey = null;
             m_HasAppliedCookResult = false;
+            m_LastMeshBinaryHash = 0;
         }
 
         private bool TryBuildExecutionJson(PcgPreviewQuality quality, out string json)
@@ -493,13 +495,24 @@ namespace DJTechRuntime.PCG
             switch (kind)
             {
                 case PcgResultKind.Mesh:
-                    if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out var meshError))
+                {
+                    var binHash = ComputeBinaryHash(result.MeshBinary);
+                    if (binHash != 0 && binHash == m_LastMeshBinaryHash && m_GeneratedMesh != null)
                     {
-                        Debug.LogError($"[PCG] Failed to parse mesh result: {meshError}");
-                        return false;
+                        ApplyMesh(m_GeneratedMesh);
                     }
-                    ApplyMesh(mesh);
+                    else
+                    {
+                        if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out var meshError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse mesh result: {meshError}");
+                            return false;
+                        }
+                        ApplyMesh(mesh);
+                        m_LastMeshBinaryHash = binHash;
+                    }
                     break;
+                }
 
                 case PcgResultKind.Splines:
                     if (!PcgResultParser.TryParseSplines(result.Json, out var splines, out var splineError))
@@ -518,7 +531,16 @@ namespace DJTechRuntime.PCG
                             Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
                             return false;
                         }
-                        ApplyPoints(points, BuildSpawnPrototypeMesh(result));
+                        var spawnHash = ComputeBinaryHash(result.MeshBinary);
+                        Mesh spawnPrototype;
+                        if (spawnHash != 0 && spawnHash == m_LastMeshBinaryHash && m_OwnedSpawnPrototypeMesh != null)
+                            spawnPrototype = m_OwnedSpawnPrototypeMesh;
+                        else
+                        {
+                            spawnPrototype = BuildSpawnPrototypeMesh(result);
+                            m_LastMeshBinaryHash = spawnHash;
+                        }
+                        ApplyPoints(points, spawnPrototype);
                     }
                     else
                     {
@@ -860,6 +882,22 @@ namespace DJTechRuntime.PCG
 
             mesh.name = "PCG Spawn Prototype Mesh";
             return mesh;
+        }
+
+        /// <summary>FNV-1a 64-bit hash of a byte array (0 if null/empty).</summary>
+        private static ulong ComputeBinaryHash(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+                return 0;
+            const ulong fnvOffsetBasis = 14695981039346656037UL;
+            const ulong fnvPrime = 1099511628211UL;
+            ulong hash = fnvOffsetBasis;
+            for (int i = 0; i < data.Length; i++)
+            {
+                hash ^= data[i];
+                hash *= fnvPrime;
+            }
+            return hash;
         }
 
         private Mesh ResolveScatterPointMesh()
