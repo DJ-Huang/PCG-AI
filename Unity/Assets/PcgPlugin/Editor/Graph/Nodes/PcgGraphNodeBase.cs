@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -19,15 +20,20 @@ namespace DJTechEditor.PCG.Graph
         private string m_UserTitle = "";
         private bool m_IsPointerOnNode;
         private bool m_IsPointerOnMenu;
+        private bool m_OverlayAttached;
+        private VisualElement m_InputRowPlaceholder;
+        private VisualElement m_OutputRowPlaceholder;
 
         protected PcgGraphNodeBase()
         {
             style.minWidth = 100;
             style.width = 110;
+            style.maxWidth = 110;
             style.minHeight = 56;
             ConfigureHoudiniPortLayout();
             BuildRightTitleUI();
             BuildHoverRadialMenu();
+            RegisterCallback<GeometryChangedEvent>(_ => UpdateOverlayPlacement());
             RegisterCallback<MouseEnterEvent>(_ =>
             {
                 m_IsPointerOnNode = true;
@@ -46,8 +52,10 @@ namespace DJTechEditor.PCG.Graph
             expanded = true;
             SetPosition(new Rect(position, Vector2.zero));
             BuildPorts();
+            EnsureFixedPortRows();
             RefreshExpandedState();
             RefreshPorts();
+            EnsureFixedPortRows();
             UpdateDisplayedTitle();
         }
 
@@ -83,8 +91,18 @@ namespace DJTechEditor.PCG.Graph
 
         private void ConfigureHoudiniPortLayout()
         {
+            style.paddingLeft = 0;
+            style.paddingRight = 0;
+            style.paddingTop = 0;
+            style.paddingBottom = 0;
+
             topContainer.style.flexDirection = FlexDirection.Column;
             topContainer.style.alignItems = Align.Stretch;
+            topContainer.style.width = Length.Percent(100);
+            topContainer.style.paddingLeft = 0;
+            topContainer.style.paddingRight = 0;
+            topContainer.style.marginLeft = 0;
+            topContainer.style.marginRight = 0;
 
             titleContainer.style.alignSelf = Align.Center;
 
@@ -92,15 +110,19 @@ namespace DJTechEditor.PCG.Graph
             inputContainer.style.justifyContent = Justify.Center;
             inputContainer.style.alignSelf = Align.Stretch;
             inputContainer.style.flexWrap = Wrap.Wrap;
-            inputContainer.style.marginTop = -8;
-            inputContainer.style.marginBottom = 2;
+            inputContainer.style.minHeight = 12;
+            inputContainer.style.height = 12;
+            inputContainer.style.marginTop = 0;
+            inputContainer.style.marginBottom = 0;
 
             outputContainer.style.flexDirection = FlexDirection.Row;
             outputContainer.style.justifyContent = Justify.Center;
             outputContainer.style.alignSelf = Align.Stretch;
             outputContainer.style.flexWrap = Wrap.Wrap;
-            outputContainer.style.marginTop = 2;
-            outputContainer.style.marginBottom = -8;
+            outputContainer.style.minHeight = 12;
+            outputContainer.style.height = 12;
+            outputContainer.style.marginTop = 0;
+            outputContainer.style.marginBottom = 0;
 
             topContainer.Remove(inputContainer);
             topContainer.Remove(outputContainer);
@@ -109,6 +131,38 @@ namespace DJTechEditor.PCG.Graph
 
             titleContainer.style.display = DisplayStyle.None;
             mainContainer.style.overflow = Overflow.Visible;
+        }
+
+        private void EnsureFixedPortRows()
+        {
+            inputContainer.style.display = DisplayStyle.Flex;
+            outputContainer.style.display = DisplayStyle.Flex;
+
+            if (m_InputRowPlaceholder == null)
+            {
+                m_InputRowPlaceholder = new VisualElement();
+                m_InputRowPlaceholder.style.width = 1;
+                m_InputRowPlaceholder.style.height = 1;
+                m_InputRowPlaceholder.style.opacity = 0;
+            }
+
+            if (m_OutputRowPlaceholder == null)
+            {
+                m_OutputRowPlaceholder = new VisualElement();
+                m_OutputRowPlaceholder.style.width = 1;
+                m_OutputRowPlaceholder.style.height = 1;
+                m_OutputRowPlaceholder.style.opacity = 0;
+            }
+
+            if (inputContainer.childCount == 0)
+                inputContainer.Add(m_InputRowPlaceholder);
+            else if (m_InputRowPlaceholder.parent == inputContainer && inputContainer.childCount > 1)
+                m_InputRowPlaceholder.RemoveFromHierarchy();
+
+            if (outputContainer.childCount == 0)
+                outputContainer.Add(m_OutputRowPlaceholder);
+            else if (m_OutputRowPlaceholder.parent == outputContainer && outputContainer.childCount > 1)
+                m_OutputRowPlaceholder.RemoveFromHierarchy();
         }
 
         protected static void StyleHoudiniPin(Port port, Direction direction)
@@ -128,9 +182,15 @@ namespace DJTechEditor.PCG.Graph
             port.style.paddingBottom = 0;
 
             if (direction == Direction.Input)
+            {
                 port.style.alignSelf = Align.FlexStart;
+                port.style.translate = new Translate(0, -6, 0);
+            }
             else
+            {
                 port.style.alignSelf = Align.FlexEnd;
+                port.style.translate = new Translate(0, 6, 0);
+            }
         }
 
         private void BuildRightTitleUI()
@@ -160,7 +220,7 @@ namespace DJTechEditor.PCG.Graph
                     evt.StopPropagation();
                 }
             });
-            mainContainer.Add(m_RightTitleLabel);
+            m_RightTitleLabel.pickingMode = PickingMode.Position;
         }
 
         private void BeginRename()
@@ -188,7 +248,9 @@ namespace DJTechEditor.PCG.Graph
                     evt.StopPropagation();
                 }
             });
-            mainContainer.Add(m_TitleEditor);
+            EnsureOverlayAttached();
+            GetOverlayParent()?.Add(m_TitleEditor);
+            UpdateOverlayPlacement();
             m_TitleEditor.Focus();
             m_TitleEditor.SelectAll();
         }
@@ -219,7 +281,7 @@ namespace DJTechEditor.PCG.Graph
             if (m_TitleEditor == null)
                 return;
 
-            mainContainer.Remove(m_TitleEditor);
+            m_TitleEditor.RemoveFromHierarchy();
             m_TitleEditor = null;
         }
 
@@ -241,12 +303,12 @@ namespace DJTechEditor.PCG.Graph
                     position = Position.Absolute,
                     left = -16,
                     top = -42,
-                    width = 142,
-                    height = 142,
-                    borderTopLeftRadius = 71,
-                    borderTopRightRadius = 71,
-                    borderBottomLeftRadius = 71,
-                    borderBottomRightRadius = 71,
+                    width = 172,
+                    height = 172,
+                    borderTopLeftRadius = 86,
+                    borderTopRightRadius = 86,
+                    borderBottomLeftRadius = 86,
+                    borderBottomRightRadius = 86,
                     borderTopWidth = 1,
                     borderRightWidth = 1,
                     borderBottomWidth = 1,
@@ -259,19 +321,10 @@ namespace DJTechEditor.PCG.Graph
                     display = DisplayStyle.None,
                 },
             };
-            m_RadialMenu.pickingMode = PickingMode.Position;
-            m_RadialMenu.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                m_IsPointerOnMenu = true;
-                UpdateRadialMenuVisibility();
-            });
-            m_RadialMenu.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                m_IsPointerOnMenu = false;
-                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(50);
-            });
+            // Important: the ring itself must not block node dragging.
+            m_RadialMenu.pickingMode = PickingMode.Ignore;
 
-            var infoBtn = CreateCircleButton("i", 60, 10, () =>
+            var infoBtn = CreateCircleButton("i", () =>
             {
                 var graphView = GetFirstAncestorOfType<PcgGraphView>();
                 if (graphView == null)
@@ -283,9 +336,19 @@ namespace DJTechEditor.PCG.Graph
                 graphView.Inspector.OnSelectionChanged();
             });
             infoBtn.tooltip = "Node info";
+            infoBtn.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                m_IsPointerOnMenu = true;
+                UpdateRadialMenuVisibility();
+            });
+            infoBtn.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                m_IsPointerOnMenu = false;
+                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(80);
+            });
             m_RadialMenu.Add(infoBtn);
 
-            var paramsBtn = CreateCircleButton("P", 60, 108, () =>
+            var paramsBtn = CreateCircleButton("P", () =>
             {
                 var graphView = GetFirstAncestorOfType<PcgGraphView>();
                 if (graphView?.Blackboard == null)
@@ -294,12 +357,22 @@ namespace DJTechEditor.PCG.Graph
                     graphView.Blackboard.ToggleVisible();
             });
             paramsBtn.tooltip = "Parameters";
+            paramsBtn.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                m_IsPointerOnMenu = true;
+                UpdateRadialMenuVisibility();
+            });
+            paramsBtn.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                m_IsPointerOnMenu = false;
+                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(80);
+            });
             m_RadialMenu.Add(paramsBtn);
 
-            mainContainer.Add(m_RadialMenu);
+            EnsureOverlayAttached();
         }
 
-        private static Button CreateCircleButton(string text, float left, float top, Action onClick)
+        private static Button CreateCircleButton(string text, Action onClick)
         {
             var button = new Button(onClick)
             {
@@ -307,15 +380,14 @@ namespace DJTechEditor.PCG.Graph
                 style =
                 {
                     position = Position.Absolute,
-                    left = left,
-                    top = top,
-                    width = 22,
-                    height = 22,
-                    borderTopLeftRadius = 11,
-                    borderTopRightRadius = 11,
-                    borderBottomLeftRadius = 11,
-                    borderBottomRightRadius = 11,
+                    width = 30,
+                    height = 30,
+                    borderTopLeftRadius = 15,
+                    borderTopRightRadius = 15,
+                    borderBottomLeftRadius = 15,
+                    borderBottomRightRadius = 15,
                     unityTextAlign = TextAnchor.MiddleCenter,
+                    fontSize = 16,
                     paddingLeft = 0,
                     paddingRight = 0,
                     paddingTop = 0,
@@ -327,6 +399,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void SetRadialMenuVisible(bool isVisible)
         {
+            EnsureOverlayAttached();
             if (m_RadialMenu != null)
                 m_RadialMenu.style.display = isVisible ? DisplayStyle.Flex : DisplayStyle.None;
         }
@@ -334,6 +407,79 @@ namespace DJTechEditor.PCG.Graph
         private void UpdateRadialMenuVisibility()
         {
             SetRadialMenuVisible(m_IsPointerOnNode || m_IsPointerOnMenu);
+        }
+
+        private VisualElement GetOverlayParent()
+        {
+            var graphView = GetFirstAncestorOfType<PcgGraphView>();
+            return graphView?.contentViewContainer;
+        }
+
+        private void EnsureOverlayAttached()
+        {
+            if (m_OverlayAttached)
+                return;
+
+            var overlayParent = GetOverlayParent();
+            if (overlayParent == null)
+                return;
+
+            if (m_RightTitleLabel != null && m_RightTitleLabel.parent != overlayParent)
+                overlayParent.Add(m_RightTitleLabel);
+            if (m_RadialMenu != null && m_RadialMenu.parent != overlayParent)
+                overlayParent.Add(m_RadialMenu);
+            m_OverlayAttached = true;
+            UpdateOverlayPlacement();
+        }
+
+        private void UpdateOverlayPlacement()
+        {
+            EnsureOverlayAttached();
+            var rect = GetPosition();
+
+            if (m_RightTitleLabel != null)
+            {
+                m_RightTitleLabel.style.left = rect.x + rect.width + 14;
+                m_RightTitleLabel.style.top = rect.y + 10;
+            }
+
+            if (m_TitleEditor != null)
+            {
+                m_TitleEditor.style.left = rect.x + rect.width + 14;
+                m_TitleEditor.style.top = rect.y + 8;
+            }
+
+            if (m_RadialMenu != null)
+            {
+                m_RadialMenu.style.left = rect.x + (rect.width - 172f) * 0.5f;
+                m_RadialMenu.style.top = rect.y + (rect.height - 172f) * 0.5f;
+                LayoutRadialButtons();
+            }
+        }
+
+        private void LayoutRadialButtons()
+        {
+            if (m_RadialMenu == null)
+                return;
+
+            var buttons = m_RadialMenu.Query<Button>().ToList();
+            if (buttons.Count == 0)
+                return;
+
+            const float diameter = 30f;
+            const float ringRadius = 64f;
+            const float center = 86f;
+            const float startDeg = -135f; // left-top
+            const float stepDeg = 28f;    // clockwise
+
+            for (var i = 0; i < buttons.Count; i++)
+            {
+                var angle = (startDeg + stepDeg * i) * Mathf.Deg2Rad;
+                var x = center + Mathf.Cos(angle) * ringRadius - diameter * 0.5f;
+                var y = center + Mathf.Sin(angle) * ringRadius - diameter * 0.5f;
+                buttons[i].style.left = x;
+                buttons[i].style.top = y;
+            }
         }
 
         protected static void AddField<T>(VisualElement parent, string label, T initialValue, Action<T> onChanged)

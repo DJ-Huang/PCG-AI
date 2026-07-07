@@ -32,12 +32,6 @@
       "data": {"texture": "Resources/tuanjie_builtin_extra/Default-Particle", "repeatX": 1, "repeatY": 1}
     },
     {
-      "id": "n115",
-      "type": "StaticMeshSpawner",
-      "position": { "x": 174.5, "y": 730 },
-      "data": {"prefab": "", "mesh": "", "scale": 1}
-    },
-    {
       "id": "n110",
       "type": "SampleMeshSurface",
       "position": { "x": -127.5, "y": 594.5 },
@@ -48,6 +42,12 @@
       "type": "GetMeshData",
       "position": { "x": -295.5, "y": 479 },
       "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
+    },
+    {
+      "id": "n115",
+      "type": "StaticMeshSpawner",
+      "position": { "x": 174.5, "y": 730 },
+      "data": {"prefab": "", "mesh": "", "scale": 1}
     },
     {
       "id": "n109",
