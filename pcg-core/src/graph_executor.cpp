@@ -120,7 +120,8 @@ PcgResultCode execute_graph(const Graph& graph,
                             int err_buf_size,
                             const TextureRuntime* textures,
                             const MeshRuntime* meshes,
-                            GraphCookCache* cache)
+                            GraphCookCache* cache,
+                            bool (*is_cancel_requested)())
 {
     elements::register_builtin_elements();
 
@@ -144,6 +145,9 @@ PcgResultCode execute_graph(const Graph& graph,
     std::unordered_map<std::string, uint64_t> output_hashes;
     NodeOutputMap outputs;
     for (const auto& node_id : order) {
+        if (is_cancel_requested && is_cancel_requested())
+            return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
+
         const GraphNode* node = node_by_id[node_id];
 
         std::vector<std::pair<std::string, uint64_t>> upstream_hashes;
@@ -188,6 +192,7 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.meshes = meshes;
         ctx.err_buf = err_buf;
         ctx.err_buf_size = err_buf_size;
+        ctx.is_cancel_requested = is_cancel_requested;
 
         PcgResultCode input_code = PCG_OK;
         gather_inputs(graph, node_id, outputs, ctx.inputs, err_buf, err_buf_size, input_code);
@@ -197,6 +202,9 @@ PcgResultCode execute_graph(const Graph& graph,
         const PcgResultCode rc = element->execute(ctx);
         if (rc != PCG_OK)
             return rc;
+
+        if (is_cancel_requested && is_cancel_requested())
+            return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
         outputs[node_id] = std::move(ctx.outputs);
         const uint64_t out_hash = compute_output_hash(outputs[node_id]);

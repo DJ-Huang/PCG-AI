@@ -16,6 +16,7 @@ PcgResultCode execute_graph(const Graph& graph,
                             int err_buf_size,
                             const TextureRuntime* textures = nullptr,
                             const MeshRuntime* meshes = nullptr,
-                            GraphCookCache* cache = nullptr);
+                            GraphCookCache* cache = nullptr,
+                            bool (*is_cancel_requested)() = nullptr);
 
 } // namespace pcg::internal

@@ -203,6 +203,12 @@ PCG_API PcgResultCode pcg_execute_graph_v5(const char* json,
 /** Clears the session-scoped per-node cook cache. */
 PCG_API void pcg_cook_cache_clear(void);
 
+/** Requests cancellation for the current running execution (best effort). */
+PCG_API void pcg_request_cancel(void);
+
+/** Clears the cancellation flag before a new execution starts. */
+PCG_API void pcg_clear_cancel(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

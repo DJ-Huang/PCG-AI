@@ -19,6 +19,7 @@ struct PcgContext {
     data::PcgDataCollection outputs;
     char* err_buf = nullptr;
     int err_buf_size = 0;
+    bool (*is_cancel_requested)() = nullptr;
 };
 
 } // namespace pcg::internal

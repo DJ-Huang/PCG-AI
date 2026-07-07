@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
 #if UNITY_EDITOR
@@ -23,6 +25,7 @@ namespace DJTechRuntime.PCG
 
         [SerializeField, Min(0.05f)]
         private float editModeCookInterval = 0.15f;
+        [SerializeField] private bool enableAsyncCookInEditor = true;
 
         [SerializeField]
         private List<PcgParameterOverride> m_ParameterOverrides = new();
@@ -33,7 +36,12 @@ namespace DJTechRuntime.PCG
         private float m_NextEditModeCookTime;
         private bool m_PreviewCookPending;
         private bool m_CookInProgress;
+        private bool m_AsyncCookInProgress;
         private bool m_ForceFullQuality;
+        private CancellationTokenSource m_AsyncCookCts;
+        private Task<AsyncCookResult> m_AsyncCookTask;
+        private int m_AsyncCookGeneration;
+        private string m_LastAsyncCookStatus = "idle";
 
 #if UNITY_EDITOR
         private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
@@ -63,6 +71,8 @@ namespace DJTechRuntime.PCG
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
         public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
         public PcgCookMode CookMode => cookMode;
+        public bool IsAsyncCookInProgress => m_AsyncCookInProgress;
+        public string LastAsyncCookStatus => m_LastAsyncCookStatus;
 
         /// <summary>
         /// Edit Mode: <see cref="PcgCookMode.EveryFrame"/> is downgraded to
@@ -98,6 +108,7 @@ namespace DJTechRuntime.PCG
 #if UNITY_EDITOR
             s_EditModePreviewCooks.Remove(this);
 #endif
+            CancelAsyncCook(null, log: false);
         }
 
         private void Start()
@@ -122,8 +133,23 @@ namespace DJTechRuntime.PCG
             foreach (var component in s_EditModePreviewCooks.ToArray())
             {
                 if (component != null)
+                {
+                    component.PumpAsyncCookCompletion();
                     component.TickEditModePreviewCook();
+                }
             }
+        }
+
+        public static bool CancelAllEditModeAsyncCooks()
+        {
+            var cancelledAny = false;
+            foreach (var component in s_EditModePreviewCooks.ToArray())
+            {
+                if (component != null)
+                    cancelledAny |= component.CancelAsyncCook("Esc");
+            }
+
+            return cancelledAny;
         }
 
         internal void TickEditModePreviewCook()
@@ -144,9 +170,10 @@ namespace DJTechRuntime.PCG
             if (Run(skipDocumentRefresh: true))
             {
                 m_PreviewCookPending = false;
-                EditorAfterPreviewCookApplied?.Invoke();
+                if (!m_AsyncCookInProgress)
+                    EditorAfterPreviewCookApplied?.Invoke();
             }
-            else if (!m_CookInProgress)
+            else if (!IsCookBusy())
             {
                 m_PreviewCookPending = false;
             }
@@ -300,6 +327,14 @@ namespace DJTechRuntime.PCG
             if (m_CookInProgress)
                 return false;
 
+            if (m_AsyncCookInProgress)
+            {
+                if (ShouldUseAsyncCook(forceFullQuality))
+                    CancelAsyncCook(null, log: false);
+                else
+                    return false;
+            }
+
             if (!skipDocumentRefresh)
                 RefreshDocument();
 
@@ -338,9 +373,26 @@ namespace DJTechRuntime.PCG
                     return false;
             }
 
+            var textures = PcgTextureResolver.CollectFromGraphJson(json);
+            if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
+            {
+                Debug.LogError($"[PCG] {textureError}");
+                return false;
+            }
+
             var previewBindings = EditorResolvePreviewMeshBindings?.Invoke(this);
-            var result = PcgGraphLoader.ExecuteWithResolvedAssets(
-                json, seed, gameObject, m_MeshBindings, previewBindings, quality);
+            var meshes = PcgMeshResolver.CollectFromGraphJson(
+                json, gameObject, m_MeshBindings, previewBindings);
+            if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out _))
+                return false;
+
+            if (ShouldUseAsyncCook(m_ForceFullQuality))
+            {
+                StartAsyncCook(json, textures, meshes);
+                return true;
+            }
+
+            var result = PcgGraphLoader.Execute(json, seed, textures, meshes, quality);
             if (result == null)
                 return false;
 
@@ -404,6 +456,171 @@ namespace DJTechRuntime.PCG
             }
 
             return true;
+        }
+
+        private bool IsCookBusy() => m_CookInProgress || m_AsyncCookInProgress;
+
+        private bool ShouldUseAsyncCook(bool forceFullQuality)
+        {
+#if UNITY_EDITOR
+            return enableAsyncCookInEditor && !Application.isPlaying && !forceFullQuality;
+#else
+            return false;
+#endif
+        }
+
+        private void StartAsyncCook(
+            string json,
+            IReadOnlyList<PcgTextureUpload> textures,
+            IReadOnlyList<PcgMeshUpload> meshes)
+        {
+            CancelAsyncCook(null, log: false);
+            m_AsyncCookInProgress = true;
+            m_LastAsyncCookStatus = "running";
+            m_AsyncCookGeneration++;
+            var generation = m_AsyncCookGeneration;
+            var localSeed = seed;
+            m_AsyncCookCts = new CancellationTokenSource();
+            var token = m_AsyncCookCts.Token;
+            m_AsyncCookTask = Task.Run(() =>
+            {
+                if (token.IsCancellationRequested)
+                    return AsyncCookResult.FromCancelled(generation);
+
+                var (validateCode, validateError) = PcgNative.ValidateGraph(json);
+                if (validateCode != PcgResultCode.Ok)
+                {
+                    return AsyncCookResult.Failed(
+                        generation,
+                        $"Validation failed ({validateCode}): {validateError}");
+                }
+
+                if (token.IsCancellationRequested)
+                    return AsyncCookResult.FromCancelled(generation);
+
+                var (execCode, execResult) = PcgNative.ExecuteGraph(json, localSeed, textures, meshes);
+                if (execCode != PcgResultCode.Ok)
+                {
+                    return AsyncCookResult.Failed(
+                        generation,
+                        $"Execution failed ({execCode}): {execResult?.Error}");
+                }
+
+                return AsyncCookResult.Succeeded(generation, execResult);
+            }, token);
+        }
+
+        private bool CancelAsyncCook(string reason, bool log = true)
+        {
+            if (!m_AsyncCookInProgress)
+                return false;
+
+            PcgNative.RequestCancel();
+            m_AsyncCookCts?.Cancel();
+            m_AsyncCookInProgress = false;
+            m_AsyncCookTask = null;
+            m_AsyncCookCts?.Dispose();
+            m_AsyncCookCts = null;
+            m_LastAsyncCookStatus = "cancelled";
+
+#if UNITY_EDITOR
+            if (log && !string.IsNullOrEmpty(reason))
+                Debug.Log($"[PCG] Async cook cancelled ({reason}).");
+#endif
+            return true;
+        }
+
+        private void PumpAsyncCookCompletion()
+        {
+            if (!m_AsyncCookInProgress || m_AsyncCookTask == null || !m_AsyncCookTask.IsCompleted)
+                return;
+
+            var completedTask = m_AsyncCookTask;
+            m_AsyncCookTask = null;
+            m_AsyncCookInProgress = false;
+            m_AsyncCookCts?.Dispose();
+            m_AsyncCookCts = null;
+
+            if (completedTask.IsCanceled)
+                return;
+
+            if (completedTask.IsFaulted)
+            {
+                m_LastAsyncCookStatus = "failed";
+                Debug.LogError($"[PCG] Async cook task failed: {completedTask.Exception?.GetBaseException().Message}", this);
+                return;
+            }
+
+            var asyncResult = completedTask.Result;
+            if (asyncResult == null || asyncResult.IsCancelled || asyncResult.Generation != m_AsyncCookGeneration)
+                return;
+
+            if (!string.IsNullOrEmpty(asyncResult.Error))
+            {
+                m_LastAsyncCookStatus = asyncResult.Error.Contains("Execution cancelled")
+                    ? "cancelled"
+                    : "failed";
+                Debug.LogError($"[PCG] {asyncResult.Error}", this);
+                return;
+            }
+
+            var result = asyncResult.Result;
+            if (result == null)
+                return;
+
+            if (result.CookNodesSkipped > 0)
+            {
+                Debug.Log(
+                    $"[PCG] Cook cache: skipped {result.CookNodesSkipped} node(s), executed {result.CookNodesExecuted}.");
+            }
+            else if (PcgProjectSettings.IsLogEnabled)
+            {
+                Debug.Log(
+                    $"[PCG] Cook cache: skipped 0 node(s), executed {result.CookNodesExecuted} (cold).");
+            }
+
+            if (ApplyExecutionResult(result))
+            {
+                m_LastAsyncCookStatus = "completed";
+#if UNITY_EDITOR
+                EditorAfterPreviewCookApplied?.Invoke();
+#endif
+            }
+        }
+
+        private sealed class AsyncCookResult
+        {
+            public int Generation;
+            public PcgGraphExecuteResult Result;
+            public string Error;
+            public bool IsCancelled;
+
+            public static AsyncCookResult Succeeded(int generation, PcgGraphExecuteResult result)
+            {
+                return new AsyncCookResult
+                {
+                    Generation = generation,
+                    Result = result
+                };
+            }
+
+            public static AsyncCookResult Failed(int generation, string error)
+            {
+                return new AsyncCookResult
+                {
+                    Generation = generation,
+                    Error = error
+                };
+            }
+
+            public static AsyncCookResult FromCancelled(int generation)
+            {
+                return new AsyncCookResult
+                {
+                    Generation = generation,
+                    IsCancelled = true
+                };
+            }
         }
 
         public void ClearResults()

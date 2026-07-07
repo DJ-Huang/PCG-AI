@@ -84,6 +84,9 @@ data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
     std::vector<TriangleRef> tris;
     tris.reserve(triangles.size() / 3);
     for (size_t t = 0; t + 2 < triangles.size(); t += 3) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            return points;
+
         const int i0 = triangles[t];
         const int i1 = triangles[t + 1];
         const int i2 = triangles[t + 2];
@@ -114,6 +117,9 @@ data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
     uint32_t rng = mix_seed(options.seed, static_cast<int>(tris.size() * 97 + options.count));
 
     for (int sample = 0; sample < options.count; ++sample) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            return points;
+
         const double pick = rand01(rng) * total_area;
         const int tri_index = pick_triangle(cumulative, pick, static_cast<int>(tris.size()) - 1);
         const TriangleRef& tri = tris[static_cast<size_t>(tri_index)];

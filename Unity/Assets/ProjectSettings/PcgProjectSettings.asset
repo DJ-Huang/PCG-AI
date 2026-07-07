@@ -12,4 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e779d01ab20d4d4f870a5e02fd4b112, type: 3}
   m_Name: PcgProjectSettings
   m_EditorClassIdentifier: 
-  enableLogging: 1
+  enableLogging: 0

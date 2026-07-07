@@ -137,7 +137,36 @@ namespace DJTechRuntime.PCG
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         private static extern void pcg_cook_cache_clear();
 
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void pcg_request_cancel();
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void pcg_clear_cancel();
+
         public static void ClearCookCache() => pcg_cook_cache_clear();
+        public static void RequestCancel()
+        {
+            try
+            {
+                pcg_request_cancel();
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // Older native binaries may not expose cancellation APIs yet.
+            }
+        }
+
+        public static void ClearCancel()
+        {
+            try
+            {
+                pcg_clear_cancel();
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // Older native binaries may not expose cancellation APIs yet.
+            }
+        }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         private struct NativeMeshSlot
@@ -159,6 +188,7 @@ namespace DJTechRuntime.PCG
         public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
             string json, int seed, IReadOnlyList<PcgTextureUpload> textures, IReadOnlyList<PcgMeshUpload> meshes)
         {
+            ClearCancel();
             var errBuf = new StringBuilder(ErrBufSize);
             var jsonBuf = new byte[OutJsonBufSize];
             var meshBuf = new byte[OutMeshBufSize];

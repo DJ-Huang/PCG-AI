@@ -15,6 +15,7 @@ namespace DJTechEditor.PCG
         static PcgEditModeCookScheduler()
         {
             EditorApplication.update += Tick;
+            SceneView.duringSceneGui += OnSceneGui;
         }
 
         private static void Tick()
@@ -23,6 +24,19 @@ namespace DJTechEditor.PCG
                 return;
 
             PcgGraphComponent.TickAllEditModePreviewCooks();
+        }
+
+        private static void OnSceneGui(SceneView _)
+        {
+            if (Application.isPlaying)
+                return;
+
+            var evt = Event.current;
+            if (evt == null || evt.type != EventType.KeyDown || evt.keyCode != KeyCode.Escape)
+                return;
+
+            if (PcgGraphComponent.CancelAllEditModeAsyncCooks())
+                evt.Use();
         }
     }
 }

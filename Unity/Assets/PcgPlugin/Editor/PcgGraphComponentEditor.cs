@@ -16,6 +16,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_MeshBindingsProp;
         private SerializedProperty m_ScatterPointScaleProp;
         private SerializedProperty m_ScatterPointMeshProp;
+        private SerializedProperty m_EnableAsyncCookInEditorProp;
         private bool m_SliderReleasedThisFrame;
 
         private void OnEnable()
@@ -28,6 +29,7 @@ namespace DJTechEditor.PCG
             m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
             m_ScatterPointScaleProp = serializedObject.FindProperty("scatterPointScale");
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
+            m_EnableAsyncCookInEditorProp = serializedObject.FindProperty("enableAsyncCookInEditor");
 
             m_Target.RefreshDocument();
             serializedObject.Update();
@@ -59,6 +61,12 @@ namespace DJTechEditor.PCG
                     new GUIContent(
                         "Edit Mode Debounce",
                         "EveryFrame is downgraded in Edit Mode; debounce interval for parameter preview."));
+            if (!Application.isPlaying && m_EnableAsyncCookInEditorProp != null)
+            {
+                EditorGUILayout.PropertyField(
+                    m_EnableAsyncCookInEditorProp,
+                    new GUIContent("Async Cook In Editor", "Run preview cook in background thread; Esc cancels current cook."));
+            }
             if (EditorGUI.EndChangeCheck())
             {
                 serializedObject.ApplyModifiedProperties();
@@ -68,6 +76,7 @@ namespace DJTechEditor.PCG
             }
 
             DrawCookModeHelp();
+            DrawAsyncCookStatus();
 
             EditorGUILayout.Space();
 
@@ -94,6 +103,9 @@ namespace DJTechEditor.PCG
                     serializedObject.Update();
                 }
             }
+
+            if (!Application.isPlaying && GUILayout.Button("Cancel Preview Cook (Esc)"))
+                PcgGraphComponent.CancelAllEditModeAsyncCooks();
 
             DrawMeshBindings();
             DrawScatterSettings();
@@ -147,6 +159,26 @@ namespace DJTechEditor.PCG
                         MessageType.Info);
                     break;
             }
+        }
+
+        private void DrawAsyncCookStatus()
+        {
+            if (Application.isPlaying || m_Target == null)
+                return;
+
+            var status = m_Target.LastAsyncCookStatus;
+            if (string.IsNullOrEmpty(status))
+                status = "idle";
+
+            var type = MessageType.None;
+            if (m_Target.IsAsyncCookInProgress || status == "running")
+                type = MessageType.Info;
+            else if (status == "failed")
+                type = MessageType.Error;
+            else if (status == "cancelled")
+                type = MessageType.Warning;
+
+            EditorGUILayout.HelpBox($"Async cook status: {status}", type);
         }
 
         private void DrawMeshBindings()

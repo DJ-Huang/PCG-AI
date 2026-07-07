@@ -54,8 +54,11 @@ public:
         opts.seed = mix_seed(ctx.graph_seed, ctx.node->data.value("seed", 0));
         opts.normal_offset = ctx.node->data.value("normalOffset", 0.0);
         opts.looseness = std::max(0.0, ctx.node->data.value("looseness", 0.0));
+        opts.is_cancel_requested = ctx.is_cancel_requested;
 
         emit_points(ctx, sample_mesh_surface(mesh, opts));
+        if (ctx.is_cancel_requested && ctx.is_cancel_requested())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Execution cancelled");
         return PCG_OK;
     }
 };

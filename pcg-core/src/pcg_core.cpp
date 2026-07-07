@@ -13,10 +13,17 @@
 
 #include <cstdio>
 #include <cstring>
+#include <atomic>
 
 namespace {
 
 pcg::internal::GraphCookCache g_cook_cache;
+std::atomic<bool> g_cancel_requested{false};
+
+bool is_cancel_requested_now()
+{
+    return g_cancel_requested.load(std::memory_order_relaxed);
+}
 
 PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& result,
                                      int* out_kind,
@@ -149,6 +156,7 @@ PcgResultCode execute_graph_cached(const char* json,
                                    int err_buf_size,
                                    pcg::internal::GraphCookCache* cache)
 {
+    g_cancel_requested.store(false, std::memory_order_relaxed);
     pcg::internal::write_error(err_buf, err_buf_size, "");
     if (out_kind)
         *out_kind = PCG_RESULT_KIND_NONE;
@@ -179,7 +187,7 @@ PcgResultCode execute_graph_cached(const char* json,
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
         texture_count > 0 ? &texture_runtime : nullptr,
-        mesh_count > 0 ? &mesh_runtime : nullptr, cache);
+        mesh_count > 0 ? &mesh_runtime : nullptr, cache, is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -236,6 +244,7 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
                                    char* err_buf,
                                    int err_buf_size)
 {
+    g_cancel_requested.store(false, std::memory_order_relaxed);
     pcg::internal::write_error(err_buf, err_buf_size, "");
     if (out_kind)
         *out_kind = PCG_RESULT_KIND_NONE;
@@ -258,7 +267,8 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
 
     pcg::internal::GraphExecutionResult result;
     const PcgResultCode exec_code =
-        pcg::internal::execute_graph(graph, seed, result, err_buf, err_buf_size, nullptr, nullptr);
+        pcg::internal::execute_graph(
+            graph, seed, result, err_buf, err_buf_size, nullptr, nullptr, nullptr, is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -335,6 +345,7 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
                                    char* err_buf,
                                    int err_buf_size)
 {
+    g_cancel_requested.store(false, std::memory_order_relaxed);
     pcg::internal::write_error(err_buf, err_buf_size, "");
     if (out_kind)
         *out_kind = PCG_RESULT_KIND_NONE;
@@ -371,7 +382,7 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
     pcg::internal::GraphExecutionResult result;
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
-        texture_count > 0 ? &runtime : nullptr, nullptr);
+        texture_count > 0 ? &runtime : nullptr, nullptr, nullptr, is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -450,6 +461,7 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
                                    char* err_buf,
                                    int err_buf_size)
 {
+    g_cancel_requested.store(false, std::memory_order_relaxed);
     if (!meshes || mesh_count <= 0)
         return pcg_execute_graph_v3(json, seed, textures, texture_count, out_kind, out_json,
                                     out_json_size, out_mesh_buf, out_mesh_buf_size,
@@ -514,7 +526,7 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
     pcg::internal::GraphExecutionResult result;
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
-        texture_count > 0 ? &texture_runtime : nullptr, &mesh_runtime);
+        texture_count > 0 ? &texture_runtime : nullptr, &mesh_runtime, nullptr, is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -599,6 +611,16 @@ PcgResultCode pcg_execute_graph(const char* json,
 void pcg_cook_cache_clear(void)
 {
     g_cook_cache.clear();
+}
+
+void pcg_request_cancel(void)
+{
+    g_cancel_requested.store(true, std::memory_order_relaxed);
+}
+
+void pcg_clear_cancel(void)
+{
+    g_cancel_requested.store(false, std::memory_order_relaxed);
 }
 
 PcgResultCode pcg_execute_graph_v5(const char* json,

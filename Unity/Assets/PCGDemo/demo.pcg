@@ -11,13 +11,13 @@
       "id": "n105",
       "type": "BevelMesh",
       "position": { "x": 103.5, "y": 274 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.3470588, "segments": 1, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.3470588, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     },
     {
       "id": "n107",
       "type": "SubdivideMesh",
       "position": { "x": 103.5, "y": 417.5 },
-      "data": {"levels": 1}
+      "data": {"levels": 4}
     },
     {
       "id": "n106",
@@ -35,13 +35,7 @@
       "id": "n110",
       "type": "SampleMeshSurface",
       "position": { "x": -127.5, "y": 594.5 },
-      "data": {"count": 128, "seed": 0, "normalOffset": 0, "looseness": 0}
-    },
-    {
-      "id": "n111",
-      "type": "GetMeshData",
-      "position": { "x": -295.5, "y": 479 },
-      "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
+      "data": {"count": 200, "seed": 0, "normalOffset": 0, "looseness": 0}
     },
     {
       "id": "n115",
@@ -52,8 +46,14 @@
     {
       "id": "n109",
       "type": "Output",
-      "position": { "x": 207.5, "y": 901.5 },
+      "position": { "x": 174.5, "y": 818.5 },
       "data": {"label": "Output"}
+    },
+    {
+      "id": "n111",
+      "type": "GetMeshData",
+      "position": { "x": -127.5, "y": 500 },
+      "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
     }
   ],
   "edges": [

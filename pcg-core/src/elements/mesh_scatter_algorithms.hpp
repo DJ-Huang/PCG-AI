@@ -10,6 +10,7 @@ struct SampleMeshSurfaceOptions {
     int seed = 0;
     double normal_offset = 0.0;
     double looseness = 0.0;
+    bool (*is_cancel_requested)() = nullptr;
 };
 
 /** Area-weighted random points on mesh triangles with face normal metadata (nx, ny, nz, triIndex). */
