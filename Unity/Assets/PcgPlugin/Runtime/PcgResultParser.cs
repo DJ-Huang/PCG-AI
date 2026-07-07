@@ -70,6 +70,15 @@ namespace DJTechRuntime.PCG
         public PcgMeshPayload spawnMesh;
     }
 
+    public struct PcgScatterPoint
+    {
+        public Vector3 Position;
+        public Vector3 Normal;
+        public bool HasNormal;
+        public float Scale;
+        public bool HasScale;
+    }
+
     /// <summary>
     /// Parses result JSON produced by pcg_execute_graph.
     /// </summary>
@@ -169,9 +178,9 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        public static bool TryParsePointBinary(byte[] data, out List<Vector3> points, out string error)
+        public static bool TryParsePointBinary(byte[] data, out List<PcgScatterPoint> points, out string error)
         {
-            points = new List<Vector3>();
+            points = new List<PcgScatterPoint>();
             error = null;
 
             if (data == null || data.Length < PcgNative.PointBinaryHeaderSize)
@@ -219,8 +228,51 @@ namespace DJTechRuntime.PCG
                     offset += 4;
                     var z = BitConverter.ToSingle(data, offset);
                     offset += 4;
-                    points.Add(new Vector3(x, y, z));
+                    var position = new Vector3(x, y, z);
+                    points.Add(new PcgScatterPoint
+                    {
+                        Position = position,
+                        Normal = Vector3.up,
+                        HasNormal = false,
+                        Scale = 1f,
+                        HasScale = false
+                    });
                 }
+
+                if (flags.HasFlag(PcgPointAttrFlags.Normal))
+                {
+                    for (var i = 0; i < pointCount; i++)
+                    {
+                        var nx = BitConverter.ToSingle(data, offset);
+                        offset += 4;
+                        var ny = BitConverter.ToSingle(data, offset);
+                        offset += 4;
+                        var nz = BitConverter.ToSingle(data, offset);
+                        offset += 4;
+                        var point = points[i];
+                        point.Normal = new Vector3(nx, ny, nz);
+                        point.HasNormal = point.Normal.sqrMagnitude > 1e-8f;
+                        points[i] = point;
+                    }
+                }
+
+                if (flags.HasFlag(PcgPointAttrFlags.Uv))
+                    offset += pointCount * 8;
+                if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
+                    offset += pointCount * 4;
+                if (flags.HasFlag(PcgPointAttrFlags.Scale))
+                {
+                    for (var i = 0; i < pointCount; i++)
+                    {
+                        var point = points[i];
+                        point.Scale = BitConverter.ToSingle(data, offset);
+                        point.HasScale = true;
+                        points[i] = point;
+                        offset += 4;
+                    }
+                }
+                if (flags.HasFlag(PcgPointAttrFlags.Rotation))
+                    offset += pointCount * 16;
 
                 return true;
             }
@@ -370,6 +422,27 @@ namespace DJTechRuntime.PCG
             foreach (var point in result.points)
                 vectors.Add(new Vector3(point.x, point.y, point.z));
             return vectors;
+        }
+
+        public static List<PcgScatterPoint> ToScatterPoints(List<Vector3> points)
+        {
+            var scatterPoints = new List<PcgScatterPoint>(points?.Count ?? 0);
+            if (points == null)
+                return scatterPoints;
+
+            foreach (var point in points)
+            {
+                scatterPoints.Add(new PcgScatterPoint
+                {
+                    Position = point,
+                    Normal = Vector3.up,
+                    HasNormal = false,
+                    Scale = 1f,
+                    HasScale = false
+                });
+            }
+
+            return scatterPoints;
         }
     }
 }

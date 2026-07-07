@@ -458,7 +458,7 @@ namespace DJTechRuntime.PCG
                             Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
                             return false;
                         }
-                        ApplyPoints(PcgResultParser.ToVector3List(parsed), BuildSpawnPrototypeMesh(parsed));
+                        ApplyPoints(PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)), BuildSpawnPrototypeMesh(parsed));
                     }
                     break;
 
@@ -642,7 +642,7 @@ namespace DJTechRuntime.PCG
 
         // --- Result rendering ---
 
-        private void ApplyPoints(List<Vector3> points, Mesh pointPrototypeMesh = null)
+        private void ApplyPoints(List<PcgScatterPoint> points, Mesh pointPrototypeMesh = null)
         {
             var scatterMesh = BuildScatterMesh(points, pointPrototypeMesh);
             ApplyMesh(scatterMesh);
@@ -713,7 +713,7 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private Mesh BuildScatterMesh(List<Vector3> points, Mesh prototypeMesh = null)
+        private Mesh BuildScatterMesh(List<PcgScatterPoint> points, Mesh prototypeMesh = null)
         {
             if (points == null || points.Count == 0)
                 return null;
@@ -723,13 +723,19 @@ namespace DJTechRuntime.PCG
                 return null;
 
             var combines = new CombineInstance[points.Count];
-            var uniformScale = Vector3.one * scatterPointScale;
             for (var i = 0; i < points.Count; i++)
             {
+                var point = points[i];
+                var rotation = Quaternion.identity;
+                if (point.HasNormal && point.Normal.sqrMagnitude > 1e-8f)
+                    rotation = Quaternion.FromToRotation(Vector3.up, point.Normal.normalized);
+
+                var perPointScale = point.HasScale ? point.Scale : 1f;
+                var uniformScale = Vector3.one * (scatterPointScale * perPointScale);
                 combines[i] = new CombineInstance
                 {
                     mesh = sourceMesh,
-                    transform = Matrix4x4.TRS(points[i], Quaternion.identity, uniformScale)
+                    transform = Matrix4x4.TRS(point.Position, rotation, uniformScale)
                 };
             }
 
