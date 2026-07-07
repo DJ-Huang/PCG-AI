@@ -14,6 +14,8 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_CookModeProp;
         private SerializedProperty m_OverridesProp;
         private SerializedProperty m_MeshBindingsProp;
+        private SerializedProperty m_ScatterPointScaleProp;
+        private SerializedProperty m_ScatterPointMeshProp;
         private bool m_SliderReleasedThisFrame;
 
         private void OnEnable()
@@ -24,6 +26,8 @@ namespace DJTechEditor.PCG
             m_CookModeProp = serializedObject.FindProperty("cookMode");
             m_OverridesProp = serializedObject.FindProperty("m_ParameterOverrides");
             m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
+            m_ScatterPointScaleProp = serializedObject.FindProperty("scatterPointScale");
+            m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
 
             m_Target.RefreshDocument();
             serializedObject.Update();
@@ -92,6 +96,7 @@ namespace DJTechEditor.PCG
             }
 
             DrawMeshBindings();
+            DrawScatterSettings();
             DrawParameters();
 
             if (m_SliderReleasedThisFrame && m_Target.SupportsEditModePreview())
@@ -103,6 +108,18 @@ namespace DJTechEditor.PCG
             }
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawScatterSettings()
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Scatter Rendering", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                m_ScatterPointScaleProp,
+                new GUIContent("Point Scale", "Scale of each generated scatter instance mesh."));
+            EditorGUILayout.PropertyField(
+                m_ScatterPointMeshProp,
+                new GUIContent("Point Mesh", "Mesh used for each point instance. Empty = built-in Sphere/Cube fallback."));
         }
 
         private void DrawCookModeHelp()

@@ -173,7 +173,10 @@
       "type": "StaticMeshSpawner",
       "displayName": "Static Mesh Spawner",
       "category": "Spawner",
-      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "inputs": [
+        { "id": "in", "label": "Points", "pinType": "SpatialPoint" },
+        { "id": "mesh", "label": "Instance Mesh", "pinType": "SpatialMesh" }
+      ],
       "outputs": [{ "id": "out", "label": "Instances", "pinType": "SpatialPoint" }],
       "properties": {
         "prefab": { "type": "string", "default": "" },

@@ -3,7 +3,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
 {
@@ -67,9 +66,25 @@ namespace DJTechEditor.PCG.Graph
             tree.Add(new SearchTreeGroupEntry(new GUIContent(groupName), 1));
             foreach (var type in types)
             {
-                var label = PcgNodeManifest.TryGet(type, out var def) ? def.displayName ?? type : type;
+                string label = BuildSearchLabel(type);
                 tree.Add(new SearchTreeEntry(new GUIContent(label)) { level = 2, userData = type });
             }
+        }
+
+        private static string BuildSearchLabel(string type)
+        {
+            if (!PcgNodeManifest.TryGet(type, out var def))
+                return type;
+
+            var displayName = string.IsNullOrWhiteSpace(def.displayName) ? type : def.displayName;
+            var compactDisplay = displayName.Replace(" ", "");
+            var compactType = type.Replace(" ", "");
+
+            // Include both displayName and raw type so SearchWindow can match either style:
+            // "Sample Mesh Surface" or "SampleMeshSurface".
+            if (compactDisplay == compactType)
+                return $"{displayName} ({type})";
+            return $"{displayName} ({type}) [{compactDisplay}]";
         }
 
         public bool OnSelectEntry(SearchTreeEntry searchTreeEntry, SearchWindowContext context)

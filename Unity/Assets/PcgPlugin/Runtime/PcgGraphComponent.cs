@@ -42,9 +42,8 @@ namespace DJTechRuntime.PCG
         public static System.Func<PcgGraphComponent, IReadOnlyList<PcgPreviewMeshBinding>> EditorResolvePreviewMeshBindings;
 #endif
 
-        [SerializeField] private float gizmoSize = 0.2f;
-        [SerializeField] private Color gizmoColor = new(0.2f, 0.8f, 1f);
-        [SerializeField] private Color splineColor = new(1f, 0.85f, 0.2f);
+        [SerializeField, Min(0.001f)] private float scatterPointScale = 0.2f;
+        [SerializeField] private Mesh scatterPointMesh;
         [SerializeField] private Material meshMaterial;
 
         private PcgGraphDocument m_Document;
@@ -396,7 +395,7 @@ namespace DJTechRuntime.PCG
                         Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
                         return false;
                     }
-                    ApplyPoints(PcgResultParser.ToVector3List(parsed));
+                    ApplyPoints(PcgResultParser.ToVector3List(parsed), BuildSpawnPrototypeMesh(parsed));
                     break;
 
                 default:
@@ -409,31 +408,22 @@ namespace DJTechRuntime.PCG
 
         public void ClearResults()
         {
-            m_Points.Clear();
-            m_Splines.Clear();
             ClearGeneratedMesh();
         }
 
         // --- Result rendering ---
 
-        private readonly List<Vector3> m_Points = new();
-        private readonly List<List<Vector3>> m_Splines = new();
-
-        private void ApplyPoints(List<Vector3> points)
+        private void ApplyPoints(List<Vector3> points, Mesh pointPrototypeMesh = null)
         {
-            ClearGeneratedMesh();
-            m_Points.Clear();
-            m_Splines.Clear();
-            m_Points.AddRange(points);
+            var scatterMesh = BuildScatterMesh(points, pointPrototypeMesh);
+            ApplyMesh(scatterMesh);
         }
 
         private void ApplySplines(List<List<Vector3>> splines)
         {
             ClearGeneratedMesh();
-            m_Points.Clear();
-            m_Splines.Clear();
-            if (splines != null)
-                m_Splines.AddRange(splines);
+            if (splines != null && splines.Count > 0 && PcgProjectSettings.IsLogEnabled)
+                Debug.Log($"[PCG] Spline result has {splines.Count} spline(s); spline mesh rendering is not implemented yet.");
         }
 
         private Mesh m_GeneratedMesh;
@@ -461,12 +451,6 @@ namespace DJTechRuntime.PCG
 
         private void ApplyMesh(Mesh mesh)
         {
-            if (mesh != null)
-            {
-                m_Points.Clear();
-                m_Splines.Clear();
-            }
-
             if (m_GeneratedMesh != null && m_GeneratedMesh != mesh)
             {
 #if UNITY_EDITOR
@@ -500,22 +484,72 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private void OnDrawGizmos()
+        private Mesh BuildScatterMesh(List<Vector3> points, Mesh prototypeMesh = null)
         {
-            Gizmos.color = gizmoColor;
-            foreach (var p in m_Points)
-                Gizmos.DrawSphere(transform.position + p, gizmoSize);
+            if (points == null || points.Count == 0)
+                return null;
 
-            Gizmos.color = splineColor;
-            foreach (var spline in m_Splines)
+            var sourceMesh = prototypeMesh != null ? prototypeMesh : ResolveScatterPointMesh();
+            if (sourceMesh == null)
+                return null;
+
+            var combines = new CombineInstance[points.Count];
+            var uniformScale = Vector3.one * scatterPointScale;
+            for (var i = 0; i < points.Count; i++)
             {
-                for (var i = 1; i < spline.Count; i++)
+                combines[i] = new CombineInstance
                 {
-                    Gizmos.DrawLine(
-                        transform.position + spline[i - 1],
-                        transform.position + spline[i]);
-                }
+                    mesh = sourceMesh,
+                    transform = Matrix4x4.TRS(points[i], Quaternion.identity, uniformScale)
+                };
             }
+
+            var mesh = new Mesh { name = "PCG Scatter Points Mesh" };
+            if (points.Count * sourceMesh.vertexCount > 65535)
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.CombineMeshes(combines, true, true, false);
+            mesh.RecalculateBounds();
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            return mesh;
+        }
+
+        private static Mesh BuildSpawnPrototypeMesh(PcgExecutionResult parsed)
+        {
+            if (parsed?.spawnMesh?.vertices == null || parsed.spawnMesh.vertices.Length == 0)
+                return null;
+            if (parsed.spawnMesh.triangles == null || parsed.spawnMesh.triangles.Length < 3)
+                return null;
+
+            var vertices = new Vector3[parsed.spawnMesh.vertices.Length];
+            for (var i = 0; i < parsed.spawnMesh.vertices.Length; i++)
+            {
+                var v = parsed.spawnMesh.vertices[i];
+                vertices[i] = new Vector3(v.x, v.y, v.z);
+            }
+
+            var mesh = new Mesh { name = "PCG Spawn Prototype Mesh" };
+            if (vertices.Length > 65535)
+                mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.vertices = vertices;
+            mesh.triangles = parsed.spawnMesh.triangles;
+            mesh.RecalculateBounds();
+            mesh.RecalculateNormals();
+            mesh.RecalculateTangents();
+            return mesh;
+        }
+
+        private Mesh ResolveScatterPointMesh()
+        {
+            if (scatterPointMesh != null)
+                return scatterPointMesh;
+
+            var sphere = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
+            if (sphere != null)
+                return sphere;
+
+            var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            return cube;
         }
     }
 }

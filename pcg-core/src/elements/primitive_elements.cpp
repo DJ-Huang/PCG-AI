@@ -466,12 +466,24 @@ public:
         const std::string mesh = ctx.node->data.value("mesh", "");
         const double scale = ctx.node->data.value("scale", 1.0);
 
+        bool has_spawn_mesh = false;
+        data::PcgMeshData spawn_mesh;
+        if (const data::PcgMeshData* mesh_input = ctx.inputs.find_mesh("mesh")) {
+            spawn_mesh = *mesh_input;
+            has_spawn_mesh = !spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3;
+        } else if (const nlohmann::json* mesh_json = ctx.inputs.find_json("mesh")) {
+            spawn_mesh = parse_mesh_input(*mesh_json);
+            has_spawn_mesh = !spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3;
+        }
+
         data::PcgPointData points = parse_point_input(*input);
         for (auto& point : points.points_mut()) {
             if (!prefab.empty())
                 point.attributes["prefab"] = prefab;
             if (!mesh.empty())
                 point.attributes["mesh"] = mesh;
+            if (has_spawn_mesh)
+                point.attributes["spawnMesh"] = "__connected__";
             point.attributes["scale"] = scale;
         }
 
@@ -481,6 +493,8 @@ public:
         out["mesh"] = mesh;
         out["scale"] = scale;
         out["pointCount"] = out["points"].size();
+        if (has_spawn_mesh)
+            out["spawnMesh"] = spawn_mesh.to_json();
         ctx.outputs.add("out", data::PcgDataType::Point, std::move(out));
         return PCG_OK;
     }
