@@ -4,56 +4,56 @@
     {
       "id": "n101",
       "type": "CreateBoxMesh",
-      "position": { "x": 50, "y": 266 },
+      "position": { "x": 79.5, "y": 97 },
       "data": {"width": 2.652941, "height": 2, "depth": 2}
     },
     {
       "id": "n105",
       "type": "BevelMesh",
-      "position": { "x": 279.5, "y": 266 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.3470588, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
+      "position": { "x": 103.5, "y": 274 },
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.3470588, "segments": 1, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     },
     {
       "id": "n107",
       "type": "SubdivideMesh",
-      "position": { "x": 498, "y": 189 },
-      "data": {"levels": 4}
-    },
-    {
-      "id": "n108",
-      "type": "ImageTexture",
-      "position": { "x": 413.5, "y": 449.5 },
-      "data": {"texture": "Resources/tuanjie_builtin_extra/Default-Particle", "repeatX": 1, "repeatY": 1}
-    },
-    {
-      "id": "n109",
-      "type": "Output",
-      "position": { "x": 1418.5, "y": 411 },
-      "data": {"label": "Output"}
+      "position": { "x": 103.5, "y": 417.5 },
+      "data": {"levels": 1}
     },
     {
       "id": "n106",
       "type": "MeshNoiseDeform",
-      "position": { "x": 732, "y": 387 },
+      "position": { "x": 149, "y": 556 },
       "data": {"intensity": 0.02, "scale": 14.31365, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
     },
     {
-      "id": "n111",
-      "type": "GetMeshData",
-      "position": { "x": 749.5, "y": 531.5 },
-      "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
-    },
-    {
-      "id": "n110",
-      "type": "SampleMeshSurface",
-      "position": { "x": 1024, "y": 411 },
-      "data": {"count": 200, "seed": 0, "normalOffset": 0, "looseness": 0}
+      "id": "n108",
+      "type": "ImageTexture",
+      "position": { "x": 349, "y": 439 },
+      "data": {"texture": "Resources/tuanjie_builtin_extra/Default-Particle", "repeatX": 1, "repeatY": 1}
     },
     {
       "id": "n115",
       "type": "StaticMeshSpawner",
-      "position": { "x": 1134.5, "y": 531.5 },
+      "position": { "x": 174.5, "y": 730 },
       "data": {"prefab": "", "mesh": "", "scale": 1}
+    },
+    {
+      "id": "n110",
+      "type": "SampleMeshSurface",
+      "position": { "x": -127.5, "y": 594.5 },
+      "data": {"count": 128, "seed": 0, "normalOffset": 0, "looseness": 0}
+    },
+    {
+      "id": "n111",
+      "type": "GetMeshData",
+      "position": { "x": -295.5, "y": 479 },
+      "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
+    },
+    {
+      "id": "n109",
+      "type": "Output",
+      "position": { "x": 207.5, "y": 901.5 },
+      "data": {"label": "Output"}
     }
   ],
   "edges": [
@@ -61,10 +61,10 @@
     {"id": "e170", "source": "n105", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e171", "source": "n107", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e177", "source": "n108", "target": "n106", "sourceHandle": "out", "targetHandle": "texture"},
-    {"id": "e235", "source": "n111", "target": "n110", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e243", "source": "n111", "target": "n115", "sourceHandle": "out", "targetHandle": "mesh"},
-    {"id": "e244", "source": "n110", "target": "n115", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e245", "source": "n115", "target": "n109", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e342", "source": "n110", "target": "n115", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e343", "source": "n115", "target": "n109", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e344", "source": "n106", "target": "n115", "sourceHandle": "out", "targetHandle": "mesh"},
+    {"id": "e345", "source": "n111", "target": "n110", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},

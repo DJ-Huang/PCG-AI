@@ -110,7 +110,7 @@ namespace DJTechEditor.PCG.Graph
                 m_Body.Clear();
                 style.display = DisplayStyle.Flex;
 
-                var titleLabel = new Label(node.title)
+                var titleLabel = new Label(node.GetDisplayTitle())
                 {
                     style =
                     {

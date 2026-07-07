@@ -55,11 +55,13 @@ namespace DJTechEditor.PCG.Graph
 
         public override void ApplyData(PcgNodeData data)
         {
-            _data = data;
+            _data = data ?? new PcgNodeData();
+            SetUserTitle(_data.GetRaw("__nodeTitle")?.ToString() ?? "");
         }
 
         public override PcgNodeData CollectData()
         {
+            _data.SetRaw("__nodeTitle", GetUserTitle());
             return _data;
         }
 
@@ -71,9 +73,11 @@ namespace DJTechEditor.PCG.Graph
         private Port CreatePort(Direction direction, string portName, string label)
         {
             var capacity = direction == Direction.Input ? Port.Capacity.Single : Port.Capacity.Multi;
-            var port = PcgPort.Create(Orientation.Horizontal, direction, capacity, typeof(float));
-            port.portName = string.IsNullOrEmpty(label) ? portName : label;
+            var port = PcgPort.Create(Orientation.Vertical, direction, capacity, typeof(float));
+            port.portName = "";
+            port.tooltip = string.IsNullOrEmpty(label) ? portName : label;
             port.userData = portName;
+            StyleHoudiniPin(port, direction);
             return port;
         }
     }
