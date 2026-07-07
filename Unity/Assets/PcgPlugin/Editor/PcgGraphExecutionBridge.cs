@@ -18,7 +18,7 @@ namespace DJTechEditor.PCG
             PcgGraphComponent.EditorBuildExecutionJson = BuildExecutionJson;
         }
 
-        private static string BuildExecutionJson(PcgGraphComponent component)
+        private static string BuildExecutionJson(PcgGraphComponent component, PcgPreviewQuality quality)
         {
             if (component == null || component.GraphAsset == null)
                 return null;
@@ -41,6 +41,7 @@ namespace DJTechEditor.PCG
                     continue;
 
                 component.ApplyOverridesToDocument(liveDoc);
+                PcgGraphPreviewOverrides.Apply(liveDoc, quality);
                 var json = PcgGraphSerializer.ToJson(liveDoc, pretty: false);
                 Debug.Log($"[PCG] Run uses live Graph Editor state for '{assetPath}'.");
                 return json;

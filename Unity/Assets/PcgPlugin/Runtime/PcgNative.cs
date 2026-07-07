@@ -90,8 +90,74 @@ namespace DJTechRuntime.PCG
             return ExecuteGraph(json, seed, null);
         }
 
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v4(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            out int outVertexCount,
+            out int outIndexCount,
+            StringBuilder errBuf,
+            int errBufSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeCookStats
+        {
+            public int nodes_executed;
+            public int nodes_skipped;
+        }
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v5(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            StringBuilder errBuf,
+            int errBufSize);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void pcg_cook_cache_clear();
+
+        public static void ClearCookCache() => pcg_cook_cache_clear();
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct NativeMeshSlot
+        {
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string slot_id;
+            public int vertex_count;
+            public int index_count;
+            public IntPtr positions;
+            public IntPtr indices;
+        }
+
         public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
             string json, int seed, IReadOnlyList<PcgTextureUpload> textures)
+        {
+            return ExecuteGraph(json, seed, textures, null);
+        }
+
+        public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
+            string json, int seed, IReadOnlyList<PcgTextureUpload> textures, IReadOnlyList<PcgMeshUpload> meshes)
         {
             var errBuf = new StringBuilder(ErrBufSize);
             var jsonBuf = new byte[OutJsonBufSize];
@@ -101,8 +167,80 @@ namespace DJTechRuntime.PCG
             int kind;
             int vertexCount;
             int indexCount;
+            NativeCookStats cookStats;
 
-            if (textures != null && textures.Count > 0)
+            var hasTextures = textures != null && textures.Count > 0;
+            var hasMeshes = meshes != null && meshes.Count > 0;
+
+            if (hasMeshes)
+            {
+                var nativeTextures = hasTextures ? new NativeTextureSlot[textures.Count] : null;
+                var textureHandles = new List<GCHandle>();
+                var nativeMeshes = new NativeMeshSlot[meshes.Count];
+                var meshHandles = new List<GCHandle>();
+                try
+                {
+                    if (hasTextures)
+                    {
+                        for (var i = 0; i < textures.Count; i++)
+                        {
+                            var upload = textures[i];
+                            var pin = GCHandle.Alloc(upload.Rgba, GCHandleType.Pinned);
+                            textureHandles.Add(pin);
+                            nativeTextures[i] = new NativeTextureSlot
+                            {
+                                slot_id = upload.SlotId,
+                                width = upload.Width,
+                                height = upload.Height,
+                                rgba = pin.AddrOfPinnedObject(),
+                            };
+                        }
+                    }
+
+                    for (var i = 0; i < meshes.Count; i++)
+                    {
+                        var upload = meshes[i];
+                        var posPin = GCHandle.Alloc(upload.Positions, GCHandleType.Pinned);
+                        var idxPin = GCHandle.Alloc(upload.Indices, GCHandleType.Pinned);
+                        meshHandles.Add(posPin);
+                        meshHandles.Add(idxPin);
+                        nativeMeshes[i] = new NativeMeshSlot
+                        {
+                            slot_id = upload.SlotId,
+                            vertex_count = upload.VertexCount,
+                            index_count = upload.IndexCount,
+                            positions = posPin.AddrOfPinnedObject(),
+                            indices = idxPin.AddrOfPinnedObject(),
+                        };
+                    }
+
+                    rc = (PcgResultCode)pcg_execute_graph_v5(
+                        json,
+                        seed,
+                        nativeTextures,
+                        nativeTextures?.Length ?? 0,
+                        nativeMeshes,
+                        nativeMeshes.Length,
+                        out kind,
+                        jsonBuf,
+                        jsonBuf.Length,
+                        meshBuf,
+                        meshBuf.Length,
+                        out vertexCount,
+                        out indexCount,
+                        out cookStats,
+                        errBuf,
+                        ErrBufSize);
+                }
+                finally
+                {
+                    foreach (var handle in textureHandles)
+                        handle.Free();
+                    foreach (var handle in meshHandles)
+                        handle.Free();
+                }
+            }
+            else if (hasTextures)
             {
                 var nativeSlots = new NativeTextureSlot[textures.Count];
                 var handles = new List<GCHandle>(textures.Count);
@@ -122,11 +260,13 @@ namespace DJTechRuntime.PCG
                         };
                     }
 
-                    rc = (PcgResultCode)pcg_execute_graph_v3(
+                    rc = (PcgResultCode)pcg_execute_graph_v5(
                         json,
                         seed,
                         nativeSlots,
                         nativeSlots.Length,
+                        null,
+                        0,
                         out kind,
                         jsonBuf,
                         jsonBuf.Length,
@@ -134,6 +274,7 @@ namespace DJTechRuntime.PCG
                         meshBuf.Length,
                         out vertexCount,
                         out indexCount,
+                        out cookStats,
                         errBuf,
                         ErrBufSize);
                 }
@@ -145,9 +286,13 @@ namespace DJTechRuntime.PCG
             }
             else
             {
-                rc = (PcgResultCode)pcg_execute_graph_v2(
+                rc = (PcgResultCode)pcg_execute_graph_v5(
                     json,
                     seed,
+                    null,
+                    0,
+                    null,
+                    0,
                     out kind,
                     jsonBuf,
                     jsonBuf.Length,
@@ -155,6 +300,7 @@ namespace DJTechRuntime.PCG
                     meshBuf.Length,
                     out vertexCount,
                     out indexCount,
+                    out cookStats,
                     errBuf,
                     ErrBufSize);
             }
@@ -181,6 +327,8 @@ namespace DJTechRuntime.PCG
                     MeshBinary = meshBinary,
                     VertexCount = vertexCount,
                     IndexCount = indexCount,
+                    CookNodesExecuted = cookStats.nodes_executed,
+                    CookNodesSkipped = cookStats.nodes_skipped,
                 });
             }
 
@@ -190,6 +338,8 @@ namespace DJTechRuntime.PCG
             {
                 Kind = executeKind,
                 Json = Encoding.UTF8.GetString(jsonBuf, 0, length),
+                CookNodesExecuted = cookStats.nodes_executed,
+                CookNodesSkipped = cookStats.nodes_skipped,
             });
         }
     }
@@ -218,5 +368,7 @@ namespace DJTechRuntime.PCG
         public int VertexCount;
         public int IndexCount;
         public string Error;
+        public int CookNodesExecuted;
+        public int CookNodesSkipped;
     }
 }

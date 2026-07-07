@@ -6,6 +6,7 @@
 namespace pcg::internal {
 
 class TextureRuntime;
+class MeshRuntime;
 
 /** Per-node execution context (UE PCGContext analogue). */
 struct PcgContext {
@@ -13,6 +14,7 @@ struct PcgContext {
     const Graph* graph = nullptr;
     const GraphNode* node = nullptr;
     const TextureRuntime* textures = nullptr;
+    const MeshRuntime* meshes = nullptr;
     data::PcgDataCollection inputs;
     data::PcgDataCollection outputs;
     char* err_buf = nullptr;

@@ -5,25 +5,19 @@
       "id": "n101",
       "type": "CreateBoxMesh",
       "position": { "x": 50, "y": 266 },
-      "data": {"width": 2, "height": 2, "depth": 2}
+      "data": {"width": 2.464706, "height": 2, "depth": 2}
     },
     {
       "id": "n105",
       "type": "BevelMesh",
       "position": { "x": 279.5, "y": 266 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.4529412, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.4529412, "segments": 1, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     },
     {
       "id": "n107",
       "type": "SubdivideMesh",
       "position": { "x": 498, "y": 189 },
-      "data": {"levels": 3}
-    },
-    {
-      "id": "n109",
-      "type": "Output",
-      "position": { "x": 976.5, "y": 387 },
-      "data": {"label": "Output"}
+      "data": {"levels": 1}
     },
     {
       "id": "n108",
@@ -35,15 +29,28 @@
       "id": "n106",
       "type": "MeshNoiseDeform",
       "position": { "x": 732, "y": 387 },
-      "data": {"intensity": 0.05, "scale": 13.18441, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
+      "data": {"intensity": 0.02, "scale": 14.31365, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
+    },
+    {
+      "id": "n109",
+      "type": "Output",
+      "position": { "x": 1357.5, "y": 388 },
+      "data": {"label": "Output"}
+    },
+    {
+      "id": "n110",
+      "type": "SampleMeshSurface",
+      "position": { "x": 1011.5, "y": 411 },
+      "data": {"count": 100, "seed": 0, "normalOffset": 0, "looseness": 0}
     }
   ],
   "edges": [
     {"id": "e105", "source": "n101", "target": "n105", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e170", "source": "n105", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e171", "source": "n107", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e175", "source": "n106", "target": "n109", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e177", "source": "n108", "target": "n106", "sourceHandle": "out", "targetHandle": "texture"}
+    {"id": "e177", "source": "n108", "target": "n106", "sourceHandle": "out", "targetHandle": "texture"},
+    {"id": "e195", "source": "n106", "target": "n110", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e196", "source": "n110", "target": "n109", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p2", "name": "Width", "type": "number", "default": 2, "exposed": true, "targetNode": "n101", "targetProperty": "width", "hasRange": true, "min": 1, "max": 4},

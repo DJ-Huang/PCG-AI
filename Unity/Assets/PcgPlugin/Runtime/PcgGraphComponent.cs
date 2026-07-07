@@ -1,15 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
+#if UNITY_EDITOR
+using System.Linq;
+#endif
 
 namespace DJTechRuntime.PCG
 {
-    public enum PcgExecutionMode
-    {
-        None = 0,
-        RunOnStart = 1,
-        EveryFrame = 2,
-    }
-
     /// <summary>
     /// Unified PCG component — binds a <see cref="PcgGraphAsset"/>, exposes its
     /// parameters in the Inspector, executes the graph, and renders the result.
@@ -20,10 +17,30 @@ namespace DJTechRuntime.PCG
     {
         [SerializeField] private PcgGraphAsset graphAsset;
         [SerializeField] private int seed = 42;
-        [SerializeField] private PcgExecutionMode executionMode = PcgExecutionMode.RunOnStart;
+
+        [FormerlySerializedAs("executionMode")]
+        [SerializeField] private PcgCookMode cookMode = PcgCookMode.OnParameterChange;
+
+        [SerializeField, Min(0.05f)]
+        private float editModeCookInterval = 0.15f;
 
         [SerializeField]
         private List<PcgParameterOverride> m_ParameterOverrides = new();
+
+        [SerializeField]
+        private List<PcgMeshBinding> m_MeshBindings = new();
+
+        private float m_NextEditModeCookTime;
+        private bool m_PreviewCookPending;
+        private bool m_CookInProgress;
+        private bool m_ForceFullQuality;
+
+#if UNITY_EDITOR
+        private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
+
+        /// <summary>Editor-only preview mesh bindings (Graph Editor / Inspector).</summary>
+        public static System.Func<PcgGraphComponent, IReadOnlyList<PcgPreviewMeshBinding>> EditorResolvePreviewMeshBindings;
+#endif
 
         [SerializeField] private float gizmoSize = 0.2f;
         [SerializeField] private Color gizmoColor = new(0.2f, 0.8f, 1f);
@@ -45,24 +62,143 @@ namespace DJTechRuntime.PCG
 
         public List<PcgParameterOverride> ParameterOverrides => m_ParameterOverrides;
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
+        public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
+        public PcgCookMode CookMode => cookMode;
+
+        /// <summary>
+        /// Edit Mode: <see cref="PcgCookMode.EveryFrame"/> is downgraded to
+        /// <see cref="PcgCookMode.OnParameterChange"/> (V107). Play Mode keeps EveryFrame.
+        /// </summary>
+        public PcgCookMode EffectiveCookMode =>
+            !Application.isPlaying && cookMode == PcgCookMode.EveryFrame
+                ? PcgCookMode.OnParameterChange
+                : cookMode;
+
         public PcgGraphDocument Document => m_Document;
         public bool HasGraph => graphAsset != null && !string.IsNullOrEmpty(graphAsset.GraphJson);
 
 #if UNITY_EDITOR
         /// <summary>Set by Editor bridge to include live Graph Editor node data when Run is pressed.</summary>
-        public static System.Func<PcgGraphComponent, string> EditorBuildExecutionJson;
+        public static System.Func<PcgGraphComponent, PcgPreviewQuality, string> EditorBuildExecutionJson;
+
+        /// <summary>Invoked after a preview cook applies results (SceneView repaint).</summary>
+        public static System.Action EditorAfterPreviewCookApplied;
 #endif
+
+        private void OnEnable()
+        {
+#if UNITY_EDITOR
+            s_EditModePreviewCooks.Add(this);
+#endif
+            if (!Application.isPlaying && SupportsEditModePreview())
+                RequestPreviewCook(immediate: true);
+        }
+
+        private void OnDisable()
+        {
+#if UNITY_EDITOR
+            s_EditModePreviewCooks.Remove(this);
+#endif
+        }
 
         private void Start()
         {
-            if (executionMode == PcgExecutionMode.RunOnStart && Application.isPlaying)
+            if (cookMode == PcgCookMode.RunOnStart && Application.isPlaying)
                 Run();
         }
 
         private void Update()
         {
-            if (executionMode == PcgExecutionMode.EveryFrame)
-                Run();
+            if (!Application.isPlaying)
+                return;
+
+            if (cookMode == PcgCookMode.EveryFrame)
+                Run(skipDocumentRefresh: true);
+        }
+
+#if UNITY_EDITOR
+        /// <summary>Called by <c>PcgEditModeCookScheduler</c> in the Editor assembly.</summary>
+        public static void TickAllEditModePreviewCooks()
+        {
+            foreach (var component in s_EditModePreviewCooks.ToArray())
+            {
+                if (component != null)
+                    component.TickEditModePreviewCook();
+            }
+        }
+
+        internal void TickEditModePreviewCook()
+        {
+            if (Application.isPlaying || !SupportsEditModePreview())
+                return;
+
+            if (EffectiveCookMode != PcgCookMode.OnParameterChange ||
+                !m_PreviewCookPending ||
+                Time.realtimeSinceStartup < m_NextEditModeCookTime)
+            {
+                return;
+            }
+
+            if (m_Document == null)
+                RefreshDocument();
+
+            if (Run(skipDocumentRefresh: true))
+            {
+                m_PreviewCookPending = false;
+                EditorAfterPreviewCookApplied?.Invoke();
+            }
+            else if (!m_CookInProgress)
+            {
+                m_PreviewCookPending = false;
+            }
+            else
+            {
+                m_NextEditModeCookTime = Time.realtimeSinceStartup + 0.05f;
+            }
+        }
+#endif
+
+        public bool SupportsEditModePreview()
+        {
+            return cookMode == PcgCookMode.EveryFrame ||
+                   cookMode == PcgCookMode.OnParameterChange;
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            // FormerlySerializedAs OnMouseUp = 5
+            if ((int)cookMode == 5)
+                cookMode = PcgCookMode.OnParameterChange;
+        }
+#endif
+
+        /// <summary>
+        /// Schedules a debounced cook for Edit Mode preview (OnParameterChange;
+        /// EveryFrame is downgraded to the same path in Edit Mode).
+        /// </summary>
+        public void RequestPreviewCook(bool immediate = false)
+        {
+            if (!SupportsEditModePreview())
+                return;
+
+            if (immediate)
+            {
+                m_PreviewCookPending = false;
+                if (m_Document == null)
+                    RefreshDocument();
+                if (Run(skipDocumentRefresh: true))
+                {
+                    m_NextEditModeCookTime = Time.realtimeSinceStartup + editModeCookInterval;
+#if UNITY_EDITOR
+                    EditorAfterPreviewCookApplied?.Invoke();
+#endif
+                }
+                return;
+            }
+
+            m_PreviewCookPending = true;
+            m_NextEditModeCookTime = Time.realtimeSinceStartup + editModeCookInterval;
         }
 
         public void RefreshDocument()
@@ -156,9 +292,17 @@ namespace DJTechRuntime.PCG
             return null;
         }
 
-        public bool Run()
+        public bool Run() => Run(skipDocumentRefresh: false, forceFullQuality: true);
+
+        public bool Run(bool skipDocumentRefresh) => Run(skipDocumentRefresh, forceFullQuality: false);
+
+        public bool Run(bool skipDocumentRefresh, bool forceFullQuality)
         {
-            RefreshDocument();
+            if (m_CookInProgress)
+                return false;
+
+            if (!skipDocumentRefresh)
+                RefreshDocument();
 
             if (m_Document == null)
             {
@@ -166,20 +310,64 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            m_ForceFullQuality = forceFullQuality;
+            m_CookInProgress = true;
+            try
+            {
+                return RunInternal();
+            }
+            finally
+            {
+                m_CookInProgress = false;
+                m_ForceFullQuality = false;
+            }
+        }
+
+        private static PcgPreviewQuality CurrentPreviewQuality(bool forceFullQuality) =>
+            forceFullQuality ? PcgPreviewQuality.Full : PcgPreviewQuality.Preview;
+
+        private bool RunInternal()
+        {
+            var quality = CurrentPreviewQuality(m_ForceFullQuality);
             string json = null;
 #if UNITY_EDITOR
-            json = EditorBuildExecutionJson?.Invoke(this);
+            json = EditorBuildExecutionJson?.Invoke(this, quality);
 #endif
             if (string.IsNullOrEmpty(json))
             {
-                ApplyOverridesToDocument();
-                json = PcgGraphSerializer.ToJson(m_Document, pretty: false);
+                if (!TryBuildExecutionJson(quality, out json))
+                    return false;
             }
 
-            var result = PcgGraphLoader.ExecuteWithResolvedTextures(json, seed);
+            var previewBindings = EditorResolvePreviewMeshBindings?.Invoke(this);
+            var result = PcgGraphLoader.ExecuteWithResolvedAssets(
+                json, seed, gameObject, m_MeshBindings, previewBindings, quality);
             if (result == null)
                 return false;
 
+            return ApplyExecutionResult(result);
+        }
+
+        private bool TryBuildExecutionJson(PcgPreviewQuality quality, out string json)
+        {
+            json = null;
+            if (!PcgGraphSerializer.TryFromJson(
+                    PcgGraphSerializer.ToJson(m_Document, pretty: false),
+                    out var execDoc,
+                    out var error))
+            {
+                Debug.LogError($"[PCG] Failed to clone graph document: {error}", this);
+                return false;
+            }
+
+            ApplyOverridesToDocument(execDoc);
+            PcgGraphPreviewOverrides.Apply(execDoc, quality);
+            json = PcgGraphSerializer.ToJson(execDoc, pretty: false);
+            return true;
+        }
+
+        private bool ApplyExecutionResult(PcgGraphExecuteResult result)
+        {
             var kind = PcgResultParser.DetectKind(result);
 
             switch (kind)
@@ -223,7 +411,7 @@ namespace DJTechRuntime.PCG
         {
             m_Points.Clear();
             m_Splines.Clear();
-            ApplyMesh(null);
+            ClearGeneratedMesh();
         }
 
         // --- Result rendering ---
@@ -233,17 +421,17 @@ namespace DJTechRuntime.PCG
 
         private void ApplyPoints(List<Vector3> points)
         {
+            ClearGeneratedMesh();
             m_Points.Clear();
             m_Splines.Clear();
-            ApplyMesh(null);
             m_Points.AddRange(points);
         }
 
         private void ApplySplines(List<List<Vector3>> splines)
         {
+            ClearGeneratedMesh();
             m_Points.Clear();
             m_Splines.Clear();
-            ApplyMesh(null);
             if (splines != null)
                 m_Splines.AddRange(splines);
         }
@@ -252,10 +440,42 @@ namespace DJTechRuntime.PCG
         private MeshFilter m_MeshFilter;
         private MeshRenderer m_MeshRenderer;
 
+        private void ClearGeneratedMesh()
+        {
+            if (m_GeneratedMesh != null)
+            {
+#if UNITY_EDITOR
+                DestroyImmediate(m_GeneratedMesh);
+#else
+                Destroy(m_GeneratedMesh);
+#endif
+                m_GeneratedMesh = null;
+            }
+
+            EnsureMeshComponents();
+            if (m_MeshFilter != null)
+                m_MeshFilter.sharedMesh = null;
+            if (m_MeshRenderer != null)
+                m_MeshRenderer.enabled = false;
+        }
+
         private void ApplyMesh(Mesh mesh)
         {
-            m_Points.Clear();
-            m_Splines.Clear();
+            if (mesh != null)
+            {
+                m_Points.Clear();
+                m_Splines.Clear();
+            }
+
+            if (m_GeneratedMesh != null && m_GeneratedMesh != mesh)
+            {
+#if UNITY_EDITOR
+                DestroyImmediate(m_GeneratedMesh);
+#else
+                Destroy(m_GeneratedMesh);
+#endif
+            }
+
             m_GeneratedMesh = mesh;
             EnsureMeshComponents();
             m_MeshFilter.sharedMesh = mesh;

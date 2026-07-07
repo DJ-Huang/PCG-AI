@@ -26,6 +26,8 @@ set(PCG_CORE_SOURCES
     src/pcg_core.cpp
     src/graph_parser.cpp
     src/graph_executor.cpp
+    src/cook_hash.cpp
+    src/graph_cook_cache.cpp
     src/data/pcg_metadata.cpp
     src/data/pcg_point_data.cpp
     src/data/pcg_param_data.cpp
@@ -34,10 +36,13 @@ set(PCG_CORE_SOURCES
     src/data/pcg_mesh_binary.cpp
     src/data/pcg_texture_data.cpp
     src/texture_runtime.cpp
+    src/mesh_runtime.cpp
     src/elements/mesh_algorithms.cpp
     src/elements/bevel_blender.cpp
     src/geometry/bmesh.cpp
     src/elements/mesh_elements.cpp
+    src/elements/mesh_scatter_algorithms.cpp
+    src/elements/mesh_scatter_elements.cpp
     src/data/pcg_data_collection.cpp
     src/elements/element_registry.cpp
     src/elements/element_utils.cpp
@@ -99,3 +104,15 @@ add_test(NAME test_data COMMAND test_data)
 add_test(NAME test_phase41 COMMAND test_phase41 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME test_phase42 COMMAND test_phase42 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 add_test(NAME test_phase43 COMMAND test_phase43 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_phase44 tests/test_phase44.cpp)
+target_link_libraries(test_phase44 PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_phase44 PRIVATE src)
+
+add_test(NAME test_phase44 COMMAND test_phase44 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_cook_cache tests/test_cook_cache.cpp)
+target_link_libraries(test_cook_cache PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_cook_cache PRIVATE src)
+
+add_test(NAME test_cook_cache COMMAND test_cook_cache WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)

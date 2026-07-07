@@ -130,6 +130,9 @@ namespace DJTechEditor.PCG.Graph
                 };
                 m_Body.Add(typeLabel);
 
+                if (node is PcgManifestNodeView meshDataNode && meshDataNode.NodeType == "GetMeshData")
+                    m_Body.Add(CreateGetMeshDataPreviewRow(meshDataNode));
+
                 if (node is PcgManifestNodeView manifestNode)
                     ShowManifestProperties(manifestNode);
             }
@@ -267,7 +270,11 @@ namespace DJTechEditor.PCG.Graph
                                 m_Blackboard.SetParameterDefault(binding.id, text));
                         },
                         onDragBegin: () => m_GraphView.BeginDrag("Change Parameter"),
-                        onDragEnd: () => m_GraphView.EndDrag()));
+                        onDragEnd: () =>
+                        {
+                            m_GraphView.EndDrag();
+                            NotifyGraphChanged();
+                        }));
                 }
                 else
                 {
@@ -296,9 +303,14 @@ namespace DJTechEditor.PCG.Graph
                             node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
                         else
                             node.SetPropertyValue(key, newValue);
+                        NotifyGraphChanged();
                     },
                     onDragBegin: () => m_GraphView.BeginDrag("Change Property"),
-                    onDragEnd: () => m_GraphView.EndDrag(),
+                    onDragEnd: () =>
+                    {
+                        m_GraphView.EndDrag();
+                        NotifyGraphChanged();
+                    },
                     onFieldCommit: newValue =>
                     {
                         m_GraphView.WithUndo("Change Property", () =>
@@ -308,6 +320,7 @@ namespace DJTechEditor.PCG.Graph
                             else
                                 node.SetPropertyValue(key, newValue);
                         });
+                        NotifyGraphChanged();
                     }));
                 return wrapper;
             }
@@ -361,6 +374,45 @@ namespace DJTechEditor.PCG.Graph
         }
 
         // ─── Shared helpers ─────────────────────────────────────────
+
+        private VisualElement CreateGetMeshDataPreviewRow(PcgManifestNodeView node)
+        {
+            var container = new VisualElement { style = { marginBottom = 8 } };
+            container.Add(new Label("Preview Mesh Binding")
+            {
+                style = { color = new Color(0.75f, 0.75f, 0.75f), fontSize = 10, marginBottom = 2 },
+            });
+
+            var bindingKey = node.CollectData().GetRaw("bindingKey")?.ToString() ?? "targetMesh";
+            MeshFilter current = null;
+            if (m_GraphView.HostWindow is PcgGraphEditorWindow editorWindow)
+            {
+                foreach (var binding in editorWindow.PreviewMeshBindings)
+                {
+                    if (binding != null && binding.bindingKey == bindingKey)
+                    {
+                        current = binding.previewMeshFilter;
+                        break;
+                    }
+                }
+            }
+
+            var field = new ObjectField("MeshFilter")
+            {
+                objectType = typeof(MeshFilter),
+                value = current,
+            };
+            field.RegisterValueChangedCallback(evt =>
+            {
+                if (m_GraphView.HostWindow is PcgGraphEditorWindow window)
+                    window.SetPreviewMeshFilter(bindingKey, evt.newValue as MeshFilter);
+                NotifyGraphChanged();
+            });
+            container.Add(field);
+            return container;
+        }
+
+        private void NotifyGraphChanged() => m_GraphView?.NotifyDocumentChanged();
 
         private (List<string> options, List<string> paramIds, int currentIdx) BuildBindOptions(
             string nodeId, string propertyKey, string propType)

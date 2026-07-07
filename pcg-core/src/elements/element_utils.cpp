@@ -118,6 +118,8 @@ data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* l
         return *mesh;
 
     const nlohmann::json* input = require_input_json(ctx, pin, label);
+    if (!input)
+        return {};
     return parse_mesh_input(*input);
 }
 

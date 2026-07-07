@@ -11,16 +11,19 @@ namespace DJTechEditor.PCG
         private PcgGraphComponent m_Target;
         private SerializedProperty m_GraphAssetProp;
         private SerializedProperty m_SeedProp;
-        private SerializedProperty m_ExecutionModeProp;
+        private SerializedProperty m_CookModeProp;
         private SerializedProperty m_OverridesProp;
+        private SerializedProperty m_MeshBindingsProp;
+        private bool m_SliderReleasedThisFrame;
 
         private void OnEnable()
         {
             m_Target = target as PcgGraphComponent;
             m_GraphAssetProp = serializedObject.FindProperty("graphAsset");
             m_SeedProp = serializedObject.FindProperty("seed");
-            m_ExecutionModeProp = serializedObject.FindProperty("executionMode");
+            m_CookModeProp = serializedObject.FindProperty("cookMode");
             m_OverridesProp = serializedObject.FindProperty("m_ParameterOverrides");
+            m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
 
             m_Target.RefreshDocument();
             serializedObject.Update();
@@ -39,16 +42,37 @@ namespace DJTechEditor.PCG
                 serializedObject.Update();
             }
 
+            EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(m_SeedProp);
-            EditorGUILayout.PropertyField(m_ExecutionModeProp);
+            EditorGUILayout.PropertyField(m_CookModeProp);
+            var cookMode = (PcgCookMode)m_CookModeProp.enumValueIndex;
+            var intervalProp = serializedObject.FindProperty("editModeCookInterval");
+            if (cookMode == PcgCookMode.OnParameterChange)
+                EditorGUILayout.PropertyField(intervalProp);
+            else if (cookMode == PcgCookMode.EveryFrame && !Application.isPlaying)
+                EditorGUILayout.PropertyField(
+                    intervalProp,
+                    new GUIContent(
+                        "Edit Mode Debounce",
+                        "EveryFrame is downgraded in Edit Mode; debounce interval for parameter preview."));
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                if (m_Target.SupportsEditModePreview())
+                    m_Target.RequestPreviewCook(immediate: true);
+                serializedObject.Update();
+            }
+
+            DrawCookModeHelp();
 
             EditorGUILayout.Space();
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Run", GUILayout.Height(28)))
+                if (GUILayout.Button("Run (Full)", GUILayout.Height(28)))
                 {
                     serializedObject.ApplyModifiedProperties();
+                    PcgNative.ClearCookCache();
                     m_Target.Run();
                     serializedObject.Update();
                 }
@@ -67,9 +91,52 @@ namespace DJTechEditor.PCG
                 }
             }
 
+            DrawMeshBindings();
             DrawParameters();
 
+            if (m_SliderReleasedThisFrame && m_Target.SupportsEditModePreview())
+            {
+                serializedObject.ApplyModifiedProperties();
+                m_Target.RequestPreviewCook(immediate: true);
+                m_SliderReleasedThisFrame = false;
+                serializedObject.Update();
+            }
+
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private void DrawCookModeHelp()
+        {
+            if (Application.isPlaying)
+                return;
+
+            switch ((PcgCookMode)m_CookModeProp.enumValueIndex)
+            {
+                case PcgCookMode.EveryFrame:
+                    EditorGUILayout.HelpBox(
+                        Application.isPlaying
+                            ? "Play Mode: cooks every frame."
+                            : "EveryFrame applies in Play Mode only. Edit Mode preview is downgraded to On Parameter Change (debounced).",
+                        Application.isPlaying ? MessageType.Info : MessageType.Warning);
+                    break;
+                case PcgCookMode.OnParameterChange:
+                    EditorGUILayout.HelpBox(
+                        "Debounced preview after parameter changes.",
+                        MessageType.Info);
+                    break;
+                case PcgCookMode.Manual:
+                    EditorGUILayout.HelpBox(
+                        "Manual only — use Run (Full) or Graph Editor.",
+                        MessageType.Info);
+                    break;
+            }
+        }
+
+        private void DrawMeshBindings()
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Mesh Bindings", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(m_MeshBindingsProp, includeChildren: true);
         }
 
         private void DrawParameters()
@@ -92,6 +159,7 @@ namespace DJTechEditor.PCG
 
             EnsureOverrideCount(graphParams);
 
+            EditorGUI.BeginChangeCheck();
             for (var i = 0; i < graphParams.Count; i++)
             {
                 var param = graphParams[i];
@@ -102,6 +170,14 @@ namespace DJTechEditor.PCG
                     break;
 
                 DrawOverrideField(param, m_OverridesProp.GetArrayElementAtIndex(i));
+            }
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                if (m_Target.SupportsEditModePreview())
+                    m_Target.RequestPreviewCook();
+                serializedObject.Update();
             }
         }
 
@@ -134,7 +210,7 @@ namespace DJTechEditor.PCG
             }
         }
 
-        private static void DrawOverrideField(PcgGraphParameter param, SerializedProperty element)
+        private void DrawOverrideField(PcgGraphParameter param, SerializedProperty element)
         {
             var typeProp = element.FindPropertyRelative("type");
 
@@ -151,6 +227,8 @@ namespace DJTechEditor.PCG
                         iProp.intValue = EditorGUILayout.IntField(
                             iProp.intValue, GUILayout.Width(50));
                         EditorGUILayout.EndHorizontal();
+                        if (IsSliderMouseUp())
+                            m_SliderReleasedThisFrame = true;
                     }
                     else
                         iProp.intValue = EditorGUILayout.IntField(param.name, iProp.intValue);
@@ -166,6 +244,8 @@ namespace DJTechEditor.PCG
                         fProp.floatValue = EditorGUILayout.FloatField(
                             fProp.floatValue, GUILayout.Width(50));
                         EditorGUILayout.EndHorizontal();
+                        if (IsSliderMouseUp())
+                            m_SliderReleasedThisFrame = true;
                     }
                     else
                         fProp.floatValue = EditorGUILayout.FloatField(param.name, fProp.floatValue);
@@ -179,6 +259,14 @@ namespace DJTechEditor.PCG
                     sProp.stringValue = EditorGUILayout.TextField(param.name, sProp.stringValue);
                     break;
             }
+        }
+
+        private static bool IsSliderMouseUp()
+        {
+            var evt = Event.current;
+            return evt != null &&
+                   (evt.type == EventType.MouseUp || evt.type == EventType.DragExited) &&
+                   evt.button == 0;
         }
     }
 }

@@ -23,7 +23,11 @@ namespace DJTechEditor.PCG.Graph
         private string m_PendingAction;
         private bool m_PendingCommit;
 
+        public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
+
         public PcgGraphState State => m_State;
+
+        public EditorWindow HostWindow => m_HostWindow;
 
         public PcgGraphBlackboard Blackboard
         {
@@ -247,6 +251,13 @@ namespace DJTechEditor.PCG.Graph
             }
             m_PendingSnapshot = null;
             m_PendingAction = null;
+            NotifyDocumentChanged();
+        }
+
+        public void NotifyDocumentChanged()
+        {
+            if (m_HostWindow is PcgGraphEditorWindow window)
+                GraphDocumentChanged?.Invoke(window);
         }
 
         /// <summary>Called by EditorWindow.Update() when version mismatch is detected.

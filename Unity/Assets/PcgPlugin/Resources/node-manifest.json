@@ -329,18 +329,6 @@
       }
     },
     {
-      "type": "ImageTexture",
-      "displayName": "Image Texture",
-      "category": "Texture",
-      "inputs": [],
-      "outputs": [{ "id": "out", "label": "Texture", "pinType": "Texture" }],
-      "properties": {
-        "texture": { "type": "texture2d", "default": "" },
-        "repeatX": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 64.0 },
-        "repeatY": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 64.0 }
-      }
-    },
-    {
       "type": "MeshNoiseDeform",
       "displayName": "Mesh Noise Deform",
       "category": "Mesh",
@@ -366,6 +354,51 @@
             { "value": "texture", "label": "Texture (requires input)" }
           ]
         }
+      }
+    },
+    {
+      "type": "ImageTexture",
+      "displayName": "Image Texture",
+      "category": "Texture",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Texture", "pinType": "Texture" }],
+      "properties": {
+        "texture": { "type": "texture2d", "default": "" },
+        "repeatX": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 64.0 },
+        "repeatY": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 64.0 }
+      }
+    },
+    {
+      "type": "GetMeshData",
+      "displayName": "Get Mesh Data",
+      "category": "Input",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "source": {
+          "type": "enum",
+          "default": "Binding",
+          "options": [
+            { "value": "Binding", "label": "Binding" },
+            { "value": "Self", "label": "Self" },
+            { "value": "Asset", "label": "Asset" }
+          ]
+        },
+        "bindingKey": { "type": "string", "default": "targetMesh" },
+        "meshAsset": { "type": "string", "default": "" }
+      }
+    },
+    {
+      "type": "SampleMeshSurface",
+      "displayName": "Sample Mesh Surface",
+      "category": "Generation",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "count": { "type": "integer", "default": 100, "minimum": 0, "maximum": 1000000 },
+        "seed": { "type": "integer", "default": 0 },
+        "normalOffset": { "type": "number", "default": 0.0 },
+        "looseness": { "type": "number", "default": 0.0, "minimum": 0 }
       }
     },
     {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 /* ── DLL export/import macros ────────────────────────── */
 
 #if defined(_WIN32) && !defined(PCG_STATIC)
@@ -128,6 +130,7 @@ typedef struct {
 
 /**
  * Executes a Graph JSON with optional runtime texture pixel uploads.
+ * Falls back to pcg_execute_graph_v2 when textures is null or texture_count is 0.
  */
 PCG_API PcgResultCode pcg_execute_graph_v3(const char* json,
                                            int seed,
@@ -142,6 +145,63 @@ PCG_API PcgResultCode pcg_execute_graph_v3(const char* json,
                                            int* out_index_count,
                                            char* err_buf,
                                            int err_buf_size);
+
+typedef struct {
+    const char* slot_id;
+    int vertex_count;
+    int index_count;
+    const float* positions;
+    const uint32_t* indices;
+} PcgMeshSlot;
+
+/**
+ * Executes a Graph JSON with optional runtime texture and mesh slot uploads.
+ * Falls back to v3 when mesh_count is 0; v3 falls back to v2 when texture_count is 0.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v4(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           char* err_buf,
+                                           int err_buf_size);
+
+typedef struct {
+    int nodes_executed;
+    int nodes_skipped;
+} PcgCookStats;
+
+/**
+ * Executes a graph with per-node dirty cache (Blender depsgraph-style input_hash memoization).
+ * Falls back to v4 when mesh_count is 0; v4 falls back to v3 when texture_count is 0.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v5(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           PcgCookStats* out_stats,
+                                           char* err_buf,
+                                           int err_buf_size);
+
+/** Clears the session-scoped per-node cook cache. */
+PCG_API void pcg_cook_cache_clear(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

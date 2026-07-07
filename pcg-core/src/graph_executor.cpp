@@ -1,5 +1,6 @@
 #include "graph_executor.hpp"
 
+#include "cook_hash.hpp"
 #include "data/pcg_context.hpp"
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
@@ -7,7 +8,9 @@
 
 #include <queue>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+#include <algorithm>
 
 namespace pcg::internal {
 namespace {
@@ -115,7 +118,9 @@ PcgResultCode execute_graph(const Graph& graph,
                             GraphExecutionResult& out_result,
                             char* err_buf,
                             int err_buf_size,
-                            const TextureRuntime* textures)
+                            const TextureRuntime* textures,
+                            const MeshRuntime* meshes,
+                            GraphCookCache* cache)
 {
     elements::register_builtin_elements();
 
@@ -124,13 +129,53 @@ PcgResultCode execute_graph(const Graph& graph,
     if (topo_code != PCG_OK)
         return topo_code;
 
+    if (cache) {
+        const uint64_t structure_hash = compute_graph_structure_hash(graph);
+        if (cache->structure_hash() != 0 && cache->structure_hash() != structure_hash)
+            cache->clear();
+        cache->set_structure_hash(structure_hash);
+        cache->reset_stats();
+    }
+
     std::unordered_map<std::string, const GraphNode*> node_by_id;
     for (const auto& node : graph.nodes)
         node_by_id[node.id] = &node;
 
+    std::unordered_map<std::string, uint64_t> output_hashes;
     NodeOutputMap outputs;
     for (const auto& node_id : order) {
         const GraphNode* node = node_by_id[node_id];
+
+        std::vector<std::pair<std::string, uint64_t>> upstream_hashes;
+        for (const auto& edge : graph.edges) {
+            if (edge.target != node_id)
+                continue;
+
+            const auto it = output_hashes.find(edge.source);
+            if (it == output_hashes.end())
+                continue;
+
+            const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
+            upstream_hashes.emplace_back(pin + "\0" + edge.source, it->second);
+        }
+
+        std::sort(upstream_hashes.begin(), upstream_hashes.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        uint64_t input_hash = 0;
+        if (cache)
+            input_hash = compute_node_input_hash(*node, seed, upstream_hashes, textures, meshes);
+
+        if (cache) {
+            data::PcgDataCollection cached_outputs;
+            uint64_t cached_output_hash = 0;
+            if (cache->try_get(node_id, input_hash, cached_outputs, cached_output_hash)) {
+                outputs[node_id] = std::move(cached_outputs);
+                output_hashes[node_id] = cached_output_hash;
+                continue;
+            }
+        }
+
         const elements::IPcgElement* element = elements::find_element(node->type);
         if (!element)
             return fail(err_buf, err_buf_size, PCG_ERR_UNKNOWN_NODE, "Unknown node type");
@@ -140,6 +185,7 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.graph = &graph;
         ctx.node = node;
         ctx.textures = textures;
+        ctx.meshes = meshes;
         ctx.err_buf = err_buf;
         ctx.err_buf_size = err_buf_size;
 
@@ -153,6 +199,11 @@ PcgResultCode execute_graph(const Graph& graph,
             return rc;
 
         outputs[node_id] = std::move(ctx.outputs);
+        const uint64_t out_hash = compute_output_hash(outputs[node_id]);
+        output_hashes[node_id] = out_hash;
+
+        if (cache)
+            cache->put(node_id, input_hash, out_hash, outputs[node_id]);
     }
 
     const GraphNode* sink = nullptr;

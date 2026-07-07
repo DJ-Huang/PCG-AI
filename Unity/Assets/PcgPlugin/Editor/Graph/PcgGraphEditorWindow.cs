@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -24,9 +25,16 @@ namespace DJTechEditor.PCG.Graph
         private string m_CurrentFilePath;
         private bool m_GraphLoaded;
 
+        [SerializeField]
+        private List<PcgPreviewMeshBinding> m_PreviewMeshBindings = new();
+
         public string selectedGuid => m_Selected;
 
         public bool HasLoadedGraph => m_GraphLoaded && m_GraphView != null;
+
+        public string CurrentAssetPath => FullPathToAssetPath(m_CurrentFilePath);
+
+        public IReadOnlyList<PcgPreviewMeshBinding> PreviewMeshBindings => m_PreviewMeshBindings;
 
         public PcgGraphDocument ExportLiveDocument() => m_GraphView?.ExportDocument();
 
@@ -40,6 +48,27 @@ namespace DJTechEditor.PCG.Graph
 
             var windowAssetPath = FullPathToAssetPath(m_CurrentFilePath);
             return string.Equals(windowAssetPath, assetDatabasePath, System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        public void SetPreviewMeshFilter(string bindingKey, MeshFilter filter)
+        {
+            if (string.IsNullOrEmpty(bindingKey))
+                bindingKey = "targetMesh";
+
+            foreach (var binding in m_PreviewMeshBindings)
+            {
+                if (binding != null && binding.bindingKey == bindingKey)
+                {
+                    binding.previewMeshFilter = filter;
+                    return;
+                }
+            }
+
+            m_PreviewMeshBindings.Add(new PcgPreviewMeshBinding
+            {
+                bindingKey = bindingKey,
+                previewMeshFilter = filter,
+            });
         }
 
         [MenuItem(MenuPath)]

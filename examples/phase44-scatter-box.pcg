@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": { "width": 2.0, "height": 2.0, "depth": 2.0 }
+    },
+    {
+      "id": "n2",
+      "type": "SubdivideMesh",
+      "position": { "x": 280, "y": 0 },
+      "data": { "levels": 1 }
+    },
+    {
+      "id": "n3",
+      "type": "SampleMeshSurface",
+      "position": { "x": 560, "y": 0 },
+      "data": { "count": 256, "seed": 42, "normalOffset": 0.0, "looseness": 0.0 }
+    },
+    {
+      "id": "n4",
+      "type": "StaticMeshSpawner",
+      "position": { "x": 840, "y": 0 },
+      "data": { "prefab": "ScatterMarker", "mesh": "", "scale": 0.15 }
+    },
+    {
+      "id": "n5",
+      "type": "Output",
+      "position": { "x": 1120, "y": 0 },
+      "data": { "label": "Scatter Output" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "n1", "target": "n2", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2", "source": "n2", "target": "n3", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3", "source": "n3", "target": "n4", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e4", "source": "n4", "target": "n5", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}
