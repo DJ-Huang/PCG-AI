@@ -67,7 +67,7 @@ namespace DJTechEditor.PCG
             {
                 EditorGUILayout.PropertyField(
                     m_EnableAsyncCookInEditorProp,
-                    new GUIContent("Async Cook In Editor", "Run preview cook in background thread; Esc cancels current cook."));
+                    new GUIContent("Async Cook In Editor", "Run cook in background thread; Esc cancels current cook."));
             }
             if (EditorGUI.EndChangeCheck())
             {
@@ -84,7 +84,7 @@ namespace DJTechEditor.PCG
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("Run (Full)", GUILayout.Height(28)))
+                if (GUILayout.Button("Run", GUILayout.Height(28)))
                 {
                     serializedObject.ApplyModifiedProperties();
                     PcgNative.ClearCookCache();
@@ -183,7 +183,7 @@ namespace DJTechEditor.PCG
                     break;
                 case PcgCookMode.Manual:
                     EditorGUILayout.HelpBox(
-                        "Manual only — use Run (Full) or Graph Editor.",
+                        "Manual only — use Run or Graph Editor.",
                         MessageType.Info);
                     break;
             }

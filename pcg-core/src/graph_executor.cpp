@@ -87,8 +87,8 @@ void gather_inputs(const Graph& graph,
         const std::string source_pin = edge.source_handle.empty() ? "out" : edge.source_handle;
         const data::PcgDataCollection& upstream = it->second;
 
-        if (const data::PcgPointData* points = upstream.find_points(source_pin)) {
-            inputs.add_points(pin, *points);
+        if (auto points = upstream.find_points_shared(source_pin)) {
+            inputs.add_points_shared(pin, points);
             if (auto spawn_mesh = upstream.find_mesh_shared("spawnMesh"))
                 inputs.add_mesh_shared("spawnMesh", spawn_mesh);
             continue;
@@ -283,6 +283,15 @@ PcgResultCode execute_graph(const Graph& graph,
                 break;
             }
         }
+    }
+
+    if (const data::PcgTaggedData* out_item = sink_output.find("out"); out_item && out_item->points) {
+        out_result.kind = GraphResultKind::Points;
+        out_result.points = out_item->points;
+        out_result.point_sidecar = out_item->payload;
+        out_result.json = nlohmann::json::object();
+        out_result.mesh = data::PcgMeshData{};
+        return PCG_OK;
     }
 
     const nlohmann::json primary = sink_output.primary_json();

@@ -21,7 +21,7 @@ namespace DJTechRuntime.PCG
 
         public static PcgGraphExecuteResult ExecuteWithResolvedTextures(string json, int seed = 42)
         {
-            return ExecuteWithResolvedAssets(json, seed, null, null, null, PcgPreviewQuality.Full);
+            return ExecuteWithResolvedAssets(json, seed, null, null, null);
         }
 
         public static PcgGraphExecuteResult ExecuteWithResolvedAssets(
@@ -29,8 +29,7 @@ namespace DJTechRuntime.PCG
             int seed,
             GameObject componentHost,
             IReadOnlyList<PcgMeshBinding> meshBindings,
-            IReadOnlyList<PcgPreviewMeshBinding> previewBindings,
-            PcgPreviewQuality quality)
+            IReadOnlyList<PcgPreviewMeshBinding> previewBindings)
         {
             var assetSw = System.Diagnostics.Stopwatch.StartNew();
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
@@ -46,7 +45,7 @@ namespace DJTechRuntime.PCG
                 return null;
             assetSw.Stop();
 
-            var result = Execute(json, seed, textures, meshes, quality);
+            var result = Execute(json, seed, textures, meshes);
             if (result?.Perf != null)
                 result.Perf.AssetResolveMs = assetSw.Elapsed.TotalMilliseconds;
             return result;
@@ -54,15 +53,14 @@ namespace DJTechRuntime.PCG
 
         public static PcgGraphExecuteResult Execute(string json, int seed = 42)
         {
-            return Execute(json, seed, null, null, PcgPreviewQuality.Full);
+            return Execute(json, seed, null, null);
         }
 
         public static PcgGraphExecuteResult Execute(
             string json,
             int seed,
             IReadOnlyList<PcgTextureUpload> textures,
-            IReadOnlyList<PcgMeshUpload> meshes,
-            PcgPreviewQuality quality)
+            IReadOnlyList<PcgMeshUpload> meshes)
         {
             var validateSw = System.Diagnostics.Stopwatch.StartNew();
             var (validateCode, error) = PcgNative.ValidateGraph(json);
@@ -94,23 +92,23 @@ namespace DJTechRuntime.PCG
                     $"[PCG] Cook cache: skipped 0 node(s), executed {result.CookNodesExecuted} (cold).");
             }
 
-            PcgCookPerfLog.Log(result.Perf, quality);
+            PcgCookPerfLog.Log(result.Perf);
 
             if (PcgProjectSettings.IsLogEnabled)
             {
                 if (result.Kind == PcgExecuteKind.Mesh)
                 {
                     Debug.Log(
-                        $"[PCG] Graph executed ({quality}). Mesh binary: {result.VertexCount} verts, {result.IndexCount} indices.");
+                        $"[PCG] Graph executed. Mesh binary: {result.VertexCount} verts, {result.IndexCount} indices.");
                 }
                 else if (result.Kind == PcgExecuteKind.Points)
                 {
                     Debug.Log(
-                        $"[PCG] Graph executed ({quality}). Point binary: {result.PointCount} points, flags=0x{result.PointAttrFlags:X}.");
+                        $"[PCG] Graph executed. Point binary: {result.PointCount} points, flags=0x{result.PointAttrFlags:X}.");
                 }
                 else
                 {
-                    Debug.Log($"[PCG] Graph executed ({quality}). Result: {result.Json}");
+                    Debug.Log($"[PCG] Graph executed. Result: {result.Json}");
                 }
             }
 

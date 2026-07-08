@@ -1,6 +1,7 @@
 #include "pcg_api.h"
 
 #include "data/pcg_mesh_binary.hpp"
+#include "data/pcg_point_binary.hpp"
 #include "data/pcg_texture_data.hpp"
 #include "graph_cook_cache.hpp"
 #include "graph_executor.hpp"
@@ -130,6 +131,99 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
             return PCG_ERR_EXECUTION;
         }
 
+        return PCG_OK;
+    }
+
+    if (result.kind == pcg::internal::GraphResultKind::Points && result.points) {
+        const int point_count = static_cast<int>(result.points->points().size());
+        if (point_count <= 0) {
+            pcg::internal::write_error(err_buf, err_buf_size, "Point result is empty");
+            return PCG_ERR_EXECUTION;
+        }
+
+        if (out_points_buf && out_points_buf_size > 0) {
+            uint32_t flags = PCG_POINT_ATTR_NONE;
+            if (!pcg::internal::data::write_point_binary(
+                    *result.points, out_points_buf, out_points_buf_size, &flags)) {
+                const int required =
+                    pcg::internal::data::point_binary_size(*result.points,
+                                                           pcg::internal::data::detect_point_attr_flags(
+                                                               *result.points));
+                char message[256];
+                std::snprintf(message, sizeof(message),
+                              "Point binary buffer too small (need %d bytes, got %d)",
+                              required, out_points_buf_size);
+                pcg::internal::write_error(err_buf, err_buf_size, message);
+                return PCG_ERR_EXECUTION;
+            }
+
+            bool wrote_spawn_mesh_binary = false;
+            if (out_mesh_buf && out_mesh_buf_size > 0) {
+                const auto& spawn_mesh = result.spawn_mesh;
+                if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3) {
+                    if (!pcg::internal::data::write_mesh_binary(
+                            spawn_mesh, out_mesh_buf, out_mesh_buf_size)) {
+                        const int required = pcg::internal::data::mesh_binary_size(spawn_mesh);
+                        char message[256];
+                        std::snprintf(message, sizeof(message),
+                                      "Spawn mesh binary buffer too small (need %d bytes, got %d)",
+                                      required, out_mesh_buf_size);
+                        pcg::internal::write_error(err_buf, err_buf_size, message);
+                        return PCG_ERR_EXECUTION;
+                    }
+                    if (out_vertex_count)
+                        *out_vertex_count = static_cast<int>(spawn_mesh.vertices().size());
+                    if (out_index_count)
+                        *out_index_count = static_cast<int>(spawn_mesh.triangles().size());
+                    wrote_spawn_mesh_binary = true;
+                }
+            }
+
+            if (out_kind)
+                *out_kind = PCG_RESULT_KIND_POINTS;
+            if (out_point_count)
+                *out_point_count = point_count;
+            if (out_point_attr_flags)
+                *out_point_attr_flags = flags;
+            if (!wrote_spawn_mesh_binary) {
+                if (out_vertex_count)
+                    *out_vertex_count = 0;
+                if (out_index_count)
+                    *out_index_count = 0;
+            }
+            if (out_json && out_json_size > 0)
+                out_json[0] = '\0';
+            return PCG_OK;
+        }
+
+        if (!out_json || out_json_size <= 0) {
+            pcg::internal::write_error(err_buf, err_buf_size,
+                                       "Point result requires out_json or out_points_buf");
+            return PCG_ERR_EXECUTION;
+        }
+
+        nlohmann::json payload = result.points->to_json();
+        if (result.point_sidecar.is_object()) {
+            for (auto it = result.point_sidecar.begin(); it != result.point_sidecar.end(); ++it)
+                payload[it.key()] = it.value();
+        }
+        if (!payload.contains("pointCount"))
+            payload["pointCount"] = point_count;
+
+        const std::string serialized = payload.dump();
+        if (static_cast<int>(serialized.size()) >= out_json_size) {
+            pcg::internal::write_error(err_buf, err_buf_size, "JSON result exceeds output buffer");
+            return PCG_ERR_EXECUTION;
+        }
+
+        std::strncpy(out_json, serialized.c_str(), static_cast<size_t>(out_json_size - 1));
+        out_json[out_json_size - 1] = '\0';
+        if (out_kind)
+            *out_kind = PCG_RESULT_KIND_JSON;
+        if (out_vertex_count)
+            *out_vertex_count = 0;
+        if (out_index_count)
+            *out_index_count = 0;
         return PCG_OK;
     }
 
@@ -517,60 +611,9 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
         return exec_code;
     }
 
-    if (result.kind == pcg::internal::GraphResultKind::Mesh) {
-        if (out_kind)
-            *out_kind = PCG_RESULT_KIND_MESH;
-
-        const int vertex_count = static_cast<int>(result.mesh.vertices().size());
-        const int index_count = static_cast<int>(result.mesh.triangles().size());
-        if (out_vertex_count)
-            *out_vertex_count = vertex_count;
-        if (out_index_count)
-            *out_index_count = index_count;
-
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-
-        if (!out_mesh_buf || out_mesh_buf_size <= 0) {
-            pcg::internal::write_error(err_buf, err_buf_size,
-                                       "Mesh result requires out_mesh_buf");
-            return PCG_ERR_EXECUTION;
-        }
-
-        if (!pcg::internal::data::write_mesh_binary(result.mesh, out_mesh_buf, out_mesh_buf_size)) {
-            const int required = pcg::internal::data::mesh_binary_size(result.mesh);
-            char message[256];
-            std::snprintf(message, sizeof(message),
-                          "Mesh binary buffer too small (need %d bytes, got %d)",
-                          required, out_mesh_buf_size);
-            pcg::internal::write_error(err_buf, err_buf_size, message);
-            return PCG_ERR_EXECUTION;
-        }
-
-        return PCG_OK;
-    }
-
-    if (out_kind)
-        *out_kind = PCG_RESULT_KIND_JSON;
-    if (out_vertex_count)
-        *out_vertex_count = 0;
-    if (out_index_count)
-        *out_index_count = 0;
-
-    if (!out_json || out_json_size <= 0) {
-        pcg::internal::write_error(err_buf, err_buf_size, "JSON result requires out_json buffer");
-        return PCG_ERR_EXECUTION;
-    }
-
-    const std::string serialized = result.json.dump();
-    if (static_cast<int>(serialized.size()) >= out_json_size) {
-        pcg::internal::write_error(err_buf, err_buf_size, "JSON result exceeds output buffer");
-        return PCG_ERR_EXECUTION;
-    }
-
-    std::strncpy(out_json, serialized.c_str(), static_cast<size_t>(out_json_size - 1));
-    out_json[out_json_size - 1] = '\0';
-    return PCG_OK;
+    return write_execution_result(result, out_kind, out_json, out_json_size, out_mesh_buf,
+                                  out_mesh_buf_size, nullptr, 0, nullptr, nullptr,
+                                  out_vertex_count, out_index_count, err_buf, err_buf_size);
 }
 
 PcgResultCode pcg_execute_graph_v3(const char* json,
@@ -633,60 +676,9 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
         return exec_code;
     }
 
-    if (result.kind == pcg::internal::GraphResultKind::Mesh) {
-        if (out_kind)
-            *out_kind = PCG_RESULT_KIND_MESH;
-
-        const int vertex_count = static_cast<int>(result.mesh.vertices().size());
-        const int index_count = static_cast<int>(result.mesh.triangles().size());
-        if (out_vertex_count)
-            *out_vertex_count = vertex_count;
-        if (out_index_count)
-            *out_index_count = index_count;
-
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-
-        if (!out_mesh_buf || out_mesh_buf_size <= 0) {
-            pcg::internal::write_error(err_buf, err_buf_size,
-                                       "Mesh result requires out_mesh_buf");
-            return PCG_ERR_EXECUTION;
-        }
-
-        if (!pcg::internal::data::write_mesh_binary(result.mesh, out_mesh_buf, out_mesh_buf_size)) {
-            const int required = pcg::internal::data::mesh_binary_size(result.mesh);
-            char message[256];
-            std::snprintf(message, sizeof(message),
-                          "Mesh binary buffer too small (need %d bytes, got %d)",
-                          required, out_mesh_buf_size);
-            pcg::internal::write_error(err_buf, err_buf_size, message);
-            return PCG_ERR_EXECUTION;
-        }
-
-        return PCG_OK;
-    }
-
-    if (out_kind)
-        *out_kind = PCG_RESULT_KIND_JSON;
-    if (out_vertex_count)
-        *out_vertex_count = 0;
-    if (out_index_count)
-        *out_index_count = 0;
-
-    if (!out_json || out_json_size <= 0) {
-        pcg::internal::write_error(err_buf, err_buf_size, "JSON result requires out_json buffer");
-        return PCG_ERR_EXECUTION;
-    }
-
-    const std::string serialized = result.json.dump();
-    if (static_cast<int>(serialized.size()) >= out_json_size) {
-        pcg::internal::write_error(err_buf, err_buf_size, "JSON result exceeds output buffer");
-        return PCG_ERR_EXECUTION;
-    }
-
-    std::strncpy(out_json, serialized.c_str(), static_cast<size_t>(out_json_size - 1));
-    out_json[out_json_size - 1] = '\0';
-    return PCG_OK;
+    return write_execution_result(result, out_kind, out_json, out_json_size, out_mesh_buf,
+                                  out_mesh_buf_size, nullptr, 0, nullptr, nullptr,
+                                  out_vertex_count, out_index_count, err_buf, err_buf_size);
 }
 
 PcgResultCode pcg_execute_graph_v4(const char* json,
@@ -779,60 +771,9 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
         return exec_code;
     }
 
-    if (result.kind == pcg::internal::GraphResultKind::Mesh) {
-        if (out_kind)
-            *out_kind = PCG_RESULT_KIND_MESH;
-
-        const int vertex_count = static_cast<int>(result.mesh.vertices().size());
-        const int index_count = static_cast<int>(result.mesh.triangles().size());
-        if (out_vertex_count)
-            *out_vertex_count = vertex_count;
-        if (out_index_count)
-            *out_index_count = index_count;
-
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-
-        if (!out_mesh_buf || out_mesh_buf_size <= 0) {
-            pcg::internal::write_error(err_buf, err_buf_size,
-                                       "Mesh result requires out_mesh_buf");
-            return PCG_ERR_EXECUTION;
-        }
-
-        if (!pcg::internal::data::write_mesh_binary(result.mesh, out_mesh_buf, out_mesh_buf_size)) {
-            const int required = pcg::internal::data::mesh_binary_size(result.mesh);
-            char message[256];
-            std::snprintf(message, sizeof(message),
-                          "Mesh binary buffer too small (need %d bytes, got %d)",
-                          required, out_mesh_buf_size);
-            pcg::internal::write_error(err_buf, err_buf_size, message);
-            return PCG_ERR_EXECUTION;
-        }
-
-        return PCG_OK;
-    }
-
-    if (out_kind)
-        *out_kind = PCG_RESULT_KIND_JSON;
-    if (out_vertex_count)
-        *out_vertex_count = 0;
-    if (out_index_count)
-        *out_index_count = 0;
-
-    if (!out_json || out_json_size <= 0) {
-        pcg::internal::write_error(err_buf, err_buf_size, "JSON result requires out_json buffer");
-        return PCG_ERR_EXECUTION;
-    }
-
-    const std::string serialized = result.json.dump();
-    if (static_cast<int>(serialized.size()) >= out_json_size) {
-        pcg::internal::write_error(err_buf, err_buf_size, "JSON result exceeds output buffer");
-        return PCG_ERR_EXECUTION;
-    }
-
-    std::strncpy(out_json, serialized.c_str(), static_cast<size_t>(out_json_size - 1));
-    out_json[out_json_size - 1] = '\0';
-    return PCG_OK;
+    return write_execution_result(result, out_kind, out_json, out_json_size, out_mesh_buf,
+                                  out_mesh_buf_size, nullptr, 0, nullptr, nullptr,
+                                  out_vertex_count, out_index_count, err_buf, err_buf_size);
 }
 
 PcgResultCode pcg_execute_graph(const char* json,

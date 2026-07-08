@@ -30,6 +30,9 @@ void emit_points(PcgContext& ctx, data::PcgPointData data);
 void emit_points_with_meta(PcgContext& ctx,
                            data::PcgPointData data,
                            nlohmann::json sidecar);
+void emit_points_shared_with_meta(PcgContext& ctx,
+                                  std::shared_ptr<const data::PcgPointData> points,
+                                  nlohmann::json sidecar);
 void emit_splines(PcgContext& ctx, data::PcgSplineData data);
 void emit_mesh(PcgContext& ctx, data::PcgMeshData data);
 void emit_mesh_shared(PcgContext& ctx,

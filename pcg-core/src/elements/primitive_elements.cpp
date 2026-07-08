@@ -452,16 +452,17 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing node");
 
-        data::PcgPointData points =
-            get_points_input(ctx, "in", "StaticMeshSpawner missing points input");
-        if (points.points().empty())
+        auto input_points = ctx.inputs.find_points_shared("in");
+        if (!input_points || input_points->points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing points input");
+
+        auto points = std::make_shared<data::PcgPointData>(*input_points);
 
         const std::string prefab = ctx.node->data.value("prefab", "");
         const std::string mesh = ctx.node->data.value("mesh", "");
         const double scale = ctx.node->data.value("scale", 1.0);
 
-        for (auto& point : points.points_mut()) {
+        for (auto& point : points->points_mut()) {
             if (!prefab.empty())
                 point.attributes["prefab"] = prefab;
             if (!mesh.empty())
@@ -474,7 +475,7 @@ public:
             {"prefab", prefab},
             {"mesh", mesh},
             {"scale", scale},
-            {"pointCount", points.points().size()},
+            {"pointCount", points->points().size()},
         };
 
         if (auto prototype = ctx.inputs.find_mesh_shared("mesh")) {
@@ -485,7 +486,7 @@ public:
                 ctx.outputs.add_mesh("spawnMesh", std::move(spawn_mesh));
         }
 
-        ctx.outputs.add_points_with_meta("out", std::move(points), std::move(sidecar));
+        emit_points_shared_with_meta(ctx, std::move(points), std::move(sidecar));
         return PCG_OK;
     }
 };

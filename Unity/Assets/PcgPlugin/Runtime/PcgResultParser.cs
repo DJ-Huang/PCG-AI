@@ -111,7 +111,7 @@ namespace DJTechRuntime.PCG
             return DetectKind(result.Json);
         }
 
-        public static bool TryParseMeshBinary(byte[] data, out Mesh mesh, out string error)
+        public static unsafe bool TryParseMeshBinary(byte[] data, out Mesh mesh, out string error)
         {
             mesh = null;
             error = null;
@@ -124,51 +124,48 @@ namespace DJTechRuntime.PCG
 
             try
             {
-                var magic = BitConverter.ToUInt32(data, 0);
-                if (magic != PcgNative.MeshBinaryMagic)
+                fixed (byte* ptr = data)
                 {
-                    error = $"Invalid mesh binary magic: 0x{magic:X8}";
-                    return false;
-                }
+                    var magic = *(uint*)ptr;
+                    if (magic != PcgNative.MeshBinaryMagic)
+                    {
+                        error = $"Invalid mesh binary magic: 0x{magic:X8}";
+                        return false;
+                    }
 
-                var vertexCount = BitConverter.ToInt32(data, 8);
-                var indexCount = BitConverter.ToInt32(data, 12);
-                var required = PcgNative.MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
-                if (data.Length < required)
-                {
-                    error = $"Mesh binary truncated (need {required} bytes, got {data.Length}).";
-                    return false;
-                }
+                    var vertexCount = *(int*)(ptr + 8);
+                    var indexCount = *(int*)(ptr + 12);
+                    var required = PcgNative.MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+                    if (data.Length < required)
+                    {
+                        error = $"Mesh binary truncated (need {required} bytes, got {data.Length}).";
+                        return false;
+                    }
 
-                var vertices = new Vector3[vertexCount];
-                var offset = PcgNative.MeshBinaryHeaderSize;
-                for (var i = 0; i < vertexCount; i++)
-                {
-                    var x = BitConverter.ToSingle(data, offset);
-                    offset += 4;
-                    var y = BitConverter.ToSingle(data, offset);
-                    offset += 4;
-                    var z = BitConverter.ToSingle(data, offset);
-                    offset += 4;
-                    vertices[i] = new Vector3(x, y, z);
-                }
+                    var vertices = new Vector3[vertexCount];
+                    fixed (Vector3* dst = vertices)
+                    {
+                        Buffer.MemoryCopy(ptr + PcgNative.MeshBinaryHeaderSize, dst, vertexCount * 12,
+                            vertexCount * 12);
+                    }
 
-                var triangles = new int[indexCount];
-                for (var i = 0; i < indexCount; i++)
-                {
-                    triangles[i] = (int)BitConverter.ToUInt32(data, offset);
-                    offset += 4;
-                }
+                    var triangles = new int[indexCount];
+                    var indexOffset = PcgNative.MeshBinaryHeaderSize + vertexCount * 12;
+                    fixed (int* dst = triangles)
+                    {
+                        Buffer.MemoryCopy(ptr + indexOffset, dst, indexCount * 4, indexCount * 4);
+                    }
 
-                mesh = new Mesh { name = "PCG Generated Mesh" };
-                if (vertices.Length > 65535)
-                    mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                mesh.vertices = vertices;
-                mesh.triangles = triangles;
-                mesh.RecalculateNormals();
-                mesh.RecalculateTangents();
-                mesh.RecalculateBounds();
-                return true;
+                    mesh = new Mesh { name = "PCG Generated Mesh" };
+                    if (vertices.Length > 65535)
+                        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                    mesh.vertices = vertices;
+                    mesh.triangles = triangles;
+                    mesh.RecalculateNormals();
+                    mesh.RecalculateTangents();
+                    mesh.RecalculateBounds();
+                    return true;
+                }
             }
             catch (Exception ex)
             {
@@ -177,7 +174,7 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        public static bool TryParsePointBinary(byte[] data, out List<PcgScatterPoint> points, out string error)
+        public static unsafe bool TryParsePointBinary(byte[] data, out List<PcgScatterPoint> points, out string error)
         {
             points = new List<PcgScatterPoint>();
             error = null;
@@ -190,90 +187,91 @@ namespace DJTechRuntime.PCG
 
             try
             {
-                var magic = BitConverter.ToUInt32(data, 0);
-                if (magic != PcgNative.PointBinaryMagic)
+                fixed (byte* ptr = data)
                 {
-                    error = $"Invalid point binary magic: 0x{magic:X8}";
-                    return false;
-                }
-
-                var pointCount = BitConverter.ToInt32(data, 8);
-                var flags = (PcgPointAttrFlags)BitConverter.ToUInt32(data, 12);
-                var required = PcgNative.PointBinaryHeaderSize + pointCount * 12;
-                if (flags.HasFlag(PcgPointAttrFlags.Normal))
-                    required += pointCount * 12;
-                if (flags.HasFlag(PcgPointAttrFlags.Uv))
-                    required += pointCount * 8;
-                if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
-                    required += pointCount * 4;
-                if (flags.HasFlag(PcgPointAttrFlags.Scale))
-                    required += pointCount * 4;
-                if (flags.HasFlag(PcgPointAttrFlags.Rotation))
-                    required += pointCount * 16;
-
-                if (data.Length < required)
-                {
-                    error = $"Point binary truncated (need {required} bytes, got {data.Length}).";
-                    return false;
-                }
-
-                var offset = PcgNative.PointBinaryHeaderSize;
-                points.Capacity = pointCount;
-                for (var i = 0; i < pointCount; i++)
-                {
-                    var x = BitConverter.ToSingle(data, offset);
-                    offset += 4;
-                    var y = BitConverter.ToSingle(data, offset);
-                    offset += 4;
-                    var z = BitConverter.ToSingle(data, offset);
-                    offset += 4;
-                    var position = new Vector3(x, y, z);
-                    points.Add(new PcgScatterPoint
+                    var magic = *(uint*)ptr;
+                    if (magic != PcgNative.PointBinaryMagic)
                     {
-                        Position = position,
-                        Normal = Vector3.up,
-                        HasNormal = false,
-                        Scale = 1f,
-                        HasScale = false
-                    });
-                }
+                        error = $"Invalid point binary magic: 0x{magic:X8}";
+                        return false;
+                    }
 
-                if (flags.HasFlag(PcgPointAttrFlags.Normal))
-                {
+                    var pointCount = *(int*)(ptr + 8);
+                    var flags = (PcgPointAttrFlags)(*(uint*)(ptr + 12));
+                    var required = PcgNative.PointBinaryHeaderSize + pointCount * 12;
+                    if (flags.HasFlag(PcgPointAttrFlags.Normal))
+                        required += pointCount * 12;
+                    if (flags.HasFlag(PcgPointAttrFlags.Uv))
+                        required += pointCount * 8;
+                    if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
+                        required += pointCount * 4;
+                    if (flags.HasFlag(PcgPointAttrFlags.Scale))
+                        required += pointCount * 4;
+                    if (flags.HasFlag(PcgPointAttrFlags.Rotation))
+                        required += pointCount * 16;
+
+                    if (data.Length < required)
+                    {
+                        error = $"Point binary truncated (need {required} bytes, got {data.Length}).";
+                        return false;
+                    }
+
+                    var parsed = new PcgScatterPoint[pointCount];
+                    var offset = PcgNative.PointBinaryHeaderSize;
+                    var src = (float*)(ptr + offset);
                     for (var i = 0; i < pointCount; i++)
                     {
-                        var nx = BitConverter.ToSingle(data, offset);
-                        offset += 4;
-                        var ny = BitConverter.ToSingle(data, offset);
-                        offset += 4;
-                        var nz = BitConverter.ToSingle(data, offset);
-                        offset += 4;
-                        var point = points[i];
-                        point.Normal = new Vector3(nx, ny, nz);
-                        point.HasNormal = point.Normal.sqrMagnitude > 1e-8f;
-                        points[i] = point;
+                        var baseIndex = i * 3;
+                        parsed[i] = new PcgScatterPoint
+                        {
+                            Position = new Vector3(src[baseIndex], src[baseIndex + 1], src[baseIndex + 2]),
+                            Normal = Vector3.up,
+                            HasNormal = false,
+                            Scale = 1f,
+                            HasScale = false
+                        };
                     }
-                }
 
-                if (flags.HasFlag(PcgPointAttrFlags.Uv))
-                    offset += pointCount * 8;
-                if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
-                    offset += pointCount * 4;
-                if (flags.HasFlag(PcgPointAttrFlags.Scale))
-                {
-                    for (var i = 0; i < pointCount; i++)
+                    offset += pointCount * 12;
+                    if (flags.HasFlag(PcgPointAttrFlags.Normal))
                     {
-                        var point = points[i];
-                        point.Scale = BitConverter.ToSingle(data, offset);
-                        point.HasScale = true;
-                        points[i] = point;
-                        offset += 4;
-                    }
-                }
-                if (flags.HasFlag(PcgPointAttrFlags.Rotation))
-                    offset += pointCount * 16;
+                        var normals = (float*)(ptr + offset);
+                        for (var i = 0; i < pointCount; i++)
+                        {
+                            var baseIndex = i * 3;
+                            var normal = new Vector3(normals[baseIndex], normals[baseIndex + 1],
+                                normals[baseIndex + 2]);
+                            parsed[i].Normal = normal;
+                            parsed[i].HasNormal = normal.sqrMagnitude > 1e-8f;
+                        }
 
-                return true;
+                        offset += pointCount * 12;
+                    }
+
+                    if (flags.HasFlag(PcgPointAttrFlags.Uv))
+                        offset += pointCount * 8;
+                    if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
+                        offset += pointCount * 4;
+                    if (flags.HasFlag(PcgPointAttrFlags.Scale))
+                    {
+                        var scales = (float*)(ptr + offset);
+                        for (var i = 0; i < pointCount; i++)
+                        {
+                            parsed[i].Scale = scales[i];
+                            parsed[i].HasScale = true;
+                        }
+
+                        offset += pointCount * 4;
+                    }
+
+                    if (flags.HasFlag(PcgPointAttrFlags.Rotation))
+                        offset += pointCount * 16;
+
+                    points = new List<PcgScatterPoint>(pointCount);
+                    for (var i = 0; i < pointCount; i++)
+                        points.Add(parsed[i]);
+                    return true;
+                }
             }
             catch (Exception ex)
             {

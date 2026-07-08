@@ -37,7 +37,6 @@ namespace DJTechRuntime.PCG
         private bool m_PreviewCookPending;
         private bool m_CookInProgress;
         private bool m_AsyncCookInProgress;
-        private bool m_ForceFullQuality;
         private CancellationTokenSource m_AsyncCookCts;
         private Task<AsyncCookResult> m_AsyncCookTask;
         private int m_AsyncCookGeneration;
@@ -107,7 +106,7 @@ namespace DJTechRuntime.PCG
 
 #if UNITY_EDITOR
         /// <summary>Set by Editor bridge to include live Graph Editor node data when Run is pressed.</summary>
-        public static System.Func<PcgGraphComponent, PcgPreviewQuality, string> EditorBuildExecutionJson;
+        public static System.Func<PcgGraphComponent, string> EditorBuildExecutionJson;
 
         /// <summary>Invoked after a preview cook applies results (SceneView repaint).</summary>
         public static System.Action EditorAfterPreviewCookApplied;
@@ -354,18 +353,16 @@ namespace DJTechRuntime.PCG
             return null;
         }
 
-        public bool Run() => Run(skipDocumentRefresh: false, forceFullQuality: true);
+        public bool Run() => Run(skipDocumentRefresh: false);
 
-        public bool Run(bool skipDocumentRefresh) => Run(skipDocumentRefresh, forceFullQuality: false);
-
-        public bool Run(bool skipDocumentRefresh, bool forceFullQuality)
+        public bool Run(bool skipDocumentRefresh)
         {
             if (m_CookInProgress)
                 return false;
 
             if (m_AsyncCookInProgress)
             {
-                if (ShouldUseAsyncCook(forceFullQuality))
+                if (ShouldUseAsyncCook())
                     CancelAsyncCook(null, log: false);
                 else
                     return false;
@@ -380,7 +377,6 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
-            m_ForceFullQuality = forceFullQuality;
             m_CookInProgress = true;
             try
             {
@@ -389,28 +385,23 @@ namespace DJTechRuntime.PCG
             finally
             {
                 m_CookInProgress = false;
-                m_ForceFullQuality = false;
             }
         }
 
-        private static PcgPreviewQuality CurrentPreviewQuality(bool forceFullQuality) =>
-            forceFullQuality ? PcgPreviewQuality.Full : PcgPreviewQuality.Preview;
-
         private bool RunInternal()
         {
-            var quality = CurrentPreviewQuality(m_ForceFullQuality);
             string json = null;
 #if UNITY_EDITOR
-            json = EditorBuildExecutionJson?.Invoke(this, quality);
+            json = EditorBuildExecutionJson?.Invoke(this);
 #endif
             if (string.IsNullOrEmpty(json))
             {
-                if (!TryBuildExecutionJson(quality, out json))
+                if (!TryBuildExecutionJson(out json))
                     return false;
             }
 
-            var cookKey = PcgGraphCookCache.BuildKey(json, seed, quality);
-            if (TryReuseCachedCook(cookKey, quality))
+            var cookKey = PcgGraphCookCache.BuildKey(json, seed);
+            if (TryReuseCachedCook(cookKey))
                 return true;
 
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
@@ -426,13 +417,13 @@ namespace DJTechRuntime.PCG
             if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out _))
                 return false;
 
-            if (ShouldUseAsyncCook(m_ForceFullQuality))
+            if (ShouldUseAsyncCook())
             {
                 StartAsyncCook(json, textures, meshes);
                 return true;
             }
 
-            var result = PcgGraphLoader.Execute(json, seed, textures, meshes, quality);
+            var result = PcgGraphLoader.Execute(json, seed, textures, meshes);
             if (result == null)
                 return false;
 
@@ -440,21 +431,21 @@ namespace DJTechRuntime.PCG
             return CommitCookResult(cookKey, result);
         }
 
-        private bool TryReuseCachedCook(string cookKey, PcgPreviewQuality quality)
+        private bool TryReuseCachedCook(string cookKey)
         {
             if (Application.isPlaying &&
                 cookMode == PcgCookMode.EveryFrame &&
                 cookKey == m_LastCookKey &&
                 m_HasAppliedCookResult)
             {
-                Debug.Log($"[PCG] Cook perf: skipped execute (EveryFrame, same key, {quality}).");
+                Debug.Log("[PCG] Cook perf: skipped execute (EveryFrame, same key).");
                 return true;
             }
 
             if (!PcgGraphCookCache.TryGet(cookKey, out var cached) || !CommitCookResult(cookKey, cached))
                 return false;
 
-            PcgCookPerfLog.LogCacheHit(cached.Perf, quality);
+            PcgCookPerfLog.LogCacheHit(cached.Perf);
             return true;
         }
 
@@ -475,7 +466,7 @@ namespace DJTechRuntime.PCG
             m_LastMeshBinaryHash = 0;
         }
 
-        private bool TryBuildExecutionJson(PcgPreviewQuality quality, out string json)
+        private bool TryBuildExecutionJson(out string json)
         {
             json = null;
             if (!PcgGraphSerializer.TryFromJson(
@@ -488,7 +479,6 @@ namespace DJTechRuntime.PCG
             }
 
             ApplyOverridesToDocument(execDoc);
-            PcgGraphPreviewOverrides.Apply(execDoc, quality);
             json = PcgGraphSerializer.ToJson(execDoc, pretty: false);
             return true;
         }
@@ -568,10 +558,10 @@ namespace DJTechRuntime.PCG
 
         private bool IsCookBusy() => m_CookInProgress || m_AsyncCookInProgress;
 
-        private bool ShouldUseAsyncCook(bool forceFullQuality)
+        private bool ShouldUseAsyncCook()
         {
 #if UNITY_EDITOR
-            return enableAsyncCookInEditor && !Application.isPlaying && !forceFullQuality;
+            return enableAsyncCookInEditor && !Application.isPlaying;
 #else
             return false;
 #endif

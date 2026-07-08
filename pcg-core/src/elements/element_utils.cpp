@@ -160,6 +160,13 @@ void emit_points_with_meta(PcgContext& ctx, data::PcgPointData data, nlohmann::j
     ctx.outputs.add_points_with_meta("out", std::move(data), std::move(sidecar));
 }
 
+void emit_points_shared_with_meta(PcgContext& ctx,
+                                  std::shared_ptr<const data::PcgPointData> points,
+                                  nlohmann::json sidecar)
+{
+    ctx.outputs.add_points_shared_with_meta("out", std::move(points), std::move(sidecar));
+}
+
 void emit_splines(PcgContext& ctx, data::PcgSplineData data)
 {
     ctx.outputs.add_splines("out", std::move(data));

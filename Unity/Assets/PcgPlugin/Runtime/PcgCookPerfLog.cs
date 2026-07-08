@@ -8,21 +8,21 @@ namespace DJTechRuntime.PCG
     /// <summary>Formats and logs end-to-end cook performance metrics.</summary>
     public static class PcgCookPerfLog
     {
-        public static void LogCacheHit(PcgCookPerfReport report, PcgPreviewQuality quality)
+        public static void LogCacheHit(PcgCookPerfReport report)
         {
-            Write(report, quality, "[whole-graph cache hit, re-applied last cook]");
+            Write(report, "[whole-graph cache hit, re-applied last cook]");
         }
 
-        public static void Log(PcgCookPerfReport report, PcgPreviewQuality quality)
+        public static void Log(PcgCookPerfReport report)
         {
-            Write(report, quality, null);
+            Write(report, null);
         }
 
-        private static void Write(PcgCookPerfReport report, PcgPreviewQuality quality, string suffix)
+        private static void Write(PcgCookPerfReport report, string suffix)
         {
             if (report == null)
             {
-                Debug.Log($"[PCG] Cook perf: whole-graph cache hit ({quality}), no perf snapshot.");
+                Debug.Log("[PCG] Cook perf: whole-graph cache hit, no perf snapshot.");
                 return;
             }
 
@@ -30,7 +30,7 @@ namespace DJTechRuntime.PCG
                 ? $"{Fmt(report.TotalMs)} total"
                 : suffix;
             var sb = new StringBuilder(512);
-            sb.AppendLine($"[PCG] Cook perf ({tag}, {quality}):");
+            sb.AppendLine($"[PCG] Cook perf ({tag}):");
             sb.AppendLine(
                 $"  Managed: assets={Fmt(report.AssetResolveMs)} validate={Fmt(report.ValidateMs)} buffer_copy={Fmt(report.BufferCopyMs)}");
             sb.AppendLine(

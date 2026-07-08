@@ -34,6 +34,7 @@ set(PCG_CORE_SOURCES
     src/data/pcg_spline_data.cpp
     src/data/pcg_mesh_data.cpp
     src/data/pcg_mesh_binary.cpp
+    src/data/pcg_point_binary.cpp
     src/data/pcg_texture_data.cpp
     src/texture_runtime.cpp
     src/mesh_runtime.cpp

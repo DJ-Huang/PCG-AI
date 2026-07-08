@@ -72,7 +72,7 @@ public:
         if (!ctx.node)
             return fail(ctx, PCG_ERR_EXECUTION, "PlaceInScene missing node");
 
-        const data::PcgPointData* points_payload = ctx.inputs.find_points("in");
+        auto points_payload = ctx.inputs.find_points_shared("in");
         if (!points_payload) {
             const nlohmann::json* json_payload = ctx.inputs.find_json("in");
             if (!json_payload)
@@ -104,7 +104,7 @@ public:
             {"scale", scale},
             {"pointCount", points_payload->points().size()},
         };
-        ctx.outputs.add_points_with_meta("out", *points_payload, std::move(sidecar));
+        ctx.outputs.add_points_shared_with_meta("out", std::move(points_payload), std::move(sidecar));
         return PCG_OK;
     }
 };
@@ -126,7 +126,7 @@ public:
 
         if (const data::PcgTaggedData* in_item = ctx.inputs.find("in");
             in_item && in_item->points) {
-            ctx.outputs.add_points_with_meta("out", *in_item->points, in_item->payload);
+            ctx.outputs.add_points_shared_with_meta("out", in_item->points, in_item->payload);
             if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
                 ctx.outputs.add_mesh_shared("spawnMesh", spawn_mesh);
             return PCG_OK;

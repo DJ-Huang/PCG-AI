@@ -21,7 +21,7 @@ struct PcgTaggedData {
     /** JSON payload for Param nodes and optional point sidecar fields (status/prefab/...). */
     nlohmann::json payload;
     std::shared_ptr<const PcgMeshData> mesh;
-    std::optional<PcgPointData> points;
+    std::shared_ptr<const PcgPointData> points;
     std::optional<PcgSplineData> splines;
 };
 
@@ -31,9 +31,13 @@ public:
     void add(const std::string& tag, PcgDataType type, nlohmann::json payload);
     void add_param(const std::string& tag, PcgParamData data);
     void add_points(const std::string& tag, PcgPointData data);
+    void add_points_shared(const std::string& tag, std::shared_ptr<const PcgPointData> points);
     void add_points_with_meta(const std::string& tag,
                               PcgPointData data,
                               nlohmann::json sidecar);
+    void add_points_shared_with_meta(const std::string& tag,
+                                     std::shared_ptr<const PcgPointData> points,
+                                     nlohmann::json sidecar);
     void add_splines(const std::string& tag, PcgSplineData data);
     void add_mesh(const std::string& tag, PcgMeshData data);
     void add_mesh_shared(const std::string& tag, std::shared_ptr<const PcgMeshData> mesh);
@@ -41,6 +45,7 @@ public:
     const PcgTaggedData* find(const std::string& tag) const;
     const nlohmann::json* find_json(const std::string& tag) const;
     const PcgPointData* find_points(const std::string& tag) const;
+    std::shared_ptr<const PcgPointData> find_points_shared(const std::string& tag) const;
     const PcgSplineData* find_splines(const std::string& tag) const;
     const PcgMeshData* find_mesh(const std::string& tag) const;
     std::shared_ptr<const PcgMeshData> find_mesh_shared(const std::string& tag) const;

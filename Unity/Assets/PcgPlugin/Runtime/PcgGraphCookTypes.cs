@@ -13,14 +13,7 @@ namespace DJTechRuntime.PCG
         Manual = 4,
     }
 
-    /// <summary>Preview vs full-quality execution — implicit from cook trigger, not user-facing.</summary>
-    public enum PcgPreviewQuality
-    {
-        Preview = 0,
-        Full = 1,
-    }
-
-    /// <summary>How scatter point results are drawn — independent of <see cref="PcgPreviewQuality"/>.</summary>
+    /// <summary>How scatter point results are drawn.</summary>
     public enum PcgScatterDisplayMode
     {
         MergedMesh = 0,

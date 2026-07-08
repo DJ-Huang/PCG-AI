@@ -32,7 +32,20 @@ void PcgDataCollection::add_points(const std::string& tag, PcgPointData data)
     PcgTaggedData item;
     item.tag = tag;
     item.type = PcgDataType::Point;
-    item.points = std::move(data);
+    item.points = std::make_shared<PcgPointData>(std::move(data));
+    items_.push_back(std::move(item));
+}
+
+void PcgDataCollection::add_points_shared(const std::string& tag,
+                                          std::shared_ptr<const PcgPointData> points)
+{
+    if (!points)
+        return;
+
+    PcgTaggedData item;
+    item.tag = tag;
+    item.type = PcgDataType::Point;
+    item.points = std::move(points);
     items_.push_back(std::move(item));
 }
 
@@ -43,7 +56,22 @@ void PcgDataCollection::add_points_with_meta(const std::string& tag,
     PcgTaggedData item;
     item.tag = tag;
     item.type = PcgDataType::Point;
-    item.points = std::move(data);
+    item.points = std::make_shared<PcgPointData>(std::move(data));
+    item.payload = std::move(sidecar);
+    items_.push_back(std::move(item));
+}
+
+void PcgDataCollection::add_points_shared_with_meta(const std::string& tag,
+                                                    std::shared_ptr<const PcgPointData> points,
+                                                    nlohmann::json sidecar)
+{
+    if (!points)
+        return;
+
+    PcgTaggedData item;
+    item.tag = tag;
+    item.type = PcgDataType::Point;
+    item.points = std::move(points);
     item.payload = std::move(sidecar);
     items_.push_back(std::move(item));
 }
@@ -98,10 +126,17 @@ const nlohmann::json* PcgDataCollection::find_json(const std::string& tag) const
 
 const PcgPointData* PcgDataCollection::find_points(const std::string& tag) const
 {
+    const auto shared = find_points_shared(tag);
+    return shared ? shared.get() : nullptr;
+}
+
+std::shared_ptr<const PcgPointData> PcgDataCollection::find_points_shared(
+    const std::string& tag) const
+{
     const PcgTaggedData* item = find(tag);
     if (!item || !item->points)
         return nullptr;
-    return &*item->points;
+    return item->points;
 }
 
 const PcgSplineData* PcgDataCollection::find_splines(const std::string& tag) const
