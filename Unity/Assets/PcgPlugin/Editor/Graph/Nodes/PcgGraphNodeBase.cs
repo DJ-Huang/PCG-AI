@@ -17,6 +17,7 @@ namespace DJTechEditor.PCG.Graph
         private Label m_RightTitleLabel;
         private TextField m_TitleEditor;
         private VisualElement m_RadialMenu;
+        private Button m_PreviewBtn;
         private string m_UserTitle = "";
         private bool m_IsPointerOnNode;
         private bool m_IsPointerOnMenu;
@@ -369,7 +370,58 @@ namespace DJTechEditor.PCG.Graph
             });
             m_RadialMenu.Add(paramsBtn);
 
+            m_PreviewBtn = CreateCircleButton("◎", () =>
+            {
+                var graphView = GetFirstAncestorOfType<PcgGraphView>();
+                graphView?.ToggleNodePreview(this);
+            });
+            m_PreviewBtn.tooltip = "Preview in Scene (toggle)";
+            m_PreviewBtn.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                m_IsPointerOnMenu = true;
+                UpdateRadialMenuVisibility();
+            });
+            m_PreviewBtn.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                m_IsPointerOnMenu = false;
+                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(80);
+            });
+            m_RadialMenu.Add(m_PreviewBtn);
+
             EnsureOverlayAttached();
+        }
+
+        public void SetNodePreviewState(bool isActive)
+        {
+            SetPreviewHighlighted(isActive);
+            if (m_PreviewBtn == null)
+                return;
+
+            m_PreviewBtn.style.backgroundColor = isActive
+                ? new Color(0.15f, 0.55f, 0.95f, 0.95f)
+                : new Color(0.2f, 0.2f, 0.2f, 0.85f);
+            m_PreviewBtn.style.color = isActive
+                ? Color.white
+                : new Color(0.85f, 0.9f, 0.95f);
+        }
+
+        private void SetPreviewHighlighted(bool highlighted)
+        {
+            const float normalBorder = 1f;
+            const float previewBorder = 2f;
+            var width = highlighted ? previewBorder : normalBorder;
+            var color = highlighted
+                ? new Color(0.25f, 0.75f, 1f, 1f)
+                : new Color(0.35f, 0.35f, 0.35f, 1f);
+
+            style.borderTopWidth = width;
+            style.borderRightWidth = width;
+            style.borderBottomWidth = width;
+            style.borderLeftWidth = width;
+            style.borderTopColor = color;
+            style.borderRightColor = color;
+            style.borderBottomColor = color;
+            style.borderLeftColor = color;
         }
 
         private static Button CreateCircleButton(string text, Action onClick)
@@ -469,8 +521,8 @@ namespace DJTechEditor.PCG.Graph
             const float diameter = 30f;
             const float ringRadius = 64f;
             const float center = 86f;
-            const float startDeg = -135f; // left-top
-            const float stepDeg = 28f;    // clockwise
+            const float startDeg = -150f;
+            const float stepDeg = 24f;
 
             for (var i = 0; i < buttons.Count; i++)
             {

@@ -41,8 +41,28 @@ namespace DJTechEditor.PCG
                     continue;
 
                 component.ApplyOverridesToDocument(liveDoc);
-                var json = PcgGraphSerializer.ToJson(liveDoc, pretty: false);
-                Debug.Log($"[PCG] Run uses live Graph Editor state for '{assetPath}'.");
+
+                var cookDoc = liveDoc;
+                var previewNodeId = window.PreviewNodeId;
+                if (!string.IsNullOrEmpty(previewNodeId))
+                {
+                    if (!PcgGraphPreviewSubgraph.TryBuildUpstream(
+                            liveDoc, previewNodeId, out var subgraph, out var previewError))
+                    {
+                        Debug.LogError($"[PCG] Node preview subgraph failed: {previewError}");
+                        return null;
+                    }
+
+                    cookDoc = subgraph;
+                    Debug.Log(
+                        $"[PCG] Run uses node preview '{window.PreviewNodeLabel}' for '{assetPath}'.");
+                }
+                else
+                {
+                    Debug.Log($"[PCG] Run uses live Graph Editor state for '{assetPath}'.");
+                }
+
+                var json = PcgGraphSerializer.ToJson(cookDoc, pretty: false);
                 return json;
             }
 

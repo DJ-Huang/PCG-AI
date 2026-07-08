@@ -30,7 +30,21 @@ namespace DJTechEditor.PCG.Graph
         [SerializeField]
         private List<PcgPreviewMeshBinding> m_PreviewMeshBindings = new();
 
+        [SerializeField]
+        private string m_PreviewNodeId;
+
+        [SerializeField]
+        private string m_PreviewNodeLabel;
+
+        private Label m_PreviewStatusLabel;
+        private Button m_ClearPreviewButton;
+
         public string selectedGuid => m_Selected;
+
+        public string PreviewNodeId => m_PreviewNodeId;
+
+        public string PreviewNodeLabel =>
+            string.IsNullOrEmpty(m_PreviewNodeLabel) ? m_PreviewNodeId : m_PreviewNodeLabel;
 
         public bool HasLoadedGraph => m_GraphLoaded && m_GraphView != null;
 
@@ -50,6 +64,91 @@ namespace DJTechEditor.PCG.Graph
 
             var windowAssetPath = FullPathToAssetPath(m_CurrentFilePath);
             return string.Equals(windowAssetPath, assetDatabasePath, System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        public void ToggleNodePreview(string nodeId, string nodeType, string displayTitle)
+        {
+            if (string.IsNullOrEmpty(nodeId))
+                return;
+
+            if (m_PreviewNodeId == nodeId)
+            {
+                ClearNodePreview();
+                return;
+            }
+
+            var label = string.IsNullOrEmpty(displayTitle) ? nodeType : $"{displayTitle} ({nodeType})";
+            SetPreviewNode(nodeId, label);
+        }
+
+        public void SetPreviewNode(string nodeId, string label)
+        {
+            if (string.IsNullOrEmpty(nodeId))
+                return;
+
+            m_PreviewNodeId = nodeId;
+            m_PreviewNodeLabel = label;
+            OnPreviewNodeChanged();
+        }
+
+        public void ClearNodePreview(bool silent = false)
+        {
+            if (string.IsNullOrEmpty(m_PreviewNodeId))
+                return;
+
+            m_PreviewNodeId = null;
+            m_PreviewNodeLabel = null;
+            OnPreviewNodeChanged(silent);
+        }
+
+        public void ValidatePreviewNodeExists()
+        {
+            if (string.IsNullOrEmpty(m_PreviewNodeId) || m_GraphView == null)
+                return;
+
+            var exists = false;
+            foreach (var node in m_GraphView.nodes)
+            {
+                if (node is PcgGraphNodeBase graphNode && graphNode.NodeId == m_PreviewNodeId)
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists)
+                ClearNodePreview(silent: true);
+        }
+
+        private void OnPreviewNodeChanged(bool silent = false)
+        {
+            m_GraphView?.RefreshNodePreviewVisuals();
+            RefreshPreviewToolbar();
+
+            PcgGraphCookCache.Clear();
+            PcgNative.ClearCookCache();
+            PcgGraphEditorCookBridge.NotifyGraphChanged(this, immediate: true);
+
+            if (!silent)
+            {
+                if (string.IsNullOrEmpty(m_PreviewNodeId))
+                    Debug.Log("[PCG] Node preview cleared — showing full graph output.");
+                else
+                    Debug.Log($"[PCG] Node preview enabled: {PreviewNodeLabel}");
+            }
+        }
+
+        internal void RefreshPreviewToolbar()
+        {
+            if (m_PreviewStatusLabel == null || m_ClearPreviewButton == null)
+                return;
+
+            var hasPreview = !string.IsNullOrEmpty(m_PreviewNodeId);
+            m_PreviewStatusLabel.style.display = hasPreview ? DisplayStyle.Flex : DisplayStyle.None;
+            m_ClearPreviewButton.style.display = hasPreview ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (hasPreview)
+                m_PreviewStatusLabel.text = $"Preview: {PreviewNodeLabel}";
         }
 
         public void SetPreviewMeshFilter(string bindingKey, MeshFilter filter)
@@ -215,6 +314,22 @@ namespace DJTechEditor.PCG.Graph
             toolbar.Add(MakeButton("Save", SaveGraph));
             toolbar.Add(MakeButton("Save As…", SaveAsGraph));
 
+            m_PreviewStatusLabel = new Label
+            {
+                style =
+                {
+                    marginRight = 8,
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                    color = new Color(0.55f, 0.85f, 1f),
+                    display = DisplayStyle.None,
+                },
+            };
+            toolbar.Add(m_PreviewStatusLabel);
+
+            m_ClearPreviewButton = MakeButton("Clear Preview", () => ClearNodePreview());
+            m_ClearPreviewButton.style.display = DisplayStyle.None;
+            toolbar.Add(m_ClearPreviewButton);
+
             var spacer = new VisualElement { style = { flexGrow = 1 } };
             toolbar.Add(spacer);
 
@@ -294,6 +409,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void LoadDefaultGraph()
         {
+            ClearNodePreview(silent: true);
             m_GraphView.LoadDocument(PcgGraphDefaults.CreatePipeline());
             m_Selected = null;
             m_CurrentFilePath = null;
@@ -322,6 +438,7 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
+            ClearNodePreview(silent: true);
             m_GraphView.LoadDocument(doc);
             m_CurrentFilePath = Path.GetFullPath(path);
 

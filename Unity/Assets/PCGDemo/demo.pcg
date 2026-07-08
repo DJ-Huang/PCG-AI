@@ -2,34 +2,10 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "n107",
-      "type": "SubdivideMesh",
-      "position": { "x": 103.5, "y": 417.5 },
-      "data": {"levels": 2}
-    },
-    {
-      "id": "n106",
-      "type": "MeshNoiseDeform",
-      "position": { "x": 149, "y": 556 },
-      "data": {"intensity": 0.02, "scale": 19.60208, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
-    },
-    {
       "id": "n108",
       "type": "ImageTexture",
       "position": { "x": 395, "y": 417.5 },
       "data": {"texture": "Resources/tuanjie_builtin_extra/Default-Particle", "repeatX": 1, "repeatY": 1}
-    },
-    {
-      "id": "n105",
-      "type": "BevelMesh",
-      "position": { "x": 103.5, "y": 322.5 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1652893, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
-    },
-    {
-      "id": "n101",
-      "type": "CreateBoxMesh",
-      "position": { "x": 103.5, "y": 230.5 },
-      "data": {"width": 2, "height": 2, "depth": 2}
     },
     {
       "id": "n115",
@@ -44,16 +20,40 @@
       "data": {"label": "Output"}
     },
     {
-      "id": "n110",
-      "type": "SampleMeshSurface",
-      "position": { "x": -127.5, "y": 594.5 },
-      "data": {"count": 91, "seed": 0, "normalOffset": 0, "looseness": 0}
+      "id": "n101",
+      "type": "CreateBoxMesh",
+      "position": { "x": 103.5, "y": 230.5 },
+      "data": {"width": 2, "height": 2, "depth": 2}
     },
     {
       "id": "n111",
       "type": "GetMeshData",
       "position": { "x": -127.5, "y": 500 },
       "data": {"source": "Binding", "bindingKey": "targetMesh", "meshAsset": ""}
+    },
+    {
+      "id": "n110",
+      "type": "SampleMeshSurface",
+      "position": { "x": -127.5, "y": 594.5 },
+      "data": {"count": 668, "seed": 0, "normalOffset": 0, "looseness": 0}
+    },
+    {
+      "id": "n106",
+      "type": "MeshNoiseDeform",
+      "position": { "x": 149, "y": 556 },
+      "data": {"intensity": 0.02, "scale": 19.60208, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin"}
+    },
+    {
+      "id": "n107",
+      "type": "SubdivideMesh",
+      "position": { "x": 103.5, "y": 421.5 },
+      "data": {"levels": 1}
+    },
+    {
+      "id": "n105",
+      "type": "BevelMesh",
+      "position": { "x": 103.5, "y": 322.5 },
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1652893, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj"}
     }
   ],
   "edges": [

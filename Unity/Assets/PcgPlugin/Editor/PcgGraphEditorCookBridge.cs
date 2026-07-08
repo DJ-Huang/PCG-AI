@@ -21,7 +21,7 @@ namespace DJTechEditor.PCG
             EditorApplication.QueuePlayerLoopUpdate();
         }
 
-        public static void NotifyGraphChanged(PcgGraphEditorWindow window)
+        public static void NotifyGraphChanged(PcgGraphEditorWindow window, bool immediate = false)
         {
             if (window == null || !window.HasLoadedGraph)
                 return;
@@ -43,7 +43,7 @@ namespace DJTechEditor.PCG
                 if (!component.SupportsEditModePreview())
                     continue;
 
-                component.RequestPreviewCook();
+                component.RequestPreviewCook(immediate);
             }
         }
 

@@ -126,6 +126,10 @@ namespace DJTechEditor.PCG.Graph
                 if (nodeView != null)
                 {
                     evt.menu.AppendAction(
+                        "Preview in Scene",
+                        _ => ToggleNodePreview(nodeView));
+
+                    evt.menu.AppendAction(
                         "Copy Raw Data",
                         _ =>
                         {
@@ -257,7 +261,25 @@ namespace DJTechEditor.PCG.Graph
         public void NotifyDocumentChanged()
         {
             if (m_HostWindow is PcgGraphEditorWindow window)
+            {
+                window.ValidatePreviewNodeExists();
                 GraphDocumentChanged?.Invoke(window);
+            }
+        }
+
+        public void ToggleNodePreview(PcgGraphNodeBase node)
+        {
+            if (node == null || m_HostWindow is not PcgGraphEditorWindow window)
+                return;
+
+            window.ToggleNodePreview(node.NodeId, node.NodeType, node.GetDisplayTitle());
+        }
+
+        public void RefreshNodePreviewVisuals()
+        {
+            var previewNodeId = m_HostWindow is PcgGraphEditorWindow window ? window.PreviewNodeId : null;
+            foreach (var node in nodes.OfType<PcgGraphNodeBase>())
+                node.SetNodePreviewState(!string.IsNullOrEmpty(previewNodeId) && node.NodeId == previewNodeId);
         }
 
         /// <summary>Called by EditorWindow.Update() when version mismatch is detected.
@@ -469,6 +491,9 @@ namespace DJTechEditor.PCG.Graph
                 state.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
             }
             m_Inspector?.OnSelectionChanged();
+            RefreshNodePreviewVisuals();
+            if (m_HostWindow is PcgGraphEditorWindow window)
+                window.RefreshPreviewToolbar();
         }
 
         public PcgGraphDocument ExportDocument()
