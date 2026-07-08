@@ -5,6 +5,7 @@
 #include "graph_perf_report.hpp"
 #include "internal/graph_types.hpp"
 #include "mesh_runtime.hpp"
+#include "spline_runtime.hpp"
 #include "pcg_api.h"
 #include "texture_runtime.hpp"
 
@@ -17,6 +18,7 @@ PcgResultCode execute_graph(const Graph& graph,
                             int err_buf_size,
                             const TextureRuntime* textures = nullptr,
                             const MeshRuntime* meshes = nullptr,
+                            const SplineRuntime* splines = nullptr,
                             GraphCookCache* cache = nullptr,
                             bool (*is_cancel_requested)() = nullptr,
                             GraphPerfReport* perf = nullptr);

@@ -2,6 +2,8 @@
 #include "elements/primitive_elements.hpp"
 #include "elements/mesh_elements.hpp"
 #include "elements/mesh_scatter_elements.hpp"
+#include "elements/spline_elements.hpp"
+#include "elements/spline_mesh_elements.hpp"
 #include "elements/structural_elements.hpp"
 
 #include "internal/error_util.hpp"
@@ -169,6 +171,8 @@ void register_builtin_elements()
     register_phase42_elements(map);
     register_mesh_elements(map);
     register_mesh_scatter_elements(map);
+    register_spline_elements(map);
+    register_spline_mesh_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

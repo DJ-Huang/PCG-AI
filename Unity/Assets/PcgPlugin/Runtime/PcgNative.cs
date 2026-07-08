@@ -167,6 +167,44 @@ namespace DJTechRuntime.PCG
             StringBuilder errBuf,
             int errBufSize);
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct NativeSplineSlot
+        {
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string slot_id;
+            public int spline_count;
+            public IntPtr spline_point_counts;
+            public IntPtr positions;
+            public IntPtr closed;
+        }
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v7(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            NativeSplineSlot[] splines,
+            int spline_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            byte[] outPointsBuf,
+            int outPointsBufSize,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
+            StringBuilder errBuf,
+            int errBufSize);
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         private static extern void pcg_cook_cache_clear();
 
@@ -221,12 +259,31 @@ namespace DJTechRuntime.PCG
         public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
             string json, int seed, IReadOnlyList<PcgTextureUpload> textures, IReadOnlyList<PcgMeshUpload> meshes)
         {
+            return ExecuteGraph(json, seed, textures, meshes, null);
+        }
+
+        public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
+            string json,
+            int seed,
+            IReadOnlyList<PcgTextureUpload> textures,
+            IReadOnlyList<PcgMeshUpload> meshes,
+            IReadOnlyList<PcgSplineUpload> splines)
+        {
             ClearCancel();
             var errBuf = new StringBuilder(ErrBufSize);
             var jsonBuf = new byte[OutJsonBufSize];
             var meshBuf = new byte[OutMeshBufSize];
             var pointsBuf = new byte[OutPointsBufSize];
             var perfBuf = new byte[OutPerfBufSize];
+
+            var hasTextures = textures != null && textures.Count > 0;
+            var hasMeshes = meshes != null && meshes.Count > 0;
+            var hasSplines = splines != null && splines.Count > 0;
+
+            var textureHandles = new List<GCHandle>();
+            var meshHandles = new List<GCHandle>();
+            var splineHandles = new List<GCHandle>();
+            var nativeSw = System.Diagnostics.Stopwatch.StartNew();
 
             PcgResultCode rc;
             int kind;
@@ -236,35 +293,31 @@ namespace DJTechRuntime.PCG
             int indexCount;
             NativeCookStats cookStats;
 
-            var hasTextures = textures != null && textures.Count > 0;
-            var hasMeshes = meshes != null && meshes.Count > 0;
-            var nativeSw = System.Diagnostics.Stopwatch.StartNew();
-
-            if (hasMeshes)
+            try
             {
-                var nativeTextures = hasTextures ? new NativeTextureSlot[textures.Count] : null;
-                var textureHandles = new List<GCHandle>();
-                var nativeMeshes = new NativeMeshSlot[meshes.Count];
-                var meshHandles = new List<GCHandle>();
-                try
+                NativeTextureSlot[] nativeTextures = null;
+                if (hasTextures)
                 {
-                    if (hasTextures)
+                    nativeTextures = new NativeTextureSlot[textures.Count];
+                    for (var i = 0; i < textures.Count; i++)
                     {
-                        for (var i = 0; i < textures.Count; i++)
+                        var upload = textures[i];
+                        var pin = GCHandle.Alloc(upload.Rgba, GCHandleType.Pinned);
+                        textureHandles.Add(pin);
+                        nativeTextures[i] = new NativeTextureSlot
                         {
-                            var upload = textures[i];
-                            var pin = GCHandle.Alloc(upload.Rgba, GCHandleType.Pinned);
-                            textureHandles.Add(pin);
-                            nativeTextures[i] = new NativeTextureSlot
-                            {
-                                slot_id = upload.SlotId,
-                                width = upload.Width,
-                                height = upload.Height,
-                                rgba = pin.AddrOfPinnedObject(),
-                            };
-                        }
+                            slot_id = upload.SlotId,
+                            width = upload.Width,
+                            height = upload.Height,
+                            rgba = pin.AddrOfPinnedObject(),
+                        };
                     }
+                }
 
+                NativeMeshSlot[] nativeMeshes = null;
+                if (hasMeshes)
+                {
+                    nativeMeshes = new NativeMeshSlot[meshes.Count];
                     for (var i = 0; i < meshes.Count; i++)
                     {
                         var upload = meshes[i];
@@ -281,98 +334,41 @@ namespace DJTechRuntime.PCG
                             indices = idxPin.AddrOfPinnedObject(),
                         };
                     }
+                }
 
-                    rc = (PcgResultCode)pcg_execute_graph_v6(
-                        json,
-                        seed,
-                        nativeTextures,
-                        nativeTextures?.Length ?? 0,
-                        nativeMeshes,
-                        nativeMeshes.Length,
-                        out kind,
-                        jsonBuf,
-                        jsonBuf.Length,
-                        meshBuf,
-                        meshBuf.Length,
-                        pointsBuf,
-                        pointsBuf.Length,
-                        out pointCount,
-                        out pointAttrFlags,
-                        out vertexCount,
-                        out indexCount,
-                        out cookStats,
-                        perfBuf,
-                        perfBuf.Length,
-                        errBuf,
-                        ErrBufSize);
-                }
-                finally
+                NativeSplineSlot[] nativeSplines = null;
+                if (hasSplines)
                 {
-                    foreach (var handle in textureHandles)
-                        handle.Free();
-                    foreach (var handle in meshHandles)
-                        handle.Free();
-                }
-            }
-            else if (hasTextures)
-            {
-                var nativeSlots = new NativeTextureSlot[textures.Count];
-                var handles = new List<GCHandle>(textures.Count);
-                try
-                {
-                    for (var i = 0; i < textures.Count; i++)
+                    nativeSplines = new NativeSplineSlot[splines.Count];
+                    for (var i = 0; i < splines.Count; i++)
                     {
-                        var upload = textures[i];
-                        var pin = GCHandle.Alloc(upload.Rgba, GCHandleType.Pinned);
-                        handles.Add(pin);
-                        nativeSlots[i] = new NativeTextureSlot
+                        var upload = splines[i];
+                        var countsPin = GCHandle.Alloc(upload.SplinePointCounts, GCHandleType.Pinned);
+                        var posPin = GCHandle.Alloc(upload.Positions, GCHandleType.Pinned);
+                        var closedPin = GCHandle.Alloc(upload.Closed, GCHandleType.Pinned);
+                        splineHandles.Add(countsPin);
+                        splineHandles.Add(posPin);
+                        splineHandles.Add(closedPin);
+                        nativeSplines[i] = new NativeSplineSlot
                         {
                             slot_id = upload.SlotId,
-                            width = upload.Width,
-                            height = upload.Height,
-                            rgba = pin.AddrOfPinnedObject(),
+                            spline_count = upload.SplineCount,
+                            spline_point_counts = countsPin.AddrOfPinnedObject(),
+                            positions = posPin.AddrOfPinnedObject(),
+                            closed = closedPin.AddrOfPinnedObject(),
                         };
                     }
+                }
 
-                    rc = (PcgResultCode)pcg_execute_graph_v6(
-                        json,
-                        seed,
-                        nativeSlots,
-                        nativeSlots.Length,
-                        null,
-                        0,
-                        out kind,
-                        jsonBuf,
-                        jsonBuf.Length,
-                        meshBuf,
-                        meshBuf.Length,
-                        pointsBuf,
-                        pointsBuf.Length,
-                        out pointCount,
-                        out pointAttrFlags,
-                        out vertexCount,
-                        out indexCount,
-                        out cookStats,
-                        perfBuf,
-                        perfBuf.Length,
-                        errBuf,
-                        ErrBufSize);
-                }
-                finally
-                {
-                    foreach (var handle in handles)
-                        handle.Free();
-                }
-            }
-            else
-            {
-                rc = (PcgResultCode)pcg_execute_graph_v6(
+                rc = (PcgResultCode)pcg_execute_graph_v7(
                     json,
                     seed,
-                    null,
-                    0,
-                    null,
-                    0,
+                    nativeTextures,
+                    nativeTextures?.Length ?? 0,
+                    nativeMeshes,
+                    nativeMeshes?.Length ?? 0,
+                    nativeSplines,
+                    nativeSplines?.Length ?? 0,
                     out kind,
                     jsonBuf,
                     jsonBuf.Length,
@@ -389,6 +385,15 @@ namespace DJTechRuntime.PCG
                     perfBuf.Length,
                     errBuf,
                     ErrBufSize);
+            }
+            finally
+            {
+                foreach (var handle in textureHandles)
+                    handle.Free();
+                foreach (var handle in meshHandles)
+                    handle.Free();
+                foreach (var handle in splineHandles)
+                    handle.Free();
             }
 
             nativeSw.Stop();

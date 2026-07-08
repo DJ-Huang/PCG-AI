@@ -9,6 +9,7 @@
 #include "graph_perf_report.hpp"
 #include "internal/error_util.hpp"
 #include "mesh_runtime.hpp"
+#include "spline_runtime.hpp"
 #include "texture_runtime.hpp"
 
 #include <nlohmann/json.hpp>
@@ -440,12 +441,51 @@ void build_mesh_runtime(const PcgMeshSlot* meshes, int mesh_count, pcg::internal
     }
 }
 
+void build_spline_runtime(const PcgSplineSlot* splines, int spline_count, pcg::internal::SplineRuntime& runtime)
+{
+    if (!splines || spline_count <= 0)
+        return;
+
+    for (int i = 0; i < spline_count; ++i) {
+        const PcgSplineSlot& slot = splines[i];
+        if (!slot.slot_id || slot.spline_count <= 0 || !slot.spline_point_counts || !slot.positions)
+            continue;
+
+        pcg::internal::data::PcgSplineData data;
+        int point_offset = 0;
+        for (int s = 0; s < slot.spline_count; ++s) {
+            const int point_count = slot.spline_point_counts[s];
+            if (point_count <= 0)
+                continue;
+
+            pcg::internal::data::PcgSpline spline;
+            spline.closed = slot.closed && slot.closed[s] != 0;
+            spline.points.reserve(static_cast<size_t>(point_count));
+            for (int p = 0; p < point_count; ++p) {
+                const int base = (point_offset + p) * 3;
+                spline.points.push_back(pcg::internal::data::PcgSplinePoint{
+                    slot.positions[base],
+                    slot.positions[base + 1],
+                    slot.positions[base + 2],
+                });
+            }
+            point_offset += point_count;
+            data.add_spline(std::move(spline));
+        }
+
+        if (!data.splines().empty())
+            runtime.add_slot(slot.slot_id, std::move(data));
+    }
+}
+
 PcgResultCode execute_graph_cached(const char* json,
                                    int seed,
                                    const PcgTextureSlot* textures,
                                    int texture_count,
                                    const PcgMeshSlot* meshes,
                                    int mesh_count,
+                                   const PcgSplineSlot* splines,
+                                   int spline_count,
                                    int* out_kind,
                                    char* out_json,
                                    int out_json_size,
@@ -493,13 +533,18 @@ PcgResultCode execute_graph_cached(const char* json,
     pcg::internal::MeshRuntime mesh_runtime;
     build_mesh_runtime(meshes, mesh_count, mesh_runtime);
 
+    pcg::internal::SplineRuntime spline_runtime;
+    build_spline_runtime(splines, spline_count, spline_runtime);
+
     pcg::internal::GraphExecutionResult result;
     pcg::internal::GraphPerfReport perf;
     const auto graph_start = std::chrono::steady_clock::now();
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
         texture_count > 0 ? &texture_runtime : nullptr,
-        mesh_count > 0 ? &mesh_runtime : nullptr, cache, is_cancel_requested_now, &perf);
+        mesh_count > 0 ? &mesh_runtime : nullptr,
+        spline_count > 0 ? &spline_runtime : nullptr,
+        cache, is_cancel_requested_now, &perf);
     const auto graph_end = std::chrono::steady_clock::now();
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
@@ -604,7 +649,8 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
     pcg::internal::GraphExecutionResult result;
     const PcgResultCode exec_code =
         pcg::internal::execute_graph(
-            graph, seed, result, err_buf, err_buf_size, nullptr, nullptr, nullptr, is_cancel_requested_now);
+            graph, seed, result, err_buf, err_buf_size, nullptr, nullptr, nullptr, nullptr,
+            is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -669,7 +715,7 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
     pcg::internal::GraphExecutionResult result;
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
-        texture_count > 0 ? &runtime : nullptr, nullptr, nullptr, is_cancel_requested_now);
+        texture_count > 0 ? &runtime : nullptr, nullptr, nullptr, nullptr, is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -764,7 +810,8 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
     pcg::internal::GraphExecutionResult result;
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
-        texture_count > 0 ? &texture_runtime : nullptr, &mesh_runtime, nullptr, is_cancel_requested_now);
+        texture_count > 0 ? &texture_runtime : nullptr, &mesh_runtime, nullptr, nullptr,
+        is_cancel_requested_now);
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
@@ -832,7 +879,8 @@ PcgResultCode pcg_execute_graph_v5(const char* json,
                                    char* err_buf,
                                    int err_buf_size)
 {
-    return execute_graph_cached(json, seed, textures, texture_count, meshes, mesh_count, out_kind,
+    return execute_graph_cached(json, seed, textures, texture_count, meshes, mesh_count, nullptr, 0,
+                                out_kind,
                                 out_json, out_json_size, out_mesh_buf, out_mesh_buf_size, nullptr, 0,
                                 nullptr, nullptr, out_vertex_count, out_index_count, out_stats,
                                 nullptr, 0, err_buf, err_buf_size,
@@ -862,12 +910,46 @@ PcgResultCode pcg_execute_graph_v6(const char* json,
                                    char* err_buf,
                                    int err_buf_size)
 {
-    return execute_graph_cached(json, seed, textures, texture_count, meshes, mesh_count, out_kind,
+    return execute_graph_cached(json, seed, textures, texture_count, meshes, mesh_count, nullptr, 0,
+                                out_kind,
                                 out_json, out_json_size, out_mesh_buf, out_mesh_buf_size,
                                 out_points_buf, out_points_buf_size, out_point_count,
                                 out_point_attr_flags, out_vertex_count, out_index_count,
                                 out_stats, out_perf_json, out_perf_json_size,
                                 err_buf, err_buf_size, &g_cook_cache);
+}
+
+PcgResultCode pcg_execute_graph_v7(const char* json,
+                                   int seed,
+                                   const PcgTextureSlot* textures,
+                                   int texture_count,
+                                   const PcgMeshSlot* meshes,
+                                   int mesh_count,
+                                   const PcgSplineSlot* splines,
+                                   int spline_count,
+                                   int* out_kind,
+                                   char* out_json,
+                                   int out_json_size,
+                                   void* out_mesh_buf,
+                                   int out_mesh_buf_size,
+                                   void* out_points_buf,
+                                   int out_points_buf_size,
+                                   int* out_point_count,
+                                   uint32_t* out_point_attr_flags,
+                                   int* out_vertex_count,
+                                   int* out_index_count,
+                                   PcgCookStats* out_stats,
+                                   char* out_perf_json,
+                                   int out_perf_json_size,
+                                   char* err_buf,
+                                   int err_buf_size)
+{
+    return execute_graph_cached(json, seed, textures, texture_count, meshes, mesh_count, splines,
+                                spline_count, out_kind, out_json, out_json_size, out_mesh_buf,
+                                out_mesh_buf_size, out_points_buf, out_points_buf_size, out_point_count,
+                                out_point_attr_flags, out_vertex_count, out_index_count, out_stats,
+                                out_perf_json, out_perf_json_size, err_buf, err_buf_size,
+                                &g_cook_cache);
 }
 
 PcgResultCode pcg_mesh_binary_size_for_counts(int vertex_count,

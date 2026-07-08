@@ -21,7 +21,7 @@ namespace DJTechRuntime.PCG
 
         public static PcgGraphExecuteResult ExecuteWithResolvedTextures(string json, int seed = 42)
         {
-            return ExecuteWithResolvedAssets(json, seed, null, null, null);
+            return ExecuteWithResolvedAssets(json, seed, null, null, null, null, null);
         }
 
         public static PcgGraphExecuteResult ExecuteWithResolvedAssets(
@@ -30,6 +30,19 @@ namespace DJTechRuntime.PCG
             GameObject componentHost,
             IReadOnlyList<PcgMeshBinding> meshBindings,
             IReadOnlyList<PcgPreviewMeshBinding> previewBindings)
+        {
+            return ExecuteWithResolvedAssets(
+                json, seed, componentHost, meshBindings, previewBindings, null, null);
+        }
+
+        public static PcgGraphExecuteResult ExecuteWithResolvedAssets(
+            string json,
+            int seed,
+            GameObject componentHost,
+            IReadOnlyList<PcgMeshBinding> meshBindings,
+            IReadOnlyList<PcgPreviewMeshBinding> previewBindings,
+            IReadOnlyList<PcgSplineBinding> splineBindings,
+            IReadOnlyList<PcgPreviewSplineBinding> previewSplineBindings)
         {
             var assetSw = System.Diagnostics.Stopwatch.StartNew();
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
@@ -43,9 +56,12 @@ namespace DJTechRuntime.PCG
                 json, componentHost, meshBindings, previewBindings);
             if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out _))
                 return null;
+
+            var splines = PcgSplineResolver.CollectFromGraphJson(
+                json, componentHost, splineBindings, previewSplineBindings);
             assetSw.Stop();
 
-            var result = Execute(json, seed, textures, meshes);
+            var result = Execute(json, seed, textures, meshes, splines);
             if (result?.Perf != null)
                 result.Perf.AssetResolveMs = assetSw.Elapsed.TotalMilliseconds;
             return result;
@@ -53,7 +69,7 @@ namespace DJTechRuntime.PCG
 
         public static PcgGraphExecuteResult Execute(string json, int seed = 42)
         {
-            return Execute(json, seed, null, null);
+            return Execute(json, seed, null, null, null);
         }
 
         public static PcgGraphExecuteResult Execute(
@@ -61,6 +77,16 @@ namespace DJTechRuntime.PCG
             int seed,
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes)
+        {
+            return Execute(json, seed, textures, meshes, null);
+        }
+
+        public static PcgGraphExecuteResult Execute(
+            string json,
+            int seed,
+            IReadOnlyList<PcgTextureUpload> textures,
+            IReadOnlyList<PcgMeshUpload> meshes,
+            IReadOnlyList<PcgSplineUpload> splines)
         {
             var validateSw = System.Diagnostics.Stopwatch.StartNew();
             var (validateCode, error) = PcgNative.ValidateGraph(json);
@@ -71,7 +97,7 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
-            var (execCode, result) = PcgNative.ExecuteGraph(json, seed, textures, meshes);
+            var (execCode, result) = PcgNative.ExecuteGraph(json, seed, textures, meshes, splines);
             if (execCode != PcgResultCode.Ok)
             {
                 Debug.LogError($"[PCG] Execution failed ({execCode}): {result?.Error}");

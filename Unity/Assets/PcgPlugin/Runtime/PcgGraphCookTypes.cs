@@ -43,4 +43,25 @@ namespace DJTechRuntime.PCG
         public string bindingKey = "targetMesh";
         public MeshFilter previewMeshFilter;
     }
+
+    [Serializable]
+    public class PcgSplineBinding
+    {
+        public string bindingKey = "bridgePath";
+        public PcgSplineBindingSource source = PcgSplineBindingSource.Binding;
+        public LineRenderer lineRenderer;
+    }
+
+    public enum PcgSplineBindingSource
+    {
+        Self = 0,
+        Binding = 1,
+    }
+
+    [Serializable]
+    public class PcgPreviewSplineBinding
+    {
+        public string bindingKey = "bridgePath";
+        public LineRenderer previewLineRenderer;
+    }
 }

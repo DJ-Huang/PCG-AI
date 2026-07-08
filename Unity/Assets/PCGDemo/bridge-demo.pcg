@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "piers",
+      "type": "InstanceAlongSpline",
+      "position": { "x": 320, "y": 220 },
+      "data": {"spacing": 10, "offset": 5, "includeEnd": false, "alignToTangent": true, "scale": 1}
+    },
+    {
+      "id": "deck",
+      "type": "ExtrudeAlongSpline",
+      "position": { "x": 499.5, "y": -21.5 },
+      "data": {"profileWidth": 6, "profileHeight": 0.4, "sampleSpacing": 0.8, "capStart": true, "capEnd": true}
+    },
+    {
+      "id": "merge",
+      "type": "MergeMesh",
+      "position": { "x": 517, "y": 327.5 },
+      "data": {}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 517, "y": 456.5 },
+      "data": {"label": "Bridge"}
+    },
+    {
+      "id": "pier_proto",
+      "type": "CreateBoxMesh",
+      "position": { "x": 390.5, "y": 118 },
+      "data": {"width": 1.2, "height": 7, "depth": 1.2}
+    },
+    {
+      "id": "path",
+      "type": "CreateSpline",
+      "position": { "x": 320, "y": -120.5 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":12,\"y\":3,\"z\":8},{\"x\":28,\"y\":0,\"z\":12},{\"x\":40,\"y\":0,\"z\":0}]"}
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "path", "target": "deck", "sourceHandle": "out", "targetHandle": "spline"},
+    {"id": "e2", "source": "path", "target": "piers", "sourceHandle": "out", "targetHandle": "spline"},
+    {"id": "e3", "source": "pier_proto", "target": "piers", "sourceHandle": "out", "targetHandle": "mesh"},
+    {"id": "e4", "source": "deck", "target": "merge", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e5", "source": "piers", "target": "merge", "sourceHandle": "out", "targetHandle": "b"},
+    {"id": "e6", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+  ],
+  "parameters": [
+  ]
+}

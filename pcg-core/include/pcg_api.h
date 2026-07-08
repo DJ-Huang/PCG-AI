@@ -255,6 +255,43 @@ PCG_API PcgResultCode pcg_execute_graph_v6(const char* json,
                                            char* err_buf,
                                            int err_buf_size);
 
+typedef struct {
+    const char* slot_id;
+    int spline_count;
+    const int* spline_point_counts;
+    const float* positions;
+    const uint8_t* closed;
+} PcgSplineSlot;
+
+/**
+ * Executes a graph with optional runtime texture, mesh, and spline slot uploads.
+ * Falls back to v6 when spline_count is 0; v6 falls back to v5 when mesh_count is 0.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v7(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           const PcgSplineSlot* splines,
+                                           int spline_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           void* out_points_buf,
+                                           int out_points_buf_size,
+                                           int* out_point_count,
+                                           uint32_t* out_point_attr_flags,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           PcgCookStats* out_stats,
+                                           char* out_perf_json,
+                                           int out_perf_json_size,
+                                           char* err_buf,
+                                           int err_buf_size);
+
 /** Clears the session-scoped per-node cook cache. */
 PCG_API void pcg_cook_cache_clear(void);
 

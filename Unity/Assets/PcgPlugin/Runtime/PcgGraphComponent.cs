@@ -33,6 +33,9 @@ namespace DJTechRuntime.PCG
         [SerializeField]
         private List<PcgMeshBinding> m_MeshBindings = new();
 
+        [SerializeField]
+        private List<PcgSplineBinding> m_SplineBindings = new();
+
         private float m_NextEditModeCookTime;
         private bool m_PreviewCookPending;
         private bool m_CookInProgress;
@@ -50,6 +53,7 @@ namespace DJTechRuntime.PCG
 
         /// <summary>Editor-only preview mesh bindings (Graph Editor / Inspector).</summary>
         public static System.Func<PcgGraphComponent, IReadOnlyList<PcgPreviewMeshBinding>> EditorResolvePreviewMeshBindings;
+        public static System.Func<PcgGraphComponent, IReadOnlyList<PcgPreviewSplineBinding>> EditorResolvePreviewSplineBindings;
 #endif
 
         [SerializeField, Min(0.001f)] private float scatterPointScale = 0.2f;
@@ -73,6 +77,7 @@ namespace DJTechRuntime.PCG
         public List<PcgParameterOverride> ParameterOverrides => m_ParameterOverrides;
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
         public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
+        public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
 
@@ -412,18 +417,22 @@ namespace DJTechRuntime.PCG
             }
 
             var previewBindings = EditorResolvePreviewMeshBindings?.Invoke(this);
+            var previewSplineBindings = EditorResolvePreviewSplineBindings?.Invoke(this);
             var meshes = PcgMeshResolver.CollectFromGraphJson(
                 json, gameObject, m_MeshBindings, previewBindings);
             if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out _))
                 return false;
 
+            var splines = PcgSplineResolver.CollectFromGraphJson(
+                json, gameObject, m_SplineBindings, previewSplineBindings);
+
             if (ShouldUseAsyncCook())
             {
-                StartAsyncCook(json, textures, meshes);
+                StartAsyncCook(json, textures, meshes, splines);
                 return true;
             }
 
-            var result = PcgGraphLoader.Execute(json, seed, textures, meshes);
+            var result = PcgGraphLoader.Execute(json, seed, textures, meshes, splines);
             if (result == null)
                 return false;
 
@@ -570,7 +579,8 @@ namespace DJTechRuntime.PCG
         private void StartAsyncCook(
             string json,
             IReadOnlyList<PcgTextureUpload> textures,
-            IReadOnlyList<PcgMeshUpload> meshes)
+            IReadOnlyList<PcgMeshUpload> meshes,
+            IReadOnlyList<PcgSplineUpload> splines)
         {
             CancelAsyncCook(null, log: false);
             m_AsyncCookInProgress = true;
@@ -596,7 +606,7 @@ namespace DJTechRuntime.PCG
                 if (token.IsCancellationRequested)
                     return AsyncCookResult.FromCancelled(generation);
 
-                var (execCode, execResult) = PcgNative.ExecuteGraph(json, localSeed, textures, meshes);
+                var (execCode, execResult) = PcgNative.ExecuteGraph(json, localSeed, textures, meshes, splines);
                 if (execCode != PcgResultCode.Ok)
                 {
                     return AsyncCookResult.Failed(
@@ -758,8 +768,10 @@ namespace DJTechRuntime.PCG
         private void ApplySplines(List<List<Vector3>> splines)
         {
             ClearGeneratedMesh();
+            var preview = GetComponent<PcgPreview>() ?? gameObject.AddComponent<PcgPreview>();
+            preview.SetSplines(splines);
             if (splines != null && splines.Count > 0 && PcgProjectSettings.IsLogEnabled)
-                Debug.Log($"[PCG] Spline result has {splines.Count} spline(s); spline mesh rendering is not implemented yet.");
+                Debug.Log($"[PCG] Spline preview updated ({splines.Count} spline(s)).");
         }
 
         private Mesh m_GeneratedMesh;

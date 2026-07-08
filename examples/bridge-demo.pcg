@@ -1,0 +1,101 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "path",
+      "type": "CreateSpline",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "mode": "catmullRom",
+        "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":12,\"y\":3,\"z\":8},{\"x\":28,\"y\":0,\"z\":12},{\"x\":40,\"y\":0,\"z\":0}]",
+        "subdivisions": 8
+      }
+    },
+    {
+      "id": "deck",
+      "type": "ExtrudeAlongSpline",
+      "position": { "x": 320, "y": 0 },
+      "data": {
+        "profileWidth": 6.0,
+        "profileHeight": 0.4,
+        "sampleSpacing": 0.8,
+        "capStart": true,
+        "capEnd": true
+      }
+    },
+    {
+      "id": "pier_proto",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 220 },
+      "data": { "width": 1.2, "height": 7.0, "depth": 1.2 }
+    },
+    {
+      "id": "piers",
+      "type": "InstanceAlongSpline",
+      "position": { "x": 320, "y": 220 },
+      "data": {
+        "spacing": 10.0,
+        "offset": 5.0,
+        "includeEnd": false,
+        "alignToTangent": true,
+        "scale": 1.0
+      }
+    },
+    {
+      "id": "merge",
+      "type": "MergeMesh",
+      "position": { "x": 640, "y": 110 },
+      "data": {}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 960, "y": 110 },
+      "data": { "label": "Bridge" }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "path",
+      "target": "deck",
+      "sourceHandle": "out",
+      "targetHandle": "spline"
+    },
+    {
+      "id": "e2",
+      "source": "path",
+      "target": "piers",
+      "sourceHandle": "out",
+      "targetHandle": "spline"
+    },
+    {
+      "id": "e3",
+      "source": "pier_proto",
+      "target": "piers",
+      "sourceHandle": "out",
+      "targetHandle": "mesh"
+    },
+    {
+      "id": "e4",
+      "source": "deck",
+      "target": "merge",
+      "sourceHandle": "out",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e5",
+      "source": "piers",
+      "target": "merge",
+      "sourceHandle": "out",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e6",
+      "source": "merge",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

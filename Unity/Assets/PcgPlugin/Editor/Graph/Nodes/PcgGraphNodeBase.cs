@@ -491,6 +491,21 @@ namespace DJTechEditor.PCG.Graph
             UpdateOverlayPlacement();
         }
 
+        /// <summary>
+        /// Remove title/radial overlays from the graph content container.
+        /// Required before <see cref="GraphView.DeleteElements"/> — overlays live
+        /// outside the node hierarchy and would otherwise accumulate on reload.
+        /// </summary>
+        internal void DetachOverlays()
+        {
+            m_RightTitleLabel?.RemoveFromHierarchy();
+            m_RadialMenu?.RemoveFromHierarchy();
+            m_TitleEditor?.RemoveFromHierarchy();
+            m_TitleEditor = null;
+            m_OverlayAttached = false;
+            m_RadialMenuOpen = false;
+        }
+
         private void UpdateOverlayPlacement()
         {
             EnsureOverlayAttached();

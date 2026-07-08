@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
+using DJTechEditor.PCG;
 using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
@@ -283,6 +284,8 @@ namespace DJTechEditor.PCG.Graph
                 node.SetNodePreviewState(!string.IsNullOrEmpty(previewNodeId) && node.NodeId == previewNodeId);
         }
 
+        internal void RefreshInspector() => m_Inspector?.OnSelectionChanged();
+
         /// <summary>Called by EditorWindow.Update() when version mismatch is detected.
         /// Restores the graph from the proxy's serialized JSON.</summary>
         public void RestoreFromUndoState()
@@ -293,6 +296,12 @@ namespace DJTechEditor.PCG.Graph
                 LoadDocument(doc, clearUndo: false);
             state.HandleUndoRedo();
             m_SuppressUndo = false;
+
+            RefreshInspector();
+            NotifyDocumentChanged();
+            if (m_HostWindow is PcgGraphEditorWindow window)
+                PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
+            SceneView.RepaintAll();
         }
 
         private void OnMouseMove(MouseMoveEvent evt)
@@ -501,6 +510,9 @@ namespace DJTechEditor.PCG.Graph
 
             m_SuppressUndo = true;
 
+            foreach (var node in nodes.ToList().OfType<PcgGraphNodeBase>())
+                node.DetachOverlays();
+
             DeleteElements(graphElements.ToList());
             PcgGraphNodeFactory.ResetCounterFromDocument(doc);
 
@@ -612,6 +624,15 @@ namespace DJTechEditor.PCG.Graph
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
         {
+            if (change.elementsToRemove != null)
+            {
+                foreach (var element in change.elementsToRemove)
+                {
+                    if (element is PcgGraphNodeBase node)
+                        node.DetachOverlays();
+                }
+            }
+
             if (m_SuppressUndo) return change;
 
             // Filter valid edges to create

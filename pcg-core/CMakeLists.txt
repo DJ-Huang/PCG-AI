@@ -38,9 +38,11 @@ set(PCG_CORE_SOURCES
     src/data/pcg_texture_data.cpp
     src/texture_runtime.cpp
     src/mesh_runtime.cpp
+    src/spline_runtime.cpp
     src/elements/mesh_algorithms.cpp
     src/elements/bevel_blender.cpp
     src/geometry/bmesh.cpp
+    src/geometry/spline_geometry.cpp
     src/elements/mesh_elements.cpp
     src/elements/mesh_scatter_algorithms.cpp
     src/elements/mesh_scatter_elements.cpp
@@ -50,6 +52,9 @@ set(PCG_CORE_SOURCES
     src/elements/primitive_elements.cpp
     src/elements/structural_algorithms.cpp
     src/elements/structural_elements.cpp
+    src/elements/spline_algorithms.cpp
+    src/elements/spline_elements.cpp
+    src/elements/spline_mesh_elements.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
@@ -123,3 +128,9 @@ target_link_libraries(test_spawn_mesh_binary PRIVATE PcgCoreStatic nlohmann_json
 target_include_directories(test_spawn_mesh_binary PRIVATE src)
 
 add_test(NAME test_spawn_mesh_binary COMMAND test_spawn_mesh_binary WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_phase45_spline tests/test_phase45_spline.cpp)
+target_link_libraries(test_phase45_spline PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_phase45_spline PRIVATE src)
+
+add_test(NAME test_phase45_spline COMMAND test_phase45_spline WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)

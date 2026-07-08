@@ -1,6 +1,6 @@
 {
-  "version": "1.3",
-  "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh). Pin types align with UE EPCGDataType.",
+  "version": "1.4",
+  "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh + Phase 4.5 spline bridge). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
       "type": "SpawnPoints",
@@ -402,6 +402,150 @@
         "seed": { "type": "integer", "default": 0 },
         "normalOffset": { "type": "number", "default": 0.0 },
         "looseness": { "type": "number", "default": 0.0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "CreateSpline",
+      "displayName": "Create Spline",
+      "category": "Spline",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "mode": {
+          "type": "enum",
+          "default": "catmullRom",
+          "options": [
+            { "value": "line", "label": "Line" },
+            { "value": "polyline", "label": "Polyline" },
+            { "value": "catmullRom", "label": "Catmull-Rom" }
+          ]
+        },
+        "closed": { "type": "boolean", "default": false },
+        "subdivisions": { "type": "integer", "default": 8, "minimum": 1, "maximum": 64 },
+        "startX": { "type": "number", "default": 0 },
+        "startY": { "type": "number", "default": 0 },
+        "startZ": { "type": "number", "default": 0 },
+        "endX": { "type": "number", "default": 40 },
+        "endY": { "type": "number", "default": 0 },
+        "endZ": { "type": "number", "default": 0 },
+        "controlPoints": {
+          "type": "string",
+          "default": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":10,\"y\":2,\"z\":5},{\"x\":25,\"y\":0,\"z\":15},{\"x\":40,\"y\":0,\"z\":0}]"
+        }
+      }
+    },
+    {
+      "type": "GetSplineData",
+      "displayName": "Get Spline Data",
+      "category": "Input",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "source": {
+          "type": "enum",
+          "default": "Binding",
+          "options": [
+            { "value": "Binding", "label": "Binding" },
+            { "value": "Self", "label": "Self" }
+          ]
+        },
+        "bindingKey": { "type": "string", "default": "bridgePath" }
+      }
+    },
+    {
+      "type": "ResampleSpline",
+      "displayName": "Resample Spline",
+      "category": "Spline",
+      "inputs": [{ "id": "in", "label": "Spline", "pinType": "SpatialSpline" }],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "mode": {
+          "type": "enum",
+          "default": "spacing",
+          "options": [
+            { "value": "spacing", "label": "Spacing" },
+            { "value": "count", "label": "Count" }
+          ]
+        },
+        "spacing": { "type": "number", "default": 1.0, "minimum": 0.01 },
+        "pointCount": { "type": "integer", "default": 32, "minimum": 2 }
+      }
+    },
+    {
+      "type": "SampleAlongSpline",
+      "displayName": "Sample Along Spline",
+      "category": "Spline",
+      "inputs": [{ "id": "in", "label": "Spline", "pinType": "SpatialSpline" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "spacing": { "type": "number", "default": 8.0, "minimum": 0.1 },
+        "offset": { "type": "number", "default": 0.0 },
+        "includeEnd": { "type": "boolean", "default": true },
+        "alignToTangent": { "type": "boolean", "default": true },
+        "seed": { "type": "integer", "default": 0 }
+      }
+    },
+    {
+      "type": "ExtrudeAlongSpline",
+      "displayName": "Extrude Along Spline",
+      "category": "Spline",
+      "inputs": [
+        { "id": "spline", "label": "Spline", "pinType": "SpatialSpline" },
+        { "id": "profile", "label": "Profile", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "profileWidth": { "type": "number", "default": 6.0, "minimum": 0.01 },
+        "profileHeight": { "type": "number", "default": 0.4, "minimum": 0.01 },
+        "sampleSpacing": { "type": "number", "default": 1.0, "minimum": 0.05 },
+        "capStart": { "type": "boolean", "default": true },
+        "capEnd": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "TransformMesh",
+      "displayName": "Transform Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "translateX": { "type": "number", "default": 0 },
+        "translateY": { "type": "number", "default": 0 },
+        "translateZ": { "type": "number", "default": 0 },
+        "rotationX": { "type": "number", "default": 0 },
+        "rotationY": { "type": "number", "default": 0 },
+        "rotationZ": { "type": "number", "default": 0 },
+        "scaleX": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleY": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleZ": { "type": "number", "default": 1.0, "minimum": 0.001 }
+      }
+    },
+    {
+      "type": "MergeMesh",
+      "displayName": "Merge Mesh",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "a", "label": "Mesh A", "pinType": "SpatialMesh" },
+        { "id": "b", "label": "Mesh B", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {}
+    },
+    {
+      "type": "InstanceAlongSpline",
+      "displayName": "Instance Along Spline",
+      "category": "Spline",
+      "inputs": [
+        { "id": "spline", "label": "Spline", "pinType": "SpatialSpline" },
+        { "id": "mesh", "label": "Prototype", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "spacing": { "type": "number", "default": 10.0, "minimum": 0.1 },
+        "offset": { "type": "number", "default": 0.0 },
+        "includeEnd": { "type": "boolean", "default": false },
+        "alignToTangent": { "type": "boolean", "default": true },
+        "scale": { "type": "number", "default": 1.0, "minimum": 0.001 }
       }
     },
     {

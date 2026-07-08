@@ -136,6 +136,7 @@ PcgResultCode execute_graph(const Graph& graph,
                             int err_buf_size,
                             const TextureRuntime* textures,
                             const MeshRuntime* meshes,
+                            const SplineRuntime* splines,
                             GraphCookCache* cache,
                             bool (*is_cancel_requested)(),
                             GraphPerfReport* perf)
@@ -187,7 +188,7 @@ PcgResultCode execute_graph(const Graph& graph,
 
         uint64_t input_hash = 0;
         if (cache)
-            input_hash = compute_node_input_hash(*node, seed, upstream_hashes, textures, meshes);
+            input_hash = compute_node_input_hash(*node, seed, upstream_hashes, textures, meshes, splines);
 
         if (cache) {
             data::PcgDataCollection cached_outputs;
@@ -213,6 +214,7 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.node = node;
         ctx.textures = textures;
         ctx.meshes = meshes;
+        ctx.splines = splines;
         ctx.err_buf = err_buf;
         ctx.err_buf_size = err_buf_size;
         ctx.is_cancel_requested = is_cancel_requested;

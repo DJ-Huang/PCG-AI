@@ -133,6 +133,20 @@ namespace DJTechEditor.PCG.Graph
                 if (node is PcgManifestNodeView meshDataNode && meshDataNode.NodeType == "GetMeshData")
                     m_Body.Add(CreateGetMeshDataPreviewRow(meshDataNode));
 
+                if (node is PcgManifestNodeView { NodeType: "CreateSpline" })
+                {
+                    m_Body.Add(new Label("Drag control points in Scene View.")
+                    {
+                        style =
+                        {
+                            color = new Color(0.55f, 0.85f, 1f),
+                            fontSize = 10,
+                            marginBottom = 6,
+                            whiteSpace = WhiteSpace.Normal,
+                        },
+                    });
+                }
+
                 if (node is PcgManifestNodeView manifestNode)
                     ShowManifestProperties(manifestNode);
             }

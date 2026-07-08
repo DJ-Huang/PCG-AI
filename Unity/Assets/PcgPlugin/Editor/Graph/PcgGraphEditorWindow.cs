@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -47,6 +48,8 @@ namespace DJTechEditor.PCG.Graph
             string.IsNullOrEmpty(m_PreviewNodeLabel) ? m_PreviewNodeId : m_PreviewNodeLabel;
 
         public bool HasLoadedGraph => m_GraphLoaded && m_GraphView != null;
+
+        internal PcgGraphView GraphView => m_GraphView;
 
         public string CurrentAssetPath => FullPathToAssetPath(m_CurrentFilePath);
 
@@ -175,7 +178,7 @@ namespace DJTechEditor.PCG.Graph
         [MenuItem(MenuPath)]
         public static void Open()
         {
-            var window = GetWindow<PcgGraphEditorWindow>();
+            var window = CreateWindow<PcgGraphEditorWindow>();
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
             window.titleContent = new GUIContent("PCG Graph", icon);
             window.Show();
@@ -211,11 +214,11 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
 
-            var editor = GetWindow<PcgGraphEditorWindow>();
+            var editor = CreateWindow<PcgGraphEditorWindow>();
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
             editor.titleContent = new GUIContent("PCG Graph", icon);
-            editor.Show();
             editor.Initialize(guid);
+            editor.Show();
             editor.Focus();
             return true;
         }
@@ -267,7 +270,17 @@ namespace DJTechEditor.PCG.Graph
 
         private void OnDisable()
         {
-            m_GraphView?.DestroyUndoState();
+            if (m_GraphView != null)
+            {
+                foreach (var node in m_GraphView.nodes.ToList())
+                {
+                    if (node is PcgGraphNodeBase graphNode)
+                        graphNode.DetachOverlays();
+                }
+
+                m_GraphView.DestroyUndoState();
+            }
+
             m_GraphLoaded = false;
         }
 
