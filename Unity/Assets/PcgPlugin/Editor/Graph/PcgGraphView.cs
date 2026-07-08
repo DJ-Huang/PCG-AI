@@ -22,6 +22,7 @@ namespace DJTechEditor.PCG.Graph
         private string m_PendingSnapshot;
         private string m_PendingAction;
         private bool m_PendingCommit;
+        private PcgGraphNodeBase m_ActiveRadialMenuNode;
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
 
@@ -59,7 +60,7 @@ namespace DJTechEditor.PCG.Graph
 
             graphViewChanged = OnGraphViewChanged;
 
-            RegisterCallback<MouseMoveEvent>(evt => m_LastMousePos = evt.mousePosition);
+            RegisterCallback<MouseMoveEvent>(OnMouseMove);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<PointerDownEvent>(OnPointerDown, TrickleDown.TrickleDown);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
@@ -294,11 +295,62 @@ namespace DJTechEditor.PCG.Graph
             m_SuppressUndo = false;
         }
 
+        private void OnMouseMove(MouseMoveEvent evt)
+        {
+            m_LastMousePos = evt.mousePosition;
+            UpdateActiveRadialMenuFromPointer(evt.mousePosition);
+        }
+
+        internal void NotifyRadialMenuOpened(PcgGraphNodeBase node)
+        {
+            if (node == null)
+                return;
+
+            if (m_ActiveRadialMenuNode != null && m_ActiveRadialMenuNode != node)
+                m_ActiveRadialMenuNode.DismissRadialMenu();
+
+            m_ActiveRadialMenuNode = node;
+        }
+
+        internal void NotifyRadialMenuClosed(PcgGraphNodeBase node)
+        {
+            if (m_ActiveRadialMenuNode == node)
+                m_ActiveRadialMenuNode = null;
+        }
+
+        private void UpdateActiveRadialMenuFromPointer(Vector2 panelMousePosition)
+        {
+            if (m_ActiveRadialMenuNode == null || !m_ActiveRadialMenuNode.IsRadialMenuOpen)
+                return;
+
+            var graphPos = contentViewContainer.WorldToLocal(panelMousePosition);
+            if (!m_ActiveRadialMenuNode.ContainsGraphPointer(graphPos))
+                m_ActiveRadialMenuNode.DismissRadialMenu();
+        }
+
+        private static bool IsEdgePointerTarget(VisualElement target)
+        {
+            if (target == null)
+                return false;
+
+            if (target is Edge)
+                return true;
+
+            return target.GetFirstAncestorOfType<Edge>() != null;
+        }
+
         // ─── Pointer Events (node drag only; edge drag handled by EdgeConnector) ──
 
         private void OnPointerDown(PointerDownEvent evt)
         {
             if (m_SuppressUndo) return;
+
+            if (m_ActiveRadialMenuNode != null &&
+                m_ActiveRadialMenuNode.IsRadialMenuOpen &&
+                IsEdgePointerTarget(evt.target as VisualElement))
+            {
+                m_ActiveRadialMenuNode.DismissRadialMenu();
+            }
 
             if (evt.target is VisualElement ve &&
                 ve.GetFirstAncestorOfType<PcgGraphNodeBase>() != null)
@@ -444,6 +496,9 @@ namespace DJTechEditor.PCG.Graph
 
         public void LoadDocument(PcgGraphDocument doc, bool clearUndo = true)
         {
+            m_ActiveRadialMenuNode?.DismissRadialMenu();
+            m_ActiveRadialMenuNode = null;
+
             m_SuppressUndo = true;
 
             DeleteElements(graphElements.ToList());

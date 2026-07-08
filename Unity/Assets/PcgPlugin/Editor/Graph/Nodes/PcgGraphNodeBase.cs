@@ -19,32 +19,29 @@ namespace DJTechEditor.PCG.Graph
         private VisualElement m_RadialMenu;
         private Button m_PreviewBtn;
         private string m_UserTitle = "";
-        private bool m_IsPointerOnNode;
-        private bool m_IsPointerOnMenu;
+        private bool m_RadialMenuOpen;
         private bool m_OverlayAttached;
         private VisualElement m_InputRowPlaceholder;
         private VisualElement m_OutputRowPlaceholder;
 
+        internal const float NodeWidth = 92f;
+        internal const float NodeHeight = 46f;
+        internal const float RadialMenuSize = 120f;
+        internal const float RadialMenuRadius = RadialMenuSize * 0.5f;
+        internal const float RadialMenuOffsetX = -3f;
+        internal const float RadialMenuOffsetY = -5f;
+
         protected PcgGraphNodeBase()
         {
-            style.minWidth = 100;
-            style.width = 110;
-            style.maxWidth = 110;
-            style.minHeight = 56;
+            style.minWidth = NodeWidth;
+            style.width = NodeWidth;
+            style.maxWidth = NodeWidth;
+            style.minHeight = NodeHeight;
             ConfigureHoudiniPortLayout();
             BuildRightTitleUI();
             BuildHoverRadialMenu();
             RegisterCallback<GeometryChangedEvent>(_ => UpdateOverlayPlacement());
-            RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                m_IsPointerOnNode = true;
-                UpdateRadialMenuVisibility();
-            });
-            RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                m_IsPointerOnNode = false;
-                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(50);
-            });
+            RegisterCallback<MouseEnterEvent>(_ => ShowRadialMenu());
         }
 
         public void Initialize(string id, Vector2 position)
@@ -111,8 +108,8 @@ namespace DJTechEditor.PCG.Graph
             inputContainer.style.justifyContent = Justify.Center;
             inputContainer.style.alignSelf = Align.Stretch;
             inputContainer.style.flexWrap = Wrap.Wrap;
-            inputContainer.style.minHeight = 12;
-            inputContainer.style.height = 12;
+            inputContainer.style.minHeight = 10;
+            inputContainer.style.height = 10;
             inputContainer.style.marginTop = 0;
             inputContainer.style.marginBottom = 0;
 
@@ -120,8 +117,8 @@ namespace DJTechEditor.PCG.Graph
             outputContainer.style.justifyContent = Justify.Center;
             outputContainer.style.alignSelf = Align.Stretch;
             outputContainer.style.flexWrap = Wrap.Wrap;
-            outputContainer.style.minHeight = 12;
-            outputContainer.style.height = 12;
+            outputContainer.style.minHeight = 10;
+            outputContainer.style.height = 10;
             outputContainer.style.marginTop = 0;
             outputContainer.style.marginBottom = 0;
 
@@ -185,12 +182,12 @@ namespace DJTechEditor.PCG.Graph
             if (direction == Direction.Input)
             {
                 port.style.alignSelf = Align.FlexStart;
-                port.style.translate = new Translate(0, -6, 0);
+                port.style.translate = new Translate(0, -5, 0);
             }
             else
             {
                 port.style.alignSelf = Align.FlexEnd;
-                port.style.translate = new Translate(0, 6, 0);
+                port.style.translate = new Translate(0, 5, 0);
             }
         }
 
@@ -304,12 +301,12 @@ namespace DJTechEditor.PCG.Graph
                     position = Position.Absolute,
                     left = -16,
                     top = -42,
-                    width = 172,
-                    height = 172,
-                    borderTopLeftRadius = 86,
-                    borderTopRightRadius = 86,
-                    borderBottomLeftRadius = 86,
-                    borderBottomRightRadius = 86,
+                    width = RadialMenuSize,
+                    height = RadialMenuSize,
+                    borderTopLeftRadius = RadialMenuRadius,
+                    borderTopRightRadius = RadialMenuRadius,
+                    borderBottomLeftRadius = RadialMenuRadius,
+                    borderBottomRightRadius = RadialMenuRadius,
                     borderTopWidth = 1,
                     borderRightWidth = 1,
                     borderBottomWidth = 1,
@@ -337,16 +334,6 @@ namespace DJTechEditor.PCG.Graph
                 graphView.Inspector.OnSelectionChanged();
             });
             infoBtn.tooltip = "Node info";
-            infoBtn.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                m_IsPointerOnMenu = true;
-                UpdateRadialMenuVisibility();
-            });
-            infoBtn.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                m_IsPointerOnMenu = false;
-                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(80);
-            });
             m_RadialMenu.Add(infoBtn);
 
             var paramsBtn = CreateCircleButton("P", () =>
@@ -358,16 +345,6 @@ namespace DJTechEditor.PCG.Graph
                     graphView.Blackboard.ToggleVisible();
             });
             paramsBtn.tooltip = "Parameters";
-            paramsBtn.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                m_IsPointerOnMenu = true;
-                UpdateRadialMenuVisibility();
-            });
-            paramsBtn.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                m_IsPointerOnMenu = false;
-                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(80);
-            });
             m_RadialMenu.Add(paramsBtn);
 
             m_PreviewBtn = CreateCircleButton("◎", () =>
@@ -376,19 +353,54 @@ namespace DJTechEditor.PCG.Graph
                 graphView?.ToggleNodePreview(this);
             });
             m_PreviewBtn.tooltip = "Preview in Scene (toggle)";
-            m_PreviewBtn.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                m_IsPointerOnMenu = true;
-                UpdateRadialMenuVisibility();
-            });
-            m_PreviewBtn.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                m_IsPointerOnMenu = false;
-                schedule.Execute(UpdateRadialMenuVisibility).ExecuteLater(80);
-            });
             m_RadialMenu.Add(m_PreviewBtn);
 
             EnsureOverlayAttached();
+        }
+
+        internal bool IsRadialMenuOpen => m_RadialMenuOpen;
+
+        internal bool ContainsGraphPointer(Vector2 graphPointerPos)
+        {
+            return Vector2.Distance(GetRadialMenuCenter(), graphPointerPos) <= RadialMenuRadius;
+        }
+
+        internal void ShowRadialMenu()
+        {
+            if (m_RadialMenuOpen)
+                return;
+
+            m_RadialMenuOpen = true;
+            SetRadialMenuVisible(true);
+
+            var graphView = GetFirstAncestorOfType<PcgGraphView>();
+            graphView?.NotifyRadialMenuOpened(this);
+        }
+
+        internal void DismissRadialMenu()
+        {
+            if (!m_RadialMenuOpen)
+                return;
+
+            m_RadialMenuOpen = false;
+            SetRadialMenuVisible(false);
+
+            var graphView = GetFirstAncestorOfType<PcgGraphView>();
+            graphView?.NotifyRadialMenuClosed(this);
+        }
+
+        private Vector2 GetRadialMenuCenter()
+        {
+            var rect = GetPosition();
+            return new Vector2(
+                rect.x + rect.width * 0.5f + RadialMenuOffsetX,
+                rect.y + rect.height * 0.5f + RadialMenuOffsetY);
+        }
+
+        private Vector2 GetRadialMenuTopLeft()
+        {
+            var center = GetRadialMenuCenter();
+            return new Vector2(center.x - RadialMenuRadius, center.y - RadialMenuRadius);
         }
 
         public void SetNodePreviewState(bool isActive)
@@ -456,11 +468,6 @@ namespace DJTechEditor.PCG.Graph
                 m_RadialMenu.style.display = isVisible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        private void UpdateRadialMenuVisibility()
-        {
-            SetRadialMenuVisible(m_IsPointerOnNode || m_IsPointerOnMenu);
-        }
-
         private VisualElement GetOverlayParent()
         {
             var graphView = GetFirstAncestorOfType<PcgGraphView>();
@@ -503,8 +510,9 @@ namespace DJTechEditor.PCG.Graph
 
             if (m_RadialMenu != null)
             {
-                m_RadialMenu.style.left = rect.x + (rect.width - 172f) * 0.5f;
-                m_RadialMenu.style.top = rect.y + (rect.height - 172f) * 0.5f;
+                var topLeft = GetRadialMenuTopLeft();
+                m_RadialMenu.style.left = topLeft.x;
+                m_RadialMenu.style.top = topLeft.y;
                 LayoutRadialButtons();
             }
         }
@@ -519,16 +527,16 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             const float diameter = 30f;
-            const float ringRadius = 64f;
-            const float center = 86f;
-            const float startDeg = -150f;
+            const float buttonOrbitRadius = NodeWidth * 0.5f + 14f;
+            const float center = RadialMenuRadius;
+            const float startDeg = -156f;
             const float stepDeg = 24f;
 
             for (var i = 0; i < buttons.Count; i++)
             {
                 var angle = (startDeg + stepDeg * i) * Mathf.Deg2Rad;
-                var x = center + Mathf.Cos(angle) * ringRadius - diameter * 0.5f;
-                var y = center + Mathf.Sin(angle) * ringRadius - diameter * 0.5f;
+                var x = center + Mathf.Cos(angle) * buttonOrbitRadius - diameter * 0.5f;
+                var y = center + Mathf.Sin(angle) * buttonOrbitRadius - diameter * 0.5f;
                 buttons[i].style.left = x;
                 buttons[i].style.top = y;
             }

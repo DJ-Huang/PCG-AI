@@ -674,7 +674,7 @@ MonoBehaviour:
     name: levels
     type: integer
     floatValue: 0
-    intValue: 1
+    intValue: 2
     boolValue: 0
     stringValue: 
   - parameterId: p7
@@ -694,14 +694,14 @@ MonoBehaviour:
   - parameterId: p9
     name: intensity
     type: number
-    floatValue: 0.02
+    floatValue: 0.10967742
     intValue: 0
     boolValue: 0
     stringValue: 
   - parameterId: p10
     name: scale
     type: number
-    floatValue: 19.602076
+    floatValue: 36.528465
     intValue: 0
     boolValue: 0
     stringValue: 
