@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -18,14 +19,22 @@ PcgResultCode fail_ctx(PcgContext& ctx, PcgResultCode code, const char* message)
 
 const nlohmann::json* require_input_json(PcgContext& ctx, const char* pin, const char* node_label);
 
+data::PcgPointData get_points_input(PcgContext& ctx, const char* pin, const char* label);
 data::PcgPointData parse_point_input(const nlohmann::json& json);
+data::PcgSplineData get_splines_input(PcgContext& ctx, const char* pin, const char* label);
 data::PcgSplineData parse_spline_input(const nlohmann::json& json);
 data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
 data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* label);
 nlohmann::json point_data_to_json(const data::PcgPointData& data);
 void emit_points(PcgContext& ctx, data::PcgPointData data);
+void emit_points_with_meta(PcgContext& ctx,
+                           data::PcgPointData data,
+                           nlohmann::json sidecar);
 void emit_splines(PcgContext& ctx, data::PcgSplineData data);
 void emit_mesh(PcgContext& ctx, data::PcgMeshData data);
+void emit_mesh_shared(PcgContext& ctx,
+                      const std::string& tag,
+                      std::shared_ptr<const data::PcgMeshData> mesh);
 
 uint32_t mix_seed(int a, int b);
 uint32_t next_rand(uint32_t& state);

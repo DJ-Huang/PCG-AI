@@ -32,6 +32,7 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgPreviewMeshBinding> previewBindings,
             PcgPreviewQuality quality)
         {
+            var assetSw = System.Diagnostics.Stopwatch.StartNew();
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {
@@ -43,8 +44,12 @@ namespace DJTechRuntime.PCG
                 json, componentHost, meshBindings, previewBindings);
             if (!PcgMeshGraphUtil.TryValidateMeshRequirements(json, meshes, out _))
                 return null;
+            assetSw.Stop();
 
-            return Execute(json, seed, textures, meshes, quality);
+            var result = Execute(json, seed, textures, meshes, quality);
+            if (result?.Perf != null)
+                result.Perf.AssetResolveMs = assetSw.Elapsed.TotalMilliseconds;
+            return result;
         }
 
         public static PcgGraphExecuteResult Execute(string json, int seed = 42)
@@ -59,7 +64,9 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgMeshUpload> meshes,
             PcgPreviewQuality quality)
         {
+            var validateSw = System.Diagnostics.Stopwatch.StartNew();
             var (validateCode, error) = PcgNative.ValidateGraph(json);
+            validateSw.Stop();
             if (validateCode != PcgResultCode.Ok)
             {
                 Debug.LogError($"[PCG] Validation failed ({validateCode}): {error}");
@@ -73,6 +80,9 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
+            if (result.Perf != null)
+                result.Perf.ValidateMs = validateSw.Elapsed.TotalMilliseconds;
+
             if (result.CookNodesSkipped > 0)
             {
                 Debug.Log(
@@ -83,6 +93,8 @@ namespace DJTechRuntime.PCG
                 Debug.Log(
                     $"[PCG] Cook cache: skipped 0 node(s), executed {result.CookNodesExecuted} (cold).");
             }
+
+            PcgCookPerfLog.Log(result.Perf, quality);
 
             if (PcgProjectSettings.IsLogEnabled)
             {

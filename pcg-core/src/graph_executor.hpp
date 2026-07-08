@@ -2,6 +2,7 @@
 
 #include "graph_cook_cache.hpp"
 #include "graph_execution_result.hpp"
+#include "graph_perf_report.hpp"
 #include "internal/graph_types.hpp"
 #include "mesh_runtime.hpp"
 #include "pcg_api.h"
@@ -17,6 +18,7 @@ PcgResultCode execute_graph(const Graph& graph,
                             const TextureRuntime* textures = nullptr,
                             const MeshRuntime* meshes = nullptr,
                             GraphCookCache* cache = nullptr,
-                            bool (*is_cancel_requested)() = nullptr);
+                            bool (*is_cancel_requested)() = nullptr,
+                            GraphPerfReport* perf = nullptr);
 
 } // namespace pcg::internal

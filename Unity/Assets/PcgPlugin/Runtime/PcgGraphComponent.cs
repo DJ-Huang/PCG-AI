@@ -410,7 +410,7 @@ namespace DJTechRuntime.PCG
             }
 
             var cookKey = PcgGraphCookCache.BuildKey(json, seed, quality);
-            if (TryReuseCachedCook(cookKey))
+            if (TryReuseCachedCook(cookKey, quality))
                 return true;
 
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
@@ -440,17 +440,22 @@ namespace DJTechRuntime.PCG
             return CommitCookResult(cookKey, result);
         }
 
-        private bool TryReuseCachedCook(string cookKey)
+        private bool TryReuseCachedCook(string cookKey, PcgPreviewQuality quality)
         {
             if (Application.isPlaying &&
                 cookMode == PcgCookMode.EveryFrame &&
                 cookKey == m_LastCookKey &&
                 m_HasAppliedCookResult)
             {
+                Debug.Log($"[PCG] Cook perf: skipped execute (EveryFrame, same key, {quality}).");
                 return true;
             }
 
-            return PcgGraphCookCache.TryGet(cookKey, out var cached) && CommitCookResult(cookKey, cached);
+            if (!PcgGraphCookCache.TryGet(cookKey, out var cached) || !CommitCookResult(cookKey, cached))
+                return false;
+
+            PcgCookPerfLog.LogCacheHit(cached.Perf, quality);
+            return true;
         }
 
         private bool CommitCookResult(string cookKey, PcgGraphExecuteResult result)

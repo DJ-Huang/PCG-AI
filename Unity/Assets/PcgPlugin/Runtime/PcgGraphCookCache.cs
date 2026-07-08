@@ -66,6 +66,28 @@ namespace DJTechRuntime.PCG
                 CookNodesSkipped = source.CookNodesSkipped,
                 MeshBinary = source.MeshBinary != null ? (byte[])source.MeshBinary.Clone() : null,
                 PointBinary = source.PointBinary != null ? (byte[])source.PointBinary.Clone() : null,
+                Perf = ClonePerf(source.Perf),
+            };
+        }
+
+        private static PcgCookPerfReport ClonePerf(PcgCookPerfReport source)
+        {
+            if (source == null)
+                return null;
+
+            return new PcgCookPerfReport
+            {
+                AssetResolveMs = source.AssetResolveMs,
+                ValidateMs = source.ValidateMs,
+                NativeCallMs = source.NativeCallMs,
+                GraphExecuteMs = source.GraphExecuteMs,
+                BinaryWriteMs = source.BinaryWriteMs,
+                BufferCopyMs = source.BufferCopyMs,
+                CookNodesExecuted = source.CookNodesExecuted,
+                CookNodesSkipped = source.CookNodesSkipped,
+                NodeEntries = source.NodeEntries != null
+                    ? (PcgNodePerfEntry[])source.NodeEntries.Clone()
+                    : null,
             };
         }
     }

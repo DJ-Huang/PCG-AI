@@ -59,6 +59,8 @@ int main()
         &vertex_count,
         &index_count,
         nullptr,
+        nullptr,
+        0,
         err,
         sizeof(err));
 

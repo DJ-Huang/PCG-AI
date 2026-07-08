@@ -97,6 +97,28 @@ const nlohmann::json* require_input_json(PcgContext& ctx, const char* pin, const
     return input;
 }
 
+data::PcgPointData get_points_input(PcgContext& ctx, const char* pin, const char* label)
+{
+    if (const data::PcgPointData* points = ctx.inputs.find_points(pin))
+        return *points;
+
+    const nlohmann::json* input = require_input_json(ctx, pin, label);
+    if (!input)
+        return {};
+    return parse_point_input(*input);
+}
+
+data::PcgSplineData get_splines_input(PcgContext& ctx, const char* pin, const char* label)
+{
+    if (const data::PcgSplineData* splines = ctx.inputs.find_splines(pin))
+        return *splines;
+
+    const nlohmann::json* input = require_input_json(ctx, pin, label);
+    if (!input)
+        return {};
+    return parse_spline_input(*input);
+}
+
 data::PcgPointData parse_point_input(const nlohmann::json& json)
 {
     return data::PcgPointData::from_json(json);
@@ -133,6 +155,11 @@ void emit_points(PcgContext& ctx, data::PcgPointData data)
     ctx.outputs.add_points("out", std::move(data));
 }
 
+void emit_points_with_meta(PcgContext& ctx, data::PcgPointData data, nlohmann::json sidecar)
+{
+    ctx.outputs.add_points_with_meta("out", std::move(data), std::move(sidecar));
+}
+
 void emit_splines(PcgContext& ctx, data::PcgSplineData data)
 {
     ctx.outputs.add_splines("out", std::move(data));
@@ -141,6 +168,13 @@ void emit_splines(PcgContext& ctx, data::PcgSplineData data)
 void emit_mesh(PcgContext& ctx, data::PcgMeshData data)
 {
     ctx.outputs.add_mesh("out", std::move(data));
+}
+
+void emit_mesh_shared(PcgContext& ctx,
+                      const std::string& tag,
+                      std::shared_ptr<const data::PcgMeshData> mesh)
+{
+    ctx.outputs.add_mesh_shared(tag, std::move(mesh));
 }
 
 uint32_t mix_seed(int a, int b)

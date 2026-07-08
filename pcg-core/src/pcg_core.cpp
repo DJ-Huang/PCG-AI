@@ -5,6 +5,7 @@
 #include "graph_cook_cache.hpp"
 #include "graph_executor.hpp"
 #include "graph_parser.hpp"
+#include "graph_perf_report.hpp"
 #include "internal/error_util.hpp"
 #include "mesh_runtime.hpp"
 #include "texture_runtime.hpp"
@@ -14,6 +15,7 @@
 #include <cstdio>
 #include <cstring>
 #include <atomic>
+#include <chrono>
 
 namespace {
 
@@ -52,6 +54,30 @@ bool is_cancel_requested_now()
     if (current == 0)
         return false;
     return g_cancel_job.load(std::memory_order_relaxed) == current;
+}
+
+void write_perf_json(const pcg::internal::GraphPerfReport& perf, char* out_buf, int out_buf_size)
+{
+    if (!out_buf || out_buf_size <= 0)
+        return;
+
+    nlohmann::json root = nlohmann::json::array();
+    for (const auto& entry : perf.entries()) {
+        root.push_back({
+            {"id", entry.id},
+            {"type", entry.type},
+            {"ms", entry.ms},
+            {"cached", entry.cached},
+        });
+    }
+
+    const std::string serialized = root.dump();
+    if (static_cast<int>(serialized.size()) + 1 > out_buf_size) {
+        out_buf[0] = '\0';
+        return;
+    }
+
+    std::memcpy(out_buf, serialized.c_str(), serialized.size() + 1);
 }
 
 void write_u32(uint8_t* dst, uint32_t value)
@@ -338,6 +364,8 @@ PcgResultCode execute_graph_cached(const char* json,
                                    int* out_vertex_count,
                                    int* out_index_count,
                                    PcgCookStats* out_stats,
+                                   char* out_perf_json,
+                                   int out_perf_json_size,
                                    char* err_buf,
                                    int err_buf_size,
                                    pcg::internal::GraphCookCache* cache)
@@ -372,25 +400,48 @@ PcgResultCode execute_graph_cached(const char* json,
     build_mesh_runtime(meshes, mesh_count, mesh_runtime);
 
     pcg::internal::GraphExecutionResult result;
+    pcg::internal::GraphPerfReport perf;
+    const auto graph_start = std::chrono::steady_clock::now();
     const PcgResultCode exec_code = pcg::internal::execute_graph(
         graph, seed, result, err_buf, err_buf_size,
         texture_count > 0 ? &texture_runtime : nullptr,
-        mesh_count > 0 ? &mesh_runtime : nullptr, cache, is_cancel_requested_now);
+        mesh_count > 0 ? &mesh_runtime : nullptr, cache, is_cancel_requested_now, &perf);
+    const auto graph_end = std::chrono::steady_clock::now();
     if (exec_code != PCG_OK) {
         if (out_json && out_json_size > 0)
             out_json[0] = '\0';
         return exec_code;
     }
 
-    if (out_stats && cache) {
-        out_stats->nodes_executed = cache->nodes_executed();
-        out_stats->nodes_skipped = cache->nodes_skipped();
-    }
+    const double graph_ms =
+        std::chrono::duration<double, std::milli>(graph_end - graph_start).count();
 
-    return write_execution_result(result, out_kind, out_json, out_json_size, out_mesh_buf,
+    const auto write_start = std::chrono::steady_clock::now();
+    const PcgResultCode write_code = write_execution_result(result, out_kind, out_json, out_json_size, out_mesh_buf,
                                 out_mesh_buf_size, out_points_buf, out_points_buf_size,
                                 out_point_count, out_point_attr_flags, out_vertex_count,
                                 out_index_count, err_buf, err_buf_size);
+    const auto write_end = std::chrono::steady_clock::now();
+    const double write_ms =
+        std::chrono::duration<double, std::milli>(write_end - write_start).count();
+
+    if (write_code != PCG_OK)
+        return write_code;
+
+    if (out_stats) {
+        if (cache) {
+            out_stats->nodes_executed = cache->nodes_executed();
+            out_stats->nodes_skipped = cache->nodes_skipped();
+        } else {
+            out_stats->nodes_executed = 0;
+            out_stats->nodes_skipped = 0;
+        }
+        out_stats->graph_execute_ms = graph_ms;
+        out_stats->binary_write_ms = write_ms;
+    }
+
+    write_perf_json(perf, out_perf_json, out_perf_json_size);
+    return PCG_OK;
 }
 
 } // namespace
@@ -843,7 +894,7 @@ PcgResultCode pcg_execute_graph_v5(const char* json,
     return execute_graph_cached(json, seed, textures, texture_count, meshes, mesh_count, out_kind,
                                 out_json, out_json_size, out_mesh_buf, out_mesh_buf_size, nullptr, 0,
                                 nullptr, nullptr, out_vertex_count, out_index_count, out_stats,
-                                err_buf, err_buf_size,
+                                nullptr, 0, err_buf, err_buf_size,
                                 &g_cook_cache);
 }
 
@@ -865,6 +916,8 @@ PcgResultCode pcg_execute_graph_v6(const char* json,
                                    int* out_vertex_count,
                                    int* out_index_count,
                                    PcgCookStats* out_stats,
+                                   char* out_perf_json,
+                                   int out_perf_json_size,
                                    char* err_buf,
                                    int err_buf_size)
 {
@@ -872,7 +925,8 @@ PcgResultCode pcg_execute_graph_v6(const char* json,
                                 out_json, out_json_size, out_mesh_buf, out_mesh_buf_size,
                                 out_points_buf, out_points_buf_size, out_point_count,
                                 out_point_attr_flags, out_vertex_count, out_index_count,
-                                out_stats, err_buf, err_buf_size, &g_cook_cache);
+                                out_stats, out_perf_json, out_perf_json_size,
+                                err_buf, err_buf_size, &g_cook_cache);
 }
 
 PcgResultCode pcg_mesh_binary_size_for_counts(int vertex_count,

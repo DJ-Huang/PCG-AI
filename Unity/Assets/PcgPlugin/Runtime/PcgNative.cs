@@ -77,6 +77,7 @@ namespace DJTechRuntime.PCG
         public const int OutJsonBufSize = 8 * 1024 * 1024;
         public const int OutMeshBufSize = 8 * 1024 * 1024;
         public const int OutPointsBufSize = 8 * 1024 * 1024;
+        public const int OutPerfBufSize = 64 * 1024;
 
         public static string GetVersion()
         {
@@ -118,6 +119,8 @@ namespace DJTechRuntime.PCG
         {
             public int nodes_executed;
             public int nodes_skipped;
+            public double graph_execute_ms;
+            public double binary_write_ms;
         }
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
@@ -159,6 +162,8 @@ namespace DJTechRuntime.PCG
             out int outVertexCount,
             out int outIndexCount,
             out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
             StringBuilder errBuf,
             int errBufSize);
 
@@ -221,6 +226,7 @@ namespace DJTechRuntime.PCG
             var jsonBuf = new byte[OutJsonBufSize];
             var meshBuf = new byte[OutMeshBufSize];
             var pointsBuf = new byte[OutPointsBufSize];
+            var perfBuf = new byte[OutPerfBufSize];
 
             PcgResultCode rc;
             int kind;
@@ -232,6 +238,7 @@ namespace DJTechRuntime.PCG
 
             var hasTextures = textures != null && textures.Count > 0;
             var hasMeshes = meshes != null && meshes.Count > 0;
+            var nativeSw = System.Diagnostics.Stopwatch.StartNew();
 
             if (hasMeshes)
             {
@@ -294,6 +301,8 @@ namespace DJTechRuntime.PCG
                         out vertexCount,
                         out indexCount,
                         out cookStats,
+                        perfBuf,
+                        perfBuf.Length,
                         errBuf,
                         ErrBufSize);
                 }
@@ -344,6 +353,8 @@ namespace DJTechRuntime.PCG
                         out vertexCount,
                         out indexCount,
                         out cookStats,
+                        perfBuf,
+                        perfBuf.Length,
                         errBuf,
                         ErrBufSize);
                 }
@@ -374,9 +385,14 @@ namespace DJTechRuntime.PCG
                     out vertexCount,
                     out indexCount,
                     out cookStats,
+                    perfBuf,
+                    perfBuf.Length,
                     errBuf,
                     ErrBufSize);
             }
+
+            nativeSw.Stop();
+            var perf = BuildPerfReport(cookStats, perfBuf, nativeSw.Elapsed.TotalMilliseconds);
 
             if (rc != PcgResultCode.Ok)
             {
@@ -385,16 +401,61 @@ namespace DJTechRuntime.PCG
                     Error = string.IsNullOrEmpty(errBuf.ToString())
                         ? rc.ToString()
                         : errBuf.ToString(),
+                    Perf = perf,
                 });
             }
 
-            var executeKind = (PcgExecuteKind)kind;
+            return BuildSuccessResult(
+                rc,
+                (PcgExecuteKind)kind,
+                jsonBuf,
+                meshBuf,
+                pointsBuf,
+                pointCount,
+                pointAttrFlags,
+                vertexCount,
+                indexCount,
+                cookStats,
+                perf);
+        }
+
+        private static PcgCookPerfReport BuildPerfReport(
+            NativeCookStats cookStats, byte[] perfBuf, double nativeCallMs)
+        {
+            var perfJson = ReadNullTerminatedUtf8(perfBuf);
+            return new PcgCookPerfReport
+            {
+                NativeCallMs = nativeCallMs,
+                GraphExecuteMs = cookStats.graph_execute_ms,
+                BinaryWriteMs = cookStats.binary_write_ms,
+                CookNodesExecuted = cookStats.nodes_executed,
+                CookNodesSkipped = cookStats.nodes_skipped,
+                NodeEntries = PcgCookPerfJson.TryParse(perfJson),
+            };
+        }
+
+        private static (PcgResultCode code, PcgGraphExecuteResult result) BuildSuccessResult(
+            PcgResultCode rc,
+            PcgExecuteKind executeKind,
+            byte[] jsonBuf,
+            byte[] meshBuf,
+            byte[] pointsBuf,
+            int pointCount,
+            uint pointAttrFlags,
+            int vertexCount,
+            int indexCount,
+            NativeCookStats cookStats,
+            PcgCookPerfReport perf)
+        {
+            var copySw = System.Diagnostics.Stopwatch.StartNew();
+            PcgGraphExecuteResult result;
+
             if (executeKind == PcgExecuteKind.Mesh)
             {
                 var required = MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
                 var meshBinary = new byte[required];
                 Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, required);
-                return (rc, new PcgGraphExecuteResult
+                result = new PcgGraphExecuteResult
                 {
                     Kind = executeKind,
                     MeshBinary = meshBinary,
@@ -402,10 +463,9 @@ namespace DJTechRuntime.PCG
                     IndexCount = indexCount,
                     CookNodesExecuted = cookStats.nodes_executed,
                     CookNodesSkipped = cookStats.nodes_skipped,
-                });
+                };
             }
-
-            if (executeKind == PcgExecuteKind.Points)
+            else if (executeKind == PcgExecuteKind.Points)
             {
                 var required = PointBinaryHeaderSize + pointCount * 12;
                 var flags = (PcgPointAttrFlags)pointAttrFlags;
@@ -429,7 +489,8 @@ namespace DJTechRuntime.PCG
                     meshBinary = new byte[meshRequired];
                     Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, meshRequired);
                 }
-                return (rc, new PcgGraphExecuteResult
+
+                result = new PcgGraphExecuteResult
                 {
                     Kind = executeKind,
                     PointBinary = pointBinary,
@@ -440,18 +501,35 @@ namespace DJTechRuntime.PCG
                     IndexCount = indexCount,
                     CookNodesExecuted = cookStats.nodes_executed,
                     CookNodesSkipped = cookStats.nodes_skipped,
-                });
+                };
+            }
+            else
+            {
+                var zero = Array.IndexOf(jsonBuf, (byte)0);
+                var length = zero >= 0 ? zero : jsonBuf.Length;
+                result = new PcgGraphExecuteResult
+                {
+                    Kind = executeKind,
+                    Json = Encoding.UTF8.GetString(jsonBuf, 0, length),
+                    CookNodesExecuted = cookStats.nodes_executed,
+                    CookNodesSkipped = cookStats.nodes_skipped,
+                };
             }
 
-            var zero = Array.IndexOf(jsonBuf, (byte)0);
-            var length = zero >= 0 ? zero : jsonBuf.Length;
-            return (rc, new PcgGraphExecuteResult
-            {
-                Kind = executeKind,
-                Json = Encoding.UTF8.GetString(jsonBuf, 0, length),
-                CookNodesExecuted = cookStats.nodes_executed,
-                CookNodesSkipped = cookStats.nodes_skipped,
-            });
+            copySw.Stop();
+            perf.BufferCopyMs = copySw.Elapsed.TotalMilliseconds;
+            result.Perf = perf;
+            return (rc, result);
+        }
+
+        private static string ReadNullTerminatedUtf8(byte[] buffer)
+        {
+            if (buffer == null || buffer.Length == 0 || buffer[0] == 0)
+                return string.Empty;
+
+            var zero = Array.IndexOf(buffer, (byte)0);
+            var length = zero >= 0 ? zero : buffer.Length;
+            return Encoding.UTF8.GetString(buffer, 0, length);
         }
     }
 
@@ -496,5 +574,6 @@ namespace DJTechRuntime.PCG
         public string Error;
         public int CookNodesExecuted;
         public int CookNodesSkipped;
+        public PcgCookPerfReport Perf;
     }
 }

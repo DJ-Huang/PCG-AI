@@ -1,6 +1,8 @@
 #pragma once
 
 #include "data/pcg_data_collection.hpp"
+#include "data/pcg_point_data.hpp"
+#include "data/pcg_spline_data.hpp"
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_texture_data.hpp"
 #include "internal/graph_types.hpp"
@@ -28,6 +30,8 @@ uint64_t hash_bytes(const void* data, std::size_t size, uint64_t seed = kFnvOffs
 uint64_t hash_string(const std::string& value);
 uint64_t hash_json(const nlohmann::json& value);
 uint64_t hash_mesh(const data::PcgMeshData& mesh);
+uint64_t hash_points(const data::PcgPointData& points);
+uint64_t hash_splines(const data::PcgSplineData& splines);
 uint64_t hash_texture(const data::PcgTextureData& texture);
 uint64_t hash_collection(const data::PcgDataCollection& collection);
 

@@ -201,6 +201,8 @@ PCG_API PcgResultCode pcg_execute_graph_v4(const char* json,
 typedef struct {
     int nodes_executed;
     int nodes_skipped;
+    double graph_execute_ms;
+    double binary_write_ms;
 } PcgCookStats;
 
 /**
@@ -248,6 +250,8 @@ PCG_API PcgResultCode pcg_execute_graph_v6(const char* json,
                                            int* out_vertex_count,
                                            int* out_index_count,
                                            PcgCookStats* out_stats,
+                                           char* out_perf_json,
+                                           int out_perf_json_size,
                                            char* err_buf,
                                            int err_buf_size);
 

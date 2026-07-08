@@ -36,8 +36,11 @@ public:
         data::PcgPointData points;
 
         // Merge optional input points
-        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
-            for (const auto& p : parse_point_input(*input).points())
+        if (const data::PcgPointData* input = ctx.inputs.find_points("in"))
+            for (const auto& p : input->points())
+                points.add_point(p);
+        else if (const nlohmann::json* json_input = ctx.inputs.find_json("in"))
+            for (const auto& p : parse_point_input(*json_input).points())
                 points.add_point(p);
 
         const double origin_x = -((count_x - 1) * spacing) * 0.5;
@@ -76,8 +79,11 @@ public:
         data::PcgPointData points;
 
         // Merge optional input points
-        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
-            for (const auto& p : parse_point_input(*input).points())
+        if (const data::PcgPointData* input = ctx.inputs.find_points("in"))
+            for (const auto& p : input->points())
+                points.add_point(p);
+        else if (const nlohmann::json* json_input = ctx.inputs.find_json("in"))
+            for (const auto& p : parse_point_input(*json_input).points())
                 points.add_point(p);
 
         for (int i = 0; i < count; ++i) {
@@ -108,8 +114,11 @@ public:
         data::PcgPointData points;
 
         // Merge optional input points
-        if (const nlohmann::json* input = ctx.inputs.find_json("in"))
-            for (const auto& p : parse_point_input(*input).points())
+        if (const data::PcgPointData* input = ctx.inputs.find_points("in"))
+            for (const auto& p : input->points())
+                points.add_point(p);
+        else if (const nlohmann::json* json_input = ctx.inputs.find_json("in"))
+            for (const auto& p : parse_point_input(*json_input).points())
                 points.add_point(p);
 
         const double step = subdivisions <= 1 ? extent : extent / static_cast<double>(subdivisions - 1);
@@ -135,11 +144,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CopyAttributes missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "CopyAttributes missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
-
-        data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "CopyAttributes missing points input");
+        if (points.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CopyAttributes missing points input");
         const auto names = parse_name_list(ctx.node->data, "attributeNames");
         const nlohmann::json& source = ctx.node->data.contains("values") && ctx.node->data["values"].is_object()
             ? ctx.node->data["values"]
@@ -166,11 +173,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "DeleteAttributes missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "DeleteAttributes missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
-
-        data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "DeleteAttributes missing points input");
+        if (points.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "DeleteAttributes missing points input");
         const auto names = parse_name_list(ctx.node->data, "attributeNames");
 
         for (auto& point : points.points_mut()) {
@@ -192,11 +197,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BreakAttributes missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "BreakAttributes missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
-
-        data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "BreakAttributes missing points input");
+        if (points.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "BreakAttributes missing points input");
         const std::string name = ctx.node->data.value("attributeName", "");
         if (name.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BreakAttributes attributeName required");
@@ -224,15 +227,14 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "DensityFilter missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "DensityFilter missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
+        data::PcgPointData source = get_points_input(ctx, "in", "DensityFilter missing points input");
+        if (source.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "DensityFilter missing points input");
 
         const double density = ctx.node->data.value("density", 1.0);
         if (density < 0.0 || density > 1.0)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "DensityFilter density out of range");
 
-        data::PcgPointData source = parse_point_input(*input);
         data::PcgPointData filtered;
         uint32_t rng = mix_seed(ctx.graph_seed, 17);
 
@@ -256,16 +258,15 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "AttributeFilter missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "AttributeFilter missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
+        data::PcgPointData source = get_points_input(ctx, "in", "AttributeFilter missing points input");
+        if (source.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "AttributeFilter missing points input");
 
         const std::string name = ctx.node->data.value("attributeName", "");
         const std::string match_value = ctx.node->data.value("matchValue", "");
         if (name.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "AttributeFilter attributeName required");
 
-        data::PcgPointData source = parse_point_input(*input);
         data::PcgPointData filtered;
         for (const auto& point : source.points()) {
             if (!point.attributes.contains(name))
@@ -290,9 +291,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformPoints missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "TransformPoints missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
+        data::PcgPointData source = get_points_input(ctx, "in", "TransformPoints missing points input");
+        if (source.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformPoints missing points input");
 
         const double tx = ctx.node->data.value("translateX", 0.0);
         const double ty = ctx.node->data.value("translateY", 0.0);
@@ -302,7 +303,6 @@ public:
         const double cos_r = std::cos(rot_y);
         const double sin_r = std::sin(rot_y);
 
-        data::PcgPointData source = parse_point_input(*input);
         data::PcgPointData transformed;
         for (const auto& point : source.points()) {
             const double sx = point.x * scale;
@@ -350,15 +350,13 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ProjectPoints missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "ProjectPoints missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
-
+        data::PcgPointData source = get_points_input(ctx, "in", "ProjectPoints missing points input");
+        if (source.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ProjectPoints missing points input");
         const nlohmann::json* terrain = ctx.inputs.find_json("terrain");
         const bool use_terrain = ctx.node->data.value("useTerrain", terrain != nullptr);
         const double base_y = ctx.node->data.value("baseY", 0.0);
 
-        data::PcgPointData source = parse_point_input(*input);
         data::PcgPointData projected;
         for (const auto& point : source.points()) {
             const double y = use_terrain
@@ -415,9 +413,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SampleSurface missing node");
 
-        const nlohmann::json* points_json = require_input_json(ctx, "in", "SampleSurface missing points input");
-        if (!points_json)
-            return PCG_ERR_EXECUTION;
+        data::PcgPointData source = get_points_input(ctx, "in", "SampleSurface missing points input");
+        if (source.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SampleSurface missing points input");
 
         const nlohmann::json* terrain = require_input_json(ctx, "terrain", "SampleSurface missing terrain input");
         if (!terrain)
@@ -429,7 +427,6 @@ public:
         if (blend < 0.0) blend = 0.0;
         if (blend > 1.0) blend = 1.0;
 
-        data::PcgPointData source = parse_point_input(*points_json);
         data::PcgPointData sampled;
         for (const auto& point : source.points()) {
             const double terrain_y = sample_terrain_height(terrain, point.x, point.z, seed);
@@ -455,28 +452,15 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "StaticMeshSpawner missing points input");
-        if (!input)
-            return PCG_ERR_EXECUTION;
-
-        if (!input->contains("points") || !(*input)["points"].is_array())
+        data::PcgPointData points =
+            get_points_input(ctx, "in", "StaticMeshSpawner missing points input");
+        if (points.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing points input");
 
         const std::string prefab = ctx.node->data.value("prefab", "");
         const std::string mesh = ctx.node->data.value("mesh", "");
         const double scale = ctx.node->data.value("scale", 1.0);
 
-        bool has_spawn_mesh = false;
-        data::PcgMeshData spawn_mesh;
-        if (const data::PcgMeshData* mesh_input = ctx.inputs.find_mesh("mesh")) {
-            spawn_mesh = *mesh_input;
-            has_spawn_mesh = !spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3;
-        } else if (const nlohmann::json* mesh_json = ctx.inputs.find_json("mesh")) {
-            spawn_mesh = parse_mesh_input(*mesh_json);
-            has_spawn_mesh = !spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3;
-        }
-
-        data::PcgPointData points = parse_point_input(*input);
         for (auto& point : points.points_mut()) {
             if (!prefab.empty())
                 point.attributes["prefab"] = prefab;
@@ -485,15 +469,23 @@ public:
             point.attributes["scale"] = scale;
         }
 
-        nlohmann::json out = point_data_to_json(points);
-        out["status"] = "ok";
-        out["prefab"] = prefab;
-        out["mesh"] = mesh;
-        out["scale"] = scale;
-        out["pointCount"] = out["points"].size();
-        if (has_spawn_mesh)
-            ctx.outputs.add_mesh("spawnMesh", spawn_mesh);
-        ctx.outputs.add("out", data::PcgDataType::Point, std::move(out));
+        nlohmann::json sidecar{
+            {"status", "ok"},
+            {"prefab", prefab},
+            {"mesh", mesh},
+            {"scale", scale},
+            {"pointCount", points.points().size()},
+        };
+
+        if (auto prototype = ctx.inputs.find_mesh_shared("mesh")) {
+            emit_mesh_shared(ctx, "spawnMesh", prototype);
+        } else if (const nlohmann::json* mesh_json = ctx.inputs.find_json("mesh")) {
+            data::PcgMeshData spawn_mesh = parse_mesh_input(*mesh_json);
+            if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3)
+                ctx.outputs.add_mesh("spawnMesh", std::move(spawn_mesh));
+        }
+
+        ctx.outputs.add_points_with_meta("out", std::move(points), std::move(sidecar));
         return PCG_OK;
     }
 };

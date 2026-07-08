@@ -58,8 +58,7 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConvexHull missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "ConvexHull missing points input");
-        const data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "ConvexHull missing points input");
         if (points.points().size() < 3)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConvexHull requires at least 3 points");
 
@@ -78,8 +77,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConnectNearest missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "ConnectNearest missing points input");
-        const data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "ConnectNearest missing points input");
+        if (points.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConnectNearest missing points input");
         const int k = clamp_int(ctx.node->data.value("k", 1), 1, 16);
         const double max_distance = ctx.node->data.value("maxDistance", -1.0);
 
@@ -97,8 +97,7 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Delaunay missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "Delaunay missing points input");
-        const data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "Delaunay missing points input");
         if (points.points().size() < 3)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Delaunay requires at least 3 points");
 
@@ -119,10 +118,16 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MST missing node");
 
-        const nlohmann::json* edge_input = require_input_json(ctx, "in", "MST missing edges input");
-        const nlohmann::json* point_input = require_input_json(ctx, "points", "MST missing points input");
-        const data::PcgSplineData edges = parse_spline_input(*edge_input);
-        const data::PcgPointData points = parse_point_input(*point_input);
+        data::PcgSplineData edges = get_splines_input(ctx, "in", "MST missing edges input");
+        if (edges.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MST missing edges input");
+
+        const nlohmann::json* point_input = ctx.inputs.find_json("points");
+        data::PcgPointData points;
+        if (const data::PcgPointData* typed_points = ctx.inputs.find_points("points"))
+            points = *typed_points;
+        else if (point_input)
+            points = parse_point_input(*point_input);
 
         const double max_edge_length = ctx.node->data.value("maxEdgeLength", -1.0);
         data::PcgSplineData splines = mst_splines(edges, points);
@@ -141,8 +146,7 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Voronoi missing node");
 
-        const nlohmann::json* input = require_input_json(ctx, "in", "Voronoi missing points input");
-        const data::PcgPointData points = parse_point_input(*input);
+        data::PcgPointData points = get_points_input(ctx, "in", "Voronoi missing points input");
         if (points.points().size() < 3)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Voronoi requires at least 3 points");
 
@@ -165,10 +169,17 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "AStarPathfinding missing node");
 
-        const nlohmann::json* edge_input = require_input_json(ctx, "in", "AStarPathfinding missing edges input");
-        const nlohmann::json* point_input = require_input_json(ctx, "points", "AStarPathfinding missing points input");
-        const data::PcgSplineData edges = parse_spline_input(*edge_input);
-        const data::PcgPointData points = parse_point_input(*point_input);
+        data::PcgSplineData edges = get_splines_input(ctx, "in", "AStarPathfinding missing edges input");
+        if (edges.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "AStarPathfinding missing edges input");
+
+        data::PcgPointData points;
+        if (const data::PcgPointData* typed_points = ctx.inputs.find_points("points"))
+            points = *typed_points;
+        else if (const nlohmann::json* point_input = ctx.inputs.find_json("points"))
+            points = parse_point_input(*point_input);
+        else
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "AStarPathfinding missing points input");
 
         const int n = static_cast<int>(points.points().size());
         const int start_index = clamp_int(ctx.node->data.value("startIndex", 0), 0, std::max(0, n - 1));

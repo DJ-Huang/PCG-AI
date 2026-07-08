@@ -6,6 +6,7 @@
 #include "internal/error_util.hpp"
 #include "texture_runtime.hpp"
 
+#include <chrono>
 #include <queue>
 #include <unordered_map>
 #include <utility>
@@ -86,22 +87,34 @@ void gather_inputs(const Graph& graph,
         const std::string source_pin = edge.source_handle.empty() ? "out" : edge.source_handle;
         const data::PcgDataCollection& upstream = it->second;
 
-        if (const nlohmann::json* payload = upstream.find_json(source_pin)) {
-            inputs.add(pin, data::PcgDataType::Unknown, *payload);
-            if (const data::PcgMeshData* spawn_mesh = upstream.find_mesh("spawnMesh"))
-                inputs.add_mesh("spawnMesh", *spawn_mesh);
+        if (const data::PcgPointData* points = upstream.find_points(source_pin)) {
+            inputs.add_points(pin, *points);
+            if (auto spawn_mesh = upstream.find_mesh_shared("spawnMesh"))
+                inputs.add_mesh_shared("spawnMesh", spawn_mesh);
             continue;
         }
 
-        if (const data::PcgMeshData* mesh = upstream.find_mesh(source_pin)) {
-            inputs.add_mesh(pin, *mesh);
+        if (const data::PcgSplineData* splines = upstream.find_splines(source_pin)) {
+            inputs.add_splines(pin, *splines);
+            continue;
+        }
+
+        if (auto mesh = upstream.find_mesh_shared(source_pin)) {
+            inputs.add_mesh_shared(pin, mesh);
+            continue;
+        }
+
+        if (const nlohmann::json* payload = upstream.find_json(source_pin)) {
+            inputs.add(pin, data::PcgDataType::Unknown, *payload);
+            if (auto spawn_mesh = upstream.find_mesh_shared("spawnMesh"))
+                inputs.add_mesh_shared("spawnMesh", spawn_mesh);
             continue;
         }
 
         const nlohmann::json primary = upstream.primary_json();
         if (!primary.is_object() || primary.empty()) {
-            if (const data::PcgMeshData* mesh = upstream.primary_mesh()) {
-                inputs.add_mesh(pin, *mesh);
+            if (auto mesh = upstream.primary_mesh_shared()) {
+                inputs.add_mesh_shared(pin, mesh);
                 continue;
             }
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
@@ -124,9 +137,12 @@ PcgResultCode execute_graph(const Graph& graph,
                             const TextureRuntime* textures,
                             const MeshRuntime* meshes,
                             GraphCookCache* cache,
-                            bool (*is_cancel_requested)())
+                            bool (*is_cancel_requested)(),
+                            GraphPerfReport* perf)
 {
     elements::register_builtin_elements();
+    if (perf)
+        perf->clear();
 
     PcgResultCode topo_code = PCG_OK;
     const auto order = topological_order(graph, err_buf, err_buf_size, topo_code);
@@ -179,9 +195,13 @@ PcgResultCode execute_graph(const Graph& graph,
             if (cache->try_get(node_id, input_hash, cached_outputs, cached_output_hash)) {
                 outputs[node_id] = std::move(cached_outputs);
                 output_hashes[node_id] = cached_output_hash;
+                if (perf)
+                    perf->add(node_id, node->type, 0.0, true);
                 continue;
             }
         }
+
+        const auto node_start = std::chrono::steady_clock::now();
 
         const elements::IPcgElement* element = elements::find_element(node->type);
         if (!element)
@@ -215,6 +235,12 @@ PcgResultCode execute_graph(const Graph& graph,
 
         if (cache)
             cache->put(node_id, input_hash, out_hash, outputs[node_id]);
+
+        if (perf) {
+            const auto node_end = std::chrono::steady_clock::now();
+            const double ms = std::chrono::duration<double, std::milli>(node_end - node_start).count();
+            perf->add(node_id, node->type, ms, false);
+        }
     }
 
     const GraphNode* sink = nullptr;

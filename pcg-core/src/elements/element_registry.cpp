@@ -72,24 +72,39 @@ public:
         if (!ctx.node)
             return fail(ctx, PCG_ERR_EXECUTION, "PlaceInScene missing node");
 
-        const nlohmann::json* points_payload = ctx.inputs.find_json("in");
-        if (!points_payload)
-            return fail(ctx, PCG_ERR_EXECUTION, "PlaceInScene missing points input");
+        const data::PcgPointData* points_payload = ctx.inputs.find_points("in");
+        if (!points_payload) {
+            const nlohmann::json* json_payload = ctx.inputs.find_json("in");
+            if (!json_payload)
+                return fail(ctx, PCG_ERR_EXECUTION, "PlaceInScene missing points input");
 
-        if (!points_payload->contains("points") || !(*points_payload)["points"].is_array())
-            return fail(ctx, PCG_ERR_EXECUTION, "PlaceInScene missing points input");
+            if (!json_payload->contains("points") || !(*json_payload)["points"].is_array())
+                return fail(ctx, PCG_ERR_EXECUTION, "PlaceInScene missing points input");
+
+            const std::string prefab = ctx.node->data.value("prefab", "");
+            const double scale = ctx.node->data.value("scale", 1.0);
+
+            nlohmann::json out{
+                {"status", "ok"},
+                {"prefab", prefab},
+                {"scale", scale},
+                {"pointCount", (*json_payload)["points"].size()},
+                {"points", (*json_payload)["points"]},
+            };
+            ctx.outputs.add("out", data::PcgDataType::Point, std::move(out));
+            return PCG_OK;
+        }
 
         const std::string prefab = ctx.node->data.value("prefab", "");
         const double scale = ctx.node->data.value("scale", 1.0);
 
-        nlohmann::json out{
+        nlohmann::json sidecar{
             {"status", "ok"},
             {"prefab", prefab},
             {"scale", scale},
-            {"pointCount", (*points_payload)["points"].size()},
-            {"points", (*points_payload)["points"]},
+            {"pointCount", points_payload->points().size()},
         };
-        ctx.outputs.add("out", data::PcgDataType::Point, std::move(out));
+        ctx.outputs.add_points_with_meta("out", *points_payload, std::move(sidecar));
         return PCG_OK;
     }
 };
@@ -102,8 +117,23 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        if (const data::PcgMeshData* mesh = ctx.inputs.find_mesh("in")) {
-            ctx.outputs.add_mesh("out", *mesh);
+        if (auto mesh = ctx.inputs.find_mesh_shared("in")) {
+            ctx.outputs.add_mesh_shared("out", mesh);
+            if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
+                ctx.outputs.add_mesh_shared("spawnMesh", spawn_mesh);
+            return PCG_OK;
+        }
+
+        if (const data::PcgTaggedData* in_item = ctx.inputs.find("in");
+            in_item && in_item->points) {
+            ctx.outputs.add_points_with_meta("out", *in_item->points, in_item->payload);
+            if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
+                ctx.outputs.add_mesh_shared("spawnMesh", spawn_mesh);
+            return PCG_OK;
+        }
+
+        if (const data::PcgSplineData* splines = ctx.inputs.find_splines("in")) {
+            ctx.outputs.add_splines("out", *splines);
             return PCG_OK;
         }
 
@@ -112,8 +142,8 @@ public:
             return fail(ctx, PCG_ERR_EXECUTION, "Output missing input");
 
         ctx.outputs.add("out", data::PcgDataType::Unknown, *input);
-        if (const data::PcgMeshData* spawn_mesh = ctx.inputs.find_mesh("spawnMesh"))
-            ctx.outputs.add_mesh("spawnMesh", *spawn_mesh);
+        if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
+            ctx.outputs.add_mesh_shared("spawnMesh", spawn_mesh);
         return PCG_OK;
     }
 };

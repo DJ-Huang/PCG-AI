@@ -55,6 +55,38 @@ uint64_t hash_mesh(const data::PcgMeshData& mesh)
     return h;
 }
 
+uint64_t hash_points(const data::PcgPointData& points)
+{
+    uint64_t h = kFnvOffsetBasis;
+    h = hash_combine(h, static_cast<uint64_t>(points.points().size()));
+    for (const auto& point : points.points()) {
+        h = hash_bytes(&point.x, sizeof(double), h);
+        h = hash_bytes(&point.y, sizeof(double), h);
+        h = hash_bytes(&point.z, sizeof(double), h);
+        h = hash_combine(h, hash_json(point.attributes));
+    }
+    h = hash_combine(h, hash_json(points.metadata().raw()));
+    return h;
+}
+
+uint64_t hash_splines(const data::PcgSplineData& splines)
+{
+    uint64_t h = kFnvOffsetBasis;
+    h = hash_combine(h, static_cast<uint64_t>(splines.splines().size()));
+    for (const auto& spline : splines.splines()) {
+        h = hash_combine(h, static_cast<uint64_t>(spline.points.size()));
+        for (const auto& point : spline.points) {
+            h = hash_bytes(&point.x, sizeof(double), h);
+            h = hash_bytes(&point.y, sizeof(double), h);
+            h = hash_bytes(&point.z, sizeof(double), h);
+        }
+        h = hash_combine(h, static_cast<uint64_t>(spline.closed));
+        h = hash_combine(h, hash_json(spline.attributes));
+    }
+    h = hash_combine(h, hash_json(splines.metadata().raw()));
+    return h;
+}
+
 uint64_t hash_texture(const data::PcgTextureData& texture)
 {
     uint64_t h = kFnvOffsetBasis;
@@ -74,6 +106,12 @@ uint64_t hash_collection(const data::PcgDataCollection& collection)
         h = hash_combine(h, static_cast<uint64_t>(item.type));
         if (item.mesh)
             h = hash_combine(h, hash_mesh(*item.mesh));
+        else if (item.points) {
+            h = hash_combine(h, hash_points(*item.points));
+            h = hash_combine(h, hash_json(item.payload));
+        }
+        else if (item.splines)
+            h = hash_combine(h, hash_splines(*item.splines));
         else
             h = hash_combine(h, hash_json(item.payload));
     }
