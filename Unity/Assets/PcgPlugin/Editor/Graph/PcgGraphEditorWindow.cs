@@ -443,6 +443,8 @@ namespace DJTechEditor.PCG.Graph
 
         private bool ImportFromPath(string path)
         {
+            PcgNodeManifest.Reload();
+
             var json = File.ReadAllText(path);
             if (!PcgGraphSerializer.TryFromJson(json, out var doc, out var error))
             {

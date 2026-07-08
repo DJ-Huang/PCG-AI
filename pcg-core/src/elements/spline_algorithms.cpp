@@ -1,6 +1,7 @@
 #include "elements/spline_algorithms.hpp"
 
 #include "elements/element_utils.hpp"
+#include "geometry/sweep_geometry.hpp"
 
 #include <cmath>
 #include <cstring>
@@ -23,31 +24,6 @@ std::vector<geometry::Vec3> collect_control_points(const CreateSplineOptions& op
     return points;
 }
 
-void append_cap_fan(data::PcgMeshData& mesh, const std::vector<int>& ring, bool flip)
-{
-    if (ring.size() < 3)
-        return;
-
-    geometry::Vec3 center{0.0, 0.0, 0.0};
-    for (int idx : ring) {
-        const auto& v = mesh.vertices()[static_cast<size_t>(idx)];
-        center = geometry::add(center, to_vec3(v));
-    }
-    center = geometry::scale(center, 1.0 / static_cast<double>(ring.size()));
-
-    const int center_idx = static_cast<int>(mesh.vertices().size());
-    mesh.add_vertex(to_vertex(center));
-
-    for (size_t i = 0; i + 1 < ring.size(); ++i) {
-        const int a = ring[i];
-        const int b = ring[i + 1];
-        if (flip)
-            mesh.add_triangle(center_idx, b, a);
-        else
-            mesh.add_triangle(center_idx, a, b);
-    }
-}
-
 data::PcgMeshData make_box_profile(double width, double height)
 {
     data::PcgMeshData profile;
@@ -62,13 +38,62 @@ data::PcgMeshData make_box_profile(double width, double height)
     return profile;
 }
 
-std::vector<geometry::Vec3> profile_ring_local(const data::PcgMeshData& profile)
+geometry::CurveProfile make_builtin_curve_profile(const SweepAlongSplineOptions& options)
 {
-    std::vector<geometry::Vec3> ring;
-    ring.reserve(profile.vertices().size());
-    for (const auto& v : profile.vertices())
-        ring.push_back(to_vec3(v));
-    return ring;
+    geometry::CurveProfile profile;
+    const int columns = std::max(3, options.columns);
+
+    if (options.surface_shape == "circle") {
+        profile.closed = true;
+        profile.points.reserve(static_cast<size_t>(columns));
+        for (int i = 0; i < columns; ++i) {
+            const double t = static_cast<double>(i) / static_cast<double>(columns) * 2.0 * 3.14159265358979323846;
+            profile.points.push_back(
+                {std::cos(t) * options.radius, std::sin(t) * options.radius, 0.0});
+        }
+        return profile;
+    }
+
+    if (options.surface_shape == "ribbon") {
+        profile.closed = false;
+        const double hw = options.profile_width * 0.5;
+        profile.points.push_back({-hw, 0.0, 0.0});
+        profile.points.push_back({hw, 0.0, 0.0});
+        return profile;
+    }
+
+    profile.closed = true;
+    const double hw = options.profile_width * 0.5;
+    const double hh = options.profile_height * 0.5;
+    profile.points.push_back({-hw, -hh, 0.0});
+    profile.points.push_back({hw, -hh, 0.0});
+    profile.points.push_back({hw, hh, 0.0});
+    profile.points.push_back({-hw, hh, 0.0});
+    return profile;
+}
+
+geometry::CurveProfile profile_from_spline_data(const data::PcgSplineData& profile_spline,
+                                              const SweepAlongSplineOptions& options)
+{
+    if (profile_spline.splines().empty())
+        return {};
+
+    const auto& spline = profile_spline.splines().front();
+    std::vector<geometry::Vec3> points;
+    points.reserve(spline.points.size());
+    for (const auto& p : spline.points)
+        points.push_back(to_vec3(p));
+
+    return geometry::prepare_curve_profile(points, spline.closed, true, options.profile_plane);
+}
+
+bool spline_is_closed(const std::vector<geometry::Vec3>& polyline, bool closed_flag)
+{
+    if (closed_flag)
+        return true;
+    if (polyline.size() < 2)
+        return false;
+    return geometry::length(geometry::sub(polyline.front(), polyline.back())) <= 1e-4;
 }
 
 } // namespace
@@ -202,6 +227,69 @@ data::PcgPointData sample_along_spline(const data::PcgSplineData& splines, const
     return points;
 }
 
+data::PcgMeshData extract_cross_section_profile(const data::PcgMeshData& mesh,
+                                                const CrossSectionProfileOptions& options)
+{
+    geometry::CrossSectionOptions prep;
+    prep.plane = options.plane;
+    prep.weld_epsilon = options.weld_epsilon;
+    prep.center = options.center;
+
+    const geometry::CrossSectionMesh section = geometry::prepare_cross_section(mesh, prep);
+    data::PcgMeshData out;
+    for (const auto& v : section.vertices)
+        out.add_vertex({v.x, v.y, v.z});
+    for (int idx : section.triangles)
+        out.triangles_mut().push_back(idx);
+    return out;
+}
+
+data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
+                                     const data::PcgSplineData* profile_spline,
+                                     const SweepAlongSplineOptions& options)
+{
+    data::PcgMeshData result;
+    if (backbone.splines().empty())
+        return result;
+
+    geometry::CurveProfile profile;
+    if (options.use_profile_spline && profile_spline && !profile_spline->splines().empty())
+        profile = profile_from_spline_data(*profile_spline, options);
+    else
+        profile = make_builtin_curve_profile(options);
+
+    if (profile.points.size() < 2)
+        return result;
+
+    geometry::SweepAlongFramesOptions sweep_opts;
+    sweep_opts.cap_start = options.cap_start;
+    sweep_opts.cap_end = options.cap_end;
+    sweep_opts.twist_radians = options.twist_degrees * 3.14159265358979323846 / 180.0;
+    sweep_opts.scale_start = options.scale_start;
+    sweep_opts.scale_end = options.scale_end;
+    sweep_opts.profile_closed = profile.closed;
+
+    const geometry::Vec3 up_hint{options.up_x, options.up_y, options.up_z};
+
+    for (const auto& spline : backbone.splines()) {
+        std::vector<geometry::Vec3> polyline;
+        for (const auto& p : spline.points)
+            polyline.push_back(to_vec3(p));
+
+        sweep_opts.backbone_closed = spline_is_closed(polyline, spline.closed);
+
+        polyline = geometry::resample_polyline_by_spacing(polyline, std::max(0.05, options.sample_spacing));
+        if (polyline.size() < 2)
+            continue;
+
+        const auto frames = geometry::build_frames(polyline, up_hint);
+        const data::PcgMeshData swept = geometry::sweep_curve_profile(profile, frames, sweep_opts);
+        result = merge_meshes(result, swept);
+    }
+
+    return result;
+}
+
 data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
                                        const data::PcgMeshData* profile_mesh,
                                        const ExtrudeAlongSplineOptions& options)
@@ -211,10 +299,23 @@ data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
         return result;
 
     const data::PcgMeshData box_profile = make_box_profile(options.profile_width, options.profile_height);
-    const data::PcgMeshData& profile = (options.use_profile_mesh && profile_mesh && !profile_mesh->vertices().empty())
-                                           ? *profile_mesh
-                                           : box_profile;
-    const std::vector<geometry::Vec3> profile_ring = profile_ring_local(profile);
+    const data::PcgMeshData& source_profile =
+        (options.use_profile_mesh && profile_mesh && !profile_mesh->vertices().empty()) ? *profile_mesh
+                                                                                        : box_profile;
+
+    geometry::CrossSectionOptions prep;
+    prep.plane = options.profile_plane;
+    prep.center = true;
+    const geometry::CrossSectionMesh section = geometry::prepare_cross_section(source_profile, prep);
+
+    geometry::SweepAlongFramesOptions sweep_opts;
+    sweep_opts.cap_start = options.cap_start;
+    sweep_opts.cap_end = options.cap_end;
+    sweep_opts.twist_radians = options.twist_degrees * 3.14159265358979323846 / 180.0;
+    sweep_opts.scale_start = options.scale_start;
+    sweep_opts.scale_end = options.scale_end;
+
+    const geometry::Vec3 up_hint{options.up_x, options.up_y, options.up_z};
 
     for (const auto& spline : splines.splines()) {
         std::vector<geometry::Vec3> polyline;
@@ -225,36 +326,9 @@ data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
         if (polyline.size() < 2)
             continue;
 
-        const auto frames = geometry::build_frames(polyline);
-        std::vector<std::vector<int>> rings;
-        rings.reserve(frames.size());
-
-        for (size_t i = 0; i < frames.size(); ++i) {
-            std::vector<int> ring;
-            ring.reserve(profile_ring.size());
-            for (const auto& local : profile_ring) {
-                const geometry::Vec3 world = geometry::transform_local_to_world(frames[i], local);
-                ring.push_back(static_cast<int>(result.vertices().size()));
-                result.add_vertex(to_vertex(world));
-            }
-            rings.push_back(std::move(ring));
-        }
-
-        for (size_t i = 0; i + 1 < rings.size(); ++i) {
-            const auto& a = rings[i];
-            const auto& b = rings[i + 1];
-            const size_t count = std::min(a.size(), b.size());
-            for (size_t j = 0; j < count; ++j) {
-                const size_t jn = (j + 1) % count;
-                result.add_triangle(a[j], b[j], b[jn]);
-                result.add_triangle(a[j], b[jn], a[jn]);
-            }
-        }
-
-        if (options.cap_start && !rings.empty())
-            append_cap_fan(result, rings.front(), true);
-        if (options.cap_end && !rings.empty())
-            append_cap_fan(result, rings.back(), false);
+        const auto frames = geometry::build_frames(polyline, up_hint);
+        const data::PcgMeshData swept = geometry::sweep_cross_section(section, frames, sweep_opts);
+        result = merge_meshes(result, swept);
     }
 
     return result;

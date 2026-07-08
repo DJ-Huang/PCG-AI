@@ -234,8 +234,17 @@ namespace DJTechRuntime.PCG
                 while (_index < _json.Length && (char.IsDigit(_json[_index]) || _json[_index] == '.'))
                     _index++;
 
+                if (_index < _json.Length && (_json[_index] == 'e' || _json[_index] == 'E'))
+                {
+                    _index++;
+                    if (_index < _json.Length && (_json[_index] == '+' || _json[_index] == '-'))
+                        _index++;
+                    while (_index < _json.Length && char.IsDigit(_json[_index]))
+                        _index++;
+                }
+
                 var text = _json.Substring(start, _index - start);
-                if (text.Contains('.'))
+                if (text.IndexOf('.') >= 0 || text.IndexOf('e') >= 0 || text.IndexOf('E') >= 0)
                     return double.Parse(text, CultureInfo.InvariantCulture);
                 return long.Parse(text, CultureInfo.InvariantCulture);
             }

@@ -43,6 +43,7 @@ set(PCG_CORE_SOURCES
     src/elements/bevel_blender.cpp
     src/geometry/bmesh.cpp
     src/geometry/spline_geometry.cpp
+    src/geometry/sweep_geometry.cpp
     src/elements/mesh_elements.cpp
     src/elements/mesh_scatter_algorithms.cpp
     src/elements/mesh_scatter_elements.cpp

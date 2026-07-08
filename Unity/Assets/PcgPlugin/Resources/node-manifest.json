@@ -431,7 +431,20 @@
         "controlPoints": {
           "type": "string",
           "default": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":10,\"y\":2,\"z\":5},{\"x\":25,\"y\":0,\"z\":15},{\"x\":40,\"y\":0,\"z\":0}]"
-        }
+        },
+        "editPlane": {
+          "type": "enum",
+          "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "xy", "label": "XY" },
+            { "value": "xz", "label": "XZ" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        },
+        "sceneOffsetX": { "type": "number", "default": 0 },
+        "sceneOffsetY": { "type": "number", "default": 0 },
+        "sceneOffsetZ": { "type": "number", "default": 0 }
       }
     },
     {
@@ -486,6 +499,50 @@
       }
     },
     {
+      "type": "SweepAlongSpline",
+      "displayName": "Sweep Along Spline",
+      "category": "Spline",
+      "inputs": [
+        { "id": "backbone", "label": "Backbone", "pinType": "SpatialSpline" },
+        { "id": "profile", "label": "Cross Section", "pinType": "SpatialSpline" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "surfaceShape": {
+          "type": "enum",
+          "default": "crossSection",
+          "options": [
+            { "value": "crossSection", "label": "Cross Section Input" },
+            { "value": "rectangle", "label": "Rectangle" },
+            { "value": "circle", "label": "Circle" },
+            { "value": "ribbon", "label": "Ribbon" }
+          ]
+        },
+        "profileWidth": { "type": "number", "default": 6.0, "minimum": 0.01 },
+        "profileHeight": { "type": "number", "default": 0.4, "minimum": 0.01 },
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.01 },
+        "columns": { "type": "integer", "default": 16, "minimum": 3, "maximum": 128 },
+        "sampleSpacing": { "type": "number", "default": 1.0, "minimum": 0.05 },
+        "capStart": { "type": "boolean", "default": false },
+        "capEnd": { "type": "boolean", "default": false },
+        "upX": { "type": "number", "default": 0 },
+        "upY": { "type": "number", "default": 1 },
+        "upZ": { "type": "number", "default": 0 },
+        "twist": { "type": "number", "default": 0 },
+        "scaleStart": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleEnd": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "profilePlane": {
+          "type": "enum",
+          "default": "xy",
+          "options": [
+            { "value": "xy", "label": "XY" },
+            { "value": "xz", "label": "XZ" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        }
+      }
+    },
+    {
       "type": "ExtrudeAlongSpline",
       "displayName": "Extrude Along Spline",
       "category": "Spline",
@@ -499,7 +556,44 @@
         "profileHeight": { "type": "number", "default": 0.4, "minimum": 0.01 },
         "sampleSpacing": { "type": "number", "default": 1.0, "minimum": 0.05 },
         "capStart": { "type": "boolean", "default": true },
-        "capEnd": { "type": "boolean", "default": true }
+        "capEnd": { "type": "boolean", "default": true },
+        "upX": { "type": "number", "default": 0 },
+        "upY": { "type": "number", "default": 1 },
+        "upZ": { "type": "number", "default": 0 },
+        "twist": { "type": "number", "default": 0 },
+        "scaleStart": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleEnd": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "profilePlane": {
+          "type": "enum",
+          "default": "auto",
+          "options": [
+            { "value": "auto", "label": "Auto" },
+            { "value": "xy", "label": "XY" },
+            { "value": "xz", "label": "XZ" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "CrossSectionProfile",
+      "displayName": "Cross Section Profile",
+      "category": "Spline",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Profile", "pinType": "SpatialMesh" }],
+      "properties": {
+        "plane": {
+          "type": "enum",
+          "default": "auto",
+          "options": [
+            { "value": "auto", "label": "Auto" },
+            { "value": "xy", "label": "XY" },
+            { "value": "xz", "label": "XZ" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        },
+        "weldEpsilon": { "type": "number", "default": 0.0001, "minimum": 1e-8 },
+        "center": { "type": "boolean", "default": true }
       }
     },
     {

@@ -45,6 +45,38 @@ struct ExtrudeAlongSplineOptions {
     bool cap_start = true;
     bool cap_end = true;
     bool use_profile_mesh = false;
+    double up_x = 0.0;
+    double up_y = 1.0;
+    double up_z = 0.0;
+    double twist_degrees = 0.0;
+    double scale_start = 1.0;
+    double scale_end = 1.0;
+    std::string profile_plane = "auto";
+};
+
+struct CrossSectionProfileOptions {
+    std::string plane = "auto";
+    double weld_epsilon = 1e-4;
+    bool center = true;
+};
+
+struct SweepAlongSplineOptions {
+    std::string surface_shape = "crossSection";
+    double profile_width = 6.0;
+    double profile_height = 0.4;
+    double radius = 1.0;
+    int columns = 16;
+    double sample_spacing = 1.0;
+    bool cap_start = false;
+    bool cap_end = false;
+    bool use_profile_spline = false;
+    double up_x = 0.0;
+    double up_y = 1.0;
+    double up_z = 0.0;
+    double twist_degrees = 0.0;
+    double scale_start = 1.0;
+    double scale_end = 1.0;
+    std::string profile_plane = "xy";
 };
 
 struct TransformMeshOptions {
@@ -73,6 +105,11 @@ data::PcgPointData sample_along_spline(const data::PcgSplineData& splines, const
 data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
                                          const data::PcgMeshData* profile_mesh,
                                          const ExtrudeAlongSplineOptions& options);
+data::PcgMeshData extract_cross_section_profile(const data::PcgMeshData& mesh,
+                                                const CrossSectionProfileOptions& options);
+data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
+                                     const data::PcgSplineData* profile_spline,
+                                     const SweepAlongSplineOptions& options);
 data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformMeshOptions& options);
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b);
 data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,

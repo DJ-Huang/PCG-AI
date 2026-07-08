@@ -49,6 +49,8 @@ namespace DJTechEditor.PCG.Graph
         private static Dictionary<string, ManifestNodeDef> _byType = new();
         private static List<ManifestNodeDef> _all = new();
         private static bool _loaded;
+        private static string _loadedSourcePath;
+        private static long _loadedSourceMtimeUtc;
 
         static PcgNodeManifest()
         {
@@ -79,6 +81,15 @@ namespace DJTechEditor.PCG.Graph
         {
             EnsureLoaded();
             return _byType.TryGetValue(type, out def);
+        }
+
+        /// <summary>Force re-read node-manifest from disk (e.g. after schema sync).</summary>
+        public static void Reload()
+        {
+            _loaded = false;
+            _loadedSourcePath = null;
+            _loadedSourceMtimeUtc = 0;
+            EnsureLoaded();
         }
 
         public static string GetOutputPinType(string sourceType, string sourceHandle = "out")
@@ -139,35 +150,55 @@ namespace DJTechEditor.PCG.Graph
 
         private static void EnsureLoaded()
         {
-            if (_loaded)
+            if (!TryResolveManifestPath(out var manifestPath))
+            {
+                Debug.LogWarning("[PCG] node-manifest not found in dev path or Editor assets");
+                return;
+            }
+
+            var mtimeUtc = File.GetLastWriteTimeUtc(manifestPath).Ticks;
+            if (_loaded && manifestPath == _loadedSourcePath && mtimeUtc == _loadedSourceMtimeUtc)
                 return;
 
             _byType = new Dictionary<string, ManifestNodeDef>();
             _all = new List<ManifestNodeDef>();
+            _loadedSourcePath = manifestPath;
+            _loadedSourceMtimeUtc = mtimeUtc;
+
+            LoadFromString(File.ReadAllText(manifestPath));
+        }
+
+        private static bool TryResolveManifestPath(out string fullPath)
+        {
+            fullPath = null;
 
             // 1. Dev path — hot-reload during development (schema/ is repo sibling of Unity/)
             var devPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../schema/node-manifest.json"));
             if (File.Exists(devPath))
             {
-                LoadFromString(File.ReadAllText(devPath));
-                return;
+                fullPath = devPath;
+                return true;
             }
 
-            // 2. Distribution — load from Editor assets (bundled with plugin, not in Resources)
+            // 2. Distribution — prefer Editor/Graph copy over Resources (stable order)
             var guids = AssetDatabase.FindAssets("node-manifest t:TextAsset");
-            if (guids.Length > 0)
+            string editorAssetPath = null;
+            string fallbackAssetPath = null;
+            foreach (var guid in guids)
             {
-                var path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                var textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
-                if (textAsset != null)
-                {
-                    LoadFromString(textAsset.text);
-                    return;
-                }
+                var assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (assetPath.EndsWith("Editor/Graph/node-manifest.json", StringComparison.Ordinal))
+                    editorAssetPath = assetPath;
+                else if (fallbackAssetPath == null)
+                    fallbackAssetPath = assetPath;
             }
 
-            Debug.LogWarning("[PCG] node-manifest not found in dev path or Editor assets");
-            _loaded = true;
+            var chosenAssetPath = editorAssetPath ?? fallbackAssetPath;
+            if (string.IsNullOrEmpty(chosenAssetPath))
+                return false;
+
+            fullPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", chosenAssetPath));
+            return File.Exists(fullPath);
         }
 
         private static void LoadFromString(string json)
@@ -196,6 +227,9 @@ namespace DJTechEditor.PCG.Graph
             {
                 Debug.LogError($"[PCG] Failed to load node-manifest: {ex.Message}");
             }
+
+            if (_byType.Count == 0)
+                Debug.LogWarning($"[PCG] node-manifest loaded 0 nodes from {_loadedSourcePath}");
 
             _loaded = true;
         }

@@ -57,6 +57,8 @@ namespace DJTechEditor.PCG.Graph
         {
             var anchor = FindPreviewAnchor(window);
             var nodeData = node.CollectData();
+            var sceneOffset = ReadSceneOffset(nodeData);
+            var editPlane = ReadEditPlane(nodeData);
             var usesExplicit = PcgSplineControlPoints.HasExplicitControlPoints(nodeData);
             var points = PcgSplineControlPoints.GetEffectivePoints(nodeData);
             if (points.Count < 2)
@@ -64,7 +66,7 @@ namespace DJTechEditor.PCG.Graph
 
             var worldPoints = new Vector3[points.Count];
             for (var i = 0; i < points.Count; i++)
-                worldPoints[i] = LocalToWorld(points[i], anchor);
+                worldPoints[i] = LocalToWorld(points[i] + sceneOffset, anchor);
 
             Handles.color = s_ControlLineColor;
             Handles.DrawAAPolyLine(3f, worldPoints);
@@ -81,7 +83,8 @@ namespace DJTechEditor.PCG.Graph
 
                 BeginSplineDrag(graphView, window);
 
-                var newLocal = WorldToLocal(newWorld, anchor);
+                var newLocal = WorldToLocal(newWorld, anchor) - sceneOffset;
+                newLocal = ConstrainToEditPlane(newLocal, editPlane);
                 points[i] = newLocal;
 
                 if (usesExplicit || points.Count > 2)
@@ -176,6 +179,55 @@ namespace DJTechEditor.PCG.Graph
 
         private static Vector3 WorldToLocal(Vector3 world, Transform anchor) =>
             anchor != null ? anchor.InverseTransformPoint(world) : world;
+
+        private static Vector3 ReadSceneOffset(PcgNodeData data)
+        {
+            if (data == null)
+                return Vector3.zero;
+
+            return new Vector3(
+                ReadFloat(data, "sceneOffsetX", 0f),
+                ReadFloat(data, "sceneOffsetY", 0f),
+                ReadFloat(data, "sceneOffsetZ", 0f));
+        }
+
+        private static string ReadEditPlane(PcgNodeData data)
+        {
+            return data?.GetRaw("editPlane")?.ToString() ?? "none";
+        }
+
+        private static Vector3 ConstrainToEditPlane(Vector3 local, string editPlane)
+        {
+            return editPlane switch
+            {
+                "xy" => new Vector3(local.x, local.y, 0f),
+                "xz" => new Vector3(local.x, 0f, local.z),
+                "yz" => new Vector3(0f, local.y, local.z),
+                _ => local,
+            };
+        }
+
+        private static float ReadFloat(PcgNodeData data, string key, float defaultValue)
+        {
+            var raw = data.GetRaw(key);
+            if (raw == null)
+                return defaultValue;
+
+            return raw switch
+            {
+                float f => f,
+                double d => (float)d,
+                int i => i,
+                long l => l,
+                _ => float.TryParse(
+                    raw.ToString(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var parsed)
+                    ? parsed
+                    : defaultValue,
+            };
+        }
     }
 }
 #endif

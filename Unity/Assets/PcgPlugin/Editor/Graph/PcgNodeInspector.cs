@@ -133,9 +133,14 @@ namespace DJTechEditor.PCG.Graph
                 if (node is PcgManifestNodeView meshDataNode && meshDataNode.NodeType == "GetMeshData")
                     m_Body.Add(CreateGetMeshDataPreviewRow(meshDataNode));
 
-                if (node is PcgManifestNodeView { NodeType: "CreateSpline" })
+                if (node is PcgManifestNodeView createSplineNode && createSplineNode.NodeType == "CreateSpline")
                 {
-                    m_Body.Add(new Label("Drag control points in Scene View.")
+                    var data = createSplineNode.CollectData();
+                    var editPlane = data?.GetRaw("editPlane")?.ToString() ?? "none";
+                    var hint = editPlane != "none"
+                        ? $"Drag control points in Scene View (locked to {editPlane.ToUpperInvariant()} plane)."
+                        : "Drag control points in Scene View.";
+                    m_Body.Add(new Label(hint)
                     {
                         style =
                         {

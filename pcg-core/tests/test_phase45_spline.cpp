@@ -2,6 +2,7 @@
 
 #include "data/pcg_mesh_binary.hpp"
 #include "elements/spline_algorithms.hpp"
+#include "elements/mesh_algorithms.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -96,6 +97,66 @@ int main()
     std::printf("PASS: extrude_along_spline unit (%zu verts, %zu tris)\n", deck.vertices().size(),
                 deck.triangles().size() / 3);
 
+    SweepAlongSplineOptions sweep_opts;
+    sweep_opts.surface_shape = "rectangle";
+    sweep_opts.profile_width = 4.0;
+    sweep_opts.profile_height = 0.5;
+    sweep_opts.sample_spacing = 1.0;
+    const auto swept_rect = sweep_along_spline(spline, nullptr, sweep_opts);
+    if (swept_rect.vertices().empty() || swept_rect.triangles().empty())
+    {
+        std::printf("FAIL: sweep_along_spline rectangle\n");
+        return 1;
+    }
+    std::printf("PASS: sweep_along_spline rectangle (%zu verts, %zu tris)\n",
+                swept_rect.vertices().size(), swept_rect.triangles().size() / 3);
+
+    CreateSplineOptions profile_opts_create;
+    profile_opts_create.mode = "polyline";
+    profile_opts_create.closed = true;
+    profile_opts_create.control_points = {
+        {-2.0, -0.25, 0.0},
+        {2.0, -0.25, 0.0},
+        {2.0, 0.25, 0.0},
+        {-2.0, 0.25, 0.0},
+    };
+    const auto profile_spline = create_spline_data(profile_opts_create);
+
+    SweepAlongSplineOptions curve_sweep_opts;
+    curve_sweep_opts.surface_shape = "crossSection";
+    curve_sweep_opts.use_profile_spline = true;
+    curve_sweep_opts.sample_spacing = 1.0;
+    const auto swept_curve = sweep_along_spline(spline, &profile_spline, curve_sweep_opts);
+    if (swept_curve.vertices().empty() || swept_curve.triangles().empty())
+    {
+        std::printf("FAIL: sweep_along_spline profile curve\n");
+        return 1;
+    }
+    std::printf("PASS: sweep_along_spline profile curve (%zu verts, %zu tris)\n",
+                swept_curve.vertices().size(), swept_curve.triangles().size() / 3);
+
+    const auto box_profile = create_box_mesh(4.0, 1.0, 0.05);
+    ExtrudeAlongSplineOptions profile_opts;
+    profile_opts.sample_spacing = 1.0;
+    profile_opts.use_profile_mesh = true;
+    const auto swept_profile = extrude_along_spline(spline, &box_profile, profile_opts);
+    if (swept_profile.vertices().empty() || swept_profile.triangles().empty())
+    {
+        std::printf("FAIL: extrude_along_spline profile mesh sweep\n");
+        return 1;
+    }
+    std::printf("PASS: extrude_along_spline profile mesh sweep (%zu verts, %zu tris)\n",
+                swept_profile.vertices().size(), swept_profile.triangles().size() / 3);
+
+    const auto extracted = extract_cross_section_profile(box_profile, CrossSectionProfileOptions{});
+    if (extracted.vertices().size() < 4 || extracted.triangles().size() < 6)
+    {
+        std::printf("FAIL: extract_cross_section_profile\n");
+        return 1;
+    }
+    std::printf("PASS: extract_cross_section_profile (%zu verts, %zu tris)\n",
+                extracted.vertices().size(), extracted.triangles().size() / 3);
+
     const char* bridge_graph = R"({
       "version": "1.0",
       "nodes": [
@@ -110,10 +171,20 @@ int main()
           }
         },
         {
+          "id": "deck_profile",
+          "type": "CreateSpline",
+          "position": { "x": 0, "y": -180 },
+          "data": {
+            "mode": "polyline",
+            "closed": true,
+            "controlPoints": "[{\"x\":-3,\"y\":-0.2,\"z\":0},{\"x\":3,\"y\":-0.2,\"z\":0},{\"x\":3,\"y\":0.2,\"z\":0},{\"x\":-3,\"y\":0.2,\"z\":0}]"
+          }
+        },
+        {
           "id": "deck",
-          "type": "ExtrudeAlongSpline",
+          "type": "SweepAlongSpline",
           "position": { "x": 300, "y": 0 },
-          "data": { "profileWidth": 6.0, "profileHeight": 0.4, "sampleSpacing": 1.0 }
+          "data": { "surfaceShape": "crossSection", "sampleSpacing": 1.0 }
         },
         {
           "id": "pier_proto",
@@ -141,7 +212,8 @@ int main()
         }
       ],
       "edges": [
-        { "id": "e1", "source": "path", "target": "deck", "sourceHandle": "out", "targetHandle": "spline" },
+        { "id": "e1", "source": "path", "target": "deck", "sourceHandle": "out", "targetHandle": "backbone" },
+        { "id": "e1b", "source": "deck_profile", "target": "deck", "sourceHandle": "out", "targetHandle": "profile" },
         { "id": "e2", "source": "path", "target": "piers", "sourceHandle": "out", "targetHandle": "spline" },
         { "id": "e3", "source": "pier_proto", "target": "piers", "sourceHandle": "out", "targetHandle": "mesh" },
         { "id": "e4", "source": "deck", "target": "merge", "sourceHandle": "out", "targetHandle": "a" },

@@ -11,6 +11,47 @@
 namespace pcg::internal::elements {
 namespace {
 
+class SweepAlongSplineElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "SweepAlongSpline"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SweepAlongSpline missing node");
+
+        const data::PcgSplineData backbone =
+            get_splines_input(ctx, "backbone", "SweepAlongSpline missing backbone input");
+        if (backbone.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SweepAlongSpline missing backbone input");
+
+        const data::PcgSplineData* profile_spline = ctx.inputs.find_splines("profile");
+
+        SweepAlongSplineOptions opts;
+        opts.surface_shape = ctx.node->data.value("surfaceShape", "crossSection");
+        opts.profile_width = ctx.node->data.value("profileWidth", 6.0);
+        opts.profile_height = ctx.node->data.value("profileHeight", 0.4);
+        opts.radius = ctx.node->data.value("radius", 1.0);
+        opts.columns = ctx.node->data.value("columns", 16);
+        opts.sample_spacing = ctx.node->data.value("sampleSpacing", 1.0);
+        opts.cap_start = ctx.node->data.value("capStart", false);
+        opts.cap_end = ctx.node->data.value("capEnd", false);
+        opts.use_profile_spline =
+            profile_spline != nullptr && !profile_spline->splines().empty() &&
+            opts.surface_shape == "crossSection";
+        opts.up_x = ctx.node->data.value("upX", 0.0);
+        opts.up_y = ctx.node->data.value("upY", 1.0);
+        opts.up_z = ctx.node->data.value("upZ", 0.0);
+        opts.twist_degrees = ctx.node->data.value("twist", 0.0);
+        opts.scale_start = ctx.node->data.value("scaleStart", 1.0);
+        opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
+        opts.profile_plane = ctx.node->data.value("profilePlane", "xy");
+
+        emit_mesh(ctx, sweep_along_spline(backbone, profile_spline, opts));
+        return PCG_OK;
+    }
+};
+
 class ExtrudeAlongSplineElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "ExtrudeAlongSpline"; }
@@ -38,6 +79,13 @@ public:
         opts.cap_start = ctx.node->data.value("capStart", true);
         opts.cap_end = ctx.node->data.value("capEnd", true);
         opts.use_profile_mesh = profile_mesh != nullptr;
+        opts.up_x = ctx.node->data.value("upX", 0.0);
+        opts.up_y = ctx.node->data.value("upY", 1.0);
+        opts.up_z = ctx.node->data.value("upZ", 0.0);
+        opts.twist_degrees = ctx.node->data.value("twist", 0.0);
+        opts.scale_start = ctx.node->data.value("scaleStart", 1.0);
+        opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
+        opts.profile_plane = ctx.node->data.value("profilePlane", "auto");
 
         emit_mesh(ctx, extrude_along_spline(splines, profile_mesh, opts));
         return PCG_OK;
@@ -92,6 +140,30 @@ public:
     }
 };
 
+class CrossSectionProfileElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CrossSectionProfile"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CrossSectionProfile missing node");
+
+        const data::PcgMeshData mesh =
+            get_mesh_input(ctx, "in", "CrossSectionProfile missing mesh input");
+        if (mesh.vertices().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CrossSectionProfile missing mesh input");
+
+        CrossSectionProfileOptions opts;
+        opts.plane = ctx.node->data.value("plane", "auto");
+        opts.weld_epsilon = ctx.node->data.value("weldEpsilon", 1e-4);
+        opts.center = ctx.node->data.value("center", true);
+
+        emit_mesh(ctx, extract_cross_section_profile(mesh, opts));
+        return PCG_OK;
+    }
+};
+
 class InstanceAlongSplineElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "InstanceAlongSpline"; }
@@ -126,9 +198,11 @@ public:
 
 void register_spline_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
+    map.emplace("SweepAlongSpline", std::make_unique<SweepAlongSplineElement>());
     map.emplace("ExtrudeAlongSpline", std::make_unique<ExtrudeAlongSplineElement>());
     map.emplace("TransformMesh", std::make_unique<TransformMeshElement>());
     map.emplace("MergeMesh", std::make_unique<MergeMeshElement>());
+    map.emplace("CrossSectionProfile", std::make_unique<CrossSectionProfileElement>());
     map.emplace("InstanceAlongSpline", std::make_unique<InstanceAlongSplineElement>());
 }
 
