@@ -508,6 +508,16 @@ namespace DJTechEditor.PCG.Graph
             m_ActiveRadialMenuNode?.DismissRadialMenu();
             m_ActiveRadialMenuNode = null;
 
+            List<string> selectedNodeIds = null;
+            if (!clearUndo)
+            {
+                selectedNodeIds = selection
+                    .OfType<PcgGraphNodeBase>()
+                    .Select(node => node.NodeId)
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .ToList();
+            }
+
             m_SuppressUndo = true;
 
             foreach (var node in nodes.ToList().OfType<PcgGraphNodeBase>())
@@ -557,6 +567,16 @@ namespace DJTechEditor.PCG.Graph
                 state.ClearUndo();
                 state.SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
             }
+            else if (selectedNodeIds is { Count: > 0 })
+            {
+                ClearSelection();
+                foreach (var id in selectedNodeIds)
+                {
+                    if (nodeViews.TryGetValue(id, out var selectedView))
+                        AddToSelection(selectedView);
+                }
+            }
+
             m_Inspector?.OnSelectionChanged();
             RefreshNodePreviewVisuals();
             if (m_HostWindow is PcgGraphEditorWindow window)
