@@ -123,6 +123,10 @@ namespace DJTechEditor.PCG.Graph
                 FrameAll();
                 evt.StopPropagation();
             }
+            else if (evt.keyCode == KeyCode.Escape)
+            {
+                HideNodeInfoPanel();
+            }
         }
 
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
@@ -333,7 +337,7 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_ActiveRadialMenuNode == node)
                 m_ActiveRadialMenuNode = null;
-            HideNodeInfoPanel();
+            // Info panel stays visible — it's dismissed by explicit interaction
         }
 
         private void UpdateActiveRadialMenuFromPointer(Vector2 panelMousePosition)
@@ -362,6 +366,25 @@ namespace DJTechEditor.PCG.Graph
         private void OnPointerDown(PointerDownEvent evt)
         {
             if (m_SuppressUndo) return;
+
+            // Dismiss info panel on any click outside the panel itself
+            if (m_InfoPanel != null && m_InfoPanel.style.display == DisplayStyle.Flex)
+            {
+                var targetVE = evt.target as VisualElement;
+                bool clickedInsidePanel = false;
+                var walker = targetVE;
+                while (walker != null)
+                {
+                    if (walker == m_InfoPanel)
+                    {
+                        clickedInsidePanel = true;
+                        break;
+                    }
+                    walker = walker.parent;
+                }
+                if (!clickedInsidePanel)
+                    HideNodeInfoPanel();
+            }
 
             if (m_ActiveRadialMenuNode != null &&
                 m_ActiveRadialMenuNode.IsRadialMenuOpen &&

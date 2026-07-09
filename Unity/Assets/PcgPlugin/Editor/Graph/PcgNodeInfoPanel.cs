@@ -34,7 +34,7 @@ namespace DJTechEditor.PCG.Graph
             style.borderBottomColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
             style.borderLeftColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
             style.display = DisplayStyle.None;
-            pickingMode = PickingMode.Ignore; // let clicks pass through to graph
+            pickingMode = PickingMode.Position; // capture clicks for close button
         }
 
         public void Show(PcgGraphNodeBase node)
@@ -49,6 +49,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     ("Node Type", node.NodeType),
                 }));
+                WireCloseButton();
                 style.display = DisplayStyle.Flex;
                 PositionNear(node);
                 return;
@@ -107,6 +108,7 @@ namespace DJTechEditor.PCG.Graph
             if (pinRows.Count > 0)
                 Add(MakeSection("Pins", pinRows));
 
+            WireCloseButton();
             style.display = DisplayStyle.Flex;
             PositionNear(node);
         }
@@ -116,18 +118,35 @@ namespace DJTechEditor.PCG.Graph
             style.display = DisplayStyle.None;
         }
 
+        private void WireCloseButton()
+        {
+            var closeBtn = this.Q<Button>("info-close-btn");
+            if (closeBtn != null)
+            {
+                closeBtn.clickable = null;
+                closeBtn.RegisterCallback<ClickEvent>(_ => Hide());
+            }
+        }
+
         private void PositionNear(PcgGraphNodeBase node)
         {
             var rect = node.GetPosition();
-            var left = rect.x + rect.width + 14;
+            const float panelWidth = 280f;
+            const float gap = 14f;
+
+            // Default: left side of the node
+            var left = rect.x - panelWidth - gap;
             var top = rect.y;
 
-            // If panel would go off right edge, place on left side
+            // If panel would go off left edge, fall back to right side
+            if (left < 0)
+                left = rect.x + rect.width + gap;
+
+            // Clamp vertical position
             var graphView = m_GraphView;
             if (graphView != null)
             {
                 var gvRect = graphView.contentRect;
-                // Estimate panel height (~40px header + 80px per section, rough)
                 var estHeight = 40 + childCount * 80;
                 if (top + estHeight > gvRect.height)
                     top = Mathf.Max(0, gvRect.height - estHeight);
@@ -144,6 +163,17 @@ namespace DJTechEditor.PCG.Graph
             var container = new VisualElement();
             var bgColor = color ?? new Color(0.35f, 0.35f, 0.45f);
 
+            var headerRow = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    backgroundColor = bgColor,
+                    borderTopLeftRadius = 7,
+                    borderTopRightRadius = 7,
+                },
+            };
+
             var titleBar = new Label(displayName)
             {
                 style =
@@ -151,16 +181,34 @@ namespace DJTechEditor.PCG.Graph
                     fontSize = 13,
                     unityFontStyleAndWeight = FontStyle.Bold,
                     color = Color.white,
-                    backgroundColor = bgColor,
                     paddingTop = 6,
                     paddingBottom = 4,
                     paddingLeft = 10,
-                    paddingRight = 10,
-                    borderTopLeftRadius = 7,
-                    borderTopRightRadius = 7,
+                    paddingRight = 4,
+                    flexGrow = 1,
                 },
             };
-            container.Add(titleBar);
+            headerRow.Add(titleBar);
+
+            var closeBtn = new Button(() => { }) { text = "×" };
+            closeBtn.style.fontSize = 14;
+            closeBtn.style.color = new Color(0.7f, 0.7f, 0.75f);
+            closeBtn.style.backgroundColor = new Color(0, 0, 0, 0);
+            closeBtn.style.borderTopWidth = 0;
+            closeBtn.style.borderRightWidth = 0;
+            closeBtn.style.borderBottomWidth = 0;
+            closeBtn.style.borderLeftWidth = 0;
+            closeBtn.style.paddingTop = 4;
+            closeBtn.style.paddingBottom = 4;
+            closeBtn.style.paddingLeft = 6;
+            closeBtn.style.paddingRight = 6;
+            closeBtn.style.flexShrink = 0;
+            closeBtn.tooltip = "Close";
+            // Close button will be wired by Show() via event propagation
+            closeBtn.name = "info-close-btn";
+            headerRow.Add(closeBtn);
+
+            container.Add(headerRow);
 
             var subLabel = new Label($"{typeName}{(string.IsNullOrEmpty(category) ? "" : " · " + category)}")
             {
