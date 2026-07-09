@@ -14,6 +14,7 @@ struct GroupCreateOptions {
     double min_edge_angle_deg = 30.0;
     bool include_unshared = false;
     std::string from_face_group;
+    std::string from_edge_group;
 };
 
 struct GroupCombineOptions {

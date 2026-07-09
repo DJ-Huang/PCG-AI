@@ -6,7 +6,8 @@ import manifestJson from '../../../schema/node-manifest.json';
 // ── Types ──────────────────────────────────────────────
 
 export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialMesh' | 'Param' | 'Any';
-export type PropertyType = 'integer' | 'number' | 'boolean' | 'string' | 'enum';
+export type PropertyType = 'integer' | 'number' | 'boolean' | 'string' | 'enum' | 'groupSelect' | 'groupMultiSelect';
+export type GroupDomain = 'edge' | 'face' | 'point';
 
 export interface ManifestEnumOption {
   value: string;
@@ -19,12 +20,26 @@ export interface ManifestProperty {
   minimum?: number;
   maximum?: number;
   options?: ManifestEnumOption[];
+  /** For groupSelect/groupMultiSelect: filter available groups by domain */
+  groupDomain?: GroupDomain;
+  /** True for outputGroup-style properties that define a new group name */
+  isGroupOutput?: boolean;
 }
 
 export interface ManifestPin {
   id: string;
   label: string;
   pinType: PinType;
+}
+
+export interface ManifestOutputGroup {
+  name: string;
+  domain: GroupDomain;
+  label: string;
+  /** Property key whose value determines if this group is produced (e.g. "capStart") */
+  condition?: string;
+  /** If true, the group name comes from the property named by `name` (dynamic, not static) */
+  dynamic?: boolean;
 }
 
 export interface ManifestNodeDef {
@@ -34,6 +49,8 @@ export interface ManifestNodeDef {
   inputs: ManifestPin[];
   outputs: ManifestPin[];
   properties: Record<string, ManifestProperty>;
+  /** Groups this node produces on its output */
+  outputGroups?: ManifestOutputGroup[];
 }
 
 export interface NodeManifest {
@@ -161,6 +178,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   Sampler: '#9c6644',
   Structural: '#5a189a',
   Mesh: '#e07ba0',
+  Spline: '#1d7874',
+  Geometry: '#d4a373',
   Output: '#6c757d',
 };
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -57,6 +58,7 @@ namespace DJTechEditor.PCG.Graph
         {
             _data = data ?? new PcgNodeData();
             SetUserTitle(_data.GetRaw("__nodeTitle")?.ToString() ?? "");
+            UpdateGroupTooltip();
         }
 
         public override PcgNodeData CollectData()
@@ -68,6 +70,36 @@ namespace DJTechEditor.PCG.Graph
         public override void SetPropertyValue(string key, object value)
         {
             _data.SetRaw(key, value);
+            if (_def.properties.TryGetValue(key, out var prop) && prop.isGroupOutput)
+                UpdateGroupTooltip();
+        }
+
+        private void UpdateGroupTooltip()
+        {
+            var groups = new List<string>();
+            foreach (var og in _def.outputGroups)
+            {
+                if (!string.IsNullOrEmpty(og.condition))
+                {
+                    var condVal = _data.GetRaw(og.condition);
+                    if (condVal is bool b && !b)
+                        continue;
+                }
+
+                string name = og.name;
+                if (og.dynamic)
+                {
+                    var val = _data.GetRaw(og.name)?.ToString();
+                    if (string.IsNullOrWhiteSpace(val))
+                        continue;
+                    name = val;
+                }
+                groups.Add($"{name} ({og.domain})");
+            }
+
+            tooltip = groups.Count > 0
+                ? $"{_def.displayName} — outputs: {string.Join(", ", groups)}"
+                : _def.displayName;
         }
 
         private Port CreatePort(Direction direction, string portName, string label)

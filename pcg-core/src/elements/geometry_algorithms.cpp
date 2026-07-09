@@ -49,10 +49,22 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
         return result;
 
     const geometry::BMesh bmesh = geometry::bmesh_from_geometry(input);
-    const double angle_limit = 180.0 - options.min_edge_angle_deg;
+
+    // If from_edge_group is set, only consider edges already in that group
+    std::unordered_set<int64_t> candidate_edges;
+    if (!options.from_edge_group.empty()) {
+        const auto members = input.groups().members(geometry::GroupDomain::Edge, options.from_edge_group);
+        for (int id : members)
+            candidate_edges.insert(static_cast<int64_t>(id));
+    }
 
     for (const auto& entry : bmesh.edges) {
         const geometry::BMeshEdge& edge = entry.second;
+
+        // Filter by from_edge_group if specified
+        if (!options.from_edge_group.empty() && candidate_edges.count(entry.first) == 0)
+            continue;
+
         if (!options.include_unshared && edge.face1 < 0)
             continue;
 
@@ -71,7 +83,7 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
         }
 
         if (options.mode == "angle") {
-            if (edge_angle_deg(input, entry.first) <= angle_limit)
+            if (edge_angle_deg(input, entry.first) < options.min_edge_angle_deg)
                 continue;
         }
 

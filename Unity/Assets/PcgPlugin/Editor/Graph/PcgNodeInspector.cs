@@ -15,6 +15,8 @@ namespace DJTechEditor.PCG.Graph
     /// Houdini-style Node Inspector (right panel).
     /// Shows the selected node's properties with value fields,
     /// a bind-to-parameter dropdown, and a promote-to-parameter button.
+    /// Group properties (groupSelect/groupMultiSelect) resolve available
+    /// groups from upstream SpatialMesh connections.
     /// </summary>
     public sealed class PcgNodeInspector : VisualElement
     {
@@ -171,8 +173,69 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
+            // Split properties into group-related and regular
+            var groupProps = new List<(string key, ManifestPropertyDef prop)>();
+            var regularProps = new List<(string key, ManifestPropertyDef prop)>();
             foreach (var (key, prop) in def.properties)
+            {
+                if (prop.type == "groupSelect" || prop.type == "groupMultiSelect" || prop.isGroupOutput)
+                    groupProps.Add((key, prop));
+                else
+                    regularProps.Add((key, prop));
+            }
+
+            // Groups section
+            if (groupProps.Count > 0)
+            {
+                AddSectionHeader("Groups");
+                foreach (var (key, prop) in groupProps)
+                    m_Body.Add(CreatePropertyRow(node, key, prop));
+
+                var available = ResolveUpstreamGroups(node.NodeId);
+                if (available.Count > 0)
+                {
+                    m_Body.Add(new Label($"{available.Count} group{(available.Count != 1 ? "s" : "")} available from upstream")
+                    {
+                        style = { color = new Color(0.4f, 0.66f, 0.4f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4 },
+                    });
+                }
+                else
+                {
+                    var hasConsumers = groupProps.Any(p => p.prop.type is "groupSelect" or "groupMultiSelect");
+                    if (hasConsumers)
+                    {
+                        m_Body.Add(new Label("No groups from upstream — connect a Group Create or Sweep node")
+                        {
+                            style = { color = new Color(0.6f, 0.5f, 0.3f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4, whiteSpace = WhiteSpace.Normal },
+                        });
+                    }
+                }
+            }
+
+            // Parameters section
+            if (groupProps.Count > 0 && regularProps.Count > 0)
+                AddSectionHeader("Parameters");
+            foreach (var (key, prop) in regularProps)
                 m_Body.Add(CreatePropertyRow(node, key, prop));
+        }
+
+        private void AddSectionHeader(string title)
+        {
+            m_Body.Add(new Label(title)
+            {
+                style =
+                {
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    fontSize = 10,
+                    color = new Color(0.55f, 0.55f, 0.55f),
+                    marginTop = 6,
+                    marginBottom = 2,
+                    paddingTop = 4,
+                    paddingBottom = 2,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.2f, 0.2f, 0.2f),
+                },
+            });
         }
 
         private VisualElement CreatePropertyRow(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
@@ -351,6 +414,8 @@ namespace DJTechEditor.PCG.Graph
                 "boolean" => MakeToggleField(key, currentVal, v => node.SetPropertyValue(key, v)),
                 "enum" => MakeEnumField(key, prop, currentVal, v => node.SetPropertyValue(key, v)),
                 "texture2d" => MakeTextureField(key, currentVal, v => node.SetPropertyValue(key, v)),
+                "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => node.SetPropertyValue(key, v)),
+                "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => node.SetPropertyValue(key, v)),
                 _ => MakeTextField(key, currentVal, v => node.SetPropertyValue(key, v)),
             };
             wrapper.Add(field);
@@ -377,7 +442,7 @@ namespace DJTechEditor.PCG.Graph
                     _ => currentVal?.ToString() ?? prop.defaultValue?.ToString() ?? "",
                 };
 
-                var paramType = prop.type == "enum" ? "string" : prop.type;
+                var paramType = prop.type is "enum" or "groupSelect" or "groupMultiSelect" ? "string" : prop.type;
                 var param = m_Blackboard.CreateParameter(key, paramType, defaultStr);
 
                 if (prop.hasRange)
@@ -531,6 +596,8 @@ namespace DJTechEditor.PCG.Graph
                 "number" => paramType == "number" || paramType == "integer",
                 "boolean" => paramType == "boolean",
                 "enum" => paramType == "string",
+                "groupSelect" => paramType == "string",
+                "groupMultiSelect" => paramType == "string",
                 _ => paramType == "string",
             };
         }
@@ -634,6 +701,290 @@ namespace DJTechEditor.PCG.Graph
             field.RegisterValueChangedCallback(evt =>
                 m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
             return field;
+        }
+
+        // ─── Group Resolution ──────────────────────────────────────
+
+        private struct AvailableGroup
+        {
+            public string name;
+            public string domain;
+            public string sourceNodeId;
+            public string sourceNodeType;
+            public string label;
+        }
+
+        /// <summary>
+        /// Walks upstream SpatialMesh connections to collect all named groups
+        /// produced by upstream nodes (Houdini-style group resolution).
+        /// </summary>
+        private List<AvailableGroup> ResolveUpstreamGroups(string startNodeId)
+        {
+            var result = new List<AvailableGroup>();
+            var seen = new HashSet<string>();
+            var visited = new HashSet<string>();
+            FindUpstreamMeshGroups(startNodeId, result, seen, visited);
+            return result;
+        }
+
+        private void FindUpstreamMeshGroups(
+            string nodeId,
+            List<AvailableGroup> result,
+            HashSet<string> seen,
+            HashSet<string> visited)
+        {
+            if (visited.Contains(nodeId))
+                return;
+            visited.Add(nodeId);
+
+            // Walk GraphView edges to find incoming connections
+            foreach (var edge in m_GraphView.edges)
+            {
+                if (edge.input?.node is not PcgGraphNodeBase targetNode)
+                    continue;
+                if (targetNode.NodeId != nodeId)
+                    continue;
+                if (edge.output?.node is not PcgGraphNodeBase sourceNode)
+                    continue;
+
+                // Check if this edge carries SpatialMesh data
+                var sourceHandle = edge.output.userData as string ?? edge.output.portName;
+                var outputPinType = PcgNodeManifest.GetOutputPinType(sourceNode.NodeType, sourceHandle);
+                if (outputPinType != "SpatialMesh")
+                    continue;
+
+                CollectNodeGroups(sourceNode, result, seen);
+                FindUpstreamMeshGroups(sourceNode.NodeId, result, seen, visited);
+            }
+        }
+
+        private static void CollectNodeGroups(
+            PcgGraphNodeBase node,
+            List<AvailableGroup> result,
+            HashSet<string> seen)
+        {
+            if (!PcgNodeManifest.TryGet(node.NodeType, out var def))
+                return;
+
+            var data = node.CollectData();
+
+            // 1. Static output groups from manifest (e.g. SweepAlongSpline)
+            foreach (var og in def.outputGroups)
+            {
+                // Check condition property
+                if (!string.IsNullOrEmpty(og.condition))
+                {
+                    var condVal = data.GetRaw(og.condition);
+                    if (condVal is bool b && !b)
+                        continue;
+                    if (condVal is string s && s != "true")
+                        continue;
+                }
+
+                string groupName = og.name;
+                if (og.dynamic)
+                {
+                    // Dynamic: group name comes from a property value
+                    var propValue = data.GetRaw(og.name)?.ToString();
+                    if (string.IsNullOrWhiteSpace(propValue))
+                        continue;
+                    groupName = propValue;
+                }
+
+                var dedupKey = $"{groupName}:{og.domain}";
+                if (seen.Contains(dedupKey))
+                    continue;
+                seen.Add(dedupKey);
+
+                result.Add(new AvailableGroup
+                {
+                    name = groupName,
+                    domain = og.domain,
+                    sourceNodeId = node.NodeId,
+                    sourceNodeType = node.NodeType,
+                    label = og.label,
+                });
+            }
+
+            // 2. Dynamic output groups from properties with isGroupOutput flag
+            if (def.outputGroups.Count == 0)
+            {
+                foreach (var (key, prop) in def.properties)
+                {
+                    if (!prop.isGroupOutput)
+                        continue;
+
+                    var groupName = data.GetRaw(key)?.ToString();
+                    if (string.IsNullOrWhiteSpace(groupName))
+                        continue;
+
+                    var domain = string.IsNullOrEmpty(prop.groupDomain) ? "edge" : prop.groupDomain;
+                    var dedupKey = $"{groupName}:{domain}";
+                    if (seen.Contains(dedupKey))
+                        continue;
+                    seen.Add(dedupKey);
+
+                    result.Add(new AvailableGroup
+                    {
+                        name = groupName,
+                        domain = domain,
+                        sourceNodeId = node.NodeId,
+                        sourceNodeType = node.NodeType,
+                    });
+                }
+            }
+        }
+
+        // ─── Group Field Factories ──────────────────────────────────
+
+        private VisualElement MakeGroupSelectField(
+            string key, ManifestPropertyDef prop, object val,
+            PcgManifestNodeView node, Action<string> onSet)
+        {
+            var container = new VisualElement();
+
+            var available = ResolveUpstreamGroups(node.NodeId);
+
+            // Filter by domain if specified
+            if (!string.IsNullOrEmpty(prop.groupDomain))
+                available = available.Where(g => g.domain == prop.groupDomain).ToList();
+
+            var currentVal = val?.ToString() ?? "";
+
+            // TextField for manual entry (always visible)
+            var textField = new TextField { value = currentVal };
+            textField.style.marginBottom = 2;
+            textField.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Change Group", () => onSet(evt.newValue)));
+            container.Add(textField);
+
+            // Quick-pick chips for available groups
+            if (available.Count > 0)
+            {
+                var chipsRow = new VisualElement
+                {
+                    style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap },
+                };
+
+                foreach (var g in available)
+                {
+                    var chip = new Button
+                    {
+                        text = g.name,
+                        tooltip = $"{g.label ?? g.name} ({g.domain}) from {g.sourceNodeType}",
+                    };
+                    chip.style.fontSize = 9;
+                    chip.style.paddingLeft = 6;
+                    chip.style.paddingRight = 6;
+                    chip.style.paddingTop = 1;
+                    chip.style.paddingBottom = 1;
+                    chip.style.marginRight = 2;
+                    chip.style.marginBottom = 2;
+                    chip.style.unityFontStyleAndWeight = currentVal == g.name ? FontStyle.Bold : FontStyle.Normal;
+
+                    var capturedName = g.name;
+                    chip.clicked += () =>
+                    {
+                        m_GraphView.WithUndo("Pick Group", () =>
+                        {
+                            onSet(capturedName);
+                            textField.value = capturedName;
+                            NotifyGraphChanged();
+                        });
+                    };
+                    chipsRow.Add(chip);
+                }
+
+                container.Add(chipsRow);
+            }
+
+            return container;
+        }
+
+        private VisualElement MakeGroupMultiSelectField(
+            string key, ManifestPropertyDef prop, object val,
+            PcgManifestNodeView node, Action<string> onSet)
+        {
+            var container = new VisualElement();
+
+            var available = ResolveUpstreamGroups(node.NodeId);
+
+            // Filter by domain if specified
+            if (!string.IsNullOrEmpty(prop.groupDomain))
+                available = available.Where(g => g.domain == prop.groupDomain).ToList();
+
+            var currentStr = val?.ToString() ?? "";
+            var selected = currentStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToList();
+
+            // Checkboxes for available groups
+            if (available.Count > 0)
+            {
+                var availableNames = new HashSet<string>(available.Select(g => g.name));
+
+                foreach (var g in available)
+                {
+                    var groupName = g.name;
+                    var toggle = new Toggle
+                    {
+                        value = selected.Contains(groupName),
+                        text = $"{groupName} ({g.domain})",
+                        tooltip = g.label ?? groupName,
+                    };
+                    toggle.style.fontSize = 10;
+                    toggle.style.marginBottom = 1;
+
+                    toggle.RegisterValueChangedCallback(evt =>
+                    {
+                        m_GraphView.WithUndo("Toggle Group", () =>
+                        {
+                            if (evt.newValue && !selected.Contains(groupName))
+                                selected.Add(groupName);
+                            else if (!evt.newValue)
+                                selected.Remove(groupName);
+
+                            onSet(string.Join(",", selected));
+                            NotifyGraphChanged();
+                        });
+                    });
+                    container.Add(toggle);
+                }
+
+                // Show custom entries that aren't in available groups
+                foreach (var custom in selected.Where(s => !availableNames.Contains(s)))
+                {
+                    var toggle = new Toggle
+                    {
+                        value = true,
+                        text = $"{custom} (custom)",
+                    };
+                    toggle.style.fontSize = 10;
+                    toggle.style.marginBottom = 1;
+
+                    var capturedCustom = custom;
+                    toggle.RegisterValueChangedCallback(evt =>
+                    {
+                        m_GraphView.WithUndo("Toggle Group", () =>
+                        {
+                            selected.Remove(capturedCustom);
+                            onSet(string.Join(",", selected));
+                            NotifyGraphChanged();
+                        });
+                    });
+                    container.Add(toggle);
+                }
+            }
+
+            // TextField for manual comma-separated entry
+            var textField = new TextField { value = currentStr };
+            textField.style.marginTop = 2;
+            textField.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Change Groups", () => onSet(evt.newValue)));
+            container.Add(textField);
+
+            return container;
         }
     }
 }

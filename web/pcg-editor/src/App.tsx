@@ -279,7 +279,7 @@ function PcgEditor() {
       const currentValue = (nodes.find((n) => n.id === nodeId)?.data as Record<string, unknown>)?.[propertyKey] ?? prop.default;
       const hasRange = prop.minimum !== undefined && prop.maximum !== undefined;
 
-      const paramType = prop.type === 'enum' ? 'string' : (prop.type as GraphParameter['type']);
+      const paramType: GraphParameter['type'] = (prop.type === 'enum' || prop.type === 'groupSelect' || prop.type === 'groupMultiSelect') ? 'string' : prop.type;
       const newParam: GraphParameter = {
         id: `p-${propertyKey}-${Date.now()}`,
         name: propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1),
@@ -580,6 +580,8 @@ function PcgEditor() {
           <Inspector
             selectedNode={selectedNode}
             parameters={parameters}
+            nodes={nodes}
+            edges={edges}
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}

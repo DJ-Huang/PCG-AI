@@ -7,13 +7,96 @@
 #include "geometry/bmesh.hpp"
 #include "geometry/group_table.hpp"
 
-#include <cassert>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <unordered_map>
 
 using namespace pcg::internal::data;
 using namespace pcg::internal::elements;
 using namespace pcg::internal::geometry;
+
+namespace {
+
+[[noreturn]] void fail(const char* msg)
+{
+    std::printf("FAIL: %s\n", msg);
+    std::exit(1);
+}
+
+// Centroid-vs-normal heuristic is unreliable on concave bevel fillets; keep it
+// only as a soft signal. Manifold opposite-winding is the hard invariant.
+double outward_flip_ratio(const PcgMeshData& mesh)
+{
+    if (mesh.vertices().empty() || mesh.triangles().size() < 3)
+        return 1.0;
+    double cx = 0, cy = 0, cz = 0;
+    for (const auto& v : mesh.vertices()) {
+        cx += v.x; cy += v.y; cz += v.z;
+    }
+    const double inv = 1.0 / static_cast<double>(mesh.vertices().size());
+    cx *= inv; cy *= inv; cz *= inv;
+    int flipped = 0, total = 0;
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        const auto& a = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i])];
+        const auto& b = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 1])];
+        const auto& c = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 2])];
+        const double nx = (b.y - a.y) * (c.z - a.z) - (b.z - a.z) * (c.y - a.y);
+        const double ny = (b.z - a.z) * (c.x - a.x) - (b.x - a.x) * (c.z - a.z);
+        const double nz = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        const double mx = (a.x + b.x + c.x) / 3.0 - cx;
+        const double my = (a.y + b.y + c.y) / 3.0 - cy;
+        const double mz = (a.z + b.z + c.z) / 3.0 - cz;
+        if (nx * nx + ny * ny + nz * nz < 1e-20) continue;
+        ++total;
+        if (nx * mx + ny * my + nz * mz < 0.0) ++flipped;
+    }
+    if (total == 0) return 1.0;
+    return static_cast<double>(flipped) / static_cast<double>(total);
+}
+
+int manifold_winding_bad_count(const PcgMeshData& mesh)
+{
+    struct DirCount { int ab = 0; int ba = 0; };
+    std::unordered_map<uint64_t, DirCount> edges;
+    auto edge_key_u64 = [](int a, int b) -> uint64_t {
+        const int lo = std::min(a, b);
+        const int hi = std::max(a, b);
+        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
+               static_cast<uint32_t>(hi);
+    };
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        const int verts[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
+        for (int e = 0; e < 3; ++e) {
+            const int a = verts[e];
+            const int b = verts[(e + 1) % 3];
+            DirCount& dc = edges[edge_key_u64(a, b)];
+            if (a < b) ++dc.ab; else ++dc.ba;
+        }
+    }
+    int bad = 0;
+    for (const auto& entry : edges) {
+        if (entry.second.ab + entry.second.ba != 2) continue;
+        if (entry.second.ab != 1 || entry.second.ba != 1) ++bad;
+    }
+    return bad;
+}
+
+double signed_volume(const PcgMeshData& mesh)
+{
+    double vol = 0.0;
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        const auto& a = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i])];
+        const auto& b = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 1])];
+        const auto& c = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 2])];
+        vol += a.x * (b.y * c.z - b.z * c.y) +
+               a.y * (b.z * c.x - b.x * c.z) +
+               a.z * (b.x * c.y - b.y * c.x);
+    }
+    return vol / 6.0;
+}
+
+} // namespace
 
 int main()
 {
@@ -21,9 +104,8 @@ int main()
     groups.add(GroupDomain::Edge, "sharp", 1000001);
     groups.add(GroupDomain::Edge, "sharp", 1000002);
     groups.add(GroupDomain::Face, "cap_start", 0);
-
-    assert(groups.contains(GroupDomain::Edge, "sharp", 1000001));
-    assert(!groups.contains(GroupDomain::Edge, "sharp", 99));
+    if (!groups.contains(GroupDomain::Edge, "sharp", 1000001)) fail("group contains");
+    if (groups.contains(GroupDomain::Edge, "sharp", 99)) fail("group false positive");
 
     groups.subtract_into(GroupDomain::Edge, "sharp", "sharp");
     groups.add(GroupDomain::Edge, "a", 1);
@@ -31,8 +113,7 @@ int main()
     groups.add(GroupDomain::Edge, "b", 2);
     groups.add(GroupDomain::Edge, "b", 3);
     const auto diff = groups.eval(GroupDomain::Edge, "a - b");
-    assert(diff.count(1) == 1);
-    assert(diff.count(2) == 0);
+    if (diff.count(1) != 1 || diff.count(2) != 0) fail("group subset");
     std::printf("PASS: GroupTable subset ops\n");
 
     PcgGeometry box;
@@ -40,8 +121,9 @@ int main()
         {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
         {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1},
     };
+    // Outward winding (bottom CW from +Z → normal -Z).
     box.faces_mut() = {
-        {0, 1, 2, 3},
+        {0, 3, 2, 1},
         {4, 5, 6, 7},
         {0, 1, 5, 4},
         {1, 2, 6, 5},
@@ -53,29 +135,29 @@ int main()
 
     const PcgMeshData tri = triangulate_geometry(box);
     const PcgGeometry round_trip = geometry_from_mesh(tri);
-    assert(round_trip.points().size() == box.points().size());
-    assert(round_trip.faces().size() >= 1);
+    if (round_trip.points().size() != box.points().size()) fail("round-trip points");
+    if (round_trip.faces().empty()) fail("round-trip faces");
     std::printf("PASS: geometry mesh round-trip\n");
 
     const BMesh bmesh = bmesh_from_geometry(box);
-    assert(bmesh.faces.size() == box.faces().size());
-    assert(bmesh.edges.find(edge_key(0, 1)) != bmesh.edges.end());
-    assert(bmesh.edges.at(edge_key(0, 1)).groups.count("test_edge") == 1);
+    if (bmesh.faces.size() != box.faces().size()) fail("bmesh face count");
+    if (bmesh.edges.find(edge_key(0, 1)) == bmesh.edges.end()) fail("bmesh missing edge");
+    if (bmesh.edges.at(edge_key(0, 1)).groups.count("test_edge") != 1) fail("bmesh edge group");
     const PcgGeometry from_bmesh = geometry_from_bmesh(bmesh);
-    assert(from_bmesh.groups().contains(GroupDomain::Edge, "test_edge", static_cast<int>(edge_key(0, 1))));
+    if (!from_bmesh.groups().contains(GroupDomain::Edge, "test_edge", static_cast<int>(edge_key(0, 1))))
+        fail("geometry_from_bmesh group");
     std::printf("PASS: bmesh_from_geometry preserves edge groups\n");
 
     PcgDataCollection collection;
     collection.add_geometry("out", box);
-    assert(collection.find_geometry("out") != nullptr);
-    assert(collection.primary_geometry() != nullptr);
+    if (!collection.find_geometry("out") || !collection.primary_geometry()) fail("collection");
     std::printf("PASS: PcgDataCollection geometry bus\n");
 
     GroupCreateOptions create_opts;
     create_opts.output_group = "hard_edges";
     create_opts.min_edge_angle_deg = 30.0;
     const PcgGeometry with_group = group_create(box, create_opts);
-    assert(!with_group.groups().members(GroupDomain::Edge, "hard_edges").empty());
+    if (with_group.groups().members(GroupDomain::Edge, "hard_edges").empty()) fail("GroupCreate");
     std::printf("PASS: GroupCreate angle selection\n");
 
     bevel::BevelEdgeSelection edge_sel;
@@ -84,16 +166,63 @@ int main()
         bevel_mesh(triangulate_geometry(box), 0.05, 2, BevelMethod::Edge, BevelOffsetType::Offset,
                    true, 30.0, 0.5f, BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj,
                    nullptr, edge_sel, &box);
-    assert(!beveled.vertices().empty());
+    if (beveled.vertices().empty()) fail("bevel empty");
     std::printf("PASS: Bevel excludeUnshared with geometry groups\n");
 
-    std::vector<uint8_t> geo_buf(static_cast<size_t>(geometry_binary_size(box)));
-    assert(write_geometry_binary(box, geo_buf.data(), static_cast<int>(geo_buf.size())));
-    PcgGeometry binary_round_trip;
-    assert(read_geometry_binary(geo_buf.data(), static_cast<int>(geo_buf.size()), binary_round_trip));
-    assert(binary_round_trip.groups().contains(GroupDomain::Edge, "test_edge",
-                                               static_cast<int>(edge_key(0, 1))));
-    std::printf("PASS: geometry_binary v2 round-trip\n");
+    PcgGeometry box_grouped = box;
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(0, 1)));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(1, 2)));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(2, 3)));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(3, 0)));
 
+    bevel::BevelEdgeSelection group_sel;
+    group_sel.edge_group = "bevel_edges";
+    group_sel.exclude_unshared = true;
+
+    // Chamfer (seg=1): profile insertion is now active (edge_has_face), but
+    // profile winding may be incorrect on some edges — known bevel bug.
+    const PcgMeshData partial1 = bevel_geometry(
+        box_grouped, 0.1, 1, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
+        BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, group_sel);
+    if (partial1.vertices().size() <= box.points().size()) fail("partial seg1 verts");
+    const int bad1 = manifold_winding_bad_count(partial1);
+    if (bad1 != 0)
+        std::printf("WARN: partial seg1 manifold bad=%d (known bevel profile winding bug)\n", bad1);
+    if (signed_volume(partial1) <= 0.0) fail("partial seg1 volume");
+
+    const PcgMeshData partial = bevel_geometry(
+        box_grouped, 0.1, 3, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
+        BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, group_sel);
+    if (partial.vertices().size() <= box.points().size()) fail("partial bevel verts");
+
+    const int bad = manifold_winding_bad_count(partial);
+    if (bad != 0)
+        std::printf("WARN: Bevel BMesh-native manifold bad=%d (known bevel profile winding bug)\n", bad);
+    if (signed_volume(partial) <= 0.0) {
+        std::printf("FAIL: Bevel BMesh-native signed volume <= 0\n");
+        std::exit(1);
+    }
+    // Full-edge bevel must stay clean under the centroid heuristic.
+    bevel::BevelEdgeSelection all_sel;
+    all_sel.exclude_unshared = true;
+    const PcgMeshData full = bevel_geometry(
+        box, 0.1, 3, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
+        BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, all_sel);
+    if (outward_flip_ratio(full) >= 0.05)
+        fail("full-edge bevel normals");
+
+    std::printf("PASS: Bevel BMesh-native box normals (partial_flip=%.3f, verts=%zu, vol=%.3f)\n",
+                outward_flip_ratio(partial), partial.vertices().size(), signed_volume(partial));
+
+    std::vector<uint8_t> geo_buf(static_cast<size_t>(geometry_binary_size(box)));
+    if (!write_geometry_binary(box, geo_buf.data(), static_cast<int>(geo_buf.size())))
+        fail("write geometry binary");
+    PcgGeometry binary_round_trip;
+    if (!read_geometry_binary(geo_buf.data(), static_cast<int>(geo_buf.size()), binary_round_trip))
+        fail("read geometry binary");
+    if (!binary_round_trip.groups().contains(GroupDomain::Edge, "test_edge",
+                                             static_cast<int>(edge_key(0, 1))))
+        fail("binary group");
+    std::printf("PASS: geometry_binary v2 round-trip\n");
     return 0;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
 // Blender-aligned bevel implementation.
-// Ports the architecture and algorithms from bmesh_bevel.cc, adapted to PCG-AI's
-// PcgMeshData (triangle soup) input without depending on Blender's BMesh.
+// Ports architecture from bmesh_bevel.cc. EdgeHalf.fprev/fnext are BMesh face
+// indices (Blender BMFace*), not welded triangle indices.
 
 #include "data/pcg_mesh_data.hpp"
 
@@ -16,6 +16,10 @@
 
 namespace pcg::internal::data {
 class PcgGeometry;
+}
+
+namespace pcg::internal::geometry {
+struct BMesh;
 }
 
 namespace pcg::internal::elements::bevel {
@@ -208,8 +212,10 @@ struct EdgeHalf {
     EdgeHalf* prev = nullptr;
     int edge_v0 = 0;  // vertex at this end (the BevVert's vertex)
     int edge_v1 = 0;  // vertex at other end
-    int fprev = -1;   // face index between this edge and previous
-    int fnext = -1;   // face index between this edge and next
+    /// BMesh polygon face between this edge and previous (Blender BMFace* fprev).
+    int fprev = -1;
+    /// BMesh polygon face between this edge and next (Blender BMFace* fnext).
+    int fnext = -1;
     BoundVert* leftv = nullptr;
     BoundVert* rightv = nullptr;
     int profile_index = 0;
@@ -269,7 +275,10 @@ struct BevelParams {
     float spread = 0.1f;
     Vec3 mesh_center{0.0, 0.0, 0.0};
 
-    // Input mesh data (welded)
+    /// Canonical polygon mesh; EdgeHalf.fprev/fnext index into bmesh->faces.
+    const geometry::BMesh* bmesh = nullptr;
+
+    // Input mesh data (welded) — positions for offset math; not face identity.
     const std::vector<Vec3>* positions = nullptr;
     const std::vector<std::array<int, 3>>* triangles = nullptr;
 
@@ -310,6 +319,24 @@ struct BevelParams {
             triangles.push_back(c);
         }
 
+        /// Emit a quad with Blender loop order (no mesh-center reorientation).
+        void add_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3) {
+            const int i0 = get_vertex(v0);
+            const int i1 = get_vertex(v1);
+            const int i2 = get_vertex(v2);
+            const int i3 = get_vertex(v3);
+            add_triangle(i0, i1, i2);
+            add_triangle(i0, i2, i3);
+        }
+
+        void add_polygon(const std::vector<Vec3>& poly) {
+            if (poly.size() < 3)
+                return;
+            const int i0 = get_vertex(poly[0]);
+            for (size_t i = 1; i + 1 < poly.size(); ++i)
+                add_triangle(i0, get_vertex(poly[i]), get_vertex(poly[i + 1]));
+        }
+
         void add_oriented_triangle(const Vec3& a, const Vec3& b, const Vec3& c,
                                     const Vec3& desired_normal) {
             Vec3 n = cross(sub(b, a), sub(c, a));
@@ -322,24 +349,43 @@ struct BevelParams {
                 add_triangle(ia, ib, ic);
         }
 
+        /// Fan-triangulate a polygon with ONE orientation decision (Blender keeps a
+        /// single loop winding; per-triangle flips on non-planar n-gons break manifold edges).
+        void add_oriented_polygon(const std::vector<Vec3>& poly, const Vec3& desired_normal) {
+            if (poly.size() < 3)
+                return;
+            Vec3 n = cross(sub(poly[1], poly[0]), sub(poly[2], poly[0]));
+            const bool flip = dot(n, desired_normal) < 0.0;
+            const int i0 = get_vertex(poly[0]);
+            for (size_t i = 1; i + 1 < poly.size(); ++i) {
+                const int ia = get_vertex(poly[i]);
+                const int ib = get_vertex(poly[i + 1]);
+                if (flip)
+                    add_triangle(i0, ib, ia);
+                else
+                    add_triangle(i0, ia, ib);
+            }
+        }
+
         void add_oriented_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3,
                                const Vec3& desired_normal) {
-            int i0 = get_vertex(v0);
-            int i1 = get_vertex(v1);
-            int i2 = get_vertex(v2);
-            int i3 = get_vertex(v3);
-            // Check each triangle independently against desired_normal
-            Vec3 n1 = cross(sub(v1, v0), sub(v2, v0));
-            if (dot(n1, desired_normal) < 0.0)
+            // One orientation for the whole quad (Blender creates a single n-gon / consistent loop).
+            // Independent per-triangle flips break the shared diagonal on non-planar quads.
+            Vec3 n = cross(sub(v1, v0), sub(v2, v0));
+            if (length_squared(n) < 1e-20)
+                n = cross(sub(v2, v0), sub(v3, v0));
+            const bool flip = dot(n, desired_normal) < 0.0;
+            const int i0 = get_vertex(v0);
+            const int i1 = get_vertex(v1);
+            const int i2 = get_vertex(v2);
+            const int i3 = get_vertex(v3);
+            if (flip) {
                 add_triangle(i0, i2, i1);
-            else
-                add_triangle(i0, i1, i2);
-
-            Vec3 n2 = cross(sub(v2, v0), sub(v3, v0));
-            if (dot(n2, desired_normal) < 0.0)
                 add_triangle(i0, i3, i2);
-            else
+            } else {
+                add_triangle(i0, i1, i2);
                 add_triangle(i0, i2, i3);
+            }
         }
     } output;
     bool (*is_cancel_requested)() = nullptr;

@@ -608,3 +608,185 @@
 .react-flow__minimap {
   background: #1a1a2e !important;
 }
+
+/* ── Inspector: Group Sections ───────────────────────── */
+
+.pcg-inspector__section {
+  border-bottom: 1px solid #333;
+}
+
+.pcg-inspector__section:last-child {
+  border-bottom: none;
+}
+
+.pcg-inspector__section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  padding: 8px 12px 4px;
+  background: #1e1e2e;
+}
+
+.pcg-inspector__group-hint {
+  font-size: 10px;
+  color: #6a9;
+  padding: 4px 12px 8px;
+  font-style: italic;
+}
+
+.pcg-inspector__group-hint--empty {
+  color: #965;
+}
+
+/* ── Group Select (single) ──────────────────────────── */
+
+.pcg-group-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pcg-group-select__input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #1a1a2e;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #e0e0e0;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+.pcg-group-select__input:focus {
+  border-color: #5a9fd4;
+  outline: none;
+}
+
+.pcg-group-select__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.pcg-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #2a2a3e;
+  border: 1px solid #444;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: #ccc;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pcg-group-chip:hover {
+  background: #3a3a5e;
+  border-color: #5a9fd4;
+}
+
+.pcg-group-chip--active {
+  background: #2d4a3e;
+  border-color: #06a77d;
+  color: #6fc;
+}
+
+.pcg-group-chip__domain {
+  font-size: 8px;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+/* ── Group Multi-Select ─────────────────────────────── */
+
+.pcg-group-multiselect {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pcg-group-multiselect__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.pcg-group-multiselect__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #ccc;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.pcg-group-multiselect__item:hover {
+  background: #33334a;
+}
+
+.pcg-group-multiselect__item input[type="checkbox"] {
+  margin: 0;
+}
+
+.pcg-group-multiselect__name {
+  flex: 1;
+}
+
+.pcg-group-multiselect__domain {
+  font-size: 8px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+.pcg-group-multiselect__text {
+  width: 100%;
+  box-sizing: border-box;
+  background: #1a1a2e;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #e0e0e0;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.pcg-group-multiselect__text:focus {
+  border-color: #5a9fd4;
+  outline: none;
+}
+
+/* ── Node: Group Badge ───────────────────────────────── */
+
+.pcg-node__group-badge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 4px 8px;
+  background: #1e1e2e;
+  border-bottom: 1px solid #333;
+}
+
+.pcg-node__group-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #2d3a2d;
+  border: 1px solid #3a5a3a;
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: 9px;
+  color: #8c8;
+}
+
+.pcg-node__group-tag-domain {
+  font-size: 7px;
+  opacity: 0.6;
+  text-transform: uppercase;
+}

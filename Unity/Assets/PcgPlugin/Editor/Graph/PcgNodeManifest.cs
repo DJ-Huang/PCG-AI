@@ -22,6 +22,15 @@ namespace DJTechEditor.PCG.Graph
         public string label;
     }
 
+    public class ManifestOutputGroupDef
+    {
+        public string name;
+        public string domain;
+        public string label;
+        public string condition;
+        public bool dynamic;
+    }
+
     public class ManifestPropertyDef
     {
         public string type;
@@ -30,6 +39,8 @@ namespace DJTechEditor.PCG.Graph
         public bool hasRange = false;
         public float minimum = 0f;
         public float maximum = 1f;
+        public string groupDomain;
+        public bool isGroupOutput;
     }
 
     public class ManifestNodeDef
@@ -40,6 +51,7 @@ namespace DJTechEditor.PCG.Graph
         public List<ManifestPinDef> inputs = new();
         public List<ManifestPinDef> outputs = new();
         public Dictionary<string, ManifestPropertyDef> properties = new();
+        public List<ManifestOutputGroupDef> outputGroups = new();
     }
 
     /// <summary>Loads schema/node-manifest.json for manifest-driven GraphView nodes.</summary>
@@ -282,6 +294,11 @@ namespace DJTechEditor.PCG.Graph
                             propDef.maximum = Convert.ToSingle(maxVal, CultureInfo.InvariantCulture);
                         propDef.hasRange = hasMin && hasMax;
 
+                        // Parse group-related metadata
+                        propDef.groupDomain = GetString(propObj, "groupDomain");
+                        propDef.isGroupOutput = propObj.TryGetValue("isGroupOutput", out var groupOutVal)
+                            && Convert.ToBoolean(groupOutVal, CultureInfo.InvariantCulture);
+
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)
                         {
@@ -298,6 +315,24 @@ namespace DJTechEditor.PCG.Graph
                         }
                         def.properties[key] = propDef;
                     }
+                }
+            }
+
+            // Parse outputGroups (groups this node produces on its output)
+            if (nodeDict.TryGetValue("outputGroups", out var outputGroupsObj) && outputGroupsObj is List<object> outputGroupsList)
+            {
+                foreach (var ogObj in outputGroupsList)
+                {
+                    if (ogObj is not Dictionary<string, object> ogDict)
+                        continue;
+                    def.outputGroups.Add(new ManifestOutputGroupDef
+                    {
+                        name = GetString(ogDict, "name"),
+                        domain = GetString(ogDict, "domain", "edge"),
+                        label = GetString(ogDict, "label"),
+                        condition = GetString(ogDict, "condition"),
+                        dynamic = ogDict.TryGetValue("dynamic", out var dynVal) && Convert.ToBoolean(dynVal, CultureInfo.InvariantCulture),
+                    });
                 }
             }
 

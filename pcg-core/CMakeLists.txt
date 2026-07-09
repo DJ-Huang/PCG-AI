@@ -146,3 +146,10 @@ target_link_libraries(test_phase46 PRIVATE PcgCoreStatic nlohmann_json::nlohmann
 target_include_directories(test_phase46 PRIVATE src)
 
 add_test(NAME test_phase46 COMMAND test_phase46 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_bridge_bevel tests/test_bridge_bevel.cpp)
+target_link_libraries(test_bridge_bevel PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_bridge_bevel PRIVATE src)
+
+add_test(NAME test_bridge_bevel COMMAND test_bridge_bevel WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+

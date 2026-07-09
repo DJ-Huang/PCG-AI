@@ -1,19 +1,24 @@
 // Inspector.tsx — Houdini-style right panel showing selected node properties.
 // Supports promote-to-parameter (+) and bind/unbind via dropdown.
+// Group properties (groupSelect/groupMultiSelect) resolve available groups from upstream nodes.
 
-import { useCallback } from 'react';
-import type { Node } from '@xyflow/react';
+import { useCallback, useId, useMemo } from 'react';
+import type { Node, Edge } from '@xyflow/react';
 import {
   getNodeTypeDefs,
   getCategoryColor,
   type ManifestProperty,
   type PropertyType,
+  type GroupDomain,
 } from './nodeManifest';
 import type { GraphParameter, ParameterType, NodeData } from './graphSchema';
+import { resolveUpstreamGroups, filterGroupsByDomain, type AvailableGroup } from './groupResolver';
 
 interface InspectorProps {
   selectedNode: Node | null;
   parameters: GraphParameter[];
+  nodes: Node[];
+  edges: Edge[];
   onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
   onPromoteParameter: (nodeId: string, nodeType: string, propertyKey: string, prop: ManifestProperty) => void;
   onBindParameter: (nodeId: string, propertyKey: string, paramId: string | null) => void;
@@ -24,13 +29,15 @@ function typesCompatible(paramType: ParameterType, propType: PropertyType): bool
   if (paramType === 'number') return propType === 'number' || propType === 'integer';
   if (paramType === 'integer') return propType === 'integer';
   if (paramType === 'boolean') return propType === 'boolean';
-  if (paramType === 'string') return propType === 'string' || propType === 'enum';
+  if (paramType === 'string') return propType === 'string' || propType === 'enum' || propType === 'groupSelect' || propType === 'groupMultiSelect';
   return false;
 }
 
 export default function Inspector({
   selectedNode,
   parameters,
+  nodes,
+  edges,
   onUpdateNodeData,
   onPromoteParameter,
   onBindParameter,
@@ -40,6 +47,12 @@ export default function Inspector({
       onUpdateNodeData(nodeId, { [key]: value });
     },
     [onUpdateNodeData],
+  );
+
+  // Resolve available groups from upstream SpatialMesh connections (Houdini-style)
+  const upstreamGroups = useMemo(
+    () => selectedNode ? resolveUpstreamGroups(selectedNode.id, nodes, edges) : [],
+    [selectedNode, nodes, edges],
   );
 
   if (!selectedNode) {
@@ -64,6 +77,73 @@ export default function Inspector({
   const color = getCategoryColor(def.category);
   const data = selectedNode.data as NodeData;
 
+  // Split properties into group-related and regular
+  const groupProps: [string, ManifestProperty][] = [];
+  const regularProps: [string, ManifestProperty][] = [];
+  for (const [key, prop] of Object.entries(def.properties)) {
+    if (prop.type === 'groupSelect' || prop.type === 'groupMultiSelect' || prop.isGroupOutput) {
+      groupProps.push([key, prop]);
+    } else {
+      regularProps.push([key, prop]);
+    }
+  }
+
+  const renderProp = (key: string, prop: ManifestProperty) => {
+    const binding = parameters.find(
+      (p) => p.targetNode === selectedNode.id && p.targetProperty === key,
+    );
+    const isBound = !!binding;
+    const value = data[key] ?? prop.default;
+    const filteredGroups = prop.groupDomain
+      ? filterGroupsByDomain(upstreamGroups, prop.groupDomain as GroupDomain)
+      : upstreamGroups;
+
+    return (
+      <div key={key} className="pcg-inspector__prop">
+        <div className="pcg-inspector__prop-header">
+          <span className="pcg-inspector__prop-label">{key}</span>
+          <div className="pcg-inspector__prop-actions">
+            <button
+              type="button"
+              className="pcg-inspector__promote"
+              title="Promote to Parameter"
+              disabled={isBound}
+              onClick={() => onPromoteParameter(selectedNode.id, selectedNode.type!, key, prop)}
+            >
+              +
+            </button>
+            <select
+              className="pcg-inspector__bind-select"
+              value={binding?.id ?? ''}
+              onChange={(e) => onBindParameter(selectedNode.id, key, e.target.value || null)}
+            >
+              <option value="">(none)</option>
+              {parameters
+                .filter((p) => typesCompatible(p.type, prop.type))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+        <div className="pcg-inspector__prop-value">
+          <PropertyEditor
+            prop={prop}
+            value={value}
+            disabled={isBound}
+            binding={binding}
+            availableGroups={filteredGroups}
+            onChange={(v) => handleValueChange(selectedNode.id, key, v)}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const hasGroupConsumers = groupProps.some(([, p]) => p.type === 'groupSelect' || p.type === 'groupMultiSelect');
+
   return (
     <div className="pcg-inspector">
       <div className="pcg-inspector__title">Inspector</div>
@@ -72,59 +152,30 @@ export default function Inspector({
       </div>
       <div className="pcg-inspector__node-type">{selectedNode.type}</div>
 
-      <div className="pcg-inspector__props">
-        {Object.entries(def.properties).map(([key, prop]) => {
-          const binding = parameters.find(
-            (p) => p.targetNode === selectedNode.id && p.targetProperty === key,
-          );
-          const isBound = !!binding;
-          const value = data[key] ?? prop.default;
-
-          return (
-            <div key={key} className="pcg-inspector__prop">
-              <div className="pcg-inspector__prop-header">
-                <span className="pcg-inspector__prop-label">{key}</span>
-                <div className="pcg-inspector__prop-actions">
-                  <button
-                    type="button"
-                    className="pcg-inspector__promote"
-                    title="Promote to Parameter"
-                    disabled={isBound}
-                    onClick={() => onPromoteParameter(selectedNode.id, selectedNode.type!, key, prop)}
-                  >
-                    +
-                  </button>
-                  <select
-                    className="pcg-inspector__bind-select"
-                    value={binding?.id ?? ''}
-                    onChange={(e) => onBindParameter(selectedNode.id, key, e.target.value || null)}
-                  >
-                    <option value="">(none)</option>
-                    {parameters
-                      .filter((p) => typesCompatible(p.type, prop.type))
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-              <div className="pcg-inspector__prop-value">
-                <PropertyEditor
-                  prop={prop}
-                  value={value}
-                  disabled={isBound}
-                  binding={binding}
-                  onChange={(v) => handleValueChange(selectedNode.id, key, v)}
-                />
-              </div>
+      {groupProps.length > 0 && (
+        <div className="pcg-inspector__section">
+          <div className="pcg-inspector__section-title">Groups</div>
+          <div className="pcg-inspector__props">
+            {groupProps.map(([key, prop]) => renderProp(key, prop))}
+          </div>
+          {hasGroupConsumers && (
+            <div className={`pcg-inspector__group-hint${upstreamGroups.length === 0 ? ' pcg-inspector__group-hint--empty' : ''}`}>
+              {upstreamGroups.length > 0
+                ? `${upstreamGroups.length} group${upstreamGroups.length !== 1 ? 's' : ''} available from upstream`
+                : 'No groups from upstream — connect a Group Create or Sweep node'}
             </div>
-          );
-        })}
-        {Object.keys(def.properties).length === 0 && (
-          <div className="pcg-inspector__no-props">No properties</div>
-        )}
+          )}
+        </div>
+      )}
+
+      <div className="pcg-inspector__section">
+        {groupProps.length > 0 && <div className="pcg-inspector__section-title">Parameters</div>}
+        <div className="pcg-inspector__props">
+          {regularProps.map(([key, prop]) => renderProp(key, prop))}
+          {Object.keys(def.properties).length === 0 && (
+            <div className="pcg-inspector__no-props">No properties</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -137,10 +188,11 @@ interface PropertyEditorProps {
   value: unknown;
   disabled: boolean;
   binding: GraphParameter | undefined;
+  availableGroups?: AvailableGroup[];
   onChange: (value: unknown) => void;
 }
 
-function PropertyEditor({ prop, value, disabled, binding, onChange }: PropertyEditorProps) {
+function PropertyEditor({ prop, value, disabled, binding, availableGroups, onChange }: PropertyEditorProps) {
   if (disabled && binding) {
     // Bound: show blue readonly label
     const displayValue = binding.hasRange ? value : `(default: ${binding.default})`;
@@ -231,7 +283,141 @@ function PropertyEditor({ prop, value, disabled, binding, onChange }: PropertyEd
         />
       );
 
+    case 'groupSelect':
+      return (
+        <GroupSelect
+          value={String(value ?? '')}
+          groups={availableGroups ?? []}
+          onChange={onChange}
+        />
+      );
+
+    case 'groupMultiSelect':
+      return (
+        <GroupMultiSelect
+          value={String(value ?? '')}
+          groups={availableGroups ?? []}
+          onChange={onChange}
+        />
+      );
+
     default:
       return <span>{String(value)}</span>;
   }
+}
+
+// ── Group Select (single) ──────────────────────────────
+// Houdini-style: text input with datalist autocomplete from upstream groups.
+
+function GroupSelect({
+  value,
+  groups,
+  onChange,
+}: {
+  value: string;
+  groups: AvailableGroup[];
+  onChange: (value: string) => void;
+}) {
+  const listId = useId();
+
+  return (
+    <div className="pcg-group-select">
+      <input
+        type="text"
+        list={listId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="(all or type name)"
+        className="pcg-group-select__input"
+      />
+      <datalist id={listId}>
+        {groups.map((g) => (
+          <option key={`${g.source}-${g.name}`} value={g.name}>
+            {g.label ? `${g.label} — ${g.name}` : g.name} ({g.domain})
+          </option>
+        ))}
+      </datalist>
+      {groups.length > 0 && (
+        <div className="pcg-group-select__chips">
+          {groups.map((g) => (
+            <button
+              key={`${g.source}-${g.name}`}
+              type="button"
+              className={`pcg-group-chip${value === g.name ? ' pcg-group-chip--active' : ''}`}
+              onClick={() => onChange(g.name)}
+              title={`${g.label ?? g.name} (${g.domain}) from ${g.sourceType}`}
+            >
+              {g.name}
+              <span className="pcg-group-chip__domain">{g.domain}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Group Multi-Select ─────────────────────────────────
+// Shows checkboxes for each available group + text input for custom names.
+
+function GroupMultiSelect({
+  value,
+  groups,
+  onChange,
+}: {
+  value: string;
+  groups: AvailableGroup[];
+  onChange: (value: string) => void;
+}) {
+  const selected = value.split(',').map((s) => s.trim()).filter(Boolean);
+
+  const toggle = (name: string) => {
+    if (selected.includes(name)) {
+      onChange(selected.filter((s) => s !== name).join(','));
+    } else {
+      onChange([...selected, name].join(','));
+    }
+  };
+
+  // Show custom names that aren't in the available groups
+  const availableNames = new Set(groups.map((g) => g.name));
+  const customSelected = selected.filter((s) => !availableNames.has(s));
+
+  return (
+    <div className="pcg-group-multiselect">
+      {groups.length > 0 && (
+        <div className="pcg-group-multiselect__list">
+          {groups.map((g) => (
+            <label key={`${g.source}-${g.name}`} className="pcg-group-multiselect__item">
+              <input
+                type="checkbox"
+                checked={selected.includes(g.name)}
+                onChange={() => toggle(g.name)}
+              />
+              <span className="pcg-group-multiselect__name">{g.name}</span>
+              <span className="pcg-group-multiselect__domain">{g.domain}</span>
+            </label>
+          ))}
+          {customSelected.map((name) => (
+            <label key={`custom-${name}`} className="pcg-group-multiselect__item">
+              <input
+                type="checkbox"
+                checked
+                onChange={() => toggle(name)}
+              />
+              <span className="pcg-group-multiselect__name">{name}</span>
+              <span className="pcg-group-multiselect__domain">custom</span>
+            </label>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Comma-separated group names"
+        className="pcg-group-multiselect__text"
+      />
+    </div>
+  );
 }

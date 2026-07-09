@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <set>
+#include <unordered_map>
 
 namespace pcg::internal::elements::bevel {
 
@@ -561,26 +562,29 @@ std::vector<VertEdge> get_bmesh_vert_edges(int v_idx, const geometry::BMesh& bme
     return edges;
 }
 
-int representative_triangle_for_bmesh_face(const geometry::BMesh& bmesh, int face_idx)
+/// Face normal for EdgeHalf.fprev/fnext (BMesh face index). Blender: e->fprev->no.
+Vec3 bmesh_face_normal(const BevelParams& bp, int face_idx)
 {
-    if (face_idx < 0 || face_idx >= static_cast<int>(bmesh.faces.size()))
-        return -1;
-    const auto& tris = bmesh.faces[static_cast<size_t>(face_idx)].triangle_indices;
-    return tris.empty() ? -1 : tris.front();
+    if (!bp.bmesh || face_idx < 0 ||
+        face_idx >= static_cast<int>(bp.bmesh->faces.size()))
+        return {0, 0, 0};
+    const geometry::Vec3 n = geometry::face_normal(*bp.bmesh, face_idx);
+    return {n.x, n.y, n.z};
 }
 
 int find_bmesh_face_between(const geometry::BMesh& bmesh, int v_idx, int other_a, int other_b)
 {
+    // Strict loop order: face must walk other_a → v → other_b.
+    // Returns -1 when sort_ccw produces CW order on non-coplanar faces.
     for (int fi = 0; fi < static_cast<int>(bmesh.faces.size()); ++fi) {
         const auto& loop = bmesh.faces[static_cast<size_t>(fi)].verts;
         const int n = static_cast<int>(loop.size());
         for (int i = 0; i < n; ++i) {
             if (loop[static_cast<size_t>(i)] != v_idx)
                 continue;
-
             const int prev = loop[static_cast<size_t>((i + n - 1) % n)];
             const int next = loop[static_cast<size_t>((i + 1) % n)];
-            if ((prev == other_a && next == other_b) || (prev == other_b && next == other_a))
+            if (prev == other_a && next == other_b)
                 return fi;
         }
     }
@@ -901,7 +905,7 @@ void offset_meet(BevelParams& bp,
         // Parallel: use bisector direction
         Vec3 norm_v;
         if (f_idx >= 0) {
-            norm_v = tri_normal({positions, triangles}, f_idx);
+            norm_v = bmesh_face_normal(bp, f_idx);
         } else {
             norm_v = vertex_normal({positions, triangles}, v_idx);
         }
@@ -922,12 +926,12 @@ void offset_meet(BevelParams& bp,
         Vec3 norm_v1, norm_v2;
 
         if (f_idx >= 0 && ang < BEVEL_SMALL_ANG) {
-            norm_v1 = tri_normal({positions, triangles}, f_idx);
+            norm_v1 = bmesh_face_normal(bp, f_idx);
             norm_v2 = norm_v1;
         } else if (!edges_between) {
             norm_v1 = normalize(cross(dir2, dir1));
             if (f_idx >= 0) {
-                Vec3 f_no = tri_normal({positions, triangles}, f_idx);
+                Vec3 f_no = bmesh_face_normal(bp, f_idx);
                 if (dot(norm_v1, f_no) < 0.0) norm_v1 = negate(norm_v1);
             }
             norm_v2 = norm_v1;
@@ -1030,8 +1034,8 @@ bool eh_on_plane(EdgeHalf* e, int v_idx, const BevelParams& bp) {
     if (e->fprev < 0 || e->fnext < 0)
         return false;
 
-    Vec3 n1 = tri_normal({*bp.positions, *bp.triangles}, e->fprev);
-    Vec3 n2 = tri_normal({*bp.positions, *bp.triangles}, e->fnext);
+    Vec3 n1 = bmesh_face_normal(bp, e->fprev);
+    Vec3 n2 = bmesh_face_normal(bp, e->fnext);
     return nearly_parallel(n1, n2);
 }
 
@@ -1416,7 +1420,7 @@ void build_boundary(BevelParams& bp, BevVert* bv, bool construct) {
             // Only 2 edges: offset in plane on each side
             int fprev = e->fprev;
             if (fprev >= 0) {
-                Vec3 f_no = tri_normal({*bp.positions, *bp.triangles}, fprev);
+                Vec3 f_no = bmesh_face_normal(bp, fprev);
                 co = offset_in_plane(e, f_no, true, bv->v_idx, bp);
             } else {
                 co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
@@ -1431,7 +1435,7 @@ void build_boundary(BevelParams& bp, BevVert* bv, bool construct) {
 
             int fnext = e->fnext;
             if (fnext >= 0) {
-                Vec3 f_no = tri_normal({*bp.positions, *bp.triangles}, fnext);
+                Vec3 f_no = bmesh_face_normal(bp, fnext);
                 co = offset_in_plane(e, f_no, false, bv->v_idx, bp);
             } else {
                 co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
@@ -2424,52 +2428,33 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
             }
         }
 
-        // Create quad faces
-        int odd = ns % 2;
-        Vec3 vert_normal = vertex_normal_from_data(*bp.positions, *bp.triangles, bv->v_idx);
+        // Create F_VERT quads with Blender loop order (v1,v2,v3,v4) — no mesh-center flip.
+        const int odd = ns % 2;
         bndv = vm_out->boundstart;
         do {
-            int i = bndv->index;
-
+            const int i = bndv->index;
             for (int j = 0; j < ns2; j++) {
                 for (int k = 0; k < ns2 + odd; k++) {
-                    Vec3 v1 = vm_out->at(i, j, k).co;
-                    Vec3 v2 = vm_out->at(i, j, k + 1).co;
-                    Vec3 v3 = vm_out->at(i, j + 1, k + 1).co;
-                    Vec3 v4 = vm_out->at(i, j + 1, k).co;
-
+                    const Vec3 v1 = vm_out->at(i, j, k).co;
+                    const Vec3 v2 = vm_out->at(i, j, k + 1).co;
+                    const Vec3 v3 = vm_out->at(i, j + 1, k + 1).co;
+                    const Vec3 v4 = vm_out->at(i, j + 1, k).co;
                     if (length_squared(sub(v1, v2)) > 1e-16 ||
                         length_squared(sub(v3, v4)) > 1e-16) {
-                        // Desired outward direction: from mesh center to quad center
-                        Vec3 quad_center = scale(add(add(v1, v2), add(v3, v4)), 0.25);
-                        Vec3 face_normal = normalize(quad_center);
-                        if (length_squared(face_normal) < 1e-12)
-                            face_normal = vert_normal;
-                        bp.output.add_oriented_quad(v1, v2, v3, v4, face_normal);
+                        bp.output.add_quad(v1, v2, v3, v4);
                     }
                 }
             }
-
-            // Center ngon (odd segments)
-            if (odd) {
-                std::vector<Vec3> center_verts;
-                for (int i2 = 0; i2 < n; i2++) {
-                    center_verts.push_back(vm_out->at(i2, ns2, ns2).co);
-                }
-                // Normal: from mesh center to center of ngon
-                Vec3 ngon_center{0, 0, 0};
-                for (const auto& cv : center_verts)
-                    ngon_center = add(ngon_center, cv);
-                ngon_center = scale(ngon_center, 1.0 / center_verts.size());
-                Vec3 normal = normalize(ngon_center);
-                if (length_squared(normal) < 1e-12)
-                    normal = vert_normal;
-                for (size_t i2 = 1; i2 + 1 < center_verts.size(); i2++) {
-                    bp.output.add_oriented_triangle(
-                        center_verts[0], center_verts[i2], center_verts[i2 + 1], normal);
-                }
-            }
         } while ((bndv = bndv->next) != vm_out->boundstart);
+
+        // Center ngon once (Blender builds it after the ring loop).
+        if (odd) {
+            std::vector<Vec3> center_verts;
+            center_verts.reserve(static_cast<size_t>(n));
+            for (int i2 = 0; i2 < n; i2++)
+                center_verts.push_back(vm_out->at(i2, ns2, ns2).co);
+            bp.output.add_polygon(center_verts);
+        }
         break;
     }
     case MeshKind::TriFan:
@@ -2519,218 +2504,28 @@ void build_edge_polygons(BevelParams& bp, BevVert* bv1, BevVert* bv2, EdgeHalf* 
     int ns = bp.seg;
     if (ns < 1) return;
 
-    // Chamfer normal = bisector of adjacent face normals
-    Vec3 n0, n1;
-    if (e->fprev >= 0) n0 = tri_normal({*bp.positions, *bp.triangles}, e->fprev);
-    if (e->fnext >= 0) n1 = tri_normal({*bp.positions, *bp.triangles}, e->fnext);
-    Vec3 chamfer_dir = normalize(add(n0, n1));
-    if (length_squared(chamfer_dir) < 1e-12) {
-        Vec3 d = sub((*bp.positions)[static_cast<size_t>(e->edge_v1)],
-                     (*bp.positions)[static_cast<size_t>(e->edge_v0)]);
-        chamfer_dir = normalize(cross(d, cross(n0, n1)));
-    }
-
-    // Create quad strip: bv1's profile → bv2's profile (reversed)
-    // Quad: (bv1[s], bv1[s+1], bv2[ns-s-1], bv2[ns-s])
+    // Chamfer strip: Blender bev_create_ngon(verts) with loop
+    // (bv1[s], bv2[ns-s], bv2[ns-s-1], bv1[s+1]) — topology winding, no reorient.
     for (int s = 0; s < ns; s++) {
         Vec3 a = get_profile_point(bndv1->profile, s, ns, bp.seg);
-        Vec3 b = get_profile_point(bndv1->profile, s + 1, ns, bp.seg);
+        Vec3 b = get_profile_point(bndv2->profile, ns - s, ns, bp.seg);
         Vec3 c = get_profile_point(bndv2->profile, ns - (s + 1), ns, bp.seg);
-        Vec3 d = get_profile_point(bndv2->profile, ns - s, ns, bp.seg);
+        Vec3 d = get_profile_point(bndv1->profile, s + 1, ns, bp.seg);
 
-        if (length_squared(sub(a, b)) > 1e-16 &&
-            length_squared(sub(c, d)) > 1e-16) {
-            bp.output.add_oriented_quad(a, b, c, d, chamfer_dir);
+        if (length_squared(sub(a, d)) > 1e-16 &&
+            length_squared(sub(b, c)) > 1e-16) {
+            bp.output.add_quad(a, b, c, d);
         }
     }
 }
 
-/// Reconstruct original faces with new boundary vertices.
-void rebuild_faces(BevelParams& bp, const WeldedMesh& welded) {
-    // Group triangles by face normal
-    std::unordered_map<std::string, std::vector<int>> face_groups;
-    for (size_t ti = 0; ti < welded.triangles.size(); ++ti) {
-        Vec3 n = tri_normal(welded, static_cast<int>(ti));
-        auto quantize = [](double v) -> int64_t {
-            return static_cast<int64_t>(std::llround(v / 1e-4));
-        };
-        std::string key = std::to_string(quantize(n.x)) + ',' +
-                          std::to_string(quantize(n.y)) + ',' +
-                          std::to_string(quantize(n.z));
-        face_groups[key].push_back(static_cast<int>(ti));
-    }
-
-    for (const auto& [group_key, tri_indices] : face_groups) {
-        if (tri_indices.empty()) continue;
-
-        // Get boundary loop
-        std::unordered_map<int64_t, int> edge_use;
-        for (int ti : tri_indices) {
-            const auto& tri = welded.triangles[static_cast<size_t>(ti)];
-            for (int e = 0; e < 3; e++) {
-                int a = tri[e];
-                int b = tri[(e + 1) % 3];
-                edge_use[edge_key(a, b)]++;
-            }
-        }
-
-        // Find boundary edges (used by only 1 triangle)
-        std::unordered_map<int, std::vector<int>> adjacency;
-        for (int ti : tri_indices) {
-            const auto& tri = welded.triangles[static_cast<size_t>(ti)];
-            for (int e = 0; e < 3; e++) {
-                int a = tri[e];
-                int b = tri[(e + 1) % 3];
-                if (edge_use[edge_key(a, b)] == 1) {
-                    adjacency[a].push_back(b);
-                    adjacency[b].push_back(a);
-                }
-            }
-        }
-
-        if (adjacency.empty()) continue;
-
-        // Trace boundary loop
-        int start = adjacency.begin()->first;
-        std::vector<int> loop = {start};
-        int prev = -1, current = start;
-        while (true) {
-            const auto& neighbors = adjacency[current];
-            int next = -1;
-            for (int cand : neighbors) {
-                if (cand != prev) { next = cand; break; }
-            }
-            if (next < 0 || next == start) break;
-            loop.push_back(next);
-            prev = current;
-            current = next;
-            if (loop.size() > welded.positions.size() + 1) break;
-        }
-
-        if (loop.size() < 3) continue;
-
-        // Build offset polygon: replace vertices that are on beveled edges
-        Vec3 face_normal = tri_normal(welded, tri_indices[0]);
-        Vec3 centroid{0, 0, 0};
-        int count = 0;
-        for (int ti : tri_indices) {
-            const auto& tri = welded.triangles[static_cast<size_t>(ti)];
-            for (int idx : tri) {
-                centroid = add(centroid, welded.positions[static_cast<size_t>(idx)]);
-                count++;
-            }
-        }
-        centroid = scale(centroid, 1.0 / count);
-
-        // Build a set of triangle indices in this face group for fast lookup
-        std::set<int> face_tri_set(tri_indices.begin(), tri_indices.end());
-
-        // For each vertex in loop, check if it's a beveled edge endpoint.
-        // Match BoundVerts by FACE INDEX (not edge keys) — this is robust against
-        // face boundary loop direction ≠ CCW edge ordering.
-        //
-        // KEY: For each hard edge in the face boundary, insert ALL profile points
-        // (profile[0]..profile[ns]) so the face polygon edges match the edge strip
-        // edges. Without this, the face polygon has a single edge (meet_A→meet_B)
-        // while the edge strip has ns edges, creating boundary edges.
-        std::vector<Vec3> polygon;
-        auto push_distinct = [&](const Vec3& p) {
-            if (polygon.empty() || length_squared(sub(p, polygon.back())) > 1e-18)
-                polygon.push_back(p);
-        };
-        for (size_t i = 0; i < loop.size(); i++) {
-            int prev_v = loop[(i + loop.size() - 1) % loop.size()];
-            int curr_v = loop[i];
-            int next_v = loop[(i + 1) % loop.size()];
-
-            int64_t edge_in = edge_key(prev_v, curr_v);
-            int64_t edge_out = edge_key(curr_v, next_v);
-
-            bool hard_in = bp.hard_edges.count(edge_in) > 0;
-            bool hard_out = bp.hard_edges.count(edge_out) > 0;
-
-            if (hard_in && hard_out) {
-                // Corner: find BoundVert whose adjacent face (efirst->fnext) is in
-                // this face group. Push meet point only — the edge strip and VMesh
-                // handle the profile curve between meet points.
-                bool found = false;
-                for (auto& bv : bp.bevverts) {
-                    if (bv.v_idx != curr_v) continue;
-                    if (!bv.vmesh) continue;
-                    BoundVert* bndv = bv.vmesh->boundstart;
-                    do {
-                        if (!bndv->efirst || !bndv->elast) {
-                            bndv = bndv->next;
-                            continue;
-                        }
-                        int face = bndv->efirst->fnext;
-                        if (face >= 0 && face_tri_set.count(face)) {
-                            push_distinct(bndv->nv.co);
-                            found = true;
-                            break;
-                        }
-                    } while ((bndv = bndv->next) != bv.vmesh->boundstart);
-                }
-                if (!found)
-                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
-            } else if (hard_out) {
-                // Start of beveled edge: insert ALL profile points so face polygon
-                // edges match edge strip edges.
-                bool found = false;
-                for (auto& bv : bp.bevverts) {
-                    if (bv.v_idx != curr_v) continue;
-                    if (!bv.vmesh) continue;
-                    BoundVert* bndv = bv.vmesh->boundstart;
-                    do {
-                        if (!bndv->ebev || bndv->ebev->edge_v1 != next_v) {
-                            bndv = bndv->next;
-                            continue;
-                        }
-                        // Determine direction: fprev → forward (0..ns), fnext → reverse (ns..0)
-                        bool forward = (bndv->ebev->fprev >= 0 && face_tri_set.count(bndv->ebev->fprev));
-                        bool reverse = (bndv->ebev->fnext >= 0 && face_tri_set.count(bndv->ebev->fnext));
-                        if (forward || reverse) {
-                            for (int k = 0; k <= bp.seg; k++) {
-                                int idx = forward ? k : (bp.seg - k);
-                                Vec3 pt = get_profile_point(bndv->profile, idx, bp.seg, bp.seg);
-                                // Don't push the last point — it belongs to the next vertex
-                                if (k < bp.seg)
-                                    push_distinct(pt);
-                            }
-                            found = true;
-                            break;
-                        }
-                    } while ((bndv = bndv->next) != bv.vmesh->boundstart);
-                }
-                if (!found)
-                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
-            } else if (hard_in) {
-                // End of beveled edge: profile points were already inserted by the
-                // start vertex (hard_out case). Skip this vertex entirely.
-                // But we need the profile endpoint — it was the last point pushed.
-                // If nothing was pushed yet (start vertex failed), push original.
-                if (polygon.empty())
-                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
-            } else {
-                push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
-            }
-        }
-        // Close the loop: ensure last point connects to first
-        if (polygon.size() >= 3 && length_squared(sub(polygon.front(), polygon.back())) < 1e-18)
-            polygon.pop_back();
-
-        // Triangulate polygon
-        if (polygon.size() >= 3) {
-            for (size_t i = 1; i + 1 < polygon.size(); i++) {
-                bp.output.add_oriented_triangle(polygon[0], polygon[i], polygon[i + 1], face_normal);
-            }
-        }
-    }
-}
-
-/// Reconstruct original faces using explicit BMesh n-gon boundaries.
-void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const WeldedMesh& welded) {
-    for (const auto& bface : bmesh.faces) {
+/// Reconstruct original faces using BMesh face identity on EdgeHalf.fprev/fnext
+/// (Blender BMFace*). Profile insertion matches prior working structure; face
+/// membership uses polygon indices — never welded triangle indices.
+void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const WeldedMesh& welded)
+{
+    for (int fi = 0; fi < static_cast<int>(bmesh.faces.size()); ++fi) {
+        const auto& bface = bmesh.faces[static_cast<size_t>(fi)];
         if (bface.verts.size() < 3)
             continue;
 
@@ -2738,85 +2533,83 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
         const geometry::Vec3 gn = geometry::face_normal_from_loop(bmesh, loop);
         const Vec3 face_normal = {gn.x, gn.y, gn.z};
 
-        std::set<int> face_tri_set(bface.triangle_indices.begin(), bface.triangle_indices.end());
-
         std::vector<Vec3> polygon;
         auto push_distinct = [&](const Vec3& p) {
             if (polygon.empty() || length_squared(sub(p, polygon.back())) > 1e-18)
                 polygon.push_back(p);
         };
 
+        // Check if BMesh edge (a,b) has face fi as an adjacent face
+        auto edge_has_face = [&](int a, int b, int fi) -> bool {
+            const auto it = bmesh.edges.find(edge_key(a, b));
+            if (it == bmesh.edges.end()) return false;
+            return it->second.face0 == fi || it->second.face1 == fi;
+        };
+
         auto append_outgoing_profile = [&](int curr_v, int next_v) -> bool {
-            for (auto& bv : bp.bevverts) {
-                if (bv.v_idx != curr_v)
+            BevVert* bv = find_bevvert(bp, curr_v);
+            if (!bv || !bv->vmesh || !bv->vmesh->boundstart)
+                return false;
+            BoundVert* bndv = bv->vmesh->boundstart;
+            do {
+                if (!bndv->ebev || bndv->ebev->edge_v1 != next_v)
                     continue;
-                if (!bv.vmesh)
+                // Check if the beveled edge (curr_v, next_v) has this face
+                // as an adjacent face, using BMesh edge adjacency directly.
+                if (!edge_has_face(curr_v, next_v, fi))
                     continue;
-                BoundVert* bndv = bv.vmesh->boundstart;
-                do {
-                    if (!bndv->ebev || bndv->ebev->edge_v1 != next_v) {
-                        bndv = bndv->next;
-                        continue;
-                    }
-                    const bool forward =
-                        (bndv->ebev->fprev >= 0 && face_tri_set.count(bndv->ebev->fprev));
-                    const bool reverse =
-                        (bndv->ebev->fnext >= 0 && face_tri_set.count(bndv->ebev->fnext));
-                    if (forward || reverse) {
-                        for (int k = 0; k <= bp.seg; k++) {
-                            const int idx = forward ? k : (bp.seg - k);
-                            const Vec3 pt = get_profile_point(bndv->profile, idx, bp.seg, bp.seg);
-                            if (k < bp.seg)
-                                push_distinct(pt);
-                        }
-                        return true;
-                    }
-                } while ((bndv = bndv->next) != bv.vmesh->boundstart);
-            }
+                // Determine profile winding geometrically: compare the profile's
+                // natural normal with the face normal.
+                Vec3 e_dir = normalize(sub(welded.positions[static_cast<size_t>(next_v)],
+                                          welded.positions[static_cast<size_t>(curr_v)]));
+                Vec3 p_span = sub(bndv->next->nv.co, bndv->nv.co);
+                Vec3 p_up = cross(e_dir, p_span);
+                bool forward = dot(p_up, face_normal) > 0.0;
+                for (int k = 0; k <= bp.seg; ++k) {
+                    const int idx = forward ? k : (bp.seg - k);
+                    push_distinct(get_profile_point(bndv->profile, idx, bp.seg, bp.seg));
+                }
+                return true;
+            } while ((bndv = bndv->next) != bv->vmesh->boundstart);
             return false;
         };
 
-        for (size_t i = 0; i < loop.size(); i++) {
+        for (size_t i = 0; i < loop.size(); ++i) {
             const int prev_v = loop[(i + loop.size() - 1) % loop.size()];
             const int curr_v = loop[i];
             const int next_v = loop[(i + 1) % loop.size()];
 
             const int64_t edge_in = edge_key(prev_v, curr_v);
             const int64_t edge_out = edge_key(curr_v, next_v);
-
             const bool hard_in = bp.hard_edges.count(edge_in) > 0;
             const bool hard_out = bp.hard_edges.count(edge_out) > 0;
 
             if (hard_in && hard_out) {
+                // Corner: both edges beveled. Find BoundVert whose adjacent face
+                // (ebev->fnext or ebev->fprev) is this face; push meet point.
+                BevVert* bv = find_bevvert(bp, curr_v);
                 bool found = false;
-                for (auto& bv : bp.bevverts) {
-                    if (bv.v_idx != curr_v)
-                        continue;
-                    if (!bv.vmesh)
-                        continue;
-                    BoundVert* bndv = bv.vmesh->boundstart;
+                if (bv && bv->vmesh && bv->vmesh->boundstart) {
+                    BoundVert* bndv = bv->vmesh->boundstart;
                     do {
-                        if (!bndv->efirst || !bndv->elast) {
-                            bndv = bndv->next;
+                        if (!bndv->ebev)
                             continue;
-                        }
-                        const int face = bndv->efirst->fnext;
-                        if (face >= 0 && face_tri_set.count(face)) {
+                        // Check if either adjacent face of this edge is face fi
+                        if (edge_has_face(curr_v, next_v, fi)) {
                             push_distinct(bndv->nv.co);
-                            append_outgoing_profile(curr_v, next_v);
                             found = true;
                             break;
                         }
-                    } while ((bndv = bndv->next) != bv.vmesh->boundstart);
+                    } while ((bndv = bndv->next) != bv->vmesh->boundstart);
                 }
                 if (!found)
                     push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
             } else if (hard_out) {
+                // Beveled edge outgoing: insert profile points.
                 if (!append_outgoing_profile(curr_v, next_v))
                     push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
             } else if (hard_in) {
-                if (polygon.empty())
-                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+                // Profile endpoint already appended by the previous hard_out vertex.
             } else {
                 push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
             }
@@ -2825,11 +2618,9 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
         if (polygon.size() >= 3 && length_squared(sub(polygon.front(), polygon.back())) < 1e-18)
             polygon.pop_back();
 
-        if (polygon.size() >= 3) {
-            for (size_t i = 1; i + 1 < polygon.size(); i++) {
-                bp.output.add_oriented_triangle(polygon[0], polygon[i], polygon[i + 1], face_normal);
-            }
-        }
+        // One orientation for the whole n-gon (Blender bev_create_ngon keeps a single loop).
+        if (polygon.size() >= 3)
+            bp.output.add_oriented_polygon(polygon, face_normal);
     }
 }
 
@@ -2981,6 +2772,7 @@ data::PcgMeshData bevel_mesh_blender(
     bp.vmesh_method = vmesh_method;
     bp.is_cancel_requested = is_cancel_requested;
     bp.mesh_center = mesh_center;
+    bp.bmesh = &bmesh;
     bp.positions = &welded.positions;
     bp.triangles = &welded.triangles;
     bp.edge_faces = edge_faces;
@@ -3029,8 +2821,12 @@ data::PcgMeshData bevel_mesh_blender(
                 bmesh, v_idx, vert_edges[static_cast<size_t>(prev_idx)].other_v, vert_edges[i].other_v);
             const int fnext_bm = find_bmesh_face_between(
                 bmesh, v_idx, vert_edges[i].other_v, vert_edges[static_cast<size_t>(next_idx)].other_v);
-            eh.fprev = representative_triangle_for_bmesh_face(bmesh, fprev_bm);
-            eh.fnext = representative_triangle_for_bmesh_face(bmesh, fnext_bm);
+            // fprev/fnext store BMesh face indices (Blender BMFace*).
+            // find_bmesh_face_between may return -1 when sort_ccw produces CW
+            // order on non-coplanar faces; build_boundary falls back to vertex
+            // normal when fprev/fnext < 0.
+            eh.fprev = fprev_bm;
+            eh.fnext = fnext_bm;
 
             // Set initial offsets
             if (eh.is_bev) {
@@ -3039,8 +2835,8 @@ data::PcgMeshData bevel_mesh_blender(
                     // Convert width to offset
                     double angle = M_PI / 2.0; // Default for 90-degree edges
                     if (eh.fprev >= 0 && eh.fnext >= 0) {
-                        Vec3 n0 = tri_normal(welded, eh.fprev);
-                        Vec3 n1 = tri_normal(welded, eh.fnext);
+                        Vec3 n0 = bmesh_face_normal(bp, eh.fprev);
+                        Vec3 n1 = bmesh_face_normal(bp, eh.fnext);
                         angle = std::acos(std::clamp(-dot(n0, n1), -1.0, 1.0));
                     }
                     double denom = 2.0 * std::sin(angle * 0.5);
@@ -3126,31 +2922,11 @@ data::PcgMeshData bevel_mesh_blender(
         }
     }
 
-    // 11. Reconstruct original faces from BMesh n-gons
+    // 11. Reconstruct original faces from BMesh n-gons (Blender bev_rebuild_polygon).
+    // Winding follows original face normals via add_oriented_triangle — no mesh-center flip.
     if (bevel_cancel_requested(bp))
         return mesh;
     rebuild_faces_bmesh(bp, bmesh, welded);
-
-    // 12. Fix winding: ensure all triangle normals point outward.
-    // For a closed mesh centered at origin, the centroid of each triangle
-    // should be on the same side as the face normal.
-    // Use the original input mesh centroid as the outward reference.
-    for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
-        if (bevel_cancel_requested(bp))
-            return mesh;
-        const auto& a = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i])];
-        const auto& b = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i + 1])];
-        const auto& c = bp.output.vertices[static_cast<size_t>(bp.output.triangles[i + 2])];
-        Vec3 n = cross(sub({b.x, b.y, b.z}, {a.x, a.y, a.z}),
-                       sub({c.x, c.y, c.z}, {a.x, a.y, a.z}));
-        if (length_squared(n) < 1e-20)
-            continue;
-        Vec3 centroid = scale(add(add({a.x, a.y, a.z}, {b.x, b.y, b.z}), {c.x, c.y, c.z}), 1.0 / 3.0);
-        Vec3 outward = sub(centroid, bp.mesh_center);
-        if (dot(n, outward) < 0.0) {
-            std::swap(bp.output.triangles[i + 1], bp.output.triangles[i + 2]);
-        }
-    }
 
     // 12. Skip degenerate triangles (two identical vertices) and geometric duplicates
     //     (different vertex indices but same 3 positions — happens when VMesh inner
@@ -3165,7 +2941,7 @@ data::PcgMeshData bevel_mesh_blender(
             return std::to_string(q(v.x)) + ',' + std::to_string(q(v.y)) + ',' + std::to_string(q(v.z));
         };
 
-        std::set<std::string> seen_geo;
+        std::unordered_map<std::string, size_t> seen_geo;
 
         for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
             if (bevel_cancel_requested(bp))
@@ -3176,7 +2952,9 @@ data::PcgMeshData bevel_mesh_blender(
             if (ia == ib || ib == ic || ia == ic)
                 continue;
 
-            // Geometric dedup: sorted position keys
+            // Geometric dedup: same 3 positions from VMesh + face rebuild.
+            // Prefer the later triangle (rebuild / edge strip) so shared boundary
+            // winding matches F_RECON rather than an earlier flipped VMesh cap.
             const auto& va = bp.output.vertices[static_cast<size_t>(ia)];
             const auto& vb = bp.output.vertices[static_cast<size_t>(ib)];
             const auto& vc = bp.output.vertices[static_cast<size_t>(ic)];
@@ -3185,9 +2963,15 @@ data::PcgMeshData bevel_mesh_blender(
             };
             std::sort(pk.begin(), pk.end());
             std::string geo_key = pk[0] + '|' + pk[1] + '|' + pk[2];
-            if (seen_geo.count(geo_key))
+            auto it = seen_geo.find(geo_key);
+            if (it != seen_geo.end()) {
+                const size_t old = it->second;
+                deduped[old] = ia;
+                deduped[old + 1] = ib;
+                deduped[old + 2] = ic;
                 continue;
-            seen_geo.insert(geo_key);
+            }
+            seen_geo.emplace(geo_key, deduped.size());
 
             deduped.push_back(ia);
             deduped.push_back(ib);

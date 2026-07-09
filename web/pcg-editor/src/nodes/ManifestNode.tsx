@@ -1,11 +1,12 @@
 // ManifestNode.tsx — Generic manifest-driven node component.
 // All node types use this single component; ports and colors are read from node-manifest.json.
 // Layout: Header (top) → Input ports (left) → Output ports (right) → Properties summary.
+// Nodes that produce groups show a "Groups" badge.
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { getNodeTypeDefs, getCategoryColor } from '../nodeManifest';
 
-export default function ManifestNode({ type, selected }: NodeProps) {
+export default function ManifestNode({ type, selected, data }: NodeProps) {
   const def = getNodeTypeDefs(type ?? '');
   if (!def) {
     return (
@@ -17,6 +18,27 @@ export default function ManifestNode({ type, selected }: NodeProps) {
 
   const color = getCategoryColor(def.category);
 
+  // Collect group names this node produces (for badge display)
+  const producedGroups: { name: string; domain: string }[] = [];
+  if (def.outputGroups) {
+    for (const og of def.outputGroups) {
+      if (og.dynamic) {
+        // Dynamic: read actual group name from node data
+        const groupName = (data as Record<string, unknown>)?.[og.name];
+        if (typeof groupName === 'string' && groupName.trim()) {
+          producedGroups.push({ name: groupName, domain: og.domain });
+        }
+      } else {
+        // Check condition property
+        if (og.condition) {
+          const condValue = (data as Record<string, unknown>)?.[og.condition];
+          if (!condValue) continue;
+        }
+        producedGroups.push({ name: og.name, domain: og.domain });
+      }
+    }
+  }
+
   return (
     <div
       className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}
@@ -26,6 +48,18 @@ export default function ManifestNode({ type, selected }: NodeProps) {
       <div className="pcg-node__header" style={{ background: color }}>
         {def.displayName}
       </div>
+
+      {/* Group output badge */}
+      {producedGroups.length > 0 && (
+        <div className="pcg-node__group-badge">
+          {producedGroups.map((g) => (
+            <span key={g.name} className="pcg-node__group-tag">
+              {g.name}
+              <span className="pcg-node__group-tag-domain">{g.domain}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Input ports (left side) */}
       {def.inputs.map((pin) => (

@@ -50,6 +50,26 @@ namespace DJTechRuntime.PCG
 
 #if UNITY_EDITOR
         private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
+        private bool m_DeferredEnablePreviewCook;
+
+        /// <summary>
+        /// Editor bridge: when true, <see cref="OnEnable"/> queues preview instead of a synchronous cook
+        /// (e.g. while a scene is still opening).
+        /// </summary>
+        public static System.Func<bool> EditorShouldDeferPreviewCookOnEnable;
+
+        public static void FlushDeferredEnablePreviewCooks()
+        {
+            foreach (var component in s_EditModePreviewCooks.ToArray())
+            {
+                if (component == null || !component.m_DeferredEnablePreviewCook)
+                    continue;
+
+                component.m_DeferredEnablePreviewCook = false;
+                if (component.SupportsEditModePreview())
+                    component.RequestPreviewCook(immediate: true);
+            }
+        }
 
         /// <summary>Editor-only preview mesh bindings (Graph Editor / Inspector).</summary>
         public static System.Func<PcgGraphComponent, IReadOnlyList<PcgPreviewMeshBinding>> EditorResolvePreviewMeshBindings;
@@ -130,7 +150,19 @@ namespace DJTechRuntime.PCG
             s_EditModePreviewCooks.Add(this);
 #endif
             if (!Application.isPlaying && SupportsEditModePreview())
-                RequestPreviewCook(immediate: true);
+            {
+#if UNITY_EDITOR
+                if (EditorShouldDeferPreviewCookOnEnable != null &&
+                    EditorShouldDeferPreviewCookOnEnable())
+                {
+                    m_DeferredEnablePreviewCook = true;
+                }
+                else
+#endif
+                {
+                    RequestPreviewCook(immediate: true);
+                }
+            }
         }
 
         private void OnDisable()

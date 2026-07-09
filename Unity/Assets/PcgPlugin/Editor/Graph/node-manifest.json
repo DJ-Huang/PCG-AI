@@ -329,9 +329,9 @@
             { "value": "cutoff", "label": "Cutoff" }
           ]
         },
-        "edgeGroup": { "type": "string", "default": "" },
+        "edgeGroup": { "type": "groupSelect", "default": "", "groupDomain": "edge" },
         "excludeUnshared": { "type": "boolean", "default": true },
-        "excludeGroups": { "type": "string", "default": "cap_start,cap_end" }
+        "excludeGroups": { "type": "groupMultiSelect", "default": "cap_start,cap_end" }
       }
     },
     {
@@ -340,8 +340,9 @@
       "category": "Geometry",
       "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputGroups": [{ "name": "outputGroup", "domain": "edge", "label": "Output Group", "dynamic": true }],
       "properties": {
-        "outputGroup": { "type": "string", "default": "bevel_edges" },
+        "outputGroup": { "type": "string", "default": "bevel_edges", "isGroupOutput": true },
         "domain": {
           "type": "enum",
           "default": "edge",
@@ -361,7 +362,8 @@
         },
         "minEdgeAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
         "includeUnshared": { "type": "boolean", "default": false },
-        "fromFaceGroup": { "type": "string", "default": "" }
+        "fromFaceGroup": { "type": "groupSelect", "default": "", "groupDomain": "face" },
+        "fromEdgeGroup": { "type": "groupSelect", "default": "", "groupDomain": "edge" }
       }
     },
     {
@@ -370,8 +372,9 @@
       "category": "Geometry",
       "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputGroups": [{ "name": "outputGroup", "domain": "edge", "label": "Output Group", "dynamic": true }],
       "properties": {
-        "outputGroup": { "type": "string", "default": "combined" },
+        "outputGroup": { "type": "string", "default": "combined", "isGroupOutput": true },
         "domain": {
           "type": "enum",
           "default": "edge",
@@ -390,7 +393,7 @@
             { "value": "subtract", "label": "Subtract" }
           ]
         },
-        "sourceGroups": { "type": "string", "default": "" }
+        "sourceGroups": { "type": "groupMultiSelect", "default": "" }
       }
     },
     {
@@ -569,6 +572,14 @@
         { "id": "profile", "label": "Cross Section", "pinType": "SpatialSpline" }
       ],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "side", "domain": "face", "label": "Side surfaces" },
+        { "name": "cap_start", "domain": "face", "label": "Start cap", "condition": "capStart" },
+        { "name": "cap_end", "domain": "face", "label": "End cap", "condition": "capEnd" },
+        { "name": "seam", "domain": "edge", "label": "Profile seam edges" },
+        { "name": "profile_corner", "domain": "edge", "label": "Profile corner edges" },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
       "properties": {
         "surfaceShape": {
           "type": "enum",
