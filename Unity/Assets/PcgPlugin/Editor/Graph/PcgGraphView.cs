@@ -68,7 +68,7 @@ namespace DJTechEditor.PCG.Graph
             m_State = PcgGraphState.Create();
 
             style.flexGrow = 1;
-            SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
+            SetupZoom(ContentZoomer.DefaultMinScale, 6f);
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());

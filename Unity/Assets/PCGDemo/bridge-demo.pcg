@@ -20,12 +20,6 @@
       "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-3,\"y\":-0.2,\"z\":0},{\"x\":3,\"y\":-0.2,\"z\":0},{\"x\":3.002011,\"y\":0.5830598,\"z\":0},{\"x\":-3,\"y\":0.5240312,\"z\":0}]", "editPlane": "xy", "sceneOffsetX": 0, "sceneOffsetY": -6, "sceneOffsetZ": 0}
     },
     {
-      "id": "deck",
-      "type": "SweepAlongSpline",
-      "position": { "x": 351, "y": 232.5 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.8, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy"}
-    },
-    {
       "id": "n118",
       "type": "GroupCreate",
       "position": { "x": 142.5, "y": 320 },
@@ -36,6 +30,12 @@
       "type": "BevelMesh",
       "position": { "x": 211.5, "y": 404 },
       "data": {"method": "edge", "offsetType": "offset", "amount": 0.128, "segments": 6, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "bevel_edges"}
+    },
+    {
+      "id": "deck",
+      "type": "SweepAlongSpline",
+      "position": { "x": 351, "y": 232.5 },
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.8, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy"}
     }
   ],
   "edges": [
