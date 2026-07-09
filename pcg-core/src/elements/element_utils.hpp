@@ -3,6 +3,7 @@
 #include "data/pcg_context.hpp"
 #include "data/pcg_point_data.hpp"
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_geometry.hpp"
 #include "data/pcg_spline_data.hpp"
 #include "pcg_api.h"
 
@@ -25,6 +26,11 @@ data::PcgSplineData get_splines_input(PcgContext& ctx, const char* pin, const ch
 data::PcgSplineData parse_spline_input(const nlohmann::json& json);
 data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
 data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* label);
+data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const char* label);
+void emit_geometry(PcgContext& ctx, data::PcgGeometry data);
+void emit_geometry_shared(PcgContext& ctx,
+                          const std::string& tag,
+                          std::shared_ptr<const data::PcgGeometry> geometry);
 nlohmann::json point_data_to_json(const data::PcgPointData& data);
 void emit_points(PcgContext& ctx, data::PcgPointData data);
 void emit_points_with_meta(PcgContext& ctx,

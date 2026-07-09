@@ -14,6 +14,10 @@
 #include <unordered_set>
 #include <vector>
 
+namespace pcg::internal::data {
+class PcgGeometry;
+}
+
 namespace pcg::internal::elements::bevel {
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -344,6 +348,12 @@ struct BevelParams {
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /// Main bevel function — completely aligned with Blender's BM_mesh_bevel pipeline.
+struct BevelEdgeSelection {
+    std::string edge_group;
+    bool exclude_unshared = true;
+    std::vector<std::string> exclude_groups;
+};
+
 data::PcgMeshData bevel_mesh_blender(
     const data::PcgMeshData& mesh,
     double amount,
@@ -355,6 +365,8 @@ data::PcgMeshData bevel_mesh_blender(
     BevelMiter miter_outer = BevelMiter::Sharp,
     BevelMiter miter_inner = BevelMiter::Sharp,
     BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
-    bool (*is_cancel_requested)() = nullptr);
+    bool (*is_cancel_requested)() = nullptr,
+    const BevelEdgeSelection& edge_selection = {},
+    const data::PcgGeometry* geometry = nullptr);
 
 } // namespace pcg::internal::elements::bevel

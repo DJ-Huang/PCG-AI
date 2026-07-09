@@ -7,6 +7,7 @@ enum class PcgDataType {
     Point,
     Spline,
     Mesh,
+    Geometry,
     Unknown,
 };
 

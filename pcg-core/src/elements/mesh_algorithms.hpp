@@ -2,8 +2,15 @@
 
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_texture_data.hpp"
+#include "elements/bevel_blender.hpp"
+
+namespace pcg::internal::data {
+class PcgGeometry;
+}
 
 namespace pcg::internal::elements {
+
+using BevelEdgeSelection = bevel::BevelEdgeSelection;
 
 enum class BevelMethod {
     Edge,
@@ -60,6 +67,18 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
                              BevelMiter miter_outer = BevelMiter::Sharp,
                              BevelMiter miter_inner = BevelMiter::Sharp,
                              BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
-                             bool (*is_cancel_requested)() = nullptr);
+                             bool (*is_cancel_requested)() = nullptr,
+                             const BevelEdgeSelection& edge_selection = {},
+                             const data::PcgGeometry* geometry = nullptr);
+data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amount, int segments,
+                                 BevelMethod method = BevelMethod::Edge,
+                                 BevelOffsetType offset_type = BevelOffsetType::Offset,
+                                 bool clamp_overlap = true, double angle_limit_deg = 30.0,
+                                 float profile = 0.5f,
+                                 BevelMiter miter_outer = BevelMiter::Sharp,
+                                 BevelMiter miter_inner = BevelMiter::Sharp,
+                                 BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
+                                 bool (*is_cancel_requested)() = nullptr,
+                                 const BevelEdgeSelection& edge_selection = {});
 
 } // namespace pcg::internal::elements

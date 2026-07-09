@@ -328,7 +328,69 @@
             { "value": "adj", "label": "ADJ (Catmull-Clark)" },
             { "value": "cutoff", "label": "Cutoff" }
           ]
-        }
+        },
+        "edgeGroup": { "type": "string", "default": "" },
+        "excludeUnshared": { "type": "boolean", "default": true },
+        "excludeGroups": { "type": "string", "default": "cap_start,cap_end" }
+      }
+    },
+    {
+      "type": "GroupCreate",
+      "displayName": "Group Create",
+      "category": "Geometry",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "outputGroup": { "type": "string", "default": "bevel_edges" },
+        "domain": {
+          "type": "enum",
+          "default": "edge",
+          "options": [
+            { "value": "edge", "label": "Edge" },
+            { "value": "face", "label": "Face" },
+            { "value": "point", "label": "Point" }
+          ]
+        },
+        "mode": {
+          "type": "enum",
+          "default": "angle",
+          "options": [
+            { "value": "angle", "label": "Min Edge Angle" },
+            { "value": "unshared", "label": "Unshared Edges" }
+          ]
+        },
+        "minEdgeAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
+        "includeUnshared": { "type": "boolean", "default": false },
+        "fromFaceGroup": { "type": "string", "default": "" }
+      }
+    },
+    {
+      "type": "GroupCombine",
+      "displayName": "Group Combine",
+      "category": "Geometry",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "outputGroup": { "type": "string", "default": "combined" },
+        "domain": {
+          "type": "enum",
+          "default": "edge",
+          "options": [
+            { "value": "edge", "label": "Edge" },
+            { "value": "face", "label": "Face" },
+            { "value": "point", "label": "Point" }
+          ]
+        },
+        "operation": {
+          "type": "enum",
+          "default": "union",
+          "options": [
+            { "value": "union", "label": "Union" },
+            { "value": "intersect", "label": "Intersect" },
+            { "value": "subtract", "label": "Subtract" }
+          ]
+        },
+        "sourceGroups": { "type": "string", "default": "" }
       }
     },
     {

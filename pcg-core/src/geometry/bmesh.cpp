@@ -1,5 +1,7 @@
 #include "geometry/bmesh.hpp"
 
+#include "data/pcg_geometry.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -300,6 +302,28 @@ BMesh bmesh_from_mesh(const data::PcgMeshData& mesh, const BMeshBuildOptions& op
     return result;
 }
 
+data::PcgGeometry geometry_from_bmesh(const BMesh& mesh) {
+    data::PcgGeometry geometry;
+    for (const auto& v : mesh.verts)
+        geometry.points_mut().push_back({v.x, v.y, v.z});
+
+    for (size_t fi = 0; fi < mesh.faces.size(); ++fi) {
+        const auto& face = mesh.faces[fi];
+        if (face.verts.size() < 3)
+            continue;
+        geometry.faces_mut().push_back(face.verts);
+        for (const std::string& group : face.groups)
+            geometry.groups().add(GroupDomain::Face, group, static_cast<int>(fi));
+    }
+
+    for (const auto& entry : mesh.edges) {
+        for (const std::string& group : entry.second.groups)
+            geometry.groups().add(GroupDomain::Edge, group, static_cast<int>(entry.first));
+    }
+
+    return geometry;
+}
+
 data::PcgMeshData mesh_from_bmesh(const BMesh& mesh) {
     data::PcgMeshData out;
     for (const auto& v : mesh.verts)
@@ -314,6 +338,47 @@ data::PcgMeshData mesh_from_bmesh(const BMesh& mesh) {
     }
 
     return out;
+}
+
+BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOptions& options) {
+    BMesh result;
+    if (geometry.points().empty() || geometry.faces().empty())
+        return result;
+
+    result.verts.reserve(geometry.points().size());
+    for (const auto& p : geometry.points())
+        result.verts.push_back({p.x, p.y, p.z});
+
+    for (const auto& face : geometry.faces()) {
+        if (face.size() < 3)
+            continue;
+        BMeshFace bm_face;
+        bm_face.verts = face;
+        result.faces.push_back(std::move(bm_face));
+    }
+
+    build_edges(result);
+
+    for (const std::string& group_name : geometry.groups().group_names(GroupDomain::Face)) {
+        const auto& members = geometry.groups().members(GroupDomain::Face, group_name);
+        for (int fi : members) {
+            if (fi < 0 || fi >= static_cast<int>(result.faces.size()))
+                continue;
+            result.faces[static_cast<size_t>(fi)].groups.insert(group_name);
+        }
+    }
+
+    for (const std::string& group_name : geometry.groups().group_names(GroupDomain::Edge)) {
+        const auto& members = geometry.groups().members(GroupDomain::Edge, group_name);
+        for (int64_t key : members) {
+            const auto it = result.edges.find(key);
+            if (it != result.edges.end())
+                it->second.groups.insert(group_name);
+        }
+    }
+
+    mark_sharp_edges(result, options.sharp_angle_deg);
+    return result;
 }
 
 } // namespace pcg::internal::geometry

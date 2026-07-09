@@ -33,6 +33,8 @@ set(PCG_CORE_SOURCES
     src/data/pcg_param_data.cpp
     src/data/pcg_spline_data.cpp
     src/data/pcg_mesh_data.cpp
+    src/data/pcg_geometry.cpp
+    src/data/pcg_geometry_binary.cpp
     src/data/pcg_mesh_binary.cpp
     src/data/pcg_point_binary.cpp
     src/data/pcg_texture_data.cpp
@@ -40,8 +42,11 @@ set(PCG_CORE_SOURCES
     src/mesh_runtime.cpp
     src/spline_runtime.cpp
     src/elements/mesh_algorithms.cpp
+    src/elements/geometry_algorithms.cpp
+    src/elements/geometry_elements.cpp
     src/elements/bevel_blender.cpp
     src/geometry/bmesh.cpp
+    src/geometry/group_table.cpp
     src/geometry/spline_geometry.cpp
     src/geometry/sweep_geometry.cpp
     src/elements/mesh_elements.cpp
@@ -135,3 +140,9 @@ target_link_libraries(test_phase45_spline PRIVATE PcgCoreStatic nlohmann_json::n
 target_include_directories(test_phase45_spline PRIVATE src)
 
 add_test(NAME test_phase45_spline COMMAND test_phase45_spline WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_phase46 tests/test_phase46.cpp)
+target_link_libraries(test_phase46 PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_phase46 PRIVATE src)
+
+add_test(NAME test_phase46 COMMAND test_phase46 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)

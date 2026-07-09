@@ -1,5 +1,6 @@
 #include "cook_hash.hpp"
 
+#include "geometry/group_table.hpp"
 #include "mesh_runtime.hpp"
 #include "spline_runtime.hpp"
 #include "texture_runtime.hpp"
@@ -56,6 +57,40 @@ uint64_t hash_mesh(const data::PcgMeshData& mesh)
     return h;
 }
 
+uint64_t hash_geometry(const data::PcgGeometry& geometry)
+{
+    uint64_t h = kFnvOffsetBasis;
+    const auto& points = geometry.points();
+    const auto& faces = geometry.faces();
+    h = hash_combine(h, static_cast<uint64_t>(points.size()));
+    h = hash_combine(h, static_cast<uint64_t>(faces.size()));
+
+    for (const auto& p : points) {
+        h = hash_bytes(&p.x, sizeof(double), h);
+        h = hash_bytes(&p.y, sizeof(double), h);
+        h = hash_bytes(&p.z, sizeof(double), h);
+    }
+    for (const auto& face : faces) {
+        h = hash_combine(h, static_cast<uint64_t>(face.size()));
+        if (!face.empty())
+            h = hash_bytes(face.data(), face.size() * sizeof(int), h);
+    }
+
+    for (geometry::GroupDomain domain :
+         {geometry::GroupDomain::Point, geometry::GroupDomain::Edge, geometry::GroupDomain::Face}) {
+        for (const std::string& name : geometry.groups().group_names(domain)) {
+            h = hash_combine(h, hash_string(name));
+            const auto& members = geometry.groups().members(domain, name);
+            std::vector<int> sorted(members.begin(), members.end());
+            std::sort(sorted.begin(), sorted.end());
+            if (!sorted.empty())
+                h = hash_bytes(sorted.data(), sorted.size() * sizeof(int), h);
+        }
+    }
+
+    return h;
+}
+
 uint64_t hash_points(const data::PcgPointData& points)
 {
     uint64_t h = kFnvOffsetBasis;
@@ -107,6 +142,8 @@ uint64_t hash_collection(const data::PcgDataCollection& collection)
         h = hash_combine(h, static_cast<uint64_t>(item.type));
         if (item.mesh)
             h = hash_combine(h, hash_mesh(*item.mesh));
+        else if (item.geometry)
+            h = hash_combine(h, hash_geometry(*item.geometry));
         else if (item.points) {
             h = hash_combine(h, hash_points(*item.points));
             h = hash_combine(h, hash_json(item.payload));

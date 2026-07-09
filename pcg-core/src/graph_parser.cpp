@@ -3,6 +3,7 @@
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 
+#include <cstdio>
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
@@ -114,7 +115,11 @@ PcgResultCode validate_graph_structure(const Graph& graph,
     std::unordered_map<std::string, const GraphNode*> node_by_id;
     for (const auto& node : graph.nodes) {
         if (!is_known_node_type(node.type))
-            return fail(err_buf, err_buf_size, PCG_ERR_UNKNOWN_NODE, "Unknown node type");
+        {
+            char msg[512];
+            std::snprintf(msg, sizeof(msg), "Unknown node type: \"%s\"", node.type.c_str());
+            return fail(err_buf, err_buf_size, PCG_ERR_UNKNOWN_NODE, msg);
+        }
 
         node_by_id[node.id] = &node;
     }

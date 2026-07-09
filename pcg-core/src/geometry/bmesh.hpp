@@ -1,12 +1,18 @@
 #pragma once
 
 // Minimal BMesh-style polygon mesh for PCG geometry ops (bevel tier-1).
-// Faces may be n-gons; edges carry manifold adjacency and sharp flags.
+// Faces may be n-gons; edges carry manifold adjacency, sharp flags, and groups.
 
 #include "data/pcg_mesh_data.hpp"
 
 #include <cstdint>
+
+namespace pcg::internal::data {
+class PcgGeometry;
+}
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace pcg::internal::geometry {
@@ -22,6 +28,7 @@ struct BMeshFace {
     std::vector<int> verts;
     /// Welded triangle indices that were merged into this face.
     std::vector<int> triangle_indices;
+    std::unordered_set<std::string> groups;
 };
 
 struct BMeshEdge {
@@ -30,6 +37,7 @@ struct BMeshEdge {
     int face0 = -1;
     int face1 = -1;
     bool sharp = false;
+    std::unordered_set<std::string> groups;
 };
 
 struct BMeshBuildOptions {
@@ -50,6 +58,13 @@ int64_t edge_key(int a, int b);
 
 /// Build a polygon mesh from triangle soup (weld + coplanar merge).
 BMesh bmesh_from_mesh(const data::PcgMeshData& mesh, const BMeshBuildOptions& options = {});
+
+/// Build BMesh from canonical geometry; preserves edge/face groups.
+BMesh bmesh_from_geometry(const data::PcgGeometry& geometry,
+                            const BMeshBuildOptions& options = {});
+
+/// Convert BMesh back to canonical geometry (groups preserved).
+data::PcgGeometry geometry_from_bmesh(const BMesh& mesh);
 
 /// Fan-triangulate n-gon faces back to render mesh.
 data::PcgMeshData mesh_from_bmesh(const BMesh& mesh);

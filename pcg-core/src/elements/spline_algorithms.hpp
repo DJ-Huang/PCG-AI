@@ -3,6 +3,7 @@
 #include "geometry/spline_geometry.hpp"
 
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_geometry.hpp"
 #include "data/pcg_point_data.hpp"
 #include "data/pcg_spline_data.hpp"
 
@@ -112,6 +113,9 @@ data::PcgMeshData extract_cross_section_profile(const data::PcgMeshData& mesh,
 data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
                                      const data::PcgSplineData* profile_spline,
                                      const SweepAlongSplineOptions& options);
+data::PcgGeometry sweep_along_spline_geometry(const data::PcgSplineData& backbone,
+                                              const data::PcgSplineData* profile_spline,
+                                              const SweepAlongSplineOptions& options);
 data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformMeshOptions& options);
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b);
 data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,

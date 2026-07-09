@@ -1,5 +1,7 @@
 #include "data/pcg_data_collection.hpp"
 
+#include "data/pcg_geometry.hpp"
+
 namespace pcg::internal::data {
 namespace {
 
@@ -107,6 +109,28 @@ void PcgDataCollection::add_mesh_shared(const std::string& tag,
     items_.push_back(std::move(item));
 }
 
+void PcgDataCollection::add_geometry(const std::string& tag, PcgGeometry data)
+{
+    PcgTaggedData item;
+    item.tag = tag;
+    item.type = PcgDataType::Geometry;
+    item.geometry = std::make_shared<PcgGeometry>(std::move(data));
+    items_.push_back(std::move(item));
+}
+
+void PcgDataCollection::add_geometry_shared(const std::string& tag,
+                                            std::shared_ptr<const PcgGeometry> geometry)
+{
+    if (!geometry)
+        return;
+
+    PcgTaggedData item;
+    item.tag = tag;
+    item.type = PcgDataType::Geometry;
+    item.geometry = std::move(geometry);
+    items_.push_back(std::move(item));
+}
+
 const PcgTaggedData* PcgDataCollection::find(const std::string& tag) const
 {
     for (const auto& item : items_) {
@@ -119,7 +143,8 @@ const PcgTaggedData* PcgDataCollection::find(const std::string& tag) const
 const nlohmann::json* PcgDataCollection::find_json(const std::string& tag) const
 {
     const PcgTaggedData* item = find(tag);
-    if (!item || item->type == PcgDataType::Mesh || item->points || item->splines)
+    if (!item || item->type == PcgDataType::Mesh || item->type == PcgDataType::Geometry ||
+        item->points || item->splines)
         return nullptr;
     return &item->payload;
 }
@@ -160,6 +185,21 @@ std::shared_ptr<const PcgMeshData> PcgDataCollection::find_mesh_shared(
     if (!item || item->type != PcgDataType::Mesh || !item->mesh)
         return nullptr;
     return item->mesh;
+}
+
+const PcgGeometry* PcgDataCollection::find_geometry(const std::string& tag) const
+{
+    const auto shared = find_geometry_shared(tag);
+    return shared ? shared.get() : nullptr;
+}
+
+std::shared_ptr<const PcgGeometry> PcgDataCollection::find_geometry_shared(
+    const std::string& tag) const
+{
+    const PcgTaggedData* item = find(tag);
+    if (!item || item->type != PcgDataType::Geometry || !item->geometry)
+        return nullptr;
+    return item->geometry;
 }
 
 nlohmann::json PcgDataCollection::build_point_sink_json(const PcgTaggedData& item)
@@ -207,12 +247,36 @@ const PcgMeshData* PcgDataCollection::primary_mesh() const
 std::shared_ptr<const PcgMeshData> PcgDataCollection::primary_mesh_shared() const
 {
     const PcgTaggedData* preferred = find("out");
-    if (preferred && preferred->type == PcgDataType::Mesh && preferred->mesh)
-        return preferred->mesh;
+    if (preferred) {
+        if (preferred->type == PcgDataType::Mesh && preferred->mesh)
+            return preferred->mesh;
+        if (preferred->type == PcgDataType::Geometry && preferred->geometry)
+            return nullptr;
+    }
 
     for (const auto& item : items_) {
         if (item.type == PcgDataType::Mesh && item.mesh)
             return item.mesh;
+    }
+
+    return nullptr;
+}
+
+const PcgGeometry* PcgDataCollection::primary_geometry() const
+{
+    const auto shared = primary_geometry_shared();
+    return shared ? shared.get() : nullptr;
+}
+
+std::shared_ptr<const PcgGeometry> PcgDataCollection::primary_geometry_shared() const
+{
+    const PcgTaggedData* preferred = find("out");
+    if (preferred && preferred->type == PcgDataType::Geometry && preferred->geometry)
+        return preferred->geometry;
+
+    for (const auto& item : items_) {
+        if (item.type == PcgDataType::Geometry && item.geometry)
+            return item.geometry;
     }
 
     return nullptr;

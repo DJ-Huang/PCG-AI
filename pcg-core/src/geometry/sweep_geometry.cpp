@@ -1,5 +1,8 @@
 #include "geometry/sweep_geometry.hpp"
 
+#include "data/pcg_geometry.hpp"
+#include "geometry/group_table.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <unordered_map>
@@ -8,6 +11,13 @@ namespace pcg::internal::geometry {
 namespace {
 
 constexpr double kEpsilon = 1e-9;
+
+int64_t sweep_edge_key(int a, int b)
+{
+    if (a > b)
+        std::swap(a, b);
+    return static_cast<int64_t>(a) * 1000000 + b;
+}
 
 Vec3 mesh_centroid(const data::PcgMeshData& mesh)
 {
@@ -431,6 +441,81 @@ data::PcgMeshData sweep_curve_profile(const CurveProfile& profile,
         append_profile_cap(rings.back(), false);
 
     return result;
+}
+
+data::PcgGeometry sweep_curve_profile_geometry(const CurveProfile& profile,
+                                               const std::vector<Frame3>& frames,
+                                               const SweepAlongFramesOptions& options)
+{
+    data::PcgGeometry geometry;
+    if (profile.points.size() < 2 || frames.empty())
+        return geometry;
+
+    const size_t profile_count = profile.points.size();
+    const size_t frame_count = frames.size();
+
+    std::vector<std::vector<int>> rings(frame_count, std::vector<int>(profile_count, -1));
+
+    for (size_t fi = 0; fi < frame_count; ++fi) {
+        const double t = frame_count <= 1 ? 0.0 : static_cast<double>(fi) / static_cast<double>(frame_count - 1);
+        const double roll = options.profile_roll_radians + options.twist_radians * t;
+        const double scale_xy = options.scale_start + (options.scale_end - options.scale_start) * t;
+        const Frame3 frame = apply_twist_and_scale(frames[fi], roll, scale_xy);
+
+        for (size_t vi = 0; vi < profile_count; ++vi) {
+            rings[fi][vi] = static_cast<int>(geometry.points().size());
+            const Vec3 world = transform_profile_vertex(frame, profile.points[vi], scale_xy);
+            geometry.points_mut().push_back({world.x, world.y, world.z});
+        }
+    }
+
+    const size_t edge_count = profile.closed ? profile_count : profile_count - 1;
+    int side_face_index = 0;
+
+    for (size_t fi = 0; fi + 1 < frame_count; ++fi) {
+        for (size_t ei = 0; ei < edge_count; ++ei) {
+            const size_t nj = (ei + 1) % profile_count;
+            const int a0 = rings[fi][ei];
+            const int b0 = rings[fi][nj];
+            const int a1 = rings[fi + 1][ei];
+            const int b1 = rings[fi + 1][nj];
+            geometry.faces_mut().push_back({a0, b0, b1, a1});
+            geometry.groups().add(geometry::GroupDomain::Face, "side", side_face_index++);
+
+            const int64_t seam_key = sweep_edge_key(a0, b0);
+            const int64_t corner_key = sweep_edge_key(a0, a1);
+            geometry.groups().add(geometry::GroupDomain::Edge, "seam", static_cast<int>(seam_key));
+            geometry.groups().add(geometry::GroupDomain::Edge, "profile_corner",
+                                  static_cast<int>(corner_key));
+        }
+    }
+
+    const auto append_cap = [&](const std::vector<int>& ring, const char* group_name, bool flip) {
+        if (ring.size() < 3)
+            return;
+        std::vector<int> face = ring;
+        if (flip)
+            std::reverse(face.begin(), face.end());
+        const int face_index = static_cast<int>(geometry.faces().size());
+        geometry.faces_mut().push_back(std::move(face));
+        geometry.groups().add(geometry::GroupDomain::Face, group_name, face_index);
+    };
+
+    const bool forms_tube = profile.closed || options.backbone_closed;
+    if (!forms_tube || options.backbone_closed) {
+        data::maintain_unshared_edge_group(geometry, "unshared");
+        return geometry;
+    }
+
+    if (profile.closed) {
+        if (options.cap_start)
+            append_cap(rings.front(), "cap_start", true);
+        if (options.cap_end && frame_count > 0)
+            append_cap(rings.back(), "cap_end", false);
+    }
+
+    data::maintain_unshared_edge_group(geometry, "unshared");
+    return geometry;
 }
 
 } // namespace pcg::internal::geometry

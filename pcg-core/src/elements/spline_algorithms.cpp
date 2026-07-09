@@ -1,5 +1,6 @@
 #include "elements/spline_algorithms.hpp"
 
+#include "data/pcg_geometry.hpp"
 #include "elements/element_utils.hpp"
 #include "geometry/sweep_geometry.hpp"
 
@@ -287,6 +288,55 @@ data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
         const auto frames = geometry::build_frames(polyline, up_hint);
         const data::PcgMeshData swept = geometry::sweep_curve_profile(profile, frames, sweep_opts);
         result = merge_meshes(result, swept);
+    }
+
+    return result;
+}
+
+data::PcgGeometry sweep_along_spline_geometry(const data::PcgSplineData& backbone,
+                                              const data::PcgSplineData* profile_spline,
+                                              const SweepAlongSplineOptions& options)
+{
+    data::PcgGeometry result;
+    if (backbone.splines().empty())
+        return result;
+
+    geometry::CurveProfile profile;
+    if (options.use_profile_spline && profile_spline && !profile_spline->splines().empty())
+        profile = profile_from_spline_data(*profile_spline, options);
+    else
+        profile = make_builtin_curve_profile(options);
+
+    if (profile.points.size() < 2)
+        return result;
+
+    geometry::SweepAlongFramesOptions sweep_opts;
+    sweep_opts.cap_start = options.cap_start;
+    sweep_opts.cap_end = options.cap_end;
+    sweep_opts.profile_roll_radians =
+        options.profile_roll_degrees * 3.14159265358979323846 / 180.0;
+    sweep_opts.twist_radians = options.twist_degrees * 3.14159265358979323846 / 180.0;
+    sweep_opts.scale_start = options.scale_start;
+    sweep_opts.scale_end = options.scale_end;
+    sweep_opts.profile_closed = profile.closed;
+
+    const geometry::Vec3 up_hint{options.up_x, options.up_y, options.up_z};
+
+    for (const auto& spline : backbone.splines()) {
+        std::vector<geometry::Vec3> polyline;
+        for (const auto& p : spline.points)
+            polyline.push_back(to_vec3(p));
+
+        sweep_opts.backbone_closed = spline_is_closed(polyline, spline.closed);
+
+        polyline = geometry::resample_polyline_by_spacing(polyline, std::max(0.05, options.sample_spacing));
+        if (polyline.size() < 2)
+            continue;
+
+        const auto frames = geometry::build_frames(polyline, up_hint);
+        const data::PcgGeometry swept =
+            geometry::sweep_curve_profile_geometry(profile, frames, sweep_opts);
+        result = data::merge_geometries(result, swept);
     }
 
     return result;

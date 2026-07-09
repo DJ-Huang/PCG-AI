@@ -313,7 +313,9 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
                              double angle_limit_deg, float profile,
                              BevelMiter miter_outer, BevelMiter miter_inner,
                              BevelVMeshMethod vmesh_method,
-                             bool (*is_cancel_requested)())
+                             bool (*is_cancel_requested)(),
+                             const BevelEdgeSelection& edge_selection,
+                             const data::PcgGeometry* geometry)
 {
     switch (method) {
     case BevelMethod::VertexPush:
@@ -327,8 +329,24 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
             bevel::BevelMiter(miter_outer),
             bevel::BevelMiter(miter_inner),
             bevel::BevelVMeshMethod(vmesh_method),
-            is_cancel_requested);
+            is_cancel_requested,
+            edge_selection,
+            geometry);
     }
+}
+
+data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amount, int segments,
+                                 BevelMethod method, BevelOffsetType offset_type,
+                                 bool clamp_overlap, double angle_limit_deg, float profile,
+                                 BevelMiter miter_outer, BevelMiter miter_inner,
+                                 BevelVMeshMethod vmesh_method,
+                                 bool (*is_cancel_requested)(),
+                                 const BevelEdgeSelection& edge_selection)
+{
+    const data::PcgMeshData mesh = data::triangulate_geometry(geometry);
+    return bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap, angle_limit_deg,
+                      profile, miter_outer, miter_inner, vmesh_method, is_cancel_requested,
+                      edge_selection, &geometry);
 }
 
 } // namespace pcg::internal::elements

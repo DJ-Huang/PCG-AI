@@ -48,7 +48,7 @@ public:
         opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
         opts.profile_plane = ctx.node->data.value("profilePlane", "xy");
 
-        emit_mesh(ctx, sweep_along_spline(backbone, profile_spline, opts));
+        emit_geometry(ctx, sweep_along_spline_geometry(backbone, profile_spline, opts));
         return PCG_OK;
     }
 };

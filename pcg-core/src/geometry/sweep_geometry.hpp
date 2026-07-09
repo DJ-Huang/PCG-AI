@@ -1,6 +1,7 @@
 #pragma once
 
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_geometry.hpp"
 #include "geometry/spline_geometry.hpp"
 
 #include <cstdint>
@@ -53,5 +54,9 @@ data::PcgMeshData sweep_cross_section(const CrossSectionMesh& section,
 data::PcgMeshData sweep_curve_profile(const CurveProfile& profile,
                                       const std::vector<Frame3>& frames,
                                       const SweepAlongFramesOptions& options);
+
+data::PcgGeometry sweep_curve_profile_geometry(const CurveProfile& profile,
+                                               const std::vector<Frame3>& frames,
+                                               const SweepAlongFramesOptions& options);
 
 } // namespace pcg::internal::geometry

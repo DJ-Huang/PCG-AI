@@ -76,8 +76,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BevelMesh missing node");
 
-        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "BevelMesh missing mesh input");
-        if (mesh.vertices().empty())
+        const data::PcgGeometry geometry =
+            get_geometry_input(ctx, "in", "BevelMesh missing mesh input");
+        if (geometry.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BevelMesh missing mesh input");
 
         const double amount = ctx.node->data.value("amount", 0.1);
@@ -103,9 +104,17 @@ public:
         const std::string vmesh_str = ctx.node->data.value("vmeshMethod", std::string("adj"));
         const BevelVMeshMethod vmesh_method =
             vmesh_str == "cutoff" ? BevelVMeshMethod::Cutoff : BevelVMeshMethod::Adj;
-        emit_mesh(ctx, bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap,
-                                  angle_limit, profile, miter_outer, miter_inner, vmesh_method,
-                                  ctx.is_cancel_requested));
+
+        BevelEdgeSelection edge_selection;
+        edge_selection.edge_group = ctx.node->data.value("edgeGroup", std::string(""));
+        edge_selection.exclude_unshared = ctx.node->data.value("excludeUnshared", true);
+        edge_selection.exclude_groups = parse_name_list(ctx.node->data, "excludeGroups");
+        if (edge_selection.exclude_groups.empty())
+            edge_selection.exclude_groups = {"cap_start", "cap_end"};
+
+        emit_mesh(ctx, bevel_geometry(geometry, amount, segments, method, offset_type, clamp_overlap,
+                                        angle_limit, profile, miter_outer, miter_inner, vmesh_method,
+                                        ctx.is_cancel_requested, edge_selection));
         if (ctx.is_cancel_requested && ctx.is_cancel_requested())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Execution cancelled");
         return PCG_OK;

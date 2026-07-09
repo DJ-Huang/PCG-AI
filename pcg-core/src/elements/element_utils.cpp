@@ -139,10 +139,25 @@ data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* l
     if (const data::PcgMeshData* mesh = ctx.inputs.find_mesh(pin))
         return *mesh;
 
+    if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry(pin))
+        return data::triangulate_geometry(*geometry);
+
     const nlohmann::json* input = require_input_json(ctx, pin, label);
     if (!input)
         return {};
     return parse_mesh_input(*input);
+}
+
+data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const char* label)
+{
+    if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry(pin))
+        return *geometry;
+
+    const data::PcgMeshData mesh = get_mesh_input(ctx, pin, label);
+    if (!mesh.vertices().empty())
+        return data::geometry_from_mesh(mesh);
+
+    return {};
 }
 
 nlohmann::json point_data_to_json(const data::PcgPointData& data)
@@ -175,6 +190,18 @@ void emit_splines(PcgContext& ctx, data::PcgSplineData data)
 void emit_mesh(PcgContext& ctx, data::PcgMeshData data)
 {
     ctx.outputs.add_mesh("out", std::move(data));
+}
+
+void emit_geometry(PcgContext& ctx, data::PcgGeometry data)
+{
+    ctx.outputs.add_geometry("out", std::move(data));
+}
+
+void emit_geometry_shared(PcgContext& ctx,
+                          const std::string& tag,
+                          std::shared_ptr<const data::PcgGeometry> geometry)
+{
+    ctx.outputs.add_geometry_shared(tag, std::move(geometry));
 }
 
 void emit_mesh_shared(PcgContext& ctx,

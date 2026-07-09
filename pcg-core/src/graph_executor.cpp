@@ -2,6 +2,7 @@
 
 #include "cook_hash.hpp"
 #include "data/pcg_context.hpp"
+#include "data/pcg_geometry.hpp"
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 #include "texture_runtime.hpp"
@@ -104,6 +105,11 @@ void gather_inputs(const Graph& graph,
             continue;
         }
 
+        if (auto geometry = upstream.find_geometry_shared(source_pin)) {
+            inputs.add_geometry_shared(pin, geometry);
+            continue;
+        }
+
         if (const nlohmann::json* payload = upstream.find_json(source_pin)) {
             inputs.add(pin, data::PcgDataType::Unknown, *payload);
             if (auto spawn_mesh = upstream.find_mesh_shared("spawnMesh"))
@@ -115,6 +121,10 @@ void gather_inputs(const Graph& graph,
         if (!primary.is_object() || primary.empty()) {
             if (auto mesh = upstream.primary_mesh_shared()) {
                 inputs.add_mesh_shared(pin, mesh);
+                continue;
+            }
+            if (auto geometry = upstream.primary_geometry_shared()) {
+                inputs.add_geometry_shared(pin, geometry);
                 continue;
             }
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
@@ -301,6 +311,20 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Json;
         out_result.json = primary;
         out_result.mesh = data::PcgMeshData{};
+        return PCG_OK;
+    }
+
+    if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
+        out_result.kind = GraphResultKind::Mesh;
+        out_result.mesh = data::triangulate_geometry(*geometry);
+        out_result.json = nlohmann::json::object();
+        return PCG_OK;
+    }
+
+    if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
+        out_result.kind = GraphResultKind::Mesh;
+        out_result.mesh = data::triangulate_geometry(*geometry);
+        out_result.json = nlohmann::json::object();
         return PCG_OK;
     }
 

@@ -1,6 +1,9 @@
 #include "elements/bevel_blender.hpp"
 #include "geometry/bmesh.hpp"
 
+#include "data/pcg_geometry.hpp"
+#include "geometry/group_table.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -2836,6 +2839,63 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
 // Section 11: Main Entry Point (Blender BM_mesh_bevel)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+namespace {
+
+bool group_name_matches(const std::string& pattern, const std::string& name)
+{
+    if (pattern.size() >= 2 && pattern.back() == '*' && pattern.find('*') == pattern.size() - 1) {
+        const std::string prefix = pattern.substr(0, pattern.size() - 1);
+        return name.size() >= prefix.size() && name.compare(0, prefix.size(), prefix) == 0;
+    }
+    return pattern == name;
+}
+
+bool edge_excluded(const geometry::BMeshEdge& edge, const BevelEdgeSelection& selection)
+{
+    if (selection.exclude_unshared && edge.face1 < 0)
+        return true;
+
+    for (const std::string& pattern : selection.exclude_groups) {
+        for (const std::string& group : edge.groups) {
+            if (group_name_matches(pattern, group))
+                return true;
+        }
+    }
+    return false;
+}
+
+std::unordered_set<int64_t> select_hard_edges(const geometry::BMesh& bmesh,
+                                              const BevelEdgeSelection& selection,
+                                              const data::PcgGeometry* geometry)
+{
+    std::unordered_set<int64_t> hard_edges;
+
+    if (!selection.edge_group.empty() && geometry) {
+        const auto selected =
+            geometry->groups().eval(geometry::GroupDomain::Edge, selection.edge_group);
+        for (int64_t key : selected) {
+            const auto it = bmesh.edges.find(key);
+            if (it == bmesh.edges.end())
+                continue;
+            if (!edge_excluded(it->second, selection))
+                hard_edges.insert(key);
+        }
+        return hard_edges;
+    }
+
+    for (const auto& entry : bmesh.edges) {
+        if (!entry.second.sharp)
+            continue;
+        if (edge_excluded(entry.second, selection))
+            continue;
+        hard_edges.insert(entry.first);
+    }
+
+    return hard_edges;
+}
+
+} // namespace
+
 data::PcgMeshData bevel_mesh_blender(
     const data::PcgMeshData& mesh,
     double amount,
@@ -2847,7 +2907,9 @@ data::PcgMeshData bevel_mesh_blender(
     BevelMiter miter_outer,
     BevelMiter miter_inner,
     BevelVMeshMethod vmesh_method,
-    bool (*is_cancel_requested)())
+    bool (*is_cancel_requested)(),
+    const BevelEdgeSelection& edge_selection,
+    const data::PcgGeometry* geometry)
 {
     amount = std::max(amount, 0.0);
     segments = std::clamp(segments, 1, 8);
@@ -2873,7 +2935,9 @@ data::PcgMeshData bevel_mesh_blender(
     // 1. Build BMesh (weld + coplanar merge + sharp edges)
     geometry::BMeshBuildOptions bmesh_opts;
     bmesh_opts.sharp_angle_deg = angle_limit_deg;
-    const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh, bmesh_opts);
+    const geometry::BMesh bmesh = geometry
+        ? geometry::bmesh_from_geometry(*geometry, bmesh_opts)
+        : geometry::bmesh_from_mesh(mesh, bmesh_opts);
 
     // 2. Weld mesh for bevel internals
     WeldedMesh welded = weld_mesh(mesh);
@@ -2883,12 +2947,9 @@ data::PcgMeshData bevel_mesh_blender(
     // 3. Build edge→face adjacency
     auto edge_faces = build_edge_faces(welded);
 
-    // 4. Hard edges from BMesh topology
-    std::unordered_set<int64_t> hard_edges;
-    for (const auto& entry : bmesh.edges) {
-        if (entry.second.sharp)
-            hard_edges.insert(entry.first);
-    }
+    // 4. Hard edges from BMesh topology + group selection
+    const std::unordered_set<int64_t> hard_edges =
+        select_hard_edges(bmesh, edge_selection, geometry);
 
     if (hard_edges.empty())
         return mesh;
