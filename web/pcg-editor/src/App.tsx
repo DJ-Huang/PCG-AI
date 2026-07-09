@@ -37,6 +37,7 @@ import {
 import { useUndoRedo } from './useUndoRedo';
 import Blackboard from './Blackboard';
 import Inspector from './Inspector';
+import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import './App.css';
 
@@ -79,6 +80,8 @@ function PcgEditor() {
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>('');
+  const [hoveredNode, setHoveredNode] = useState<{ node: Node; x: number; y: number } | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const connectingNodeId = useRef<string | null>(null);
@@ -246,9 +249,23 @@ function PcgEditor() {
     setSelectedNode(node);
   }, []);
 
+  // ── Node hover → Node Info panel (300ms delay) ─────
+  const onNodeMouseEnter: NodeMouseHandler = useCallback((event, node) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => {
+      setHoveredNode({ node, x: event.clientX + 16, y: event.clientY + 8 });
+    }, 300);
+  }, []);
+
+  const onNodeMouseLeave: NodeMouseHandler = useCallback(() => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoveredNode(null);
+  }, []);
+
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setContextMenu(null);
+    setHoveredNode(null);
   }, []);
 
   // ── Node data update (from Inspector) ──────────────
@@ -336,12 +353,6 @@ function PcgEditor() {
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         fitView({ duration: 200 });
-      } else if (e.key === 'p' || e.key === 'P') {
-        e.preventDefault();
-        setShowBlackboard((v) => !v);
-      } else if (e.key === 'i' || e.key === 'I') {
-        e.preventDefault();
-        setShowInspector((v) => !v);
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -549,6 +560,8 @@ function PcgEditor() {
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
             onNodeClick={onNodeClick}
+            onNodeMouseEnter={onNodeMouseEnter}
+            onNodeMouseLeave={onNodeMouseLeave}
             onPaneClick={onPaneClick}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
@@ -567,7 +580,7 @@ function PcgEditor() {
           {/* Status bar */}
           <div className="pcg-status-bar">
             <span>{nodes.length} nodes · {edges.length} edges · {parameters.length} params</span>
-            <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit · P: Params · I: Inspector</span>
+            <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit</span>
             {(canUndo || canRedo) && (
               <span className="pcg-status-bar__undo">
                 <button type="button" onClick={undo} disabled={!canUndo} className="pcg-status-bar__btn">↶ Undo</button>
@@ -595,6 +608,17 @@ function PcgEditor() {
           <div className="pcg-overlay" onClick={() => searchConfig.onSelect(null)} />
           <NodeSearchPanel config={searchConfig} />
         </>
+      )}
+
+      {/* Floating: Node Info Panel */}
+      {hoveredNode && (
+        <NodeInfoPanel
+          node={hoveredNode.node}
+          nodes={nodes}
+          edges={edges}
+          x={hoveredNode.x}
+          y={hoveredNode.y}
+        />
       )}
 
       {/* Floating: Context Menu */}

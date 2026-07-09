@@ -329,23 +329,10 @@ namespace DJTechEditor.PCG.Graph
                     return;
                 graphView.ClearSelection();
                 graphView.AddToSelection(this);
-                if (graphView.Inspector.style.display.value != DisplayStyle.Flex)
-                    graphView.Inspector.ToggleVisible();
-                graphView.Inspector.OnSelectionChanged();
+                graphView.ShowNodeInfoPanel(this);
             });
             infoBtn.tooltip = "Node info";
             m_RadialMenu.Add(infoBtn);
-
-            var paramsBtn = CreateCircleButton("P", () =>
-            {
-                var graphView = GetFirstAncestorOfType<PcgGraphView>();
-                if (graphView?.Blackboard == null)
-                    return;
-                if (graphView.Blackboard.style.display.value != DisplayStyle.Flex)
-                    graphView.Blackboard.ToggleVisible();
-            });
-            paramsBtn.tooltip = "Parameters";
-            m_RadialMenu.Add(paramsBtn);
 
             m_PreviewBtn = CreateCircleButton("◎", () =>
             {
@@ -545,7 +532,7 @@ namespace DJTechEditor.PCG.Graph
             const float buttonOrbitRadius = NodeWidth * 0.5f + 14f;
             const float center = RadialMenuRadius;
             const float startDeg = -156f;
-            const float stepDeg = 24f;
+            const float stepDeg = 48f;
 
             for (var i = 0; i < buttons.Count; i++)
             {

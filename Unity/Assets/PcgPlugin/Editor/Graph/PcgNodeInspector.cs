@@ -705,7 +705,7 @@ namespace DJTechEditor.PCG.Graph
 
         // ─── Group Resolution ──────────────────────────────────────
 
-        private struct AvailableGroup
+        public struct AvailableGroup
         {
             public string name;
             public string domain;
@@ -718,7 +718,7 @@ namespace DJTechEditor.PCG.Graph
         /// Walks upstream SpatialMesh connections to collect all named groups
         /// produced by upstream nodes (Houdini-style group resolution).
         /// </summary>
-        private List<AvailableGroup> ResolveUpstreamGroups(string startNodeId)
+        public List<AvailableGroup> ResolveUpstreamGroups(string startNodeId)
         {
             var result = new List<AvailableGroup>();
             var seen = new HashSet<string>();

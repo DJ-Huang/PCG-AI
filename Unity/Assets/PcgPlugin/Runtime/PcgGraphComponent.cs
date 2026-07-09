@@ -532,6 +532,14 @@ namespace DJTechRuntime.PCG
             {
                 case PcgResultKind.Mesh:
                 {
+                    // Feed group stats JSON to visualizer (if present)
+                    if (!string.IsNullOrEmpty(result.Json))
+                    {
+                        var gv = GetComponent<PcgGroupVisualizer>();
+                        if (gv != null)
+                            gv.SetResultJson(result.Json);
+                    }
+
                     var binHash = ComputeBinaryHash(result.MeshBinary);
                     if (binHash != 0 && binHash == m_LastMeshBinaryHash && m_GeneratedMesh != null)
                     {

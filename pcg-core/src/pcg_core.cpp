@@ -113,7 +113,13 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
         if (out_index_count)
             *out_index_count = index_count;
 
-        if (out_json && out_json_size > 0)
+        if (out_json && out_json_size > 0 && result.json.is_object() && !result.json.empty()) {
+            const auto serialized = result.json.dump();
+            if (static_cast<int>(serialized.size()) + 1 <= out_json_size)
+                std::strncpy(out_json, serialized.c_str(), static_cast<size_t>(out_json_size - 1));
+            else
+                out_json[0] = '\0';
+        } else if (out_json && out_json_size > 0)
             out_json[0] = '\0';
 
         if (!out_mesh_buf || out_mesh_buf_size <= 0) {

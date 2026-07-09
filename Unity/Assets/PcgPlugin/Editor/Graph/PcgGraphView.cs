@@ -24,6 +24,7 @@ namespace DJTechEditor.PCG.Graph
         private string m_PendingAction;
         private bool m_PendingCommit;
         private PcgGraphNodeBase m_ActiveRadialMenuNode;
+        private PcgNodeInfoPanel m_InfoPanel;
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
 
@@ -41,6 +42,23 @@ namespace DJTechEditor.PCG.Graph
         {
             get => m_Inspector;
             set => m_Inspector = value;
+        }
+
+        /// <summary>Called by radial menu "i" button — shows read-only Node Info panel.</summary>
+        public void ShowNodeInfoPanel(PcgGraphNodeBase node)
+        {
+            if (m_InfoPanel == null)
+            {
+                m_InfoPanel = new PcgNodeInfoPanel(this);
+                contentViewContainer.Add(m_InfoPanel);
+            }
+            m_InfoPanel.Show(node);
+        }
+
+        /// <summary>Hides the Node Info panel if visible.</summary>
+        public void HideNodeInfoPanel()
+        {
+            m_InfoPanel?.Hide();
         }
 
         public PcgGraphView()
@@ -103,16 +121,6 @@ namespace DJTechEditor.PCG.Graph
             else if (evt.keyCode == KeyCode.F)
             {
                 FrameAll();
-                evt.StopPropagation();
-            }
-            else if (evt.keyCode == KeyCode.P)
-            {
-                Blackboard?.ToggleVisible();
-                evt.StopPropagation();
-            }
-            else if (evt.keyCode == KeyCode.I)
-            {
-                m_Inspector?.ToggleVisible();
                 evt.StopPropagation();
             }
         }
@@ -325,6 +333,7 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_ActiveRadialMenuNode == node)
                 m_ActiveRadialMenuNode = null;
+            HideNodeInfoPanel();
         }
 
         private void UpdateActiveRadialMenuFromPointer(Vector2 panelMousePosition)

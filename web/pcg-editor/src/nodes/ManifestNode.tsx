@@ -1,12 +1,15 @@
 // ManifestNode.tsx — Generic manifest-driven node component.
 // All node types use this single component; ports and colors are read from node-manifest.json.
 // Layout: Header (top) → Input ports (left) → Output ports (right) → Properties summary.
-// Nodes that produce groups show a "Groups" badge.
+// Nodes that produce groups show a compact "🔗 N groups" badge with hover popup.
 
+import { useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { getNodeTypeDefs, getCategoryColor } from '../nodeManifest';
 
 export default function ManifestNode({ type, selected, data }: NodeProps) {
+  const [showGroupPopup, setShowGroupPopup] = useState(false);
+
   const def = getNodeTypeDefs(type ?? '');
   if (!def) {
     return (
@@ -17,27 +20,29 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
   }
 
   const color = getCategoryColor(def.category);
+  const nodeData = data as Record<string, unknown>;
 
   // Collect group names this node produces (for badge display)
-  const producedGroups: { name: string; domain: string }[] = [];
+  const producedGroups: { name: string; domain: string; condition?: string; dynamic?: boolean }[] = [];
   if (def.outputGroups) {
     for (const og of def.outputGroups) {
       if (og.dynamic) {
-        // Dynamic: read actual group name from node data
-        const groupName = (data as Record<string, unknown>)?.[og.name];
+        const groupName = nodeData?.[og.name];
         if (typeof groupName === 'string' && groupName.trim()) {
-          producedGroups.push({ name: groupName, domain: og.domain });
+          producedGroups.push({ name: groupName, domain: og.domain, dynamic: true });
         }
       } else {
-        // Check condition property
+        let active = true;
         if (og.condition) {
-          const condValue = (data as Record<string, unknown>)?.[og.condition];
-          if (!condValue) continue;
+          active = !!nodeData?.[og.condition];
         }
-        producedGroups.push({ name: og.name, domain: og.domain });
+        producedGroups.push({ name: og.name, domain: og.domain, condition: og.condition && !active ? og.condition : undefined });
       }
     }
   }
+
+  const activeGroups = producedGroups.filter((g) => !g.condition);
+  const inactiveGroups = producedGroups.filter((g) => g.condition);
 
   return (
     <div
@@ -48,18 +53,6 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
       <div className="pcg-node__header" style={{ background: color }}>
         {def.displayName}
       </div>
-
-      {/* Group output badge */}
-      {producedGroups.length > 0 && (
-        <div className="pcg-node__group-badge">
-          {producedGroups.map((g) => (
-            <span key={g.name} className="pcg-node__group-tag">
-              {g.name}
-              <span className="pcg-node__group-tag-domain">{g.domain}</span>
-            </span>
-          ))}
-        </div>
-      )}
 
       {/* Input ports (left side) */}
       {def.inputs.map((pin) => (
@@ -86,6 +79,42 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
           />
         </div>
       ))}
+
+      {/* Group output badge — compact */}
+      {producedGroups.length > 0 && (
+        <div
+          className="pcg-node__group-badge"
+          onMouseEnter={() => setShowGroupPopup(true)}
+          onMouseLeave={() => setShowGroupPopup(false)}
+        >
+          <span className="pcg-node__group-badge-count">
+            🔗 {activeGroups.length} group{activeGroups.length !== 1 ? 's' : ''}
+          </span>
+          {showGroupPopup && (
+            <div className="pcg-node__group-badge-popup">
+              <div className="pcg-node__group-badge-popup-title">Output Groups</div>
+              {activeGroups.map((g) => (
+                <div key={g.name} className="pcg-node__group-badge-popup-row">
+                  <span className="pcg-node__group-badge-popup-name">{g.name}</span>
+                  <span className="pcg-node__group-badge-popup-domain">{g.domain}</span>
+                </div>
+              ))}
+              {inactiveGroups.length > 0 && (
+                <>
+                  <div className="pcg-node__group-badge-popup-sep" />
+                  <div className="pcg-node__group-badge-popup-title">Conditional (inactive)</div>
+                  {inactiveGroups.map((g) => (
+                    <div key={g.name} className="pcg-node__group-badge-popup-row pcg-node__group-badge-popup-row--inactive">
+                      <span className="pcg-node__group-badge-popup-name">{g.name}</span>
+                      <span className="pcg-node__group-badge-popup-domain">if {g.condition}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Properties summary (read-only, editing in Inspector) */}
       {Object.keys(def.properties).length > 0 && (

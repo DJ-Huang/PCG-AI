@@ -764,15 +764,77 @@
 
 /* ── Node: Group Badge ───────────────────────────────── */
 
+/* ── Group badge (compact) ──────────────────────────── */
+
 .pcg-node__group-badge {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 4px 8px;
-  background: #1e1e2e;
-  border-bottom: 1px solid #333;
+  position: relative;
+  padding: 3px 8px 4px;
+  background: #1e2e1e;
+  border-top: 1px solid #2a4a2a;
+  cursor: default;
 }
 
+.pcg-node__group-badge-count {
+  font-size: 9px;
+  color: #7c7;
+  font-weight: 500;
+}
+
+.pcg-node__group-badge-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  min-width: 160px;
+  max-width: 220px;
+  background: #1a1a2e;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  padding: 6px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.pcg-node__group-badge-popup-title {
+  font-size: 9px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.pcg-node__group-badge-popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.pcg-node__group-badge-popup-row--inactive {
+  opacity: 0.45;
+}
+
+.pcg-node__group-badge-popup-name {
+  font-size: 10px;
+  color: #cfc;
+}
+
+.pcg-node__group-badge-popup-domain {
+  font-size: 8px;
+  color: #88a;
+  text-transform: uppercase;
+}
+
+.pcg-node__group-badge-popup-sep {
+  height: 1px;
+  background: #333;
+  margin: 4px 0;
+}
+
+/* Legacy group tag styles (kept for backward compat, unused) */
 .pcg-node__group-tag {
   display: inline-flex;
   align-items: center;
@@ -789,4 +851,129 @@
   font-size: 7px;
   opacity: 0.6;
   text-transform: uppercase;
+}
+
+/* ── Node Info Panel (hover, read-only) ────────────── */
+
+.pcg-node-info-panel {
+  position: fixed;
+  z-index: 30;
+  min-width: 240px;
+  max-width: 300px;
+  background: #1a1a2e;
+  border: 1px solid #3a3a5a;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  font-size: 11px;
+  color: #ccc;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.pcg-node-info-panel__header {
+  padding: 6px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  color: #fff;
+  border-radius: 7px 7px 0 0;
+}
+
+.pcg-node-info-panel__type {
+  padding: 2px 10px 4px;
+  font-size: 9px;
+  color: #888;
+  border-bottom: 1px solid #333;
+}
+
+.pcg-node-info-panel__section {
+  padding: 6px 10px;
+  border-bottom: 1px solid #2a2a3e;
+}
+
+.pcg-node-info-panel__section:last-child {
+  border-bottom: none;
+}
+
+.pcg-node-info-panel__section-title {
+  font-size: 8px;
+  color: #667;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.pcg-node-info-panel__group-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+}
+
+.pcg-node-info-panel__group-row--inactive {
+  opacity: 0.4;
+}
+
+.pcg-node-info-panel__group-name {
+  font-size: 10px;
+  color: #cfc;
+  flex: 1;
+}
+
+.pcg-node-info-panel__group-domain {
+  font-size: 8px;
+  color: #88a;
+  text-transform: uppercase;
+}
+
+.pcg-node-info-panel__group-cond {
+  font-size: 8px;
+  color: #a88;
+  font-style: italic;
+}
+
+.pcg-node-info-panel__group-source {
+  font-size: 8px;
+  color: #667;
+}
+
+.pcg-node-info-panel__prop-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.pcg-node-info-panel__prop-key {
+  font-size: 10px;
+  color: #aac;
+}
+
+.pcg-node-info-panel__prop-value {
+  font-size: 10px;
+  color: #ddd;
+  text-align: right;
+}
+
+.pcg-node-info-panel__pin-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+}
+
+.pcg-node-info-panel__pin-dir {
+  font-size: 9px;
+  color: #556;
+  width: 12px;
+}
+
+.pcg-node-info-panel__pin-label {
+  font-size: 10px;
+  color: #aab;
+  flex: 1;
+}
+
+.pcg-node-info-panel__pin-type {
+  font-size: 8px;
+  color: #556;
 }

@@ -23,6 +23,32 @@ PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const ch
     return code;
 }
 
+/// Builds lightweight group statistics JSON for execution results.
+/// Output format: {"groups": [{"name": "side", "domain": "face", "count": 24, "members": [0,1,2,...]}, ...]}
+nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
+{
+    auto groups = nlohmann::json::array();
+    static const char* kDomainNames[] = {"point", "edge", "face"};
+    for (int d = 0; d < 3; ++d) {
+        const auto domain = static_cast<geometry::GroupDomain>(d);
+        for (const auto& name : geometry.groups().group_names(domain)) {
+            const auto& members = geometry.groups().members(domain, name);
+            auto memberArray = nlohmann::json::array();
+            for (int id : members)
+                memberArray.push_back(id);
+            groups.push_back({
+                {"name", name},
+                {"domain", kDomainNames[d]},
+                {"count", static_cast<int>(members.size())},
+                {"members", std::move(memberArray)},
+            });
+        }
+    }
+    auto obj = nlohmann::json::object();
+    obj["groups"] = std::move(groups);
+    return obj;
+}
+
 std::vector<std::string> topological_order(const Graph& graph,
                                            char* err_buf,
                                            int err_buf_size,
@@ -317,14 +343,14 @@ PcgResultCode execute_graph(const Graph& graph,
     if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = data::triangulate_geometry(*geometry);
-        out_result.json = nlohmann::json::object();
+        out_result.json = build_group_stats(*geometry);
         return PCG_OK;
     }
 
     if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = data::triangulate_geometry(*geometry);
-        out_result.json = nlohmann::json::object();
+        out_result.json = build_group_stats(*geometry);
         return PCG_OK;
     }
 

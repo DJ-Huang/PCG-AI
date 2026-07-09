@@ -373,5 +373,24 @@ namespace DJTechEditor.PCG.Graph
 
         private static string GetString(Dictionary<string, object> dict, string key, string fallback = "") =>
             dict.TryGetValue(key, out var value) ? value?.ToString() ?? fallback : fallback;
+
+        private static readonly Dictionary<string, Color> s_CategoryColors = new()
+        {
+            { "Generation", new Color(0.2f, 0.6f, 0.3f) },
+            { "Filter", new Color(0.6f, 0.4f, 0.2f) },
+            { "Transform", new Color(0.3f, 0.5f, 0.7f) },
+            { "Sampler", new Color(0.5f, 0.3f, 0.6f) },
+            { "Metadata", new Color(0.4f, 0.4f, 0.4f) },
+            { "Spawner", new Color(0.6f, 0.5f, 0.2f) },
+            { "Structural", new Color(0.3f, 0.3f, 0.5f) },
+            { "Mesh", new Color(0.2f, 0.4f, 0.6f) },
+            { "Geometry", new Color(0.2f, 0.5f, 0.4f) },
+            { "Spline", new Color(0.3f, 0.5f, 0.4f) },
+            { "Input", new Color(0.4f, 0.4f, 0.5f) },
+            { "Output", new Color(0.35f, 0.35f, 0.35f) },
+        };
+
+        public static Color GetCategoryColor(string category) =>
+            s_CategoryColors.TryGetValue(category ?? "", out var c) ? c : new Color(0.35f, 0.35f, 0.45f);
     }
 }

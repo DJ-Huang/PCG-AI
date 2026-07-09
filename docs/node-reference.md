@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json` 中定义的全部 **25 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json` 中定义的全部 **27 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -42,6 +42,9 @@
   - [CreateBoxMesh](#createboxmesh)
   - [SubdivideMesh](#subdividemesh)
   - [BevelMesh](#bevelmesh)
+- [Geometry 类别](#geometry-类别)
+  - [GroupCreate](#groupcreate)
+  - [GroupCombine](#groupcombine)
 - [Output 类别](#output-类别)
   - [Output](#output)
 - [常见节点组合](#常见节点组合)
@@ -1179,6 +1182,206 @@
 
 ---
 
+## Geometry 类别
+
+Geometry 类别节点操作 `PcgGeometry`（多边形网格 + 命名组 + 属性），是 Houdini Group SOP 的对等实现。节点间传递的 `SpatialMesh` pin 在内部携带 `PcgGeometry`，包含拓扑面/边/组语义，而非仅三角汤。
+
+### Group 系统
+
+Group 是 PCG 几何管线的核心概念，参考 Houdini 的 Group SOP + PolyBevel group 参数模式：
+
+- **生产者节点**（如 `SweepAlongSpline`）在 manifest 中声明 `outputGroups`，在执行时将几何元素（边/面/点）归入命名组
+- **消费者节点**（如 `BevelMesh`）通过 `edgeGroup` / `excludeGroups` 参数按组名选择操作范围
+- **GroupCreate / GroupCombine** 是中间过滤节点，按规则从上游已有组中筛选或组合，生成新组供下游使用
+
+#### 支持的域
+
+| 域 | 说明 |
+|----|------|
+| `edge` | 边（两个顶点之间的连线） |
+| `face` | 面（多边形面片） |
+| `point` | 点（顶点位置） |
+
+#### 上游组自动发现
+
+Inspector 中的 `groupSelect` / `groupMultiSelect` 属性会自动遍历上游 SpatialMesh 边，收集所有可用组名并显示为下拉选择 / 复选框。无需手动输入组名。
+
+#### SweepAlongSpline 输出组
+
+`SweepAlongSpline` 是目前主要的组生产者，输出以下 6 个命名组：
+
+| 组名 | 域 | 条件 | 含义 |
+|------|-----|------|------|
+| `side` | face | 总是 | 沿 backbone 的侧壁面 |
+| `cap_start` | face | `capStart=true` | 起始端盖面 |
+| `cap_end` | face | `capEnd=true` | 结束端盖面 |
+| `seam` | edge | 总是 | 截面闭合处的缝合边（沿扫掠方向） |
+| `profile_corner` | edge | 总是 | 截面折角处的纵向棱边（连接相邻 ring） |
+| `unshared` | edge | 总是 | 边界边（只有一侧面的边） |
+
+> `seam` 来源于截面轮廓形状，角度由路径曲率产生；`profile_corner` 来源于截面折角，角度由截面形状决定。Bevel 截面圆角时使用 `fromEdgeGroup=profile_corner`。
+
+---
+
+### GroupCreate
+
+**类别**：Geometry
+
+**功能**：从上游几何中按规则筛选边/面/点，归入一个命名组输出。参考 Houdini Group SOP。是连接生产者（如 `SweepAlongSpline`）和消费者（如 `BevelMesh`）的中间过滤节点。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Geometry | `SpatialMesh` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Geometry | `SpatialMesh` |
+
+**输出组**：
+
+| 组名 | 域 | 说明 |
+|------|-----|------|
+| `outputGroup` 属性值 | 同 `domain` 属性 | 动态命名组，组名由 `outputGroup` 属性决定 |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `outputGroup` | string | `"bevel_edges"` | — | 新建的组名。下游节点用此名称引用 |
+| `domain` | enum | `"edge"` | `edge` / `face` / `point` | 操作域。当前仅 `edge` 域支持 angle 模式 |
+| `mode` | enum | `"angle"` | `angle` / `unshared` | 选择模式。`angle` = 按相邻面夹角选边；`unshared` = 选边界边 |
+| `minEdgeAngle` | number | `30.0` | 0 ~ 180 | **angle 模式**：选中相邻面夹角 ≥ 此值的边。值越大 = 只有越锐的转角才入选 |
+| `includeUnshared` | boolean | `false` | — | 是否包含边界边（只有一侧面的边）。默认排除，对齐 Houdini PolyBevel |
+| `fromEdgeGroup` | groupSelect | `""` | 上游可用边组 | 先从已有边组中筛选候选边，再应用 mode 规则。留空 = 考虑所有边 |
+| `fromFaceGroup` | groupSelect | `""` | 上游可用面组 | 仅选与该面组中的面相邻的边 |
+
+**执行逻辑**：
+
+```
+候选边集 = 所有边（或 fromEdgeGroup 指定的边集）
+    ↓
+fromFaceGroup 过滤：仅保留与指定面组相邻的边
+    ↓
+includeUnshared 过滤：若 false，排除边界边（face1 < 0）
+    ↓
+mode=angle: 保留相邻面夹角 ≥ minEdgeAngle 的边
+mode=unshared: 保留所有边界边（忽略 fromEdgeGroup / fromFaceGroup / angle）
+    ↓
+选中的边 → 归入 outputGroup 命名组
+```
+
+> **关键**：`fromEdgeGroup` 是串联过滤的第一步。Sweep 生成的 mesh 有两类内部边 — `seam`（截面轮廓边）和 `profile_corner`（截面折角棱边）。不设 `fromEdgeGroup` 时 angle 模式会选中曲面内部三角化对角线，导致下游 Bevel 产生锯齿破面。
+
+**用法示例**：
+
+bridge-demo 桥梁截面圆角：
+
+```
+CreateSpline(backbone) ─┐
+                        ├─→ SweepAlongSpline ──→ GroupCreate ──→ BevelMesh ──→ Output
+CreateSpline(profile) ──┘
+```
+
+```json
+{
+  "id": "grp",
+  "type": "GroupCreate",
+  "position": { "x": 212, "y": 320 },
+  "data": {
+    "outputGroup": "bevel_edges",
+    "domain": "edge",
+    "mode": "angle",
+    "minEdgeAngle": 30,
+    "includeUnshared": false,
+    "fromFaceGroup": "",
+    "fromEdgeGroup": "profile_corner"
+  }
+}
+```
+
+下游 BevelMesh 引用此组：
+
+```json
+{
+  "id": "bev",
+  "type": "BevelMesh",
+  "data": {
+    "edgeGroup": "bevel_edges",
+    "excludeGroups": "cap_start,cap_end",
+    "amount": 0.425,
+    "segments": 6
+  }
+}
+```
+
+> Inspector 底部绿字 "N groups available from upstream" 表示已成功发现上游输出的 N 个组。下拉框中可选择这些组名。
+
+---
+
+### GroupCombine
+
+**类别**：Geometry
+
+**功能**：对已有的多个组执行集合运算（并/交/差），生成新的组合组。参考 Houdini Group Combine SOP。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Geometry | `SpatialMesh` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Geometry | `SpatialMesh` |
+
+**输出组**：
+
+| 组名 | 域 | 说明 |
+|------|-----|------|
+| `outputGroup` 属性值 | 同 `domain` 属性 | 动态命名组，组名由 `outputGroup` 属性决定 |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `outputGroup` | string | `"combined"` | 新建的组名 |
+| `domain` | enum | `"edge"` | 操作域：`edge` / `face` / `point` |
+| `operation` | enum | `"union"` | 集合运算：`union`（并集）/ `intersect`（交集）/ `subtract`（差集） |
+| `sourceGroups` | groupMultiSelect | `""` | 逗号分隔的源组名列表。复选框从上游可用组中选择 |
+
+**执行逻辑**：
+
+1. 清除 outputGroup 原有成员
+2. `union`：将所有 sourceGroups 的成员取并集
+3. `intersect`：取所有 sourceGroups 的交集（≥2 个源组）
+4. `subtract`：以第一个源组为基准，依次减去后续源组
+
+**用法示例**：
+
+```json
+{
+  "id": "comb",
+  "type": "GroupCombine",
+  "position": { "x": 300, "y": 320 },
+  "data": {
+    "outputGroup": "all_sharp_edges",
+    "domain": "edge",
+    "operation": "union",
+    "sourceGroups": "bevel_edges,profile_corner,seam"
+  }
+}
+```
+
+> 典型用途：将多个 GroupCreate 的输出合并为一个组，或用 subtract 排除某些边（如从 `profile_corner` 中减去 `cap_start` 的边）。
+
+---
+
 ## Output 类别
 
 ### Output
@@ -1331,7 +1534,42 @@ CreateBoxMesh ──(Mesh)──→ SubdivideMesh ──(Mesh)──→ BevelMes
 }
 ```
 
-### 5. 属性分类放置
+### 5. 桥梁截面圆角（Sweep + Group + Bevel）
+
+沿样条扫掠生成 mesh → 按组筛选棱边 → 倒角圆角。
+
+```
+CreateSpline ──(backbone)──┐
+                           ├─→ SweepAlongSpline ──→ GroupCreate ──→ BevelMesh ──→ Output
+CreateSpline ──(profile)──┘
+```
+
+```json
+{
+  "version": "1.0",
+  "nodes": [
+    { "id": "spline_path", "type": "CreateSpline", "position": {"x":0,"y":0}, "data": {"closed": false, "controlPoints": [[0,0,0],[0,0,20],[5,0,40]]} },
+    { "id": "spline_profile", "type": "CreateSpline", "position": {"x":0,"y":200}, "data": {"closed": true, "controlPoints": [[-3,0,0],[3,0,0],[3,1,0],[-3,1,0]]} },
+    { "id": "sweep", "type": "SweepAlongSpline", "position": {"x":300,"y":100}, "data": {"surfaceShape": "crossSection", "capStart": true, "capEnd": true} },
+    { "id": "grp", "type": "GroupCreate", "position": {"x":600,"y":100}, "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "fromEdgeGroup": "profile_corner"} },
+    { "id": "bev", "type": "BevelMesh", "position": {"x":900,"y":100}, "data": {"method": "edge", "amount": 0.3, "segments": 4, "edgeGroup": "bevel_edges", "excludeGroups": "cap_start,cap_end"} },
+    { "id": "out", "type": "Output", "position": {"x":1200,"y":100}, "data": {"label": "Bridge"} }
+  ],
+  "edges": [
+    { "id": "e1", "source": "spline_path", "target": "sweep", "sourceHandle": "out", "targetHandle": "backbone" },
+    { "id": "e2", "source": "spline_profile", "target": "sweep", "sourceHandle": "out", "targetHandle": "profile" },
+    { "id": "e3", "source": "sweep", "target": "grp", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e4", "source": "grp", "target": "bev", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e5", "source": "bev", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}
+```
+
+> **要点**：`fromEdgeGroup=profile_corner` 限定 GroupCreate 只在截面折角棱边中选边，避免选到 Sweep 曲面内部的三角化对角线。`excludeGroups=cap_start,cap_end` 让 BevelMesh 跳过端盖边。
+
+---
+
+### 6. 属性分类放置
 
 生成点 → 打标签 → 按标签过滤 → 分别放置不同 prefab。
 
