@@ -49,6 +49,7 @@ struct ExtrudeAlongSplineOptions {
     double up_y = 1.0;
     double up_z = 0.0;
     double twist_degrees = 0.0;
+    double profile_roll_degrees = 0.0;
     double scale_start = 1.0;
     double scale_end = 1.0;
     std::string profile_plane = "auto";
@@ -74,6 +75,7 @@ struct SweepAlongSplineOptions {
     double up_y = 1.0;
     double up_z = 0.0;
     double twist_degrees = 0.0;
+    double profile_roll_degrees = 0.0;
     double scale_start = 1.0;
     double scale_end = 1.0;
     std::string profile_plane = "xy";

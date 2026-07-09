@@ -43,6 +43,7 @@ public:
         opts.up_y = ctx.node->data.value("upY", 1.0);
         opts.up_z = ctx.node->data.value("upZ", 0.0);
         opts.twist_degrees = ctx.node->data.value("twist", 0.0);
+        opts.profile_roll_degrees = ctx.node->data.value("profileRoll", 0.0);
         opts.scale_start = ctx.node->data.value("scaleStart", 1.0);
         opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
         opts.profile_plane = ctx.node->data.value("profilePlane", "xy");
@@ -83,6 +84,7 @@ public:
         opts.up_y = ctx.node->data.value("upY", 1.0);
         opts.up_z = ctx.node->data.value("upZ", 0.0);
         opts.twist_degrees = ctx.node->data.value("twist", 0.0);
+        opts.profile_roll_degrees = ctx.node->data.value("profileRoll", 0.0);
         opts.scale_start = ctx.node->data.value("scaleStart", 1.0);
         opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
         opts.profile_plane = ctx.node->data.value("profilePlane", "auto");

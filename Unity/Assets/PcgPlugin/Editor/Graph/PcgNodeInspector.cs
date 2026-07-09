@@ -138,8 +138,8 @@ namespace DJTechEditor.PCG.Graph
                     var data = createSplineNode.CollectData();
                     var editPlane = data?.GetRaw("editPlane")?.ToString() ?? "none";
                     var hint = editPlane != "none"
-                        ? $"Drag control points in Scene View (locked to {editPlane.ToUpperInvariant()} plane)."
-                        : "Drag control points in Scene View.";
+                        ? $"Scene View: select point, drag on selection, I/Del insert/delete, Shift+click segment (locked to {editPlane.ToUpperInvariant()})."
+                        : "Scene View: select point, drag on selection, I insert, Del delete, Shift+click segment to insert.";
                     m_Body.Add(new Label(hint)
                     {
                         style =

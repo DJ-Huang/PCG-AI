@@ -84,6 +84,13 @@ if $COPY_TO_UNITY; then
             pending="${dest}.new"
             cp -f "$src" "$pending"
             echo "WARN: Unity may have locked $(basename "$dest"); wrote ${pending} instead."
+            dest="$pending"
+        fi
+        if [[ "$(basename "$dest")" == *.dylib ]]; then
+            xattr -cr "$dest" 2>/dev/null || true
+            codesign --force --sign - "$dest"
+            codesign --verify --verbose=2 "$dest"
+            echo "Re-signed -> $dest"
         fi
     done
 fi

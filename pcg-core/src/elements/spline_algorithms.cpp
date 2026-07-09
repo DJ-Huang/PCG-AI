@@ -264,6 +264,8 @@ data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
     geometry::SweepAlongFramesOptions sweep_opts;
     sweep_opts.cap_start = options.cap_start;
     sweep_opts.cap_end = options.cap_end;
+    sweep_opts.profile_roll_radians =
+        options.profile_roll_degrees * 3.14159265358979323846 / 180.0;
     sweep_opts.twist_radians = options.twist_degrees * 3.14159265358979323846 / 180.0;
     sweep_opts.scale_start = options.scale_start;
     sweep_opts.scale_end = options.scale_end;
@@ -311,6 +313,8 @@ data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
     geometry::SweepAlongFramesOptions sweep_opts;
     sweep_opts.cap_start = options.cap_start;
     sweep_opts.cap_end = options.cap_end;
+    sweep_opts.profile_roll_radians =
+        options.profile_roll_degrees * 3.14159265358979323846 / 180.0;
     sweep_opts.twist_radians = options.twist_degrees * 3.14159265358979323846 / 180.0;
     sweep_opts.scale_start = options.scale_start;
     sweep_opts.scale_end = options.scale_end;
@@ -424,8 +428,7 @@ data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,
             };
         }
 
-        geometry::Vec3 binormal = geometry::normalize(geometry::cross(tangent, normal));
-        normal = geometry::normalize(geometry::cross(binormal, tangent));
+        geometry::Vec3 binormal = geometry::normalize(geometry::cross(normal, tangent));
 
         const geometry::Frame3 frame{{placement.x, placement.y, placement.z}, tangent, normal, binormal};
         const int offset = static_cast<int>(merged.vertices().size());

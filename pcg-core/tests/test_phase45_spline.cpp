@@ -3,6 +3,7 @@
 #include "data/pcg_mesh_binary.hpp"
 #include "elements/spline_algorithms.hpp"
 #include "elements/mesh_algorithms.hpp"
+#include "geometry/spline_geometry.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -70,6 +71,7 @@ PcgResultCode execute_mesh_graph(const char* json, int seed, int& vertex_count, 
 int main()
 {
     using namespace pcg::internal::elements;
+    using namespace pcg::internal::geometry;
 
     CreateSplineOptions create_opts;
     create_opts.mode = "line";
@@ -97,6 +99,56 @@ int main()
     std::printf("PASS: extrude_along_spline unit (%zu verts, %zu tris)\n", deck.vertices().size(),
                 deck.triangles().size() / 3);
 
+    int extrude_left_z = 0;
+    int extrude_right_z = 0;
+    for (const auto& vertex : deck.vertices())
+    {
+        if (std::abs(vertex.x) > 0.05 || std::abs(vertex.y + 0.25) > 0.05)
+            continue;
+        if (vertex.z > 1.5)
+            ++extrude_left_z;
+        else if (vertex.z < -1.5)
+            ++extrude_right_z;
+    }
+    if (extrude_left_z == 0 || extrude_right_z == 0)
+    {
+        std::printf("FAIL: extrude width corners missing (left=%d right=%d)\n", extrude_left_z,
+                    extrude_right_z);
+        return 1;
+    }
+
+    int extrude_outward_width = 0;
+    int extrude_inward_width = 0;
+    for (size_t i = 0; i + 2 < deck.triangles().size(); i += 3)
+    {
+        const auto& a = deck.vertices()[static_cast<size_t>(deck.triangles()[i])];
+        const auto& b = deck.vertices()[static_cast<size_t>(deck.triangles()[i + 1])];
+        const auto& c = deck.vertices()[static_cast<size_t>(deck.triangles()[i + 2])];
+        const Vec3 va{a.x, a.y, a.z};
+        const Vec3 vb{b.x, b.y, b.z};
+        const Vec3 vc{c.x, c.y, c.z};
+        const Vec3 n = normalize(cross(sub(vb, va), sub(vc, va)));
+        if (std::abs(n.y) > 0.5)
+            continue;
+        if (std::abs(n.z) <= 0.5)
+            continue;
+
+        const Vec3 center = scale(add(add(va, vb), vc), 1.0 / 3.0);
+        const double outward = dot(n, center);
+        if (outward > 0.0)
+            ++extrude_outward_width;
+        else
+            ++extrude_inward_width;
+    }
+    if (extrude_outward_width == 0 || extrude_inward_width > extrude_outward_width / 2)
+    {
+        std::printf("FAIL: extrude width-face normals should face outward (out=%d in=%d)\n",
+                    extrude_outward_width, extrude_inward_width);
+        return 1;
+    }
+    std::printf("PASS: extrude width orientation + outward side normals (out=%d in=%d)\n",
+                extrude_outward_width, extrude_inward_width);
+
     SweepAlongSplineOptions sweep_opts;
     sweep_opts.surface_shape = "rectangle";
     sweep_opts.profile_width = 4.0;
@@ -110,6 +162,40 @@ int main()
     }
     std::printf("PASS: sweep_along_spline rectangle (%zu verts, %zu tris)\n",
                 swept_rect.vertices().size(), swept_rect.triangles().size() / 3);
+
+    const std::vector<Vec3> axis_line = {{0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}};
+    const auto axis_frames = build_frames(axis_line, {0.0, 1.0, 0.0});
+    if (axis_frames.empty() || axis_frames.front().normal.y < 0.9)
+    {
+        std::printf("FAIL: build_frames should keep +Y as profile up for +X backbone\n");
+        return 1;
+    }
+    std::printf("PASS: build_frames +X backbone keeps +Y normal\n");
+
+    double upward_sum = 0.0;
+    int upward_count = 0;
+    for (size_t i = 0; i + 2 < swept_rect.triangles().size(); i += 3)
+    {
+        const auto& a = swept_rect.vertices()[static_cast<size_t>(swept_rect.triangles()[i])];
+        const auto& b = swept_rect.vertices()[static_cast<size_t>(swept_rect.triangles()[i + 1])];
+        const auto& c = swept_rect.vertices()[static_cast<size_t>(swept_rect.triangles()[i + 2])];
+        const Vec3 va{a.x, a.y, a.z};
+        const Vec3 vb{b.x, b.y, b.z};
+        const Vec3 vc{c.x, c.y, c.z};
+        const Vec3 n = normalize(cross(sub(vb, va), sub(vc, va)));
+        if (n.y > 0.5)
+        {
+            upward_sum += n.y;
+            ++upward_count;
+        }
+    }
+    if (upward_count == 0 || upward_sum / static_cast<double>(upward_count) < 0.8)
+    {
+        std::printf("FAIL: sweep rectangle normals should face +Y (count=%d)\n", upward_count);
+        return 1;
+    }
+    std::printf("PASS: sweep rectangle upward normals (avg=%.3f, count=%d)\n",
+                upward_sum / static_cast<double>(upward_count), upward_count);
 
     CreateSplineOptions profile_opts_create;
     profile_opts_create.mode = "polyline";

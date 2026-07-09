@@ -90,18 +90,12 @@ int64_t weld_key(const Vec3& v, double epsilon)
 
 std::vector<std::pair<int, int>> extract_boundary_edges(const std::vector<int>& triangles, int vertex_count)
 {
-    std::unordered_map<uint64_t, std::pair<int, int>> edge_use;
-    edge_use.reserve(triangles.size());
+    std::unordered_map<uint64_t, int> directed_use;
+    directed_use.reserve(triangles.size());
 
-    const auto add_edge = [&](int a, int b) {
-        const int lo = std::min(a, b);
-        const int hi = std::max(a, b);
-        const uint64_t key = (static_cast<uint64_t>(lo) << 32) | static_cast<uint32_t>(hi);
-        auto it = edge_use.find(key);
-        if (it == edge_use.end())
-            edge_use.emplace(key, std::make_pair(lo, hi));
-        else
-            it->second = {-1, -1};
+    const auto edge_key = [](int a, int b) -> uint64_t {
+        return (static_cast<uint64_t>(static_cast<uint32_t>(a)) << 32) |
+               static_cast<uint32_t>(b);
     };
 
     for (size_t i = 0; i + 2 < triangles.size(); i += 3) {
@@ -110,17 +104,20 @@ std::vector<std::pair<int, int>> extract_boundary_edges(const std::vector<int>& 
         const int c = triangles[i + 2];
         if (a < 0 || b < 0 || c < 0 || a >= vertex_count || b >= vertex_count || c >= vertex_count)
             continue;
-        add_edge(a, b);
-        add_edge(b, c);
-        add_edge(c, a);
+        ++directed_use[edge_key(a, b)];
+        ++directed_use[edge_key(b, c)];
+        ++directed_use[edge_key(c, a)];
     }
 
     std::vector<std::pair<int, int>> boundary;
-    boundary.reserve(edge_use.size());
-    for (const auto& [key, edge] : edge_use) {
-        (void)key;
-        if (edge.first >= 0)
-            boundary.push_back(edge);
+    boundary.reserve(directed_use.size());
+    for (const auto& [key, count] : directed_use) {
+        if (count != 1)
+            continue;
+        const int a = static_cast<int>(key >> 32);
+        const int b = static_cast<int>(key & 0xffffffffu);
+        if (directed_use[edge_key(b, a)] == 0)
+            boundary.push_back({a, b});
     }
     return boundary;
 }
@@ -240,9 +237,9 @@ data::PcgMeshData sweep_cross_section(const CrossSectionMesh& section,
 
     for (size_t fi = 0; fi < frame_count; ++fi) {
         const double t = frame_count <= 1 ? 0.0 : static_cast<double>(fi) / static_cast<double>(frame_count - 1);
-        const double twist = options.twist_radians * t;
+        const double roll = options.profile_roll_radians + options.twist_radians * t;
         const double scale_xy = options.scale_start + (options.scale_end - options.scale_start) * t;
-        const Frame3 frame = apply_twist_and_scale(frames[fi], twist, scale_xy);
+        const Frame3 frame = apply_twist_and_scale(frames[fi], roll, scale_xy);
 
         for (size_t vi = 0; vi < profile_count; ++vi) {
             rings[fi][vi] = static_cast<int>(result.vertices().size());
@@ -376,9 +373,9 @@ data::PcgMeshData sweep_curve_profile(const CurveProfile& profile,
 
     for (size_t fi = 0; fi < frame_count; ++fi) {
         const double t = frame_count <= 1 ? 0.0 : static_cast<double>(fi) / static_cast<double>(frame_count - 1);
-        const double twist = options.twist_radians * t;
+        const double roll = options.profile_roll_radians + options.twist_radians * t;
         const double scale_xy = options.scale_start + (options.scale_end - options.scale_start) * t;
-        const Frame3 frame = apply_twist_and_scale(frames[fi], twist, scale_xy);
+        const Frame3 frame = apply_twist_and_scale(frames[fi], roll, scale_xy);
 
         for (size_t vi = 0; vi < profile_count; ++vi) {
             rings[fi][vi] = static_cast<int>(result.vertices().size());

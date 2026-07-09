@@ -21,6 +21,21 @@ int wrap_index(int index, int count, bool closed)
     return wrapped;
 }
 
+Vec3 project_onto_plane_perpendicular(const Vec3& v, const Vec3& axis)
+{
+    return sub(v, scale(axis, dot(v, axis)));
+}
+
+Vec3 compute_frame_normal(const Vec3& tangent, const Vec3& up_hint)
+{
+    Vec3 normal = project_onto_plane_perpendicular(up_hint, tangent);
+    if (length(normal) <= kEpsilon) {
+        const Vec3 fallback = std::abs(tangent.y) < 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0};
+        normal = project_onto_plane_perpendicular(fallback, tangent);
+    }
+    return normalize(normal);
+}
+
 } // namespace
 
 Vec3 add(const Vec3& a, const Vec3& b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
@@ -234,10 +249,7 @@ std::vector<Frame3> build_frames(const std::vector<Vec3>& polyline, const Vec3& 
         else
             tangent = normalize(add(sub(polyline[i + 1], polyline[i]), sub(polyline[i], polyline[i - 1])));
 
-        Vec3 normal = cross(cross(up_hint, tangent), tangent);
-        if (length(normal) <= kEpsilon)
-            normal = cross(cross(Vec3{1.0, 0.0, 0.0}, tangent), tangent);
-        normal = normalize(normal);
+        Vec3 normal = compute_frame_normal(tangent, up_hint);
 
         if (i > 0 && length(prev_normal) > kEpsilon) {
             Vec3 axis = cross(prev_normal, normal);
@@ -252,10 +264,10 @@ std::vector<Frame3> build_frames(const std::vector<Vec3>& polyline, const Vec3& 
             }
         }
 
-        Vec3 binormal = normalize(cross(tangent, normal));
+        // Profile local +X maps to binormal; cross(up, tangent) matches path-right width.
+        Vec3 binormal = normalize(cross(normal, tangent));
         if (length(binormal) <= kEpsilon)
-            binormal = normalize(cross(tangent, Vec3{1.0, 0.0, 0.0}));
-        normal = normalize(cross(binormal, tangent));
+            binormal = normalize(cross(Vec3{1.0, 0.0, 0.0}, tangent));
 
         frames.push_back(Frame3{polyline[i], tangent, normal, binormal});
         prev_normal = normal;

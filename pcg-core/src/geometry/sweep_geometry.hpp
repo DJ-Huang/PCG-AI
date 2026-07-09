@@ -25,6 +25,7 @@ struct CrossSectionMesh {
 struct SweepAlongFramesOptions {
     bool cap_start = true;
     bool cap_end = true;
+    double profile_roll_radians = 0.0;
     double twist_radians = 0.0;
     double scale_start = 1.0;
     double scale_end = 1.0;

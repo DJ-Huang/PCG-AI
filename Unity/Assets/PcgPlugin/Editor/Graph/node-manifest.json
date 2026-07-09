@@ -529,6 +529,7 @@
         "upY": { "type": "number", "default": 1 },
         "upZ": { "type": "number", "default": 0 },
         "twist": { "type": "number", "default": 0 },
+        "profileRoll": { "type": "number", "default": 0, "minimum": -360, "maximum": 360 },
         "scaleStart": { "type": "number", "default": 1.0, "minimum": 0.001 },
         "scaleEnd": { "type": "number", "default": 1.0, "minimum": 0.001 },
         "profilePlane": {
@@ -561,6 +562,7 @@
         "upY": { "type": "number", "default": 1 },
         "upZ": { "type": "number", "default": 0 },
         "twist": { "type": "number", "default": 0 },
+        "profileRoll": { "type": "number", "default": 0, "minimum": -360, "maximum": 360 },
         "scaleStart": { "type": "number", "default": 1.0, "minimum": 0.001 },
         "scaleEnd": { "type": "number", "default": 1.0, "minimum": 0.001 },
         "profilePlane": {
