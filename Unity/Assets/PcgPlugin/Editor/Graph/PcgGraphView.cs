@@ -68,7 +68,7 @@ namespace DJTechEditor.PCG.Graph
             m_State = PcgGraphState.Create();
 
             style.flexGrow = 1;
-            SetupZoom(ContentZoomer.DefaultMinScale, 6f);
+            SetupZoom(ContentZoomer.DefaultMinScale, 4f);
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());
@@ -367,7 +367,7 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_SuppressUndo) return;
 
-            // Dismiss info panel on any click outside the panel itself
+            // Dismiss info panel when clicking on a node, edge, or button (not blank graph)
             if (m_InfoPanel != null && m_InfoPanel.style.display == DisplayStyle.Flex)
             {
                 var targetVE = evt.target as VisualElement;
@@ -383,7 +383,13 @@ namespace DJTechEditor.PCG.Graph
                     walker = walker.parent;
                 }
                 if (!clickedInsidePanel)
-                    HideNodeInfoPanel();
+                {
+                    bool clickedNode = targetVE is PcgGraphNodeBase || targetVE?.GetFirstAncestorOfType<PcgGraphNodeBase>() != null;
+                    bool clickedEdge = IsEdgePointerTarget(targetVE);
+                    bool clickedButton = targetVE is Button || targetVE?.GetFirstAncestorOfType<Button>() != null;
+                    if (clickedNode || clickedEdge || clickedButton)
+                        HideNodeInfoPanel();
+                }
             }
 
             if (m_ActiveRadialMenuNode != null &&

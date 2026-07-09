@@ -123,8 +123,7 @@ namespace DJTechEditor.PCG.Graph
             var closeBtn = this.Q<Button>("info-close-btn");
             if (closeBtn != null)
             {
-                closeBtn.clickable = null;
-                closeBtn.RegisterCallback<ClickEvent>(_ => Hide());
+                closeBtn.clicked += Hide;
             }
         }
 
