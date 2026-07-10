@@ -29,7 +29,7 @@ namespace DJTechEditor.PCG.Graph
 
         internal const float NodeWidth = 92f * 2f / 3f;
         internal const float NodeHeight = 23f;
-        internal const float NodeCornerRadius = 4f;
+        internal const float NodeCornerRadius = 12f;
         internal const float PinSize = 14f * 2f / 3f;
         internal const float PinMargin = 4f * 2f / 3f;
         internal const float PinBorderWidth = 2f * 2f / 3f;
@@ -131,6 +131,10 @@ namespace DJTechEditor.PCG.Graph
             style.borderBottomWidth = 0;
             style.borderLeftWidth = 0;
             style.backgroundColor = Color.clear;
+            style.borderTopLeftRadius = NodeCornerRadius;
+            style.borderTopRightRadius = NodeCornerRadius;
+            style.borderBottomLeftRadius = NodeCornerRadius;
+            style.borderBottomRightRadius = NodeCornerRadius;
 
             EnsureNodeFrame();
 
@@ -153,6 +157,10 @@ namespace DJTechEditor.PCG.Graph
             mainContainer.style.borderBottomWidth = 0;
             mainContainer.style.borderLeftWidth = 0;
             mainContainer.style.backgroundColor = Color.clear;
+            mainContainer.style.borderTopLeftRadius = NodeCornerRadius;
+            mainContainer.style.borderTopRightRadius = NodeCornerRadius;
+            mainContainer.style.borderBottomLeftRadius = NodeCornerRadius;
+            mainContainer.style.borderBottomRightRadius = NodeCornerRadius;
             mainContainer.pickingMode = PickingMode.Ignore;
             extensionContainer.pickingMode = PickingMode.Ignore;
 
@@ -195,9 +203,7 @@ namespace DJTechEditor.PCG.Graph
         /// <summary>
         /// Called by PcgGraphView after any selection change. Reads the
         /// actual USS "selected" class state and updates the frame border
-        /// accordingly. This is the single source of truth for selection
-        /// visual state — Select/Unselect overrides are not used because
-        /// Tuanjie's GraphView does not call them reliably.
+        /// accordingly.
         /// </summary>
         internal void RefreshSelectionVisual()
         {
@@ -206,9 +212,8 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Force border 0 and clear background on the Node root and
-        /// mainContainer to suppress Unity's built-in GraphView selection
-        /// styling (USS .selected). Our m_NodeFrame handles all visuals.
+        /// Suppress Unity's built-in GraphView selection styling (USS .selected)
+        /// on the Node root and mainContainer — border AND background.
         /// </summary>
         private void SuppressBuiltinSelectionStyle()
         {
@@ -217,20 +222,20 @@ namespace DJTechEditor.PCG.Graph
             style.borderBottomWidth = 0;
             style.borderLeftWidth = 0;
             style.backgroundColor = Color.clear;
-            style.borderTopLeftRadius = 0;
-            style.borderTopRightRadius = 0;
-            style.borderBottomLeftRadius = 0;
-            style.borderBottomRightRadius = 0;
+            style.borderTopLeftRadius = NodeCornerRadius;
+            style.borderTopRightRadius = NodeCornerRadius;
+            style.borderBottomLeftRadius = NodeCornerRadius;
+            style.borderBottomRightRadius = NodeCornerRadius;
 
             mainContainer.style.borderTopWidth = 0;
             mainContainer.style.borderRightWidth = 0;
             mainContainer.style.borderBottomWidth = 0;
             mainContainer.style.borderLeftWidth = 0;
             mainContainer.style.backgroundColor = Color.clear;
-            mainContainer.style.borderTopLeftRadius = 0;
-            mainContainer.style.borderTopRightRadius = 0;
-            mainContainer.style.borderBottomLeftRadius = 0;
-            mainContainer.style.borderBottomRightRadius = 0;
+            mainContainer.style.borderTopLeftRadius = NodeCornerRadius;
+            mainContainer.style.borderTopRightRadius = NodeCornerRadius;
+            mainContainer.style.borderBottomLeftRadius = NodeCornerRadius;
+            mainContainer.style.borderBottomRightRadius = NodeCornerRadius;
         }
 
         private void UpdateNodeFrameBorder()
