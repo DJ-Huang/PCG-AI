@@ -437,6 +437,14 @@ data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshDa
     return out;
 }
 
+data::PcgMeshData merge_meshes(const std::vector<data::PcgMeshData>& meshes)
+{
+    data::PcgMeshData out;
+    for (const auto& mesh : meshes)
+        out = merge_meshes(out, mesh);
+    return out;
+}
+
 data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,
                                         const data::PcgMeshData& prototype,
                                         const InstanceAlongSplineOptions& options)

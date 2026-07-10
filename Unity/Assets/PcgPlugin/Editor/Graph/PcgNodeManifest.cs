@@ -14,6 +14,7 @@ namespace DJTechEditor.PCG.Graph
         public string id;
         public string label;
         public string pinType;
+        public bool variadic;
     }
 
     public class ManifestPropertyOption
@@ -344,6 +345,7 @@ namespace DJTechEditor.PCG.Graph
             id = GetString(pin, "id"),
             label = GetString(pin, "label", GetString(pin, "id")),
             pinType = GetString(pin, "pinType", "SpatialPoint"),
+            variadic = pin.TryGetValue("variadic", out var v) && Convert.ToBoolean(v, CultureInfo.InvariantCulture),
         };
 
         private static object ParseDefault(Dictionary<string, object> prop)

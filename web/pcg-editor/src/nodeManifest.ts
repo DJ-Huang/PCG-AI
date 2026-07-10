@@ -30,6 +30,7 @@ export interface ManifestPin {
   id: string;
   label: string;
   pinType: PinType;
+  variadic?: boolean;
 }
 
 export interface ManifestOutputGroup {

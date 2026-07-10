@@ -146,3 +146,9 @@ Unity/Assets/PcgPlugin/Runtime/PcgMiniJson.cs.meta
 Unity/Assets/PcgPlugin/Runtime/PcgParameterApplicator.cs
 Unity/Assets/PcgPlugin/Runtime/PcgParameterApplicator.cs.meta
 Unity/Assets/PcgPlugin/Runtime/PcgRuntimeRunner.cs
+
+# >>> Codely setup.bat (synced rules — do not commit) >>>
+# Source: Codely main repo sync/ + CODELY.md — re-run setup.bat to refresh
+.codely-cli/rules/
+CODELY.md
+# <<< Codely setup.bat >>>

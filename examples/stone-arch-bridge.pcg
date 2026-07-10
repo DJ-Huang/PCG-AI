@@ -111,15 +111,9 @@
       }
     },
     {
-      "id": "merge1",
-      "type": "MergeMesh",
-      "position": { "x": 200, "y": 800 },
-      "data": {}
-    },
-    {
       "id": "left_abut_box",
       "type": "CreateBoxMesh",
-      "position": { "x": -20, "y": 800 },
+      "position": { "x": -20, "y": 640 },
       "data": {
         "width": 2, "height": 7, "depth": 7
       }
@@ -127,7 +121,7 @@
     {
       "id": "left_abut",
       "type": "TransformMesh",
-      "position": { "x": -20, "y": 960 },
+      "position": { "x": -20, "y": 800 },
       "data": {
         "translateX": -1, "translateY": -3.5, "translateZ": 0,
         "rotationX": 0, "rotationY": 0, "rotationZ": 0,
@@ -137,21 +131,15 @@
     {
       "id": "right_abut_box",
       "type": "CreateBoxMesh",
-      "position": { "x": 420, "y": 960 },
+      "position": { "x": 420, "y": 800 },
       "data": {
         "width": 2, "height": 7, "depth": 7
       }
     },
     {
-      "id": "merge2",
-      "type": "MergeMesh",
-      "position": { "x": 200, "y": 1120 },
-      "data": {}
-    },
-    {
       "id": "right_abut",
       "type": "TransformMesh",
-      "position": { "x": 420, "y": 1120 },
+      "position": { "x": 420, "y": 960 },
       "data": {
         "translateX": 41, "translateY": -3.5, "translateZ": 0,
         "rotationX": 0, "rotationY": 0, "rotationZ": 0,
@@ -159,15 +147,9 @@
       }
     },
     {
-      "id": "merge3",
-      "type": "MergeMesh",
-      "position": { "x": 200, "y": 1280 },
-      "data": {}
-    },
-    {
       "id": "left_rail_path",
       "type": "CreateSpline",
-      "position": { "x": -20, "y": 1280 },
+      "position": { "x": -20, "y": 960 },
       "data": {
         "mode": "catmullRom",
         "closed": false,
@@ -182,7 +164,7 @@
     {
       "id": "post_box",
       "type": "CreateBoxMesh",
-      "position": { "x": 420, "y": 1280 },
+      "position": { "x": 620, "y": 960 },
       "data": {
         "width": 0.25, "height": 1.2, "depth": 0.25
       }
@@ -190,7 +172,7 @@
     {
       "id": "left_railing",
       "type": "InstanceAlongSpline",
-      "position": { "x": -20, "y": 1440 },
+      "position": { "x": -20, "y": 1120 },
       "data": {
         "spacing": 2.0,
         "offset": 0.5,
@@ -202,7 +184,7 @@
     {
       "id": "right_rail_path",
       "type": "CreateSpline",
-      "position": { "x": 420, "y": 1440 },
+      "position": { "x": 420, "y": 1120 },
       "data": {
         "mode": "catmullRom",
         "closed": false,
@@ -215,15 +197,9 @@
       }
     },
     {
-      "id": "merge4",
-      "type": "MergeMesh",
-      "position": { "x": 200, "y": 1600 },
-      "data": {}
-    },
-    {
       "id": "right_railing",
       "type": "InstanceAlongSpline",
-      "position": { "x": 420, "y": 1600 },
+      "position": { "x": 420, "y": 1280 },
       "data": {
         "spacing": 2.0,
         "offset": 0.5,
@@ -233,15 +209,15 @@
       }
     },
     {
-      "id": "merge5",
+      "id": "merge",
       "type": "MergeMesh",
-      "position": { "x": 200, "y": 1760 },
+      "position": { "x": 200, "y": 1440 },
       "data": {}
     },
     {
       "id": "noise",
       "type": "MeshNoiseDeform",
-      "position": { "x": 200, "y": 1920 },
+      "position": { "x": 200, "y": 1600 },
       "data": {
         "intensity": 0.015,
         "scale": 3.0,
@@ -253,7 +229,7 @@
     {
       "id": "output",
       "type": "Output",
-      "position": { "x": 200, "y": 2080 },
+      "position": { "x": 200, "y": 1760 },
       "data": {
         "label": "Stone Arch Bridge"
       }
@@ -272,18 +248,14 @@
     { "id": "e10", "source": "post_box", "target": "left_railing", "sourceHandle": "out", "targetHandle": "mesh" },
     { "id": "e11", "source": "right_rail_path", "target": "right_railing", "sourceHandle": "out", "targetHandle": "spline" },
     { "id": "e12", "source": "post_box", "target": "right_railing", "sourceHandle": "out", "targetHandle": "mesh" },
-    { "id": "e13", "source": "arch_deck", "target": "merge1", "sourceHandle": "out", "targetHandle": "a" },
-    { "id": "e14", "source": "arch_bevel", "target": "merge1", "sourceHandle": "out", "targetHandle": "b" },
-    { "id": "e15", "source": "merge1", "target": "merge2", "sourceHandle": "out", "targetHandle": "a" },
-    { "id": "e16", "source": "left_abut", "target": "merge2", "sourceHandle": "out", "targetHandle": "b" },
-    { "id": "e17", "source": "merge2", "target": "merge3", "sourceHandle": "out", "targetHandle": "a" },
-    { "id": "e18", "source": "right_abut", "target": "merge3", "sourceHandle": "out", "targetHandle": "b" },
-    { "id": "e19", "source": "merge3", "target": "merge4", "sourceHandle": "out", "targetHandle": "a" },
-    { "id": "e20", "source": "left_railing", "target": "merge4", "sourceHandle": "out", "targetHandle": "b" },
-    { "id": "e21", "source": "merge4", "target": "merge5", "sourceHandle": "out", "targetHandle": "a" },
-    { "id": "e22", "source": "right_railing", "target": "merge5", "sourceHandle": "out", "targetHandle": "b" },
-    { "id": "e23", "source": "merge5", "target": "noise", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e24", "source": "noise", "target": "output", "sourceHandle": "out", "targetHandle": "in" }
+    { "id": "e13", "source": "arch_deck", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e14", "source": "arch_bevel", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e15", "source": "left_abut", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e16", "source": "right_abut", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e17", "source": "left_railing", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e18", "source": "right_railing", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e19", "source": "merge", "target": "noise", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e20", "source": "noise", "target": "output", "sourceHandle": "out", "targetHandle": "in" }
   ],
   "parameters": [
     { "id": "p1", "name": "bevelAmount", "type": "number", "default": 0.15, "exposed": true, "targetNode": "arch_bevel", "targetProperty": "amount", "hasRange": true, "min": 0.02, "max": 0.5 },

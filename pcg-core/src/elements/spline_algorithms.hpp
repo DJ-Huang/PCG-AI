@@ -118,6 +118,7 @@ data::PcgGeometry sweep_along_spline_geometry(const data::PcgSplineData& backbon
                                               const SweepAlongSplineOptions& options);
 data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformMeshOptions& options);
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b);
+data::PcgMeshData merge_meshes(const std::vector<data::PcgMeshData>& meshes);
 data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,
                                         const data::PcgMeshData& prototype,
                                         const InstanceAlongSplineOptions& options);

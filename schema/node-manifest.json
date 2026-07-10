@@ -694,8 +694,7 @@
       "displayName": "Merge Mesh",
       "category": "Mesh",
       "inputs": [
-        { "id": "a", "label": "Mesh A", "pinType": "SpatialMesh" },
-        { "id": "b", "label": "Mesh B", "pinType": "SpatialMesh" }
+        { "id": "in", "label": "Meshes", "pinType": "SpatialMesh", "variadic": true }
       ],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "properties": {}

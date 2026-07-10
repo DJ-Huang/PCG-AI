@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "nodes": [
+    { "id": "track_box", "type": "CreateBoxMesh", "position": { "x": -20, "y": 0 },
+      "data": { "width": 3.0, "height": 0.6, "depth": 3.5 } },
+    { "id": "body_box", "type": "CreateBoxMesh", "position": { "x": 420, "y": 0 },
+      "data": { "width": 2.6, "height": 1.0, "depth": 2.8 } },
+
+    { "id": "track_tm", "type": "TransformMesh", "position": { "x": -20, "y": 160 },
+      "data": { "translateY": 0.3 } },
+    { "id": "body_tm", "type": "TransformMesh", "position": { "x": 420, "y": 160 },
+      "data": { "translateY": 1.1, "translateZ": -0.3 } },
+
+    { "id": "cab_box", "type": "CreateBoxMesh", "position": { "x": 420, "y": 320 },
+      "data": { "width": 1.6, "height": 1.3, "depth": 1.2 } },
+    { "id": "cab_tm", "type": "TransformMesh", "position": { "x": 420, "y": 480 },
+      "data": { "translateY": 2.25, "translateZ": 1.0 } },
+
+    { "id": "cwt_box", "type": "CreateBoxMesh", "position": { "x": 420, "y": 640 },
+      "data": { "width": 2.4, "height": 1.0, "depth": 0.4 } },
+    { "id": "cwt_tm", "type": "TransformMesh", "position": { "x": 420, "y": 800 },
+      "data": { "translateY": 1.1, "translateZ": -1.5 } },
+
+    { "id": "boom_box", "type": "CreateBoxMesh", "position": { "x": 420, "y": 960 },
+      "data": { "width": 0.35, "height": 3.0, "depth": 0.45 } },
+    { "id": "boom_tm", "type": "TransformMesh", "position": { "x": 420, "y": 1120 },
+      "data": { "translateY": 2.0, "translateZ": 1.0, "rotationX": 40 } },
+
+    { "id": "stick_box", "type": "CreateBoxMesh", "position": { "x": 420, "y": 1280 },
+      "data": { "width": 0.3, "height": 2.4, "depth": 0.4 } },
+    { "id": "stick_tm", "type": "TransformMesh", "position": { "x": 420, "y": 1440 },
+      "data": { "translateY": 2.0, "translateZ": 2.5, "rotationX": -30 } },
+
+    { "id": "bucket_box", "type": "CreateBoxMesh", "position": { "x": 420, "y": 1600 },
+      "data": { "width": 0.9, "height": 0.7, "depth": 0.6 } },
+    { "id": "bucket_tm", "type": "TransformMesh", "position": { "x": 420, "y": 1760 },
+      "data": { "translateY": 0.6, "translateZ": 3.5, "rotationX": -15 } },
+
+    { "id": "merge", "type": "MergeMesh", "position": { "x": 200, "y": 1920 }, "data": {} },
+
+    { "id": "subdiv", "type": "SubdivideMesh", "position": { "x": 200, "y": 2080 },
+      "data": { "levels": 2 } },
+
+    { "id": "bevel", "type": "BevelMesh", "position": { "x": 200, "y": 2240 },
+      "data": { "method": "edge", "amount": 0.08, "segments": 2, "angleLimit": 40 } },
+
+    { "id": "out", "type": "Output", "position": { "x": 200, "y": 2400 },
+      "data": { "label": "Excavator" } }
+  ],
+  "edges": [
+    { "id": "e1",  "source": "track_box",  "target": "track_tm",  "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2",  "source": "body_box",   "target": "body_tm",   "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3",  "source": "cab_box",    "target": "cab_tm",    "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e4",  "source": "cwt_box",    "target": "cwt_tm",    "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e5",  "source": "boom_box",   "target": "boom_tm",   "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e6",  "source": "stick_box",  "target": "stick_tm",  "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e7",  "source": "bucket_box", "target": "bucket_tm", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e8",  "source": "track_tm",   "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e9",  "source": "body_tm",    "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e10", "source": "cab_tm",     "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e11", "source": "cwt_tm",     "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e12", "source": "boom_tm",    "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e13", "source": "stick_tm",   "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e14", "source": "bucket_tm",  "target": "merge",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e15", "source": "merge",      "target": "subdiv",    "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e16", "source": "subdiv",     "target": "bevel",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e17", "source": "bevel",      "target": "out",       "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

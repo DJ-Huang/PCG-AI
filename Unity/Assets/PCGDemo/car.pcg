@@ -1,0 +1,149 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "body_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 200, "y": 0 },
+      "data": { "width": 4.2, "height": 0.8, "depth": 1.8 }
+    },
+    {
+      "id": "cabin_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 360, "y": 0 },
+      "data": { "width": 2.0, "height": 0.75, "depth": 1.55 }
+    },
+    {
+      "id": "wheel_spline",
+      "type": "CreateSpline",
+      "position": { "x": 520, "y": 0 },
+      "data": {
+        "mode": "line",
+        "closed": false,
+        "subdivisions": 1,
+        "controlPoints": "[{\"x\":0,\"y\":0,\"z\":-0.15},{\"x\":0,\"y\":0,\"z\":0.15}]",
+        "editPlane": "none"
+      }
+    },
+    {
+      "id": "body_subdiv",
+      "type": "SubdivideMesh",
+      "position": { "x": 200, "y": 160 },
+      "data": { "levels": 2 }
+    },
+    {
+      "id": "cabin_subdiv",
+      "type": "SubdivideMesh",
+      "position": { "x": 360, "y": 160 },
+      "data": { "levels": 2 }
+    },
+    {
+      "id": "wheel_mesh",
+      "type": "SweepAlongSpline",
+      "position": { "x": 520, "y": 160 },
+      "data": {
+        "surfaceShape": "circle",
+        "radius": 0.35,
+        "columns": 16,
+        "sampleSpacing": 0.3,
+        "capStart": true,
+        "capEnd": true,
+        "upX": 0, "upY": 1, "upZ": 0,
+        "scaleStart": 1.0, "scaleEnd": 1.0,
+        "profilePlane": "xy"
+      }
+    },
+    {
+      "id": "body_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 200, "y": 320 },
+      "data": {
+        "method": "edge",
+        "amount": 0.25,
+        "segments": 5,
+        "profile": 0.7,
+        "clampOverlap": true
+      }
+    },
+    {
+      "id": "cabin_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 360, "y": 320 },
+      "data": {
+        "method": "edge",
+        "amount": 0.2,
+        "segments": 5,
+        "profile": 0.7,
+        "clampOverlap": true
+      }
+    },
+    {
+      "id": "body_t",
+      "type": "TransformMesh",
+      "position": { "x": 200, "y": 480 },
+      "data": { "translateY": 0.6 }
+    },
+    {
+      "id": "cabin_t",
+      "type": "TransformMesh",
+      "position": { "x": 360, "y": 480 },
+      "data": { "translateX": 0.3, "translateY": 1.3 }
+    },
+    {
+      "id": "wheel_fl",
+      "type": "TransformMesh",
+      "position": { "x": 520, "y": 480 },
+      "data": { "translateX": 1.4, "translateY": 0.35, "translateZ": 0.9 }
+    },
+    {
+      "id": "wheel_fr",
+      "type": "TransformMesh",
+      "position": { "x": 600, "y": 480 },
+      "data": { "translateX": 1.4, "translateY": 0.35, "translateZ": -0.9 }
+    },
+    {
+      "id": "wheel_rl",
+      "type": "TransformMesh",
+      "position": { "x": 680, "y": 480 },
+      "data": { "translateX": -1.4, "translateY": 0.35, "translateZ": 0.9 }
+    },
+    {
+      "id": "wheel_rr",
+      "type": "TransformMesh",
+      "position": { "x": 760, "y": 480 },
+      "data": { "translateX": -1.4, "translateY": 0.35, "translateZ": -0.9 }
+    },
+    {
+      "id": "merge",
+      "type": "MergeMesh",
+      "position": { "x": 400, "y": 640 },
+      "data": {}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 400, "y": 800 },
+      "data": { "label": "Car" }
+    }
+  ],
+  "edges": [
+    { "id": "e1",  "source": "body_box",     "target": "body_subdiv",  "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2",  "source": "body_subdiv",  "target": "body_bevel",   "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3",  "source": "body_bevel",   "target": "body_t",       "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e4",  "source": "cabin_box",    "target": "cabin_subdiv", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e5",  "source": "cabin_subdiv", "target": "cabin_bevel",  "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e6",  "source": "cabin_bevel",  "target": "cabin_t",      "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e7",  "source": "wheel_spline", "target": "wheel_mesh",   "sourceHandle": "out", "targetHandle": "backbone" },
+    { "id": "e8",  "source": "wheel_mesh",   "target": "wheel_fl",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e9",  "source": "wheel_mesh",   "target": "wheel_fr",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e10", "source": "wheel_mesh",   "target": "wheel_rl",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e11", "source": "wheel_mesh",   "target": "wheel_rr",     "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e12", "source": "body_t",      "target": "merge",         "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e13", "source": "cabin_t",     "target": "merge",         "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e14", "source": "wheel_fl",    "target": "merge",         "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e15", "source": "wheel_fr",    "target": "merge",         "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e16", "source": "wheel_rl",    "target": "merge",         "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e17", "source": "wheel_rr",    "target": "merge",         "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e18", "source": "merge",       "target": "out",           "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

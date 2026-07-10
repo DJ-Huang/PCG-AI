@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace pcg::internal::elements {
 namespace {
@@ -132,12 +133,21 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh missing node");
 
-        const data::PcgMeshData mesh_a = get_mesh_input(ctx, "a", "MergeMesh missing mesh input A");
-        const data::PcgMeshData mesh_b = get_mesh_input(ctx, "b", "MergeMesh missing mesh input B");
-        if (mesh_a.vertices().empty() && mesh_b.vertices().empty())
+        std::vector<data::PcgMeshData> meshes;
+        for (const auto& item : ctx.inputs.items())
+        {
+            if (item.mesh)
+                meshes.push_back(*item.mesh);
+            else if (item.geometry)
+                meshes.push_back(data::triangulate_geometry(*item.geometry));
+            else if (item.payload.is_object() && item.payload.contains("vertices"))
+                meshes.push_back(parse_mesh_input(item.payload));
+        }
+
+        if (meshes.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh missing mesh inputs");
 
-        emit_mesh(ctx, merge_meshes(mesh_a, mesh_b));
+        emit_mesh(ctx, merge_meshes(meshes));
         return PCG_OK;
     }
 };

@@ -52,7 +52,7 @@ namespace DJTechEditor.PCG.Graph
         {
             foreach (var pin in _def.inputs)
             {
-                var port = CreatePort(Direction.Input, pin.id, pin.label, pin.pinType);
+                var port = CreatePort(Direction.Input, pin.id, pin.label, pin.pinType, pin.variadic);
                 _inputPorts[pin.id] = port;
                 inputContainer.Add(port);
             }
@@ -176,9 +176,11 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private Port CreatePort(Direction direction, string portName, string label, string pinType = null)
+        private Port CreatePort(Direction direction, string portName, string label, string pinType = null, bool variadic = false)
         {
-            var capacity = direction == Direction.Input ? Port.Capacity.Single : Port.Capacity.Multi;
+            var capacity = direction == Direction.Input
+                ? (variadic ? Port.Capacity.Multi : Port.Capacity.Single)
+                : Port.Capacity.Multi;
             var port = PcgPort.Create(Orientation.Vertical, direction, capacity, typeof(float));
             port.portName = "";
             port.tooltip = string.IsNullOrEmpty(label) ? portName : label;
