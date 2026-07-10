@@ -153,3 +153,9 @@ target_include_directories(test_bridge_bevel PRIVATE src)
 
 add_test(NAME test_bridge_bevel COMMAND test_bridge_bevel WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_stone_arch_bridge tests/test_stone_arch_bridge.cpp)
+target_link_libraries(test_stone_arch_bridge PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_stone_arch_bridge PRIVATE src)
+
+add_test(NAME test_stone_arch_bridge COMMAND test_stone_arch_bridge WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
