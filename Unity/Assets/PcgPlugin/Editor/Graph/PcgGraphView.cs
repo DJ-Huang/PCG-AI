@@ -316,6 +316,17 @@ namespace DJTechEditor.PCG.Graph
 
         internal void RefreshInspector() => m_Inspector?.OnSelectionChanged();
 
+        /// <summary>
+        /// Refresh selection visuals on every node after a selection change.
+        /// GraphView toggles the "selected" USS class internally; each node
+        /// reads that class to update its custom m_NodeFrame border color.
+        /// </summary>
+        private void RefreshAllNodeSelectionVisuals()
+        {
+            foreach (var node in graphElements.OfType<PcgGraphNodeBase>())
+                node.RefreshSelectionVisual();
+        }
+
         /// <summary>Called by EditorWindow.Update() when version mismatch is detected.
         /// Restores the graph from the proxy's serialized JSON.</summary>
         public void RestoreFromUndoState()
@@ -450,18 +461,21 @@ namespace DJTechEditor.PCG.Graph
         public override void AddToSelection(ISelectable selectable)
         {
             base.AddToSelection(selectable);
+            RefreshAllNodeSelectionVisuals();
             m_Inspector?.OnSelectionChanged();
         }
 
         public override void RemoveFromSelection(ISelectable selectable)
         {
             base.RemoveFromSelection(selectable);
+            RefreshAllNodeSelectionVisuals();
             m_Inspector?.OnSelectionChanged();
         }
 
         public override void ClearSelection()
         {
             base.ClearSelection();
+            RefreshAllNodeSelectionVisuals();
             m_Inspector?.OnSelectionChanged();
         }
 

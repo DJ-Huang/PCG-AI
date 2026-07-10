@@ -25,9 +25,11 @@ namespace DJTechEditor.PCG.Graph
         private VisualElement m_InputRowPlaceholder;
         private VisualElement m_OutputRowPlaceholder;
         private VisualElement m_NodeFrame;
+        private bool m_IsPreviewActive;
 
         internal const float NodeWidth = 92f * 2f / 3f;
         internal const float NodeHeight = 23f;
+        internal const float NodeCornerRadius = 4f;
         internal const float PinSize = 14f * 2f / 3f;
         internal const float PinMargin = 4f * 2f / 3f;
         internal const float PinBorderWidth = 2f * 2f / 3f;
@@ -54,6 +56,7 @@ namespace DJTechEditor.PCG.Graph
             RegisterCallback<GeometryChangedEvent>(_ =>
             {
                 EnsureNodeFrame();
+                RefreshSelectionVisual();
                 if (inputContainer.parent != this || outputContainer.parent != this)
                     EnsureHoudiniPortContainers();
                 UpdateOverlayPlacement();
@@ -182,17 +185,66 @@ namespace DJTechEditor.PCG.Graph
             }
 
             m_NodeFrame.style.backgroundColor = new Color(0.17f, 0.17f, 0.17f, 1f);
+            m_NodeFrame.style.borderTopLeftRadius = NodeCornerRadius;
+            m_NodeFrame.style.borderTopRightRadius = NodeCornerRadius;
+            m_NodeFrame.style.borderBottomLeftRadius = NodeCornerRadius;
+            m_NodeFrame.style.borderBottomRightRadius = NodeCornerRadius;
             ApplyNodeFrameBorder(highlighted: false);
         }
 
-        private void ApplyNodeFrameBorder(bool highlighted)
+        /// <summary>
+        /// Called by PcgGraphView after any selection change. Reads the
+        /// actual USS "selected" class state and updates the frame border
+        /// accordingly. This is the single source of truth for selection
+        /// visual state — Select/Unselect overrides are not used because
+        /// Tuanjie's GraphView does not call them reliably.
+        /// </summary>
+        internal void RefreshSelectionVisual()
+        {
+            SuppressBuiltinSelectionStyle();
+            UpdateNodeFrameBorder();
+        }
+
+        /// <summary>
+        /// Force border 0 and clear background on the Node root and
+        /// mainContainer to suppress Unity's built-in GraphView selection
+        /// styling (USS .selected). Our m_NodeFrame handles all visuals.
+        /// </summary>
+        private void SuppressBuiltinSelectionStyle()
+        {
+            style.borderTopWidth = 0;
+            style.borderRightWidth = 0;
+            style.borderBottomWidth = 0;
+            style.borderLeftWidth = 0;
+            style.backgroundColor = Color.clear;
+            style.borderTopLeftRadius = 0;
+            style.borderTopRightRadius = 0;
+            style.borderBottomLeftRadius = 0;
+            style.borderBottomRightRadius = 0;
+
+            mainContainer.style.borderTopWidth = 0;
+            mainContainer.style.borderRightWidth = 0;
+            mainContainer.style.borderBottomWidth = 0;
+            mainContainer.style.borderLeftWidth = 0;
+            mainContainer.style.backgroundColor = Color.clear;
+            mainContainer.style.borderTopLeftRadius = 0;
+            mainContainer.style.borderTopRightRadius = 0;
+            mainContainer.style.borderBottomLeftRadius = 0;
+            mainContainer.style.borderBottomRightRadius = 0;
+        }
+
+        private void UpdateNodeFrameBorder()
         {
             if (m_NodeFrame == null)
                 return;
 
+            // Re-assert opaque background — USS .selected may have overridden it
+            m_NodeFrame.style.backgroundColor = new Color(0.17f, 0.17f, 0.17f, 1f);
+
+            var highlighted = ClassListContains("selected") || m_IsPreviewActive;
             const float normalBorder = 1f;
-            const float previewBorder = 2f;
-            var width = highlighted ? previewBorder : normalBorder;
+            const float highlightBorder = 2f;
+            var width = highlighted ? highlightBorder : normalBorder;
             var color = highlighted
                 ? new Color(0.25f, 0.75f, 1f, 1f)
                 : new Color(0.35f, 0.35f, 0.35f, 1f);
@@ -205,6 +257,11 @@ namespace DJTechEditor.PCG.Graph
             m_NodeFrame.style.borderRightColor = color;
             m_NodeFrame.style.borderBottomColor = color;
             m_NodeFrame.style.borderLeftColor = color;
+        }
+
+        private void ApplyNodeFrameBorder(bool highlighted)
+        {
+            UpdateNodeFrameBorder();
         }
 
         private static void StylePortRow(VisualElement row)
@@ -587,7 +644,8 @@ namespace DJTechEditor.PCG.Graph
 
         public void SetNodePreviewState(bool isActive)
         {
-            SetPreviewHighlighted(isActive);
+            m_IsPreviewActive = isActive;
+            UpdateNodeFrameBorder();
             if (m_PreviewBtn == null)
                 return;
 
@@ -601,7 +659,8 @@ namespace DJTechEditor.PCG.Graph
 
         private void SetPreviewHighlighted(bool highlighted)
         {
-            ApplyNodeFrameBorder(highlighted);
+            m_IsPreviewActive = highlighted;
+            UpdateNodeFrameBorder();
         }
 
         private static Button CreateCircleButton(string text, Action onClick)
