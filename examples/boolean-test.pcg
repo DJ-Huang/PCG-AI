@@ -1,0 +1,100 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "box_a",
+      "type": "CreateBoxMesh",
+      "position": {"x": 0, "y": 0},
+      "data": {
+        "width": 4.0,
+        "height": 4.0,
+        "depth": 4.0
+      }
+    },
+    {
+      "id": "box_b",
+      "type": "CreateBoxMesh",
+      "position": {"x": 200, "y": 0},
+      "data": {
+        "width": 3.0,
+        "height": 3.0,
+        "depth": 3.0
+      }
+    },
+    {
+      "id": "transform_b",
+      "type": "TransformMesh",
+      "position": {"x": 200, "y": 160},
+      "data": {
+        "translateX": 2.0,
+        "translateY": 0.0,
+        "translateZ": 0.0,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "scaleZ": 1.0
+      }
+    },
+    {
+      "id": "bool_subtract",
+      "type": "BooleanMesh",
+      "position": {"x": 0, "y": 320},
+      "data": {
+        "operation": "subtract",
+        "detriangulate": "all",
+        "weldEpsilon": 0.0001,
+        "triangleBudget": 500000
+      }
+    },
+    {
+      "id": "bool_union",
+      "type": "BooleanMesh",
+      "position": {"x": 200, "y": 320},
+      "data": {
+        "operation": "union",
+        "detriangulate": "all",
+        "weldEpsilon": 0.0001,
+        "triangleBudget": 500000
+      }
+    },
+    {
+      "id": "bool_intersect",
+      "type": "BooleanMesh",
+      "position": {"x": 0, "y": 480},
+      "data": {
+        "operation": "intersect",
+        "detriangulate": "all",
+        "weldEpsilon": 0.0001,
+        "triangleBudget": 500000
+      }
+    },
+    {
+      "id": "bool_shatter",
+      "type": "BooleanMesh",
+      "position": {"x": 200, "y": 480},
+      "data": {
+        "operation": "shatter",
+        "detriangulate": "all",
+        "weldEpsilon": 0.0001,
+        "triangleBudget": 500000
+      }
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": {"x": 100, "y": 640},
+      "data": {}
+    }
+  ],
+  "edges": [
+    {"id": "e_tf_b", "source": "box_b", "target": "transform_b", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_sub_a", "source": "box_a", "target": "bool_subtract", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e_sub_b", "source": "transform_b", "target": "bool_subtract", "sourceHandle": "out", "targetHandle": "b"},
+    {"id": "e_uni_a", "source": "box_a", "target": "bool_union", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e_uni_b", "source": "transform_b", "target": "bool_union", "sourceHandle": "out", "targetHandle": "b"},
+    {"id": "e_int_a", "source": "box_a", "target": "bool_intersect", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e_int_b", "source": "transform_b", "target": "bool_intersect", "sourceHandle": "out", "targetHandle": "b"},
+    {"id": "e_sha_a", "source": "box_a", "target": "bool_shatter", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e_sha_b", "source": "transform_b", "target": "bool_shatter", "sourceHandle": "out", "targetHandle": "b"},
+    {"id": "e_out", "source": "bool_subtract", "target": "output", "sourceHandle": "out", "targetHandle": "in"}
+  ]
+}

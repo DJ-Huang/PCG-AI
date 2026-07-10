@@ -701,6 +701,59 @@
       "properties": {}
     },
     {
+      "type": "BooleanMesh",
+      "displayName": "Boolean Mesh",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "a", "label": "Mesh A", "pinType": "SpatialMesh" },
+        { "id": "b", "label": "Mesh B", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "a_inside_b",  "domain": "face", "label": "A inside B" },
+        { "name": "a_outside_b", "domain": "face", "label": "A outside B" },
+        { "name": "b_inside_a",  "domain": "face", "label": "B inside A" },
+        { "name": "b_outside_a", "domain": "face", "label": "B outside A" },
+        { "name": "ab_seams",    "domain": "edge", "label": "A-B intersection seams" }
+      ],
+      "properties": {
+        "operation": {
+          "type": "enum", "default": "subtract",
+          "options": [
+            { "value": "union", "label": "Union" },
+            { "value": "intersect", "label": "Intersect" },
+            { "value": "subtract", "label": "Subtract (A-B)" },
+            { "value": "shatter", "label": "Shatter" }
+          ]
+        },
+        "treatAAs": {
+          "type": "enum", "default": "solid",
+          "options": [
+            { "value": "solid", "label": "Solid" },
+            { "value": "surface", "label": "Surface" }
+          ]
+        },
+        "treatBAs": {
+          "type": "enum", "default": "solid",
+          "options": [
+            { "value": "solid", "label": "Solid" },
+            { "value": "surface", "label": "Surface" }
+          ]
+        },
+        "useSelf": { "type": "boolean", "default": false },
+        "detriangulate": {
+          "type": "enum", "default": "all",
+          "options": [
+            { "value": "all", "label": "All Polygons" },
+            { "value": "unchanged", "label": "Only Unchanged" },
+            { "value": "none", "label": "No Polygons" }
+          ]
+        },
+        "weldEpsilon": { "type": "number", "default": 0.0001, "minimum": 1e-8 },
+        "triangleBudget": { "type": "integer", "default": 500000, "minimum": 1000 }
+      }
+    },
+    {
       "type": "InstanceAlongSpline",
       "displayName": "Instance Along Spline",
       "category": "Spline",

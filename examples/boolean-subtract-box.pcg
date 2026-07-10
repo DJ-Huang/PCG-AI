@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "box_a",
+      "type": "CreateBoxMesh",
+      "position": {"x": 0, "y": 0},
+      "data": {
+        "width": 4.0,
+        "height": 4.0,
+        "depth": 4.0
+      }
+    },
+    {
+      "id": "box_b",
+      "type": "CreateBoxMesh",
+      "position": {"x": 0, "y": 160},
+      "data": {
+        "width": 2.0,
+        "height": 2.0,
+        "depth": 2.0
+      }
+    },
+    {
+      "id": "boolean",
+      "type": "BooleanMesh",
+      "position": {"x": 0, "y": 320},
+      "data": {
+        "operation": "subtract",
+        "treatAAs": "solid",
+        "treatBAs": "solid",
+        "useSelf": false,
+        "detriangulate": "all",
+        "weldEpsilon": 0.0001,
+        "triangleBudget": 500000
+      }
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": {"x": 0, "y": 480},
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "box_a",
+      "target": "boolean",
+      "sourceHandle": "out",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e2",
+      "source": "box_b",
+      "target": "boolean",
+      "sourceHandle": "out",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e3",
+      "source": "boolean",
+      "target": "output",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

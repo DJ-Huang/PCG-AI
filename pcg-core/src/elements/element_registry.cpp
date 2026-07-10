@@ -2,6 +2,7 @@
 #include "elements/primitive_elements.hpp"
 #include "elements/mesh_elements.hpp"
 #include "elements/geometry_elements.hpp"
+#include "elements/boolean_elements.hpp"
 #include "elements/mesh_scatter_elements.hpp"
 #include "elements/spline_elements.hpp"
 #include "elements/spline_mesh_elements.hpp"
@@ -172,6 +173,7 @@ void register_builtin_elements()
     register_phase42_elements(map);
     register_mesh_elements(map);
     register_geometry_elements(map);
+    register_boolean_elements(map);
     register_mesh_scatter_elements(map);
     register_spline_elements(map);
     register_spline_mesh_elements(map);

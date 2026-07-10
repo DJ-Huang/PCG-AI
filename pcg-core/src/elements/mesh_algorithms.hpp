@@ -8,6 +8,10 @@ namespace pcg::internal::data {
 class PcgGeometry;
 }
 
+namespace pcg::internal::data {
+class PcgGeometry;
+}
+
 namespace pcg::internal::elements {
 
 using BevelEdgeSelection = bevel::BevelEdgeSelection;

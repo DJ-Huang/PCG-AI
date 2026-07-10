@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=address -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/test_robust_predicates.dir/tests/test_robust_predicates.cpp.o -o test_robust_predicates  libPcgCore.a

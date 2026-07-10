@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=address -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/test_tri_intersect.dir/tests/test_tri_intersect.cpp.o -o test_tri_intersect  libPcgCore.a

@@ -49,7 +49,17 @@ set(PCG_CORE_SOURCES
     src/geometry/group_table.cpp
     src/geometry/spline_geometry.cpp
     src/geometry/sweep_geometry.cpp
+    src/geometry/robust_predicates.cpp
+    src/geometry/coplanar_partition.cpp
+    src/geometry/imesh.cpp
+    src/geometry/bvh.cpp
+    src/geometry/tri_split.cpp
+    src/geometry/arrangement.cpp
+    src/geometry/mesh_topology.cpp
+    src/geometry/boolean_csg.cpp
+    src/geometry/boolean_output.cpp
     src/elements/mesh_elements.cpp
+    src/elements/boolean_elements.cpp
     src/elements/mesh_scatter_algorithms.cpp
     src/elements/mesh_scatter_elements.cpp
     src/data/pcg_data_collection.cpp
@@ -65,7 +75,7 @@ set(PCG_CORE_SOURCES
 
 # ── Shared library (DLL) — for Unity Editor development ──
 add_library(PcgCore SHARED ${PCG_CORE_SOURCES})
-target_include_directories(PcgCore PUBLIC include PRIVATE src)
+target_include_directories(PcgCore PUBLIC include PRIVATE src third_party/CDT/CDT/include)
 target_link_libraries(PcgCore PRIVATE nlohmann_json::nlohmann_json)
 target_compile_definitions(PcgCore PRIVATE PCG_EXPORTS)
 set_target_properties(PcgCore PROPERTIES
@@ -80,7 +90,7 @@ endif()
 
 # ── Static library (LIB) — for IL2CPP Player static linking ──
 add_library(PcgCoreStatic STATIC ${PCG_CORE_SOURCES})
-target_include_directories(PcgCoreStatic PUBLIC include PRIVATE src)
+target_include_directories(PcgCoreStatic PUBLIC include PRIVATE src third_party/CDT/CDT/include)
 target_link_libraries(PcgCoreStatic PRIVATE nlohmann_json::nlohmann_json)
 target_compile_definitions(PcgCoreStatic PUBLIC PCG_STATIC)
 set_target_properties(PcgCoreStatic PROPERTIES
@@ -158,4 +168,68 @@ target_link_libraries(test_stone_arch_bridge PRIVATE PcgCoreStatic nlohmann_json
 target_include_directories(test_stone_arch_bridge PRIVATE src)
 
 add_test(NAME test_stone_arch_bridge COMMAND test_stone_arch_bridge WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+# ── Phase 4.7: Boolean Mesh ─────────────────────────────
+
+add_executable(test_robust_predicates tests/test_robust_predicates.cpp)
+target_link_libraries(test_robust_predicates PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_robust_predicates PRIVATE src)
+
+add_test(NAME test_robust_predicates COMMAND test_robust_predicates WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_tri_intersect tests/test_tri_intersect.cpp)
+target_link_libraries(test_tri_intersect PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_tri_intersect PRIVATE src)
+
+add_test(NAME test_tri_intersect COMMAND test_tri_intersect WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_bvh tests/test_bvh.cpp)
+target_link_libraries(test_bvh PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_bvh PRIVATE src)
+
+add_test(NAME test_bvh COMMAND test_bvh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_imesh tests/test_imesh.cpp)
+target_link_libraries(test_imesh PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_imesh PRIVATE src)
+
+add_test(NAME test_imesh COMMAND test_imesh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_arrangement tests/test_arrangement.cpp)
+target_link_libraries(test_arrangement PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_arrangement PRIVATE src)
+
+add_test(NAME test_arrangement COMMAND test_arrangement WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_boolean_output tests/test_boolean_output.cpp)
+target_link_libraries(test_boolean_output PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_boolean_output PRIVATE src)
+
+add_test(NAME test_boolean_output COMMAND test_boolean_output WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_boolean_binary tests/test_boolean_binary.cpp)
+target_link_libraries(test_boolean_binary PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_boolean_binary PRIVATE src)
+
+add_test(NAME test_boolean_binary COMMAND test_boolean_binary WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+# ── B4: Boolean element + graph tests ──
+
+add_executable(test_boolean tests/test_boolean.cpp)
+target_link_libraries(test_boolean PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_boolean PRIVATE src)
+
+add_test(NAME test_boolean COMMAND test_boolean WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_boolean_graph tests/test_boolean_graph.cpp)
+target_link_libraries(test_boolean_graph PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_boolean_graph PRIVATE src)
+
+add_test(NAME test_boolean_graph COMMAND test_boolean_graph WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_boolean_bevel_chain tests/test_boolean_bevel_chain.cpp)
+target_link_libraries(test_boolean_bevel_chain PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_boolean_bevel_chain PRIVATE src)
+
+add_test(NAME test_boolean_bevel_chain COMMAND test_boolean_bevel_chain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
