@@ -26,8 +26,11 @@ namespace DJTechEditor.PCG.Graph
         private VisualElement m_OutputRowPlaceholder;
         private VisualElement m_NodeFrame;
 
-        internal const float NodeWidth = 92f;
-        internal const float NodeHeight = 46f;
+        internal const float NodeWidth = 92f * 2f / 3f;
+        internal const float NodeHeight = 23f;
+        internal const float PinSize = 14f * 2f / 3f;
+        internal const float PinMargin = 4f * 2f / 3f;
+        internal const float PinBorderWidth = 2f * 2f / 3f;
         internal const float RadialMenuSize = 120f;
         internal const float RadialMenuRadius = RadialMenuSize * 0.5f;
         internal const float RadialMenuOffsetX = -3f;
@@ -35,10 +38,16 @@ namespace DJTechEditor.PCG.Graph
 
         protected PcgGraphNodeBase()
         {
+            // The Node root itself is the drag hit target (SelectionDragger checks
+            // evt.target as Node). Children that are purely visual use PickingMode.Ignore
+            // so they don't intercept clicks meant for the node body.
+            pickingMode = PickingMode.Position;
             style.minWidth = NodeWidth;
             style.width = NodeWidth;
             style.maxWidth = NodeWidth;
             style.minHeight = NodeHeight;
+            style.height = NodeHeight;
+            style.maxHeight = NodeHeight;
             ConfigureHoudiniPortLayout();
             BuildRightTitleUI();
             BuildHoverRadialMenu();
@@ -50,13 +59,21 @@ namespace DJTechEditor.PCG.Graph
                 UpdateOverlayPlacement();
             });
             RegisterCallback<MouseEnterEvent>(_ => ShowRadialMenu());
+            RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.clickCount >= 2)
+                {
+                    BeginRename();
+                    evt.StopPropagation();
+                }
+            });
         }
 
         public void Initialize(string id, Vector2 position)
         {
             NodeId = id;
             expanded = true;
-            SetPosition(new Rect(position, Vector2.zero));
+            SetPosition(new Rect(position, new Vector2(NodeWidth, NodeHeight)));
             BuildPorts();
             EnsureFixedPortRows();
             RefreshExpandedState();
@@ -117,13 +134,24 @@ namespace DJTechEditor.PCG.Graph
             // Default GraphView chrome is unused — one custom frame + overlay ports.
             titleContainer.style.display = DisplayStyle.None;
             topContainer.style.display = DisplayStyle.None;
-            mainContainer.style.display = DisplayStyle.None;
+
+            // Keep an invisible body so GraphView's layout has content, but don't
+            // intercept hits — the Node root itself is the drag target.
+            mainContainer.style.display = DisplayStyle.Flex;
+            mainContainer.style.flexGrow = 1;
+            mainContainer.style.minWidth = NodeWidth;
+            mainContainer.style.width = NodeWidth;
+            mainContainer.style.minHeight = NodeHeight;
+            mainContainer.style.height = NodeHeight;
+            mainContainer.style.opacity = 0;
             mainContainer.style.overflow = Overflow.Visible;
             mainContainer.style.borderTopWidth = 0;
             mainContainer.style.borderRightWidth = 0;
             mainContainer.style.borderBottomWidth = 0;
             mainContainer.style.borderLeftWidth = 0;
             mainContainer.style.backgroundColor = Color.clear;
+            mainContainer.pickingMode = PickingMode.Ignore;
+            extensionContainer.pickingMode = PickingMode.Ignore;
 
             StylePortRow(inputContainer);
             StylePortRow(outputContainer);
@@ -185,8 +213,8 @@ namespace DJTechEditor.PCG.Graph
             row.style.justifyContent = Justify.Center;
             row.style.alignItems = Align.Center;
             row.style.flexWrap = Wrap.Wrap;
-            row.style.minHeight = 16;
-            row.style.height = 16;
+            row.style.minHeight = PinSize * 0.6f;
+            row.style.height = PinSize * 0.6f;
             row.style.marginTop = 0;
             row.style.marginBottom = 0;
             row.style.marginLeft = 0;
@@ -202,6 +230,7 @@ namespace DJTechEditor.PCG.Graph
             row.style.borderLeftWidth = 0;
             row.style.backgroundColor = Color.clear;
             row.style.position = Position.Absolute;
+            row.pickingMode = PickingMode.Ignore;
             row.style.left = 0;
             row.style.right = 0;
             row.style.width = Length.Percent(100);
@@ -299,7 +328,7 @@ namespace DJTechEditor.PCG.Graph
 
         protected static void StyleHoudiniPin(Port port, Direction direction, string pinType = null)
         {
-            const float pinSize = 14f;
+            var pinSize = PinSize;
             var pinColor = GetPinTypeColor(pinType);
 
             // Style the port element itself as the visible dot
@@ -308,8 +337,8 @@ namespace DJTechEditor.PCG.Graph
             port.style.height = pinSize;
             port.style.maxWidth = pinSize;
             port.style.maxHeight = pinSize;
-            port.style.marginLeft = 4;
-            port.style.marginRight = 4;
+            port.style.marginLeft = PinMargin;
+            port.style.marginRight = PinMargin;
             port.style.marginTop = 0;
             port.style.marginBottom = 0;
             port.style.paddingLeft = 0;
@@ -321,10 +350,10 @@ namespace DJTechEditor.PCG.Graph
             port.style.borderTopRightRadius = pinSize * 0.5f;
             port.style.borderBottomLeftRadius = pinSize * 0.5f;
             port.style.borderBottomRightRadius = pinSize * 0.5f;
-            port.style.borderTopWidth = 2;
-            port.style.borderRightWidth = 2;
-            port.style.borderBottomWidth = 2;
-            port.style.borderLeftWidth = 2;
+            port.style.borderTopWidth = PinBorderWidth;
+            port.style.borderRightWidth = PinBorderWidth;
+            port.style.borderBottomWidth = PinBorderWidth;
+            port.style.borderLeftWidth = PinBorderWidth;
             var borderColor = new Color(0.08f, 0.08f, 0.08f, 0.85f);
             port.style.borderTopColor = borderColor;
             port.style.borderRightColor = borderColor;
@@ -361,6 +390,8 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
+        private static float RightTitleTop => Mathf.Max(0f, (NodeHeight - 14f) * 0.5f);
+
         private void BuildRightTitleUI()
         {
             m_RightTitleLabel = new Label
@@ -369,7 +400,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     position = Position.Absolute,
                     right = -132,
-                    top = 10,
+                    top = RightTitleTop,
                     minWidth = 120,
                     maxWidth = 220,
                     unityTextAlign = TextAnchor.MiddleLeft,
@@ -379,16 +410,10 @@ namespace DJTechEditor.PCG.Graph
                     overflow = Overflow.Visible,
                 },
             };
-            m_RightTitleLabel.pickingMode = PickingMode.Position;
-            m_RightTitleLabel.RegisterCallback<MouseDownEvent>(evt =>
-            {
-                if (evt.clickCount >= 2)
-                {
-                    BeginRename();
-                    evt.StopPropagation();
-                }
-            });
-            m_RightTitleLabel.pickingMode = PickingMode.Position;
+            // The title label is a display-only overlay in contentViewContainer.
+            // It must NOT intercept hits — otherwise it can overlap a neighbouring
+            // node's body and block SelectionDragger from starting a drag.
+            m_RightTitleLabel.pickingMode = PickingMode.Ignore;
         }
 
         private void BeginRename()
@@ -399,7 +424,7 @@ namespace DJTechEditor.PCG.Graph
             m_TitleEditor = new TextField { value = GetDisplayTitle() };
             m_TitleEditor.style.position = Position.Absolute;
             m_TitleEditor.style.right = -132;
-            m_TitleEditor.style.top = 8;
+            m_TitleEditor.style.top = RightTitleTop - 2f;
             m_TitleEditor.style.width = 180;
             m_TitleEditor.style.height = 20;
             m_TitleEditor.RegisterCallback<BlurEvent>(_ => CommitRename());
@@ -657,13 +682,13 @@ namespace DJTechEditor.PCG.Graph
             if (m_RightTitleLabel != null)
             {
                 m_RightTitleLabel.style.left = rect.x + rect.width + 14;
-                m_RightTitleLabel.style.top = rect.y + 10;
+                m_RightTitleLabel.style.top = rect.y + RightTitleTop;
             }
 
             if (m_TitleEditor != null)
             {
                 m_TitleEditor.style.left = rect.x + rect.width + 14;
-                m_TitleEditor.style.top = rect.y + 8;
+                m_TitleEditor.style.top = rect.y + RightTitleTop - 2f;
             }
 
             if (m_RadialMenu != null)

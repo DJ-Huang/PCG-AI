@@ -263,7 +263,11 @@ namespace DJTechEditor.PCG.Graph
         /// registered. Call <see cref="EndDrag"/> when the drag ends.</summary>
         public void BeginDrag(string actionName)
         {
-            if (m_SuppressUndo || m_PendingSnapshot != null) return;
+            if (m_SuppressUndo) return;
+            // A previous drag (e.g., Scene View spline handle) may not have been
+            // properly ended. Discard the stale snapshot so the new drag starts fresh.
+            m_PendingSnapshot = null;
+            m_PendingAction = null;
             m_PendingSnapshot = PcgGraphSerializer.ToJson(ExportDocument(), pretty: false);
             m_PendingAction = actionName;
         }
@@ -413,8 +417,12 @@ namespace DJTechEditor.PCG.Graph
                 m_ActiveRadialMenuNode.DismissRadialMenu();
             }
 
+            // Always clear stale Scene View drag state when interacting with the GraphView,
+            // even if the click didn't land on a node (e.g., empty canvas).
+            PcgCreateSplineSceneHandles.ForceClearDragState();
+
             if (evt.target is VisualElement ve &&
-                ve.GetFirstAncestorOfType<PcgGraphNodeBase>() != null)
+                (ve is PcgGraphNodeBase || ve.GetFirstAncestorOfType<PcgGraphNodeBase>() != null))
             {
                 BeginDrag("Move Node");
             }

@@ -618,6 +618,19 @@ namespace DJTechEditor.PCG.Graph
             s_DragWindow = null;
         }
 
+        /// <summary>
+        /// Force-clear any stale drag state. Called by <see cref="PcgGraphView"/>
+        /// when the user starts dragging a node in the GraphView, to prevent
+        /// an unfinished Scene View handle drag from blocking the new drag.
+        /// </summary>
+        internal static void ForceClearDragState()
+        {
+            s_DragActive = false;
+            s_HandleHot = false;
+            s_DragGraphView = null;
+            s_DragWindow = null;
+        }
+
         private static Transform FindPreviewAnchor(PcgGraphEditorWindow window)
         {
             var assetPath = window.CurrentAssetPath;

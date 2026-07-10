@@ -214,6 +214,20 @@ namespace DJTechRuntime.PCG
                     var value = data.GetRaw(key) ?? propInfo.defaultValue;
                     AppendJsonProperty(sb, key, value, propInfo.type);
                 }
+
+                // Append non-manifest keys (e.g., __nodeTitle) that are stored
+                // in PcgNodeData but not declared in the manifest.
+                var manifestKeys = new HashSet<string>(manifestProps.Keys);
+                foreach (var (key, value) in data.EnumerateRaw())
+                {
+                    if (manifestKeys.Contains(key))
+                        continue;
+                    if (!first) sb.Append(", ");
+                    first = false;
+                    sb.Append('"').Append(key).Append("\": ");
+                    AppendInferredValue(sb, value);
+                }
+
                 sb.Append('}');
                 return;
             }
