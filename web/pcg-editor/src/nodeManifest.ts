@@ -186,3 +186,17 @@ export const CATEGORY_COLORS: Record<string, string> = {
 export function getCategoryColor(category: string): string {
   return CATEGORY_COLORS[category] ?? '#495057';
 }
+
+/** Pin type → CSS color (Houdini-style port coloring, aligned with Unity). */
+export const PIN_TYPE_COLORS: Record<string, string> = {
+  SpatialPoint: '#00ccff',
+  SpatialSpline: '#4de66a',
+  SpatialMesh: '#ff9900',
+  Param: '#ffd700',
+  Texture: '#b34dd9',
+  Any: '#a6a6a6',
+};
+
+export function getPinTypeColor(pinType: string | undefined): string {
+  return (pinType && PIN_TYPE_COLORS[pinType]) ?? '#a6a6a6';
+}

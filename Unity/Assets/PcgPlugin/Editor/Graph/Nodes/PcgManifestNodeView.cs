@@ -15,6 +15,7 @@ namespace DJTechEditor.PCG.Graph
         private readonly Dictionary<string, VisualElement> _fields = new();
         private readonly Dictionary<string, string> _enumValues = new();
         private readonly Dictionary<string, Port> _inputPorts = new();
+        private readonly Dictionary<string, Port> _outputPorts = new();
         private PcgNodeData _data = new();
         private Label _groupBadgeLabel;
 
@@ -40,8 +41,10 @@ namespace DJTechEditor.PCG.Graph
 
         public override Port FindOutputPort(string handle = "out")
         {
-            if (handle == "out" || string.IsNullOrEmpty(handle))
-                return OutputPort;
+            if (string.IsNullOrEmpty(handle))
+                handle = "out";
+            if (_outputPorts.TryGetValue(handle, out var port))
+                return port;
             return OutputPort;
         }
 
@@ -49,16 +52,18 @@ namespace DJTechEditor.PCG.Graph
         {
             foreach (var pin in _def.inputs)
             {
-                var port = CreatePort(Direction.Input, pin.id, pin.label);
+                var port = CreatePort(Direction.Input, pin.id, pin.label, pin.pinType);
                 _inputPorts[pin.id] = port;
                 inputContainer.Add(port);
             }
 
             foreach (var pin in _def.outputs)
             {
-                OutputPort = CreatePort(Direction.Output, pin.id, pin.label);
-                OutputPort.userData = pin.id;
-                outputContainer.Add(OutputPort);
+                var port = CreatePort(Direction.Output, pin.id, pin.label, pin.pinType);
+                port.userData = pin.id;
+                _outputPorts[pin.id] = port;
+                OutputPort = port;
+                outputContainer.Add(port);
             }
         }
 
@@ -171,14 +176,14 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private Port CreatePort(Direction direction, string portName, string label)
+        private Port CreatePort(Direction direction, string portName, string label, string pinType = null)
         {
             var capacity = direction == Direction.Input ? Port.Capacity.Single : Port.Capacity.Multi;
             var port = PcgPort.Create(Orientation.Vertical, direction, capacity, typeof(float));
             port.portName = "";
             port.tooltip = string.IsNullOrEmpty(label) ? portName : label;
             port.userData = portName;
-            StyleHoudiniPin(port, direction);
+            StyleHoudiniPin(port, direction, pinType);
             return port;
         }
     }

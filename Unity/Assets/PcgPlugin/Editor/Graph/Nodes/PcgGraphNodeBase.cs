@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -23,6 +24,7 @@ namespace DJTechEditor.PCG.Graph
         private bool m_OverlayAttached;
         private VisualElement m_InputRowPlaceholder;
         private VisualElement m_OutputRowPlaceholder;
+        private VisualElement m_NodeFrame;
 
         internal const float NodeWidth = 92f;
         internal const float NodeHeight = 46f;
@@ -40,7 +42,13 @@ namespace DJTechEditor.PCG.Graph
             ConfigureHoudiniPortLayout();
             BuildRightTitleUI();
             BuildHoverRadialMenu();
-            RegisterCallback<GeometryChangedEvent>(_ => UpdateOverlayPlacement());
+            RegisterCallback<GeometryChangedEvent>(_ =>
+            {
+                EnsureNodeFrame();
+                if (inputContainer.parent != this || outputContainer.parent != this)
+                    EnsureHoudiniPortContainers();
+                UpdateOverlayPlacement();
+            });
             RegisterCallback<MouseEnterEvent>(_ => ShowRadialMenu());
         }
 
@@ -53,6 +61,8 @@ namespace DJTechEditor.PCG.Graph
             EnsureFixedPortRows();
             RefreshExpandedState();
             RefreshPorts();
+            EnsureNodeFrame();
+            EnsureHoudiniPortContainers();
             EnsureFixedPortRows();
             UpdateDisplayedTitle();
         }
@@ -65,13 +75,14 @@ namespace DJTechEditor.PCG.Graph
 
         protected virtual void BuildPorts() { }
 
-        protected Port CreatePort(Direction direction, string portName)
+        protected Port CreatePort(Direction direction, string portName, string pinType = null)
         {
             var capacity = direction == Direction.Input ? Port.Capacity.Single : Port.Capacity.Multi;
             var port = PcgPort.Create(Orientation.Vertical, direction, capacity, typeof(float));
             port.portName = "";
             port.tooltip = portName;
-            StyleHoudiniPin(port, direction);
+            port.userData = portName;
+            StyleHoudiniPin(port, direction, pinType);
             return port;
         }
 
@@ -93,42 +104,148 @@ namespace DJTechEditor.PCG.Graph
             style.paddingRight = 0;
             style.paddingTop = 0;
             style.paddingBottom = 0;
+            style.overflow = Overflow.Visible;
+            style.flexDirection = FlexDirection.Column;
+            style.borderTopWidth = 0;
+            style.borderRightWidth = 0;
+            style.borderBottomWidth = 0;
+            style.borderLeftWidth = 0;
+            style.backgroundColor = Color.clear;
 
-            topContainer.style.flexDirection = FlexDirection.Column;
-            topContainer.style.alignItems = Align.Stretch;
-            topContainer.style.width = Length.Percent(100);
-            topContainer.style.paddingLeft = 0;
-            topContainer.style.paddingRight = 0;
-            topContainer.style.marginLeft = 0;
-            topContainer.style.marginRight = 0;
+            EnsureNodeFrame();
 
-            titleContainer.style.alignSelf = Align.Center;
-
-            inputContainer.style.flexDirection = FlexDirection.Row;
-            inputContainer.style.justifyContent = Justify.Center;
-            inputContainer.style.alignSelf = Align.Stretch;
-            inputContainer.style.flexWrap = Wrap.Wrap;
-            inputContainer.style.minHeight = 10;
-            inputContainer.style.height = 10;
-            inputContainer.style.marginTop = 0;
-            inputContainer.style.marginBottom = 0;
-
-            outputContainer.style.flexDirection = FlexDirection.Row;
-            outputContainer.style.justifyContent = Justify.Center;
-            outputContainer.style.alignSelf = Align.Stretch;
-            outputContainer.style.flexWrap = Wrap.Wrap;
-            outputContainer.style.minHeight = 10;
-            outputContainer.style.height = 10;
-            outputContainer.style.marginTop = 0;
-            outputContainer.style.marginBottom = 0;
-
-            topContainer.Remove(inputContainer);
-            topContainer.Remove(outputContainer);
-            topContainer.Insert(0, inputContainer);
-            topContainer.Add(outputContainer);
-
+            // Default GraphView chrome is unused — one custom frame + overlay ports.
             titleContainer.style.display = DisplayStyle.None;
+            topContainer.style.display = DisplayStyle.None;
+            mainContainer.style.display = DisplayStyle.None;
             mainContainer.style.overflow = Overflow.Visible;
+            mainContainer.style.borderTopWidth = 0;
+            mainContainer.style.borderRightWidth = 0;
+            mainContainer.style.borderBottomWidth = 0;
+            mainContainer.style.borderLeftWidth = 0;
+            mainContainer.style.backgroundColor = Color.clear;
+
+            StylePortRow(inputContainer);
+            StylePortRow(outputContainer);
+            EnsureHoudiniPortContainers();
+        }
+
+        private void EnsureNodeFrame()
+        {
+            if (m_NodeFrame == null)
+            {
+                m_NodeFrame = new VisualElement { name = "pcg-node-frame" };
+                m_NodeFrame.pickingMode = PickingMode.Ignore;
+                m_NodeFrame.style.position = Position.Absolute;
+                m_NodeFrame.style.left = 0;
+                m_NodeFrame.style.top = 0;
+                m_NodeFrame.style.right = 0;
+                m_NodeFrame.style.bottom = 0;
+                hierarchy.Insert(0, m_NodeFrame);
+            }
+            else if (m_NodeFrame.parent != this)
+            {
+                m_NodeFrame.RemoveFromHierarchy();
+                hierarchy.Insert(0, m_NodeFrame);
+            }
+            else if (hierarchy.IndexOf(m_NodeFrame) != 0)
+            {
+                m_NodeFrame.SendToBack();
+            }
+
+            m_NodeFrame.style.backgroundColor = new Color(0.17f, 0.17f, 0.17f, 1f);
+            ApplyNodeFrameBorder(highlighted: false);
+        }
+
+        private void ApplyNodeFrameBorder(bool highlighted)
+        {
+            if (m_NodeFrame == null)
+                return;
+
+            const float normalBorder = 1f;
+            const float previewBorder = 2f;
+            var width = highlighted ? previewBorder : normalBorder;
+            var color = highlighted
+                ? new Color(0.25f, 0.75f, 1f, 1f)
+                : new Color(0.35f, 0.35f, 0.35f, 1f);
+
+            m_NodeFrame.style.borderTopWidth = width;
+            m_NodeFrame.style.borderRightWidth = width;
+            m_NodeFrame.style.borderBottomWidth = width;
+            m_NodeFrame.style.borderLeftWidth = width;
+            m_NodeFrame.style.borderTopColor = color;
+            m_NodeFrame.style.borderRightColor = color;
+            m_NodeFrame.style.borderBottomColor = color;
+            m_NodeFrame.style.borderLeftColor = color;
+        }
+
+        private static void StylePortRow(VisualElement row)
+        {
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.justifyContent = Justify.Center;
+            row.style.alignItems = Align.Center;
+            row.style.flexWrap = Wrap.Wrap;
+            row.style.minHeight = 16;
+            row.style.height = 16;
+            row.style.marginTop = 0;
+            row.style.marginBottom = 0;
+            row.style.marginLeft = 0;
+            row.style.marginRight = 0;
+            row.style.paddingLeft = 0;
+            row.style.paddingRight = 0;
+            row.style.paddingTop = 0;
+            row.style.paddingBottom = 0;
+            row.style.overflow = Overflow.Visible;
+            row.style.borderTopWidth = 0;
+            row.style.borderRightWidth = 0;
+            row.style.borderBottomWidth = 0;
+            row.style.borderLeftWidth = 0;
+            row.style.backgroundColor = Color.clear;
+            row.style.position = Position.Absolute;
+            row.style.left = 0;
+            row.style.right = 0;
+            row.style.width = Length.Percent(100);
+        }
+
+        /// <summary>
+        /// Mount input/output rows on the Node root (not contentContainer/mainContainer).
+        /// Node.Add() targets contentContainer, so ports would stay under bordered parents;
+        /// hierarchy.Add attaches to the Node element itself. Absolute positioning then
+        /// paints after Relative siblings (topContainer border), keeping dots on top.
+        /// </summary>
+        private void EnsureHoudiniPortContainers()
+        {
+            StylePortRow(inputContainer);
+            StylePortRow(outputContainer);
+
+            inputContainer.style.top = 0;
+            inputContainer.style.bottom = StyleKeyword.Auto;
+
+            outputContainer.style.top = StyleKeyword.Auto;
+            outputContainer.style.bottom = 0;
+
+            if (inputContainer.parent != this)
+            {
+                inputContainer.RemoveFromHierarchy();
+                hierarchy.Add(inputContainer);
+            }
+            else
+            {
+                inputContainer.BringToFront();
+            }
+
+            if (outputContainer.parent != this)
+            {
+                outputContainer.RemoveFromHierarchy();
+                hierarchy.Add(outputContainer);
+            }
+            else
+            {
+                outputContainer.BringToFront();
+            }
+
+            // Absolute Absolute: later sibling paints above earlier — outputs last.
+            outputContainer.BringToFront();
         }
 
         private void EnsureFixedPortRows()
@@ -163,31 +280,84 @@ namespace DJTechEditor.PCG.Graph
                 m_OutputRowPlaceholder.RemoveFromHierarchy();
         }
 
-        protected static void StyleHoudiniPin(Port port, Direction direction)
+        private static readonly Dictionary<string, Color> s_PinTypeColors = new()
         {
-            port.style.minWidth = 8;
-            port.style.width = 8;
-            port.style.height = 8;
-            port.style.maxWidth = 8;
-            port.style.maxHeight = 8;
-            port.style.marginLeft = 3;
-            port.style.marginRight = 3;
+            { "SpatialPoint", new Color(0f, 0.8f, 1f) },       // cyan
+            { "SpatialSpline", new Color(0.3f, 0.9f, 0.4f) },    // green
+            { "SpatialMesh", new Color(1f, 0.6f, 0f) },          // orange
+            { "Param", new Color(1f, 0.85f, 0f) },               // gold
+            { "Texture", new Color(0.7f, 0.3f, 0.9f) },          // purple
+            { "Any", new Color(0.65f, 0.65f, 0.65f) },           // gray
+        };
+
+        private static Color GetPinTypeColor(string pinType)
+        {
+            return !string.IsNullOrEmpty(pinType) && s_PinTypeColors.TryGetValue(pinType, out var c)
+                ? c
+                : new Color(0.65f, 0.65f, 0.65f);
+        }
+
+        protected static void StyleHoudiniPin(Port port, Direction direction, string pinType = null)
+        {
+            const float pinSize = 14f;
+            var pinColor = GetPinTypeColor(pinType);
+
+            // Style the port element itself as the visible dot
+            port.style.minWidth = pinSize;
+            port.style.width = pinSize;
+            port.style.height = pinSize;
+            port.style.maxWidth = pinSize;
+            port.style.maxHeight = pinSize;
+            port.style.marginLeft = 4;
+            port.style.marginRight = 4;
             port.style.marginTop = 0;
             port.style.marginBottom = 0;
             port.style.paddingLeft = 0;
             port.style.paddingRight = 0;
             port.style.paddingTop = 0;
             port.style.paddingBottom = 0;
+            port.style.backgroundColor = pinColor;
+            port.style.borderTopLeftRadius = pinSize * 0.5f;
+            port.style.borderTopRightRadius = pinSize * 0.5f;
+            port.style.borderBottomLeftRadius = pinSize * 0.5f;
+            port.style.borderBottomRightRadius = pinSize * 0.5f;
+            port.style.borderTopWidth = 2;
+            port.style.borderRightWidth = 2;
+            port.style.borderBottomWidth = 2;
+            port.style.borderLeftWidth = 2;
+            var borderColor = new Color(0.08f, 0.08f, 0.08f, 0.85f);
+            port.style.borderTopColor = borderColor;
+            port.style.borderRightColor = borderColor;
+            port.style.borderBottomColor = borderColor;
+            port.style.borderLeftColor = borderColor;
 
+            // Hide the internal connector — the port itself is the dot now
+            var connector = port.Q<VisualElement>("connector");
+            if (connector != null)
+                connector.style.display = DisplayStyle.None;
+
+            // Also try by USS class name (Tuanjie may use different internal name)
+            var connectorByClass = port.Query<VisualElement>(className: "connector").First();
+            if (connectorByClass != null)
+                connectorByClass.style.display = DisplayStyle.None;
+
+            // Hide port label (we show labels via tooltips / right-side title)
+            var portLabel = port.Q<Label>();
+            if (portLabel != null)
+                portLabel.style.display = DisplayStyle.None;
+
+            // Straddle the node edge: inputs half above top, outputs half below bottom.
+            // Port rows are Absolute on the node root, so translate is relative to that edge.
+            port.style.position = Position.Relative;
             if (direction == Direction.Input)
             {
-                port.style.alignSelf = Align.FlexStart;
-                port.style.translate = new Translate(0, -5, 0);
+                port.style.alignSelf = Align.Center;
+                port.style.translate = new Translate(0, -pinSize * 0.5f, 0);
             }
             else
             {
-                port.style.alignSelf = Align.FlexEnd;
-                port.style.translate = new Translate(0, 5, 0);
+                port.style.alignSelf = Align.Center;
+                port.style.translate = new Translate(0, pinSize * 0.5f, 0);
             }
         }
 
@@ -406,21 +576,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void SetPreviewHighlighted(bool highlighted)
         {
-            const float normalBorder = 1f;
-            const float previewBorder = 2f;
-            var width = highlighted ? previewBorder : normalBorder;
-            var color = highlighted
-                ? new Color(0.25f, 0.75f, 1f, 1f)
-                : new Color(0.35f, 0.35f, 0.35f, 1f);
-
-            style.borderTopWidth = width;
-            style.borderRightWidth = width;
-            style.borderBottomWidth = width;
-            style.borderLeftWidth = width;
-            style.borderTopColor = color;
-            style.borderRightColor = color;
-            style.borderBottomColor = color;
-            style.borderLeftColor = color;
+            ApplyNodeFrameBorder(highlighted);
         }
 
         private static Button CreateCircleButton(string text, Action onClick)

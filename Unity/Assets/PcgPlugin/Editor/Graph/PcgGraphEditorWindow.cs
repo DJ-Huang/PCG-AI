@@ -565,13 +565,13 @@ namespace DJTechEditor.PCG.Graph
                 Debug.LogWarning($"[PCG] Asset not found: {assetPath}");
         }
 
-        private void ToggleBlackboard()
+        internal void ToggleBlackboard()
         {
             var visible = m_Blackboard.style.display.value == DisplayStyle.Flex;
             m_Blackboard.style.display = visible ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        private void ToggleInspector()
+        internal void ToggleInspector()
         {
             m_Inspector.ToggleVisible();
         }

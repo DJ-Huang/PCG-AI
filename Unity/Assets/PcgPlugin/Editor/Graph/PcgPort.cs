@@ -17,6 +17,17 @@ namespace DJTechEditor.PCG.Graph
         private PcgPort(Orientation orientation, Direction direction, Capacity capacity, Type type)
             : base(orientation, direction, capacity, type) { }
 
+        /// <summary>
+        /// Override to return the port element's visual center (including translate)
+        /// instead of the hidden connector's layout center, which is (0,0) when
+        /// the connector is display:None. This keeps edge endpoints aligned with
+        /// the visible pin dots.
+        /// </summary>
+        public override Vector3 GetGlobalCenter()
+        {
+            return worldBound.center;
+        }
+
         /// <summary>Create a Port with our custom edge connector listener.</summary>
         public static PcgPort Create(Orientation orientation, Direction direction,
             Capacity capacity, Type type)

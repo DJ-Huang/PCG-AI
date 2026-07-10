@@ -407,16 +407,18 @@
   padding: 40px 12px;
 }
 
-/* ── Node (ManifestNode) ────────────────────────────── */
+/* ── Node (ManifestNode) — Houdini-style top/bottom ports ── */
 
 .pcg-node {
-  min-width: 160px;
+  min-width: 140px;
   max-width: 220px;
   border-radius: 6px;
   border: 2px solid;
   background: #2a2a3e;
   font-size: 12px;
   color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
 }
 
 .pcg-node--selected {
@@ -436,21 +438,63 @@
   text-align: center;
 }
 
-.pcg-node__port-row {
-  position: relative;
+/* Input ports — horizontal row at top edge */
+.pcg-node__ports-top {
   display: flex;
-  align-items: center;
-  padding: 2px 10px;
-  min-height: 18px;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding: 2px 4px 0;
+  flex-shrink: 0;
 }
 
-.pcg-node__port-row--output {
-  justify-content: flex-end;
+/* Output ports — horizontal row at bottom edge */
+.pcg-node__ports-bottom {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: flex-end;
+  padding: 0 4px 2px;
+  flex-shrink: 0;
+}
+
+/* Each port item: column with dot and label */
+.pcg-node__port-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+/* Override React Flow's absolute positioning so handles flow naturally */
+.pcg-node__handle.react-flow__handle {
+  position: relative !important;
+  transform: none !important;
+  top: auto !important;
+  left: auto !important;
+  bottom: auto !important;
+  right: auto !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px;
+  min-height: 14px;
+  border: 2px solid #111 !important;
+  border-radius: 50% !important;
+  margin: 1px 0;
+  z-index: 5;
 }
 
 .pcg-node__port-label {
-  font-size: 10px;
-  color: #999;
+  font-size: 9px;
+  color: #888;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  pointer-events: none;
 }
 
 .pcg-node__props-summary {
@@ -590,9 +634,10 @@
 }
 
 .react-flow__handle {
-  width: 10px;
-  height: 10px;
-  border: 2px solid #1a1a2e;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #111;
+  border-radius: 50%;
 }
 
 .react-flow__edge-path {

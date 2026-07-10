@@ -1,11 +1,12 @@
 // ManifestNode.tsx — Generic manifest-driven node component.
 // All node types use this single component; ports and colors are read from node-manifest.json.
-// Layout: Header (top) → Input ports (left) → Output ports (right) → Properties summary.
+// Layout: Input ports (top, horizontal) → Header → Body → Output ports (bottom, horizontal).
+// Houdini-style: each port is an independent colored dot on the node's top/bottom edge.
 // Nodes that produce groups show a compact "🔗 N groups" badge with hover popup.
 
 import { useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { getNodeTypeDefs, getCategoryColor } from '../nodeManifest';
+import { getNodeTypeDefs, getCategoryColor, getPinTypeColor } from '../nodeManifest';
 
 export default function ManifestNode({ type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
@@ -49,36 +50,28 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
       className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}
       style={{ borderColor: color }}
     >
-      {/* Header (top) */}
+      {/* Input ports — horizontal row at top edge */}
+      {def.inputs.length > 0 && (
+        <div className="pcg-node__ports-top">
+          {def.inputs.map((pin) => (
+            <div key={pin.id} className="pcg-node__port-item">
+              <Handle
+                type="target"
+                position={Position.Top}
+                id={pin.id}
+                className="pcg-node__handle"
+                style={{ background: getPinTypeColor(pin.pinType) }}
+              />
+              <span className="pcg-node__port-label">{pin.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Header */}
       <div className="pcg-node__header" style={{ background: color }}>
         {def.displayName}
       </div>
-
-      {/* Input ports (left side) */}
-      {def.inputs.map((pin) => (
-        <div key={pin.id} className="pcg-node__port-row">
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={pin.id}
-            style={{ background: color }}
-          />
-          <span className="pcg-node__port-label">{pin.label}</span>
-        </div>
-      ))}
-
-      {/* Output ports (right side) */}
-      {def.outputs.map((pin) => (
-        <div key={pin.id} className="pcg-node__port-row pcg-node__port-row--output">
-          <span className="pcg-node__port-label">{pin.label}</span>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={pin.id}
-            style={{ background: color }}
-          />
-        </div>
-      ))}
 
       {/* Group output badge — compact */}
       {producedGroups.length > 0 && (
@@ -122,6 +115,24 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
           {Object.keys(def.properties).map((key) => (
             <div key={key} className="pcg-node__prop-line">
               {key}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Output ports — horizontal row at bottom edge */}
+      {def.outputs.length > 0 && (
+        <div className="pcg-node__ports-bottom">
+          {def.outputs.map((pin) => (
+            <div key={pin.id} className="pcg-node__port-item">
+              <span className="pcg-node__port-label">{pin.label}</span>
+              <Handle
+                type="source"
+                position={Position.Bottom}
+                id={pin.id}
+                className="pcg-node__handle"
+                style={{ background: getPinTypeColor(pin.pinType) }}
+              />
             </div>
           ))}
         </div>

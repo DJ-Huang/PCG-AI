@@ -113,6 +113,10 @@ namespace DJTechEditor.PCG.Graph
             if (evt.target is not PcgGraphView)
                 return;
 
+            // Ignore shortcuts when typing in a text field
+            if (evt.target is TextField || (evt.target as VisualElement)?.GetFirstAncestorOfType<TextField>() != null)
+                return;
+
             if (evt.keyCode == KeyCode.Space)
             {
                 ShowSearchWindow(m_LastMousePos);
@@ -121,6 +125,16 @@ namespace DJTechEditor.PCG.Graph
             else if (evt.keyCode == KeyCode.F)
             {
                 FrameAll();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.P)
+            {
+                (m_HostWindow as PcgGraphEditorWindow)?.ToggleBlackboard();
+                evt.StopPropagation();
+            }
+            else if (evt.keyCode == KeyCode.I)
+            {
+                (m_HostWindow as PcgGraphEditorWindow)?.ToggleInspector();
                 evt.StopPropagation();
             }
             else if (evt.keyCode == KeyCode.Escape)
