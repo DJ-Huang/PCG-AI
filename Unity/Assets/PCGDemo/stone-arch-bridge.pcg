@@ -2,24 +2,6 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "arch_path",
-      "type": "CreateSpline",
-      "position": { "x": 420, "y": 0 },
-      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":10,\"y\":2.5,\"z\":0},{\"x\":20,\"y\":3.5,\"z\":0},{\"x\":30,\"y\":2.5,\"z\":0},{\"x\":40,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
-    },
-    {
-      "id": "ring_profile",
-      "type": "CreateSpline",
-      "position": { "x": -20, "y": 0 },
-      "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": -3, "startY": -0.5, "startZ": 0, "endX": -3, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-3,\"y\":-0.5,\"z\":0},{\"x\":3,\"y\":-0.5,\"z\":0},{\"x\":3,\"y\":0,\"z\":0},{\"x\":-3,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
-    },
-    {
-      "id": "arch_ring",
-      "type": "SweepAlongSpline",
-      "position": { "x": 200, "y": 160 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.5, "radius": 1, "columns": 24, "sampleSpacing": 0.5, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "__nodeTitle": ""}
-    },
-    {
       "id": "arch_group",
       "type": "GroupCreate",
       "position": { "x": 200, "y": 320 },
@@ -29,13 +11,7 @@
       "id": "arch_bevel",
       "type": "BevelMesh",
       "position": { "x": 200, "y": 480 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.15, "segments": 4, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
-    },
-    {
-      "id": "deck_profile",
-      "type": "CreateSpline",
-      "position": { "x": 420, "y": 480 },
-      "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": -3.5, "startY": -0.2, "startZ": 0, "endX": -3.5, "endY": 0.2, "endZ": 0, "controlPoints": "[{\"x\":-3.5,\"y\":-0.2,\"z\":0},{\"x\":3.5,\"y\":-0.2,\"z\":0},{\"x\":3.5,\"y\":0.2,\"z\":0},{\"x\":-3.5,\"y\":0.2,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0, "segments": 4, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
     },
     {
       "id": "arch_deck",
@@ -138,6 +114,30 @@
       "type": "Output",
       "position": { "x": 200, "y": 2080 },
       "data": {"label": "Stone Arch Bridge", "__nodeTitle": ""}
+    },
+    {
+      "id": "deck_profile",
+      "type": "CreateSpline",
+      "position": { "x": 586.5, "y": 533 },
+      "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": -3.5, "startY": -0.2, "startZ": 0, "endX": -3.5, "endY": 0.2, "endZ": 0, "controlPoints": "[{\"x\":-3.5,\"y\":-0.2,\"z\":-0.0456064},{\"x\":3.5,\"y\":-0.2,\"z\":-0.0456064},{\"x\":3.5,\"y\":0.2,\"z\":-0.0456064},{\"x\":-3.5,\"y\":0.2,\"z\":-0.0456064}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "arch_path",
+      "type": "CreateSpline",
+      "position": { "x": 420, "y": 0 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":10,\"y\":2.5,\"z\":0},{\"x\":20,\"y\":3.5,\"z\":0},{\"x\":30,\"y\":2.5,\"z\":0},{\"x\":40,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "arch_ring",
+      "type": "SweepAlongSpline",
+      "position": { "x": 200, "y": 160 },
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.5, "radius": 1, "columns": 24, "sampleSpacing": 0.5, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "__nodeTitle": ""}
+    },
+    {
+      "id": "ring_profile",
+      "type": "CreateSpline",
+      "position": { "x": -20, "y": 0 },
+      "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": -3, "startY": -0.5, "startZ": 0, "endX": -3, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-3,\"y\":-0.5,\"z\":0},{\"x\":3,\"y\":-0.5,\"z\":0},{\"x\":3,\"y\":0,\"z\":0},{\"x\":-3,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
     }
   ],
   "edges": [

@@ -85,7 +85,7 @@ geometry::CurveProfile profile_from_spline_data(const data::PcgSplineData& profi
     for (const auto& p : spline.points)
         points.push_back(to_vec3(p));
 
-    return geometry::prepare_curve_profile(points, spline.closed, true, options.profile_plane);
+    return geometry::prepare_curve_profile(points, spline.closed, false, options.profile_plane);
 }
 
 bool spline_is_closed(const std::vector<geometry::Vec3>& polyline, bool closed_flag)

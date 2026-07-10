@@ -9,15 +9,22 @@ namespace pcg::internal::data {
 PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
 {
     PcgMeshData mesh;
-    for (const auto& p : geometry.points())
-        mesh.add_vertex({p.x, p.y, p.z});
-
+    // Duplicate vertices per face for flat shading — each face gets its own
+    // vertices so that Unity's RecalculateNormals() produces correct per-face
+    // normals instead of smoothing across hard edges between adjacent faces.
     for (const auto& face : geometry.faces()) {
         if (face.size() < 3)
             continue;
-        const int i0 = face[0];
-        for (size_t i = 1; i + 1 < face.size(); ++i)
-            mesh.add_triangle(i0, face[i], face[i + 1]);
+        std::vector<int> local;
+        local.reserve(face.size());
+        for (int idx : face) {
+            const auto& p = geometry.points()[static_cast<size_t>(idx)];
+            local.push_back(static_cast<int>(mesh.vertices().size()));
+            mesh.add_vertex({p.x, p.y, p.z});
+        }
+        const int i0 = local[0];
+        for (size_t i = 1; i + 1 < local.size(); ++i)
+            mesh.add_triangle(i0, local[i], local[i + 1]);
     }
 
     return mesh;

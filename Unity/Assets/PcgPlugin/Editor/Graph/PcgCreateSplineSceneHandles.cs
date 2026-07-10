@@ -24,7 +24,7 @@ namespace DJTechEditor.PCG.Graph
         private const float SceneViewToolsPanelWidth = 48f;
         private const float SceneOverlayMargin = 12f;
 
-        private static readonly Dictionary<string, int> s_SelectedPointByNode = new();
+        private static readonly Dictionary<string, HashSet<int>> s_SelectedPointByNode = new();
         private static GUIStyle s_ShortcutHintStyle;
 
         private static bool s_DragActive;
@@ -88,7 +88,7 @@ namespace DJTechEditor.PCG.Graph
             for (var i = 0; i < points.Count; i++)
                 worldPoints[i] = LocalToWorld(points[i] + sceneOffset, anchor);
 
-            var selectedIndex = GetSelectedPointIndex(node.NodeId, points.Count);
+            var selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
             var closed = ReadBool(nodeData, "closed", false);
             var mode = nodeData?.GetRaw("mode")?.ToString() ?? "polyline";
 
@@ -109,7 +109,7 @@ namespace DJTechEditor.PCG.Graph
 
             if (TrySelectPointClick(worldPoints, node.NodeId))
             {
-                selectedIndex = GetSelectedPointIndex(node.NodeId, points.Count);
+                selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
                 sceneView.Repaint();
             }
 
@@ -124,7 +124,6 @@ namespace DJTechEditor.PCG.Graph
                     editPlane,
                     usesExplicit,
                     closed,
-                    selectedIndex,
                     anchor))
             {
                 sceneView.Repaint();
@@ -134,7 +133,7 @@ namespace DJTechEditor.PCG.Graph
             var changed = false;
             for (var i = 0; i < worldPoints.Length; i++)
             {
-                var isSelected = i == selectedIndex;
+                var isSelected = selectedIndices.Contains(i);
                 Handles.color = isSelected ? s_SelectedHandleColor : s_HandleColor;
 
                 if (isSelected)
@@ -148,14 +147,24 @@ namespace DJTechEditor.PCG.Graph
                 if (!EditorGUI.EndChangeCheck())
                     continue;
 
-                SetSelectedPointIndex(node.NodeId, i);
+                if (!isSelected)
+                {
+                    SetSelectedPointIndices(node.NodeId, new HashSet<int> { i });
+                    selectedIndices = new HashSet<int> { i };
+                }
+
                 BeginSplineDrag(graphView, window);
 
-                var newLocal = WorldToLocal(newWorld, anchor) - sceneOffset;
-                newLocal = ConstrainToEditPlane(newLocal, editPlane);
-                points[i] = newLocal;
+                var delta = newWorld - worldPoints[i];
+                foreach (var selIdx in selectedIndices)
+                {
+                    var newLocal = WorldToLocal(worldPoints[selIdx] + delta, anchor) - sceneOffset;
+                    newLocal = ConstrainToEditPlane(newLocal, editPlane);
+                    points[selIdx] = newLocal;
+                }
                 WritePointsToNode(node, points, usesExplicit);
                 changed = true;
+                break;
             }
 
             if (!changed)
@@ -189,7 +198,8 @@ namespace DJTechEditor.PCG.Graph
         {
             var nodeData = node.CollectData();
             var pointCount = PcgSplineControlPoints.GetEffectivePoints(nodeData).Count;
-            var selectedIndex = GetSelectedPointIndex(node.NodeId, pointCount);
+            var selectedIndices = GetSelectedPointIndices(node.NodeId, pointCount);
+            var selectedCount = selectedIndices.Count;
 
             Handles.BeginGUI();
             try
@@ -207,24 +217,29 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.Space(6f);
                 GUILayout.Label($"Create Spline — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
                 GUILayout.Label(
-                    $"Points: {pointCount}   Selected: {(selectedIndex >= 0 ? selectedIndex.ToString() : "none")}",
+                    $"Points: {pointCount}   Selected: {selectedCount}",
                     EditorStyles.miniLabel);
 
                 GUILayout.BeginHorizontal();
                 GUI.enabled = pointCount >= 2;
                 if (GUILayout.Button("Insert Point (I)", GUILayout.Height(22f)))
                 {
-                    if (InsertPointForNode(node, selectedIndex))
-                        selectedIndex = GetSelectedPointIndex(node.NodeId, pointCount + 1);
+                    if (InsertPointForNode(node, selectedIndices))
+                    {
+                        pointCount = PcgSplineControlPoints.GetEffectivePoints(node.CollectData()).Count;
+                        selectedIndices = GetSelectedPointIndices(node.NodeId, pointCount);
+                        selectedCount = selectedIndices.Count;
+                    }
                 }
 
-                GUI.enabled = pointCount > 2 && selectedIndex >= 0;
+                GUI.enabled = pointCount > 2 && selectedCount > 0;
                 if (GUILayout.Button("Delete Point (Del)", GUILayout.Height(22f)))
                 {
                     if (DeleteSelectedPointForNode(node))
                     {
                         pointCount = PcgSplineControlPoints.GetEffectivePoints(node.CollectData()).Count;
-                        selectedIndex = GetSelectedPointIndex(node.NodeId, pointCount);
+                        selectedIndices = GetSelectedPointIndices(node.NodeId, pointCount);
+                        selectedCount = selectedIndices.Count;
                     }
                 }
 
@@ -232,7 +247,7 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.EndHorizontal();
 
                 GUILayout.Label(
-                    "I insert · Del delete · Shift+click segment insert",
+                    "Shift+click multi-select · Ctrl+click segment insert",
                     ShortcutHintStyle);
                 GUILayout.EndArea();
             }
@@ -256,11 +271,11 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             var target = activeNodes[0].node;
-            var selectedIndex = GetSelectedPointIndex(target.NodeId, int.MaxValue);
+            var selectedIndices = GetSelectedPointIndices(target.NodeId, int.MaxValue);
 
             if (evt.keyCode == KeyCode.I)
             {
-                if (InsertPointForNode(target, selectedIndex))
+                if (InsertPointForNode(target, selectedIndices))
                 {
                     evt.Use();
                     sceneView.Repaint();
@@ -269,7 +284,7 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            if (selectedIndex < 0)
+            if (selectedIndices.Count == 0)
                 return;
 
             if (DeleteSelectedPointForNode(target))
@@ -284,7 +299,6 @@ namespace DJTechEditor.PCG.Graph
             var evt = Event.current;
             if (evt.type != EventType.MouseDown ||
                 evt.button != 0 ||
-                evt.shift ||
                 evt.alt ||
                 evt.control)
                 return false;
@@ -294,7 +308,7 @@ namespace DJTechEditor.PCG.Graph
             for (var i = 0; i < worldPoints.Count; i++)
             {
                 var distance = HandleUtility.DistanceToCircle(worldPoints[i], 0f);
-                if (distance > 16f || distance >= bestDistance)
+                if (distance > 20f || distance >= bestDistance)
                     continue;
 
                 bestDistance = distance;
@@ -304,7 +318,25 @@ namespace DJTechEditor.PCG.Graph
             if (bestIndex < 0)
                 return false;
 
-            SetSelectedPointIndex(nodeId, bestIndex);
+            evt.Use();
+
+            if (evt.shift)
+            {
+                var current = GetSelectedPointIndices(nodeId, worldPoints.Count);
+                if (current.Contains(bestIndex))
+                    current.Remove(bestIndex);
+                else
+                    current.Add(bestIndex);
+
+                if (current.Count == 0)
+                    current.Add(bestIndex);
+                SetSelectedPointIndices(nodeId, current);
+            }
+            else
+            {
+                SetSelectedPointIndices(nodeId, new HashSet<int> { bestIndex });
+            }
+
             return true;
         }
 
@@ -319,15 +351,14 @@ namespace DJTechEditor.PCG.Graph
             string editPlane,
             bool usesExplicit,
             bool closed,
-            int selectedIndex,
             Transform anchor)
         {
             var evt = Event.current;
             if (evt.type != EventType.MouseDown ||
                 evt.button != 0 ||
-                !evt.shift ||
+                !evt.control ||
                 evt.alt ||
-                evt.control)
+                evt.shift)
                 return false;
 
             var ray = HandleUtility.GUIPointToWorldRay(evt.mousePosition);
@@ -343,7 +374,7 @@ namespace DJTechEditor.PCG.Graph
                 WritePointsToNode(node, points, usesExplicit);
             });
 
-            SetSelectedPointIndex(node.NodeId, insertIndex);
+            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex });
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
 
@@ -355,7 +386,7 @@ namespace DJTechEditor.PCG.Graph
             return true;
         }
 
-        private static bool InsertPointForNode(PcgManifestNodeView node, int selectedIndex)
+        private static bool InsertPointForNode(PcgManifestNodeView node, HashSet<int> selectedIndices)
         {
             if (!TryGetActiveContext(node, out var window, out var graphView))
                 return false;
@@ -366,8 +397,8 @@ namespace DJTechEditor.PCG.Graph
             if (points.Count < 2)
                 return false;
 
-            var insertIndex = selectedIndex >= 0 && selectedIndex < points.Count - 1
-                ? selectedIndex + 1
+            var insertIndex = selectedIndices.Count > 0
+                ? Mathf.Clamp(selectedIndices.Max() + 1, 0, points.Count)
                 : points.Count;
 
             var left = points[Mathf.Clamp(insertIndex - 1, 0, points.Count - 1)];
@@ -380,7 +411,7 @@ namespace DJTechEditor.PCG.Graph
                 WritePointsToNode(node, points, usesExplicit);
             });
 
-            SetSelectedPointIndex(node.NodeId, insertIndex);
+            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex });
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             SceneView.RepaintAll();
@@ -395,17 +426,22 @@ namespace DJTechEditor.PCG.Graph
             var nodeData = node.CollectData();
             var usesExplicit = PcgSplineControlPoints.HasExplicitControlPoints(nodeData);
             var points = PcgSplineControlPoints.GetEffectivePoints(nodeData);
-            var selectedIndex = GetSelectedPointIndex(node.NodeId, points.Count);
-            if (selectedIndex < 0 || points.Count <= 2)
+            var selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
+            if (selectedIndices.Count == 0 || points.Count <= 2)
                 return false;
 
-            graphView.WithUndo("Delete Spline Control Point", () =>
+            if (points.Count - selectedIndices.Count < 2)
+                return false;
+
+            graphView.WithUndo("Delete Spline Control Points", () =>
             {
-                points.RemoveAt(selectedIndex);
+                var sorted = selectedIndices.OrderByDescending(i => i).ToList();
+                foreach (var idx in sorted)
+                    points.RemoveAt(idx);
                 WritePointsToNode(node, points, usesExplicit);
             });
 
-            SetSelectedPointIndex(node.NodeId, Mathf.Clamp(selectedIndex, 0, points.Count - 1));
+            SetSelectedPointIndices(node.NodeId, points.Count > 0 ? new HashSet<int> { 0 } : new HashSet<int>());
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             SceneView.RepaintAll();
@@ -459,20 +495,27 @@ namespace DJTechEditor.PCG.Graph
             node.SetPropertyValue("controlPoints", "[]");
         }
 
-        private static int GetSelectedPointIndex(string nodeId, int pointCount)
+        private static HashSet<int> GetSelectedPointIndices(string nodeId, int pointCount)
         {
-            if (!s_SelectedPointByNode.TryGetValue(nodeId, out var index))
-                return pointCount >= 2 ? 0 : -1;
+            if (!s_SelectedPointByNode.TryGetValue(nodeId, out var indices) || indices.Count == 0)
+                return pointCount >= 2 ? new HashSet<int> { 0 } : new HashSet<int>();
 
-            if (index < 0 || index >= pointCount)
-                return pointCount >= 2 ? Mathf.Clamp(index, 0, pointCount - 1) : -1;
+            var valid = new HashSet<int>();
+            foreach (var idx in indices)
+            {
+                if (idx >= 0 && idx < pointCount)
+                    valid.Add(idx);
+            }
 
-            return index;
+            if (valid.Count == 0 && pointCount >= 2)
+                valid.Add(0);
+
+            return valid;
         }
 
-        private static void SetSelectedPointIndex(string nodeId, int index)
+        private static void SetSelectedPointIndices(string nodeId, HashSet<int> indices)
         {
-            s_SelectedPointByNode[nodeId] = index;
+            s_SelectedPointByNode[nodeId] = indices;
         }
 
         private static bool TryPickSegment(
