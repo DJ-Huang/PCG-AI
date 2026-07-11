@@ -509,7 +509,11 @@
         },
         "sceneOffsetX": { "type": "number", "default": 0 },
         "sceneOffsetY": { "type": "number", "default": 0 },
-        "sceneOffsetZ": { "type": "number", "default": 0 }
+        "sceneOffsetZ": { "type": "number", "default": 0 },
+        "tangents": {
+          "type": "string",
+          "default": "[]"
+        }
       }
     },
     {

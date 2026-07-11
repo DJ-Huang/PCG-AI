@@ -20,6 +20,10 @@ namespace DJTechEditor.PCG.Graph
         private static readonly Color s_HandleColor = new(0.25f, 0.85f, 1f, 1f);
         private static readonly Color s_SelectedHandleColor = new(1f, 0.45f, 0.15f, 1f);
         private static readonly Color s_SegmentPickColor = new(0.9f, 0.9f, 0.2f, 0.9f);
+        private static readonly Color s_TangentLineColor = new(0.6f, 1f, 0.4f, 0.7f);
+        private static readonly Color s_TangentHandleColor = new(0.4f, 0.9f, 0.3f, 1f);
+        private static readonly Color s_TangentHandleActiveColor = new(0.7f, 1f, 0.5f, 1f);
+        private static readonly Color s_UnselectedPointColor = new(0.5f, 0.5f, 0.5f, 0.6f);
 
         private const float SceneViewToolsPanelWidth = 48f;
         private const float SceneOverlayMargin = 12f;
@@ -31,6 +35,7 @@ namespace DJTechEditor.PCG.Graph
         private static bool s_HandleHot;
         private static PcgGraphView s_DragGraphView;
         private static PcgGraphEditorWindow s_DragWindow;
+        private static bool s_TangentDragActive;
 
         private static bool s_PcgModeActive;
         private static PcgGraphEditorWindow s_ActiveWindow;
@@ -378,7 +383,8 @@ namespace DJTechEditor.PCG.Graph
 
             if (mode == "catmullRom")
             {
-                var preview = SampleCatmullRom(points, sceneOffset, anchor, closed, ReadInt(nodeData, "subdivisions", 8));
+                var previewTangents = PcgSplineControlPoints.GetTangents(points, nodeData, closed);
+                var preview = SampleCatmullRom(points, previewTangents, sceneOffset, anchor, closed, ReadInt(nodeData, "subdivisions", 8));
                 if (preview.Count >= 2)
                 {
                     Handles.color = s_CurvePreviewColor;
@@ -391,6 +397,84 @@ namespace DJTechEditor.PCG.Graph
             if (closed && worldPoints.Length >= 2)
                 Handles.DrawLine(worldPoints[^1], worldPoints[0]);
 
+            // Read tangent data (computed from Catmull-Rom or explicitly stored)
+            var tangents = PcgSplineControlPoints.GetTangents(points, nodeData, closed);
+            var hasExplicitTangents = PcgSplineControlPoints.HasExplicitTangents(nodeData);
+            // Normalise tangent display to a fixed visual length so handles are
+            // always visible and never collapse to a degenerate point.
+            var tangentWorldPositions = new Vector3[points.Count * 2];
+            for (var i = 0; i < points.Count; i++)
+            {
+                var wp = worldPoints[i];
+                var tangentDirWorld = LocalDirToWorldDir(tangents[i], anchor);
+                var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
+                if (tangentDirWorld.sqrMagnitude > 1e-8f)
+                    tangentDirWorld = tangentDirWorld.normalized * displayLen;
+                else
+                    tangentDirWorld = Vector3.forward * displayLen;
+                tangentWorldPositions[i * 2] = wp + tangentDirWorld;       // out-tangent
+                tangentWorldPositions[i * 2 + 1] = wp - tangentDirWorld;   // in-tangent (mirrored)
+            }
+
+            var changed = false;
+
+            // Draw tangent handles for selected points (BEFORE selection click
+            // so their hit tests register first and grab hotControl)
+            if (selectedIndices.Count > 0)
+            {
+                changed |= DrawTangentHandles(
+                    sceneView, window, graphView, node, points, worldPoints,
+                    tangents, tangentWorldPositions, sceneOffset, editPlane,
+                    usesExplicit, hasExplicitTangents, closed, anchor, selectedIndices);
+            }
+
+            // Draw control point handles — only selected points get a PositionHandle
+            // (BEFORE selection click so PositionHandle axes register first)
+            for (var i = 0; i < worldPoints.Length; i++)
+            {
+                var isSelected = selectedIndices.Contains(i);
+
+                if (!isSelected)
+                {
+                    // Unselected: small clickable sphere only, no position handle
+                    if (Event.current.type == EventType.Repaint)
+                    {
+                        Handles.color = s_UnselectedPointColor;
+                        var unselectedSize = HandleUtility.GetHandleSize(worldPoints[i]) * 0.08f;
+                        Handles.SphereHandleCap(0, worldPoints[i], Quaternion.identity, unselectedSize, EventType.Repaint);
+                    }
+                    continue;
+                }
+
+                // Selected: larger sphere + position handle
+                if (Event.current.type == EventType.Repaint)
+                {
+                    Handles.color = s_SelectedHandleColor;
+                    var pickSize = HandleUtility.GetHandleSize(worldPoints[i]) * 0.11f;
+                    Handles.SphereHandleCap(0, worldPoints[i], Quaternion.identity, pickSize, EventType.Repaint);
+                }
+
+                EditorGUI.BeginChangeCheck();
+                var newWorld = Handles.PositionHandle(worldPoints[i], Quaternion.identity);
+                if (!EditorGUI.EndChangeCheck())
+                    continue;
+
+                BeginSplineDrag(graphView, window);
+
+                var delta = newWorld - worldPoints[i];
+                foreach (var selIdx in selectedIndices)
+                {
+                    var newLocal = WorldToLocal(worldPoints[selIdx] + delta, anchor) - sceneOffset;
+                    newLocal = ConstrainToEditPlane(newLocal, editPlane);
+                    points[selIdx] = newLocal;
+                }
+                WritePointsToNode(node, points, usesExplicit);
+                changed = true;
+                break;
+            }
+
+            // Selection click handling — AFTER handles so hotControl is set
+            // by PositionHandle / FreeMoveHandle before we check it.
             if (TrySelectPointClick(worldPoints, node.NodeId))
             {
                 selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
@@ -414,43 +498,6 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            var changed = false;
-            for (var i = 0; i < worldPoints.Length; i++)
-            {
-                var isSelected = selectedIndices.Contains(i);
-                Handles.color = isSelected ? s_SelectedHandleColor : s_HandleColor;
-
-                if (isSelected)
-                {
-                    var pickSize = HandleUtility.GetHandleSize(worldPoints[i]) * 0.11f;
-                    Handles.SphereHandleCap(0, worldPoints[i], Quaternion.identity, pickSize, EventType.Repaint);
-                }
-
-                EditorGUI.BeginChangeCheck();
-                var newWorld = Handles.PositionHandle(worldPoints[i], Quaternion.identity);
-                if (!EditorGUI.EndChangeCheck())
-                    continue;
-
-                if (!isSelected)
-                {
-                    SetSelectedPointIndices(node.NodeId, new HashSet<int> { i });
-                    selectedIndices = new HashSet<int> { i };
-                }
-
-                BeginSplineDrag(graphView, window);
-
-                var delta = newWorld - worldPoints[i];
-                foreach (var selIdx in selectedIndices)
-                {
-                    var newLocal = WorldToLocal(worldPoints[selIdx] + delta, anchor) - sceneOffset;
-                    newLocal = ConstrainToEditPlane(newLocal, editPlane);
-                    points[selIdx] = newLocal;
-                }
-                WritePointsToNode(node, points, usesExplicit);
-                changed = true;
-                break;
-            }
-
             if (!changed)
                 return;
 
@@ -459,6 +506,163 @@ namespace DJTechEditor.PCG.Graph
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             sceneView.Repaint();
             HandleUtility.Repaint();
+        }
+
+        private static bool DrawTangentHandles(
+            SceneView sceneView,
+            PcgGraphEditorWindow window,
+            PcgGraphView graphView,
+            PcgManifestNodeView node,
+            List<Vector3> points,
+            Vector3[] worldPoints,
+            List<Vector3> tangents,
+            Vector3[] tangentWorldPositions,
+            Vector3 sceneOffset,
+            string editPlane,
+            bool usesExplicit,
+            bool hasExplicitTangents,
+            bool closed,
+            Transform anchor,
+            HashSet<int> selectedIndices)
+        {
+            var changed = false;
+
+            for (var i = 0; i < points.Count; i++)
+            {
+                if (!selectedIndices.Contains(i))
+                    continue;
+
+                var wp = worldPoints[i];
+                var outWorld = tangentWorldPositions[i * 2];
+                var inWorld = tangentWorldPositions[i * 2 + 1];
+
+                // Skip tangent handles when the tangent is too short — drawing a
+                // near-zero-length line or overlapping sphere caps produces black
+                // pixel artifacts, especially during Scene View rotation.
+                var tangentWorldLen = Vector3.Distance(wp, outWorld);
+                var minHandleLen = HandleUtility.GetHandleSize(wp) * 0.25f;
+                if (tangentWorldLen < minHandleLen)
+                    continue;
+
+                // Draw tangent lines (visual only — guard against non-Repaint events
+                // to prevent handle rendering from leaking into docked neighbour windows)
+                if (Event.current.type == EventType.Repaint)
+                {
+                    Handles.color = s_TangentLineColor;
+                    Handles.DrawLine(wp, outWorld);
+                    Handles.DrawLine(wp, inWorld);
+                }
+
+                var handleSize = HandleUtility.GetHandleSize(wp) * 0.07f;
+
+                // Out-tangent handle (draggable)
+                Handles.color = s_TangentHandleColor;
+                EditorGUI.BeginChangeCheck();
+                var newOut = Handles.FreeMoveHandle(outWorld, handleSize, Vector3.zero, Handles.SphereHandleCap);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    // Convert the dragged world position back to a tangent direction.
+                    // The display was normalised to a fixed length, so we store the
+                    // raw direction scaled by the drag distance ratio.
+                    var dragWorldDir = newOut - wp;
+                    var newTangentLocal = WorldDirToLocalDir(dragWorldDir, anchor);
+                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, editPlane);
+                    tangents[i] = newTangentLocal;
+
+                    var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
+                    var dirLocalWorld = LocalDirToWorldDir(newTangentLocal, anchor);
+                    if (dirLocalWorld.sqrMagnitude > 1e-8f)
+                        dirLocalWorld = dirLocalWorld.normalized * displayLen;
+                    tangentWorldPositions[i * 2] = wp + dirLocalWorld;
+                    tangentWorldPositions[i * 2 + 1] = wp - dirLocalWorld;
+
+                    BeginSplineDrag(graphView, window);
+                    s_TangentDragActive = true;
+                    WriteTangentsToNode(node, tangents);
+                    changed = true;
+                }
+
+                // In-tangent handle (draggable, mirrors out-tangent)
+                Handles.color = s_TangentHandleColor;
+                EditorGUI.BeginChangeCheck();
+                var newIn = Handles.FreeMoveHandle(inWorld, handleSize, Vector3.zero, Handles.SphereHandleCap);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    var dragWorldDir = wp - newIn;
+                    var newTangentLocal = WorldDirToLocalDir(dragWorldDir, anchor);
+                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, editPlane);
+                    tangents[i] = newTangentLocal;
+
+                    var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
+                    var dirLocalWorld = LocalDirToWorldDir(newTangentLocal, anchor);
+                    if (dirLocalWorld.sqrMagnitude > 1e-8f)
+                        dirLocalWorld = dirLocalWorld.normalized * displayLen;
+                    tangentWorldPositions[i * 2] = wp + dirLocalWorld;
+                    tangentWorldPositions[i * 2 + 1] = wp - dirLocalWorld;
+
+                    BeginSplineDrag(graphView, window);
+                    s_TangentDragActive = true;
+                    WriteTangentsToNode(node, tangents);
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        private static Vector3 WorldDirToLocalDir(Vector3 worldDir, Transform anchor) =>
+            anchor != null ? anchor.InverseTransformDirection(worldDir) : worldDir;
+
+        private static Vector3 LocalDirToWorldDir(Vector3 localDir, Transform anchor) =>
+            anchor != null ? anchor.TransformDirection(localDir) : localDir;
+
+        private static void WriteTangentsToNode(PcgManifestNodeView node, IReadOnlyList<Vector3> tangents)
+        {
+            node.SetPropertyValue("tangents", PcgSplineControlPoints.SerializeTangents(tangents));
+        }
+
+        private static void InsertTangentAtIndex(
+            PcgManifestNodeView node,
+            PcgNodeData nodeData,
+            List<Vector3> points,
+            int insertIndex,
+            bool closed)
+        {
+            if (!PcgSplineControlPoints.HasExplicitTangents(nodeData))
+                return;
+
+            var tangents = PcgSplineControlPoints.ParseTangents(
+                nodeData.GetRaw("tangents")?.ToString() ?? "[]");
+            if (tangents.Count != points.Count - 1)
+                return;
+
+            var computed = PcgSplineControlPoints.ComputeCatmullRomTangents(points, closed);
+            tangents.Insert(insertIndex, computed.Count > insertIndex
+                ? computed[insertIndex]
+                : Vector3.zero);
+            WriteTangentsToNode(node, tangents);
+        }
+
+        private static void DeleteTangentsAtIndices(
+            PcgManifestNodeView node,
+            PcgNodeData nodeData,
+            List<int> sortedIndices)
+        {
+            if (!PcgSplineControlPoints.HasExplicitTangents(nodeData))
+                return;
+
+            var tangents = PcgSplineControlPoints.ParseTangents(
+                nodeData.GetRaw("tangents")?.ToString() ?? "[]");
+            if (tangents.Count == 0)
+                return;
+
+            foreach (var idx in sortedIndices)
+            {
+                if (idx >= 0 && idx < tangents.Count)
+                    tangents.RemoveAt(idx);
+            }
+
+            WriteTangentsToNode(node, tangents);
         }
 
         private static GUIStyle ShortcutHintStyle
@@ -676,7 +880,7 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.EndHorizontal();
 
                 GUILayout.Label(
-                    "Shift+click multi-select · Ctrl+click segment insert",
+                    "Click point to select · Shift+click multi-select · Ctrl+click segment insert · Drag green handles for tangent",
                     ShortcutHintStyle);
                 GUILayout.EndArea();
             }
@@ -732,6 +936,11 @@ namespace DJTechEditor.PCG.Graph
                 evt.control)
                 return false;
 
+            // If a handle is already hot (PositionHandle axis or FreeMoveHandle),
+            // don't intercept — let the handle receive the drag.
+            if (GUIUtility.hotControl != 0)
+                return false;
+
             var bestIndex = -1;
             var bestDistance = float.MaxValue;
             for (var i = 0; i < worldPoints.Count; i++)
@@ -745,25 +954,44 @@ namespace DJTechEditor.PCG.Graph
             }
 
             if (bestIndex < 0)
+            {
+                // Click on empty space — deselect all (no modifiers)
+                if (!evt.shift)
+                {
+                    SetSelectedPointIndices(nodeId, new HashSet<int>());
+                    evt.Use();
+                    return true;
+                }
                 return false;
-
-            evt.Use();
+            }
 
             if (evt.shift)
             {
+                // Shift+click: toggle selection, consume event (no drag)
+                evt.Use();
                 var current = GetSelectedPointIndices(nodeId, worldPoints.Count);
                 if (current.Contains(bestIndex))
                     current.Remove(bestIndex);
                 else
                     current.Add(bestIndex);
-
-                if (current.Count == 0)
-                    current.Add(bestIndex);
                 SetSelectedPointIndices(nodeId, current);
             }
             else
             {
+                // Normal click on a point:
+                // - If already selected: DON'T consume — let PositionHandle
+                //   receive the MouseDown and start a drag.
+                // - If newly selected: select and consume (user clicks again
+                //   to drag, standard select-then-move UX).
+                var current = GetSelectedPointIndices(nodeId, worldPoints.Count);
+                if (current.Count == 1 && current.Contains(bestIndex))
+                {
+                    // Already solely selected — let event flow to PositionHandle
+                    return true;
+                }
+
                 SetSelectedPointIndices(nodeId, new HashSet<int> { bestIndex });
+                evt.Use();
             }
 
             return true;
@@ -790,6 +1018,8 @@ namespace DJTechEditor.PCG.Graph
                 evt.shift)
                 return false;
 
+            var nodeData = node.CollectData();
+
             var ray = HandleUtility.GUIPointToWorldRay(evt.mousePosition);
             if (!TryPickSegment(worldPoints, closed, ray, 12f, out var segmentIndex, out var hitWorld))
                 return false;
@@ -801,6 +1031,7 @@ namespace DJTechEditor.PCG.Graph
             {
                 points.Insert(insertIndex, localPoint);
                 WritePointsToNode(node, points, usesExplicit);
+                InsertTangentAtIndex(node, nodeData, points, insertIndex, closed);
             });
 
             SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex });
@@ -826,6 +1057,8 @@ namespace DJTechEditor.PCG.Graph
             if (points.Count < 2)
                 return false;
 
+            var closed = ReadBool(nodeData, "closed", false);
+
             var insertIndex = selectedIndices.Count > 0
                 ? Mathf.Clamp(selectedIndices.Max() + 1, 0, points.Count)
                 : points.Count;
@@ -838,6 +1071,7 @@ namespace DJTechEditor.PCG.Graph
             {
                 points.Insert(insertIndex, midpoint);
                 WritePointsToNode(node, points, usesExplicit);
+                InsertTangentAtIndex(node, nodeData, points, insertIndex, closed);
             });
 
             SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex });
@@ -868,9 +1102,10 @@ namespace DJTechEditor.PCG.Graph
                 foreach (var idx in sorted)
                     points.RemoveAt(idx);
                 WritePointsToNode(node, points, usesExplicit);
+                DeleteTangentsAtIndices(node, nodeData, sorted);
             });
 
-            SetSelectedPointIndices(node.NodeId, points.Count > 0 ? new HashSet<int> { 0 } : new HashSet<int>());
+            SetSelectedPointIndices(node.NodeId, new HashSet<int>());
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             SceneView.RepaintAll();
@@ -927,7 +1162,7 @@ namespace DJTechEditor.PCG.Graph
         private static HashSet<int> GetSelectedPointIndices(string nodeId, int pointCount)
         {
             if (!s_SelectedPointByNode.TryGetValue(nodeId, out var indices) || indices.Count == 0)
-                return pointCount >= 2 ? new HashSet<int> { 0 } : new HashSet<int>();
+                return new HashSet<int>();
 
             var valid = new HashSet<int>();
             foreach (var idx in indices)
@@ -935,9 +1170,6 @@ namespace DJTechEditor.PCG.Graph
                 if (idx >= 0 && idx < pointCount)
                     valid.Add(idx);
             }
-
-            if (valid.Count == 0 && pointCount >= 2)
-                valid.Add(0);
 
             return valid;
         }
@@ -1003,6 +1235,7 @@ namespace DJTechEditor.PCG.Graph
 
         private static List<Vector3> SampleCatmullRom(
             IReadOnlyList<Vector3> localPoints,
+            IReadOnlyList<Vector3> tangents,
             Vector3 sceneOffset,
             Transform anchor,
             bool closed,
@@ -1018,16 +1251,17 @@ namespace DJTechEditor.PCG.Graph
 
             for (var seg = 0; seg < segmentCount; seg++)
             {
-                var p0 = localPoints[WrapIndex(seg - 1, count, closed)];
                 var p1 = localPoints[seg];
-                var p2 = localPoints[WrapIndex(seg + 1, count, closed)];
-                var p3 = localPoints[WrapIndex(seg + 2, count, closed)];
+                var p2 = localPoints[(seg + 1) % count];
+                // Hermite tangents at each endpoint
+                var t1 = tangents[seg];
+                var t2 = tangents[(seg + 1) % count];
 
                 var endStep = seg == segmentCount - 1 && !closed ? steps : steps - 1;
                 for (var step = 0; step <= endStep; step++)
                 {
                     var t = step / (float)steps;
-                    var local = CatmullRom(p0, p1, p2, p3, t) + sceneOffset;
+                    var local = CubicHermite(p1, t1, p2, t2, t) + sceneOffset;
                     samples.Add(LocalToWorld(local, anchor));
                 }
             }
@@ -1035,23 +1269,18 @@ namespace DJTechEditor.PCG.Graph
             return samples;
         }
 
-        private static int WrapIndex(int index, int count, bool closed)
+        /// <summary>
+        /// Cubic Hermite interpolation. Equivalent to Catmull-Rom when
+        /// t1 = 0.5*(p2-p0), t2 = 0.5*(p3-p1).
+        /// </summary>
+        private static Vector3 CubicHermite(Vector3 p1, Vector3 t1, Vector3 p2, Vector3 t2, float t)
         {
-            if (closed)
-                return (index % count + count) % count;
-
-            return Mathf.Clamp(index, 0, count - 1);
-        }
-
-        private static Vector3 CatmullRom(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
-        {
-            var t2 = t * t;
-            var t3 = t2 * t;
-            return 0.5f * (
-                (2f * p1) +
-                (-p0 + p2) * t +
-                (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
-                (-p0 + 3f * p1 - 3f * p2 + p3) * t3);
+            var t2v = t * t;
+            var t3v = t2v * t;
+            return (2f * t3v - 3f * t2v + 1f) * p1
+                   + (t3v - 2f * t2v + t) * t1
+                   + (-2f * t3v + 3f * t2v) * p2
+                   + (t3v - t2v) * t2;
         }
 
         private static void BeginSplineDrag(PcgGraphView graphView, PcgGraphEditorWindow window)
@@ -1086,6 +1315,7 @@ namespace DJTechEditor.PCG.Graph
 
             s_DragActive = false;
             s_HandleHot = false;
+            s_TangentDragActive = false;
             s_DragGraphView = null;
             s_DragWindow = null;
         }
@@ -1099,6 +1329,7 @@ namespace DJTechEditor.PCG.Graph
         {
             s_DragActive = false;
             s_HandleHot = false;
+            s_TangentDragActive = false;
             s_DragGraphView = null;
             s_DragWindow = null;
         }
