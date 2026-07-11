@@ -48,6 +48,149 @@ namespace DJTechEditor.PCG.Graph
         private static OthersDisplayMode s_OthersDisplay = OthersDisplayMode.ShowAll;
         private static readonly HashSet<Renderer> s_HiddenRenderers = new();
 
+        // --- Procedurally generated toolbar icons ---
+        private static Texture2D IconObjectNormal => s_IconObjectNormal ??= MakeIcon(new(0.7f, 0.7f, 0.7f), DrawObjectIcon);
+        private static Texture2D IconObjectActive => s_IconObjectActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawObjectIcon);
+        private static Texture2D IconSplineNormal => s_IconSplineNormal ??= MakeIcon(new(0.7f, 0.7f, 0.7f), DrawSplineIcon);
+        private static Texture2D IconSplineActive => s_IconSplineActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawSplineIcon);
+        private static Texture2D IconVertexNormal => s_IconVertexNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawVertexIcon);
+        private static Texture2D IconEdgeNormal => s_IconEdgeNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawEdgeIcon);
+        private static Texture2D IconFaceNormal => s_IconFaceNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawFaceIcon);
+        private static Texture2D IconExit => s_IconExit ??= MakeIcon(new(0.85f, 0.5f, 0.4f), DrawExitIcon);
+
+        private static Texture2D s_IconObjectNormal, s_IconObjectActive;
+        private static Texture2D s_IconSplineNormal, s_IconSplineActive;
+        private static Texture2D s_IconVertexNormal, s_IconEdgeNormal, s_IconFaceNormal;
+        private static Texture2D s_IconExit;
+
+        private const int IconSize = 16;
+
+        // --- Icon generation ---
+
+        private delegate void IconDrawFunc(Color[] px, int size, Color c);
+
+        private static Texture2D MakeIcon(Color baseColor, IconDrawFunc drawFn)
+        {
+            var tex = new Texture2D(IconSize, IconSize, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                filterMode = FilterMode.Bilinear,
+            };
+            var px = new Color[IconSize * IconSize];
+            for (var i = 0; i < px.Length; i++)
+                px[i] = Color.clear;
+            drawFn(px, IconSize, baseColor);
+            tex.SetPixels(px);
+            tex.Apply();
+            return tex;
+        }
+
+        private static void SetPx(Color[] px, int size, int x, int y, Color c)
+        {
+            if (x < 0 || x >= size || y < 0 || y >= size) return;
+            px[y * size + x] = c;
+        }
+
+        private static void DrawLine(Color[] px, int size, int x0, int y0, int x1, int y1, Color c)
+        {
+            int dx = Mathf.Abs(x1 - x0), dy = Mathf.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+            while (true)
+            {
+                SetPx(px, size, x0, y0, c);
+                if (x0 == x1 && y0 == y1) break;
+                int e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
+            }
+        }
+
+        private static void DrawObjectIcon(Color[] px, int size, Color c)
+        {
+            // Wireframe cube — 3D-ish box
+            int m = 2, s = size - 3;
+            DrawLine(px, size, m, m, s, m, c);          // top
+            DrawLine(px, size, m, s, s, s, c);          // bottom
+            DrawLine(px, size, m, m, m, s, c);          // left
+            DrawLine(px, size, s, m, s, s, c);          // right
+            // depth lines
+            DrawLine(px, size, m, m, m + 2, m - 2, c);
+            DrawLine(px, size, s, m, s + 2, m - 2, c);
+            DrawLine(px, size, m + 2, m - 2, s + 2, m - 2, c);
+        }
+
+        private static void DrawSplineIcon(Color[] px, int size, Color c)
+        {
+            // Wavy curve through 4 points
+            int m = 2;
+            for (int i = 0; i < size - m * 2; i++)
+            {
+                float t = (float)i / (size - m * 2 - 1);
+                float y = Mathf.Sin(t * Mathf.PI * 2f) * 3f + size / 2f;
+                SetPx(px, size, m + i, Mathf.RoundToInt(y), c);
+                SetPx(px, size, m + i, Mathf.RoundToInt(y) + 1, c); // thicken
+            }
+        }
+
+        private static void DrawVertexIcon(Color[] px, int size, Color c)
+        {
+            // Single dot with ring
+            int cx = size / 2, cy = size / 2;
+            for (int r = 1; r <= 2; r++)
+            {
+                for (int a = 0; a < 360; a += 30)
+                {
+                    float rad = a * Mathf.Deg2Rad;
+                    SetPx(px, size, cx + Mathf.RoundToInt(Mathf.Cos(rad) * r), cy + Mathf.RoundToInt(Mathf.Sin(rad) * r), c);
+                }
+            }
+            SetPx(px, size, cx, cy, c);
+        }
+
+        private static void DrawEdgeIcon(Color[] px, int size, Color c)
+        {
+            // Diagonal line with endpoint dots
+            int m = 2, s = size - 3;
+            DrawLine(px, size, m, s, s, m, c);
+            SetPx(px, size, m, s, c); SetPx(px, size, m + 1, s, c); SetPx(px, size, m, s - 1, c);
+            SetPx(px, size, s, m, c); SetPx(px, size, s - 1, m, c); SetPx(px, size, s, m + 1, c);
+        }
+
+        private static void DrawFaceIcon(Color[] px, int size, Color c)
+        {
+            // Filled triangle
+            int m = 2, s = size - 3;
+            int mid = size / 2;
+            DrawLine(px, size, mid, m, m, s, c);     // left edge
+            DrawLine(px, size, mid, m, s, s, c);    // right edge
+            DrawLine(px, size, m, s, s, s, c);      // bottom
+            // fill
+            for (int y = m + 1; y < s; y++)
+            {
+                int half = (y - m) * (s - mid) / (s - m);
+                for (int x = mid - half; x <= mid + half; x++)
+                    SetPx(px, size, x, y, c * 0.5f);
+            }
+        }
+
+        private static void DrawExitIcon(Color[] px, int size, Color c)
+        {
+            // X in a circle
+            int cx = size / 2, cy = size / 2;
+            int r = size / 2 - 1;
+            // circle
+            for (int a = 0; a < 360; a += 20)
+            {
+                float rad = a * Mathf.Deg2Rad;
+                SetPx(px, size, cx + Mathf.RoundToInt(Mathf.Cos(rad) * r), cy + Mathf.RoundToInt(Mathf.Sin(rad) * r), c);
+            }
+            // X
+            int m = 4, s = size - 5;
+            DrawLine(px, size, m, m, s, s, c);
+            DrawLine(px, size, s, m, m, s, c);
+        }
+
         static PcgCreateSplineSceneHandles()
         {
             SceneView.duringSceneGui += OnSceneGui;
@@ -87,23 +230,6 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            // Lock selection to the PCG anchor object while in PCG Mode
-            if (s_LockedSelection != null)
-            {
-                // Add a background control that captures clicks only when no other
-                // control (toolbar buttons, handles) consumes them. This blocks
-                // Unity's hierarchy picker without blocking overlay UI.
-                HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
-
-                // Restore locked selection if user somehow picked another object
-                if (Selection.activeGameObject != s_LockedSelection)
-                {
-                    s_SelectionGuard = true;
-                    Selection.activeGameObject = s_LockedSelection;
-                    s_SelectionGuard = false;
-                }
-            }
-
             DrawPcgModeToolbar(sceneView, graphWindow);
 
             var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
@@ -128,6 +254,20 @@ namespace DJTechEditor.PCG.Graph
             }
 
             TryEndSplineDrag();
+
+            // AddDefaultControl registers a fallback that absorbs clicks on empty
+            // space, preventing Unity's hierarchy picker from changing selection.
+            // It must be called AFTER all GUI buttons and 3D handles have registered
+            // their hit tests so they take priority over the default control.
+            //
+            // Do NOT set Selection.activeGameObject here — doing so during MouseDown
+            // clears GUIUtility.hotControl, which prevents GUILayout.Button from
+            // detecting clicks (Exit, Insert Point, etc.). Selection locking is
+            // handled by OnSelectionChanged instead.
+            if (s_LockedSelection != null)
+            {
+                HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+            }
         }
 
         private static PcgGraphEditorWindow FindGraphWindow()
@@ -378,47 +518,53 @@ namespace DJTechEditor.PCG.Graph
             Handles.BeginGUI();
             try
             {
-                const float toolbarWidth = 500f;
                 const float toolbarHeight = 26f;
                 var toolbarArea = new Rect(
                     SceneViewToolsPanelWidth + SceneOverlayMargin,
                     SceneOverlayMargin,
-                    toolbarWidth,
+                    260f,
                     toolbarHeight);
                 GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
 
                 GUILayout.BeginArea(toolbarArea);
                 GUILayout.BeginHorizontal();
 
-                if (ToolbarButton("Object", ctx.IsObjectMode))
+                // Object mode — cube icon
+                if (IconToolbarButton(IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
                     window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
 
+                // Spline CP — curve icon
                 bool splineEnabled = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
                 GUI.enabled = splineEnabled;
-                if (ToolbarButton("Spline CP", ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint))
+                if (IconToolbarButton(IconSplineActive, IconSplineNormal, "Spline Control Points",
+                        ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint))
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.SplineControlPoint);
                 GUI.enabled = true;
 
+                // Vertex / Edge / Face — disabled placeholders
                 GUI.enabled = false;
-                ToolbarButton("Vertex", false);
-                ToolbarButton("Edge", false);
-                ToolbarButton("Face", false);
+                IconToolbarButton(IconVertexNormal, IconVertexNormal, "Vertex (not available)", false);
+                IconToolbarButton(IconEdgeNormal, IconEdgeNormal, "Edge (not available)", false);
+                IconToolbarButton(IconFaceNormal, IconFaceNormal, "Face (not available)", false);
                 GUI.enabled = true;
 
-                GUILayout.Space(8);
+                GUILayout.Space(4);
 
+                // Display mode popup — short label
                 var oldDisplay = s_OthersDisplay;
                 s_OthersDisplay = (OthersDisplayMode)EditorGUILayout.EnumPopup(
                     s_OthersDisplay, EditorStyles.toolbarPopup,
-                    GUILayout.Width(90));
+                    GUILayout.Width(70));
                 if (s_OthersDisplay != oldDisplay)
                     ApplyOthersDisplayMode();
 
-                GUILayout.Space(8);
+                GUILayout.Space(4);
 
+                // Exit — X icon
                 var exitColor = GUI.color;
                 GUI.color = new Color(1f, 0.7f, 0.5f);
-                if (GUILayout.Button("Exit", EditorStyles.toolbarButton))
+                if (GUILayout.Button(new GUIContent(IconExit, "Exit PCG Mode"), EditorStyles.toolbarButton,
+                        GUILayout.Width(24f)))
                 {
                     ExitPcgMode();
                     sceneView.Repaint();
@@ -434,12 +580,14 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static bool ToolbarButton(string label, bool active)
+        private static bool IconToolbarButton(Texture2D activeIcon, Texture2D normalIcon, string tooltip, bool active)
         {
+            var icon = active ? activeIcon : normalIcon;
+            var content = new GUIContent(icon, tooltip);
             var oldBg = GUI.backgroundColor;
             if (active)
                 GUI.backgroundColor = new Color(0.4f, 0.6f, 0.9f);
-            var clicked = GUILayout.Button(label, EditorStyles.toolbarButton);
+            var clicked = GUILayout.Button(content, EditorStyles.toolbarButton, GUILayout.Width(24f), GUILayout.Height(20f));
             GUI.backgroundColor = oldBg;
             return clicked;
         }
@@ -462,7 +610,8 @@ namespace DJTechEditor.PCG.Graph
                     height);
                 GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
 
-                GUILayout.BeginArea(area);
+                var paddedArea = new Rect(area.x + 6f, area.y, area.width - 6f, area.height);
+                GUILayout.BeginArea(paddedArea);
                 GUILayout.Space(4f);
                 GUILayout.Label($"Mode: {ctx.Level}" + (ctx.Domain != SceneEditDomain.None ? $" / {ctx.Domain}" : ""), EditorStyles.boldLabel);
                 GUILayout.Label($"Selected: {selText}", EditorStyles.miniLabel);
