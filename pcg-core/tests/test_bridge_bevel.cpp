@@ -236,6 +236,173 @@ double signed_volume(const pcg::internal::data::PcgMeshData& mesh)
     return vol / 6.0;
 }
 
+int count_boundary_loops(const pcg::internal::data::PcgMeshData& mesh)
+{
+    std::unordered_map<uint64_t, int> counts;
+    std::unordered_map<int, std::vector<int>> adjacency;
+    auto edge_key = [](int a, int b) -> uint64_t {
+        const int lo = std::min(a, b);
+        const int hi = std::max(a, b);
+        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
+               static_cast<uint32_t>(hi);
+    };
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        const int tri[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
+        for (int e = 0; e < 3; ++e)
+            ++counts[edge_key(tri[e], tri[(e + 1) % 3])];
+    }
+    for (const auto& [key, count] : counts) {
+        if (count != 1)
+            continue;
+        const int a = static_cast<int>(key >> 32);
+        const int b = static_cast<int>(key & 0xffffffffu);
+        adjacency[a].push_back(b);
+        adjacency[b].push_back(a);
+    }
+    std::unordered_map<int, bool> visited;
+    int loop_count = 0;
+    for (const auto& [start, _] : adjacency) {
+        if (visited[start])
+            continue;
+        int current = start;
+        int previous = -1;
+        int length = 0;
+        do {
+            visited[current] = true;
+            ++length;
+            int next = -1;
+            for (int candidate : adjacency[current]) {
+                if (candidate != previous) {
+                    next = candidate;
+                    break;
+                }
+            }
+            previous = current;
+            current = next;
+        } while (current >= 0 && current != start && length <= static_cast<int>(adjacency.size()));
+        ++loop_count;
+    }
+    return loop_count;
+}
+
+std::string build_parametric_sedan(bool cap_start, bool cap_end, int segments,
+                                   double path_length)
+{
+    std::string graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {
+          "id": "body_path",
+          "type": "CreateSpline",
+          "position": { "x": 200, "y": 0 },
+          "data": {
+            "mode": "line",
+            "closed": false,
+            "subdivisions": 1,
+            "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":4.2,\"y\":0,\"z\":0}]",
+            "editPlane": "none"
+          }
+        },
+        {
+          "id": "body_profile",
+          "type": "CreateSpline",
+          "position": { "x": 420, "y": 0 },
+          "data": {
+            "mode": "catmullRom",
+            "closed": true,
+            "subdivisions": 8,
+            "controlPoints": "[{\"x\":0.9,\"y\":0,\"z\":0},{\"x\":0.95,\"y\":0.2,\"z\":0},{\"x\":0.85,\"y\":0.5,\"z\":0},{\"x\":0.6,\"y\":0.78,\"z\":0},{\"x\":0.25,\"y\":0.9,\"z\":0},{\"x\":-0.25,\"y\":0.9,\"z\":0},{\"x\":-0.6,\"y\":0.78,\"z\":0},{\"x\":-0.85,\"y\":0.5,\"z\":0},{\"x\":-0.95,\"y\":0.2,\"z\":0},{\"x\":-0.9,\"y\":0,\"z\":0}]",
+            "editPlane": "xy"
+          }
+        },
+        {
+          "id": "body_sweep",
+          "type": "SweepAlongSpline",
+          "position": { "x": 200, "y": 160 },
+          "data": {
+            "surfaceShape": "crossSection",
+            "sampleSpacing": 0.5,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0, "upY": 1, "upZ": 0,
+            "scaleStart": 1.0, "scaleEnd": 1.0,
+            "profilePlane": "xy"
+          }
+        },
+        {
+          "id": "body_group",
+          "type": "GroupCreate",
+          "position": { "x": 200, "y": 320 },
+          "data": {
+            "outputGroup": "bevel_edges",
+            "domain": "edge",
+            "mode": "angle",
+            "minEdgeAngle": 30,
+            "includeUnshared": false,
+            "fromFaceGroup": "",
+            "fromEdgeGroup": "profile_corner"
+          }
+        },
+        {
+          "id": "body_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 480 },
+          "data": {
+            "method": "edge",
+            "amount": 0.06,
+            "segments": 2,
+            "clampOverlap": true,
+            "edgeGroup": "bevel_edges",
+            "excludeUnshared": true,
+            "excludeGroups": "cap_start,cap_end"
+          }
+        },
+        {
+          "id": "out",
+          "type": "Output",
+          "position": { "x": 200, "y": 640 },
+          "data": { "label": "SedanBody" }
+        }
+      ],
+      "edges": [
+        { "id": "e1", "source": "body_path", "target": "body_sweep", "sourceHandle": "out", "targetHandle": "backbone" },
+        { "id": "e2", "source": "body_profile", "target": "body_sweep", "sourceHandle": "out", "targetHandle": "profile" },
+        { "id": "e3", "source": "body_sweep", "target": "body_group", "sourceHandle": "out", "targetHandle": "in" },
+        { "id": "e4", "source": "body_group", "target": "body_bevel", "sourceHandle": "out", "targetHandle": "in" },
+        { "id": "e5", "source": "body_bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+      ]
+    })";
+
+    const auto replace_val = [](std::string& s, const std::string& key,
+                                const std::string& val) {
+        const size_t pos = s.find(key);
+        if (pos == std::string::npos)
+            return;
+        size_t start = pos + key.size();
+        while (start < s.size() && (s[start] == ' ' || s[start] == '\t'))
+            ++start;
+        size_t end = start;
+        while (end < s.size() && s[end] != ',' && s[end] != '\n' && s[end] != '}')
+            ++end;
+        s.replace(start, end - start, val);
+    };
+
+    replace_val(graph, "\"capStart\":", cap_start ? "true" : "false");
+    replace_val(graph, "\"capEnd\":", cap_end ? "true" : "false");
+    replace_val(graph, "\"segments\":", std::to_string(segments));
+
+    {
+        const std::string from = R"({\"x\":4.2)";
+        const size_t pos = graph.find(from);
+        if (pos != std::string::npos) {
+            char to[32];
+            std::snprintf(to, sizeof(to), R"({\"x\":%.1f)", path_length);
+            graph.replace(pos, from.size(), to);
+        }
+    }
+    return graph;
+}
+
 } // namespace
 
 int main()
@@ -431,5 +598,81 @@ int main()
 
     std::printf("PASS: sedan body Sweep+Bevel (%d verts, %d indices)\n",
                 sedan_body_vertices, sedan_body_indices);
+
+    // Task 2.7: terminal cap parameterized regression
+    // cap={start,end,both} × segments={1,2,3} × path_length={4.0,4.2} = 18 configs
+    {
+        struct CapConfig { const char* name; bool start; bool end; };
+        const CapConfig caps[] = {
+            {"both",  true,  true},
+            {"start", true,  false},
+            {"end",   false, true},
+        };
+        const int segs[] = {1, 2, 3};
+        const double paths[] = {4.0, 4.2};
+
+        int pass_count = 0;
+        for (const auto& cap : caps) {
+            for (int seg : segs) {
+                for (double path_len : paths) {
+                    const std::string graph = build_parametric_sedan(
+                        cap.start, cap.end, seg, path_len);
+
+                    char err2[512] = {};
+                    expect_code(pcg_validate_graph(graph.c_str(), err2, sizeof(err2)),
+                                PCG_OK, "parametric sedan validate");
+
+                    pcg::internal::data::PcgMeshData pmesh;
+                    int pvc = 0, pic = 0;
+                    expect_code(execute_mesh_graph(graph.c_str(), 42, pmesh, pvc, pic,
+                                                   err2, sizeof(err2)),
+                                PCG_OK, "parametric sedan execute");
+
+                    if (cap.start && cap.end) {
+                        // Closed mesh: boundary=0, winding bad=0, vol>0
+                        const int boundary = boundary_edge_count(pmesh);
+                        const int bad = manifold_winding_bad_count(pmesh);
+                        if (boundary != 0) {
+                            std::printf("FAIL: parametric cap=both seg=%d path=%.1f "
+                                        "boundary=%d (expected 0)\n", seg, path_len, boundary);
+                            dump_boundary_edges(pmesh);
+                            return 1;
+                        }
+                        if (bad != 0) {
+                            std::printf("FAIL: parametric cap=both seg=%d path=%.1f "
+                                        "winding_bad=%d (expected 0)\n", seg, path_len, bad);
+                            return 1;
+                        }
+                        if (signed_volume(pmesh) <= 0.0) {
+                            std::printf("FAIL: parametric cap=both seg=%d path=%.1f "
+                                        "volume<=0\n", seg, path_len);
+                            return 1;
+                        }
+                    } else {
+                        // Open mesh: boundary>0, at least 1 open loop at missing cap end.
+                        // Bevel terminal vertices create additional small loops at the
+                        // uncapped end, so the exact count depends on segments/profile.
+                        const int boundary = boundary_edge_count(pmesh);
+                        const int loops = count_boundary_loops(pmesh);
+                        if (boundary == 0) {
+                            std::printf("FAIL: parametric cap=%s seg=%d path=%.1f "
+                                        "boundary=0 (expected >0)\n", cap.name, seg, path_len);
+                            return 1;
+                        }
+                        if (loops < 1) {
+                            std::printf("FAIL: parametric cap=%s seg=%d path=%.1f "
+                                        "loops=%d (expected >=1)\n",
+                                        cap.name, seg, path_len, loops);
+                            return 1;
+                        }
+                    }
+                    ++pass_count;
+                }
+            }
+        }
+        std::printf("PASS: terminal cap parameterized regression (%d/18 configs)\n",
+                    pass_count);
+    }
+
     return 0;
 }

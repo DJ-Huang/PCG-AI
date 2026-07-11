@@ -32,9 +32,39 @@ namespace DJTechEditor.PCG.Graph
         private static PcgGraphView s_DragGraphView;
         private static PcgGraphEditorWindow s_DragWindow;
 
+        private static bool s_PcgModeActive;
+        private static PcgGraphEditorWindow s_ActiveWindow;
+        private static GameObject s_LockedSelection;
+        private static bool s_SelectionGuard;
+        private static Tool s_PrevTool;
+
+        private enum OthersDisplayMode
+        {
+            ShowAll,
+            HideOthers,
+            IsolatePCG,
+        }
+
+        private static OthersDisplayMode s_OthersDisplay = OthersDisplayMode.ShowAll;
+        private static readonly HashSet<Renderer> s_HiddenRenderers = new();
+
         static PcgCreateSplineSceneHandles()
         {
             SceneView.duringSceneGui += OnSceneGui;
+            Selection.selectionChanged += OnSelectionChanged;
+        }
+
+        private static void OnSelectionChanged()
+        {
+            if (!s_PcgModeActive || s_LockedSelection == null || s_SelectionGuard)
+                return;
+
+            if (Selection.activeGameObject != s_LockedSelection)
+            {
+                s_SelectionGuard = true;
+                Selection.activeGameObject = s_LockedSelection;
+                s_SelectionGuard = false;
+            }
         }
 
         private static void OnSceneGui(SceneView sceneView)
@@ -42,31 +72,145 @@ namespace DJTechEditor.PCG.Graph
             if (Application.isPlaying)
                 return;
 
-            var activeNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
-            foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
+            var graphWindow = FindGraphWindow();
+
+            if (graphWindow == null)
             {
-                if (window == null || !window.HasLoadedGraph || window.GraphView == null)
-                    continue;
+                if (s_PcgModeActive)
+                    ExitPcgMode();
+                return;
+            }
 
-                foreach (var node in window.GraphView.selection.OfType<PcgManifestNodeView>())
+            if (!s_PcgModeActive)
+            {
+                DrawPcgModeEntryOverlay(sceneView, graphWindow);
+                return;
+            }
+
+            // Lock selection to the PCG anchor object while in PCG Mode
+            if (s_LockedSelection != null)
+            {
+                // Add a background control that captures clicks only when no other
+                // control (toolbar buttons, handles) consumes them. This blocks
+                // Unity's hierarchy picker without blocking overlay UI.
+                HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+
+                // Restore locked selection if user somehow picked another object
+                if (Selection.activeGameObject != s_LockedSelection)
                 {
-                    if (node.NodeType != "CreateSpline")
-                        continue;
-
-                    activeNodes.Add((window, window.GraphView, node));
+                    s_SelectionGuard = true;
+                    Selection.activeGameObject = s_LockedSelection;
+                    s_SelectionGuard = false;
                 }
             }
 
-            if (activeNodes.Count == 0)
-                return;
+            DrawPcgModeToolbar(sceneView, graphWindow);
 
-            HandleSplineShortcuts(sceneView, activeNodes);
-            DrawSceneOverlay(activeNodes[0].node);
+            var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
+            foreach (var node in graphWindow.GraphView.selection.OfType<PcgManifestNodeView>())
+            {
+                if (node.NodeType == "CreateSpline")
+                    splineNodes.Add((graphWindow, graphWindow.GraphView, node));
+            }
 
-            foreach (var (window, graphView, node) in activeNodes)
-                DrawNodeSpline(sceneView, window, graphView, node);
+            var ctx = graphWindow.GraphView.SceneEditContext;
+            if (splineNodes.Count > 0 && ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
+            {
+                HandleSplineShortcuts(sceneView, splineNodes);
+                DrawSplineOverlay(splineNodes[0].node);
+
+                foreach (var (window, graphView, node) in splineNodes)
+                    DrawNodeSpline(sceneView, window, graphView, node);
+            }
+            else
+            {
+                DrawPcgModeStatusOverlay(graphWindow);
+            }
 
             TryEndSplineDrag();
+        }
+
+        private static PcgGraphEditorWindow FindGraphWindow()
+        {
+            if (s_PcgModeActive && s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph)
+                return s_ActiveWindow;
+
+            foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
+            {
+                if (window != null && window.HasLoadedGraph && window.GraphView != null)
+                    return window;
+            }
+            return null;
+        }
+
+        private static void EnterPcgMode(PcgGraphEditorWindow window)
+        {
+            s_PcgModeActive = true;
+            s_ActiveWindow = window;
+            window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+
+            var anchor = FindPreviewAnchor(window);
+            if (anchor != null)
+            {
+                s_LockedSelection = anchor.gameObject;
+                s_SelectionGuard = true;
+                Selection.activeGameObject = s_LockedSelection;
+                s_SelectionGuard = false;
+            }
+
+            s_PrevTool = Tools.current;
+            Tools.current = Tool.None;
+            ApplyOthersDisplayMode();
+        }
+
+        private static void ExitPcgMode()
+        {
+            s_PcgModeActive = false;
+            s_ActiveWindow = null;
+            s_LockedSelection = null;
+            s_SelectedPointByNode.Clear();
+            Tools.current = s_PrevTool;
+            RestoreHiddenRenderers();
+        }
+
+        private static void ApplyOthersDisplayMode()
+        {
+            RestoreHiddenRenderers();
+
+            if (s_OthersDisplay == OthersDisplayMode.ShowAll)
+                return;
+
+            var pcgObjects = new HashSet<GameObject>();
+            if (s_LockedSelection != null)
+            {
+                pcgObjects.Add(s_LockedSelection);
+                foreach (var comp in s_LockedSelection.GetComponentsInChildren<PcgGraphComponent>(true))
+                    pcgObjects.Add(comp.gameObject);
+            }
+
+            foreach (var renderer in Object.FindObjectsByType<Renderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (renderer == null || renderer.transform == null)
+                    continue;
+
+                var go = renderer.gameObject;
+                if (pcgObjects.Contains(go))
+                    continue;
+
+                // In Isolate mode also hide the PCG object's siblings under the same parent
+                s_HiddenRenderers.Add(renderer);
+                renderer.enabled = false;
+            }
+        }
+
+        private static void RestoreHiddenRenderers()
+        {
+            foreach (var renderer in s_HiddenRenderers)
+            {
+                if (renderer != null)
+                    renderer.enabled = true;
+            }
+            s_HiddenRenderers.Clear();
         }
 
         private static void DrawNodeSpline(
@@ -194,7 +338,143 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawSceneOverlay(PcgManifestNodeView node)
+        private static void DrawPcgModeEntryOverlay(SceneView sceneView, PcgGraphEditorWindow window)
+        {
+            Handles.BeginGUI();
+            try
+            {
+                const float width = 200f;
+                const float height = 64f;
+                var area = new Rect(
+                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    SceneOverlayMargin,
+                    width,
+                    height);
+                GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
+
+                GUILayout.BeginArea(area);
+                GUILayout.Space(6f);
+                var assetName = window.CurrentAssetPath;
+                if (string.IsNullOrEmpty(assetName))
+                    assetName = "untitled";
+                GUILayout.Label($"PCG: {assetName}", EditorStyles.boldLabel);
+                if (GUILayout.Button("Enter PCG Mode", GUILayout.Height(24f)))
+                {
+                    EnterPcgMode(window);
+                    sceneView.Repaint();
+                }
+                GUILayout.EndArea();
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawPcgModeToolbar(SceneView sceneView, PcgGraphEditorWindow window)
+        {
+            var ctx = window.GraphView.SceneEditContext;
+
+            Handles.BeginGUI();
+            try
+            {
+                const float toolbarWidth = 500f;
+                const float toolbarHeight = 26f;
+                var toolbarArea = new Rect(
+                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    SceneOverlayMargin,
+                    toolbarWidth,
+                    toolbarHeight);
+                GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
+
+                GUILayout.BeginArea(toolbarArea);
+                GUILayout.BeginHorizontal();
+
+                if (ToolbarButton("Object", ctx.IsObjectMode))
+                    window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+
+                bool splineEnabled = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
+                GUI.enabled = splineEnabled;
+                if (ToolbarButton("Spline CP", ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint))
+                    window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.SplineControlPoint);
+                GUI.enabled = true;
+
+                GUI.enabled = false;
+                ToolbarButton("Vertex", false);
+                ToolbarButton("Edge", false);
+                ToolbarButton("Face", false);
+                GUI.enabled = true;
+
+                GUILayout.Space(8);
+
+                var oldDisplay = s_OthersDisplay;
+                s_OthersDisplay = (OthersDisplayMode)EditorGUILayout.EnumPopup(
+                    s_OthersDisplay, EditorStyles.toolbarPopup,
+                    GUILayout.Width(90));
+                if (s_OthersDisplay != oldDisplay)
+                    ApplyOthersDisplayMode();
+
+                GUILayout.Space(8);
+
+                var exitColor = GUI.color;
+                GUI.color = new Color(1f, 0.7f, 0.5f);
+                if (GUILayout.Button("Exit", EditorStyles.toolbarButton))
+                {
+                    ExitPcgMode();
+                    sceneView.Repaint();
+                }
+                GUI.color = exitColor;
+
+                GUILayout.EndHorizontal();
+                GUILayout.EndArea();
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static bool ToolbarButton(string label, bool active)
+        {
+            var oldBg = GUI.backgroundColor;
+            if (active)
+                GUI.backgroundColor = new Color(0.4f, 0.6f, 0.9f);
+            var clicked = GUILayout.Button(label, EditorStyles.toolbarButton);
+            GUI.backgroundColor = oldBg;
+            return clicked;
+        }
+
+        private static void DrawPcgModeStatusOverlay(PcgGraphEditorWindow window)
+        {
+            var ctx = window.GraphView.SceneEditContext;
+            var sel = window.GraphView.selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
+            var selText = sel != null ? sel.NodeType : "(nothing)";
+
+            Handles.BeginGUI();
+            try
+            {
+                const float width = 300f;
+                const float height = 52f;
+                var area = new Rect(
+                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    SceneOverlayMargin + 30f,
+                    width,
+                    height);
+                GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
+
+                GUILayout.BeginArea(area);
+                GUILayout.Space(4f);
+                GUILayout.Label($"Mode: {ctx.Level}" + (ctx.Domain != SceneEditDomain.None ? $" / {ctx.Domain}" : ""), EditorStyles.boldLabel);
+                GUILayout.Label($"Selected: {selText}", EditorStyles.miniLabel);
+                GUILayout.EndArea();
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawSplineOverlay(PcgManifestNodeView node)
         {
             var nodeData = node.CollectData();
             var pointCount = PcgSplineControlPoints.GetEffectivePoints(nodeData).Count;
@@ -208,7 +488,7 @@ namespace DJTechEditor.PCG.Graph
                 const float height = 118f;
                 var area = new Rect(
                     SceneViewToolsPanelWidth + SceneOverlayMargin,
-                    SceneOverlayMargin,
+                    SceneOverlayMargin + 30f,
                     width,
                     height);
                 GUI.Box(area, GUIContent.none, EditorStyles.helpBox);

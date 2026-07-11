@@ -10,6 +10,50 @@ using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
 {
+    public enum SceneEditLevel
+    {
+        Object,
+        Component,
+    }
+
+    public enum SceneEditDomain
+    {
+        None,
+        SplineControlPoint,
+        Vertex,
+        Edge,
+        Face,
+    }
+
+    public readonly struct PcgSceneEditContext
+    {
+        public readonly SceneEditLevel Level;
+        public readonly SceneEditDomain Domain;
+        public readonly string ActiveNodeId;
+        public readonly SceneEditDomain[] SupportedDomains;
+
+        public PcgSceneEditContext(
+            SceneEditLevel level,
+            SceneEditDomain domain,
+            string activeNodeId,
+            SceneEditDomain[] supportedDomains)
+        {
+            Level = level;
+            Domain = domain;
+            ActiveNodeId = activeNodeId;
+            SupportedDomains = supportedDomains ?? System.Array.Empty<SceneEditDomain>();
+        }
+
+        public static PcgSceneEditContext ObjectMode => new(
+            SceneEditLevel.Object, SceneEditDomain.None, null, System.Array.Empty<SceneEditDomain>());
+
+        public bool IsObjectMode => Level == SceneEditLevel.Object;
+        public bool IsComponentMode => Level == SceneEditLevel.Component;
+
+        public bool SupportsDomain(SceneEditDomain domain) =>
+            System.Array.IndexOf(SupportedDomains, domain) >= 0;
+    }
+
     public sealed class PcgGraphView : GraphView
     {
         private readonly PcgGraphSearchWindow m_SearchWindow;
@@ -27,6 +71,14 @@ namespace DJTechEditor.PCG.Graph
         private PcgNodeInfoPanel m_InfoPanel;
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
+
+        private static readonly SceneEditDomain[] s_SplineDomains = { SceneEditDomain.SplineControlPoint };
+
+        private PcgSceneEditContext m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+
+        public PcgSceneEditContext SceneEditContext => m_SceneEditContext;
+
+        public event Action<PcgSceneEditContext> SceneContextChanged;
 
         public PcgGraphState State => m_State;
 
@@ -316,6 +368,39 @@ namespace DJTechEditor.PCG.Graph
 
         internal void RefreshInspector() => m_Inspector?.OnSelectionChanged();
 
+        private void UpdateSceneEditContext()
+        {
+            var selected = selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
+            if (selected is PcgManifestNodeView manifestNode && manifestNode.NodeType == "CreateSpline")
+            {
+                m_SceneEditContext = new PcgSceneEditContext(
+                    SceneEditLevel.Component,
+                    SceneEditDomain.SplineControlPoint,
+                    selected.NodeId,
+                    s_SplineDomains);
+            }
+            else
+            {
+                m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+            }
+            SceneContextChanged?.Invoke(m_SceneEditContext);
+        }
+
+        public void SetSceneMode(SceneEditLevel level, SceneEditDomain domain)
+        {
+            if (level == SceneEditLevel.Object)
+            {
+                m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+            }
+            else
+            {
+                m_SceneEditContext = new PcgSceneEditContext(
+                    level, domain, m_SceneEditContext.ActiveNodeId, m_SceneEditContext.SupportedDomains);
+            }
+            SceneContextChanged?.Invoke(m_SceneEditContext);
+            SceneView.RepaintAll();
+        }
+
         /// <summary>
         /// Refresh selection visuals on every node after a selection change.
         /// GraphView toggles the "selected" USS class internally; each node
@@ -462,6 +547,7 @@ namespace DJTechEditor.PCG.Graph
         {
             base.AddToSelection(selectable);
             RefreshAllNodeSelectionVisuals();
+            UpdateSceneEditContext();
             m_Inspector?.OnSelectionChanged();
         }
 
@@ -469,6 +555,7 @@ namespace DJTechEditor.PCG.Graph
         {
             base.RemoveFromSelection(selectable);
             RefreshAllNodeSelectionVisuals();
+            UpdateSceneEditContext();
             m_Inspector?.OnSelectionChanged();
         }
 
@@ -476,6 +563,7 @@ namespace DJTechEditor.PCG.Graph
         {
             base.ClearSelection();
             RefreshAllNodeSelectionVisuals();
+            UpdateSceneEditContext();
             m_Inspector?.OnSelectionChanged();
         }
 
@@ -653,6 +741,7 @@ namespace DJTechEditor.PCG.Graph
 
             m_Inspector?.OnSelectionChanged();
             RefreshNodePreviewVisuals();
+            UpdateSceneEditContext();
             if (m_HostWindow is PcgGraphEditorWindow window)
                 window.RefreshPreviewToolbar();
         }

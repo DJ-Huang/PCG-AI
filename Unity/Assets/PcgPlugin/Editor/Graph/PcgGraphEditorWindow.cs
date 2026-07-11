@@ -401,6 +401,7 @@ namespace DJTechEditor.PCG.Graph
 
             m_GraphView = new PcgGraphView();
             m_GraphView.SetHostWindow(this);
+            m_GraphView.SceneContextChanged += _ => m_GraphView.RefreshInspector();
             if (!string.IsNullOrEmpty(m_Selected))
                 m_GraphView.viewDataKey = m_Selected;
 

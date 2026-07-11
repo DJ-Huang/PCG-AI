@@ -49,3 +49,4 @@ schema/graph-schema.json
 web/pcg-editor/dist/
 web/pcg-editor/node_modules/
 # <<< Codely setup.bat >>>
+.codely-cli/
