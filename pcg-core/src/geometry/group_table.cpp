@@ -112,10 +112,24 @@ void GroupTable::intersect_into(GroupDomain domain,
 
 void GroupTable::subtract_into(GroupDomain domain, const std::string& dst, const std::string& src)
 {
-    auto& dst_members = map_for(domain)[dst];
-    const auto& src_members = members(domain, src);
-    for (int id : src_members)
+    auto& groups = map_for(domain);
+    const auto dst_it = groups.find(dst);
+    if (dst_it == groups.end())
+        return;
+    if (dst == src) {
+        groups.erase(dst_it);
+        return;
+    }
+
+    const auto src_it = groups.find(src);
+    if (src_it == groups.end())
+        return;
+
+    auto& dst_members = dst_it->second;
+    for (int id : src_it->second)
         dst_members.erase(id);
+    if (dst_members.empty())
+        groups.erase(dst_it);
 }
 
 std::unordered_set<int> GroupTable::eval(GroupDomain domain, const std::string& expr) const
