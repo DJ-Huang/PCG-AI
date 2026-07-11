@@ -294,6 +294,8 @@ namespace DJTechEditor.PCG.Graph
             s_ActiveWindow = window;
             window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
 
+            s_OthersDisplay = OthersDisplayMode.HideOthers;
+
             var anchor = FindPreviewAnchor(window);
             if (anchor != null)
             {
