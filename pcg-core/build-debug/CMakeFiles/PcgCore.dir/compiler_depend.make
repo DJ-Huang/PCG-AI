@@ -27295,6 +27295,7 @@ CMakeFiles/PcgCore.dir/src/geometry/boolean_csg.cpp.o: /Users/djhuang/PCG-AI/pcg
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/print \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/queue \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ratio \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/stack \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/stddef.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/stdexcept \
@@ -36160,7 +36161,18 @@ CMakeFiles/PcgCore.dir/src/geometry/tri_split.cpp.o: /Users/djhuang/PCG-AI/pcg-c
   /Users/djhuang/PCG-AI/pcg-core/src/geometry/group_table.hpp \
   /Users/djhuang/PCG-AI/pcg-core/src/geometry/imesh.hpp \
   /Users/djhuang/PCG-AI/pcg-core/src/geometry/robust_predicates.hpp \
-  /Users/djhuang/PCG-AI/pcg-core/src/geometry/tri_split.hpp
+  /Users/djhuang/PCG-AI/pcg-core/src/geometry/tri_split.hpp \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDT.h \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDT.hpp \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDTUtils.h \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDTUtils.hpp \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/KDTree.h \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/LocatorKDTree.h \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/Triangulation.h \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/Triangulation.hpp \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/portable_nth_element.hpp \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/predicates.h \
+  /Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/remove_at.hpp
 
 CMakeFiles/PcgCore.dir/src/graph_cook_cache.cpp.o: /Users/djhuang/PCG-AI/pcg-core/src/graph_cook_cache.cpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/Availability.h \
@@ -42308,6 +42320,14 @@ CMakeFiles/PcgCore.dir/src/texture_runtime.cpp.o: /Users/djhuang/PCG-AI/pcg-core
 
 /Users/djhuang/PCG-AI/pcg-core/src/graph_cook_cache.cpp:
 
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/predicates.h:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/Triangulation.h:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDTUtils.hpp:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDTUtils.h:
+
 /Users/djhuang/PCG-AI/pcg-core/src/geometry/tri_split.cpp:
 
 /Users/djhuang/PCG-AI/pcg-core/src/geometry/sweep_geometry.cpp:
@@ -42333,6 +42353,8 @@ CMakeFiles/PcgCore.dir/src/texture_runtime.cpp.o: /Users/djhuang/PCG-AI/pcg-core
 /Users/djhuang/PCG-AI/pcg-core/src/elements/spline_mesh_elements.cpp:
 
 /Users/djhuang/PCG-AI/pcg-core/src/geometry/sweep_geometry.hpp:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/KDTree.h:
 
 /Users/djhuang/PCG-AI/pcg-core/src/elements/mesh_scatter_elements.cpp:
 
@@ -42413,6 +42435,8 @@ CMakeFiles/PcgCore.dir/src/texture_runtime.cpp.o: /Users/djhuang/PCG-AI/pcg-core
 /Users/djhuang/PCG-AI/pcg-core/src/data/pcg_param_data.hpp:
 
 /Users/djhuang/PCG-AI/pcg-core/src/data/pcg_metadata.hpp:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDT.hpp:
 
 /Users/djhuang/PCG-AI/pcg-core/src/data/pcg_mesh_data.hpp:
 
@@ -42530,6 +42554,8 @@ _deps/json-src/include/nlohmann/detail/meta/std_fs.hpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/stdio.h:
 
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/Triangulation.hpp:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/signal.h:
 
 /Users/djhuang/PCG-AI/pcg-core/src/elements/primitive_elements.cpp:
@@ -42543,6 +42569,8 @@ _deps/json-src/include/nlohmann/detail/meta/std_fs.hpp:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_uid_t.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_short.h:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/LocatorKDTree.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_u_int8_t.h:
 
@@ -42627,6 +42655,8 @@ _deps/json-src/include/nlohmann/adl_serializer.hpp:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_pthread/_pthread_once_t.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_pthread/_pthread_mutex_t.h:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/CDT.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_ucontext.h:
 
@@ -42885,6 +42915,8 @@ _deps/json-src/include/nlohmann/detail/iterators/iter_impl.hpp:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/time_point.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/type_identity.h:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/remove_at.hpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/strip_signature.h:
 
@@ -43239,6 +43271,8 @@ _deps/json-src/include/nlohmann/detail/input/input_adapters.hpp:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/wctype.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/launder.h:
+
+/Users/djhuang/PCG-AI/pcg-core/third_party/CDT/CDT/include/portable_nth_element.hpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__new/global_typed_new_delete.h:
 

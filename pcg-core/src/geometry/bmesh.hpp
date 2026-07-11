@@ -40,6 +40,14 @@ struct BMeshEdge {
     std::unordered_set<std::string> groups;
 };
 
+/// One entry in a vertex's disk cycle — an ordered edge around the vertex.
+/// Built from face loop topology, not normal-projection sorting.
+struct BMeshDiskEntry {
+    int other_v = -1;   ///< The other vertex of this edge
+    int fprev = -1;     ///< Face between this edge and the previous edge (CCW)
+    int fnext = -1;     ///< Face between this edge and the next edge (CCW)
+};
+
 struct BMeshBuildOptions {
     double weld_eps = 1e-6;
     /// Merge coplanar triangles within this angle (degrees).
@@ -52,6 +60,8 @@ struct BMesh {
     std::vector<Vec3> verts;
     std::vector<BMeshFace> faces;
     std::unordered_map<int64_t, BMeshEdge> edges;
+    /// Per-vertex ordered edge list (disk cycle). Key = vertex index.
+    std::unordered_map<int, std::vector<BMeshDiskEntry>> disk_cycles;
 };
 
 int64_t edge_key(int a, int b);
@@ -71,5 +81,8 @@ data::PcgMeshData mesh_from_bmesh(const BMesh& mesh);
 
 Vec3 face_normal(const BMesh& mesh, int face_index);
 Vec3 face_normal_from_loop(const BMesh& mesh, const std::vector<int>& loop);
+
+/// Build disk cycles from face loops (call after build_edges + mark_sharp_edges).
+void build_disk_cycles(BMesh& mesh);
 
 } // namespace pcg::internal::geometry

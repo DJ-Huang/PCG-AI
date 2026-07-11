@@ -343,7 +343,21 @@ data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amoun
                                  bool (*is_cancel_requested)(),
                                  const BevelEdgeSelection& edge_selection)
 {
-    const data::PcgMeshData mesh = data::triangulate_geometry(geometry);
+    // Shared-vertex triangulation: geometry.points() are already welded, so use
+    // them directly to ensure BMesh (from geometry) and WeldedMesh (from mesh)
+    // share the same vertex indices. Per-face duplication (triangulate_geometry)
+    // reorders vertices on re-weld, breaking the index alignment.
+    data::PcgMeshData mesh;
+    for (const auto& p : geometry.points())
+        mesh.add_vertex({p.x, p.y, p.z});
+    for (const auto& face : geometry.faces()) {
+        if (face.size() < 3)
+            continue;
+        const int i0 = face[0];
+        for (size_t i = 1; i + 1 < face.size(); ++i)
+            mesh.add_triangle(i0, face[i], face[i + 1]);
+    }
+
     return bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap, angle_limit_deg,
                       profile, miter_outer, miter_inner, vmesh_method, is_cancel_requested,
                       edge_selection, &geometry);

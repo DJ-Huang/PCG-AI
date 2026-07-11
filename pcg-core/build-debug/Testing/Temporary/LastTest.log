@@ -1,10 +1,10 @@
-Start testing: Jul 10 20:07 CST
+Start testing: Jul 11 09:14 CST
 ----------------------------------------------------------
 1/22 Testing: test_executor
 1/22 Test: test_executor
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_executor"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_executor" start time: Jul 10 20:07 CST
+"test_executor" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: pcg-core 0.1.1 (bmesh-tier1)
@@ -12,10 +12,10 @@ PASS: execute_graph -> pointCount present
 PASS: mini graph prefab preserved
 PASS: Unity/Web round-trip fixture executes
 <end of output>
-Test time =   0.37 sec
+Test time =   0.61 sec
 ----------------------------------------------------------
 Test Passed.
-"test_executor" end time: Jul 10 20:07 CST
+"test_executor" end time: Jul 11 09:14 CST
 "test_executor" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -23,16 +23,16 @@ Test Passed.
 2/22 Test: test_data
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_data"
 Directory: /Users/djhuang/PCG-AI/pcg-core/build-debug
-"test_data" start time: Jul 10 20:07 CST
+"test_data" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 Assertion failed: (collection.primary_json().contains("points")), function main, file test_data.cpp, line 41.
 PASS: PcgPointData round-trip
 <end of output>
-Test time =   0.33 sec
+Test time =   0.32 sec
 ----------------------------------------------------------
 Test Failed.
-"test_data" end time: Jul 10 20:07 CST
+"test_data" end time: Jul 11 09:14 CST
 "test_data" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -40,7 +40,7 @@ Test Failed.
 3/22 Test: test_phase41
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_phase41"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_phase41" start time: Jul 10 20:07 CST
+"test_phase41" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: terrain + grid + sample + spawner pipeline
@@ -50,7 +50,7 @@ PASS: examples/phase41-demo.pcg
 Test time =   0.36 sec
 ----------------------------------------------------------
 Test Passed.
-"test_phase41" end time: Jul 10 20:07 CST
+"test_phase41" end time: Jul 11 09:14 CST
 "test_phase41" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -58,7 +58,7 @@ Test Passed.
 4/22 Test: test_phase42
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_phase42"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_phase42" start time: Jul 10 20:07 CST
+"test_phase42" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: convex hull pipeline
@@ -68,10 +68,10 @@ PASS: mst + astar pipeline
 PASS: voronoi pipeline
 PASS: examples/phase42-demo.pcg
 <end of output>
-Test time =   0.40 sec
+Test time =   0.41 sec
 ----------------------------------------------------------
 Test Passed.
-"test_phase42" end time: Jul 10 20:07 CST
+"test_phase42" end time: Jul 11 09:14 CST
 "test_phase42" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -79,16 +79,16 @@ Test Passed.
 5/22 Test: test_phase43
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_phase43"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_phase43" start time: Jul 10 20:07 CST
+"test_phase43" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: examples/phase43-mesh-demo.pcg
-PASS: phase43 mesh pipeline
+FAIL: edge beveled mesh triangle normals point inward
 <end of output>
-Test time =   0.73 sec
+Test time =   0.57 sec
 ----------------------------------------------------------
-Test Passed.
-"test_phase43" end time: Jul 10 20:07 CST
+Test Failed.
+"test_phase43" end time: Jul 11 09:14 CST
 "test_phase43" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -96,7 +96,7 @@ Test Passed.
 6/22 Test: test_phase44
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_phase44"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_phase44" start time: Jul 10 20:07 CST
+"test_phase44" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: sample_mesh_surface unit tests
@@ -106,10 +106,10 @@ PASS: MeshNoiseDeform missing input returns error
 PASS: GetMeshData mesh slot scatter
 ALL phase44 tests passed
 <end of output>
-Test time =   0.43 sec
+Test time =   0.45 sec
 ----------------------------------------------------------
 Test Passed.
-"test_phase44" end time: Jul 10 20:07 CST
+"test_phase44" end time: Jul 11 09:14 CST
 "test_phase44" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -117,15 +117,15 @@ Test Passed.
 7/22 Test: test_cook_cache
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_cook_cache"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_cook_cache" start time: Jul 10 20:07 CST
+"test_cook_cache" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: per-node cook cache
 <end of output>
-Test time =   0.37 sec
+Test time =   0.38 sec
 ----------------------------------------------------------
 Test Passed.
-"test_cook_cache" end time: Jul 10 20:07 CST
+"test_cook_cache" end time: Jul 11 09:14 CST
 "test_cook_cache" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -133,15 +133,15 @@ Test Passed.
 8/22 Test: test_spawn_mesh_binary
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_spawn_mesh_binary"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_spawn_mesh_binary" start time: Jul 10 20:07 CST
+"test_spawn_mesh_binary" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 spawn mesh binary test passed: points=4 verts=24 indices=36
 <end of output>
-Test time =   0.37 sec
+Test time =   0.39 sec
 ----------------------------------------------------------
 Test Passed.
-"test_spawn_mesh_binary" end time: Jul 10 20:07 CST
+"test_spawn_mesh_binary" end time: Jul 11 09:14 CST
 "test_spawn_mesh_binary" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -149,7 +149,7 @@ Test Passed.
 9/22 Test: test_phase45_spline
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_phase45_spline"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_phase45_spline" start time: Jul 10 20:07 CST
+"test_phase45_spline" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 PASS: create_spline_data line (9 points)
@@ -164,10 +164,10 @@ PASS: extract_cross_section_profile (8 verts, 4 tris)
 PASS: bridge graph mesh (920 verts, 1380 indices)
 All phase45 spline tests passed.
 <end of output>
-Test time =   0.43 sec
+Test time =   0.44 sec
 ----------------------------------------------------------
 Test Passed.
-"test_phase45_spline" end time: Jul 10 20:07 CST
+"test_phase45_spline" end time: Jul 11 09:14 CST
 "test_phase45_spline" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -175,47 +175,47 @@ Test Passed.
 10/22 Test: test_phase46
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_phase46"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_phase46" start time: Jul 10 20:07 CST
+"test_phase46" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 =================================================================
-==66763==ERROR: AddressSanitizer: heap-use-after-free on address 0x603000001c00 at pc 0x0001003adc88 bp 0x00016fa68a00 sp 0x00016fa689f8
+==82956==ERROR: AddressSanitizer: heap-use-after-free on address 0x603000001c00 at pc 0x000100eb1c88 bp 0x00016ef64840 sp 0x00016ef64838
 READ of size 8 at 0x603000001c00 thread T0
-    #0 0x0001003adc84 in std::__1::__hash_const_iterator<std::__1::__hash_node<int, void*>*>::operator++[abi:ne200100]() __hash_table:375
-    #1 0x0001005065b8 in pcg::internal::geometry::GroupTable::subtract_into(pcg::internal::geometry::GroupDomain, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&) group_table.cpp:117
-    #2 0x00010039607c in main test_phase46.cpp:110
+    #0 0x000100eb1c84 in std::__1::__hash_const_iterator<std::__1::__hash_node<int, void*>*>::operator++[abi:ne200100]() __hash_table:375
+    #1 0x000101026e30 in pcg::internal::geometry::GroupTable::subtract_into(pcg::internal::geometry::GroupDomain, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&) group_table.cpp:117
+    #2 0x000100e9a0a4 in main test_phase46.cpp:110
     #3 0x000199e32b94  (<unknown module>)
 
 0x603000001c00 is located 0 bytes inside of 24-byte region [0x603000001c00,0x603000001c18)
 freed by thread T0 here:
-    #0 0x00010104f850 in _ZdlPv+0x74 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x4b850)
-    #1 0x0001003afcdc in void std::__1::__libcpp_operator_delete[abi:ne200100]<std::__1::__hash_node<int, void*>*>(std::__1::__hash_node<int, void*>*) allocate.h:73
-    #2 0x0001003afc80 in void std::__1::__libcpp_deallocate[abi:ne200100]<std::__1::__hash_node<int, void*>>(std::__1::__type_identity<std::__1::__hash_node<int, void*>>::type*, std::__1::__element_count, unsigned long) allocate.h:113
-    #3 0x0001003afc14 in std::__1::allocator<std::__1::__hash_node<int, void*>>::deallocate[abi:ne200100](std::__1::__hash_node<int, void*>*, unsigned long) allocator.h:120
-    #4 0x0001003afb90 in std::__1::allocator_traits<std::__1::allocator<std::__1::__hash_node<int, void*>>>::deallocate[abi:ne200100](std::__1::allocator<std::__1::__hash_node<int, void*>>&, std::__1::__hash_node<int, void*>*, unsigned long) allocator_traits.h:302
-    #5 0x0001003afafc in std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>::operator()[abi:ne200100](std::__1::__hash_node<int, void*>*) __hash_table:624
-    #6 0x0001003af9c4 in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>>::reset[abi:ne200100](std::__1::__hash_node<int, void*>*) unique_ptr.h:300
-    #7 0x0001003af908 in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>>::~unique_ptr[abi:ne200100]() unique_ptr.h:269
-    #8 0x0001003af0c8 in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>>::~unique_ptr[abi:ne200100]() unique_ptr.h:269
-    #9 0x00010050b1d0 in std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::erase(std::__1::__hash_const_iterator<std::__1::__hash_node<int, void*>*>) __hash_table:1856
-    #10 0x00010050a8fc in unsigned long std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__erase_unique<int>(int const&) __hash_table:1878
-    #11 0x000100505354 in std::__1::unordered_set<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::erase[abi:ne200100](int const&) unordered_set:794
-    #12 0x00010050659c in pcg::internal::geometry::GroupTable::subtract_into(pcg::internal::geometry::GroupDomain, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&) group_table.cpp:118
-    #13 0x00010039607c in main test_phase46.cpp:110
+    #0 0x000101c6b850 in _ZdlPv+0x74 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x4b850)
+    #1 0x000100eb3cdc in void std::__1::__libcpp_operator_delete[abi:ne200100]<std::__1::__hash_node<int, void*>*>(std::__1::__hash_node<int, void*>*) allocate.h:73
+    #2 0x000100eb3c80 in void std::__1::__libcpp_deallocate[abi:ne200100]<std::__1::__hash_node<int, void*>>(std::__1::__type_identity<std::__1::__hash_node<int, void*>>::type*, std::__1::__element_count, unsigned long) allocate.h:113
+    #3 0x000100eb3c14 in std::__1::allocator<std::__1::__hash_node<int, void*>>::deallocate[abi:ne200100](std::__1::__hash_node<int, void*>*, unsigned long) allocator.h:120
+    #4 0x000100eb3b90 in std::__1::allocator_traits<std::__1::allocator<std::__1::__hash_node<int, void*>>>::deallocate[abi:ne200100](std::__1::allocator<std::__1::__hash_node<int, void*>>&, std::__1::__hash_node<int, void*>*, unsigned long) allocator_traits.h:302
+    #5 0x000100eb3afc in std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>::operator()[abi:ne200100](std::__1::__hash_node<int, void*>*) __hash_table:624
+    #6 0x000100eb39c4 in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>>::reset[abi:ne200100](std::__1::__hash_node<int, void*>*) unique_ptr.h:300
+    #7 0x000100eb3908 in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>>::~unique_ptr[abi:ne200100]() unique_ptr.h:269
+    #8 0x000100eb30c8 in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>>::~unique_ptr[abi:ne200100]() unique_ptr.h:269
+    #9 0x00010102ba48 in std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::erase(std::__1::__hash_const_iterator<std::__1::__hash_node<int, void*>*>) __hash_table:1856
+    #10 0x00010102b174 in unsigned long std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__erase_unique<int>(int const&) __hash_table:1878
+    #11 0x000101025bcc in std::__1::unordered_set<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::erase[abi:ne200100](int const&) unordered_set:794
+    #12 0x000101026e14 in pcg::internal::geometry::GroupTable::subtract_into(pcg::internal::geometry::GroupDomain, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&) group_table.cpp:118
+    #13 0x000100e9a0a4 in main test_phase46.cpp:110
     #14 0x000199e32b94  (<unknown module>)
 
 previously allocated by thread T0 here:
-    #0 0x00010104f428 in _Znwm+0x74 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x4b428)
-    #1 0x0001003af48c in void* std::__1::__libcpp_operator_new[abi:ne200100]<std::__1::__hash_node<int, void*>>(unsigned long) allocate.h:55
-    #2 0x0001003af410 in std::__1::__hash_node<int, void*>* std::__1::__libcpp_allocate[abi:ne200100]<std::__1::__hash_node<int, void*>>(std::__1::__element_count, unsigned long) allocate.h:91
-    #3 0x0001003af380 in std::__1::allocator<std::__1::__hash_node<int, void*>>::allocate[abi:ne200100](unsigned long) allocator.h:105
-    #4 0x0001003af180 in std::__1::allocator_traits<std::__1::allocator<std::__1::__hash_node<int, void*>>>::allocate[abi:ne200100](std::__1::allocator<std::__1::__hash_node<int, void*>>&, unsigned long) allocator_traits.h:270
-    #5 0x0001003aecdc in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>> std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__construct_node_hash<int const&>(unsigned long, int const&) __hash_table:1840
-    #6 0x0001003ae190 in std::__1::pair<std::__1::__hash_iterator<std::__1::__hash_node<int, void*>*>, bool> std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__emplace_unique_key_args<int, int const&>(int const&, int const&) __hash_table:1547
-    #7 0x0001003adb50 in std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__insert_unique[abi:ne200100](int const&) __hash_table:858
-    #8 0x000100504ba8 in std::__1::unordered_set<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::insert[abi:ne200100](int const&) unordered_set:778
-    #9 0x000100504754 in pcg::internal::geometry::GroupTable::add(pcg::internal::geometry::GroupDomain, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, int) group_table.cpp:53
-    #10 0x000100395ce4 in main test_phase46.cpp:105
+    #0 0x000101c6b428 in _Znwm+0x74 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x4b428)
+    #1 0x000100eb348c in void* std::__1::__libcpp_operator_new[abi:ne200100]<std::__1::__hash_node<int, void*>>(unsigned long) allocate.h:55
+    #2 0x000100eb3410 in std::__1::__hash_node<int, void*>* std::__1::__libcpp_allocate[abi:ne200100]<std::__1::__hash_node<int, void*>>(std::__1::__element_count, unsigned long) allocate.h:91
+    #3 0x000100eb3380 in std::__1::allocator<std::__1::__hash_node<int, void*>>::allocate[abi:ne200100](unsigned long) allocator.h:105
+    #4 0x000100eb3180 in std::__1::allocator_traits<std::__1::allocator<std::__1::__hash_node<int, void*>>>::allocate[abi:ne200100](std::__1::allocator<std::__1::__hash_node<int, void*>>&, unsigned long) allocator_traits.h:270
+    #5 0x000100eb2cdc in std::__1::unique_ptr<std::__1::__hash_node<int, void*>, std::__1::__hash_node_destructor<std::__1::allocator<std::__1::__hash_node<int, void*>>>> std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__construct_node_hash<int const&>(unsigned long, int const&) __hash_table:1840
+    #6 0x000100eb2190 in std::__1::pair<std::__1::__hash_iterator<std::__1::__hash_node<int, void*>*>, bool> std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__emplace_unique_key_args<int, int const&>(int const&, int const&) __hash_table:1547
+    #7 0x000100eb1b50 in std::__1::__hash_table<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::__insert_unique[abi:ne200100](int const&) __hash_table:858
+    #8 0x000101025420 in std::__1::unordered_set<int, std::__1::hash<int>, std::__1::equal_to<int>, std::__1::allocator<int>>::insert[abi:ne200100](int const&) unordered_set:778
+    #9 0x000101024fcc in pcg::internal::geometry::GroupTable::add(pcg::internal::geometry::GroupDomain, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char>> const&, int) group_table.cpp:53
+    #10 0x000100e99d0c in main test_phase46.cpp:105
     #11 0x000199e32b94  (<unknown module>)
 
 SUMMARY: AddressSanitizer: heap-use-after-free __hash_table:375 in std::__1::__hash_const_iterator<std::__1::__hash_node<int, void*>*>::operator++[abi:ne200100]()
@@ -250,12 +250,12 @@ Shadow byte legend (one shadow byte represents 8 application bytes):
   ASan internal:           fe
   Left alloca redzone:     ca
   Right alloca redzone:    cb
-==66763==ABORTING
+==82956==ABORTING
 <end of output>
-Test time =   1.30 sec
+Test time =   1.04 sec
 ----------------------------------------------------------
 Test Failed.
-"test_phase46" end time: Jul 10 20:07 CST
+"test_phase46" end time: Jul 11 09:14 CST
 "test_phase46" time elapsed: 00:00:01
 ----------------------------------------------------------
 
@@ -263,15 +263,15 @@ Test Failed.
 11/22 Test: test_bridge_bevel
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_bridge_bevel"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_bridge_bevel" start time: Jul 10 20:07 CST
+"test_bridge_bevel" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
-PASS: bridge-demo GroupCreate+Bevel (2893 verts, 17313 indices, 198 ms, zero=1250)
+PASS: bridge-demo GroupCreate+Bevel (2212 verts, 9441 indices, 155 ms, zero=315)
 <end of output>
-Test time =   1.27 sec
+Test time =   1.79 sec
 ----------------------------------------------------------
 Test Passed.
-"test_bridge_bevel" end time: Jul 10 20:07 CST
+"test_bridge_bevel" end time: Jul 11 09:14 CST
 "test_bridge_bevel" time elapsed: 00:00:01
 ----------------------------------------------------------
 
@@ -279,17 +279,17 @@ Test Passed.
 12/22 Test: test_stone_arch_bridge
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_stone_arch_bridge"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_stone_arch_bridge" start time: Jul 10 20:07 CST
+"test_stone_arch_bridge" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 OK: validate passed
-PASS: stone-arch-bridge execute (4753 verts, 15672 indices, kind=2)
+PASS: stone-arch-bridge execute (3905 verts, 10143 indices, kind=2)
 PASS: all checks passed
 <end of output>
-Test time =   1.34 sec
+Test time =   1.88 sec
 ----------------------------------------------------------
 Test Passed.
-"test_stone_arch_bridge" end time: Jul 10 20:07 CST
+"test_stone_arch_bridge" end time: Jul 11 09:14 CST
 "test_stone_arch_bridge" time elapsed: 00:00:01
 ----------------------------------------------------------
 
@@ -297,7 +297,7 @@ Test Passed.
 13/22 Test: test_robust_predicates
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_robust_predicates"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_robust_predicates" start time: Jul 10 20:07 CST
+"test_robust_predicates" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_robust_predicates: all tests passed
@@ -305,7 +305,7 @@ test_robust_predicates: all tests passed
 Test time =   0.32 sec
 ----------------------------------------------------------
 Test Passed.
-"test_robust_predicates" end time: Jul 10 20:07 CST
+"test_robust_predicates" end time: Jul 11 09:14 CST
 "test_robust_predicates" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -313,15 +313,15 @@ Test Passed.
 14/22 Test: test_tri_intersect
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_tri_intersect"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_tri_intersect" start time: Jul 10 20:07 CST
+"test_tri_intersect" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_tri_intersect: all tests passed
 <end of output>
-Test time =   0.33 sec
+Test time =   0.31 sec
 ----------------------------------------------------------
 Test Passed.
-"test_tri_intersect" end time: Jul 10 20:07 CST
+"test_tri_intersect" end time: Jul 11 09:14 CST
 "test_tri_intersect" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -329,15 +329,15 @@ Test Passed.
 15/22 Test: test_bvh
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_bvh"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_bvh" start time: Jul 10 20:07 CST
+"test_bvh" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_bvh: all tests passed
 <end of output>
-Test time =   0.33 sec
+Test time =   0.31 sec
 ----------------------------------------------------------
 Test Passed.
-"test_bvh" end time: Jul 10 20:07 CST
+"test_bvh" end time: Jul 11 09:14 CST
 "test_bvh" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -345,15 +345,15 @@ Test Passed.
 16/22 Test: test_imesh
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_imesh"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_imesh" start time: Jul 10 20:07 CST
+"test_imesh" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_imesh: all tests passed
 <end of output>
-Test time =   0.35 sec
+Test time =   0.34 sec
 ----------------------------------------------------------
 Test Passed.
-"test_imesh" end time: Jul 10 20:07 CST
+"test_imesh" end time: Jul 11 09:14 CST
 "test_imesh" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -361,15 +361,15 @@ Test Passed.
 17/22 Test: test_arrangement
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_arrangement"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_arrangement" start time: Jul 10 20:07 CST
+"test_arrangement" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_arrangement: all tests passed
 <end of output>
-Test time =   0.37 sec
+Test time =   0.36 sec
 ----------------------------------------------------------
 Test Passed.
-"test_arrangement" end time: Jul 10 20:07 CST
+"test_arrangement" end time: Jul 11 09:14 CST
 "test_arrangement" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -377,15 +377,15 @@ Test Passed.
 18/22 Test: test_boolean_output
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_boolean_output"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_boolean_output" start time: Jul 10 20:07 CST
+"test_boolean_output" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_boolean_output: all tests passed
 <end of output>
-Test time =   0.36 sec
+Test time =   0.35 sec
 ----------------------------------------------------------
 Test Passed.
-"test_boolean_output" end time: Jul 10 20:07 CST
+"test_boolean_output" end time: Jul 11 09:14 CST
 "test_boolean_output" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -393,15 +393,15 @@ Test Passed.
 19/22 Test: test_boolean_binary
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_boolean_binary"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_boolean_binary" start time: Jul 10 20:07 CST
+"test_boolean_binary" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_boolean_binary: all tests passed
 <end of output>
-Test time =   0.34 sec
+Test time =   0.35 sec
 ----------------------------------------------------------
 Test Passed.
-"test_boolean_binary" end time: Jul 10 20:07 CST
+"test_boolean_binary" end time: Jul 11 09:14 CST
 "test_boolean_binary" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -409,15 +409,15 @@ Test Passed.
 20/22 Test: test_boolean
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_boolean"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_boolean" start time: Jul 10 20:07 CST
+"test_boolean" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_boolean: all tests passed
 <end of output>
-Test time =   0.06 sec
+Test time =   0.36 sec
 ----------------------------------------------------------
 Test Passed.
-"test_boolean" end time: Jul 10 20:07 CST
+"test_boolean" end time: Jul 11 09:14 CST
 "test_boolean" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -425,7 +425,7 @@ Test Passed.
 21/22 Test: test_boolean_graph
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_boolean_graph"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_boolean_graph" start time: Jul 10 20:07 CST
+"test_boolean_graph" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_boolean_graph: all tests passed
@@ -433,7 +433,7 @@ test_boolean_graph: all tests passed
 Test time =   0.64 sec
 ----------------------------------------------------------
 Test Passed.
-"test_boolean_graph" end time: Jul 10 20:07 CST
+"test_boolean_graph" end time: Jul 11 09:14 CST
 "test_boolean_graph" time elapsed: 00:00:00
 ----------------------------------------------------------
 
@@ -441,16 +441,16 @@ Test Passed.
 22/22 Test: test_boolean_bevel_chain
 Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_boolean_bevel_chain"
 Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_boolean_bevel_chain" start time: Jul 10 20:07 CST
+"test_boolean_bevel_chain" start time: Jul 11 09:14 CST
 Output:
 ----------------------------------------------------------
 test_boolean_bevel_chain: all tests passed
 <end of output>
-Test time =   0.36 sec
+Test time =   0.37 sec
 ----------------------------------------------------------
 Test Passed.
-"test_boolean_bevel_chain" end time: Jul 10 20:07 CST
+"test_boolean_bevel_chain" end time: Jul 11 09:14 CST
 "test_boolean_bevel_chain" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Jul 10 20:07 CST
+End testing: Jul 11 09:14 CST

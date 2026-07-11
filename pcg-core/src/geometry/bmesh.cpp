@@ -177,6 +177,88 @@ void mark_sharp_edges(BMesh& mesh, double sharp_angle_deg) {
 
 } // namespace
 
+void build_disk_cycles(BMesh& mesh) {
+    mesh.disk_cycles.clear();
+
+    // Collect face-loop entries: for each vertex V in each face loop [..., A, V, B, ...],
+    // the disk cycle at V goes: edge-to-A → face → edge-to-B (CCW from outside).
+    struct LoopEntry {
+        int prev_v;   // edge (prev_v → V) precedes V in the face loop
+        int next_v;   // edge (V → next_v) follows V in the face loop
+        int face;     // face index
+    };
+
+    std::unordered_map<int, std::vector<LoopEntry>> per_vertex;
+
+    for (int fi = 0; fi < static_cast<int>(mesh.faces.size()); ++fi) {
+        const auto& verts = mesh.faces[static_cast<size_t>(fi)].verts;
+        const int n = static_cast<int>(verts.size());
+        for (int i = 0; i < n; ++i) {
+            const int v = verts[static_cast<size_t>(i)];
+            const int prev_v = verts[static_cast<size_t>((i + n - 1) % n)];
+            const int next_v = verts[static_cast<size_t>((i + 1) % n)];
+            per_vertex[v].push_back({prev_v, next_v, fi});
+        }
+    }
+
+    // Chain entries into ordered disk cycles.
+    // Entry (prev_v=A, next_v=B, face=F) means: at V, edge-to-A is followed by
+    // edge-to-B, with face F between them.  Chain: find next entry whose prev_v == current next_v.
+    for (auto& [v_idx, entries] : per_vertex) {
+        if (entries.empty())
+            continue;
+
+        std::vector<bool> used(entries.size(), false);
+        std::vector<LoopEntry> ordered;
+        ordered.reserve(entries.size());
+
+        ordered.push_back(entries[0]);
+        used[0] = true;
+        int current_next = entries[0].next_v;
+
+        for (size_t i = 1; i < entries.size(); ++i) {
+            bool found = false;
+            for (size_t j = 0; j < entries.size(); ++j) {
+                if (used[j])
+                    continue;
+                if (entries[j].prev_v == current_next) {
+                    ordered.push_back(entries[j]);
+                    used[j] = true;
+                    current_next = entries[j].next_v;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Non-manifold or broken topology: append remaining unordered.
+                for (size_t j = 0; j < entries.size(); ++j)
+                    if (!used[j])
+                        ordered.push_back(entries[j]);
+                break;
+            }
+        }
+
+        // Convert ordered loop entries to disk entries.
+        // ordered[i] = (prev_v, next_v, face)
+        //   → edge at position i goes to prev_v
+        //   → face between this edge and next = ordered[i].face
+        //   → face between previous edge and this = ordered[(i-1+n)%n].face
+        const int n = static_cast<int>(ordered.size());
+        std::vector<BMeshDiskEntry> disk;
+        disk.reserve(ordered.size());
+        for (int i = 0; i < n; ++i) {
+            const int prev_i = (i + n - 1) % n;
+            disk.push_back({
+                ordered[static_cast<size_t>(i)].prev_v,          // other_v
+                ordered[static_cast<size_t>(prev_i)].face,        // fprev
+                ordered[static_cast<size_t>(i)].face              // fnext
+            });
+        }
+
+        mesh.disk_cycles[v_idx] = std::move(disk);
+    }
+}
+
 int64_t edge_key(int a, int b) {
     if (a > b)
         std::swap(a, b);
@@ -299,6 +381,7 @@ BMesh bmesh_from_mesh(const data::PcgMeshData& mesh, const BMeshBuildOptions& op
 
     build_edges(result);
     mark_sharp_edges(result, options.sharp_angle_deg);
+    build_disk_cycles(result);
     return result;
 }
 
@@ -378,6 +461,7 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
     }
 
     mark_sharp_edges(result, options.sharp_angle_deg);
+    build_disk_cycles(result);
     return result;
 }
 

@@ -593,6 +593,66 @@ int main()
         std::printf("PASS: Unity demo.pcg levels=3 via binary mesh transport\n");
     }
 
+    // V2: SubdivideMesh + BevelMesh on non-box mesh (cone with sharp apex).
+    // Regression: sort_ccw produced CW order at non-coplanar vertices →
+    // find_bmesh_face_between returned -1 → offset_meet used wrong normal → mesh exploded.
+    // Fix: BMesh disk cycle traversal replaces sort_ccw.
+    {
+        // Create a cone (8-segment) with flat-shaded triangles
+        pcg::internal::data::PcgMeshData cone;
+        const double radius = 1.0;
+        const double height = 2.0;
+        const int segs = 8;
+        for (int i = 0; i < segs; ++i) {
+            const double a0 = 2.0 * 3.14159265358979 * i / segs;
+            const double a1 = 2.0 * 3.14159265358979 * (i + 1) / segs;
+            const int v0 = static_cast<int>(cone.vertices().size()); cone.add_vertex({0, height, 0});
+            const int v1 = static_cast<int>(cone.vertices().size()); cone.add_vertex({radius*std::cos(a0), 0, radius*std::sin(a0)});
+            const int v2 = static_cast<int>(cone.vertices().size()); cone.add_vertex({radius*std::cos(a1), 0, radius*std::sin(a1)});
+            cone.add_triangle(v0, v1, v2);
+        }
+        const int center = static_cast<int>(cone.vertices().size()); cone.add_vertex({0, 0, 0});
+        for (int i = 0; i < segs; ++i) {
+            const double a0 = 2.0 * 3.14159265358979 * i / segs;
+            const double a1 = 2.0 * 3.14159265358979 * (i + 1) / segs;
+            const int v0 = static_cast<int>(cone.vertices().size()); cone.add_vertex({radius*std::cos(a0), 0, radius*std::sin(a0)});
+            const int v1 = static_cast<int>(cone.vertices().size()); cone.add_vertex({radius*std::cos(a1), 0, radius*std::sin(a1)});
+            cone.add_triangle(center, v1, v0);
+        }
+
+        const auto cone_subdiv = pcg::internal::elements::subdivide_mesh(cone, 1);
+        const auto cone_beveled = pcg::internal::elements::bevel_mesh(
+            cone_subdiv, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
+            pcg::internal::elements::BevelOffsetType::Offset, true);
+
+        if (cone_beveled.vertices().empty() || cone_beveled.triangles().size() < 3) {
+            std::printf("FAIL: cone subdiv+bevel produced empty mesh\n");
+            return 1;
+        }
+        // Mesh should not explode: vertices must stay within reasonable bounds.
+        // Cone original: x,z in [-1,1], y in [0,2]. Bevel amount=0.08 → allow ±1.
+        for (const auto& v : cone_beveled.vertices()) {
+            if (std::abs(v.x) > radius + 1.0 || std::abs(v.z) > radius + 1.0 ||
+                v.y < -1.0 || v.y > height + 1.0) {
+                std::printf("FAIL: cone subdiv+bevel vertex (%.3f,%.3f,%.3f) out of bounds\n",
+                            v.x, v.y, v.z);
+                return 1;
+            }
+        }
+        if (cone_beveled.vertices().size() <= cone_subdiv.vertices().size()) {
+            std::printf("FAIL: cone subdiv+bevel should add geometry\n");
+            return 1;
+        }
+        // No NaN
+        for (const auto& v : cone_beveled.vertices()) {
+            if (std::isnan(v.x) || std::isnan(v.y) || std::isnan(v.z)) {
+                std::printf("FAIL: cone subdiv+bevel has NaN vertices\n");
+                return 1;
+            }
+        }
+        std::printf("PASS: cone subdiv+bevel (disk cycle regression)\n");
+    }
+
     std::printf("PASS: phase43 mesh pipeline\n");
     return 0;
 }

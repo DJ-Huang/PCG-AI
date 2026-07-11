@@ -562,6 +562,144 @@ std::vector<VertEdge> get_bmesh_vert_edges(int v_idx, const geometry::BMesh& bme
     return edges;
 }
 
+// Forward declaration for fallback
+std::vector<VertEdge> sort_ccw(
+    const std::vector<VertEdge>& edges,
+    const std::vector<Vec3>& positions,
+    const std::vector<std::array<int, 3>>& triangles,
+    int v_idx);
+
+/// Sort edges in CCW order around vertex using BMesh disk cycle (face-loop traversal).
+/// Blender BM_vert_disk_begin / BM_disk_edge_next equivalent: walks
+/// edge → face → next edge in face loop → next face, producing ordering that is
+/// guaranteed consistent with BMesh face loop direction. Falls back to sort_ccw
+/// for non-manifold vertices where the disk cycle cannot complete.
+std::vector<VertEdge> sort_edges_disk_cycle(
+    int v_idx,
+    const std::vector<VertEdge>& edges,
+    const geometry::BMesh& bmesh,
+    const std::vector<Vec3>& positions,
+    const std::vector<std::array<int, 3>>& triangles)
+{
+    if (edges.size() <= 1)
+        return edges;
+
+    // Build a lookup: other_v → VertEdge index
+    std::unordered_map<int, size_t> edge_by_other;
+    for (size_t i = 0; i < edges.size(); ++i)
+        edge_by_other[edges[i].other_v] = i;
+
+    // Track which edges have been placed
+    std::vector<bool> placed(edges.size(), false);
+    std::vector<VertEdge> result;
+    result.reserve(edges.size());
+
+    // Find a starting edge that has a face on at least one side
+    size_t start_idx = 0;
+    for (size_t i = 0; i < edges.size(); ++i) {
+        const auto it = bmesh.edges.find(edges[i].edge_key);
+        if (it != bmesh.edges.end() && it->second.face0 >= 0) {
+            start_idx = i;
+            break;
+        }
+    }
+
+    // Walk the disk cycle from a starting edge+face
+    auto walk = [&](size_t start, int start_face) {
+        size_t cur = start;
+        int cur_face = start_face;
+        do {
+            if (placed[cur])
+                break;
+            placed[cur] = true;
+            result.push_back(edges[cur]);
+
+            // Find next edge: in cur_face's loop, after v_idx
+            const auto& loop = bmesh.faces[static_cast<size_t>(cur_face)].verts;
+            const int n = static_cast<int>(loop.size());
+            int v_pos = -1;
+            for (int i = 0; i < n; ++i) {
+                if (loop[static_cast<size_t>(i)] == v_idx) {
+                    v_pos = i;
+                    break;
+                }
+            }
+            if (v_pos < 0)
+                break;
+
+            int next_v = loop[static_cast<size_t>((v_pos + 1) % n)];
+            auto next_it = edge_by_other.find(next_v);
+            if (next_it == edge_by_other.end())
+                break;
+
+            size_t next_idx = next_it->second;
+            const auto next_edge_entry = bmesh.edges.find(edges[next_idx].edge_key);
+            if (next_edge_entry == bmesh.edges.end())
+                break;
+
+            // The next face is the other face on this edge (not cur_face)
+            const auto& ne = next_edge_entry->second;
+            int next_face = (ne.face0 == cur_face) ? ne.face1 : ne.face0;
+            if (next_face < 0)
+                break;
+
+            cur = next_idx;
+            cur_face = next_face;
+        } while (cur != start);
+    };
+
+    // Walk forward from start edge using face0
+    {
+        const auto it = bmesh.edges.find(edges[start_idx].edge_key);
+        if (it != bmesh.edges.end() && it->second.face0 >= 0)
+            walk(start_idx, it->second.face0);
+    }
+
+    // If not all edges placed, walk backward from start using face1
+    if (result.size() < edges.size()) {
+        const auto it = bmesh.edges.find(edges[start_idx].edge_key);
+        if (it != bmesh.edges.end() && it->second.face1 >= 0) {
+            // Reverse walk: find the edge before start in face1's loop
+            const auto& loop = bmesh.faces[static_cast<size_t>(it->second.face1)].verts;
+            const int n = static_cast<int>(loop.size());
+            int v_pos = -1;
+            for (int i = 0; i < n; ++i) {
+                if (loop[static_cast<size_t>(i)] == v_idx) {
+                    v_pos = i;
+                    break;
+                }
+            }
+            if (v_pos >= 0) {
+                int prev_v = loop[static_cast<size_t>((v_pos + n - 1) % n)];
+                auto prev_it = edge_by_other.find(prev_v);
+                if (prev_it != edge_by_other.end()) {
+                    size_t prev_idx = prev_it->second;
+                    const auto& prev_entry = bmesh.edges.find(edges[prev_idx].edge_key);
+                    if (prev_entry != bmesh.edges.end()) {
+                        int prev_face = (prev_entry->second.face0 == it->second.face1)
+                            ? prev_entry->second.face1
+                            : prev_entry->second.face0;
+                        if (prev_face >= 0)
+                            walk(prev_idx, prev_face);
+                    }
+                }
+            }
+        }
+    }
+
+    // Append any remaining unplaced edges (non-manifold / boundary)
+    for (size_t i = 0; i < edges.size(); ++i) {
+        if (!placed[i])
+            result.push_back(edges[i]);
+    }
+
+    // If disk cycle failed to produce a full ordering, fall back to sort_ccw
+    if (result.size() != edges.size())
+        return sort_ccw(edges, positions, triangles, v_idx);
+
+    return result;
+}
+
 /// Face normal for EdgeHalf.fprev/fnext (BMesh face index). Blender: e->fprev->no.
 Vec3 bmesh_face_normal(const BevelParams& bp, int face_idx)
 {
@@ -2610,8 +2748,54 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
                     push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
             } else if (hard_in) {
                 // Profile endpoint already appended by the previous hard_out vertex.
+                // But if curr_v is also beveled in another face (e.g. cap rim
+                // vertex at a beveled corner), we need the boundary position.
+                BevVert* bv = find_bevvert(bp, curr_v);
+                if (bv && bv->vmesh && bv->vmesh->boundstart) {
+                    BoundVert* bndv = bv->vmesh->boundstart;
+                    bool found = false;
+                    do {
+                        if (!bndv->ebev)
+                            continue;
+                        const int other = bndv->ebev->edge_v1;
+                        if (edge_has_face(curr_v, other, fi)) {
+                            push_distinct(bndv->nv.co);
+                            found = true;
+                            break;
+                        }
+                    } while ((bndv = bndv->next) != bv->vmesh->boundstart);
+                    if (!found)
+                        push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+                } else {
+                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+                }
             } else {
-                push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+                // Neither edge in this face is beveled, but the vertex may still
+                // be an endpoint of a beveled edge in another face (e.g. cap rim
+                // vertices adjacent to beveled profile_corner edges).  Use the
+                // beveled boundary-vert position when available, matching Blender's
+                // bev_rebuild_polygon which checks v->e_bev before using v->co.
+                BevVert* bv = find_bevvert(bp, curr_v);
+                if (bv && bv->vmesh && bv->vmesh->boundstart) {
+                    // Find the BoundVert whose adjacent face is this face.
+                    BoundVert* bndv = bv->vmesh->boundstart;
+                    bool found = false;
+                    do {
+                        if (!bndv->ebev)
+                            continue;
+                        // Check both adjacent edges of this BoundVert.
+                        const int other = bndv->ebev->edge_v1;
+                        if (edge_has_face(curr_v, other, fi)) {
+                            push_distinct(bndv->nv.co);
+                            found = true;
+                            break;
+                        }
+                    } while ((bndv = bndv->next) != bv->vmesh->boundstart);
+                    if (!found)
+                        push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+                } else {
+                    push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
+                }
             }
         }
 
@@ -2641,17 +2825,43 @@ bool group_name_matches(const std::string& pattern, const std::string& name)
     return pattern == name;
 }
 
-bool edge_excluded(const geometry::BMeshEdge& edge, const BevelEdgeSelection& selection)
+bool edge_excluded(const geometry::BMesh& bmesh,
+                   const geometry::BMeshEdge& edge,
+                   const BevelEdgeSelection& selection)
 {
     if (selection.exclude_unshared && edge.face1 < 0)
         return true;
 
+    // Check edge-level groups
     for (const std::string& pattern : selection.exclude_groups) {
         for (const std::string& group : edge.groups) {
             if (group_name_matches(pattern, group))
                 return true;
         }
     }
+
+    // Also check face-level groups: if both adjacent faces of this edge belong
+    // to an excluded face group (e.g. "cap_start"), exclude the edge.
+    // This lets excludeGroups="cap_start,cap_end" exclude cap rim edges,
+    // since SweepAlongSpline puts cap_start/cap_end on faces, not edges.
+    for (const std::string& pattern : selection.exclude_groups) {
+        bool face0_matches = false, face1_matches = false;
+        if (edge.face0 >= 0 && edge.face0 < static_cast<int>(bmesh.faces.size())) {
+            for (const std::string& g : bmesh.faces[static_cast<size_t>(edge.face0)].groups) {
+                if (group_name_matches(pattern, g)) { face0_matches = true; break; }
+            }
+        }
+        if (edge.face1 >= 0 && edge.face1 < static_cast<int>(bmesh.faces.size())) {
+            for (const std::string& g : bmesh.faces[static_cast<size_t>(edge.face1)].groups) {
+                if (group_name_matches(pattern, g)) { face1_matches = true; break; }
+            }
+        }
+        // Exclude if at least one adjacent face is in the excluded group.
+        // This prevents beveling cap rim edges (between cap face and side face).
+        if (face0_matches || face1_matches)
+            return true;
+    }
+
     return false;
 }
 
@@ -2668,7 +2878,7 @@ std::unordered_set<int64_t> select_hard_edges(const geometry::BMesh& bmesh,
             const auto it = bmesh.edges.find(key);
             if (it == bmesh.edges.end())
                 continue;
-            if (!edge_excluded(it->second, selection))
+            if (!edge_excluded(bmesh, it->second, selection))
                 hard_edges.insert(key);
         }
         return hard_edges;
@@ -2677,7 +2887,7 @@ std::unordered_set<int64_t> select_hard_edges(const geometry::BMesh& bmesh,
     for (const auto& entry : bmesh.edges) {
         if (!entry.second.sharp)
             continue;
-        if (edge_excluded(entry.second, selection))
+        if (edge_excluded(bmesh, entry.second, selection))
             continue;
         hard_edges.insert(entry.first);
     }
@@ -2798,10 +3008,25 @@ data::PcgMeshData bevel_mesh_blender(
         BevVert bv;
         bv.v_idx = v_idx;
 
-        // Build Blender-style vertex loops from BMesh polygon edges. Using the
-        // triangle soup here pulls in face diagonals and corrupts corner VMesh.
-        auto vert_edges = get_bmesh_vert_edges(v_idx, bmesh);
-        vert_edges = sort_ccw(vert_edges, welded.positions, welded.triangles, v_idx);
+        // Use BMesh disk cycle for edge ordering — pure topology, no normal projection.
+        // Falls back to get_bmesh_vert_edges if disk cycle is missing (degenerate mesh).
+        std::vector<VertEdge> vert_edges;
+        const auto disk_it = bmesh.disk_cycles.find(v_idx);
+        if (disk_it != bmesh.disk_cycles.end() && !disk_it->second.empty()) {
+            vert_edges.reserve(disk_it->second.size());
+            for (const auto& de : disk_it->second) {
+                VertEdge ve;
+                ve.other_v = de.other_v;
+                ve.edge_key = edge_key(v_idx, de.other_v);
+                ve.edge_v0 = v_idx;
+                ve.edge_v1 = de.other_v;
+                vert_edges.push_back(ve);
+            }
+        } else {
+            vert_edges = get_bmesh_vert_edges(v_idx, bmesh);
+            vert_edges = sort_edges_disk_cycle(v_idx, vert_edges, bmesh,
+                                                welded.positions, welded.triangles);
+        }
 
         bv.edgecount = static_cast<int>(vert_edges.size());
         bv.edges.resize(vert_edges.size());
@@ -2815,18 +3040,18 @@ data::PcgMeshData bevel_mesh_blender(
             int64_t key = edge_key(v_idx, vert_edges[i].other_v);
             eh.is_bev = hard_edges.count(key) > 0;
 
-            const int prev_idx = (i == 0) ? static_cast<int>(vert_edges.size()) - 1 : static_cast<int>(i) - 1;
-            const int next_idx = (static_cast<int>(i) + 1) % static_cast<int>(vert_edges.size());
-            const int fprev_bm = find_bmesh_face_between(
-                bmesh, v_idx, vert_edges[static_cast<size_t>(prev_idx)].other_v, vert_edges[i].other_v);
-            const int fnext_bm = find_bmesh_face_between(
-                bmesh, v_idx, vert_edges[i].other_v, vert_edges[static_cast<size_t>(next_idx)].other_v);
-            // fprev/fnext store BMesh face indices (Blender BMFace*).
-            // find_bmesh_face_between may return -1 when sort_ccw produces CW
-            // order on non-coplanar faces; build_boundary falls back to vertex
-            // normal when fprev/fnext < 0.
-            eh.fprev = fprev_bm;
-            eh.fnext = fnext_bm;
+            // fprev/fnext from disk cycle (O(1)), fallback to search.
+            if (disk_it != bmesh.disk_cycles.end() && i < disk_it->second.size()) {
+                eh.fprev = disk_it->second[i].fprev;
+                eh.fnext = disk_it->second[i].fnext;
+            } else {
+                const int prev_idx = (i == 0) ? static_cast<int>(vert_edges.size()) - 1 : static_cast<int>(i) - 1;
+                const int next_idx = (static_cast<int>(i) + 1) % static_cast<int>(vert_edges.size());
+                eh.fprev = find_bmesh_face_between(
+                    bmesh, v_idx, vert_edges[static_cast<size_t>(prev_idx)].other_v, vert_edges[i].other_v);
+                eh.fnext = find_bmesh_face_between(
+                    bmesh, v_idx, vert_edges[i].other_v, vert_edges[static_cast<size_t>(next_idx)].other_v);
+            }
 
             // Set initial offsets
             if (eh.is_bev) {
