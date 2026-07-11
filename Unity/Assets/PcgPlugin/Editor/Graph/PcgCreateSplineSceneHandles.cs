@@ -198,6 +198,8 @@ namespace DJTechEditor.PCG.Graph
 
         static PcgCreateSplineSceneHandles()
         {
+            SceneView.duringSceneGui -= OnSceneGui;
+            Selection.selectionChanged -= OnSelectionChanged;
             SceneView.duringSceneGui += OnSceneGui;
             Selection.selectionChanged += OnSelectionChanged;
         }
