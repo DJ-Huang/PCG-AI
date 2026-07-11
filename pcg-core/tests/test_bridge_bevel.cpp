@@ -213,7 +213,7 @@ int manifold_winding_bad_count(const pcg::internal::data::PcgMeshData& mesh)
     }
 
     int bad = 0;
-    for (const auto& [_, count] : edges) {
+    for (const auto& [key, count] : edges) {
         if (count.ab + count.ba != 2)
             continue;
         if (count.ab != 1 || count.ba != 1)

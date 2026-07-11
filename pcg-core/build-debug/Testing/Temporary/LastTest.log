@@ -1,20 +1,20 @@
-Start testing: Jul 11 10:09 CST
+Start testing: Jul 11 16:13 CST
 ----------------------------------------------------------
-11/22 Testing: test_bridge_bevel
-11/22 Test: test_bridge_bevel
-Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_bridge_bevel"
-Directory: /Users/djhuang/PCG-AI/pcg-core/tests
-"test_bridge_bevel" start time: Jul 11 10:09 CST
+2/22 Testing: test_data
+2/22 Test: test_data
+Command: "/Users/djhuang/PCG-AI/pcg-core/build-debug/test_data"
+Directory: /Users/djhuang/PCG-AI/pcg-core/build-debug
+"test_data" start time: Jul 11 16:13 CST
 Output:
 ----------------------------------------------------------
-PASS: bridge-demo GroupCreate+Bevel (2188 verts, 7464 indices, 163 ms, zero=315)
-FAIL: lowpoly-sedan has boundary edges after bevel (728)
+Assertion failed: (collection.primary_json().contains("points")), function main, file test_data.cpp, line 41.
+PASS: PcgPointData round-trip
 <end of output>
-Test time =  10.59 sec
+Test time =   0.04 sec
 ----------------------------------------------------------
 Test Failed.
-"test_bridge_bevel" end time: Jul 11 10:09 CST
-"test_bridge_bevel" time elapsed: 00:00:10
+"test_data" end time: Jul 11 16:13 CST
+"test_data" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Jul 11 10:09 CST
+End testing: Jul 11 16:13 CST

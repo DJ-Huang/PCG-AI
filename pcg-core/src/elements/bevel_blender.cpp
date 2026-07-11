@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <set>
@@ -15,17 +16,6 @@
 namespace pcg::internal::elements::bevel {
 
 namespace {
-
-void report_bevel_debug(const char* hypothesis, const char* location, const std::string& data)
-{
-    std::string command =
-        "curl -sS -X POST http://127.0.0.1:7777/event -H 'Content-Type: application/json' "
-        "--data '{\"sessionId\":\"sedan-bevel-boundary\",\"runId\":\"pre-fix\","
-        "\"hypothesisId\":\"" + std::string(hypothesis) + "\",\"location\":\"" +
-        location + "\",\"msg\":\"[DEBUG] bevel topology probe\",\"data\":" + data + "}' "
-        ">/dev/null 2>&1";
-    std::system(command.c_str());
-}
 
 } // namespace
 
@@ -1019,16 +1009,29 @@ Vec3 slide_dist(const Vec3& v_pos, const Vec3& other_pos, double d) {
 }
 
 /// Check if co is outside edge e's range (Blender is_outside_edge L1658).
-bool is_outside_edge(const Vec3& v_pos, const Vec3& other_pos, const Vec3& co,
+/// Uses full EdgeHalf endpoints (edge_v0→edge_v1), not BevVert-relative framing.
+bool is_outside_edge(const BevelParams& bp, EdgeHalf* e, const Vec3& co,
                      int* r_closer = nullptr)
 {
-    Vec3 dir = sub(other_pos, v_pos);
-    double len_sq = length_squared(dir);
-    if (len_sq < 1e-12) return false;
+    const auto& positions = *bp.positions;
+    Vec3 p0 = positions[static_cast<size_t>(e->edge_v0)];
+    Vec3 p1 = positions[static_cast<size_t>(e->edge_v1)];
+    Vec3 u = sub(p1, p0);
+    double lenu = length(u);
+    if (lenu < 1e-12)
+        return false;
 
-    double t = dot(sub(co, v_pos), dir) / len_sq;
-    if (t < -1e-6 || t > 1.0 + 1e-6) {
-        if (r_closer) *r_closer = (t < 0) ? 0 : 1;
+    Vec3 un = scale(u, 1.0 / lenu);
+    Vec3 h = sub(co, p0);
+    double lambda = dot(un, h);
+    if (lambda <= -BEVEL_EPSILON_BIG * lenu) {
+        if (r_closer)
+            *r_closer = 0;
+        return true;
+    }
+    if (lambda >= (1.0 + BEVEL_EPSILON_BIG) * lenu) {
+        if (r_closer)
+            *r_closer = 1;
         return true;
     }
     return false;
@@ -1123,17 +1126,17 @@ void offset_meet(BevelParams& bp,
             }
         }
 
-        // Check: if one offset is 0, don't go outside that edge
+        // Check: if one offset is 0, don't go outside that edge (Blender offset_meet L2030).
         if (e1->offset_r == 0.0f) {
             int closer = -1;
-            if (is_outside_edge(v_co, positions[static_cast<size_t>(e1->edge_v1)], meetco, &closer)) {
-                meetco = (closer == 0) ? v_co : positions[static_cast<size_t>(e1->edge_v1)];
+            if (is_outside_edge(bp, e1, meetco, &closer)) {
+                meetco = positions[static_cast<size_t>(closer == 0 ? e1->edge_v0 : e1->edge_v1)];
             }
         }
         if (e2->offset_l == 0.0f) {
             int closer = -1;
-            if (is_outside_edge(v_co, positions[static_cast<size_t>(e2->edge_v1)], meetco, &closer)) {
-                meetco = (closer == 0) ? v_co : positions[static_cast<size_t>(e2->edge_v1)];
+            if (is_outside_edge(bp, e2, meetco, &closer)) {
+                meetco = positions[static_cast<size_t>(closer == 0 ? e2->edge_v0 : e2->edge_v1)];
             }
         }
     }
@@ -1551,6 +1554,147 @@ void adjust_offsets(BevelParams& bp) {
     }
 }
 
+/// Terminal single-bevel-edge case (Blender build_boundary_terminal_edge).
+void build_boundary_terminal_edge(BevelParams& bp, BevVert* bv, EdgeHalf* efirst, bool construct)
+{
+    VMesh* vm = bv->vmesh.get();
+    if (!vm) {
+        bv->vmesh = std::make_unique<VMesh>();
+        vm = bv->vmesh.get();
+        vm->seg = bp.seg;
+    }
+
+    EdgeHalf* e = efirst;
+    Vec3 co;
+
+    if (bv->edgecount == 2) {
+        int fprev = e->fprev;
+        if (fprev >= 0) {
+            Vec3 f_no = bmesh_face_normal(bp, fprev);
+            co = offset_in_plane(e, f_no, true, bv->v_idx, bp);
+        } else {
+            co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
+        }
+        if (construct) {
+            BoundVert* bndv = add_new_bound_vert(vm, co);
+            bndv->efirst = bndv->elast = bndv->ebev = e;
+            e->leftv = bndv;
+        } else {
+            adjust_bound_vert(e->leftv, co);
+        }
+
+        int fnext = e->fnext;
+        if (fnext >= 0) {
+            Vec3 f_no = bmesh_face_normal(bp, fnext);
+            co = offset_in_plane(e, f_no, false, bv->v_idx, bp);
+        } else {
+            co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
+        }
+        if (construct) {
+            BoundVert* bndv = add_new_bound_vert(vm, co);
+            bndv->efirst = bndv->elast = e;
+            e->rightv = bndv;
+        } else {
+            adjust_bound_vert(e->rightv, co);
+        }
+
+        EdgeHalf* e_next = e->next;
+        co = slide_dist((*bp.positions)[static_cast<size_t>(bv->v_idx)],
+                       (*bp.positions)[static_cast<size_t>(e_next->edge_v1)],
+                       e->offset_l);
+        if (construct) {
+            BoundVert* bndv = add_new_bound_vert(vm, co);
+            bndv->efirst = bndv->elast = e_next;
+            e_next->leftv = e_next->rightv = bndv;
+        } else {
+            adjust_bound_vert(e_next->leftv, co);
+        }
+    } else if (bv->selcount == 1 && bv->edgecount == 3) {
+        // Terminal cap: offset_meet collapses both meets to the corner. Place symmetric
+        // slide points on adjacent cap edges (matches profile synthesis in set_profile_params).
+        EdgeHalf* e_prev = efirst->prev;
+        EdgeHalf* e_next = efirst->next;
+        float d = efirst->offset_l_spec;
+        if (bp.profile < 0.25f)
+            d *= std::sqrt(2.0f);
+        const Vec3 v_co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
+        const Vec3 co_left = slide_dist(
+            v_co, (*bp.positions)[static_cast<size_t>(e_prev->edge_v1)], d);
+        const Vec3 co_right = slide_dist(
+            v_co, (*bp.positions)[static_cast<size_t>(e_next->edge_v1)], d);
+
+        if (construct) {
+            BoundVert* bndv_left = add_new_bound_vert(vm, co_left);
+            bndv_left->efirst = e_prev;
+            bndv_left->elast = bndv_left->ebev = efirst;
+            efirst->leftv = bndv_left;
+            e_prev->leftv = e_prev->rightv = bndv_left;
+
+            BoundVert* bndv_right = add_new_bound_vert(vm, co_right);
+            bndv_right->efirst = efirst;
+            bndv_right->elast = e_next;
+            e_next->leftv = e_next->rightv = bndv_right;
+            efirst->rightv = bndv_right;
+        } else {
+            adjust_bound_vert(efirst->leftv, co_left);
+            adjust_bound_vert(efirst->rightv, co_right);
+            if (e_prev->leftv)
+                adjust_bound_vert(e_prev->leftv, co_left);
+            if (e_next->leftv)
+                adjust_bound_vert(e_next->leftv, co_right);
+        }
+    } else {
+        EdgeHalf* e_prev = e->prev;
+        offset_meet(bp, e_prev, e, bv->v_idx, e->fprev, false, co, nullptr);
+        if (construct) {
+            BoundVert* bndv = add_new_bound_vert(vm, co);
+            bndv->efirst = e_prev;
+            bndv->elast = bndv->ebev = e;
+            e->leftv = bndv;
+            e_prev->leftv = e_prev->rightv = bndv;
+        } else {
+            adjust_bound_vert(e->leftv, co);
+        }
+
+        e = e->next;
+        offset_meet(bp, e->prev, e, bv->v_idx, e->fprev, false, co, nullptr);
+        if (construct) {
+            BoundVert* bndv = add_new_bound_vert(vm, co);
+            bndv->efirst = e->prev;
+            bndv->elast = e;
+            e->leftv = e->rightv = bndv;
+            e->prev->rightv = bndv;
+        } else {
+            adjust_bound_vert(e->leftv, co);
+        }
+
+        float d = efirst->offset_l_spec;
+        if (bp.profile < 0.25f)
+            d *= std::sqrt(2.0f);
+
+        for (EdgeHalf* e_iter = e->next; e_iter != efirst; e_iter = e_iter->next) {
+            co = slide_dist((*bp.positions)[static_cast<size_t>(bv->v_idx)],
+                           (*bp.positions)[static_cast<size_t>(e_iter->edge_v1)], d);
+            if (construct) {
+                BoundVert* bndv = add_new_bound_vert(vm, co);
+                bndv->efirst = bndv->elast = e_iter;
+                e_iter->leftv = e_iter->rightv = bndv;
+            } else {
+                adjust_bound_vert(e_iter->leftv, co);
+            }
+        }
+    }
+
+    if (construct) {
+        if (vm->count == 2 && bv->edgecount == 3)
+            vm->mesh_kind = MeshKind::None;
+        else if (vm->count == 3)
+            vm->mesh_kind = MeshKind::TriFan;
+        else
+            vm->mesh_kind = MeshKind::Poly;
+    }
+}
+
 void build_boundary(BevelParams& bp, BevVert* bv, bool construct) {
     if (bv->edgecount <= 1)
         return;
@@ -1567,109 +1711,7 @@ void build_boundary(BevelParams& bp, BevVert* bv, bool construct) {
         return;
 
     if (bv->selcount == 1) {
-        // Terminal edge case: only one beveled edge
-        EdgeHalf* e = efirst;
-        Vec3 co;
-
-        if (bv->edgecount == 2) {
-            // Only 2 edges: offset in plane on each side
-            int fprev = e->fprev;
-            if (fprev >= 0) {
-                Vec3 f_no = bmesh_face_normal(bp, fprev);
-                co = offset_in_plane(e, f_no, true, bv->v_idx, bp);
-            } else {
-                co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
-            }
-            if (construct) {
-                BoundVert* bndv = add_new_bound_vert(vm, co);
-                bndv->efirst = bndv->elast = bndv->ebev = e;
-                e->leftv = bndv;
-            } else {
-                adjust_bound_vert(e->leftv, co);
-            }
-
-            int fnext = e->fnext;
-            if (fnext >= 0) {
-                Vec3 f_no = bmesh_face_normal(bp, fnext);
-                co = offset_in_plane(e, f_no, false, bv->v_idx, bp);
-            } else {
-                co = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
-            }
-            if (construct) {
-                BoundVert* bndv = add_new_bound_vert(vm, co);
-                bndv->efirst = bndv->elast = e;
-                e->rightv = bndv;
-            } else {
-                adjust_bound_vert(e->rightv, co);
-            }
-
-            // Artificial extra point along unbeveled edge
-            EdgeHalf* e_next = e->next;
-            co = slide_dist((*bp.positions)[static_cast<size_t>(bv->v_idx)],
-                           (*bp.positions)[static_cast<size_t>(e_next->edge_v1)],
-                           e->offset_l);
-            if (construct) {
-                BoundVert* bndv = add_new_bound_vert(vm, co);
-                bndv->efirst = bndv->elast = e_next;
-                e_next->leftv = e_next->rightv = bndv;
-            } else {
-                adjust_bound_vert(e_next->leftv, co);
-            }
-        } else {
-            // More than 2 edges: use offset_meet
-            EdgeHalf* e_prev = e->prev;
-            Vec3 co_meet;
-            offset_meet(bp, e_prev, e, bv->v_idx, e->fprev, false, co_meet, nullptr);
-            if (construct) {
-                BoundVert* bndv = add_new_bound_vert(vm, co_meet);
-                bndv->efirst = e_prev;
-                bndv->elast = bndv->ebev = e;
-                e->leftv = bndv;
-                e_prev->leftv = e_prev->rightv = bndv;
-            } else {
-                adjust_bound_vert(e->leftv, co_meet);
-            }
-
-            EdgeHalf* e_next = e->next;
-            offset_meet(bp, e, e_next, bv->v_idx, e->fprev, false, co_meet, nullptr);
-            if (construct) {
-                BoundVert* bndv = add_new_bound_vert(vm, co_meet);
-                bndv->efirst = e;
-                bndv->elast = e_next;
-                e->rightv = e_next->leftv = bndv;
-                e_next->rightv = bndv;
-            } else {
-                adjust_bound_vert(e->rightv, co_meet);
-            }
-
-            // Remaining edges: slide along
-            float d = efirst->offset_l_spec;
-            if (bp.profile < 0.25f)
-                d *= std::sqrt(2.0f);
-
-            EdgeHalf* e_iter = e_next->next;
-            while (e_iter != efirst) {
-                co = slide_dist((*bp.positions)[static_cast<size_t>(bv->v_idx)],
-                               (*bp.positions)[static_cast<size_t>(e_iter->edge_v1)], d);
-                if (construct) {
-                    BoundVert* bndv = add_new_bound_vert(vm, co);
-                    bndv->efirst = bndv->elast = e_iter;
-                    e_iter->leftv = e_iter->rightv = bndv;
-                } else {
-                    adjust_bound_vert(e_iter->leftv, co);
-                }
-                e_iter = e_iter->next;
-            }
-        }
-
-        if (construct) {
-            if (vm->count == 2 && bv->edgecount == 3)
-                vm->mesh_kind = MeshKind::None;
-            else if (vm->count == 3)
-                vm->mesh_kind = MeshKind::TriFan;
-            else
-                vm->mesh_kind = MeshKind::Poly;
-        }
+        build_boundary_terminal_edge(bp, bv, efirst, construct);
         return;
     }
 
@@ -1994,6 +2036,35 @@ void set_profile_params(BevelParams& bp, BevVert* bv, BoundVert* bndv) {
         Vec3 e_v1 = (*bp.positions)[static_cast<size_t>(e->edge_v1)];
         pro->proj_dir = normalize(sub(e_v1, e_v0));
 
+        // Terminal cap: collapsed boundary meets at the corner — synthesize profile
+        // span along adjacent cap edges before the generic start/middle/end path.
+        if (bv->selcount == 1 && bv->edgecount >= 3 &&
+            length_squared(sub(start, end)) <= 1e-12) {
+            EdgeHalf* e_prev = e->prev;
+            EdgeHalf* e_next = e->next;
+            if (e_prev && e_next) {
+                float d = e->offset_l_spec;
+                if (bp.profile < 0.25f)
+                    d *= static_cast<float>(std::sqrt(2.0));
+                const Vec3 left = slide_dist(e_v0, (*bp.positions)[static_cast<size_t>(e_prev->edge_v1)], d);
+                const Vec3 right = slide_dist(e_v0, (*bp.positions)[static_cast<size_t>(e_next->edge_v1)], d);
+                if (length_squared(sub(left, right)) > 1e-12) {
+                    pro->start = left;
+                    pro->end = right;
+                    pro->middle = e_v0;
+                    const Vec3 td1 = normalize(sub(pro->middle, pro->start));
+                    const Vec3 td2 = normalize(sub(pro->middle, pro->end));
+                    const Vec3 plane_no = normalize(cross(td1, td2));
+                    if (!nearly_parallel(td1, td2)) {
+                        pro->plane_co = e_v0;
+                        pro->plane_no = plane_no;
+                        pro->proj_dir = normalize(sub(e_v1, e_v0));
+                        return;
+                    }
+                }
+            }
+        }
+
         Vec3 middle = project_to_edge(e_v0, e_v1, start, end);
         pro->start = start;
         pro->end = end;
@@ -2033,14 +2104,51 @@ void set_profile_params(BevelParams& bp, BevVert* bv, BoundVert* bndv) {
             d2 = normalize(sub(pro->middle, end));
             plane_no = normalize(cross(d1, d2));
             if (nearly_parallel(d1, d2)) {
-                do_linear_interp = true;
+                // Terminal cap: collapsed meet points — synthesize profile span along
+                // adjacent cap edges (non-bev edges have offset 0 so offset_in_plane degenerates).
+                if (bv->selcount == 1 && bv->edgecount >= 3 &&
+                    length_squared(sub(start, end)) <= 1e-12) {
+                    EdgeHalf* e_prev = e->prev;
+                    EdgeHalf* e_next = e->next;
+                    Vec3 left = start;
+                    Vec3 right = end;
+                    if (e_prev && e_next) {
+                        float d = e->offset_l_spec;
+                        if (bp.profile < 0.25f)
+                            d *= static_cast<float>(std::sqrt(2.0));
+                        left = slide_dist(e_v0, (*bp.positions)[static_cast<size_t>(e_prev->edge_v1)], d);
+                        right = slide_dist(e_v0, (*bp.positions)[static_cast<size_t>(e_next->edge_v1)], d);
+                    }
+                    if (length_squared(sub(left, right)) > 1e-12) {
+                        pro->start = left;
+                        pro->end = right;
+                        pro->middle = e_v0;
+                        d1 = normalize(sub(pro->middle, pro->start));
+                        d2 = normalize(sub(pro->middle, pro->end));
+                        plane_no = normalize(cross(d1, d2));
+                        if (!nearly_parallel(d1, d2)) {
+                            pro->plane_co = e_v0;
+                            pro->plane_no = plane_no;
+                            pro->proj_dir = normalize(sub(e_v1, e_v0));
+                            do_linear_interp = false;
+                        } else {
+                            do_linear_interp = true;
+                        }
+                    } else {
+                        do_linear_interp = true;
+                    }
+                } else {
+                    do_linear_interp = true;
+                }
             } else {
                 pro->plane_co = e_v0;
                 pro->plane_no = plane_no;
                 pro->proj_dir = plane_no;
             }
+        } else {
+            pro->plane_co = start;
+            pro->plane_no = plane_no;
         }
-        pro->plane_co = start;
     }
 
     if (do_linear_interp) {
@@ -2504,48 +2612,64 @@ void bevel_build_cutoff(BevelParams& bp, BevVert* bv) {
     }
 }
 
-/// Build a simple polygon (Blender bevel_build_poly).
+/// Build a simple polygon (Blender bevel_build_poly L6263).
+/// Walks the bound ring and inserts ebev profile points from VMesh ring k=1..ns-1.
 void bevel_build_poly(BevelParams& bp, BevVert* bv) {
     VMesh* vm = bv->vmesh.get();
-    int n = vm->count;
+    const int ns = vm->seg;
 
-    // Collect boundary verts
     std::vector<Vec3> poly;
     BoundVert* bndv = vm->boundstart;
     do {
         poly.push_back(bndv->nv.co);
+        if (bndv->ebev && ns > 1) {
+            const int i = bndv->index;
+            for (int k = 1; k < ns; ++k) {
+                const NewVert& nv = vm->at(i, 0, k);
+                if (nv.valid)
+                    poly.push_back(nv.co);
+            }
+        }
     } while ((bndv = bndv->next) != vm->boundstart);
 
-    // Fan triangulate
+    if (poly.size() < 3)
+        return;
+
     Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
-    for (int i = 1; i + 1 < static_cast<int>(poly.size()); i++) {
-        bp.output.add_oriented_triangle(poly[0], poly[i], poly[i + 1], normal);
+    for (size_t f = 1; f + 1 < poly.size(); ++f) {
+        bp.output.add_oriented_triangle(poly[0], poly[f], poly[f + 1], normal);
     }
 }
 
-/// Build a triangle fan (Blender bevel_build_trifan).
+/// Build a triangle fan (Blender bevel_build_trifan L6342).
+/// Terminal selcount==1 keeps legacy center fan (profile-aware poly caused strip winding clash).
+/// Poly kind uses profile-aware bevel_build_poly.
 void bevel_build_trifan(BevelParams& bp, BevVert* bv) {
-    VMesh* vm = bv->vmesh.get();
-    int n = vm->count;
+    if (bv->selcount == 1) {
+        VMesh* vm = bv->vmesh.get();
+        const int n = vm->count;
 
-    // Center is average of all boundary verts
-    Vec3 center{0, 0, 0};
-    BoundVert* bndv = vm->boundstart;
-    do {
-        center = add(center, bndv->nv.co);
-    } while ((bndv = bndv->next) != vm->boundstart);
-    center = scale(center, 1.0 / n);
+        Vec3 center{0, 0, 0};
+        BoundVert* bndv = vm->boundstart;
+        do {
+            center = add(center, bndv->nv.co);
+        } while ((bndv = bndv->next) != vm->boundstart);
+        center = scale(center, 1.0 / n);
 
-    Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
+        Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
 
-    bndv = vm->boundstart;
-    Vec3 prev = bndv->nv.co;
-    bndv = bndv->next;
-    do {
-        Vec3 curr = bndv->nv.co;
-        bp.output.add_oriented_triangle(center, prev, curr, normal);
-        prev = curr;
-    } while ((bndv = bndv->next) != vm->boundstart);
+        bndv = vm->boundstart;
+        Vec3 prev = bndv->nv.co;
+        bndv = bndv->next;
+        do {
+            Vec3 curr = bndv->nv.co;
+            bp.output.add_oriented_triangle(center, prev, curr, normal);
+            prev = curr;
+        } while ((bndv = bndv->next) != vm->boundstart);
+        return;
+    }
+
+    bevel_build_poly(bp, bv);
 }
 
 /// Build VMesh — the core function that creates the corner mesh.
@@ -2567,6 +2691,7 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
     do {
         int i = bndv->index;
         vm->at(i, 0, 0).co = bndv->nv.co;
+        vm->at(i, 0, 0).valid = true;
         if (weld && bndv->ebev) {
             if (!weld1)
                 weld1 = bndv;
@@ -2588,13 +2713,16 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
     do {
         int i = bndv->index;
         vm->at(i, 0, ns).co = bndv->next->nv.co;  // End = next boundary vert
+        vm->at(i, 0, ns).valid = true;
 
         if (vm->mesh_kind != MeshKind::Adj) {
             for (int k = 1; k < ns; k++) {
                 if (bndv->ebev) {
                     vm->at(i, 0, k).co = get_profile_point(bndv->profile, k, ns, bp.seg);
+                    vm->at(i, 0, k).valid = true;
                 } else if (n == 2) {
                     vm->at(i, 0, k).co = vm->at(1 - i, 0, ns - k).co;
+                    vm->at(i, 0, k).valid = vm->at(1 - i, 0, ns - k).valid;
                 }
             }
         }
@@ -2606,7 +2734,9 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
             const Vec3 co = mid(vm->at(weld1->index, 0, k).co,
                                 vm->at(weld2->index, 0, ns - k).co);
             vm->at(weld1->index, 0, k).co = co;
+            vm->at(weld1->index, 0, k).valid = true;
             vm->at(weld2->index, 0, ns - k).co = co;
+            vm->at(weld2->index, 0, ns - k).valid = true;
         }
     }
 
@@ -2627,6 +2757,7 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
                 for (int k = 0; k <= ns; k++) {
                     if (j == 0 && (k == 0 || k == ns)) continue;
                     vm_out->at(i, j, k).co = vm_adj->at(i, j, k).co;
+                    vm_out->at(i, j, k).valid = vm_adj->at(i, j, k).valid;
                 }
             }
         }
@@ -2686,9 +2817,8 @@ namespace {
 ///   bv1's profile[0] is on face A, bv2's profile[ns] is on face A.
 ///   So bv1[k] corresponds to bv2[ns-k].
 void build_edge_polygons(BevelParams& bp, BevVert* bv1, BevVert* bv2, EdgeHalf* e) {
-    // At bv1: the BoundVert whose ebev == e (profile goes along this edge)
-    BoundVert* bndv1 = e->leftv;
-    if (!bndv1) return;
+    if (!e->leftv || !e->rightv)
+        return;
 
     // Find EdgeHalf at bv2 for the same edge (edge_v1 points back to bv1)
     EdgeHalf* e2 = nullptr;
@@ -2698,18 +2828,22 @@ void build_edge_polygons(BevelParams& bp, BevVert* bv1, BevVert* bv2, EdgeHalf* 
             break;
         }
     }
-    if (!e2) return;
+    if (!e2 || !e2->leftv || !e2->rightv)
+        return;
 
-    // At bv2: same — leftv has ebev == e2, profile goes along this edge
-    BoundVert* bndv2 = e2->leftv;
-    if (!bndv2) return;
     VMesh* vm1 = bv1->vmesh.get();
     VMesh* vm2 = bv2->vmesh.get();
     if (!vm1 || !vm2)
         return;
 
-    int ns = bp.seg;
-    if (ns < 1) return;
+    const int ns = bp.seg;
+    if (ns < 1)
+        return;
+
+    // Blender bevel_build_edge_polygons: profile rows i1/i2 from leftv; corners use
+    // e1->{leftv,rightv} and e2->{rightv,leftv}.
+    const int i1 = e->leftv->index;
+    const int i2 = e2->leftv->index;
 
     Vec3 strip_normal{0.0, 0.0, 0.0};
     if (e->fprev >= 0)
@@ -2721,46 +2855,246 @@ void build_edge_polygons(BevelParams& bp, BevVert* bv1, BevVert* bv2, EdgeHalf* 
                            vertex_normal_from_data(*bp.positions, *bp.triangles, bv2->v_idx));
     }
 
-    // Chamfer strip: Blender bev_create_ngon(verts) with loop
-    // (bv1[s], bv2[ns-s], bv2[ns-s-1], bv1[s+1]) — topology winding, no reorient.
-    for (int s = 0; s < ns; s++) {
-        Vec3 a = vm1->at(bndv1->index, 0, s).co;
-        Vec3 b = vm2->at(bndv2->index, 0, ns - s).co;
-        Vec3 c = vm2->at(bndv2->index, 0, ns - (s + 1)).co;
-        Vec3 d = vm1->at(bndv1->index, 0, s + 1).co;
-
-        // #region debug-point A:collapsed-terminal-strip
-        const bool collapsed_left = length_squared(sub(a, d)) <= 1e-16;
-        const bool collapsed_right = length_squared(sub(b, c)) <= 1e-16;
-        if ((collapsed_left || collapsed_right) &&
-            std::max({a.x, b.x, c.x, d.x}) <= 4.3 &&
-            std::min({a.x, b.x, c.x, d.x}) >= -0.1) {
-            const std::string data =
-                "{\"v1\":" + std::to_string(bv1->v_idx) +
-                ",\"v2\":" + std::to_string(bv2->v_idx) +
-                ",\"s\":" + std::to_string(s) +
-                ",\"sel1\":" + std::to_string(bv1->selcount) +
-                ",\"sel2\":" + std::to_string(bv2->selcount) +
-                ",\"count1\":" + std::to_string(vm1->count) +
-                ",\"count2\":" + std::to_string(vm2->count) +
-                ",\"row1\":" + std::to_string(bndv1->index) +
-                ",\"row2\":" + std::to_string(bndv2->index) +
-                ",\"collapsedLeft\":" + (collapsed_left ? "true" : "false") +
-                ",\"collapsedRight\":" + (collapsed_right ? "true" : "false") + "}";
-            report_bevel_debug("A-B-C", "bevel_blender.cpp:build_edge_polygons", data);
-        }
-        // #endregion
+    auto emit_strip_quad = [&](const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3) {
+        const bool collapsed_left = length_squared(sub(v0, v3)) <= 1e-16;
+        const bool collapsed_right = length_squared(sub(v1, v2)) <= 1e-16;
 
         Vec3 desired_normal = strip_normal;
         if (length_squared(desired_normal) < 1e-20)
-            desired_normal = cross(sub(b, a), sub(d, a));
+            desired_normal = cross(sub(v1, v0), sub(v3, v0));
+
         if (!collapsed_left && !collapsed_right) {
-            bp.output.add_oriented_quad(a, b, c, d, desired_normal);
-        } else if (collapsed_left && !collapsed_right) {
-            bp.output.add_oriented_triangle(a, b, c, desired_normal);
-        } else if (!collapsed_left && collapsed_right) {
-            bp.output.add_oriented_triangle(a, b, d, desired_normal);
+            bp.output.add_oriented_quad(v0, v1, v2, v3, desired_normal);
+            return;
         }
+
+        if (collapsed_left && collapsed_right) {
+            if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v1, v2)) > 1e-16)
+                bp.output.add_oriented_triangle(v0, v1, v2, desired_normal);
+            return;
+        }
+        if (collapsed_left) {
+            // v0 == v3: degenerate quad becomes triangle (v0, v1, v2).
+            if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v1, v2)) > 1e-16)
+                bp.output.add_oriented_triangle(v0, v1, v2, desired_normal);
+            return;
+        }
+        // collapsed_right: v1 == v2 → triangle (v0, v1, v3).
+        if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v0, v3)) > 1e-16)
+            bp.output.add_oriented_triangle(v0, v1, v3, desired_normal);
+    };
+
+    Vec3 v0 = e->leftv->nv.co;
+    Vec3 v1 = e2->rightv->nv.co;
+
+    for (int k = 1; k <= ns; ++k) {
+        const NewVert& nv3 = vm1->at(i1, 0, k);
+        const NewVert& nv2 = vm2->at(i2, 0, ns - k);
+        if (!nv3.valid || !nv2.valid)
+            continue;
+        const Vec3 v3 = nv3.co;
+        const Vec3 v2 = nv2.co;
+        emit_strip_quad(v0, v1, v2, v3);
+        v0 = v3;
+        v1 = v2;
+    }
+}
+
+// --- PCG_BEVEL_DIAG staging topology (Phase 2.1 / 2.2) ---
+
+bool bevel_diag_enabled()
+{
+    const char* v = std::getenv("PCG_BEVEL_DIAG");
+    return v && v[0] && v[0] != '0';
+}
+
+struct CapExtents {
+    double x0 = 0.0;
+    double x1 = 0.0;
+};
+
+CapExtents mesh_cap_extents(const std::vector<Vec3>& positions)
+{
+    CapExtents cap;
+    if (positions.empty())
+        return cap;
+    cap.x0 = cap.x1 = positions.front().x;
+    for (const Vec3& p : positions) {
+        cap.x0 = std::min(cap.x0, p.x);
+        cap.x1 = std::max(cap.x1, p.x);
+    }
+    return cap;
+}
+
+bool on_cap_plane_x(const Vec3& p, const CapExtents& cap, double tol)
+{
+    return std::abs(p.x - cap.x0) <= tol || std::abs(p.x - cap.x1) <= tol;
+}
+
+struct BevelTopoStats {
+    int verts = 0;
+    int tris = 0;
+    int boundary = 0;
+    int nonmanifold = 0;
+    int cap_boundary = 0;
+    int loops = 0;
+    int loops_size_3 = 0;
+    int cap_loops_size_3 = 0;
+    int index_degenerate = 0;
+};
+
+BevelTopoStats analyze_bevel_output(const BevelParams::OutputMesh& out, const CapExtents& cap, double tol)
+{
+    BevelTopoStats stats;
+    stats.verts = static_cast<int>(out.vertices.size());
+    stats.tris = static_cast<int>(out.triangles.size() / 3);
+
+    auto edge_key = [](int a, int b) -> uint64_t {
+        const int lo = std::min(a, b);
+        const int hi = std::max(a, b);
+        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
+               static_cast<uint32_t>(hi);
+    };
+
+    std::unordered_map<uint64_t, int> counts;
+    for (size_t i = 0; i + 2 < out.triangles.size(); i += 3) {
+        const int ia = out.triangles[i];
+        const int ib = out.triangles[i + 1];
+        const int ic = out.triangles[i + 2];
+        if (ia == ib || ib == ic || ia == ic) {
+            ++stats.index_degenerate;
+            continue;
+        }
+        const int tri[3] = {ia, ib, ic};
+        for (int e = 0; e < 3; ++e)
+            ++counts[edge_key(tri[e], tri[(e + 1) % 3])];
+    }
+
+    std::unordered_map<int, std::vector<int>> adjacency;
+    for (const auto& [key, count] : counts) {
+        if (count == 1) {
+            ++stats.boundary;
+            const int a = static_cast<int>(key >> 32);
+            const int b = static_cast<int>(key & 0xffffffffu);
+            const Vec3& pa = out.vertices[static_cast<size_t>(a)];
+            const Vec3& pb = out.vertices[static_cast<size_t>(b)];
+            if (on_cap_plane_x(pa, cap, tol) && on_cap_plane_x(pb, cap, tol))
+                ++stats.cap_boundary;
+            adjacency[a].push_back(b);
+            adjacency[b].push_back(a);
+        } else if (count > 2) {
+            ++stats.nonmanifold;
+        }
+    }
+
+    std::unordered_map<int, bool> visited;
+    for (const auto& [start, _] : adjacency) {
+        if (visited[start])
+            continue;
+        std::vector<int> loop_verts;
+        int current = start;
+        int previous = -1;
+        do {
+            visited[current] = true;
+            loop_verts.push_back(current);
+            int next = -1;
+            for (int candidate : adjacency[current]) {
+                if (candidate != previous) {
+                    next = candidate;
+                    break;
+                }
+            }
+            previous = current;
+            current = next;
+        } while (current >= 0 && current != start &&
+                 static_cast<int>(loop_verts.size()) <= static_cast<int>(adjacency.size()));
+
+        ++stats.loops;
+        if (static_cast<int>(loop_verts.size()) == 3) {
+            ++stats.loops_size_3;
+            bool cap_loop = true;
+            for (int vi : loop_verts) {
+                if (!on_cap_plane_x(out.vertices[static_cast<size_t>(vi)], cap, tol)) {
+                    cap_loop = false;
+                    break;
+                }
+            }
+            if (cap_loop)
+                ++stats.cap_loops_size_3;
+        }
+    }
+
+    return stats;
+}
+
+void log_bevel_stage(const char* stage, const BevelParams::OutputMesh& out, const CapExtents& cap)
+{
+    if (!bevel_diag_enabled())
+        return;
+    const BevelTopoStats stats = analyze_bevel_output(out, cap, 0.05);
+    std::fprintf(stderr,
+                 "[PCG_BEVEL_DIAG] stage=%s verts=%d tris=%d boundary=%d nonmanifold=%d "
+                 "cap_boundary=%d loops=%d loops3=%d cap_loops3=%d index_degen=%d\n",
+                 stage, stats.verts, stats.tris, stats.boundary, stats.nonmanifold,
+                 stats.cap_boundary, stats.loops, stats.loops_size_3, stats.cap_loops_size_3,
+                 stats.index_degenerate);
+}
+
+void diag_terminal_verts_after_vmesh(BevelParams& bp)
+{
+    if (!bevel_diag_enabled() || !bp.positions)
+        return;
+
+    const CapExtents cap = mesh_cap_extents(*bp.positions);
+    const double tol = 0.05;
+
+    for (BevVert& bv : bp.bevverts) {
+        if (bv.selcount != 1 || bv.edgecount < 3 || !bv.vmesh || !bv.vmesh->boundstart)
+            continue;
+
+        const Vec3 vco = (*bp.positions)[static_cast<size_t>(bv.v_idx)];
+        if (!on_cap_plane_x(vco, cap, tol))
+            continue;
+
+        BoundVert* bstart = bv.vmesh->boundstart;
+        BoundVert* ebev_bnd = nullptr;
+        BoundVert* walk = bstart;
+        do {
+            if (walk->ebev) {
+                ebev_bnd = walk;
+                break;
+            }
+            walk = walk->next;
+        } while (walk != bstart);
+
+        if (!ebev_bnd || !ebev_bnd->ebev)
+            continue;
+
+        EdgeHalf* ebev = ebev_bnd->ebev;
+        BoundVert* lv = ebev->leftv;
+        BoundVert* rv = ebev->rightv;
+        if (!lv || !rv)
+            continue;
+
+        const NewVert& p0 = bv.vmesh->at(lv->index, 0, 0);
+        const NewVert& pns = bv.vmesh->at(lv->index, 0, bp.seg);
+        const NewVert& pmid = bv.vmesh->at(lv->index, 0, bp.seg / 2);
+        const bool prof_collapsed =
+            length_squared(sub(p0.co, pns.co)) <= 1e-12;
+
+        std::fprintf(stderr,
+                     "[PCG_BEVEL_DIAG] terminal_vm v=%d vm_count=%d kind=%d "
+                     "lv=(%.4f,%.4f,%.4f) rv=(%.4f,%.4f,%.4f) profile0==profile_ns=%d "
+                     "pmid_valid=%d pmid=(%.4f,%.4f,%.4f) prof_start=(%.4f,%.4f,%.4f) prof_end=(%.4f,%.4f,%.4f) "
+                     "ebev_fprev=%d ebev_fnext=%d profile_idx=%d\n",
+                     bv.v_idx, bv.vmesh->count, static_cast<int>(bv.vmesh->mesh_kind),
+                     lv->nv.co.x, lv->nv.co.y, lv->nv.co.z,
+                     rv->nv.co.x, rv->nv.co.y, rv->nv.co.z,
+                     prof_collapsed ? 1 : 0,
+                     pmid.valid ? 1 : 0, pmid.co.x, pmid.co.y, pmid.co.z,
+                     ebev_bnd->profile.start.x, ebev_bnd->profile.start.y, ebev_bnd->profile.start.z,
+                     ebev_bnd->profile.end.x, ebev_bnd->profile.end.y, ebev_bnd->profile.end.z,
+                     ebev->fprev, ebev->fnext, ebev->profile_index);
     }
 }
 
@@ -2769,6 +3103,8 @@ void build_edge_polygons(BevelParams& bp, BevVert* bv1, BevVert* bv2, EdgeHalf* 
 /// membership uses polygon indices — never welded triangle indices.
 void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const WeldedMesh& welded)
 {
+    const CapExtents cap = mesh_cap_extents(welded.positions);
+    const double cap_tol = 0.05;
     auto find_edge_half = [&](BevVert* bv, int other_v) -> EdgeHalf* {
         if (!bv)
             return nullptr;
@@ -2801,6 +3137,14 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
         const std::vector<int>& loop = bface.verts;
         const geometry::Vec3 gn = geometry::face_normal_from_loop(bmesh, loop);
         const Vec3 face_normal = {gn.x, gn.y, gn.z};
+
+        bool is_cap_face = !loop.empty();
+        for (int vi : loop) {
+            if (!on_cap_plane_x(welded.positions[static_cast<size_t>(vi)], cap, cap_tol)) {
+                is_cap_face = false;
+                break;
+            }
+        }
 
         std::vector<Vec3> polygon;
         auto push_distinct = [&](const Vec3& p) {
@@ -2859,32 +3203,84 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
                 continue;
             }
 
-            BoundVert* v = vstart;
-            if (!on_profile_start)
-                push_distinct(v->nv.co);
+            BoundVert* ebev_bnd = nullptr;
+            if (is_cap_face && bv->selcount == 1 && bv->edgecount >= 3) {
+                BoundVert* walk = vm->boundstart;
+                do {
+                    if (walk->ebev) {
+                        ebev_bnd = walk;
+                        break;
+                    }
+                    walk = walk->next;
+                } while (walk != vm->boundstart);
+            }
 
-            int guard = 0;
-            while (v != vend && guard++ < vm->count + 2) {
-                if (go_ccw) {
-                    const int ring_index = v->index;
-                    const int kstart = on_profile_start ? edge->profile_index : 1;
-                    const int kend = (edge_prev->rightv == v && edge_prev->profile_index > 0) ?
-                                         edge_prev->profile_index :
-                                         vm->seg;
-                    on_profile_start = false;
-                    for (int k = kstart; k <= kend; ++k)
-                        push_distinct(vm->at(ring_index, 0, k).co);
-                    v = v->next;
+            const bool short_ccw = ebev_bnd && go_ccw && vstart != vend &&
+                                   vstart->next == vend && vstart != ebev_bnd;
+            const bool short_cw = ebev_bnd && !go_ccw && vstart != vend &&
+                                  vstart->prev == vend && vstart != ebev_bnd;
+
+            if (bevel_diag_enabled() && is_cap_face && bv->selcount == 1 && bv->edgecount >= 3) {
+                std::fprintf(stderr,
+                             "[PCG_BEVEL_DIAG] cap_corner fi=%d curr_v=%d go_ccw=%d "
+                             "edge(fprev=%d fnext=%d prof=%d) edge_prev(fprev=%d fnext=%d prof=%d) "
+                             "vstart_idx=%d vend_idx=%d short=%d polygon_before=%zu\n",
+                             fi, curr_v, go_ccw ? 1 : 0,
+                             edge->fprev, edge->fnext, edge->profile_index,
+                             edge_prev->fprev, edge_prev->fnext, edge_prev->profile_index,
+                             vstart->index, vend->index, (short_ccw || short_cw) ? 1 : 0,
+                             polygon.size());
+            }
+
+            if (short_ccw || short_cw) {
+                const int ri = ebev_bnd->index;
+                if (short_ccw) {
+                    for (int k = vm->seg; k >= 0; --k) {
+                        const NewVert& nv = vm->at(ri, 0, k);
+                        if (nv.valid)
+                            push_distinct(nv.co);
+                    }
                 } else {
-                    const int ring_index = v->prev ? v->prev->index : v->index;
-                    const int kstart = on_profile_start ? edge_prev->profile_index : (vm->seg - 1);
-                    const int kend = (v->prev && edge->rightv == v->prev && edge->profile_index > 0) ?
-                                         edge->profile_index :
-                                         0;
-                    on_profile_start = false;
-                    for (int k = kstart; k >= kend; --k)
-                        push_distinct(vm->at(ring_index, 0, k).co);
-                    v = v->prev;
+                    for (int k = 0; k <= vm->seg; ++k) {
+                        const NewVert& nv = vm->at(ri, 0, k);
+                        if (nv.valid)
+                            push_distinct(nv.co);
+                    }
+                }
+            } else {
+                BoundVert* v = vstart;
+                if (!on_profile_start)
+                    push_distinct(v->nv.co);
+
+                int guard = 0;
+                while (v != vend && guard++ < vm->count + 2) {
+                    if (go_ccw) {
+                        const int ring_index = v->index;
+                        const int kstart = on_profile_start ? edge->profile_index : 1;
+                        const int kend = (edge_prev->rightv == v && edge_prev->profile_index > 0) ?
+                                             edge_prev->profile_index :
+                                             vm->seg;
+                        on_profile_start = false;
+                        for (int k = kstart; k <= kend; ++k) {
+                            const NewVert& nv = vm->at(ring_index, 0, k);
+                            if (nv.valid)
+                                push_distinct(nv.co);
+                        }
+                        v = v->next;
+                    } else {
+                        const int ring_index = v->prev ? v->prev->index : v->index;
+                        const int kstart = on_profile_start ? edge_prev->profile_index : (vm->seg - 1);
+                        const int kend = (v->prev && edge->rightv == v->prev && edge->profile_index > 0) ?
+                                             edge->profile_index :
+                                             0;
+                        on_profile_start = false;
+                        for (int k = kstart; k >= kend; --k) {
+                            const NewVert& nv = vm->at(ring_index, 0, k);
+                            if (nv.valid)
+                                push_distinct(nv.co);
+                        }
+                        v = v->prev;
+                    }
                 }
             }
         }
@@ -3204,6 +3600,9 @@ data::PcgMeshData bevel_mesh_blender(
         build_vmesh(bp, &bv);
     }
 
+    const CapExtents diag_cap = mesh_cap_extents(welded.positions);
+    diag_terminal_verts_after_vmesh(bp);
+
     // 9. Build edge polygons (bevel strips) — each edge only once
     std::set<std::pair<int, int>> processed_edges;
     for (auto& bv : bp.bevverts) {
@@ -3235,11 +3634,18 @@ data::PcgMeshData bevel_mesh_blender(
         }
     }
 
+    log_bevel_stage("after_edge_strips", bp.output, diag_cap);
+
     // 11. Reconstruct original faces from BMesh n-gons (Blender bev_rebuild_polygon).
     // Winding follows original face normals via add_oriented_triangle — no mesh-center flip.
     if (bevel_cancel_requested(bp))
         return mesh;
     rebuild_faces_bmesh(bp, bmesh, welded);
+
+    // Fix opposite-winding edges between strip and face polygon triangles.
+    bp.output.fix_winding();
+
+    log_bevel_stage("after_face_rebuild", bp.output, diag_cap);
 
     // 12. Skip degenerate triangles (two identical vertices) and geometric duplicates
     //     (different vertex indices but same 3 positions — happens when VMesh inner
@@ -3256,14 +3662,20 @@ data::PcgMeshData bevel_mesh_blender(
 
         std::unordered_map<std::string, size_t> seen_geo;
 
+        const size_t tris_before_dedup = bp.output.triangles.size() / 3;
+        int skipped_index_degenerate = 0;
+        int replaced_geo = 0;
+
         for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
             if (bevel_cancel_requested(bp))
                 return mesh;
             int ia = bp.output.triangles[i];
             int ib = bp.output.triangles[i + 1];
             int ic = bp.output.triangles[i + 2];
-            if (ia == ib || ib == ic || ia == ic)
+            if (ia == ib || ib == ic || ia == ic) {
+                ++skipped_index_degenerate;
                 continue;
+            }
 
             // Geometric dedup: same 3 positions from VMesh + face rebuild.
             // Prefer the later triangle (rebuild / edge strip) so shared boundary
@@ -3278,6 +3690,7 @@ data::PcgMeshData bevel_mesh_blender(
             std::string geo_key = pk[0] + '|' + pk[1] + '|' + pk[2];
             auto it = seen_geo.find(geo_key);
             if (it != seen_geo.end()) {
+                ++replaced_geo;
                 const size_t old = it->second;
                 deduped[old] = ia;
                 deduped[old + 1] = ib;
@@ -3291,7 +3704,17 @@ data::PcgMeshData bevel_mesh_blender(
             deduped.push_back(ic);
         }
         bp.output.triangles = std::move(deduped);
+
+        if (bevel_diag_enabled()) {
+            std::fprintf(stderr,
+                         "[PCG_BEVEL_DIAG] dedup before_tris=%zu after_tris=%zu "
+                         "skipped_index=%d replaced_geo=%d\n",
+                         tris_before_dedup, bp.output.triangles.size() / 3,
+                         skipped_index_degenerate, replaced_geo);
+        }
     }
+
+    log_bevel_stage("after_dedup", bp.output, diag_cap);
 
     // 13. Convert output to PcgMeshData
     data::PcgMeshData result;

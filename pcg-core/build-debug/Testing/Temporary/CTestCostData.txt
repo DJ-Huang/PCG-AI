@@ -1,24 +1,24 @@
-test_tri_intersect 4 0.077837
-test_imesh 4 0.0842706
-test_arrangement 5 0.0724211
-test_boolean 9 0.0401363
-test_executor 4 0.151836
+test_tri_intersect 6 0.0445178
+test_imesh 6 0.0489961
+test_arrangement 7 0.048621
+test_boolean 11 0.0300932
+test_executor 6 0.0554136
 test_data 0 0
-test_phase41 4 0.089356
-test_phase42 4 0.101297
-test_phase43 3 0.258208
-test_phase44 4 0.112172
-test_cook_cache 4 0.0942405
-test_spawn_mesh_binary 4 0.0970738
-test_phase45_spline 4 0.110634
-test_phase46 1 0.286216
-test_bridge_bevel 6 0
-test_stone_arch_bridge 4 0.4698
-test_robust_predicates 4 0.080774
-test_bvh 4 0.0774953
-test_boolean_output 4 0.0882968
-test_boolean_binary 4 0.0885144
-test_boolean_graph 4 0.159629
-test_boolean_bevel_chain 4 0.0921339
+test_phase41 6 0.0543203
+test_phase42 6 0.0604801
+test_phase43 5 0.138629
+test_phase44 6 0.0645468
+test_cook_cache 6 0.0545919
+test_spawn_mesh_binary 6 0.0544375
+test_phase45_spline 6 0.0658573
+test_phase46 3 0.0959752
+test_bridge_bevel 7 2.46438
+test_stone_arch_bridge 6 0.32252
+test_robust_predicates 6 0.048349
+test_bvh 6 0.0461827
+test_boolean_output 6 0.0529963
+test_boolean_binary 6 0.0527792
+test_boolean_graph 6 0.10218
+test_boolean_bevel_chain 6 0.0565656
 ---
-test_bridge_bevel
+test_data
