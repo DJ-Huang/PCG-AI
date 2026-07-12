@@ -1,0 +1,71 @@
+## 1. High-Level Summary (TL;DR)
+*   **Impact:** High - This PR introduces a major feature update spanning both the C++ core engine and the Unity C# integration, significantly enhancing mesh generation capabilities and the developer experience.
+*   **Key Changes:**
+    *   ✨ **Boolean CSG Engine:** Added robust 3D mesh boolean operations (`subtract`, `union`, `intersect`, `shatter`) to the PCG core.
+    *   ✨ **Spline Input Support:** Upgraded the native C-API to `v7`, allowing Unity `LineRenderer` data to be passed natively into the graph as Splines.
+    *   ⚡ **Live Editor Execution:** Replaced the disk-based execution model with `PcgGraphExecutionBridge`, allowing the runtime to cook directly from the live unsaved Graph Editor document.
+    *   📈 **Performance & Caching:** Implemented node-level cache tracking and end-to-end performance logging (`PcgCookPerfLog`).
+
+## 2. Visual Overview (Code & Logic Map)
+
+```mermaid
+graph TD
+    subgraph Unity ["Unity C# Environment"]
+        Editor["PcgGraphEditorWindow"] -->|"Export Live Doc"| Bridge["PcgGraphExecutionBridge"]
+        Bridge -->|"Override Disk Asset"| Component["PcgGraphComponent"]
+        Component -->|"Extract LineRenderer"| SplineRes["PcgSplineResolver"]
+        Component -->|"Invoke API"| NativeAPI["PcgNative.ExecuteGraph()"]
+        SplineRes -->|"PcgSplineUpload"| NativeAPI
+        PerfLog["PcgCookPerfLog"]
+    end
+
+    subgraph Core ["PCG Core (C++)"]
+        API["pcg_execute_graph_v7()"]
+        Cache["GraphCookCache"]
+        Boolean["BooleanMeshElement"]
+        API -->|"Cook Request"| Cache
+        Cache -->|"Evaluate Node"| Boolean
+    end
+
+    NativeAPI -->|"JSON + PcgSplineSlot"| API
+    API -->|"NativeCookStats + Perf JSON"| PerfLog
+```
+
+## 3. Detailed Change Analysis
+
+### PCG Core Engine (`pcg-core`)
+*   **What Changed:** Introduced a complete constructive solid geometry (CSG) implementation and exposed it as a new `BooleanMeshElement` node. It uses a robust topology and cell-merging algorithm to partition and merge meshes. (Source: `boolean_elements.cpp`, `boolean_csg.cpp`).
+
+**Boolean Node Configuration Parameters**
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `operation` | String | `"subtract"` | The CSG mode: `"subtract"`, `"union"`, `"intersect"`, `"shatter"`. |
+| `treatAAs` | String | `"solid"` | Treatment mode for mesh A: `"solid"` or `"surface"`. |
+| `treatBAs` | String | `"solid"` | Treatment mode for mesh B: `"solid"` or `"surface"`. |
+| `detriangulate`| String | `"all"` | Post-processing triangulation: `"all"`, `"unchanged"`, `"none"`. |
+| `weldEpsilon` | Float | `0.0001` | Tolerance for merging close vertices. |
+
+### Unity Native Bridge (`PcgNative.cs` & `pcg_api.h`)
+*   **What Changed:** The P/Invoke bridge was version-bumped to handle a new payload type: Splines. This allows continuous paths from Unity to drive procedural generation.
+
+**API Additions & Changes**
+| API / Struct | Type | Description |
+|---|---|---|
+| `pcg_execute_graph_v7` | C-API | New graph execution entry point supporting `PcgSplineSlot` inputs alongside textures and meshes. |
+| `NativeSplineSlot` | Struct | Unmanaged struct holding `spline_count`, `spline_point_counts`, `positions`, and `closed` states. |
+| `PcgSplineUpload` | C# Class | Managed container collecting Unity `LineRenderer` data to pass to native memory. |
+| `NativeCookStats` | Struct | Returns metrics like `nodes_executed`, `nodes_skipped`, and phase timings. |
+
+### Unity Editor & Runtime (`PcgGraphExecutionBridge.cs` & `PcgSplineResolver.cs`)
+*   **What Changed:** 
+    *   **Live Cooking:** The `PcgGraphExecutionBridge` intercepts graph evaluation in the Editor. Instead of reading the saved `.pcg` file, it serializes the active state of `PcgGraphEditorWindow` (including unsaved nodes and previews).
+    *   **Spline Resolution:** `PcgSplineResolver` searches for bindings and extracts positions from Unity `LineRenderer` components, flattening them into a linear `float[]` array for native execution.
+    *   **Performance Metrics:** Added `PcgCookPerfLog` to format and print caching efficiency and bottleneck nodes to the Unity console.
+
+## 4. Impact & Risk Assessment
+*   **⚠️ Breaking Changes:** None strictly, but custom native integrations relying on `pcg_execute_graph_v6` should migrate to `v7` if spline support is needed. Existing graphs will continue to execute seamlessly.
+*   **🐛 Risk:** The `BooleanMeshElement` performs intensive computational geometry. Poorly formed or highly dense inputs could cause performance spikes or infinite loops if degenerate cases are not correctly caught by `boolean_csg.cpp`.
+*   **🧪 Testing Suggestions:**
+    *   Verify the CSG boolean operations by testing overlapping, co-planar, and non-manifold input meshes in the editor.
+    *   Test live-editing a graph that takes a Spline input (manipulate the `LineRenderer` in the scene and confirm the graph updates automatically without requiring a file save).
+    *   Review Unity Console output to ensure `PcgCookPerfLog` accurately tracks cache hits vs misses across consecutive identical cooks.
