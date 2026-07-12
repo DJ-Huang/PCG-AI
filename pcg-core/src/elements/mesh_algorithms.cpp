@@ -372,7 +372,7 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
     }
 
     data::PcgGeometry out_geom;
-    bevel::bevel_mesh_blender(
+    const data::PcgMeshData result_mesh = bevel::bevel_mesh_blender(
         mesh, amount, segments,
         bevel::BevelOffsetType(offset_type),
         clamp_overlap, angle_limit_deg, profile,
@@ -384,9 +384,15 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
         &geometry,
         &out_geom);
 
-    if (out_geom.points().empty())
-        return geometry;
-    return out_geom;
+    if (!out_geom.points().empty())
+        return out_geom;
+
+    // Fallback: fast paths (e.g. axis-aligned box) return PcgMeshData without
+    // populating out_geometry. Convert the mesh result back to geometry.
+    if (!result_mesh.vertices().empty())
+        return data::geometry_from_mesh(result_mesh);
+
+    return geometry;
 }
 
 data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
