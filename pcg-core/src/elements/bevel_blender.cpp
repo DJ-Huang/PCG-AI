@@ -3249,7 +3249,10 @@ data::PcgMeshData bevel_mesh_blender(
     Vec3 box_min{}, box_max{};
     if (std::abs(profile - 0.5f) < 1e-4f && hard_edges.size() == bmesh.edges.size() &&
         bmesh_is_axis_aligned_box(bmesh, box_min, box_max)) {
-        return build_axis_aligned_rounded_box(box_min, box_max, amount, segments);
+        data::PcgMeshData rounded = build_axis_aligned_rounded_box(box_min, box_max, amount, segments);
+        if (out_geometry)
+            *out_geometry = data::geometry_from_mesh(rounded);
+        return rounded;
     }
 
     Vec3 mesh_center{0.0, 0.0, 0.0};
