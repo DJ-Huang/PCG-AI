@@ -143,7 +143,7 @@
       "id": "body_bevel",
       "type": "BevelMesh",
       "position": { "x": 211, "y": 487 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.06, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "profile_corner", "__nodeTitle": ""}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.06, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
     },
     {
       "id": "body_path",

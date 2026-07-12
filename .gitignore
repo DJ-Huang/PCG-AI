@@ -43,6 +43,7 @@ Unity/Assets/PcgPlugin/Runtime/PcgParameterApplicator.cs
 Unity/Assets/PcgPlugin/Runtime/PcgParameterApplicator.cs.meta
 Unity/Assets/PcgPlugin/Runtime/PcgRuntimeRunner.cs
 pcg-core/.deps/
+pcg-core/build-debug/
 pcg-core/build-manual/
 pcg-core/build/
 schema/graph-schema.json
@@ -50,3 +51,4 @@ web/pcg-editor/dist/
 web/pcg-editor/node_modules/
 # <<< Codely setup.bat >>>
 .codely-cli/
+*.DS_Store

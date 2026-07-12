@@ -51,7 +51,7 @@ namespace DJTechEditor.PCG.Graph
         }
 
         private static OthersDisplayMode s_OthersDisplay = OthersDisplayMode.ShowAll;
-        private static readonly HashSet<Renderer> s_HiddenRenderers = new();
+        private static readonly Dictionary<Renderer, bool> s_HiddenRenderers = new();
 
         // --- Procedurally generated toolbar icons ---
         private static Texture2D IconObjectNormal => s_IconObjectNormal ??= MakeIcon(new(0.7f, 0.7f, 0.7f), DrawObjectIcon);
@@ -347,17 +347,17 @@ namespace DJTechEditor.PCG.Graph
                     continue;
 
                 // In Isolate mode also hide the PCG object's siblings under the same parent
-                s_HiddenRenderers.Add(renderer);
+                s_HiddenRenderers[renderer] = renderer.enabled;
                 renderer.enabled = false;
             }
         }
 
         private static void RestoreHiddenRenderers()
         {
-            foreach (var renderer in s_HiddenRenderers)
+            foreach (var (renderer, originalEnabled) in s_HiddenRenderers)
             {
                 if (renderer != null)
-                    renderer.enabled = true;
+                    renderer.enabled = originalEnabled;
             }
             s_HiddenRenderers.Clear();
         }
@@ -388,7 +388,7 @@ namespace DJTechEditor.PCG.Graph
             if (mode == "catmullRom")
             {
                 var previewTangents = PcgSplineControlPoints.GetTangents(points, nodeData, closed);
-                var preview = SampleCatmullRom(points, previewTangents, sceneOffset, anchor, closed, ReadInt(nodeData, "subdivisions", 8));
+                var preview = SampleHermiteSpline(points, previewTangents, sceneOffset, anchor, closed, ReadInt(nodeData, "subdivisions", 8));
                 if (preview.Count >= 2)
                 {
                     Handles.color = s_CurvePreviewColor;
@@ -650,7 +650,8 @@ namespace DJTechEditor.PCG.Graph
         private static void DeleteTangentsAtIndices(
             PcgManifestNodeView node,
             PcgNodeData nodeData,
-            List<int> sortedIndices)
+            List<int> sortedIndices,
+            int pointCountAfterDeletion)
         {
             if (!PcgSplineControlPoints.HasExplicitTangents(nodeData))
                 return;
@@ -658,6 +659,9 @@ namespace DJTechEditor.PCG.Graph
             var tangents = PcgSplineControlPoints.ParseTangents(
                 nodeData.GetRaw("tangents")?.ToString() ?? "[]");
             if (tangents.Count == 0)
+                return;
+
+            if (tangents.Count != pointCountAfterDeletion + sortedIndices.Count)
                 return;
 
             foreach (var idx in sortedIndices)
@@ -1106,7 +1110,7 @@ namespace DJTechEditor.PCG.Graph
                 foreach (var idx in sorted)
                     points.RemoveAt(idx);
                 WritePointsToNode(node, points, usesExplicit);
-                DeleteTangentsAtIndices(node, nodeData, sorted);
+                DeleteTangentsAtIndices(node, nodeData, sorted, points.Count);
             });
 
             SetSelectedPointIndices(node.NodeId, new HashSet<int>());
@@ -1237,7 +1241,7 @@ namespace DJTechEditor.PCG.Graph
             return lateral.sqrMagnitude < 4f;
         }
 
-        private static List<Vector3> SampleCatmullRom(
+        private static List<Vector3> SampleHermiteSpline(
             IReadOnlyList<Vector3> localPoints,
             IReadOnlyList<Vector3> tangents,
             Vector3 sceneOffset,

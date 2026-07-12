@@ -1,1 +1,0 @@
-/usr/bin/c++ -fsanitize=address -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/test_bridge_bevel.dir/tests/test_bridge_bevel.cpp.o -o test_bridge_bevel  libPcgCore.a
