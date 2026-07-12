@@ -532,12 +532,13 @@ namespace DJTechRuntime.PCG
             {
                 case PcgResultKind.Mesh:
                 {
-                    // Feed group stats JSON to visualizer (if present)
+                    // Feed group stats JSON to visualizer
                     if (!string.IsNullOrEmpty(result.Json))
                     {
                         var gv = GetComponent<PcgGroupVisualizer>();
-                        if (gv != null)
-                            gv.SetResultJson(result.Json);
+                        if (gv == null)
+                            gv = gameObject.AddComponent<PcgGroupVisualizer>();
+                        gv.SetResultJson(result.Json);
                     }
 
                     var binHash = ComputeBinaryHash(result.MeshBinary);

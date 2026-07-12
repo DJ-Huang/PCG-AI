@@ -24,6 +24,9 @@ namespace DJTechRuntime.PCG
 
         public bool IsHighlighting => m_ShowHighlight && !string.IsNullOrEmpty(m_HighlightedGroupName);
 
+        /// <summary>Cached result JSON from the last graph execution.</summary>
+        public string ResultJson => m_LastResultJson;
+
         /// <summary>Called after graph execution to cache the result JSON for group lookup.</summary>
         public void SetResultJson(string json)
         {

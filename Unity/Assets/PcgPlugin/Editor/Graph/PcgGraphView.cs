@@ -73,6 +73,7 @@ namespace DJTechEditor.PCG.Graph
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
 
         private static readonly SceneEditDomain[] s_SplineDomains = { SceneEditDomain.SplineControlPoint };
+        private static readonly SceneEditDomain[] s_GroupDomains = { SceneEditDomain.Vertex, SceneEditDomain.Edge, SceneEditDomain.Face };
 
         private PcgSceneEditContext m_SceneEditContext = PcgSceneEditContext.ObjectMode;
 
@@ -371,13 +372,37 @@ namespace DJTechEditor.PCG.Graph
         private void UpdateSceneEditContext()
         {
             var selected = selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
-            if (selected is PcgManifestNodeView manifestNode && manifestNode.NodeType == "CreateSpline")
+            if (selected is PcgManifestNodeView manifestNode)
             {
-                m_SceneEditContext = new PcgSceneEditContext(
-                    SceneEditLevel.Component,
-                    SceneEditDomain.SplineControlPoint,
-                    selected.NodeId,
-                    s_SplineDomains);
+                if (manifestNode.NodeType == "CreateSpline")
+                {
+                    m_SceneEditContext = new PcgSceneEditContext(
+                        SceneEditLevel.Component,
+                        SceneEditDomain.SplineControlPoint,
+                        selected.NodeId,
+                        s_SplineDomains);
+                }
+                else if (manifestNode.NodeType == "GroupCreate" || manifestNode.NodeType == "GroupCombine")
+                {
+                    var nodeData = manifestNode.CollectData();
+                    var domainStr = nodeData?.GetRaw("domain")?.ToString() ?? "edge";
+                    var defaultDomain = domainStr switch
+                    {
+                        "edge" => SceneEditDomain.Edge,
+                        "face" => SceneEditDomain.Face,
+                        "point" => SceneEditDomain.Vertex,
+                        _ => SceneEditDomain.Edge,
+                    };
+                    m_SceneEditContext = new PcgSceneEditContext(
+                        SceneEditLevel.Component,
+                        defaultDomain,
+                        selected.NodeId,
+                        s_GroupDomains);
+                }
+                else
+                {
+                    m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+                }
             }
             else
             {
