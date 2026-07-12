@@ -99,6 +99,18 @@ namespace DJTechEditor.PCG.Graph
             if (propRows.Count > 0)
                 Add(MakeSection($"Properties ({propRows.Count})", propRows));
 
+            // Geometry stats (Houdini-style)
+            if (m_GraphView != null && m_GraphView.TryGetNodeMeshStats(node.NodeId, out var stats))
+            {
+                var geoRows = new List<(string, string)>
+                {
+                    ("Points", stats.pointCount.ToString("N0")),
+                    ("Faces", stats.faceCount.ToString("N0")),
+                    ("Triangles", stats.triangleCount.ToString("N0")),
+                };
+                Add(MakeSection("Geometry", geoRows));
+            }
+
             // Pins
             var pinRows = new List<(string, string)>();
             foreach (var pin in def.inputs)

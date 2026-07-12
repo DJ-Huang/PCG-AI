@@ -188,6 +188,53 @@ void gather_inputs(const Graph& graph,
     code = PCG_OK;
 }
 
+/// Collect per-node mesh statistics (Houdini-style geometry info).
+/// Returns a JSON array: [{"node_id", "node_type", "point_count", "face_count", "triangle_count"}, ...]
+nlohmann::json build_node_stats(
+    const NodeOutputMap& outputs,
+    const std::unordered_map<std::string, const GraphNode*>& node_by_id)
+{
+    auto stats = nlohmann::json::array();
+    for (const auto& [node_id, collection] : outputs) {
+        const auto it = node_by_id.find(node_id);
+        const std::string node_type = it != node_by_id.end() ? it->second->type : "";
+
+        int point_count = 0;
+        int face_count = 0;
+        int triangle_count = 0;
+
+        if (const auto* geom = collection.primary_geometry()) {
+            point_count = static_cast<int>(geom->points().size());
+            face_count = static_cast<int>(geom->faces().size());
+            for (const auto& face : geom->faces()) {
+                if (face.size() >= 3)
+                    triangle_count += static_cast<int>(face.size()) - 2;
+            }
+        } else if (const auto* mesh = collection.primary_mesh()) {
+            point_count = static_cast<int>(mesh->vertices().size());
+            triangle_count = static_cast<int>(mesh->triangles().size()) / 3;
+        } else if (const auto pts = collection.find_points_shared("out")) {
+            point_count = static_cast<int>(pts->points().size());
+        } else {
+            for (const auto& item : collection.items()) {
+                if (item.points) {
+                    point_count = static_cast<int>(item.points->points().size());
+                    break;
+                }
+            }
+        }
+
+        stats.push_back({
+            {"node_id", node_id},
+            {"node_type", node_type},
+            {"point_count", point_count},
+            {"face_count", face_count},
+            {"triangle_count", triangle_count},
+        });
+    }
+    return stats;
+}
+
 } // namespace
 
 PcgResultCode execute_graph(const Graph& graph,
@@ -306,6 +353,8 @@ PcgResultCode execute_graph(const Graph& graph,
         }
     }
 
+    auto node_stats = build_node_stats(outputs, node_by_id);
+
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
     for (const auto& node : graph.nodes) {
@@ -354,6 +403,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.point_sidecar = out_item->payload;
         out_result.json = nlohmann::json::object();
         out_result.mesh = data::PcgMeshData{};
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -362,6 +412,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Json;
         out_result.json = primary;
         out_result.mesh = data::PcgMeshData{};
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -369,6 +420,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = data::triangulate_geometry_shared(*geometry);
         out_result.json = build_group_stats(*geometry);
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -376,6 +428,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = data::triangulate_geometry_shared(*geometry);
         out_result.json = build_group_stats(*geometry);
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -383,6 +436,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -390,12 +444,14 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
     out_result.kind = GraphResultKind::Json;
     out_result.json = sink_output.primary_json();
     out_result.mesh = data::PcgMeshData{};
+    out_result.json["node_stats"] = node_stats;
     return PCG_OK;
 }
 

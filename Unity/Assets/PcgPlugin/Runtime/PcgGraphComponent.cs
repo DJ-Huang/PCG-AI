@@ -135,6 +135,9 @@ namespace DJTechRuntime.PCG
 
         /// <summary>Invoked after a preview cook applies results (SceneView repaint).</summary>
         public static System.Action EditorAfterPreviewCookApplied;
+
+        /// <summary>Last cook result JSON (contains groups + node_stats). Read by Graph Editor info panel.</summary>
+        public static string LastCookResultJson;
 #endif
 
 #if UNITY_EDITOR
@@ -527,6 +530,10 @@ namespace DJTechRuntime.PCG
         private bool ApplyExecutionResult(PcgGraphExecuteResult result)
         {
             var kind = PcgResultParser.DetectKind(result);
+
+#if UNITY_EDITOR
+            LastCookResultJson = result.Json;
+#endif
 
             switch (kind)
             {

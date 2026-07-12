@@ -49,7 +49,6 @@
         "mode": "angle",
         "minEdgeAngle": 30,
         "includeUnshared": false,
-        "fromFaceGroup": "cap_start,cap_end",
         "fromEdgeGroup": ""
       }
     },
@@ -121,7 +120,6 @@
         "mode": "angle",
         "minEdgeAngle": 30,
         "includeUnshared": false,
-        "fromFaceGroup": "cap_start,cap_end",
         "fromEdgeGroup": ""
       }
     },
