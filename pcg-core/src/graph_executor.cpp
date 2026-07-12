@@ -25,8 +25,20 @@ PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const ch
 
 /// Builds lightweight group statistics JSON for execution results.
 /// Output format: {"groups": [{"name": "side", "domain": "face", "count": 24, "members": [0,1,2,...]}, ...]}
+/// Face group members are remapped from geometry face indices to mesh triangle indices
+/// (fan-triangulation: an N-gon face at tri offset T produces triangles T..T+N-3).
 nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
 {
+    // Build face-index → first-mesh-triangle mapping
+    std::vector<int> face_to_tri;
+    face_to_tri.reserve(geometry.faces().size());
+    int tri_offset = 0;
+    for (const auto& face : geometry.faces()) {
+        face_to_tri.push_back(tri_offset);
+        if (face.size() >= 3)
+            tri_offset += static_cast<int>(face.size()) - 2;
+    }
+
     auto groups = nlohmann::json::array();
     static const char* kDomainNames[] = {"point", "edge", "face"};
     for (int d = 0; d < 3; ++d) {
@@ -34,12 +46,25 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
             auto memberArray = nlohmann::json::array();
-            for (int id : members)
-                memberArray.push_back(id);
+            for (int id : members) {
+                if (d == static_cast<int>(geometry::GroupDomain::Face)) {
+                    // Expand face index into constituent mesh triangles
+                    if (id >= 0 && id < static_cast<int>(face_to_tri.size())) {
+                        const auto& face = geometry.faces()[static_cast<size_t>(id)];
+                        const int first_tri = face_to_tri[static_cast<size_t>(id)];
+                        const int tri_count = face.size() >= 3
+                            ? static_cast<int>(face.size()) - 2 : 0;
+                        for (int t = 0; t < tri_count; ++t)
+                            memberArray.push_back(first_tri + t);
+                    }
+                } else {
+                    memberArray.push_back(id);
+                }
+            }
             groups.push_back({
                 {"name", name},
                 {"domain", kDomainNames[d]},
-                {"count", static_cast<int>(members.size())},
+                {"count", static_cast<int>(memberArray.size())},
                 {"members", std::move(memberArray)},
             });
         }
