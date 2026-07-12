@@ -484,6 +484,16 @@ struct BevelParams {
     bool (*is_cancel_requested)() = nullptr;
 };
 
+// ── Cap Extents (shared by production and diagnostic code) ──────────────────
+
+struct CapExtents {
+    double x0 = 0.0;
+    double x1 = 0.0;
+};
+
+CapExtents mesh_cap_extents(const std::vector<Vec3>& positions);
+bool on_cap_plane_x(const Vec3& p, const CapExtents& cap, double tol);
+
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /// Main bevel function — completely aligned with Blender's BM_mesh_bevel pipeline.
