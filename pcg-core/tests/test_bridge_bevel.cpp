@@ -340,7 +340,7 @@ std::string build_parametric_sedan(bool cap_start, bool cap_end, int segments,
             "minEdgeAngle": 30,
             "includeUnshared": false,
             "fromFaceGroup": "",
-            "fromEdgeGroup": "profile_corner"
+            "fromEdgeGroup": ""
           }
         },
         {
@@ -534,7 +534,7 @@ int main()
             "minEdgeAngle": 30,
             "includeUnshared": false,
             "fromFaceGroup": "",
-            "fromEdgeGroup": "profile_corner"
+            "fromEdgeGroup": ""
           }
         },
         {

@@ -109,8 +109,6 @@ public:
         edge_selection.edge_group = ctx.node->data.value("edgeGroup", std::string(""));
         edge_selection.exclude_unshared = ctx.node->data.value("excludeUnshared", true);
         edge_selection.exclude_groups = parse_name_list(ctx.node->data, "excludeGroups");
-        if (edge_selection.exclude_groups.empty())
-            edge_selection.exclude_groups = {"cap_start", "cap_end"};
 
         emit_geometry(ctx, bevel_geometry(geometry, amount, segments, method, offset_type, clamp_overlap,
                                         angle_limit, profile, miter_outer, miter_inner, vmesh_method,

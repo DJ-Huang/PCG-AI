@@ -481,12 +481,6 @@ data::PcgGeometry sweep_curve_profile_geometry(const CurveProfile& profile,
             const int b1 = rings[fi + 1][nj];
             geometry.faces_mut().push_back({a0, b0, b1, a1});
             geometry.groups().add(geometry::GroupDomain::Face, "side", side_face_index++);
-
-            const int64_t seam_key = sweep_edge_key(a0, b0);
-            const int64_t corner_key = sweep_edge_key(a0, a1);
-            geometry.groups().add(geometry::GroupDomain::Edge, "seam", static_cast<int>(seam_key));
-            geometry.groups().add(geometry::GroupDomain::Edge, "profile_corner",
-                                  static_cast<int>(corner_key));
         }
     }
 
