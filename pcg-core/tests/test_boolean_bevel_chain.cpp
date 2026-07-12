@@ -40,10 +40,10 @@ void test_boolean_then_bevel()
     // Bevel the result
     auto bevel_result = bevel_geometry(bool_result, 0.1, 1);
 
-    if (bevel_result.vertices().empty())
+    if (bevel_result.points().empty())
         fail("Bevel: result should not be empty");
-    if (bevel_result.triangles().empty())
-        fail("Bevel: result should have triangles");
+    if (bevel_result.faces().empty())
+        fail("Bevel: result should have faces");
 }
 
 void test_ab_seams_as_bevel_group()
@@ -79,7 +79,7 @@ void test_ab_seams_as_bevel_group()
                                         BevelVMeshMethod::Adj,
                                         nullptr, edge_sel);
 
-    if (bevel_result.vertices().empty())
+    if (bevel_result.points().empty())
         fail("Bevel with ab_seams: result should not be empty");
 }
 

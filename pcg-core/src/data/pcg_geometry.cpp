@@ -30,6 +30,21 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
     return mesh;
 }
 
+PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry)
+{
+    PcgMeshData mesh;
+    for (const auto& p : geometry.points())
+        mesh.add_vertex({p.x, p.y, p.z});
+    for (const auto& face : geometry.faces()) {
+        if (face.size() < 3)
+            continue;
+        const int i0 = face[0];
+        for (size_t i = 1; i + 1 < face.size(); ++i)
+            mesh.add_triangle(i0, face[i], face[i + 1]);
+    }
+    return mesh;
+}
+
 PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
 {
     const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh);

@@ -342,14 +342,14 @@ PcgResultCode execute_graph(const Graph& graph,
 
     if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
         out_result.kind = GraphResultKind::Mesh;
-        out_result.mesh = data::triangulate_geometry(*geometry);
+        out_result.mesh = data::triangulate_geometry_shared(*geometry);
         out_result.json = build_group_stats(*geometry);
         return PCG_OK;
     }
 
     if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
         out_result.kind = GraphResultKind::Mesh;
-        out_result.mesh = data::triangulate_geometry(*geometry);
+        out_result.mesh = data::triangulate_geometry_shared(*geometry);
         out_result.json = build_group_stats(*geometry);
         return PCG_OK;
     }

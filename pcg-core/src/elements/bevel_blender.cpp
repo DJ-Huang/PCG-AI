@@ -3091,8 +3091,11 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
         if (polygon.size() >= 3 && length_squared(sub(polygon.front(), polygon.back())) < 1e-18)
             polygon.pop_back();
 
-        if (polygon.size() >= 3)
+        if (polygon.size() >= 3) {
+            bp.output.current_face_origin = fi;
             bp.output.add_oriented_polygon(polygon, face_normal);
+            bp.output.current_face_origin = -1;
+        }
     }
 }
 
@@ -3198,7 +3201,8 @@ data::PcgMeshData bevel_mesh_blender(
     BevelVMeshMethod vmesh_method,
     bool (*is_cancel_requested)(),
     const BevelEdgeSelection& edge_selection,
-    const data::PcgGeometry* geometry)
+    const data::PcgGeometry* geometry,
+    data::PcgGeometry* out_geometry)
 {
     amount = std::max(amount, 0.0);
     segments = std::clamp(segments, 1, 8);
@@ -3456,6 +3460,8 @@ data::PcgMeshData bevel_mesh_blender(
     {
         std::vector<int> deduped;
         deduped.reserve(bp.output.triangles.size());
+        std::vector<int> deduped_origins;
+        deduped_origins.reserve(bp.output.face_origins.size());
 
         // Build position keys for geometric dedup
         auto pos_key = [](const Vec3& v) -> std::string {
@@ -3480,9 +3486,6 @@ data::PcgMeshData bevel_mesh_blender(
                 continue;
             }
 
-            // Geometric dedup: same 3 positions from VMesh + face rebuild.
-            // Prefer the later triangle (rebuild / edge strip) so shared boundary
-            // winding matches F_RECON rather than an earlier flipped VMesh cap.
             const auto& va = bp.output.vertices[static_cast<size_t>(ia)];
             const auto& vb = bp.output.vertices[static_cast<size_t>(ib)];
             const auto& vc = bp.output.vertices[static_cast<size_t>(ic)];
@@ -3498,6 +3501,8 @@ data::PcgMeshData bevel_mesh_blender(
                 deduped[old] = ia;
                 deduped[old + 1] = ib;
                 deduped[old + 2] = ic;
+                deduped_origins[old / 3] = (i / 3 < bp.output.face_origins.size())
+                    ? bp.output.face_origins[i / 3] : -1;
                 continue;
             }
             seen_geo.emplace(geo_key, deduped.size());
@@ -3505,8 +3510,11 @@ data::PcgMeshData bevel_mesh_blender(
             deduped.push_back(ia);
             deduped.push_back(ib);
             deduped.push_back(ic);
+            deduped_origins.push_back((i / 3 < bp.output.face_origins.size())
+                ? bp.output.face_origins[i / 3] : -1);
         }
         bp.output.triangles = std::move(deduped);
+        bp.output.face_origins = std::move(deduped_origins);
 
         if (bevel_diag_enabled()) {
             std::fprintf(stderr,
@@ -3519,7 +3527,29 @@ data::PcgMeshData bevel_mesh_blender(
 
     log_bevel_stage("after_dedup", bp.output, diag_cap);
 
-    // 13. Convert output to PcgMeshData
+    // 13. Build output PcgGeometry with propagated face groups (if requested)
+    if (out_geometry && geometry) {
+        data::PcgGeometry& geom = *out_geometry;
+        for (const auto& v : bp.output.vertices)
+            geom.points_mut().push_back({v.x, v.y, v.z});
+
+        const size_t ntri = bp.output.triangles.size() / 3;
+        for (size_t t = 0; t < ntri; ++t) {
+            const int i0 = bp.output.triangles[t * 3];
+            const int i1 = bp.output.triangles[t * 3 + 1];
+            const int i2 = bp.output.triangles[t * 3 + 2];
+            geom.faces_mut().push_back({i0, i1, i2});
+
+            const int origin = (t < bp.output.face_origins.size())
+                ? bp.output.face_origins[t] : -1;
+            if (origin >= 0 && origin < static_cast<int>(bmesh.faces.size())) {
+                for (const std::string& g : bmesh.faces[static_cast<size_t>(origin)].groups)
+                    geom.groups().add(geometry::GroupDomain::Face, g, static_cast<int>(t));
+            }
+        }
+    }
+
+    // 14. Convert output to PcgMeshData
     data::PcgMeshData result;
     for (const auto& v : bp.output.vertices) {
         result.add_vertex({v.x, v.y, v.z});

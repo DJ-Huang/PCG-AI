@@ -41,6 +41,9 @@ private:
 /// Fan-triangulate n-gon faces for display / legacy mesh nodes.
 PcgMeshData triangulate_geometry(const PcgGeometry& geometry);
 
+/// Triangulate with shared vertices (preserves topology for manifold checks).
+PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry);
+
 /// Rebuild polygon topology from triangle soup (weld + coplanar merge via BMesh).
 PcgGeometry geometry_from_mesh(const PcgMeshData& mesh);
 

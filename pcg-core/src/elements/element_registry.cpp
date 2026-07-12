@@ -121,6 +121,11 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (auto geometry = ctx.inputs.find_geometry_shared("in")) {
+            ctx.outputs.add_geometry_shared("out", geometry);
+            return PCG_OK;
+        }
+
         if (auto mesh = ctx.inputs.find_mesh_shared("in")) {
             ctx.outputs.add_mesh_shared("out", mesh);
             if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
