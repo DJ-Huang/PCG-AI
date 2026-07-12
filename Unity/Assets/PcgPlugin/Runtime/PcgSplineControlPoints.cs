@@ -89,6 +89,64 @@ namespace DJTechRuntime.PCG
             data.SetRaw("controlPoints", Serialize(points));
         }
 
+        // --- Tangents ---
+
+        public static List<Vector3> ParseTangents(string raw)
+        {
+            return Parse(raw);
+        }
+
+        public static string SerializeTangents(IReadOnlyList<Vector3> tangents)
+        {
+            return Serialize(tangents);
+        }
+
+        public static bool HasExplicitTangents(PcgNodeData data)
+        {
+            return ParseTangents(data?.GetRaw("tangents")?.ToString()).Count > 0;
+        }
+
+        /// <summary>
+        /// Returns explicit tangents if stored, otherwise computes Catmull-Rom tangents
+        /// from the control points. Each tangent is the direction the curve passes
+        /// through that point (not normalised).
+        /// </summary>
+        public static List<Vector3> GetTangents(
+            IReadOnlyList<Vector3> controlPoints,
+            PcgNodeData data,
+            bool closed)
+        {
+            var stored = ParseTangents(data?.GetRaw("tangents")?.ToString());
+            if (stored.Count == controlPoints.Count)
+                return stored;
+
+            return ComputeCatmullRomTangents(controlPoints, closed);
+        }
+
+        /// <summary>Standard Catmull-Rom tangent: 0.5 * (next - prev).</summary>
+        public static List<Vector3> ComputeCatmullRomTangents(
+            IReadOnlyList<Vector3> points,
+            bool closed)
+        {
+            var tangents = new List<Vector3>(points.Count);
+            var count = points.Count;
+            if (count == 0)
+                return tangents;
+
+            for (var i = 0; i < count; i++)
+            {
+                var prev = closed
+                    ? points[(i - 1 + count) % count]
+                    : points[Mathf.Max(0, i - 1)];
+                var next = closed
+                    ? points[(i + 1) % count]
+                    : points[Mathf.Min(count - 1, i + 1)];
+                tangents.Add((next - prev) * 0.5f);
+            }
+
+            return tangents;
+        }
+
         public static void WriteStartEnd(PcgNodeData data, Vector3 start, Vector3 end)
         {
             if (data == null)

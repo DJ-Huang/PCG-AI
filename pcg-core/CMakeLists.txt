@@ -45,6 +45,7 @@ set(PCG_CORE_SOURCES
     src/elements/geometry_algorithms.cpp
     src/elements/geometry_elements.cpp
     src/elements/bevel_blender.cpp
+    src/elements/bevel_diag.cpp
     src/geometry/bmesh.cpp
     src/geometry/group_table.cpp
     src/geometry/spline_geometry.cpp

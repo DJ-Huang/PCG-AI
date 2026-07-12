@@ -1,0 +1,3 @@
+[submodule "pcg-core/third_party/CDT"]
+	path = pcg-core/third_party/CDT
+	url = https://github.com/artem-ogre/CDT.git

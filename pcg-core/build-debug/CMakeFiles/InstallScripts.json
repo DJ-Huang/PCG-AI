@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/djhuang/PCG-AI/pcg-core/build-debug/cmake_install.cmake",
-		"/Users/djhuang/PCG-AI/pcg-core/build-debug/_deps/json-build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

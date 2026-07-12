@@ -1,1 +1,0 @@
-/usr/bin/c++ -fsanitize=address -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -fsanitize=address CMakeFiles/test_boolean_output.dir/tests/test_boolean_output.cpp.o -o test_boolean_output  libPcgCore.a

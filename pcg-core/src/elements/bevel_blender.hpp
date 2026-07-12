@@ -186,6 +186,8 @@ void set_profile_spacing(int seg, float super_r, ProfileSpacing& pro_spacing);
 
 struct NewVert {
     Vec3 co{};
+    /// Set when this VMesh slot has a real profile point (Blender mesh_vert->v != nullptr).
+    bool valid = false;
 };
 
 struct EdgeHalf;
@@ -354,7 +356,10 @@ struct BevelParams {
         void add_oriented_polygon(const std::vector<Vec3>& poly, const Vec3& desired_normal) {
             if (poly.size() < 3)
                 return;
-            Vec3 n = cross(sub(poly[1], poly[0]), sub(poly[2], poly[0]));
+            // Sum all fan-triangle normals for a numerically stable polygon normal.
+            Vec3 n{};
+            for (size_t i = 1; i + 1 < poly.size(); ++i)
+                n = add(n, cross(sub(poly[i], poly[0]), sub(poly[i + 1], poly[0])));
             const bool flip = dot(n, desired_normal) < 0.0;
             const int i0 = get_vertex(poly[0]);
             for (size_t i = 1; i + 1 < poly.size(); ++i) {
@@ -387,9 +392,107 @@ struct BevelParams {
                 add_triangle(i0, i2, i3);
             }
         }
+
+        /// Fix opposite-winding manifold edges by flipping triangles so that
+        /// every manifold edge has opposite winding directions on its two faces.
+        /// Uses BFS propagation from a seed triangle, flipping to match neighbors.
+        void fix_winding() {
+            const size_t ntri = triangles.size() / 3;
+            if (ntri == 0) return;
+
+            auto edge_key = [](int a, int b) -> uint64_t {
+                const int lo = std::min(a, b);
+                const int hi = std::max(a, b);
+                return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
+                       static_cast<uint32_t>(hi);
+            };
+
+            // Build edge -> list of (tri_idx, direction) where direction=true means a<b
+            std::unordered_map<uint64_t, std::vector<std::pair<int, bool>>> edge_owners;
+            for (size_t i = 0; i + 2 < triangles.size(); i += 3) {
+                const int t[3] = {triangles[i], triangles[i + 1], triangles[i + 2]};
+                for (int e = 0; e < 3; ++e) {
+                    const int a = t[e];
+                    const int b = t[(e + 1) % 3];
+                    edge_owners[edge_key(a, b)].push_back({static_cast<int>(i / 3), a < b});
+                }
+            }
+
+            // BFS: flip triangles so that adjacent triangles on shared edges
+            // have opposite directions.
+            std::vector<bool> visited(ntri, false);
+            std::vector<bool> need_flip(ntri, false);
+
+            for (size_t seed = 0; seed < ntri; ++seed) {
+                if (visited[seed]) continue;
+                visited[seed] = true;
+                need_flip[seed] = false;
+                std::vector<int> queue = {static_cast<int>(seed)};
+                size_t head = 0;
+                while (head < queue.size()) {
+                    int cur = queue[head++];
+                    const int base = cur * 3;
+                    const int t[3] = {triangles[base], triangles[base + 1], triangles[base + 2]};
+                    for (int e = 0; e < 3; ++e) {
+                        const int a = t[e];
+                        const int b = t[(e + 1) % 3];
+                        const uint64_t key = edge_key(a, b);
+                        auto it = edge_owners.find(key);
+                        if (it == edge_owners.end()) continue;
+                        for (const auto& [neighbor, neighbor_dir] : it->second) {
+                            if (neighbor == cur || visited[neighbor]) continue;
+                            visited[neighbor] = true;
+                            // Current triangle has direction (a < b) on this edge.
+                            // For consistent winding, neighbor must have opposite direction.
+                            const bool cur_dir = (a < b);
+                            // If neighbor_dir == cur_dir, neighbor needs flip to make them opposite.
+                            // But if current was already flipped, invert the logic.
+                            const bool cur_effective_dir = cur_dir ^ need_flip[cur];
+                            need_flip[neighbor] = (neighbor_dir == cur_effective_dir);
+                            queue.push_back(neighbor);
+                        }
+                    }
+                }
+            }
+
+            // Apply flips
+            for (size_t i = 0; i < ntri; ++i) {
+                if (need_flip[i]) {
+                    const int base = static_cast<int>(i) * 3;
+                    std::swap(triangles[base + 1], triangles[base + 2]);
+                }
+            }
+
+            // Check signed volume to ensure overall outward orientation.
+            // If negative, flip all triangles.
+            double vol = 0.0;
+            for (size_t i = 0; i + 2 < triangles.size(); i += 3) {
+                const auto& a = vertices[static_cast<size_t>(triangles[i])];
+                const auto& b = vertices[static_cast<size_t>(triangles[i + 1])];
+                const auto& c = vertices[static_cast<size_t>(triangles[i + 2])];
+                vol += a.x * (b.y * c.z - b.z * c.y) +
+                       a.y * (b.z * c.x - b.x * c.z) +
+                       a.z * (b.x * c.y - b.y * c.x);
+            }
+            vol /= 6.0;
+            if (vol < 0.0) {
+                for (size_t i = 0; i + 2 < triangles.size(); i += 3)
+                    std::swap(triangles[i + 1], triangles[i + 2]);
+            }
+        }
     } output;
     bool (*is_cancel_requested)() = nullptr;
 };
+
+// ── Cap Extents (shared by production and diagnostic code) ──────────────────
+
+struct CapExtents {
+    double x0 = 0.0;
+    double x1 = 0.0;
+};
+
+CapExtents mesh_cap_extents(const std::vector<Vec3>& positions);
+bool on_cap_plane_x(const Vec3& p, const CapExtents& cap, double tol);
 
 // ── Public API ──────────────────────────────────────────────────────────────
 

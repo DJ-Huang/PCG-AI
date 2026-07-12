@@ -135,24 +135,65 @@ namespace DJTechEditor.PCG.Graph
                 if (node is PcgManifestNodeView meshDataNode && meshDataNode.NodeType == "GetMeshData")
                     m_Body.Add(CreateGetMeshDataPreviewRow(meshDataNode));
 
+                var ctx = m_GraphView.SceneEditContext;
+                var modeText = ctx.IsObjectMode
+                    ? "Scene: Object mode"
+                    : $"Scene: {ctx.Domain}";
+                m_Body.Add(new Label(modeText)
+                {
+                    style =
+                    {
+                        color = new Color(0.6f, 0.6f, 0.6f),
+                        fontSize = 10,
+                        marginBottom = 4,
+                    },
+                });
+
                 if (node is PcgManifestNodeView createSplineNode && createSplineNode.NodeType == "CreateSpline")
                 {
-                    var data = createSplineNode.CollectData();
-                    var editPlane = data?.GetRaw("editPlane")?.ToString() ?? "none";
-                    var hint = editPlane != "none"
-                        ? $"Scene View: select point, drag on selection, I/Del insert/delete, Shift+click segment (locked to {editPlane.ToUpperInvariant()})."
-                        : "Scene View: select point, drag on selection, I insert, Del delete, Shift+click segment to insert.";
-                    m_Body.Add(new Label(hint)
+                    if (ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
                     {
-                        style =
+                        var data = createSplineNode.CollectData();
+                        var editPlane = data?.GetRaw("editPlane")?.ToString() ?? "none";
+                        var hint = editPlane != "none"
+                            ? $"Scene View: click point to select, drag tangent handles (green), I/Del insert/delete, Ctrl+click segment (locked to {editPlane.ToUpperInvariant()})."
+                            : "Scene View: click point to select, drag tangent handles (green), I insert, Del delete, Ctrl+click segment to insert.";
+                        m_Body.Add(new Label(hint)
                         {
-                            color = new Color(0.55f, 0.85f, 1f),
-                            fontSize = 10,
-                            marginBottom = 6,
-                            whiteSpace = WhiteSpace.Normal,
-                        },
-                    });
+                            style =
+                            {
+                                color = new Color(0.55f, 0.85f, 1f),
+                                fontSize = 10,
+                                marginBottom = 6,
+                                whiteSpace = WhiteSpace.Normal,
+                            },
+                        });
+                    }
+                    else
+                    {
+                        m_Body.Add(new Label("Enter PCG Mode in Scene View, then select Spline CP to edit control points")
+                        {
+                            style =
+                            {
+                                color = new Color(0.6f, 0.5f, 0.3f),
+                                fontSize = 10,
+                                marginBottom = 6,
+                                whiteSpace = WhiteSpace.Normal,
+                            },
+                        });
+                    }
                 }
+
+                m_Body.Add(new Label("Mesh Vertex/Edge/Face: disabled (authoring source not confirmed)")
+                {
+                    style =
+                    {
+                        color = new Color(0.4f, 0.4f, 0.4f),
+                        fontSize = 9,
+                        marginBottom = 6,
+                        whiteSpace = WhiteSpace.Normal,
+                    },
+                });
 
                 if (node is PcgManifestNodeView manifestNode)
                     ShowManifestProperties(manifestNode);
