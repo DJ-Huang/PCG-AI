@@ -362,8 +362,8 @@
         },
         "minEdgeAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
         "includeUnshared": { "type": "boolean", "default": false },
-        "fromFaceGroup": { "type": "groupSelect", "default": "", "groupDomain": "face" },
-        "fromEdgeGroup": { "type": "groupSelect", "default": "", "groupDomain": "edge" }
+        "fromFaceGroup": { "type": "groupMultiSelect", "default": "", "groupDomain": "face" },
+        "fromEdgeGroup": { "type": "groupMultiSelect", "default": "", "groupDomain": "edge" }
       }
     },
     {

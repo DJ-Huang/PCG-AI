@@ -50,19 +50,21 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
 
     const geometry::BMesh bmesh = geometry::bmesh_from_geometry(input);
 
-    // If from_edge_group is set, only consider edges already in that group
+    // If from_edge_groups is set, only consider edges already in those groups
     std::unordered_set<int64_t> candidate_edges;
-    if (!options.from_edge_group.empty()) {
-        const auto members = input.groups().members(geometry::GroupDomain::Edge, options.from_edge_group);
-        for (int id : members)
-            candidate_edges.insert(static_cast<int64_t>(id));
+    if (!options.from_edge_groups.empty()) {
+        for (const auto& grp : options.from_edge_groups) {
+            const auto members = input.groups().members(geometry::GroupDomain::Edge, grp);
+            for (int id : members)
+                candidate_edges.insert(static_cast<int64_t>(id));
+        }
     }
 
     for (const auto& entry : bmesh.edges) {
         const geometry::BMeshEdge& edge = entry.second;
 
-        // Filter by from_edge_group if specified
-        if (!options.from_edge_group.empty() && candidate_edges.count(entry.first) == 0)
+        // Filter by from_edge_groups if specified
+        if (!options.from_edge_groups.empty() && candidate_edges.count(entry.first) == 0)
             continue;
 
         if (!options.include_unshared && edge.face1 < 0)

@@ -14,7 +14,7 @@ struct GroupCreateOptions {
     double min_edge_angle_deg = 30.0;
     bool include_unshared = false;
     std::vector<std::string> from_face_groups;
-    std::string from_edge_group;
+    std::vector<std::string> from_edge_groups;
 };
 
 struct GroupCombineOptions {

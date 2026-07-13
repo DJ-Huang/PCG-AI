@@ -158,16 +158,16 @@
       "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     },
     {
-      "id": "body_group",
-      "type": "GroupCreate",
-      "position": { "x": 187.5, "y": 320 },
-      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
-    },
-    {
       "id": "body_bevel",
       "type": "BevelMesh",
       "position": { "x": 200, "y": 509.5 },
       "data": {"method": "edge", "offsetType": "offset", "amount": 0.1, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "body_group",
+      "type": "GroupCreate",
+      "position": { "x": 187.5, "y": 320 },
+      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "cap_start,cap_end", "fromEdgeGroup": "", "__nodeTitle": ""}
     }
   ],
   "edges": [

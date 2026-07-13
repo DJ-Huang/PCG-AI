@@ -32,7 +32,7 @@ public:
         opts.min_edge_angle_deg = ctx.node->data.value("minEdgeAngle", 30.0);
         opts.include_unshared = ctx.node->data.value("includeUnshared", false);
         opts.from_face_groups = parse_name_list(ctx.node->data, "fromFaceGroup");
-        opts.from_edge_group = ctx.node->data.value("fromEdgeGroup", std::string(""));
+        opts.from_edge_groups = parse_name_list(ctx.node->data, "fromEdgeGroup");
 
         emit_geometry(ctx, group_create(input, opts));
         return PCG_OK;
