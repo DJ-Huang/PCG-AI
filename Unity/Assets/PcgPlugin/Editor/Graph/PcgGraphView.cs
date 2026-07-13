@@ -450,6 +450,14 @@ namespace DJTechEditor.PCG.Graph
                         selected.NodeId,
                         s_GroupDomains);
                 }
+                else if (NodeHasOrReceivesGroups(manifestNode))
+                {
+                    m_SceneEditContext = new PcgSceneEditContext(
+                        SceneEditLevel.Component,
+                        SceneEditDomain.Edge,
+                        selected.NodeId,
+                        s_GroupDomains);
+                }
                 else
                 {
                     m_SceneEditContext = PcgSceneEditContext.ObjectMode;
@@ -460,6 +468,33 @@ namespace DJTechEditor.PCG.Graph
                 m_SceneEditContext = PcgSceneEditContext.ObjectMode;
             }
             SceneContextChanged?.Invoke(m_SceneEditContext);
+        }
+
+        private bool NodeHasOrReceivesGroups(PcgManifestNodeView node)
+        {
+            // Check if node has manifest output groups
+            if (PcgNodeManifest.TryGet(node.NodeType, out var def) && def.outputGroups.Count > 0)
+                return true;
+
+            // Check dynamic output groups (properties with isGroupOutput)
+            if (def != null)
+            {
+                foreach (var (_, prop) in def.properties)
+                {
+                    if (prop.isGroupOutput)
+                        return true;
+                }
+            }
+
+            // Check upstream groups (input groups from upstream nodes)
+            if (m_Inspector != null)
+            {
+                var upstream = m_Inspector.ResolveUpstreamGroups(node.NodeId);
+                if (upstream.Count > 0)
+                    return true;
+            }
+
+            return false;
         }
 
         public void SetSceneMode(SceneEditLevel level, SceneEditDomain domain)

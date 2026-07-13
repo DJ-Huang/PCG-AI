@@ -259,7 +259,7 @@ namespace DJTechEditor.PCG.Graph
             if (splineNodes.Count > 0 && ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
             {
                 HandleSplineShortcuts(sceneView, splineNodes);
-                DrawSplineOverlay(splineNodes[0].node);
+                DrawSplineOverlay(sceneView, splineNodes[0].node);
 
                 foreach (var (window, graphView, node) in splineNodes)
                     DrawNodeSpline(sceneView, window, graphView, node);
@@ -269,17 +269,17 @@ namespace DJTechEditor.PCG.Graph
                 var groupNode = graphWindow.GraphView.selection.OfType<PcgManifestNodeView>().FirstOrDefault();
                 if (groupNode != null)
                 {
-                    DrawGroupViewerOverlay(graphWindow, groupNode);
+                    DrawGroupViewerOverlay(sceneView, graphWindow, groupNode);
                     DrawNodeGroupHighlight(sceneView, graphWindow);
                 }
                 else
                 {
-                    DrawPcgModeStatusOverlay(graphWindow);
+                    DrawPcgModeStatusOverlay(sceneView, graphWindow);
                 }
             }
             else
             {
-                DrawPcgModeStatusOverlay(graphWindow);
+                DrawPcgModeStatusOverlay(sceneView, graphWindow);
             }
 
             TryEndSplineDrag();
@@ -725,10 +725,10 @@ namespace DJTechEditor.PCG.Graph
             Handles.BeginGUI();
             try
             {
-                const float width = 200f;
+                const float width = 320f;
                 const float height = 64f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin,
                     width,
                     height);
@@ -757,78 +757,99 @@ namespace DJTechEditor.PCG.Graph
         {
             var ctx = window.GraphView.SceneEditContext;
 
+            // Count visible buttons to compute dynamic toolbar width
+            const float btnWidth = 24f;
+            const float btnHeight = 20f;
+            const float spacing = 4f;
+            const float popupWidth = 70f;
+            const float exitWidth = 24f;
+            const float toolbarHeight = 26f;
+
+            int buttonCount = 1; // Object always visible
+            bool showSpline = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
+            bool showVertex = ctx.SupportsDomain(SceneEditDomain.Vertex);
+            bool showEdge = ctx.SupportsDomain(SceneEditDomain.Edge);
+            bool showFace = ctx.SupportsDomain(SceneEditDomain.Face);
+            if (showSpline) buttonCount++;
+            if (showVertex) buttonCount++;
+            if (showEdge) buttonCount++;
+            if (showFace) buttonCount++;
+            // + popup + exit
+            float toolbarWidth = buttonCount * (btnWidth + 2f) + spacing + popupWidth + spacing + exitWidth + 6f;
+
             Handles.BeginGUI();
             try
             {
-                const float toolbarHeight = 26f;
-                var toolbarArea = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
-                    SceneOverlayMargin,
-                    260f,
-                    toolbarHeight);
-                GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
+            var toolbarArea = new Rect(
+                (sceneView.position.width - toolbarWidth) / 2f,
+                SceneOverlayMargin,
+                toolbarWidth,
+                toolbarHeight);
+            GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
 
-                GUILayout.BeginArea(toolbarArea);
-                GUILayout.BeginHorizontal();
+            GUILayout.BeginArea(toolbarArea);
+            GUILayout.BeginHorizontal();
 
-                // Object mode — cube icon
-                if (IconToolbarButton(IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
-                    window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+            // Object mode — cube icon
+            if (IconToolbarButton(IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
+                window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
 
-                // Spline CP — curve icon
-                bool splineEnabled = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
-                GUI.enabled = splineEnabled;
+            // Spline CP — curve icon (only when supported)
+            if (showSpline)
+            {
                 if (IconToolbarButton(IconSplineActive, IconSplineNormal, "Spline Control Points",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint))
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.SplineControlPoint);
-                GUI.enabled = true;
+            }
 
-                // Vertex / Edge / Face — group viewer modes
-                bool vertexEnabled = ctx.SupportsDomain(SceneEditDomain.Vertex);
-                GUI.enabled = vertexEnabled;
+            // Vertex / Edge / Face — group viewer modes (only when supported)
+            if (showVertex)
+            {
                 if (IconToolbarButton(IconVertexActive, IconVertexNormal, "Vertex Group View",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Vertex))
                 {
                     s_SelectedGroupName = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Vertex);
                 }
+            }
 
-                bool edgeEnabled = ctx.SupportsDomain(SceneEditDomain.Edge);
-                GUI.enabled = edgeEnabled;
+            if (showEdge)
+            {
                 if (IconToolbarButton(IconEdgeActive, IconEdgeNormal, "Edge Group View",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Edge))
                 {
                     s_SelectedGroupName = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Edge);
                 }
+            }
 
-                bool faceEnabled = ctx.SupportsDomain(SceneEditDomain.Face);
-                GUI.enabled = faceEnabled;
+            if (showFace)
+            {
                 if (IconToolbarButton(IconFaceActive, IconFaceNormal, "Face Group View",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Face))
                 {
                     s_SelectedGroupName = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Face);
                 }
-                GUI.enabled = true;
+            }
 
-                GUILayout.Space(4);
+            GUILayout.Space(spacing);
 
                 // Display mode popup — short label
                 var oldDisplay = s_OthersDisplay;
                 s_OthersDisplay = (OthersDisplayMode)EditorGUILayout.EnumPopup(
                     s_OthersDisplay, EditorStyles.toolbarPopup,
-                    GUILayout.Width(70));
+                    GUILayout.Width(popupWidth));
                 if (s_OthersDisplay != oldDisplay)
                     ApplyOthersDisplayMode();
 
-                GUILayout.Space(4);
+                GUILayout.Space(spacing);
 
                 // Exit — X icon
                 var exitColor = GUI.color;
                 GUI.color = new Color(1f, 0.7f, 0.5f);
                 if (GUILayout.Button(new GUIContent(IconExit, "Exit PCG Mode"), EditorStyles.toolbarButton,
-                        GUILayout.Width(24f)))
+                        GUILayout.Width(exitWidth)))
                 {
                     ExitPcgMode();
                     sceneView.Repaint();
@@ -856,7 +877,7 @@ namespace DJTechEditor.PCG.Graph
             return clicked;
         }
 
-        private static void DrawPcgModeStatusOverlay(PcgGraphEditorWindow window)
+        private static void DrawPcgModeStatusOverlay(SceneView sceneView, PcgGraphEditorWindow window)
         {
             var ctx = window.GraphView.SceneEditContext;
             var sel = window.GraphView.selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
@@ -868,7 +889,7 @@ namespace DJTechEditor.PCG.Graph
                 const float width = 300f;
                 const float height = 52f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
                     width,
                     height);
@@ -887,7 +908,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawSplineOverlay(PcgManifestNodeView node)
+        private static void DrawSplineOverlay(SceneView sceneView, PcgManifestNodeView node)
         {
             var nodeData = node.CollectData();
             var pointCount = PcgSplineControlPoints.GetEffectivePoints(nodeData).Count;
@@ -900,7 +921,7 @@ namespace DJTechEditor.PCG.Graph
                 const float width = 300f;
                 const float height = 118f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
                     width,
                     height);
@@ -1557,111 +1578,116 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawGroupViewerOverlay(PcgGraphEditorWindow window, PcgManifestNodeView node)
+        private static void DrawGroupViewerOverlay(SceneView sceneView, PcgGraphEditorWindow window, PcgManifestNodeView node)
         {
             var ctx = window.GraphView.SceneEditContext;
             var domainStr = DomainToString(ctx.Domain);
 
+            // Collect output groups from manifest
+            var outputGroups = new List<PcgNodeInspector.AvailableGroup>();
+            PcgNodeInspector.CollectNodeGroups(node, outputGroups, new HashSet<string>());
+            var outputFiltered = outputGroups.Where(g => g.domain == domainStr).ToList();
+
+            // Collect input groups from upstream
+            var inputGroups = new List<PcgNodeInspector.AvailableGroup>();
+            var inspector = window.GraphView.Inspector;
+            if (inspector != null)
+            {
+                var upstream = inspector.ResolveUpstreamGroups(node.NodeId);
+                inputGroups = upstream.Where(g => g.domain == domainStr).ToList();
+            }
+
+            // Parse cooked result for highlighting
             var anchor = FindPreviewAnchor(window);
-            if (anchor == null)
-            {
-                DrawGroupViewerMessage("No preview anchor found.\nAdd a PcgGraphComponent to the scene.");
-                return;
-            }
-
-            var gv = anchor.GetComponent<PcgGroupVisualizer>();
+            var gv = anchor?.GetComponent<PcgGroupVisualizer>();
             var json = gv != null ? gv.ResultJson : null;
-            if (string.IsNullOrEmpty(json))
-            {
-                DrawGroupViewerMessage($"No group data available.\nCook the graph to see {domainStr} groups.");
-                return;
-            }
-
-            // Re-parse only if JSON changed
-            if (json != s_LastParsedJson)
+            if (!string.IsNullOrEmpty(json) && json != s_LastParsedJson)
             {
                 ParseGroupsFromJson(json, s_AvailableGroups);
                 s_LastParsedJson = json;
             }
+            var cookedGroups = !string.IsNullOrEmpty(json)
+                ? s_AvailableGroups.Where(g => g.domain == domainStr).ToList()
+                : new List<GroupInfo>();
 
-            var filtered = s_AvailableGroups.Where(g => g.domain == domainStr).ToList();
+            bool HasInCooked(string name) => cookedGroups.Any(g => g.name == name);
 
             // Clear stale selection
             if (!string.IsNullOrEmpty(s_SelectedGroupName) &&
-                !filtered.Any(g => g.name == s_SelectedGroupName))
+                !outputFiltered.Any(g => g.name == s_SelectedGroupName) &&
+                !inputGroups.Any(g => g.name == s_SelectedGroupName))
             {
                 s_SelectedGroupName = null;
                 gv?.ClearHighlight();
             }
 
+            // Compute dynamic height
+            int rowCount = 0;
+            if (outputFiltered.Count > 0) rowCount++;
+            if (inputGroups.Count > 0) rowCount++;
+            if (rowCount == 0) rowCount = 1;
+            float height = 24f + rowCount * 22f + 6f;
+
             Handles.BeginGUI();
             try
             {
                 const float width = 300f;
-                const float height = 80f;
-
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
                     width,
                     height);
                 GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
 
                 GUILayout.BeginArea(area);
-                GUILayout.Space(6f);
+                GUILayout.Space(4f);
                 GUILayout.Label($"{node.NodeType} — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
 
-                if (filtered.Count == 0)
+                if (outputFiltered.Count > 0)
                 {
-                    GUILayout.Label($"No {domainStr} groups in cooked result.", EditorStyles.miniLabel);
-                }
-                else
-                {
-                    var labels = filtered.Select(g => $"{g.name} ({g.count})").ToArray();
-                    var currentIdx = filtered.FindIndex(g => g.name == s_SelectedGroupName);
+                    GUILayout.Label("Output:", EditorStyles.miniLabel);
+                    var labels = outputFiltered.Select(g =>
+                        HasInCooked(g.name) ? $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})"
+                                            : $"{g.name} (not in cooked mesh)").ToArray();
+                    var currentIdx = outputFiltered.FindIndex(g => g.name == s_SelectedGroupName);
                     var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
                     if (newIdx != currentIdx)
                     {
-                        if (newIdx >= 0 && newIdx < filtered.Count)
-                        {
-                            var group = filtered[newIdx];
-                            s_SelectedGroupName = group.name;
+                        var group = outputFiltered[newIdx];
+                        s_SelectedGroupName = group.name;
+                        if (HasInCooked(group.name))
                             gv?.HighlightGroup(group.name, group.domain);
-                        }
                         else
-                        {
-                            s_SelectedGroupName = null;
                             gv?.ClearHighlight();
-                        }
                         SceneView.RepaintAll();
                     }
                 }
 
-                GUILayout.EndArea();
-            }
-            finally
-            {
-                Handles.EndGUI();
-            }
-        }
+                if (inputGroups.Count > 0)
+                {
+                    GUILayout.Label("Input:", EditorStyles.miniLabel);
+                    var labels = inputGroups.Select(g =>
+                        HasInCooked(g.name) ? $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})"
+                                            : $"{g.name} (not in cooked mesh)").ToArray();
+                    var currentIdx = inputGroups.FindIndex(g => g.name == s_SelectedGroupName);
+                    var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
+                    if (newIdx != currentIdx)
+                    {
+                        var group = inputGroups[newIdx];
+                        s_SelectedGroupName = group.name;
+                        if (HasInCooked(group.name))
+                            gv?.HighlightGroup(group.name, group.domain);
+                        else
+                            gv?.ClearHighlight();
+                        SceneView.RepaintAll();
+                    }
+                }
 
-        private static void DrawGroupViewerMessage(string message)
-        {
-            Handles.BeginGUI();
-            try
-            {
-                const float width = 300f;
-                const float height = 70f;
-                var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
-                    SceneOverlayMargin + 30f,
-                    width,
-                    height);
-                GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
+                if (outputFiltered.Count == 0 && inputGroups.Count == 0)
+                {
+                    GUILayout.Label($"No {domainStr} groups for this node.", EditorStyles.miniLabel);
+                }
 
-                GUILayout.BeginArea(area);
-                GUILayout.Space(6f);
-                GUILayout.Label(message, EditorStyles.wordWrappedLabel);
                 GUILayout.EndArea();
             }
             finally

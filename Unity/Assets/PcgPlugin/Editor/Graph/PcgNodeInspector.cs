@@ -833,7 +833,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void CollectNodeGroups(
+        public static void CollectNodeGroups(
             PcgGraphNodeBase node,
             List<AvailableGroup> result,
             HashSet<string> seen)
