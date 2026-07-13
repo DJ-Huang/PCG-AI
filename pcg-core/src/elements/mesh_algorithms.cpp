@@ -384,13 +384,18 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
         &geometry,
         &out_geom);
 
-    if (!out_geom.points().empty())
+    if (!out_geom.points().empty()) {
+        out_geom.detail() = geometry.detail();
         return out_geom;
+    }
 
     // Fallback: fast paths (e.g. axis-aligned box) return PcgMeshData without
     // populating out_geometry. Convert the mesh result back to geometry.
-    if (!result_mesh.vertices().empty())
-        return data::geometry_from_mesh(result_mesh);
+    if (!result_mesh.vertices().empty()) {
+        data::PcgGeometry fallback = data::geometry_from_mesh(result_mesh);
+        fallback.detail() = geometry.detail();
+        return fallback;
+    }
 
     return geometry;
 }

@@ -14,6 +14,14 @@ void PcgMeshData::add_triangle(int a, int b, int c)
     triangles_.push_back(c);
 }
 
+void PcgMeshData::set_normals(std::vector<PcgVertex> n)
+{
+    if (n.size() != vertices_.size())
+        return;
+    normals_ = std::move(n);
+    has_normals_ = true;
+}
+
 nlohmann::json PcgMeshData::to_json() const
 {
     nlohmann::json verts = nlohmann::json::array();
@@ -34,6 +42,12 @@ nlohmann::json PcgMeshData::to_json() const
     };
     if (!metadata_.raw().empty())
         out["metadata"] = metadata_.raw();
+    if (has_normals_ && !normals_.empty()) {
+        nlohmann::json norms = nlohmann::json::array();
+        for (const auto& n : normals_)
+            norms.push_back(nlohmann::json{{"x", n.x}, {"y", n.y}, {"z", n.z}});
+        out["normals"] = std::move(norms);
+    }
     return out;
 }
 
@@ -62,6 +76,23 @@ PcgMeshData PcgMeshData::from_json(const nlohmann::json& json)
 
     if (json.contains("metadata"))
         data.metadata_ = PcgMetadata::from_json(json["metadata"]);
+
+    if (json.contains("normals") && json["normals"].is_array()) {
+        std::vector<PcgVertex> norms;
+        for (const auto& item : json["normals"]) {
+            if (!item.is_object())
+                continue;
+            norms.push_back(PcgVertex{
+                item.value("x", 0.0),
+                item.value("y", 0.0),
+                item.value("z", 0.0),
+            });
+        }
+        if (norms.size() == data.vertices_.size()) {
+            data.normals_ = std::move(norms);
+            data.has_normals_ = true;
+        }
+    }
 
     return data;
 }

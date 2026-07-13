@@ -22,6 +22,9 @@ namespace DJTechRuntime.PCG
 
         public const uint MeshBinaryMagic = 0x4D474350u;
         public const int MeshBinaryHeaderSize = 16;
+        public const int MeshBinaryV2HeaderSize = 20;
+        public const uint MeshBinaryVersion2 = 2u;
+        public const uint MeshBinaryFlagHasNormals = 0x1u;
         public const uint PointBinaryMagic = 0x50544750u;
         public const int PointBinaryHeaderSize = 16;
 
@@ -457,7 +460,21 @@ namespace DJTechRuntime.PCG
 
             if (executeKind == PcgExecuteKind.Mesh)
             {
-                var required = MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+                // Determine actual payload size from the binary's version/flags header.
+                int headerSize = MeshBinaryHeaderSize;
+                int normalSize = 0;
+                if (meshBuf.Length >= MeshBinaryV2HeaderSize)
+                {
+                    var version = BitConverter.ToUInt32(meshBuf, 4);
+                    if (version == MeshBinaryVersion2)
+                    {
+                        headerSize = MeshBinaryV2HeaderSize;
+                        var flags = BitConverter.ToUInt32(meshBuf, 16);
+                        if ((flags & MeshBinaryFlagHasNormals) != 0)
+                            normalSize = vertexCount * 12;
+                    }
+                }
+                var required = headerSize + vertexCount * 12 + indexCount * 4 + normalSize;
                 var meshBinary = new byte[required];
                 Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, required);
                 result = new PcgGraphExecuteResult
@@ -491,7 +508,20 @@ namespace DJTechRuntime.PCG
                 byte[] meshBinary = null;
                 if (vertexCount > 0 && indexCount > 0)
                 {
-                    var meshRequired = MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+                    int meshHdr = MeshBinaryHeaderSize;
+                    int meshNorm = 0;
+                    if (meshBuf.Length >= MeshBinaryV2HeaderSize)
+                    {
+                        var mv = BitConverter.ToUInt32(meshBuf, 4);
+                        if (mv == MeshBinaryVersion2)
+                        {
+                            meshHdr = MeshBinaryV2HeaderSize;
+                            var mf = BitConverter.ToUInt32(meshBuf, 16);
+                            if ((mf & MeshBinaryFlagHasNormals) != 0)
+                                meshNorm = vertexCount * 12;
+                        }
+                    }
+                    var meshRequired = meshHdr + vertexCount * 12 + indexCount * 4 + meshNorm;
                     meshBinary = new byte[meshRequired];
                     Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, meshRequired);
                 }

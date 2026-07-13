@@ -16,8 +16,21 @@ struct PcgVec3 {
     double z = 0.0;
 };
 
+enum class ShadeMode {
+    Auto,
+    Smooth,
+    Flat,
+};
+
 struct GeometryDetailMeta {
-    // Reserved for collection-level geometry metadata (phase 2 attrs).
+    ShadeMode shade_mode = ShadeMode::Auto;
+    double cusp_angle_deg = 30.0;
+};
+
+struct NormalComputeOptions {
+    ShadeMode shade_mode = ShadeMode::Auto;
+    double cusp_angle_deg = 30.0;
+    bool hard_group_boundaries = true;
 };
 
 class PcgGeometry {
@@ -43,6 +56,10 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry);
 
 /// Triangulate with shared vertices (preserves topology for manifold checks).
 PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry);
+
+/// Triangulate with vertex split and per-vertex normals based on shade policy.
+/// Triangle order matches triangulate_geometry_shared (build_group_stats compatible).
+PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalComputeOptions& options);
 
 /// Rebuild polygon topology from triangle soup (weld + coplanar merge via BMesh).
 PcgGeometry geometry_from_mesh(const PcgMeshData& mesh);

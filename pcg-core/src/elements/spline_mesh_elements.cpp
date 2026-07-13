@@ -49,8 +49,20 @@ public:
         opts.scale_start = ctx.node->data.value("scaleStart", 1.0);
         opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
         opts.profile_plane = ctx.node->data.value("profilePlane", "xy");
+        opts.shade_mode = ctx.node->data.value("shadeMode", "auto");
+        opts.cusp_angle_deg = ctx.node->data.value("cuspAngle", 30.0);
 
-        emit_geometry(ctx, sweep_along_spline_geometry(backbone, profile_spline, opts));
+        data::PcgGeometry geometry = sweep_along_spline_geometry(backbone, profile_spline, opts);
+
+        if (opts.shade_mode == "smooth")
+            geometry.detail().shade_mode = data::ShadeMode::Smooth;
+        else if (opts.shade_mode == "flat")
+            geometry.detail().shade_mode = data::ShadeMode::Flat;
+        else
+            geometry.detail().shade_mode = data::ShadeMode::Auto;
+        geometry.detail().cusp_angle_deg = opts.cusp_angle_deg;
+
+        emit_geometry(ctx, std::move(geometry));
         return PCG_OK;
     }
 };
@@ -160,6 +172,15 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh missing mesh inputs");
 
         if (!geometries.empty()) {
+            const auto& ref = geometries[0].detail();
+            for (size_t i = 1; i < geometries.size(); ++i) {
+                if (geometries[i].detail().shade_mode != ref.shade_mode)
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh: shade mode mismatch between inputs");
+                const double diff = geometries[i].detail().cusp_angle_deg - ref.cusp_angle_deg;
+                if (diff > 1e-9 || diff < -1e-9)
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh: cusp angle mismatch between inputs");
+            }
+
             data::PcgGeometry merged = geometries[0];
             for (size_t i = 1; i < geometries.size(); ++i)
                 merged = data::merge_geometries(merged, geometries[i]);

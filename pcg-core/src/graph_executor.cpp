@@ -418,7 +418,9 @@ PcgResultCode execute_graph(const Graph& graph,
 
     if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
         out_result.kind = GraphResultKind::Mesh;
-        out_result.mesh = data::triangulate_geometry_shared(*geometry);
+        const auto& d = geometry->detail();
+        out_result.mesh = data::compute_split_normals(*geometry,
+            data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
         return PCG_OK;
@@ -426,7 +428,9 @@ PcgResultCode execute_graph(const Graph& graph,
 
     if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
         out_result.kind = GraphResultKind::Mesh;
-        out_result.mesh = data::triangulate_geometry_shared(*geometry);
+        const auto& d = geometry->detail();
+        out_result.mesh = data::compute_split_normals(*geometry,
+            data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
         return PCG_OK;

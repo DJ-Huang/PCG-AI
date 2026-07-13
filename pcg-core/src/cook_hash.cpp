@@ -88,6 +88,11 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
         }
     }
 
+    const auto& detail = geometry.detail();
+    h = hash_combine(h, static_cast<uint64_t>(detail.shade_mode));
+    double cusp = detail.cusp_angle_deg;
+    h = hash_bytes(&cusp, sizeof(double), h);
+
     return h;
 }
 

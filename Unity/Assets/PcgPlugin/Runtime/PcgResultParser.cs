@@ -133,9 +133,43 @@ namespace DJTechRuntime.PCG
                         return false;
                     }
 
+                    var version = *(uint*)(ptr + 4);
                     var vertexCount = *(int*)(ptr + 8);
                     var indexCount = *(int*)(ptr + 12);
-                    var required = PcgNative.MeshBinaryHeaderSize + vertexCount * 12 + indexCount * 4;
+
+                    if (indexCount % 3 != 0)
+                    {
+                        error = $"Mesh binary index count not divisible by 3: {indexCount}";
+                        return false;
+                    }
+
+                    int headerSize;
+                    bool hasNormals = false;
+
+                    if (version == PcgNative.MeshBinaryVersion2)
+                    {
+                        headerSize = PcgNative.MeshBinaryV2HeaderSize;
+                        if (data.Length < headerSize)
+                        {
+                            error = "Mesh binary v2 header truncated.";
+                            return false;
+                        }
+                        var flags = *(uint*)(ptr + 16);
+                        hasNormals = (flags & PcgNative.MeshBinaryFlagHasNormals) != 0;
+                    }
+                    else if (version == 1u)
+                    {
+                        headerSize = PcgNative.MeshBinaryHeaderSize;
+                    }
+                    else
+                    {
+                        error = $"Unsupported mesh binary version: {version}";
+                        return false;
+                    }
+
+                    var required = headerSize + vertexCount * 12 + indexCount * 4;
+                    if (hasNormals)
+                        required += vertexCount * 12;
                     if (data.Length < required)
                     {
                         error = $"Mesh binary truncated (need {required} bytes, got {data.Length}).";
@@ -145,12 +179,12 @@ namespace DJTechRuntime.PCG
                     var vertices = new Vector3[vertexCount];
                     fixed (Vector3* dst = vertices)
                     {
-                        Buffer.MemoryCopy(ptr + PcgNative.MeshBinaryHeaderSize, dst, vertexCount * 12,
+                        Buffer.MemoryCopy(ptr + headerSize, dst, vertexCount * 12,
                             vertexCount * 12);
                     }
 
                     var triangles = new int[indexCount];
-                    var indexOffset = PcgNative.MeshBinaryHeaderSize + vertexCount * 12;
+                    var indexOffset = headerSize + vertexCount * 12;
                     fixed (int* dst = triangles)
                     {
                         Buffer.MemoryCopy(ptr + indexOffset, dst, indexCount * 4, indexCount * 4);
@@ -161,7 +195,23 @@ namespace DJTechRuntime.PCG
                         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
                     mesh.vertices = vertices;
                     mesh.triangles = triangles;
-                    mesh.RecalculateNormals();
+
+                    if (hasNormals)
+                    {
+                        var normals = new Vector3[vertexCount];
+                        var normalOffset = indexOffset + indexCount * 4;
+                        fixed (Vector3* dst = normals)
+                        {
+                            Buffer.MemoryCopy(ptr + normalOffset, dst, vertexCount * 12,
+                                vertexCount * 12);
+                        }
+                        mesh.normals = normals;
+                    }
+                    else
+                    {
+                        mesh.RecalculateNormals();
+                    }
+
                     mesh.RecalculateTangents();
                     mesh.RecalculateBounds();
                     return true;

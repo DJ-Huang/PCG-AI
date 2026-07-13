@@ -35,7 +35,7 @@
       "id": "cabin_sweep",
       "type": "SweepAlongSpline",
       "position": { "x": 200, "y": 960 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 0.85, "profilePlane": "xy", "__nodeTitle": ""}
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 0.85, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     },
     {
       "id": "cabin_group",
@@ -65,7 +65,7 @@
       "id": "wheel_mesh",
       "type": "SweepAlongSpline",
       "position": { "x": 200, "y": 1760 },
-      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.4, "columns": 20, "sampleSpacing": 0.3, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "__nodeTitle": ""}
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.4, "columns": 20, "sampleSpacing": 0.3, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     },
     {
       "id": "wheel_fl",
@@ -152,12 +152,6 @@
       "data": {"label": "LowPolySedan", "__nodeTitle": ""}
     },
     {
-      "id": "body_sweep",
-      "type": "SweepAlongSpline",
-      "position": { "x": 200, "y": 160 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "__nodeTitle": ""}
-    },
-    {
       "id": "body_bevel",
       "type": "BevelMesh",
       "position": { "x": 200, "y": 509.5 },
@@ -168,6 +162,12 @@
       "type": "GroupCreate",
       "position": { "x": 187.5, "y": 320 },
       "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "body_sweep",
+      "type": "SweepAlongSpline",
+      "position": { "x": 200, "y": 160 },
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     }
   ],
   "edges": [
