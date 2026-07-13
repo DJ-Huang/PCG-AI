@@ -439,6 +439,13 @@ namespace DJTechEditor.PCG.Graph
 
         internal void RefreshInspector() => m_Inspector?.OnSelectionChanged();
 
+        /// <summary>
+        /// Re-derive the scene edit context from the current graph selection.
+        /// Called on selection change and when entering PCG mode so the toolbar
+        /// reflects the already-selected node instead of defaulting to Object.
+        /// </summary>
+        internal void RefreshSceneEditContext() => UpdateSceneEditContext();
+
         private void UpdateSceneEditContext()
         {
             var selected = selection.OfType<PcgGraphNodeBase>().FirstOrDefault();

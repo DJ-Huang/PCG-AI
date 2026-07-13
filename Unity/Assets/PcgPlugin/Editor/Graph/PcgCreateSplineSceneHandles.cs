@@ -318,7 +318,10 @@ namespace DJTechEditor.PCG.Graph
         {
             s_PcgModeActive = true;
             s_ActiveWindow = window;
-            window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+            // Re-derive context from current selection instead of resetting to
+            // Object/None. If a node (e.g. GroupCreate) was already selected,
+            // the toolbar activates the correct domain on entry.
+            window.GraphView.RefreshSceneEditContext();
 
             s_OthersDisplay = OthersDisplayMode.HideOthers;
 
