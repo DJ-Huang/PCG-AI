@@ -340,8 +340,7 @@ int main()
         return 1;
     }
 
-    const auto subdivided = pcg::internal::elements::subdivide_mesh(
-        pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1);
+    const auto subdivided = pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0);
 
     const auto edge_beveled = pcg::internal::elements::bevel_mesh(
         subdivided, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
@@ -356,8 +355,7 @@ int main()
     }
 
     const auto demo_beveled = pcg::internal::elements::bevel_mesh(
-        pcg::internal::elements::subdivide_mesh(
-            pcg::internal::elements::create_box_mesh(3.0, 1.5, 2.0), 1),
+        pcg::internal::elements::create_box_mesh(3.0, 1.5, 2.0),
         0.08, 3, pcg::internal::elements::BevelMethod::Edge,
         pcg::internal::elements::BevelOffsetType::Offset, true);
     if (!expect_outward_normals(demo_beveled)) {

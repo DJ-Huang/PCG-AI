@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,6 +28,12 @@ namespace DJTechEditor.PCG.Graph
         private EnumField m_ScatterDisplayField;
         private string m_CurrentFilePath;
         private bool m_GraphLoaded;
+
+        private FileSystemWatcher _fileWatcher;
+        private bool _pendingExternalReload;
+        private DateTime _lastWriteUtc = DateTime.MinValue;
+        private DateTime _lastSelfSaveUtc = DateTime.MinValue;
+        private const double SelfSaveIgnoreSeconds = 1.0;
 
         [SerializeField]
         private List<PcgPreviewMeshBinding> m_PreviewMeshBindings = new();
@@ -228,7 +235,7 @@ namespace DJTechEditor.PCG.Graph
             if (string.IsNullOrEmpty(assetGuid))
                 return;
 
-            var asset = AssetDatabase.LoadAssetAtPath<Object>(AssetDatabase.GUIDToAssetPath(assetGuid));
+            var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AssetDatabase.GUIDToAssetPath(assetGuid));
             if (asset == null || !EditorUtility.IsPersistent(asset))
                 return;
 
@@ -270,6 +277,8 @@ namespace DJTechEditor.PCG.Graph
 
         private void OnDisable()
         {
+            DisposeFileWatcher();
+
             if (m_GraphView != null)
             {
                 foreach (var node in m_GraphView.nodes.ToList())
@@ -307,6 +316,12 @@ namespace DJTechEditor.PCG.Graph
 
             if (m_GraphView.State != null && m_GraphView.State.WasUndoRedoPerformed)
                 m_GraphView.RestoreFromUndoState();
+
+            if (_pendingExternalReload)
+            {
+                _pendingExternalReload = false;
+                ReloadFromDisk();
+            }
         }
 
         private void ConstructToolbar()
@@ -423,6 +438,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void LoadDefaultGraph()
         {
+            DisposeFileWatcher();
             ClearNodePreview(silent: true);
             m_GraphView.LoadDocument(PcgGraphDefaults.CreatePipeline());
             m_Selected = null;
@@ -457,6 +473,7 @@ namespace DJTechEditor.PCG.Graph
             ClearNodePreview(silent: true);
             m_GraphView.LoadDocument(doc);
             m_CurrentFilePath = Path.GetFullPath(path);
+            SetupFileWatcher(m_CurrentFilePath);
 
             var assetPath = FullPathToAssetPath(m_CurrentFilePath);
             if (!string.IsNullOrEmpty(assetPath))
@@ -482,6 +499,7 @@ namespace DJTechEditor.PCG.Graph
 
             var doc = m_GraphView.ExportDocument();
             var json = PcgGraphSerializer.ToJson(doc);
+            _lastSelfSaveUtc = DateTime.UtcNow;
             File.WriteAllText(m_CurrentFilePath, json);
             AssetDatabase.Refresh();
             SetStatus($"Saved: {m_CurrentFilePath}");
@@ -501,8 +519,10 @@ namespace DJTechEditor.PCG.Graph
             if (string.IsNullOrEmpty(path))
                 return;
 
+            _lastSelfSaveUtc = DateTime.UtcNow;
             File.WriteAllText(path, json);
             m_CurrentFilePath = Path.GetFullPath(path);
+            SetupFileWatcher(m_CurrentFilePath);
 
             var assetPath = FullPathToAssetPath(m_CurrentFilePath);
             if (!string.IsNullOrEmpty(assetPath))
@@ -596,6 +616,79 @@ namespace DJTechEditor.PCG.Graph
                 return null;
 
             return "Assets" + normalizedFull.Substring(dataPath.Length);
+        }
+
+        private void SetupFileWatcher(string fullPath)
+        {
+            DisposeFileWatcher();
+
+            if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
+                return;
+
+            var dir = Path.GetDirectoryName(fullPath);
+            var file = Path.GetFileName(fullPath);
+            if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(file))
+                return;
+
+            _fileWatcher = new FileSystemWatcher(dir, file)
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+                EnableRaisingEvents = true,
+            };
+
+            _fileWatcher.Changed += OnWatchedFileChanged;
+            _fileWatcher.Created += OnWatchedFileChanged;
+            _fileWatcher.Renamed += OnWatchedFileChanged;
+        }
+
+        private void OnWatchedFileChanged(object sender, FileSystemEventArgs e)
+        {
+            var writeUtc = SafeGetLastWriteUtc(e.FullPath);
+            if (writeUtc <= _lastWriteUtc)
+                return;
+
+            if ((writeUtc - _lastSelfSaveUtc).TotalSeconds < SelfSaveIgnoreSeconds)
+                return;
+
+            _lastWriteUtc = writeUtc;
+            _pendingExternalReload = true;
+        }
+
+        private static DateTime SafeGetLastWriteUtc(string path)
+        {
+            try
+            {
+                return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.UtcNow;
+            }
+            catch
+            {
+                return DateTime.UtcNow;
+            }
+        }
+
+        private void ReloadFromDisk()
+        {
+            if (string.IsNullOrEmpty(m_CurrentFilePath) || !File.Exists(m_CurrentFilePath))
+            {
+                DisposeFileWatcher();
+                return;
+            }
+
+            ImportFromPath(m_CurrentFilePath);
+            Debug.Log($"[PCG] Graph reloaded from disk: {m_CurrentFilePath}");
+        }
+
+        private void DisposeFileWatcher()
+        {
+            if (_fileWatcher == null)
+                return;
+
+            _fileWatcher.EnableRaisingEvents = false;
+            _fileWatcher.Changed -= OnWatchedFileChanged;
+            _fileWatcher.Created -= OnWatchedFileChanged;
+            _fileWatcher.Renamed -= OnWatchedFileChanged;
+            _fileWatcher.Dispose();
+            _fileWatcher = null;
         }
     }
 }

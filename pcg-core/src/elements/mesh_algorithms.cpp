@@ -486,37 +486,244 @@ data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
 {
     data::PcgMeshData current = mesh;
     levels = std::clamp(levels, 0, 4);
+    constexpr double kPi = 3.14159265358979323846;
 
     for (int level = 0; level < levels; ++level) {
-        data::PcgMeshData next;
-        for (const auto& v : current.vertices())
-            next.add_vertex(v);
-
-        std::unordered_map<int, int> edge_midpoints;
         const auto& verts = current.vertices();
         const auto& tris = current.triangles();
+        if (verts.empty() || tris.size() < 3)
+            break;
 
-        auto midpoint = [&](int a, int b) -> int {
-            const int key = edge_key(a, b);
-            const auto it = edge_midpoints.find(key);
-            if (it != edge_midpoints.end())
-                return it->second;
+        // 1. Weld vertices by position
+        std::unordered_map<std::string, int> pos_to_idx;
+        std::vector<int> weld_remap(verts.size(), -1);
+        std::vector<Vec3> wpos;
+        for (size_t i = 0; i < verts.size(); ++i) {
+            const std::string key = position_key(to_vec3(verts[i]));
+            auto it = pos_to_idx.find(key);
+            if (it == pos_to_idx.end()) {
+                const int idx = static_cast<int>(wpos.size());
+                wpos.push_back(to_vec3(verts[i]));
+                pos_to_idx[key] = idx;
+                weld_remap[i] = idx;
+            } else {
+                weld_remap[i] = it->second;
+            }
+        }
 
-            const Vec3 va = to_vec3(verts[static_cast<size_t>(a)]);
-            const Vec3 vb = to_vec3(verts[static_cast<size_t>(b)]);
-            const int index = static_cast<int>(next.vertices().size());
-            next.add_vertex(to_vertex(scale(add(va, vb), 0.5)));
-            edge_midpoints[key] = index;
-            return index;
+        const int nv = static_cast<int>(wpos.size());
+
+        // Remap triangles, skip degenerate
+        std::vector<int> wtris;
+        wtris.reserve(tris.size());
+        for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+            const int a = weld_remap[tris[i]];
+            const int b = weld_remap[tris[i + 1]];
+            const int c = weld_remap[tris[i + 2]];
+            if (a == b || b == c || a == c)
+                continue;
+            wtris.push_back(a);
+            wtris.push_back(b);
+            wtris.push_back(c);
+        }
+        const int nt = static_cast<int>(wtris.size() / 3);
+        if (nt == 0)
+            break;
+
+        // 2. Build edge → opposite-vertex list and vertex → neighbor set
+        auto ek64 = [](int a, int b) -> int64_t {
+            return static_cast<int64_t>(std::min(a, b)) * 1000000LL + std::max(a, b);
         };
 
-        for (size_t i = 0; i + 2 < tris.size(); i += 3) {
-            const int a = tris[i];
-            const int b = tris[i + 1];
-            const int c = tris[i + 2];
-            const int ab = midpoint(a, b);
-            const int bc = midpoint(b, c);
-            const int ca = midpoint(c, a);
+        std::unordered_map<int64_t, std::vector<int>> edge_opp;
+        std::vector<std::unordered_set<int>> vneigh(nv);
+
+        for (int ti = 0; ti < nt; ++ti) {
+            const int a = wtris[static_cast<size_t>(ti * 3)];
+            const int b = wtris[static_cast<size_t>(ti * 3 + 1)];
+            const int c = wtris[static_cast<size_t>(ti * 3 + 2)];
+            edge_opp[ek64(a, b)].push_back(c);
+            edge_opp[ek64(b, c)].push_back(a);
+            edge_opp[ek64(c, a)].push_back(b);
+            vneigh[a].insert(b);
+            vneigh[b].insert(a);
+            vneigh[b].insert(c);
+            vneigh[c].insert(b);
+            vneigh[c].insert(a);
+            vneigh[a].insert(c);
+        }
+
+        auto is_boundary_edge = [&](int a, int b) -> bool {
+            const auto it = edge_opp.find(ek64(a, b));
+            return it == edge_opp.end() || it->second.size() < 2;
+        };
+
+        // 3. Pre-compute odd vertices (edge midpoints with Loop weights)
+        std::unordered_map<int64_t, int> odd_map;
+        std::vector<Vec3> odd_pos;
+        std::vector<std::pair<int, int>> odd_edges;
+
+        auto get_odd = [&](int a, int b) -> int {
+            const int64_t key = ek64(a, b);
+            auto it = odd_map.find(key);
+            if (it != odd_map.end())
+                return it->second;
+
+            const auto& opps = edge_opp[key];
+            Vec3 p;
+            if (opps.size() >= 2) {
+                // Interior edge: P = 3/8*(v0+v1) + 1/8*(v_opp0+v_opp1)
+                p = add(
+                    scale(add(wpos[a], wpos[b]), 3.0 / 8.0),
+                    scale(add(wpos[opps[0]], wpos[opps[1]]), 1.0 / 8.0));
+            } else {
+                // Boundary edge: simple midpoint
+                p = scale(add(wpos[a], wpos[b]), 0.5);
+            }
+
+            const int idx = static_cast<int>(odd_pos.size());
+            odd_pos.push_back(p);
+            odd_edges.push_back({a, b});
+            odd_map[key] = idx;
+            return idx;
+        };
+
+        for (int ti = 0; ti < nt; ++ti) {
+            const int a = wtris[static_cast<size_t>(ti * 3)];
+            const int b = wtris[static_cast<size_t>(ti * 3 + 1)];
+            const int c = wtris[static_cast<size_t>(ti * 3 + 2)];
+            get_odd(a, b);
+            get_odd(b, c);
+            get_odd(c, a);
+        }
+
+        // 4. Compute even vertices (adjusted original positions)
+        std::vector<Vec3> even_pos(nv);
+        for (int vi = 0; vi < nv; ++vi) {
+            const Vec3& p = wpos[vi];
+            const int n = static_cast<int>(vneigh[vi].size());
+
+            if (n == 0) {
+                even_pos[vi] = p;
+                continue;
+            }
+
+            // Boundary vertices: P' = 3/4*P + 1/8*(prev + next)
+            std::vector<int> bn;
+            for (int nb : vneigh[vi])
+                if (is_boundary_edge(vi, nb))
+                    bn.push_back(nb);
+
+            if (bn.size() >= 2) {
+                even_pos[vi] = add(
+                    scale(p, 3.0 / 4.0),
+                    scale(add(wpos[bn[0]], wpos[bn[1]]), 1.0 / 8.0));
+            } else {
+                // Interior vertex: Loop formula
+                double beta;
+                if (n == 3)
+                    beta = 3.0 / 16.0;
+                else {
+                    const double c = std::cos(2.0 * kPi / n);
+                    beta = (1.0 / n) * (5.0 / 8.0 - std::pow(3.0 / 8.0 + 0.25 * c, 2));
+                }
+
+                Vec3 sum = {0.0, 0.0, 0.0};
+                for (int nb : vneigh[vi])
+                    sum = add(sum, wpos[nb]);
+
+                even_pos[vi] = add(scale(p, 1.0 - n * beta), scale(sum, beta));
+            }
+        }
+
+        // 5. Build output mesh
+        data::PcgMeshData next;
+        for (int vi = 0; vi < nv; ++vi)
+            next.add_vertex(to_vertex(even_pos[vi]));
+        for (const auto& p : odd_pos)
+            next.add_vertex(to_vertex(p));
+
+        // 6. Propagate vertex attributes (colors, UVs, normals)
+        const bool has_colors = current.has_colors();
+        const bool has_uvs = current.has_uvs();
+        const bool has_normals = current.has_normals();
+
+        if (has_colors || has_uvs || has_normals) {
+            // Map welded vertex → first original vertex index
+            std::vector<int> w2o(nv, -1);
+            for (size_t i = 0; i < verts.size(); ++i) {
+                const int wi = weld_remap[i];
+                if (w2o[wi] < 0)
+                    w2o[wi] = static_cast<int>(i);
+            }
+
+            if (has_colors) {
+                std::vector<data::PcgColor> oc(static_cast<size_t>(nv + odd_pos.size()));
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = w2o[vi];
+                    oc[static_cast<size_t>(vi)] = oi >= 0 ? current.colors()[static_cast<size_t>(oi)]
+                                                          : data::PcgColor{};
+                }
+                for (size_t i = 0; i < odd_pos.size(); ++i) {
+                    const int a = odd_edges[i].first;
+                    const int b = odd_edges[i].second;
+                    const int oa = w2o[a], ob = w2o[b];
+                    const auto& ca = oa >= 0 ? current.colors()[static_cast<size_t>(oa)] : data::PcgColor{};
+                    const auto& cb = ob >= 0 ? current.colors()[static_cast<size_t>(ob)] : data::PcgColor{};
+                    oc[static_cast<size_t>(nv + i)] = {
+                        (ca.r + cb.r) * 0.5, (ca.g + cb.g) * 0.5,
+                        (ca.b + cb.b) * 0.5, (ca.a + cb.a) * 0.5};
+                }
+                next.set_colors(std::move(oc));
+            }
+
+            if (has_uvs) {
+                std::vector<data::PcgVec2> ou(static_cast<size_t>(nv + odd_pos.size()));
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = w2o[vi];
+                    ou[static_cast<size_t>(vi)] = oi >= 0 ? current.uvs()[static_cast<size_t>(oi)]
+                                                          : data::PcgVec2{};
+                }
+                for (size_t i = 0; i < odd_pos.size(); ++i) {
+                    const int a = odd_edges[i].first;
+                    const int b = odd_edges[i].second;
+                    const int oa = w2o[a], ob = w2o[b];
+                    const auto& ua = oa >= 0 ? current.uvs()[static_cast<size_t>(oa)] : data::PcgVec2{};
+                    const auto& ub = ob >= 0 ? current.uvs()[static_cast<size_t>(ob)] : data::PcgVec2{};
+                    ou[static_cast<size_t>(nv + i)] = {(ua.u + ub.u) * 0.5, (ua.v + ub.v) * 0.5};
+                }
+                next.set_uvs(std::move(ou));
+            }
+
+            if (has_normals) {
+                std::vector<data::PcgVertex> on(static_cast<size_t>(nv + odd_pos.size()));
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = w2o[vi];
+                    on[static_cast<size_t>(vi)] = oi >= 0 ? current.normals()[static_cast<size_t>(oi)]
+                                                          : data::PcgVertex{};
+                }
+                for (size_t i = 0; i < odd_pos.size(); ++i) {
+                    const int a = odd_edges[i].first;
+                    const int b = odd_edges[i].second;
+                    const int oa = w2o[a], ob = w2o[b];
+                    const auto& na = oa >= 0 ? current.normals()[static_cast<size_t>(oa)] : data::PcgVertex{};
+                    const auto& nb = ob >= 0 ? current.normals()[static_cast<size_t>(ob)] : data::PcgVertex{};
+                    on[static_cast<size_t>(nv + i)] = {
+                        (na.x + nb.x) * 0.5, (na.y + nb.y) * 0.5, (na.z + nb.z) * 0.5};
+                }
+                next.set_normals(std::move(on));
+            }
+        }
+
+        // 7. Create sub-triangles
+        const int odd_base = nv;
+        for (int ti = 0; ti < nt; ++ti) {
+            const int a = wtris[static_cast<size_t>(ti * 3)];
+            const int b = wtris[static_cast<size_t>(ti * 3 + 1)];
+            const int c = wtris[static_cast<size_t>(ti * 3 + 2)];
+            const int ab = odd_base + odd_map[ek64(a, b)];
+            const int bc = odd_base + odd_map[ek64(b, c)];
+            const int ca = odd_base + odd_map[ek64(c, a)];
 
             next.add_triangle(a, ab, ca);
             next.add_triangle(ab, b, bc);
@@ -528,6 +735,28 @@ data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
     }
 
     return current;
+}
+
+data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int levels)
+{
+    if (geometry.points().empty() || geometry.faces().empty())
+        return geometry;
+
+    data::PcgMeshData mesh;
+    for (const auto& p : geometry.points())
+        mesh.add_vertex({p.x, p.y, p.z});
+    for (const auto& face : geometry.faces()) {
+        if (face.size() < 3)
+            continue;
+        const int i0 = face[0];
+        for (size_t i = 1; i + 1 < face.size(); ++i)
+            mesh.add_triangle(i0, face[i], face[i + 1]);
+    }
+
+    const data::PcgMeshData result = subdivide_mesh(mesh, levels);
+    data::PcgGeometry out = data::geometry_from_mesh(result);
+    out.detail() = geometry.detail();
+    return out;
 }
 
 data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int segments,

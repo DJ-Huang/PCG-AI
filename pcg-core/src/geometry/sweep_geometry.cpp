@@ -406,6 +406,18 @@ data::PcgMeshData sweep_curve_profile(const CurveProfile& profile,
         }
     }
 
+    if (options.backbone_closed && frame_count > 1) {
+        const size_t last = frame_count - 1;
+        for (size_t ei = 0; ei < edge_count; ++ei) {
+            const size_t nj = (ei + 1) % profile_count;
+            const int a0 = rings[last][ei];
+            const int b0 = rings[last][nj];
+            const int a1 = rings[0][ei];
+            const int b1 = rings[0][nj];
+            append_side_quad(result, a0, b0, b1, a1);
+        }
+    }
+
     const bool forms_tube = profile.closed || options.backbone_closed;
     if (!forms_tube || options.backbone_closed)
         return result;
@@ -479,6 +491,19 @@ data::PcgGeometry sweep_curve_profile_geometry(const CurveProfile& profile,
             const int b0 = rings[fi][nj];
             const int a1 = rings[fi + 1][ei];
             const int b1 = rings[fi + 1][nj];
+            geometry.faces_mut().push_back({a0, b0, b1, a1});
+            geometry.groups().add(geometry::GroupDomain::Face, "side", side_face_index++);
+        }
+    }
+
+    if (options.backbone_closed && frame_count > 1) {
+        const size_t last = frame_count - 1;
+        for (size_t ei = 0; ei < edge_count; ++ei) {
+            const size_t nj = (ei + 1) % profile_count;
+            const int a0 = rings[last][ei];
+            const int b0 = rings[last][nj];
+            const int a1 = rings[0][ei];
+            const int b1 = rings[0][nj];
             geometry.faces_mut().push_back({a0, b0, b1, a1});
             geometry.groups().add(geometry::GroupDomain::Face, "side", side_face_index++);
         }

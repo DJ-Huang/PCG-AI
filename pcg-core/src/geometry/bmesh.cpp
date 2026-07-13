@@ -105,7 +105,9 @@ struct UnionFind {
     }
 };
 
-std::vector<int> trace_boundary_loop(const std::unordered_map<int, std::vector<int>>& boundary_adj) {
+std::vector<int> trace_boundary_loop(
+    const std::unordered_map<int, std::vector<int>>& boundary_adj,
+    const std::vector<Vec3>& positions) {
     if (boundary_adj.empty())
         return {};
 
@@ -119,14 +121,43 @@ std::vector<int> trace_boundary_loop(const std::unordered_map<int, std::vector<i
         if (it == boundary_adj.end())
             break;
 
-        int next = -1;
+        // Filter out prev to get valid candidates
+        std::vector<int> valid;
         for (int cand : it->second) {
-            if (cand != prev) {
-                next = cand;
-                break;
+            if (cand != prev)
+                valid.push_back(cand);
+        }
+
+        if (valid.empty())
+            break;
+
+        int next;
+        if (valid.size() == 1) {
+            next = valid[0];
+        } else {
+            // Degree > 2: pick the candidate with the smallest turn from
+            // the incoming direction (highest dot product with incoming).
+            // This follows the correct boundary loop at pinch points where
+            // multiple boundary loops share a vertex.
+            const Vec3 incoming = (prev >= 0)
+                ? sub(positions[static_cast<size_t>(current)], positions[static_cast<size_t>(prev)])
+                : sub(positions[static_cast<size_t>(valid[0])], positions[static_cast<size_t>(current)]);
+            const Vec3 in_norm = normalize(incoming);
+
+            double best_dot = -2.0;
+            next = valid[0];
+            for (int cand : valid) {
+                const Vec3 outgoing = normalize(
+                    sub(positions[static_cast<size_t>(cand)], positions[static_cast<size_t>(current)]));
+                const double d = dot(in_norm, outgoing);
+                if (d > best_dot) {
+                    best_dot = d;
+                    next = cand;
+                }
             }
         }
-        if (next < 0 || next == start)
+
+        if (next == start)
             break;
 
         loop.push_back(next);
@@ -355,7 +386,7 @@ BMesh bmesh_from_mesh(const data::PcgMeshData& mesh, const BMeshBuildOptions& op
             }
         }
 
-        std::vector<int> loop = trace_boundary_loop(boundary_adj);
+        std::vector<int> loop = trace_boundary_loop(boundary_adj, welded.positions);
         if (loop.size() < 3) {
             for (int ti : tris) {
                 const auto& tri = welded.triangles[static_cast<size_t>(ti)];

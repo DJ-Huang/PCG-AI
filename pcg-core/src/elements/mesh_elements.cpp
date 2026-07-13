@@ -58,11 +58,19 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing node");
 
+        const int levels = ctx.node->data.value("levels", 1);
+
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            if (!geometry->points().empty()) {
+                emit_geometry(ctx, subdivide_geometry(*geometry, levels));
+                return PCG_OK;
+            }
+        }
+
         const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "SubdivideMesh missing mesh input");
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing mesh input");
 
-        const int levels = ctx.node->data.value("levels", 1);
         emit_mesh(ctx, subdivide_mesh(mesh, levels));
         return PCG_OK;
     }
