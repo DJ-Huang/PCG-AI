@@ -926,52 +926,63 @@ namespace DJTechEditor.PCG.Graph
 
             var currentVal = val?.ToString() ?? "";
 
-            // TextField for manual entry (always visible)
+            // Houdini-style: text field + expand button
+            var row = new VisualElement
+            {
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
+
             var textField = new TextField { value = currentVal };
-            textField.style.marginBottom = 2;
+            textField.style.flexGrow = 1;
+            textField.style.flexShrink = 1;
             textField.RegisterValueChangedCallback(evt =>
                 m_GraphView.WithUndo("Change Group", () => onSet(evt.newValue)));
-            container.Add(textField);
+            row.Add(textField);
 
-            // Quick-pick chips for available groups
+            var expandBtn = new Button { text = "\u25be", tooltip = "Browse available groups" };
+            expandBtn.style.width = 22;
+            expandBtn.style.flexShrink = 0;
+            expandBtn.style.marginLeft = 2;
+
             if (available.Count > 0)
             {
-                var chipsRow = new VisualElement
+                expandBtn.clicked += () =>
                 {
-                    style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap },
-                };
+                    var menu = new GenericMenu();
+                    var bySource = available
+                        .GroupBy(g => g.sourceNodeType ?? "Unknown")
+                        .OrderBy(g => g.Key);
 
-                foreach (var g in available)
-                {
-                    var chip = new Button
+                    foreach (var sourceGroup in bySource)
                     {
-                        text = g.name,
-                        tooltip = $"{g.label ?? g.name} ({g.domain}) from {g.sourceNodeType}",
-                    };
-                    chip.style.fontSize = 9;
-                    chip.style.paddingLeft = 6;
-                    chip.style.paddingRight = 6;
-                    chip.style.paddingTop = 1;
-                    chip.style.paddingBottom = 1;
-                    chip.style.marginRight = 2;
-                    chip.style.marginBottom = 2;
-                    chip.style.unityFontStyleAndWeight = currentVal == g.name ? FontStyle.Bold : FontStyle.Normal;
-
-                    var capturedName = g.name;
-                    chip.clicked += () =>
-                    {
-                        m_GraphView.WithUndo("Pick Group", () =>
+                        foreach (var g in sourceGroup)
                         {
-                            onSet(capturedName);
-                            textField.value = capturedName;
-                            NotifyGraphChanged();
-                        });
-                    };
-                    chipsRow.Add(chip);
-                }
+                            var capturedName = g.name;
+                            var path = $"{sourceGroup.Key}/{g.name} ({g.domain})";
+                            var isCurrent = textField.value == capturedName;
+                            menu.AddItem(new GUIContent(path), isCurrent, () =>
+                            {
+                                m_GraphView.WithUndo("Pick Group", () =>
+                                {
+                                    onSet(capturedName);
+                                    textField.value = capturedName;
+                                    NotifyGraphChanged();
+                                });
+                            });
+                        }
+                    }
 
-                container.Add(chipsRow);
+                    var r = expandBtn.worldBound;
+                    menu.DropDown(new Rect(r.x, r.y + r.height, 0, 0));
+                };
             }
+            else
+            {
+                expandBtn.SetEnabled(false);
+            }
+
+            row.Add(expandBtn);
+            container.Add(row);
 
             return container;
         }
@@ -989,75 +1000,76 @@ namespace DJTechEditor.PCG.Graph
                 available = available.Where(g => g.domain == prop.groupDomain).ToList();
 
             var currentStr = val?.ToString() ?? "";
-            var selected = currentStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrEmpty(s))
-                .ToList();
 
-            // Checkboxes for available groups
-            if (available.Count > 0)
+            // Houdini-style: text field + expand button
+            var row = new VisualElement
             {
-                var availableNames = new HashSet<string>(available.Select(g => g.name));
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
 
-                foreach (var g in available)
-                {
-                    var groupName = g.name;
-                    var toggle = new Toggle
-                    {
-                        value = selected.Contains(groupName),
-                        text = $"{groupName} ({g.domain})",
-                        tooltip = g.label ?? groupName,
-                    };
-                    toggle.style.fontSize = 10;
-                    toggle.style.marginBottom = 1;
-
-                    toggle.RegisterValueChangedCallback(evt =>
-                    {
-                        m_GraphView.WithUndo("Toggle Group", () =>
-                        {
-                            if (evt.newValue && !selected.Contains(groupName))
-                                selected.Add(groupName);
-                            else if (!evt.newValue)
-                                selected.Remove(groupName);
-
-                            onSet(string.Join(",", selected));
-                            NotifyGraphChanged();
-                        });
-                    });
-                    container.Add(toggle);
-                }
-
-                // Show custom entries that aren't in available groups
-                foreach (var custom in selected.Where(s => !availableNames.Contains(s)))
-                {
-                    var toggle = new Toggle
-                    {
-                        value = true,
-                        text = $"{custom} (custom)",
-                    };
-                    toggle.style.fontSize = 10;
-                    toggle.style.marginBottom = 1;
-
-                    var capturedCustom = custom;
-                    toggle.RegisterValueChangedCallback(evt =>
-                    {
-                        m_GraphView.WithUndo("Toggle Group", () =>
-                        {
-                            selected.Remove(capturedCustom);
-                            onSet(string.Join(",", selected));
-                            NotifyGraphChanged();
-                        });
-                    });
-                    container.Add(toggle);
-                }
-            }
-
-            // TextField for manual comma-separated entry
             var textField = new TextField { value = currentStr };
-            textField.style.marginTop = 2;
+            textField.style.flexGrow = 1;
+            textField.style.flexShrink = 1;
             textField.RegisterValueChangedCallback(evt =>
                 m_GraphView.WithUndo("Change Groups", () => onSet(evt.newValue)));
-            container.Add(textField);
+            row.Add(textField);
+
+            var expandBtn = new Button { text = "\u25be", tooltip = "Browse available groups" };
+            expandBtn.style.width = 22;
+            expandBtn.style.flexShrink = 0;
+            expandBtn.style.marginLeft = 2;
+
+            if (available.Count > 0)
+            {
+                expandBtn.clicked += () =>
+                {
+                    var menu = new GenericMenu();
+                    var currentSelected = new HashSet<string>(
+                        textField.value
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(s => s.Trim())
+                            .Where(s => !string.IsNullOrEmpty(s)));
+
+                    var bySource = available
+                        .GroupBy(g => g.sourceNodeType ?? "Unknown")
+                        .OrderBy(g => g.Key);
+
+                    foreach (var sourceGroup in bySource)
+                    {
+                        foreach (var g in sourceGroup)
+                        {
+                            var capturedName = g.name;
+                            var path = $"{sourceGroup.Key}/{g.name} ({g.domain})";
+                            var isSelected = currentSelected.Contains(capturedName);
+                            menu.AddItem(new GUIContent(path), isSelected, () =>
+                            {
+                                m_GraphView.WithUndo("Toggle Group", () =>
+                                {
+                                    if (currentSelected.Contains(capturedName))
+                                        currentSelected.Remove(capturedName);
+                                    else
+                                        currentSelected.Add(capturedName);
+
+                                    var newVal = string.Join(",", currentSelected);
+                                    onSet(newVal);
+                                    textField.value = newVal;
+                                    NotifyGraphChanged();
+                                });
+                            });
+                        }
+                    }
+
+                    var r = expandBtn.worldBound;
+                    menu.DropDown(new Rect(r.x, r.y + r.height, 0, 0));
+                };
+            }
+            else
+            {
+                expandBtn.SetEnabled(false);
+            }
+
+            row.Add(expandBtn);
+            container.Add(row);
 
             return container;
         }

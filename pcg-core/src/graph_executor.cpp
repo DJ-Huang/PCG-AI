@@ -41,11 +41,13 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
 
     auto groups = nlohmann::json::array();
     static const char* kDomainNames[] = {"point", "edge", "face"};
+    const auto& points = geometry.points();
     for (int d = 0; d < 3; ++d) {
         const auto domain = static_cast<geometry::GroupDomain>(d);
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
             auto memberArray = nlohmann::json::array();
+            auto edgeEndpoints = nlohmann::json::array();
             for (int id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
                     // Expand face index into constituent mesh triangles
@@ -60,13 +62,32 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                 } else {
                     memberArray.push_back(id);
                 }
+                if (d == static_cast<int>(geometry::GroupDomain::Edge)) {
+                    const int64_t key = static_cast<int64_t>(id);
+                    const int a = static_cast<int>(key / 1000000);
+                    const int b = static_cast<int>(key % 1000000);
+                    if (a >= 0 && a < static_cast<int>(points.size()) &&
+                        b >= 0 && b < static_cast<int>(points.size())) {
+                        const auto& pa = points[static_cast<size_t>(a)];
+                        const auto& pb = points[static_cast<size_t>(b)];
+                        edgeEndpoints.push_back(pa.x);
+                        edgeEndpoints.push_back(pa.y);
+                        edgeEndpoints.push_back(pa.z);
+                        edgeEndpoints.push_back(pb.x);
+                        edgeEndpoints.push_back(pb.y);
+                        edgeEndpoints.push_back(pb.z);
+                    }
+                }
             }
-            groups.push_back({
+            auto entry = nlohmann::json::object({
                 {"name", name},
                 {"domain", kDomainNames[d]},
                 {"count", static_cast<int>(memberArray.size())},
                 {"members", std::move(memberArray)},
             });
+            if (d == static_cast<int>(geometry::GroupDomain::Edge))
+                entry["edgeEndpoints"] = std::move(edgeEndpoints);
+            groups.push_back(std::move(entry));
         }
     }
     auto obj = nlohmann::json::object();

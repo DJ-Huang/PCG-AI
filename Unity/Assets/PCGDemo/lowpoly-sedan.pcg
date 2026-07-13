@@ -152,12 +152,6 @@
       "data": {"label": "LowPolySedan", "__nodeTitle": ""}
     },
     {
-      "id": "body_bevel",
-      "type": "BevelMesh",
-      "position": { "x": 200, "y": 509.5 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
-    },
-    {
       "id": "body_sweep",
       "type": "SweepAlongSpline",
       "position": { "x": 200, "y": 160 },
@@ -168,6 +162,12 @@
       "type": "GroupCreate",
       "position": { "x": 187.5, "y": 320 },
       "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "body_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 200, "y": 509.5 },
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
     }
   ],
   "edges": [

@@ -1522,6 +1522,7 @@ namespace DJTechEditor.PCG.Graph
             public string domain;
             public int count;
             public long[] members;
+            public float[] edgeEndpoints;
         }
 
         [System.Serializable]
@@ -1536,6 +1537,7 @@ namespace DJTechEditor.PCG.Graph
             public string domain;
             public int count;
             public long[] members;
+            public float[] edgeEndpoints;
         }
 
         private static bool IsGroupDomain(SceneEditDomain domain) =>
@@ -1569,6 +1571,7 @@ namespace DJTechEditor.PCG.Graph
                         domain = g.domain,
                         count = g.count,
                         members = g.members,
+                        edgeEndpoints = g.edgeEndpoints,
                     });
                 }
             }
@@ -1716,15 +1719,29 @@ namespace DJTechEditor.PCG.Graph
             if (ctx.Domain == SceneEditDomain.Edge)
             {
                 Handles.color = new Color(0f, 1f, 0.8f, 0.9f);
-                foreach (var key in group.members)
+                if (group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6)
                 {
-                    int a = (int)(key / 1000000);
-                    int b = (int)(key % 1000000);
-                    if (a < 0 || b < 0 || a >= vertices.Length || b >= vertices.Length)
-                        continue;
-                    var p0 = l2w.MultiplyPoint(vertices[a]);
-                    var p1 = l2w.MultiplyPoint(vertices[b]);
-                    Handles.DrawAAPolyLine(4f, p0, p1);
+                    for (int i = 0; i + 5 < group.edgeEndpoints.Length; i += 6)
+                    {
+                        var p0 = l2w.MultiplyPoint(new Vector3(
+                            group.edgeEndpoints[i], group.edgeEndpoints[i + 1], group.edgeEndpoints[i + 2]));
+                        var p1 = l2w.MultiplyPoint(new Vector3(
+                            group.edgeEndpoints[i + 3], group.edgeEndpoints[i + 4], group.edgeEndpoints[i + 5]));
+                        Handles.DrawAAPolyLine(4f, p0, p1);
+                    }
+                }
+                else
+                {
+                    foreach (var key in group.members)
+                    {
+                        int a = (int)(key / 1000000);
+                        int b = (int)(key % 1000000);
+                        if (a < 0 || b < 0 || a >= vertices.Length || b >= vertices.Length)
+                            continue;
+                        var p0 = l2w.MultiplyPoint(vertices[a]);
+                        var p1 = l2w.MultiplyPoint(vertices[b]);
+                        Handles.DrawAAPolyLine(4f, p0, p1);
+                    }
                 }
             }
             else if (ctx.Domain == SceneEditDomain.Face)
