@@ -137,7 +137,7 @@ namespace DJTechRuntime.PCG
         public static System.Action EditorAfterPreviewCookApplied;
 
         /// <summary>Last cook result JSON (contains groups + node_stats). Read by Graph Editor info panel.</summary>
-        public static string LastCookResultJson;
+        public string LastCookResultJson;
 #endif
 
 #if UNITY_EDITOR

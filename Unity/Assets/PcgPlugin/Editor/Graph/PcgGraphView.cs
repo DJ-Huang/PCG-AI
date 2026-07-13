@@ -118,7 +118,7 @@ namespace DJTechEditor.PCG.Graph
 
         internal bool TryGetNodeMeshStats(string nodeId, out PcgNodeMeshStats stats)
         {
-            var json = PcgGraphComponent.LastCookResultJson;
+            var json = ResolveCookResultJson();
             if (json != m_LastStatsJson)
             {
                 m_LastStatsJson = json;
@@ -143,6 +143,26 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
             return m_NodeMeshStats.TryGetValue(nodeId, out stats);
+        }
+
+        private string ResolveCookResultJson()
+        {
+            if (m_HostWindow is PcgGraphEditorWindow window)
+            {
+                var assetPath = window.CurrentAssetPath;
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    foreach (var component in UnityEngine.Object.FindObjectsOfType<PcgGraphComponent>())
+                    {
+                        if (component == null || component.GraphAsset == null)
+                            continue;
+                        var componentPath = UnityEditor.AssetDatabase.GetAssetPath(component.GraphAsset);
+                        if (componentPath == assetPath)
+                            return component.LastCookResultJson;
+                    }
+                }
+            }
+            return null;
         }
 
         public PcgGraphView()

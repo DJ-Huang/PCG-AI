@@ -91,18 +91,18 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
     const auto* bytes = static_cast<const uint8_t*>(buffer);
 
     uint32_t magic = 0;
-    if (!read_u32(bytes + 0, buffer_size, magic) || magic != kPcgMeshBinaryMagic)
+    if (!read_u32(bytes + 0, buffer_size - 0, magic) || magic != kPcgMeshBinaryMagic)
         return false;
 
     uint32_t version = 0;
-    if (!read_u32(bytes + 4, buffer_size, version))
+    if (!read_u32(bytes + 4, buffer_size - 4, version))
         return false;
 
     uint32_t vertex_count = 0;
     uint32_t index_count = 0;
-    if (!read_u32(bytes + 8, buffer_size, vertex_count))
+    if (!read_u32(bytes + 8, buffer_size - 8, vertex_count))
         return false;
-    if (!read_u32(bytes + 12, buffer_size, index_count))
+    if (!read_u32(bytes + 12, buffer_size - 12, index_count))
         return false;
 
     if (version == 1u) {
@@ -110,6 +110,9 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
                              static_cast<int>(vertex_count) * 3 * static_cast<int>(sizeof(float)) +
                              static_cast<int>(index_count) * static_cast<int>(sizeof(uint32_t));
         if (buffer_size < required)
+            return false;
+
+        if (index_count % 3 != 0)
             return false;
 
         out = PcgMeshData{};
@@ -130,6 +133,8 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
             uint32_t index = 0;
             std::memcpy(&index, bytes + offset, sizeof(index));
             offset += static_cast<int>(sizeof(index));
+            if (index >= vertex_count)
+                return false;
             out.triangles_mut().push_back(static_cast<int>(index));
         }
 
@@ -141,7 +146,7 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
             return false;
 
         uint32_t flags = 0;
-        if (!read_u32(bytes + 16, buffer_size, flags))
+        if (!read_u32(bytes + 16, buffer_size - 16, flags))
             return false;
 
         const bool has_normals = (flags & kPcgMeshBinaryFlagHasNormals) != 0u;

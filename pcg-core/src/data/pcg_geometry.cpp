@@ -230,6 +230,7 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
     std::vector<PcgVertex> render_positions;
     std::vector<PcgVertex> render_normals;
     std::vector<PcgVec3> normal_accumulators;
+    std::vector<int> render_vertex_first_face;  // first face index per render vertex (for degenerate fallback)
 
     auto get_render_vertex = [&](int corner_id) -> int {
         const auto& ci = corners[static_cast<size_t>(corner_id)];
@@ -242,6 +243,7 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         render_positions.push_back({p.x, p.y, p.z});
         render_normals.push_back({0.0, 0.0, 0.0});
         normal_accumulators.push_back({0.0, 0.0, 0.0});
+        render_vertex_first_face.push_back(ci.face_index);
         render_vertex_map[key] = idx;
         return idx;
     };
@@ -305,23 +307,10 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
             render_normals[i] = {na.x / len, na.y / len, na.z / len};
         } else {
             // Fallback: use the polygon normal of the first face this vertex belongs to
-            bool found = false;
-            for (const auto& tc : triangle_corners) {
-                for (const auto& t : tc) {
-                    const auto& ci = corners[static_cast<size_t>(t.source_corner)];
-                    // Check if this render vertex corresponds to this corner
-                    RenderKey key{ci.point_index, find(t.source_corner)};
-                    auto it = render_vertex_map.find(key);
-                    if (it != render_vertex_map.end() && it->second == static_cast<int>(i)) {
-                        const auto& fn = face_normals[static_cast<size_t>(ci.face_index)];
-                        if (fn.x != 0.0 || fn.y != 0.0 || fn.z != 0.0) {
-                            render_normals[i] = {fn.x, fn.y, fn.z};
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                if (found) break;
+            const int face_idx = render_vertex_first_face[i];
+            const auto& fn = face_normals[static_cast<size_t>(face_idx)];
+            if (fn.x != 0.0 || fn.y != 0.0 || fn.z != 0.0) {
+                render_normals[i] = {fn.x, fn.y, fn.z};
             }
             // If still zero, leave as {0,0,0}
         }

@@ -965,9 +965,10 @@ PcgResultCode pcg_mesh_binary_size_for_counts(int vertex_count,
     if (!out_size || vertex_count < 0 || index_count < 0)
         return PCG_ERR_EXECUTION;
 
-    *out_size = pcg::internal::data::kPcgMeshBinaryHeaderSize +
+    *out_size = pcg::internal::data::kPcgMeshBinaryV2HeaderSize +
                 vertex_count * 3 * static_cast<int>(sizeof(float)) +
-                index_count * static_cast<int>(sizeof(uint32_t));
+                index_count * static_cast<int>(sizeof(uint32_t)) +
+                vertex_count * 3 * static_cast<int>(sizeof(float));  // normals (worst-case)
     return PCG_OK;
 }
 

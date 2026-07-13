@@ -1500,7 +1500,7 @@ namespace DJTechEditor.PCG.Graph
             public string name;
             public string domain;
             public int count;
-            public int[] members;
+            public long[] members;
         }
 
         [System.Serializable]
@@ -1514,7 +1514,7 @@ namespace DJTechEditor.PCG.Graph
             public string name;
             public string domain;
             public int count;
-            public int[] members;
+            public long[] members;
         }
 
         private static bool IsGroupDomain(SceneEditDomain domain) =>
@@ -1700,8 +1700,8 @@ namespace DJTechEditor.PCG.Graph
                 Handles.color = new Color(0f, 1f, 0.8f, 0.9f);
                 foreach (var key in group.members)
                 {
-                    int a = (int)((long)key / 1000000);
-                    int b = (int)((long)key % 1000000);
+                    int a = (int)(key / 1000000);
+                    int b = (int)(key % 1000000);
                     if (a < 0 || b < 0 || a >= vertices.Length || b >= vertices.Length)
                         continue;
                     var p0 = l2w.MultiplyPoint(vertices[a]);
@@ -1715,7 +1715,7 @@ namespace DJTechEditor.PCG.Graph
                 Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
                 foreach (var faceIdx in group.members)
                 {
-                    int baseIdx = faceIdx * 3;
+                    int baseIdx = (int)faceIdx * 3;
                     if (triangles == null || baseIdx + 2 >= triangles.Length)
                         continue;
                     int v0 = triangles[baseIdx];
@@ -1732,7 +1732,7 @@ namespace DJTechEditor.PCG.Graph
                 Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
                 foreach (var faceIdx in group.members)
                 {
-                    int baseIdx = faceIdx * 3;
+                    int baseIdx = (int)faceIdx * 3;
                     if (triangles == null || baseIdx + 2 >= triangles.Length)
                         continue;
                     int v0 = triangles[baseIdx];
@@ -1753,7 +1753,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     if (ptIdx < 0 || ptIdx >= vertices.Length)
                         continue;
-                    var p = l2w.MultiplyPoint(vertices[ptIdx]);
+                    var p = l2w.MultiplyPoint(vertices[(int)ptIdx]);
                     Handles.SphereHandleCap(0, p, Quaternion.identity, 0.02f, EventType.Repaint);
                 }
             }

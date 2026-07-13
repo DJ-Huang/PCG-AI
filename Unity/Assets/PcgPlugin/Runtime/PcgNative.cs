@@ -535,6 +535,7 @@ namespace DJTechRuntime.PCG
                     MeshBinary = meshBinary,
                     VertexCount = vertexCount,
                     IndexCount = indexCount,
+                    Json = ReadNullTerminatedUtf8(jsonBuf),
                     CookNodesExecuted = cookStats.nodes_executed,
                     CookNodesSkipped = cookStats.nodes_skipped,
                 };
