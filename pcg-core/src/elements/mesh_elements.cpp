@@ -2,6 +2,7 @@
 
 #include "elements/element_utils.hpp"
 #include "elements/mesh_algorithms.hpp"
+#include "elements/spline_algorithms.hpp"
 #include "texture_runtime.hpp"
 
 namespace pcg::internal::elements {
@@ -195,9 +196,85 @@ public:
 
 } // namespace
 
+class CreateCylinderMeshElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CreateCylinderMesh"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateCylinderMesh missing node");
+
+        const double radius = ctx.node->data.value("radius", 1.0);
+        const double height = ctx.node->data.value("height", 2.0);
+        const int radial_segments = ctx.node->data.value("radialSegments", 16);
+        const int height_segments = ctx.node->data.value("heightSegments", 1);
+        const bool cap_top = ctx.node->data.value("capTop", true);
+        const bool cap_bottom = ctx.node->data.value("capBottom", true);
+
+        data::PcgMeshData mesh = create_cylinder_mesh(radius, height,
+                                                       radial_segments, height_segments,
+                                                       cap_top, cap_bottom);
+        if (mesh.vertices().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateCylinderMesh invalid parameters");
+
+        if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in"))
+        {
+            const int vertex_offset = static_cast<int>(mesh.vertices().size());
+            for (const auto& v : input->vertices())
+                mesh.vertices_mut().push_back(v);
+            for (int idx : input->triangles())
+                mesh.triangles_mut().push_back(idx + vertex_offset);
+        }
+        else if (const nlohmann::json* input = ctx.inputs.find_json("in"))
+        {
+            const data::PcgMeshData input_mesh = parse_mesh_input(*input);
+            const int vertex_offset = static_cast<int>(mesh.vertices().size());
+            for (const auto& v : input_mesh.vertices())
+                mesh.vertices_mut().push_back(v);
+            for (int idx : input_mesh.triangles())
+                mesh.triangles_mut().push_back(idx + vertex_offset);
+        }
+
+        emit_mesh(ctx, std::move(mesh));
+        return PCG_OK;
+    }
+};
+
+class RevolveMeshElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "RevolveMesh"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "RevolveMesh missing node");
+
+        data::PcgSplineData profile = get_splines_input(ctx, "profile", "RevolveMesh missing profile input");
+        if (profile.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "RevolveMesh profile has no splines");
+
+        RevolveGeometryOptions opts;
+        opts.axis = ctx.node->data.value("axis", "y");
+        opts.segments = ctx.node->data.value("segments", 16);
+        opts.close_profile = ctx.node->data.value("closeProfile", false);
+        opts.cap_start = ctx.node->data.value("capStart", false);
+        opts.cap_end = ctx.node->data.value("capEnd", false);
+
+        data::PcgGeometry geo = revolve_geometry(profile, opts);
+        if (geo.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "RevolveMesh produced empty geometry");
+
+        emit_geometry(ctx, std::move(geo));
+        return PCG_OK;
+    }
+};
+
 void register_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("CreateBoxMesh", std::make_unique<CreateBoxMeshElement>());
+    map.emplace("CreateCylinderMesh", std::make_unique<CreateCylinderMeshElement>());
+    map.emplace("RevolveMesh", std::make_unique<RevolveMeshElement>());
     map.emplace("SubdivideMesh", std::make_unique<SubdivideMeshElement>());
     map.emplace("BevelMesh", std::make_unique<BevelMeshElement>());
     map.emplace("MeshNoiseDeform", std::make_unique<MeshNoiseDeformElement>());

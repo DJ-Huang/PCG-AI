@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "cyl",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "radius": 1.0,
+        "height": 2.0,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true
+      }
+    },
+    {
+      "id": "uv",
+      "type": "UVTexture",
+      "position": { "x": 0, "y": 200 },
+      "data": {
+        "projection": "cylindrical",
+        "axis": "y",
+        "scaleU": 1.0,
+        "scaleV": 1.0,
+        "offsetU": 0.0,
+        "offsetV": 0.0
+      }
+    },
+    {
+      "id": "color",
+      "type": "VertexColor",
+      "position": { "x": 0, "y": 400 },
+      "data": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 0.8
+      }
+    },
+    {
+      "id": "material",
+      "type": "AssignMaterial",
+      "position": { "x": 0, "y": 600 },
+      "data": {
+        "materialName": "yellow_paint"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 800 },
+      "data": { "label": "Color UV Material" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "cyl", "target": "uv", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2", "source": "uv", "target": "color", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3", "source": "color", "target": "material", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e4", "source": "material", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

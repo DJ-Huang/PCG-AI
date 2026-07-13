@@ -7,6 +7,8 @@
 #include "elements/spline_elements.hpp"
 #include "elements/spline_mesh_elements.hpp"
 #include "elements/structural_elements.hpp"
+#include "elements/material_elements.hpp"
+#include "elements/uv_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -182,6 +184,8 @@ void register_builtin_elements()
     register_mesh_scatter_elements(map);
     register_spline_elements(map);
     register_spline_mesh_elements(map);
+    register_material_elements(map);
+    register_uv_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

@@ -145,6 +145,8 @@ namespace DJTechRuntime.PCG
 
                     int headerSize;
                     bool hasNormals = false;
+                    bool hasColors = false;
+                    bool hasUVs = false;
 
                     if (version == PcgNative.MeshBinaryVersion2)
                     {
@@ -156,6 +158,8 @@ namespace DJTechRuntime.PCG
                         }
                         var flags = *(uint*)(ptr + 16);
                         hasNormals = (flags & PcgNative.MeshBinaryFlagHasNormals) != 0;
+                        hasColors = (flags & PcgNative.MeshBinaryFlagHasColors) != 0;
+                        hasUVs = (flags & PcgNative.MeshBinaryFlagHasUVs) != 0;
                     }
                     else if (version == 1u)
                     {
@@ -170,6 +174,10 @@ namespace DJTechRuntime.PCG
                     var required = headerSize + vertexCount * 12 + indexCount * 4;
                     if (hasNormals)
                         required += vertexCount * 12;
+                    if (hasColors)
+                        required += vertexCount * 16;
+                    if (hasUVs)
+                        required += vertexCount * 8;
                     if (data.Length < required)
                     {
                         error = $"Mesh binary truncated (need {required} bytes, got {data.Length}).";
@@ -210,6 +218,36 @@ namespace DJTechRuntime.PCG
                     else
                     {
                         mesh.RecalculateNormals();
+                    }
+
+                    if (hasColors)
+                    {
+                        var colors = new Color[vertexCount];
+                        var colorOffset = indexOffset + indexCount * 4;
+                        if (hasNormals)
+                            colorOffset += vertexCount * 12;
+                        fixed (Color* dst = colors)
+                        {
+                            Buffer.MemoryCopy(ptr + colorOffset, dst, vertexCount * 16,
+                                vertexCount * 16);
+                        }
+                        mesh.colors = colors;
+                    }
+
+                    if (hasUVs)
+                    {
+                        var uvs = new Vector2[vertexCount];
+                        var uvOffset = indexOffset + indexCount * 4;
+                        if (hasNormals)
+                            uvOffset += vertexCount * 12;
+                        if (hasColors)
+                            uvOffset += vertexCount * 16;
+                        fixed (Vector2* dst = uvs)
+                        {
+                            Buffer.MemoryCopy(ptr + uvOffset, dst, vertexCount * 8,
+                                vertexCount * 8);
+                        }
+                        mesh.uv = uvs;
                     }
 
                     mesh.RecalculateTangents();

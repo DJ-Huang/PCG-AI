@@ -968,7 +968,9 @@ PcgResultCode pcg_mesh_binary_size_for_counts(int vertex_count,
     *out_size = pcg::internal::data::kPcgMeshBinaryV2HeaderSize +
                 vertex_count * 3 * static_cast<int>(sizeof(float)) +
                 index_count * static_cast<int>(sizeof(uint32_t)) +
-                vertex_count * 3 * static_cast<int>(sizeof(float));  // normals (worst-case)
+                vertex_count * 3 * static_cast<int>(sizeof(float)) +   // normals (worst-case)
+                vertex_count * 4 * static_cast<int>(sizeof(float)) +   // colors  (worst-case)
+                vertex_count * 2 * static_cast<int>(sizeof(float));    // uvs     (worst-case)
     return PCG_OK;
 }
 

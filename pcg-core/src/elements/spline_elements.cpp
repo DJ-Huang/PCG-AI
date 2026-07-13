@@ -133,9 +133,35 @@ public:
 
 } // namespace
 
+class CreateSpiralSplineElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CreateSpiralSpline"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateSpiralSpline missing node");
+
+        CreateSpiralSplineOptions opts;
+        opts.radius = ctx.node->data.value("radius", 1.0);
+        opts.pitch = ctx.node->data.value("pitch", 0.5);
+        opts.turns = ctx.node->data.value("turns", 3.0);
+        opts.points_per_turn = ctx.node->data.value("pointsPerTurn", 24);
+        opts.axis = ctx.node->data.value("axis", "y");
+
+        data::PcgSplineData spline_data = create_spiral_spline_data(opts);
+        if (spline_data.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateSpiralSpline invalid parameters");
+
+        emit_splines(ctx, std::move(spline_data));
+        return PCG_OK;
+    }
+};
+
 void register_spline_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("CreateSpline", std::make_unique<CreateSplineElement>());
+    map.emplace("CreateSpiralSpline", std::make_unique<CreateSpiralSplineElement>());
     map.emplace("GetSplineData", std::make_unique<GetSplineDataElement>());
     map.emplace("ResampleSpline", std::make_unique<ResampleSplineElement>());
     map.emplace("SampleAlongSpline", std::make_unique<SampleAlongSplineElement>());

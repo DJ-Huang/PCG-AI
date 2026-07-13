@@ -22,6 +22,22 @@ void PcgMeshData::set_normals(std::vector<PcgVertex> n)
     has_normals_ = true;
 }
 
+void PcgMeshData::set_colors(std::vector<PcgColor> c)
+{
+    if (c.size() != vertices_.size())
+        return;
+    colors_ = std::move(c);
+    has_colors_ = true;
+}
+
+void PcgMeshData::set_uvs(std::vector<PcgVec2> uv)
+{
+    if (uv.size() != vertices_.size())
+        return;
+    uvs_ = std::move(uv);
+    has_uvs_ = true;
+}
+
 nlohmann::json PcgMeshData::to_json() const
 {
     nlohmann::json verts = nlohmann::json::array();
@@ -47,6 +63,18 @@ nlohmann::json PcgMeshData::to_json() const
         for (const auto& n : normals_)
             norms.push_back(nlohmann::json{{"x", n.x}, {"y", n.y}, {"z", n.z}});
         out["normals"] = std::move(norms);
+    }
+    if (has_colors_ && !colors_.empty()) {
+        nlohmann::json cols = nlohmann::json::array();
+        for (const auto& c : colors_)
+            cols.push_back(nlohmann::json{{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}});
+        out["colors"] = std::move(cols);
+    }
+    if (has_uvs_ && !uvs_.empty()) {
+        nlohmann::json uv_arr = nlohmann::json::array();
+        for (const auto& uv : uvs_)
+            uv_arr.push_back(nlohmann::json{{"u", uv.u}, {"v", uv.v}});
+        out["uvs"] = std::move(uv_arr);
     }
     return out;
 }
@@ -91,6 +119,40 @@ PcgMeshData PcgMeshData::from_json(const nlohmann::json& json)
         if (norms.size() == data.vertices_.size()) {
             data.normals_ = std::move(norms);
             data.has_normals_ = true;
+        }
+    }
+
+    if (json.contains("colors") && json["colors"].is_array()) {
+        std::vector<PcgColor> cols;
+        for (const auto& item : json["colors"]) {
+            if (!item.is_object())
+                continue;
+            cols.push_back(PcgColor{
+                item.value("r", 1.0),
+                item.value("g", 1.0),
+                item.value("b", 1.0),
+                item.value("a", 1.0),
+            });
+        }
+        if (cols.size() == data.vertices_.size()) {
+            data.colors_ = std::move(cols);
+            data.has_colors_ = true;
+        }
+    }
+
+    if (json.contains("uvs") && json["uvs"].is_array()) {
+        std::vector<PcgVec2> uv_arr;
+        for (const auto& item : json["uvs"]) {
+            if (!item.is_object())
+                continue;
+            uv_arr.push_back(PcgVec2{
+                item.value("u", 0.0),
+                item.value("v", 0.0),
+            });
+        }
+        if (uv_arr.size() == data.vertices_.size()) {
+            data.uvs_ = std::move(uv_arr);
+            data.has_uvs_ = true;
         }
     }
 

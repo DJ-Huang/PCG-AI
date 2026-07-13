@@ -778,6 +778,146 @@
       }
     },
     {
+      "type": "CreateCylinderMesh",
+      "displayName": "Create Cylinder Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "height": { "type": "number", "default": 2.0, "minimum": 0.001 },
+        "radialSegments": { "type": "integer", "default": 16, "minimum": 3, "maximum": 128 },
+        "heightSegments": { "type": "integer", "default": 1, "minimum": 1, "maximum": 64 },
+        "capTop": { "type": "boolean", "default": true },
+        "capBottom": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "RevolveMesh",
+      "displayName": "Revolve Mesh",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "profile", "label": "Profile", "pinType": "SpatialSpline" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "axis": {
+          "type": "enum",
+          "default": "y",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "segments": { "type": "integer", "default": 16, "minimum": 3, "maximum": 256 },
+        "closeProfile": { "type": "boolean", "default": false },
+        "capStart": { "type": "boolean", "default": false },
+        "capEnd": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "type": "CreateSpiralSpline",
+      "displayName": "Create Spiral Spline",
+      "category": "Spline",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "pitch": { "type": "number", "default": 0.5 },
+        "turns": { "type": "number", "default": 3.0, "minimum": 0.001 },
+        "pointsPerTurn": { "type": "integer", "default": 24, "minimum": 4 },
+        "axis": {
+          "type": "enum",
+          "default": "y",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "VertexColor",
+      "displayName": "Vertex Color",
+      "category": "Material",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "r": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
+      }
+    },
+    {
+      "type": "AssignMaterial",
+      "displayName": "Assign Material",
+      "category": "Material",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "materialName": { "type": "string", "default": "" }
+      }
+    },
+    {
+      "type": "UVTexture",
+      "displayName": "UV Texture",
+      "category": "UV",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "projection": {
+          "type": "enum",
+          "default": "planar",
+          "options": [
+            { "value": "planar", "label": "Planar" },
+            { "value": "cylindrical", "label": "Cylindrical" },
+            { "value": "spherical", "label": "Spherical" }
+          ]
+        },
+        "axis": {
+          "type": "enum",
+          "default": "y",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "scaleU": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleV": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "offsetU": { "type": "number", "default": 0.0 },
+        "offsetV": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "ProjectTexture",
+      "displayName": "Project Texture",
+      "category": "UV",
+      "inputs": [
+        { "id": "in", "label": "Mesh", "pinType": "SpatialMesh" },
+        { "id": "texture", "label": "Texture", "pinType": "Texture" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "direction": {
+          "type": "enum",
+          "default": "z",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "scaleU": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleV": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "offsetU": { "type": "number", "default": 0.0 },
+        "offsetV": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
       "type": "Output",
       "displayName": "Output",
       "category": "Output",

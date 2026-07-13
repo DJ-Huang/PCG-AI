@@ -489,6 +489,8 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        if (!mesh->metadata().raw().empty())
+            out_result.json["mesh_metadata"] = mesh->metadata().raw();
         return PCG_OK;
     }
 
@@ -498,6 +500,8 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        if (!mesh->metadata().raw().empty())
+            out_result.json["mesh_metadata"] = mesh->metadata().raw();
         return PCG_OK;
     }
 

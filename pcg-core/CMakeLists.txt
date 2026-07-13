@@ -72,6 +72,10 @@ set(PCG_CORE_SOURCES
     src/elements/spline_algorithms.cpp
     src/elements/spline_elements.cpp
     src/elements/spline_mesh_elements.cpp
+    src/elements/material_algorithms.cpp
+    src/elements/material_elements.cpp
+    src/elements/uv_algorithms.cpp
+    src/elements/uv_elements.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
@@ -169,6 +173,24 @@ target_link_libraries(test_split_normals PRIVATE PcgCoreStatic nlohmann_json::nl
 target_include_directories(test_split_normals PRIVATE src)
 
 add_test(NAME test_split_normals COMMAND test_split_normals WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_cylinder_revolve tests/test_cylinder_revolve.cpp)
+target_link_libraries(test_cylinder_revolve PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_cylinder_revolve PRIVATE src)
+
+add_test(NAME test_cylinder_revolve COMMAND test_cylinder_revolve WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_spiral_spline tests/test_spiral_spline.cpp)
+target_link_libraries(test_spiral_spline PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_spiral_spline PRIVATE src)
+
+add_test(NAME test_spiral_spline COMMAND test_spiral_spline WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_new_nodes_graph tests/test_new_nodes_graph.cpp)
+target_link_libraries(test_new_nodes_graph PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_new_nodes_graph PRIVATE src)
+
+add_test(NAME test_new_nodes_graph COMMAND test_new_nodes_graph WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 add_executable(test_stone_arch_bridge tests/test_stone_arch_bridge.cpp)
 target_link_libraries(test_stone_arch_bridge PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)

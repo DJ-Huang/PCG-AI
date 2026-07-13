@@ -260,6 +260,228 @@ data::PcgMeshData create_box_mesh(double width, double height, double depth)
     return mesh;
 }
 
+data::PcgMeshData create_cylinder_mesh(double radius, double height,
+                                       int radial_segments, int height_segments,
+                                       bool cap_top, bool cap_bottom)
+{
+    if (radius < 0.001 || height < 0.001 || radial_segments < 3 || height_segments < 1)
+        return {};
+
+    radial_segments = std::min(radial_segments, 128);
+    height_segments = std::min(height_segments, 64);
+
+    data::PcgMeshData mesh;
+    const double half_h = height * 0.5;
+    const double pi = 3.14159265358979323846;
+
+    // Side vertices: (heightSegments + 1) rings * radialSegments
+    for (int h = 0; h <= height_segments; ++h) {
+        const double y = -half_h + height * static_cast<double>(h) / height_segments;
+        for (int r = 0; r < radial_segments; ++r) {
+            const double angle = 2.0 * pi * r / radial_segments;
+            mesh.add_vertex({radius * std::cos(angle), y, radius * std::sin(angle)});
+        }
+    }
+
+    // Side faces — outward winding matching add_quad convention
+    for (int h = 0; h < height_segments; ++h) {
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            const int i0 = h * radial_segments + r;
+            const int i1 = h * radial_segments + r_next;
+            const int i2 = (h + 1) * radial_segments + r_next;
+            const int i3 = (h + 1) * radial_segments + r;
+            mesh.add_triangle(i0, i2, i1);
+            mesh.add_triangle(i0, i3, i2);
+        }
+    }
+
+    const int bottom_ring = 0;
+    const int top_ring = height_segments * radial_segments;
+
+    if (cap_bottom) {
+        const int center_idx = static_cast<int>(mesh.vertices().size());
+        mesh.add_vertex({0.0, -half_h, 0.0});
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            mesh.add_triangle(center_idx, bottom_ring + r, bottom_ring + r_next);
+        }
+    }
+
+    if (cap_top) {
+        const int center_idx = static_cast<int>(mesh.vertices().size());
+        mesh.add_vertex({0.0, half_h, 0.0});
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            mesh.add_triangle(center_idx, top_ring + r_next, top_ring + r);
+        }
+    }
+
+    return mesh;
+}
+
+data::PcgGeometry revolve_geometry(const data::PcgSplineData& profile,
+                                  const RevolveGeometryOptions& options)
+{
+    if (profile.splines().empty())
+        return {};
+
+    const auto& spline = profile.splines()[0];
+    if (spline.points.empty())
+        return {};
+
+    int axis = -1;
+    if (options.axis == "x" || options.axis == "X") axis = 0;
+    else if (options.axis == "y" || options.axis == "Y") axis = 1;
+    else if (options.axis == "z" || options.axis == "Z") axis = 2;
+    else return {};
+
+    if (options.segments < 3)
+        return {};
+
+    const int seg = options.segments;
+    const double pi = 3.14159265358979323846;
+    const double eps = 1e-8;
+
+    // Extract profile points as Vec3
+    std::vector<Vec3> prof;
+    prof.reserve(spline.points.size());
+    for (const auto& p : spline.points)
+        prof.push_back({p.x, p.y, p.z});
+
+    // Helper: distance to rotation axis
+    auto axis_dist = [axis](const Vec3& p) -> double {
+        if (axis == 0) return std::sqrt(p.y * p.y + p.z * p.z);
+        if (axis == 1) return std::sqrt(p.x * p.x + p.z * p.z);
+        return std::sqrt(p.x * p.x + p.y * p.y);
+    };
+
+    // Helper: create ring point at angle theta
+    auto ring_point = [axis](const Vec3& p, double theta) -> data::PcgVec3 {
+        const double c = std::cos(theta);
+        const double s = std::sin(theta);
+        if (axis == 0) return {p.x, p.y * c - p.z * s, p.y * s + p.z * c};
+        if (axis == 1) return {p.x * c - p.z * s, p.y, p.x * s + p.z * c};
+        return {p.x * c - p.y * s, p.x * s + p.y * c, p.z};
+    };
+
+    // Helper: axis projection of a point
+    auto axis_point = [axis](const Vec3& p) -> data::PcgVec3 {
+        if (axis == 0) return {p.x, 0.0, 0.0};
+        if (axis == 1) return {0.0, p.y, 0.0};
+        return {0.0, 0.0, p.z};
+    };
+
+    data::PcgGeometry geo;
+
+    // Generate vertices
+    // For each profile point: if on axis, create 1 point; otherwise create seg points
+    std::vector<std::vector<int>> vert_idx(prof.size());
+    for (size_t i = 0; i < prof.size(); ++i) {
+        if (axis_dist(prof[i]) <= eps) {
+            vert_idx[i].resize(1);
+            vert_idx[i][0] = static_cast<int>(geo.points().size());
+            geo.points_mut().push_back(axis_point(prof[i]));
+        } else {
+            vert_idx[i].resize(seg);
+            for (int j = 0; j < seg; ++j) {
+                const double theta = 2.0 * pi * j / seg;
+                vert_idx[i][j] = static_cast<int>(geo.points().size());
+                geo.points_mut().push_back(ring_point(prof[i], theta));
+            }
+        }
+    }
+
+    // Generate faces
+    auto add_quad_face = [&geo](int a, int b, int c, int d) {
+        geo.faces_mut().push_back({a, b, c, d});
+    };
+    auto add_tri_face = [&geo](int a, int b, int c) {
+        geo.faces_mut().push_back({a, b, c});
+    };
+
+    int n = static_cast<int>(prof.size());
+    if (options.close_profile) {
+        // Connect last to first
+        for (int i = 0; i < n; ++i) {
+            int i2 = (i + 1) % n;
+            const auto& vi = vert_idx[i];
+            const auto& vj = vert_idx[i2];
+            bool ai = (vi.size() == 1);
+            bool aj = (vj.size() == 1);
+            if (ai && aj) continue;
+            if (ai) {
+                // axis-ring → triangle
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[0], vj[j], vj[jn]);
+                }
+            } else if (aj) {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[j], vj[0], vi[jn]);
+                }
+            } else {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_quad_face(vi[j], vj[j], vj[jn], vi[jn]);
+                }
+            }
+        }
+    } else {
+        for (int i = 0; i < n - 1; ++i) {
+            const auto& vi = vert_idx[i];
+            const auto& vj = vert_idx[i + 1];
+            bool ai = (vi.size() == 1);
+            bool aj = (vj.size() == 1);
+            if (ai && aj) continue;
+            if (ai) {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[0], vj[j], vj[jn]);
+                }
+            } else if (aj) {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[j], vj[0], vi[jn]);
+                }
+            } else {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_quad_face(vi[j], vj[j], vj[jn], vi[jn]);
+                }
+            }
+        }
+
+        // Caps for open profile
+        if (options.cap_start && vert_idx[0].size() > 1) {
+            // Project first profile point to axis
+            int cap_center = static_cast<int>(geo.points().size());
+            geo.points_mut().push_back(axis_point(prof[0]));
+            for (int j = 0; j < seg; ++j) {
+                int jn = (j + 1) % seg;
+                if (axis == 1)
+                    add_tri_face(cap_center, vert_idx[0][j], vert_idx[0][jn]);
+                else
+                    add_tri_face(cap_center, vert_idx[0][jn], vert_idx[0][j]);
+            }
+        }
+        if (options.cap_end && vert_idx[n - 1].size() > 1) {
+            int cap_center = static_cast<int>(geo.points().size());
+            geo.points_mut().push_back(axis_point(prof[n - 1]));
+            for (int j = 0; j < seg; ++j) {
+                int jn = (j + 1) % seg;
+                if (axis == 1)
+                    add_tri_face(cap_center, vert_idx[n - 1][jn], vert_idx[n - 1][j]);
+                else
+                    add_tri_face(cap_center, vert_idx[n - 1][j], vert_idx[n - 1][jn]);
+            }
+        }
+    }
+
+    return geo;
+}
+
 data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
 {
     data::PcgMeshData current = mesh;

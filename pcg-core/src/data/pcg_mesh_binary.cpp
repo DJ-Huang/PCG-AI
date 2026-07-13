@@ -28,6 +28,10 @@ int mesh_binary_size(const PcgMeshData& mesh)
                index_count * static_cast<int>(sizeof(uint32_t));
     if (mesh.has_normals())
         size += vertex_count * 3 * static_cast<int>(sizeof(float));
+    if (mesh.has_colors())
+        size += vertex_count * 4 * static_cast<int>(sizeof(float));
+    if (mesh.has_uvs())
+        size += vertex_count * 2 * static_cast<int>(sizeof(float));
     return size;
 }
 
@@ -43,13 +47,15 @@ bool write_mesh_binary(const PcgMeshData& mesh, void* buffer, int buffer_size)
         return false;
 
     const uint32_t flags = mesh.has_normals() ? kPcgMeshBinaryFlagHasNormals : 0u;
+    const uint32_t flags2 = flags | (mesh.has_colors() ? kPcgMeshBinaryFlagHasColors : 0u) |
+                            (mesh.has_uvs() ? kPcgMeshBinaryFlagHasUVs : 0u);
 
     auto* bytes = static_cast<uint8_t*>(buffer);
     write_u32(bytes + 0, kPcgMeshBinaryMagic);
     write_u32(bytes + 4, kPcgMeshBinaryVersion);
     write_u32(bytes + 8, static_cast<uint32_t>(vertex_count));
     write_u32(bytes + 12, static_cast<uint32_t>(index_count));
-    write_u32(bytes + 16, flags);
+    write_u32(bytes + 16, flags2);
 
     int offset = kPcgMeshBinaryV2HeaderSize;
     for (const auto& vertex : mesh.vertices()) {
@@ -77,6 +83,30 @@ bool write_mesh_binary(const PcgMeshData& mesh, void* buffer, int buffer_size)
             };
             std::memcpy(bytes + offset, n, sizeof(n));
             offset += static_cast<int>(sizeof(n));
+        }
+    }
+
+    if (mesh.has_colors()) {
+        for (const auto& color : mesh.colors()) {
+            const float c[4] = {
+                static_cast<float>(color.r),
+                static_cast<float>(color.g),
+                static_cast<float>(color.b),
+                static_cast<float>(color.a),
+            };
+            std::memcpy(bytes + offset, c, sizeof(c));
+            offset += static_cast<int>(sizeof(c));
+        }
+    }
+
+    if (mesh.has_uvs()) {
+        for (const auto& uv : mesh.uvs()) {
+            const float u[2] = {
+                static_cast<float>(uv.u),
+                static_cast<float>(uv.v),
+            };
+            std::memcpy(bytes + offset, u, sizeof(u));
+            offset += static_cast<int>(sizeof(u));
         }
     }
 
@@ -150,10 +180,16 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
             return false;
 
         const bool has_normals = (flags & kPcgMeshBinaryFlagHasNormals) != 0u;
+        const bool has_colors  = (flags & kPcgMeshBinaryFlagHasColors)  != 0u;
+        const bool has_uvs     = (flags & kPcgMeshBinaryFlagHasUVs)     != 0u;
+
+        const int vc = static_cast<int>(vertex_count);
         const int required = kPcgMeshBinaryV2HeaderSize +
-                              static_cast<int>(vertex_count) * 3 * static_cast<int>(sizeof(float)) +
+                              vc * 3 * static_cast<int>(sizeof(float)) +
                               static_cast<int>(index_count) * static_cast<int>(sizeof(uint32_t)) +
-                              (has_normals ? static_cast<int>(vertex_count) * 3 * static_cast<int>(sizeof(float)) : 0);
+                              (has_normals ? vc * 3 * static_cast<int>(sizeof(float)) : 0) +
+                              (has_colors  ? vc * 4 * static_cast<int>(sizeof(float)) : 0) +
+                              (has_uvs     ? vc * 2 * static_cast<int>(sizeof(float)) : 0);
         if (buffer_size < required)
             return false;
 
@@ -197,6 +233,38 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
                 });
             }
             out.set_normals(std::move(normals));
+        }
+
+        if (has_colors) {
+            std::vector<PcgColor> colors;
+            colors.reserve(vertex_count);
+            for (uint32_t i = 0; i < vertex_count; ++i) {
+                float c[4] = {};
+                std::memcpy(c, bytes + offset, sizeof(c));
+                offset += static_cast<int>(sizeof(c));
+                colors.push_back(PcgColor{
+                    static_cast<double>(c[0]),
+                    static_cast<double>(c[1]),
+                    static_cast<double>(c[2]),
+                    static_cast<double>(c[3]),
+                });
+            }
+            out.set_colors(std::move(colors));
+        }
+
+        if (has_uvs) {
+            std::vector<PcgVec2> uvs;
+            uvs.reserve(vertex_count);
+            for (uint32_t i = 0; i < vertex_count; ++i) {
+                float uv[2] = {};
+                std::memcpy(uv, bytes + offset, sizeof(uv));
+                offset += static_cast<int>(sizeof(uv));
+                uvs.push_back(PcgVec2{
+                    static_cast<double>(uv[0]),
+                    static_cast<double>(uv[1]),
+                });
+            }
+            out.set_uvs(std::move(uvs));
         }
 
         return true;

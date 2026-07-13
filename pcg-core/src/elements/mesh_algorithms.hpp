@@ -2,6 +2,7 @@
 
 #include "data/pcg_geometry.hpp"
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_spline_data.hpp"
 #include "data/pcg_texture_data.hpp"
 #include "elements/bevel_blender.hpp"
 
@@ -52,6 +53,22 @@ struct NoiseDeformOptions {
 };
 
 data::PcgMeshData create_box_mesh(double width, double height, double depth);
+
+data::PcgMeshData create_cylinder_mesh(double radius, double height,
+                                       int radial_segments, int height_segments,
+                                       bool cap_top, bool cap_bottom);
+
+struct RevolveGeometryOptions {
+    std::string axis = "y";
+    int segments = 16;
+    bool close_profile = false;
+    bool cap_start = false;
+    bool cap_end = false;
+};
+
+data::PcgGeometry revolve_geometry(const data::PcgSplineData& profile,
+                                  const RevolveGeometryOptions& options);
+
 data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, const NoiseDeformOptions& options);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,

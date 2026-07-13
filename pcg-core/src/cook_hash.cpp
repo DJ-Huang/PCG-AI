@@ -53,6 +53,33 @@ uint64_t hash_mesh(const data::PcgMeshData& mesh)
     if (!tris.empty())
         h = hash_bytes(tris.data(), tris.size() * sizeof(int), h);
 
+    h = hash_combine(h, mesh.has_normals() ? 1u : 0u);
+    if (mesh.has_normals()) {
+        for (const auto& n : mesh.normals()) {
+            h = hash_bytes(&n.x, sizeof(double), h);
+            h = hash_bytes(&n.y, sizeof(double), h);
+            h = hash_bytes(&n.z, sizeof(double), h);
+        }
+    }
+
+    h = hash_combine(h, mesh.has_colors() ? 1u : 0u);
+    if (mesh.has_colors()) {
+        for (const auto& c : mesh.colors()) {
+            h = hash_bytes(&c.r, sizeof(double), h);
+            h = hash_bytes(&c.g, sizeof(double), h);
+            h = hash_bytes(&c.b, sizeof(double), h);
+            h = hash_bytes(&c.a, sizeof(double), h);
+        }
+    }
+
+    h = hash_combine(h, mesh.has_uvs() ? 1u : 0u);
+    if (mesh.has_uvs()) {
+        for (const auto& uv : mesh.uvs()) {
+            h = hash_bytes(&uv.u, sizeof(double), h);
+            h = hash_bytes(&uv.v, sizeof(double), h);
+        }
+    }
+
     h = hash_combine(h, hash_json(mesh.metadata().raw()));
     return h;
 }

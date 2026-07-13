@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "tex",
+      "type": "ImageTexture",
+      "position": { "x": -200, "y": 0 },
+      "data": {
+        "repeatX": 2.0,
+        "repeatY": 3.0
+      }
+    },
+    {
+      "id": "cyl",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 200, "y": 0 },
+      "data": {
+        "radius": 1.0,
+        "height": 2.0,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true
+      }
+    },
+    {
+      "id": "proj",
+      "type": "ProjectTexture",
+      "position": { "x": 0, "y": 200 },
+      "data": {
+        "direction": "z",
+        "scaleU": 1.0,
+        "scaleV": 1.0,
+        "offsetU": 0.0,
+        "offsetV": 0.0
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 400 },
+      "data": { "label": "Project Texture" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "tex", "target": "proj", "sourceHandle": "out", "targetHandle": "texture" },
+    { "id": "e2", "source": "cyl", "target": "proj", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3", "source": "proj", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

@@ -131,6 +131,46 @@ data::PcgSplineData create_spline_data(const CreateSplineOptions& options)
     return polyline_to_spline_data(polyline, options.closed);
 }
 
+data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& options)
+{
+    data::PcgSplineData out;
+
+    if (options.radius <= 0.0 || options.pitch == 0.0 ||
+        options.turns <= 0.0 || options.points_per_turn < 4)
+        return out;
+
+    int axis = -1;
+    if (options.axis == "x" || options.axis == "X") axis = 0;
+    else if (options.axis == "y" || options.axis == "Y") axis = 1;
+    else if (options.axis == "z" || options.axis == "Z") axis = 2;
+    else return out;
+
+    const double pi = 3.14159265358979323846;
+    const int sample_count = static_cast<int>(std::ceil(options.turns * options.points_per_turn)) + 1;
+
+    data::PcgSpline spline;
+    spline.closed = false;
+    spline.points.reserve(static_cast<size_t>(sample_count));
+
+    for (int i = 0; i < sample_count; ++i) {
+        const double t = std::min(static_cast<double>(i) / options.points_per_turn, options.turns);
+        const double height = t * options.pitch;
+        const double angle = t * 2.0 * pi;
+        const double c = options.radius * std::cos(angle);
+        const double s = options.radius * std::sin(angle);
+
+        data::PcgSplinePoint p{};
+        if (axis == 0)      { p = {height, c, s}; }
+        else if (axis == 1) { p = {c, height, s}; }
+        else                { p = {c, s, height}; }
+
+        spline.points.push_back(p);
+    }
+
+    out.add_spline(std::move(spline));
+    return out;
+}
+
 data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options)
 {
     data::PcgSplineData out;

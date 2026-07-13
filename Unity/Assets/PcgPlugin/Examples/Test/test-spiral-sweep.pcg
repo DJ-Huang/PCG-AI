@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 400 },
+      "data": {"label": "Spiral Sweep", "__nodeTitle": ""}
+    },
+    {
+      "id": "sweep",
+      "type": "SweepAlongSpline",
+      "position": { "x": 0, "y": 200 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.2, "columns": 8, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
+    },
+    {
+      "id": "spiral",
+      "type": "CreateSpiralSpline",
+      "position": { "x": 0, "y": 89 },
+      "data": {"radius": 1, "pitch": 0.5, "turns": 2, "pointsPerTurn": 12, "axis": "y", "__nodeTitle": ""}
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "spiral", "target": "sweep", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e2", "source": "sweep", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+  ],
+  "parameters": [
+  ]
+}

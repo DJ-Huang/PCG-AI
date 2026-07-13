@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **42 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **49 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -42,6 +42,7 @@
   - [ExtrudeAlongSpline](#extrudealongspline)
   - [CrossSectionProfile](#crosssectionprofile)
   - [InstanceAlongSpline](#instancealongspline)
+  - [CreateSpiralSpline](#createspiralspline)
 - [Structural 类别](#structural-类别)
   - [ConvexHull](#convexhull)
   - [ConnectNearest](#connectnearest)
@@ -57,6 +58,8 @@
   - [TransformMesh](#transformmesh)
   - [MergeMesh](#mergemesh)
   - [BooleanMesh](#booleanmesh)
+  - [CreateCylinderMesh](#createcylindermesh)
+  - [RevolveMesh](#revolvemesh)
 - [Geometry 类别](#geometry-类别)
   - [GroupCreate](#groupcreate)
   - [GroupCombine](#groupcombine)
@@ -64,7 +67,17 @@
   - [ImageTexture](#imagetexture)
 - [Output 类别](#output-类别)
   - [Output](#output)
+- [Material 类别](#material-类别)
+  - [VertexColor](#vertexcolor)
+  - [AssignMaterial](#assignmaterial)
+- [UV 类别](#uv-类别)
+  - [UVTexture](#uvtexture)
+  - [ProjectTexture](#projecttexture)
+  - [Output](#output)
 - [常见节点组合](#常见节点组合)
+- [示例 .pcg 文件](#示例-pcg-文件)
+  - [PCGDemo](#pcgdemo)
+  - [Test](#test)
 
 ---
 
@@ -1322,6 +1335,24 @@
 
 > 典型连接：`CreateSpline → InstanceAlongSpline(spline) + GetMeshData → InstanceAlongSpline(mesh)`，沿路径放置路灯柱/桥墩。
 
+### CreateSpiralSpline
+
+生成螺旋线样条（pitch-driven 模型）。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| radius | number | 1.0 | > 0 | 螺旋半径 |
+| pitch | number | 0.5 | ≠ 0 | 每完整一圈沿轴前进的距离 |
+| turns | number | 3.0 | > 0 | 圈数（支持小数如 2.5） |
+| pointsPerTurn | integer | 24 | ≥ 4 | 每圈采样点数 |
+| axis | enum | y | x/y/z | 螺旋轴 |
+
+**输出**：`out: SpatialSpline`（polyline，closed=false）。
+
+**执行逻辑**：`sample_count = ceil(turns * pointsPerTurn) + 1`。对每个采样点：`t = min(i / pointsPerTurn, turns)`，高度 = `t * pitch`，角度 = `t * 2π`。
+
+> 典型连接：`CreateSpiralSpline → SweepAlongSpline → Output`
+
 ---
 
 ## Structural 类别
@@ -2412,6 +2443,125 @@ CreateSpline ──(profile)──┘
 
 ---
 
+---
+
+### CreateCylinderMesh
+
+生成 Y 轴圆柱 mesh。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| radius | number | 1.0 | ≥ 0.001 | 半径 |
+| height | number | 2.0 | ≥ 0.001 | 高度 |
+| radialSegments | integer | 16 | 3–128 | 圆周分段 |
+| heightSegments | integer | 1 | 1–64 | 高度分段 |
+| capTop | boolean | true | | 顶盖 |
+| capBottom | boolean | true | | 底盖 |
+
+**输入**：可选 `in: SpatialMesh`（与 CreateBoxMesh 相同的 optional merge 行为）。
+
+**执行逻辑**：生成 `(heightSegments+1) * radialSegments` 个侧面顶点，每个 cap 复用 rim 并加一个 center 顶点。不生成 normals/colors/uvs。
+
+> 典型连接：`CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output`
+
+### RevolveMesh
+
+将剖面曲线绕轴旋转生成回转体。
+
+| 输入 Pin | 类型 | 说明 |
+|----------|------|------|
+| profile | SpatialSpline | 剖面曲线 |
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| axis | enum | y | x/y/z | 旋转轴 |
+| segments | integer | 16 | 3–256 | 旋转分段 |
+| closeProfile | boolean | false | | 连接首尾（启用时忽略 cap） |
+| capStart | boolean | false | | 起始端盖 |
+| capEnd | boolean | false | | 结束端盖 |
+
+**执行逻辑**：内部使用 `PcgGeometry` 传输（可直接连接 BevelMesh）。对每个 profile point：到旋转轴距离 ≤ 1e-8 时仅创建一个轴上点；否则创建 segments 个环上点。相邻 profile point 之间：ring-ring → quad，axis-ring → triangle，axis-axis → 不生成面。
+
+> 典型连接：`CreateSpline → RevolveMesh → BevelMesh → Output`
+
+---
+
+## Material 类别
+
+### VertexColor
+
+为 mesh 的每个顶点写入统一的 RGBA 颜色。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| r | number | 1.0 | [0, 1] | 红色通道 |
+| g | number | 1.0 | [0, 1] | 绿色通道 |
+| b | number | 1.0 | [0, 1] | 蓝色通道 |
+| a | number | 1.0 | [0, 1] | Alpha 通道（不会丢失） |
+
+**执行逻辑**：读取输入 mesh，为所有顶点设置相同的颜色值，输出 mesh。
+
+**范围限制**：本期仅支持 solid RGBA（统一颜色）。不支持按 face group 着色。应放在最后一个拓扑修改节点之后。
+
+### AssignMaterial
+
+将材质名称写入 mesh metadata，供下游渲染器使用。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| materialName | string | "" | 材质名称（空字符串允许） |
+
+**执行逻辑**：读取输入 mesh，将 `materialName` 写入 `mesh.metadata["material"]`，输出 mesh。
+
+**范围限制**：仅保证 material name 穿过 native result JSON（`mesh_metadata.material`）。不保证 Unity 画面自动换材质。
+
+---
+
+## UV 类别
+
+### UVTexture
+
+为 mesh 生成 UV 坐标，支持 planar / cylindrical / spherical 投射。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| projection | enum | planar | 投射方式：planar / cylindrical / spherical |
+| axis | enum | y | 投射轴：x / y / z |
+| scaleU | number | 1.0 | U 方向缩放 |
+| scaleV | number | 1.0 | V 方向缩放 |
+| offsetU | number | 0.0 | U 方向偏移 |
+| offsetV | number | 0.0 | V 方向偏移 |
+
+**执行逻辑**：
+- Planar：将 mesh AABB 归一化到 [0,1]，取垂直于 axis 的两个坐标作为 UV。
+- Cylindrical：U = atan2 角度 / 2π + 0.5，V = 轴向坐标归一化。
+- Spherical：U = 经度，V = 纬度（基于顶点到中心的方向向量）。
+
+**范围限制**：应放在最后一个拓扑修改节点之后。不支持 UV1/UV2 或 lightmap unwrap。
+
+### ProjectTexture
+
+根据 ImageTexture descriptor 的 repeat 参数生成 UV。
+
+| 输入 Pin | 类型 | 说明 |
+|----------|------|------|
+| in | SpatialMesh | 输入 mesh |
+| texture | Texture | ImageTexture 输出（必须连接） |
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| direction | enum | z | 投射方向：x / y / z |
+| scaleU | number | 1.0 | U 方向缩放 |
+| scaleV | number | 1.0 | V 方向缩放 |
+| offsetU | number | 0.0 | U 方向偏移 |
+| offsetV | number | 0.0 | V 方向偏移 |
+
+**执行逻辑**：读取 texture pin 的 ImageTexture descriptor 中的 `repeatX/repeatY`，与节点 `scaleU/scaleV` 相乘，按 direction 垂直平面做 AABB-normalized planar UV。不读取 texture pixels，不依赖 TextureRuntime。
+
+**范围限制**：未连接 texture pin 时返回 `PCG_ERR_EXECUTION`。不进行像素投射或贴花混合。
+
+---
+
 ### 6. 属性分类放置
 
 生成点 → 打标签 → 按标签过滤 → 分别放置不同 prefab。
@@ -2425,3 +2575,39 @@ CopyAttributes(tag, values=tree/rock)
 ```
 
 > 注：`CopyAttributes` 对所有点写入相同的属性值。要实现不同标签分类，可串联多个 `CopyAttributes` + `AttributeFilter` 分支，或在 Web 编辑器中手动编辑不同分支的属性。
+
+---
+
+## 示例 .pcg 文件
+
+项目提供两组示例图，可直接在 PCG Graph Editor 中打开运行。
+
+### PCGDemo
+
+位于 `examples/` 和 `Unity/Assets/PcgPlugin/Examples/PCGDemo/`，展示完整场景级用法：
+
+| 文件 | 说明 |
+|------|------|
+| `demo.pcg` | 综合演示（Box → Bevel + 基础 mesh 流水线） |
+| `bridge-demo.pcg` | 桥梁场景（Sweep + Bevel） |
+| `boolean-test.pcg` | Boolean CSG 四种操作演示 |
+| `car.pcg` / `lowpoly-car.pcg` / `lowpoly-car-2.pcg` | 程序化车辆生成 |
+| `lowpoly-sedan.pcg` | 低多边形轿车 |
+| `excavator.pcg` | 挖掘机场景 |
+| `spiral-staircase.pcg` | 螺旋楼梯（InstanceAlongSpline + Sweep） |
+| `stone-arch-bridge.pcg` | 石拱桥（BooleanMesh + BevelMesh） |
+| `village-demo.pcg` | 村落场景（点生成 + 地形 + 实例放置） |
+
+### Test
+
+位于 `examples/Test/` 和 `Unity/Assets/PcgPlugin/Examples/Test/`，覆盖 Phase 5 新增 7 节点的最小验证图：
+
+| 文件 | 测试链路 | 验证内容 |
+|------|---------|---------|
+| `test-cylinder.pcg` | `CreateCylinderMesh → Output` | 圆柱生成、顶点/索引数、cap winding |
+| `test-revolve-bevel.pcg` | `CreateSpline → RevolveMesh → BevelMesh → Output` | 回转体生成、BevelMesh 几何链保持 |
+| `test-spiral-sweep.pcg` | `CreateSpiralSpline → SweepAlongSpline → Output` | 螺旋线采样、Sweep 扫掠 |
+| `test-color-uv-material.pcg` | `CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output` | RGBA colors（含 alpha）、UV0、material metadata 跨 native boundary 传递 |
+| `test-project-texture.pcg` | `ImageTexture → ProjectTexture + CreateCylinderMesh → Output` | texture descriptor repeat 读取、planar UV 投射 |
+
+> **验证步骤**：在 Unity Editor 中打开 PCG Graph Editor → File → Open .pcg → Cook → 检查 Scene View mesh、Console 无报错。`test-color-uv-material.pcg` 可通过 mesh.colors / mesh.uv 长度验证属性传递。

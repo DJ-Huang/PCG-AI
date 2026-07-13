@@ -25,6 +25,8 @@ namespace DJTechRuntime.PCG
         public const int MeshBinaryV2HeaderSize = 20;
         public const uint MeshBinaryVersion2 = 2u;
         public const uint MeshBinaryFlagHasNormals = 0x1u;
+        public const uint MeshBinaryFlagHasColors  = 0x2u;
+        public const uint MeshBinaryFlagHasUVs     = 0x4u;
         public const uint PointBinaryMagic = 0x50544750u;
         public const int PointBinaryHeaderSize = 16;
 
@@ -442,6 +444,36 @@ namespace DJTechRuntime.PCG
             };
         }
 
+        /// <summary>
+        /// Computes the actual byte size of a mesh binary payload by reading
+        /// the version/flags header. Used by both Mesh and Points(spawnMesh) paths.
+        /// </summary>
+        private static int ComputeMeshBinaryPayloadSize(byte[] meshBuf, int vertexCount, int indexCount)
+        {
+            int headerSize = MeshBinaryHeaderSize;
+            int normalSize = 0;
+            int colorSize = 0;
+            int uvSize = 0;
+
+            if (meshBuf.Length >= MeshBinaryV2HeaderSize)
+            {
+                var version = BitConverter.ToUInt32(meshBuf, 4);
+                if (version == MeshBinaryVersion2)
+                {
+                    headerSize = MeshBinaryV2HeaderSize;
+                    var flags = BitConverter.ToUInt32(meshBuf, 16);
+                    if ((flags & MeshBinaryFlagHasNormals) != 0)
+                        normalSize = vertexCount * 12;
+                    if ((flags & MeshBinaryFlagHasColors) != 0)
+                        colorSize = vertexCount * 16;
+                    if ((flags & MeshBinaryFlagHasUVs) != 0)
+                        uvSize = vertexCount * 8;
+                }
+            }
+
+            return headerSize + vertexCount * 12 + indexCount * 4 + normalSize + colorSize + uvSize;
+        }
+
         private static (PcgResultCode code, PcgGraphExecuteResult result) BuildSuccessResult(
             PcgResultCode rc,
             PcgExecuteKind executeKind,
@@ -460,21 +492,7 @@ namespace DJTechRuntime.PCG
 
             if (executeKind == PcgExecuteKind.Mesh)
             {
-                // Determine actual payload size from the binary's version/flags header.
-                int headerSize = MeshBinaryHeaderSize;
-                int normalSize = 0;
-                if (meshBuf.Length >= MeshBinaryV2HeaderSize)
-                {
-                    var version = BitConverter.ToUInt32(meshBuf, 4);
-                    if (version == MeshBinaryVersion2)
-                    {
-                        headerSize = MeshBinaryV2HeaderSize;
-                        var flags = BitConverter.ToUInt32(meshBuf, 16);
-                        if ((flags & MeshBinaryFlagHasNormals) != 0)
-                            normalSize = vertexCount * 12;
-                    }
-                }
-                var required = headerSize + vertexCount * 12 + indexCount * 4 + normalSize;
+                var required = ComputeMeshBinaryPayloadSize(meshBuf, vertexCount, indexCount);
                 var meshBinary = new byte[required];
                 Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, required);
                 result = new PcgGraphExecuteResult
@@ -508,20 +526,7 @@ namespace DJTechRuntime.PCG
                 byte[] meshBinary = null;
                 if (vertexCount > 0 && indexCount > 0)
                 {
-                    int meshHdr = MeshBinaryHeaderSize;
-                    int meshNorm = 0;
-                    if (meshBuf.Length >= MeshBinaryV2HeaderSize)
-                    {
-                        var mv = BitConverter.ToUInt32(meshBuf, 4);
-                        if (mv == MeshBinaryVersion2)
-                        {
-                            meshHdr = MeshBinaryV2HeaderSize;
-                            var mf = BitConverter.ToUInt32(meshBuf, 16);
-                            if ((mf & MeshBinaryFlagHasNormals) != 0)
-                                meshNorm = vertexCount * 12;
-                        }
-                    }
-                    var meshRequired = meshHdr + vertexCount * 12 + indexCount * 4 + meshNorm;
+                    var meshRequired = ComputeMeshBinaryPayloadSize(meshBuf, vertexCount, indexCount);
                     meshBinary = new byte[meshRequired];
                     Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, meshRequired);
                 }
