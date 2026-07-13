@@ -14,12 +14,6 @@
       "data": {"mode": "catmullRom", "closed": true, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.9,\"y\":0,\"z\":0},{\"x\":0.95,\"y\":0.2,\"z\":0},{\"x\":0.85,\"y\":0.5,\"z\":0},{\"x\":0.6,\"y\":0.78,\"z\":0},{\"x\":0.25,\"y\":0.9,\"z\":0},{\"x\":-0.25,\"y\":0.9,\"z\":0},{\"x\":-0.6,\"y\":0.78,\"z\":0},{\"x\":-0.85,\"y\":0.5,\"z\":0},{\"x\":-0.95,\"y\":0.2,\"z\":0},{\"x\":-0.9,\"y\":0,\"z\":0}]", "editPlane": "xy", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
     },
     {
-      "id": "body_t",
-      "type": "TransformMesh",
-      "position": { "x": 200, "y": 640 },
-      "data": {"translateX": 0, "translateY": 0.4, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
-    },
-    {
       "id": "cabin_path",
       "type": "CreateSpline",
       "position": { "x": 200, "y": 800 },
@@ -152,22 +146,28 @@
       "data": {"label": "LowPolySedan", "__nodeTitle": ""}
     },
     {
-      "id": "body_sweep",
-      "type": "SweepAlongSpline",
-      "position": { "x": 200, "y": 160 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
+      "id": "body_group",
+      "type": "GroupCreate",
+      "position": { "x": 187.5, "y": 320 },
+      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "cap_start,cap_end", "fromEdgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "body_t",
+      "type": "TransformMesh",
+      "position": { "x": 200, "y": 640 },
+      "data": {"translateX": 0, "translateY": 0.4, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
     },
     {
       "id": "body_bevel",
       "type": "BevelMesh",
       "position": { "x": 200, "y": 509.5 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.472, "segments": 6, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
     },
     {
-      "id": "body_group",
-      "type": "GroupCreate",
-      "position": { "x": 187.5, "y": 320 },
-      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "cap_start,cap_end", "fromEdgeGroup": "", "__nodeTitle": ""}
+      "id": "body_sweep",
+      "type": "SweepAlongSpline",
+      "position": { "x": 200, "y": 160 },
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     }
   ],
   "edges": [

@@ -47,7 +47,7 @@
       "id": "transform_b",
       "type": "TransformMesh",
       "position": { "x": 208, "y": 163 },
-      "data": {"translateX": 2, "translateY": 0, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
+      "data": {"translateX": 2, "translateY": 0, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 3, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
     }
   ],
   "edges": [
