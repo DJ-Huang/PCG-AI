@@ -74,6 +74,8 @@ namespace DJTechEditor.PCG.Graph
 
         // --- Group viewer state ---
         private static string s_SelectedGroupName;
+        private static string s_SelectedGroupSource;
+        private static string s_SelectedGroupNodeId;
         private static readonly List<GroupInfo> s_AvailableGroups = new();
         private static string s_LastParsedJson;
 
@@ -346,6 +348,8 @@ namespace DJTechEditor.PCG.Graph
             s_LockedSelection = null;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
+            s_SelectedGroupSource = null;
+            s_SelectedGroupNodeId = null;
             s_AvailableGroups.Clear();
             s_LastParsedJson = null;
             Tools.current = s_PrevTool;
@@ -809,6 +813,7 @@ namespace DJTechEditor.PCG.Graph
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Vertex))
                 {
                     s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Vertex);
                 }
             }
@@ -819,6 +824,7 @@ namespace DJTechEditor.PCG.Graph
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Edge))
                 {
                     s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Edge);
                 }
             }
@@ -829,6 +835,7 @@ namespace DJTechEditor.PCG.Graph
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Face))
                 {
                     s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Face);
                 }
             }
@@ -1553,6 +1560,31 @@ namespace DJTechEditor.PCG.Graph
             _ => "unknown",
         };
 
+        /// <summary>
+        /// Popup defaults to index 0 visually, but selection state stays null until the user
+        /// changes the popup. Sync state so Scene View highlighting matches the displayed group.
+        /// </summary>
+        private static void EnsureDefaultGroupSelection(
+            List<PcgNodeInspector.AvailableGroup> outputGroups,
+            List<PcgNodeInspector.AvailableGroup> inputGroups)
+        {
+            if (!string.IsNullOrEmpty(s_SelectedGroupName))
+                return;
+
+            if (outputGroups.Count > 0)
+            {
+                s_SelectedGroupName = outputGroups[0].name;
+                s_SelectedGroupSource = "output";
+                return;
+            }
+
+            if (inputGroups.Count > 0)
+            {
+                s_SelectedGroupName = inputGroups[0].name;
+                s_SelectedGroupSource = "input";
+            }
+        }
+
         private static void ParseGroupsFromJson(string json, List<GroupInfo> output)
         {
             output.Clear();
@@ -1600,43 +1632,69 @@ namespace DJTechEditor.PCG.Graph
                 inputGroups = upstream.Where(g => g.domain == domainStr).ToList();
             }
 
-            // Parse cooked result for highlighting
+            // Parse per-node group stats from the cook result JSON.
+            // This gives us group member data for the selected node (not just the final output).
             var anchor = FindPreviewAnchor(window);
             var gv = anchor?.GetComponent<PcgGroupVisualizer>();
-            var json = gv != null ? gv.ResultJson : null;
-            if (!string.IsNullOrEmpty(json) && json != s_LastParsedJson)
-            {
-                ParseGroupsFromJson(json, s_AvailableGroups);
-                s_LastParsedJson = json;
-            }
-            var cookedGroups = !string.IsNullOrEmpty(json)
-                ? s_AvailableGroups.Where(g => g.domain == domainStr).ToList()
-                : new List<GroupInfo>();
+            var graphView = window.GraphView;
+            List<NodeGroupEntry> nodeGroups = null;
+            if (graphView != null && graphView.TryGetNodeGroups(node.NodeId, out var perNodeGroups))
+                nodeGroups = perNodeGroups;
 
-            // Filter to only groups that exist in cooked mesh
-            var outputInCooked = outputFiltered.Where(g => cookedGroups.Any(cg => cg.name == g.name)).ToList();
-            var inputInCooked = inputGroups.Where(g => cookedGroups.Any(cg => cg.name == g.name)).ToList();
+            // Also parse upstream node groups for input groups
+            List<NodeGroupEntry> inputNodeGroups = null;
+            if (inspector != null && inputGroups.Count > 0)
+            {
+                // Find the source node for the first input group and get its groups
+                var firstInput = inputGroups[0];
+                if (graphView != null && graphView.TryGetNodeGroups(firstInput.sourceNodeId, out var upstreamGroups))
+                    inputNodeGroups = upstreamGroups;
+            }
+
+            // Helper: find group stats by name from per-node data
+            NodeGroupEntry FindGroupStats(string name, bool fromOutput)
+            {
+                var list = fromOutput ? nodeGroups : inputNodeGroups;
+                if (list == null) return null;
+                return list.FirstOrDefault(g => g.name == name && g.domain == domainStr);
+            }
+
+            var allGroups = outputFiltered.Concat(inputGroups).ToList();
+
+            if (s_SelectedGroupNodeId != node.NodeId)
+            {
+                s_SelectedGroupNodeId = node.NodeId;
+                s_SelectedGroupName = null;
+                s_SelectedGroupSource = null;
+            }
 
             // Clear stale selection
             if (!string.IsNullOrEmpty(s_SelectedGroupName) &&
-                !outputInCooked.Any(g => g.name == s_SelectedGroupName) &&
-                !inputInCooked.Any(g => g.name == s_SelectedGroupName))
+                !allGroups.Any(g => g.name == s_SelectedGroupName))
             {
                 s_SelectedGroupName = null;
+                s_SelectedGroupSource = null;
                 gv?.ClearHighlight();
             }
 
+            EnsureDefaultGroupSelection(outputFiltered, inputGroups);
+
             // Compute dynamic height
-            int rowCount = 0;
-            if (outputInCooked.Count > 0) rowCount++;
-            if (inputInCooked.Count > 0) rowCount++;
-            if (rowCount == 0) rowCount = 1;
-            float height = 24f + rowCount * 22f + 6f;
+            bool hasOutput = outputFiltered.Count > 0;
+            bool hasInput = inputGroups.Count > 0;
+            bool hasGroups = hasOutput || hasInput;
+            float height = hasGroups ? 58f : 40f;
+
+            // Check if selected group has member data for highlighting
+            bool canHighlight = !string.IsNullOrEmpty(s_SelectedGroupName) &&
+                FindGroupStats(s_SelectedGroupName, s_SelectedGroupSource == "output") != null;
+            if (!canHighlight && hasGroups && !string.IsNullOrEmpty(s_SelectedGroupName))
+                height += 16f;
 
             Handles.BeginGUI();
             try
             {
-                const float width = 300f;
+                const float width = 380f;
                 var area = new Rect(
                     (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
@@ -1648,39 +1706,72 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.Space(4f);
                 GUILayout.Label($"{node.NodeType} — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
 
-                if (outputInCooked.Count > 0)
+                if (hasGroups)
                 {
-                    GUILayout.Label("Output:", EditorStyles.miniLabel);
-                    var labels = outputInCooked.Select(g => $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})").ToArray();
-                    var currentIdx = outputInCooked.FindIndex(g => g.name == s_SelectedGroupName);
-                    var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
-                    if (newIdx != currentIdx)
+                    GUILayout.BeginHorizontal();
+
+                    if (hasOutput)
                     {
-                        var group = outputInCooked[newIdx];
-                        s_SelectedGroupName = group.name;
-                        gv?.HighlightGroup(group.name, group.domain);
-                        SceneView.RepaintAll();
+                        GUILayout.BeginVertical();
+                        GUILayout.Label("Output:", EditorStyles.miniLabel);
+                        var labels = outputFiltered.Select(g =>
+                        {
+                            var stats = FindGroupStats(g.name, true);
+                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
+                        }).ToArray();
+                        var currentIdx = s_SelectedGroupSource == "output"
+                            ? outputFiltered.FindIndex(g => g.name == s_SelectedGroupName)
+                            : -1;
+                        if (currentIdx < 0)
+                            currentIdx = 0;
+                        EditorGUI.BeginChangeCheck();
+                        var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
+                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < outputFiltered.Count)
+                        {
+                            var group = outputFiltered[newIdx];
+                            s_SelectedGroupName = group.name;
+                            s_SelectedGroupSource = "output";
+                            SceneView.RepaintAll();
+                        }
+                        GUILayout.EndVertical();
+                    }
+
+                    if (hasInput)
+                    {
+                        GUILayout.BeginVertical();
+                        GUILayout.Label("Input:", EditorStyles.miniLabel);
+                        var labels = inputGroups.Select(g =>
+                        {
+                            var stats = FindGroupStats(g.name, false);
+                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
+                        }).ToArray();
+                        var currentIdx = s_SelectedGroupSource == "input"
+                            ? inputGroups.FindIndex(g => g.name == s_SelectedGroupName)
+                            : -1;
+                        if (currentIdx < 0)
+                            currentIdx = 0;
+                        EditorGUI.BeginChangeCheck();
+                        var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
+                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < inputGroups.Count)
+                        {
+                            var group = inputGroups[newIdx];
+                            s_SelectedGroupName = group.name;
+                            s_SelectedGroupSource = "input";
+                            SceneView.RepaintAll();
+                        }
+                        GUILayout.EndVertical();
+                    }
+
+                    GUILayout.EndHorizontal();
+
+                    if (!canHighlight && !string.IsNullOrEmpty(s_SelectedGroupName))
+                    {
+                        GUILayout.Label("Group has no member data in cook result.", EditorStyles.miniLabel);
                     }
                 }
-
-                if (inputInCooked.Count > 0)
+                else
                 {
-                    GUILayout.Label("Input:", EditorStyles.miniLabel);
-                    var labels = inputInCooked.Select(g => $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})").ToArray();
-                    var currentIdx = inputInCooked.FindIndex(g => g.name == s_SelectedGroupName);
-                    var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
-                    if (newIdx != currentIdx)
-                    {
-                        var group = inputInCooked[newIdx];
-                        s_SelectedGroupName = group.name;
-                        gv?.HighlightGroup(group.name, group.domain);
-                        SceneView.RepaintAll();
-                    }
-                }
-
-                if (outputInCooked.Count == 0 && inputInCooked.Count == 0)
-                {
-                    GUILayout.Label($"No {domainStr} groups in cooked mesh.", EditorStyles.miniLabel);
+                    GUILayout.Label($"No {domainStr} groups available.", EditorStyles.miniLabel);
                 }
 
                 GUILayout.EndArea();
@@ -1693,6 +1784,9 @@ namespace DJTechEditor.PCG.Graph
 
         private static void DrawNodeGroupHighlight(SceneView sceneView, PcgGraphEditorWindow window)
         {
+            if (Event.current.type != EventType.Repaint)
+                return;
+
             if (string.IsNullOrEmpty(s_SelectedGroupName))
                 return;
 
@@ -1701,23 +1795,47 @@ namespace DJTechEditor.PCG.Graph
             if (anchor == null)
                 return;
 
-            var mf = anchor.GetComponent<MeshFilter>();
-            if (mf == null || mf.sharedMesh == null)
+            var l2w = anchor.localToWorldMatrix;
+            var domainStr = DomainToString(ctx.Domain);
+
+            // Find the selected node and its per-node group stats
+            var graphView = window.GraphView;
+            var selectedNode = graphView.selection.OfType<PcgManifestNodeView>().FirstOrDefault();
+            if (selectedNode == null)
                 return;
 
-            var mesh = mf.sharedMesh;
-            var vertices = mesh.vertices;
-            var triangles = mesh.triangles;
-            var l2w = anchor.localToWorldMatrix;
+            List<NodeGroupEntry> nodeGroups = null;
+            var sourceNodeId = selectedNode.NodeId;
 
-            var domainStr = DomainToString(ctx.Domain);
-            var group = s_AvailableGroups.FirstOrDefault(
-                g => g.name == s_SelectedGroupName && g.domain == domainStr);
-            if (group.members == null || group.members.Length == 0)
+            // If source is "input", look up the upstream source node's groups
+            if (s_SelectedGroupSource == "input")
+            {
+                var inspector = graphView.Inspector;
+                if (inspector != null)
+                {
+                    var upstream = inspector.ResolveUpstreamGroups(selectedNode.NodeId);
+                    var matchIdx = upstream.FindIndex(g => g.name == s_SelectedGroupName && g.domain == domainStr);
+                    if (matchIdx >= 0)
+                        sourceNodeId = upstream[matchIdx].sourceNodeId;
+                }
+            }
+
+            if (!graphView.TryGetNodeGroups(sourceNodeId, out nodeGroups))
+                return;
+
+            var group = nodeGroups.FirstOrDefault(g => g.name == s_SelectedGroupName && g.domain == domainStr);
+            if (group == null)
+                return;
+
+            // Edge groups can render via edgeEndpoints without members
+            bool hasEdgeEndpoints = group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6;
+            if (!hasEdgeEndpoints && (group.members == null || group.members.Length == 0))
                 return;
 
             if (ctx.Domain == SceneEditDomain.Edge)
             {
+                var prevZTest = Handles.zTest;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
                 Handles.color = new Color(0f, 1f, 0.8f, 0.9f);
                 if (group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6)
                 {
@@ -1730,22 +1848,17 @@ namespace DJTechEditor.PCG.Graph
                         Handles.DrawAAPolyLine(4f, p0, p1);
                     }
                 }
-                else
-                {
-                    foreach (var key in group.members)
-                    {
-                        int a = (int)(key / 1000000);
-                        int b = (int)(key % 1000000);
-                        if (a < 0 || b < 0 || a >= vertices.Length || b >= vertices.Length)
-                            continue;
-                        var p0 = l2w.MultiplyPoint(vertices[a]);
-                        var p1 = l2w.MultiplyPoint(vertices[b]);
-                        Handles.DrawAAPolyLine(4f, p0, p1);
-                    }
-                }
+                Handles.zTest = prevZTest;
             }
             else if (ctx.Domain == SceneEditDomain.Face)
             {
+                var mf = anchor.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null)
+                    return;
+                var mesh = mf.sharedMesh;
+                var vertices = mesh.vertices;
+                var triangles = mesh.triangles;
+
                 // Filled translucent triangles
                 Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
                 foreach (var faceIdx in group.members)
@@ -1786,7 +1899,16 @@ namespace DJTechEditor.PCG.Graph
                 Handles.color = new Color(1f, 0.3f, 0.3f, 0.9f);
                 foreach (var ptIdx in group.members)
                 {
-                    if (ptIdx < 0 || ptIdx >= vertices.Length)
+                    if (ptIdx < 0)
+                        continue;
+                    // For vertex groups, we need mesh vertices — but per-node stats
+                    // use geometry point indices, not mesh vertex indices.
+                    // Only attempt if we have a mesh on the anchor.
+                    var mf = anchor.GetComponent<MeshFilter>();
+                    if (mf == null || mf.sharedMesh == null)
+                        break;
+                    var vertices = mf.sharedMesh.vertices;
+                    if (ptIdx >= vertices.Length)
                         continue;
                     var p = l2w.MultiplyPoint(vertices[(int)ptIdx]);
                     Handles.SphereHandleCap(0, p, Quaternion.identity, 0.02f, EventType.Repaint);

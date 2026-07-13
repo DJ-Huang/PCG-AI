@@ -256,6 +256,27 @@ nlohmann::json build_node_stats(
     return stats;
 }
 
+/// Builds a flat array of per-node group stats: [{"node_id", "name", "domain", "count", "members", "edgeEndpoints"}, ...]
+/// Flattened (not nested) so Unity's JsonUtility can deserialize it.
+nlohmann::json build_per_node_groups(
+    const NodeOutputMap& outputs,
+    const std::unordered_map<std::string, const GraphNode*>& node_by_id)
+{
+    auto result = nlohmann::json::array();
+    for (const auto& [node_id, collection] : outputs) {
+        if (const auto* geom = collection.primary_geometry()) {
+            auto groups_json = build_group_stats(*geom);
+            if (groups_json.contains("groups") && groups_json["groups"].is_array()) {
+                for (auto& g : groups_json["groups"]) {
+                    g["node_id"] = node_id;
+                    result.push_back(g);
+                }
+            }
+        }
+    }
+    return result;
+}
+
 } // namespace
 
 PcgResultCode execute_graph(const Graph& graph,
@@ -375,6 +396,7 @@ PcgResultCode execute_graph(const Graph& graph,
     }
 
     auto node_stats = build_node_stats(outputs, node_by_id);
+    auto per_node_groups = build_per_node_groups(outputs, node_by_id);
 
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
@@ -425,6 +447,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = nlohmann::json::object();
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -434,6 +457,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = primary;
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -444,6 +468,7 @@ PcgResultCode execute_graph(const Graph& graph,
             data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -454,6 +479,7 @@ PcgResultCode execute_graph(const Graph& graph,
             data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -462,6 +488,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -470,6 +497,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -477,6 +505,7 @@ PcgResultCode execute_graph(const Graph& graph,
     out_result.json = sink_output.primary_json();
     out_result.mesh = data::PcgMeshData{};
     out_result.json["node_stats"] = node_stats;
+    out_result.json["node_groups"] = per_node_groups;
     return PCG_OK;
 }
 

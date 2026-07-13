@@ -70,6 +70,7 @@ namespace DJTechEditor.PCG.Graph
         private PcgGraphNodeBase m_ActiveRadialMenuNode;
         private PcgNodeInfoPanel m_InfoPanel;
         private Dictionary<string, PcgNodeMeshStats> m_NodeMeshStats = new();
+        private Dictionary<string, List<NodeGroupEntry>> m_NodeGroups = new();
         private string m_LastStatsJson;
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
@@ -123,6 +124,7 @@ namespace DJTechEditor.PCG.Graph
             {
                 m_LastStatsJson = json;
                 m_NodeMeshStats.Clear();
+                m_NodeGroups.Clear();
                 if (!string.IsNullOrEmpty(json))
                 {
                     try
@@ -131,18 +133,35 @@ namespace DJTechEditor.PCG.Graph
                         if (wrapper?.node_stats != null)
                         {
                             foreach (var entry in wrapper.node_stats)
+                            {
                                 m_NodeMeshStats[entry.node_id] = new PcgNodeMeshStats
                                 {
                                     pointCount = entry.point_count,
                                     faceCount = entry.face_count,
                                     triangleCount = entry.triangle_count,
                                 };
+                            }
+                        }
+                        if (wrapper?.node_groups != null)
+                        {
+                            foreach (var g in wrapper.node_groups)
+                            {
+                                if (!m_NodeGroups.ContainsKey(g.node_id))
+                                    m_NodeGroups[g.node_id] = new List<NodeGroupEntry>();
+                                m_NodeGroups[g.node_id].Add(g);
+                            }
                         }
                     }
                     catch { /* JSON shape mismatch — silently skip */ }
                 }
             }
             return m_NodeMeshStats.TryGetValue(nodeId, out stats);
+        }
+
+        internal bool TryGetNodeGroups(string nodeId, out List<NodeGroupEntry> groups)
+        {
+            TryGetNodeMeshStats(nodeId, out _);
+            return m_NodeGroups.TryGetValue(nodeId, out groups);
         }
 
         private string ResolveCookResultJson()
@@ -986,6 +1005,7 @@ namespace DJTechEditor.PCG.Graph
     public class NodeStatsWrapper
     {
         public NodeStatEntry[] node_stats;
+        public NodeGroupEntry[] node_groups;
     }
 
     [System.Serializable]
@@ -996,5 +1016,16 @@ namespace DJTechEditor.PCG.Graph
         public int point_count;
         public int face_count;
         public int triangle_count;
+    }
+
+    [System.Serializable]
+    public class NodeGroupEntry
+    {
+        public string node_id;
+        public string name;
+        public string domain;
+        public int count;
+        public int[] members;
+        public float[] edgeEndpoints;
     }
 }
