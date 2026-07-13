@@ -51,7 +51,7 @@ namespace DJTechEditor.PCG.Graph
 
         internal PcgGraphView GraphView => m_GraphView;
 
-        public string CurrentAssetPath => FullPathToAssetPath(m_CurrentFilePath);
+        public string CurrentAssetPath => string.IsNullOrEmpty(m_CurrentFilePath) ? null : FullPathToAssetPath(m_CurrentFilePath);
 
         public IReadOnlyList<PcgPreviewMeshBinding> PreviewMeshBindings => m_PreviewMeshBindings;
 
@@ -588,6 +588,8 @@ namespace DJTechEditor.PCG.Graph
 
         private static string FullPathToAssetPath(string fullPath)
         {
+            if (string.IsNullOrEmpty(fullPath))
+                return null;
             var normalizedFull = Path.GetFullPath(fullPath).Replace('\\', '/');
             var dataPath = Application.dataPath.Replace('\\', '/');
             if (!normalizedFull.StartsWith(dataPath))

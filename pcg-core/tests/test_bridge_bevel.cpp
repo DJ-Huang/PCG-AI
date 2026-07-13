@@ -75,8 +75,36 @@ std::string with_bevel_amount(std::string graph, const char* amount)
     return graph;
 }
 
+// Weld vertices by position so that split normals don't create false boundaries.
+std::vector<int> weld_by_position(const pcg::internal::data::PcgMeshData& mesh)
+{
+    std::unordered_map<uint64_t, int> weld_map;
+    auto weld_key = [](double x, double y, double z) -> uint64_t {
+        const auto ix = static_cast<int64_t>(std::round(x * 1e6));
+        const auto iy = static_cast<int64_t>(std::round(y * 1e6));
+        const auto iz = static_cast<int64_t>(std::round(z * 1e6));
+        return static_cast<uint64_t>(ix * 73856093 ^ iy * 19349663 ^ iz * 83492791);
+    };
+    std::vector<int> welded(mesh.vertices().size());
+    int next_id = 0;
+    for (size_t i = 0; i < mesh.vertices().size(); ++i) {
+        const auto& v = mesh.vertices()[i];
+        const uint64_t key = weld_key(v.x, v.y, v.z);
+        auto it = weld_map.find(key);
+        if (it != weld_map.end())
+            welded[i] = it->second;
+        else {
+            welded[i] = next_id;
+            weld_map[key] = next_id++;
+        }
+    }
+    return welded;
+}
+
 int boundary_edge_count(const pcg::internal::data::PcgMeshData& mesh)
 {
+    const std::vector<int> welded = weld_by_position(mesh);
+
     struct EdgeUse {
         int count = 0;
     };
@@ -89,7 +117,11 @@ int boundary_edge_count(const pcg::internal::data::PcgMeshData& mesh)
     };
 
     for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
+        const int tri[3] = {
+            welded[static_cast<size_t>(mesh.triangles()[i])],
+            welded[static_cast<size_t>(mesh.triangles()[i + 1])],
+            welded[static_cast<size_t>(mesh.triangles()[i + 2])],
+        };
         for (int e = 0; e < 3; ++e)
             ++edges[edge_key(tri[e], tri[(e + 1) % 3])].count;
     }
@@ -187,6 +219,8 @@ void dump_boundary_loops(const pcg::internal::data::PcgMeshData& mesh)
 
 int manifold_winding_bad_count(const pcg::internal::data::PcgMeshData& mesh)
 {
+    const std::vector<int> welded = weld_by_position(mesh);
+
     struct DirCount {
         int ab = 0;
         int ba = 0;
@@ -200,7 +234,11 @@ int manifold_winding_bad_count(const pcg::internal::data::PcgMeshData& mesh)
     };
 
     for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
+        const int tri[3] = {
+            welded[static_cast<size_t>(mesh.triangles()[i])],
+            welded[static_cast<size_t>(mesh.triangles()[i + 1])],
+            welded[static_cast<size_t>(mesh.triangles()[i + 2])],
+        };
         for (int e = 0; e < 3; ++e) {
             const int a = tri[e];
             const int b = tri[(e + 1) % 3];
@@ -340,7 +378,7 @@ std::string build_parametric_sedan(bool cap_start, bool cap_end, int segments,
             "minEdgeAngle": 30,
             "includeUnshared": false,
             "fromFaceGroup": "",
-            "fromEdgeGroup": "profile_corner"
+            "fromEdgeGroup": ""
           }
         },
         {
@@ -534,7 +572,7 @@ int main()
             "minEdgeAngle": 30,
             "includeUnshared": false,
             "fromFaceGroup": "",
-            "fromEdgeGroup": "profile_corner"
+            "fromEdgeGroup": ""
           }
         },
         {

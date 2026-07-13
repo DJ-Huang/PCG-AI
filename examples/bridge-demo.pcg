@@ -23,7 +23,7 @@
       "id": "n118",
       "type": "GroupCreate",
       "position": { "x": 211.5, "y": 320 },
-      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "profile_corner"}
+      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": ""}
     },
     {
       "id": "n101",

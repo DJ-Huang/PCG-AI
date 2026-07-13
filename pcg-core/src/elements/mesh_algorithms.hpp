@@ -1,16 +1,9 @@
 #pragma once
 
+#include "data/pcg_geometry.hpp"
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_texture_data.hpp"
 #include "elements/bevel_blender.hpp"
-
-namespace pcg::internal::data {
-class PcgGeometry;
-}
-
-namespace pcg::internal::data {
-class PcgGeometry;
-}
 
 namespace pcg::internal::elements {
 
@@ -74,7 +67,7 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
                              bool (*is_cancel_requested)() = nullptr,
                              const BevelEdgeSelection& edge_selection = {},
                              const data::PcgGeometry* geometry = nullptr);
-data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amount, int segments,
+data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amount, int segments,
                                  BevelMethod method = BevelMethod::Edge,
                                  BevelOffsetType offset_type = BevelOffsetType::Offset,
                                  bool clamp_overlap = true, double angle_limit_deg = 30.0,
@@ -84,5 +77,10 @@ data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amoun
                                  BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
                                  bool (*is_cancel_requested)() = nullptr,
                                  const BevelEdgeSelection& edge_selection = {});
+
+data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
+                                    double translate_x, double translate_y, double translate_z,
+                                    double rotation_x_deg, double rotation_y_deg, double rotation_z_deg,
+                                    double scale_x, double scale_y, double scale_z);
 
 } // namespace pcg::internal::elements

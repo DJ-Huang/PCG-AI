@@ -135,6 +135,9 @@ namespace DJTechRuntime.PCG
 
         /// <summary>Invoked after a preview cook applies results (SceneView repaint).</summary>
         public static System.Action EditorAfterPreviewCookApplied;
+
+        /// <summary>Last cook result JSON (contains groups + node_stats). Read by Graph Editor info panel.</summary>
+        public string LastCookResultJson;
 #endif
 
 #if UNITY_EDITOR
@@ -528,16 +531,21 @@ namespace DJTechRuntime.PCG
         {
             var kind = PcgResultParser.DetectKind(result);
 
+#if UNITY_EDITOR
+            LastCookResultJson = result.Json;
+#endif
+
             switch (kind)
             {
                 case PcgResultKind.Mesh:
                 {
-                    // Feed group stats JSON to visualizer (if present)
+                    // Feed group stats JSON to visualizer
                     if (!string.IsNullOrEmpty(result.Json))
                     {
                         var gv = GetComponent<PcgGroupVisualizer>();
-                        if (gv != null)
-                            gv.SetResultJson(result.Json);
+                        if (gv == null)
+                            gv = gameObject.AddComponent<PcgGroupVisualizer>();
+                        gv.SetResultJson(result.Json);
                     }
 
                     var binHash = ComputeBinaryHash(result.MeshBinary);

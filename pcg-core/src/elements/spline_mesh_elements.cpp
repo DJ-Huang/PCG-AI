@@ -1,6 +1,7 @@
 #include "elements/spline_mesh_elements.hpp"
 
 #include "elements/element_utils.hpp"
+#include "elements/mesh_algorithms.hpp"
 #include "elements/pcg_element.hpp"
 #include "elements/spline_algorithms.hpp"
 
@@ -48,8 +49,20 @@ public:
         opts.scale_start = ctx.node->data.value("scaleStart", 1.0);
         opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
         opts.profile_plane = ctx.node->data.value("profilePlane", "xy");
+        opts.shade_mode = ctx.node->data.value("shadeMode", "auto");
+        opts.cusp_angle_deg = ctx.node->data.value("cuspAngle", 30.0);
 
-        emit_geometry(ctx, sweep_along_spline_geometry(backbone, profile_spline, opts));
+        data::PcgGeometry geometry = sweep_along_spline_geometry(backbone, profile_spline, opts);
+
+        if (opts.shade_mode == "smooth")
+            geometry.detail().shade_mode = data::ShadeMode::Smooth;
+        else if (opts.shade_mode == "flat")
+            geometry.detail().shade_mode = data::ShadeMode::Flat;
+        else
+            geometry.detail().shade_mode = data::ShadeMode::Auto;
+        geometry.detail().cusp_angle_deg = opts.cusp_angle_deg;
+
+        emit_geometry(ctx, std::move(geometry));
         return PCG_OK;
     }
 };
@@ -104,10 +117,6 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing node");
 
-        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "TransformMesh missing mesh input");
-        if (mesh.vertices().empty())
-            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing mesh input");
-
         TransformMeshOptions opts;
         opts.translate_x = ctx.node->data.value("translateX", 0.0);
         opts.translate_y = ctx.node->data.value("translateY", 0.0);
@@ -118,6 +127,20 @@ public:
         opts.scale_x = ctx.node->data.value("scaleX", 1.0);
         opts.scale_y = ctx.node->data.value("scaleY", 1.0);
         opts.scale_z = ctx.node->data.value("scaleZ", 1.0);
+
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            if (geometry->points().empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing mesh input");
+            emit_geometry(ctx, transform_geometry(*geometry,
+                opts.translate_x, opts.translate_y, opts.translate_z,
+                opts.rotation_x_deg, opts.rotation_y_deg, opts.rotation_z_deg,
+                opts.scale_x, opts.scale_y, opts.scale_z));
+            return PCG_OK;
+        }
+
+        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "TransformMesh missing mesh input");
+        if (mesh.vertices().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing mesh input");
 
         emit_mesh(ctx, transform_mesh(mesh, opts));
         return PCG_OK;
@@ -133,19 +156,41 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh missing node");
 
+        std::vector<data::PcgGeometry> geometries;
         std::vector<data::PcgMeshData> meshes;
         for (const auto& item : ctx.inputs.items())
         {
-            if (item.mesh)
+            if (item.geometry)
+                geometries.push_back(*item.geometry);
+            else if (item.mesh)
                 meshes.push_back(*item.mesh);
-            else if (item.geometry)
-                meshes.push_back(data::triangulate_geometry(*item.geometry));
             else if (item.payload.is_object() && item.payload.contains("vertices"))
                 meshes.push_back(parse_mesh_input(item.payload));
         }
 
-        if (meshes.empty())
+        if (geometries.empty() && meshes.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh missing mesh inputs");
+
+        if (!geometries.empty()) {
+            const auto& ref = geometries[0].detail();
+            for (size_t i = 1; i < geometries.size(); ++i) {
+                if (geometries[i].detail().shade_mode != ref.shade_mode)
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh: shade mode mismatch between inputs");
+                const double diff = geometries[i].detail().cusp_angle_deg - ref.cusp_angle_deg;
+                if (diff > 1e-9 || diff < -1e-9)
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeMesh: cusp angle mismatch between inputs");
+            }
+
+            data::PcgGeometry merged = geometries[0];
+            for (size_t i = 1; i < geometries.size(); ++i)
+                merged = data::merge_geometries(merged, geometries[i]);
+            for (const auto& mesh : meshes) {
+                data::PcgGeometry geom = data::geometry_from_mesh(mesh);
+                merged = data::merge_geometries(merged, geom);
+            }
+            emit_geometry(ctx, std::move(merged));
+            return PCG_OK;
+        }
 
         emit_mesh(ctx, merge_meshes(meshes));
         return PCG_OK;

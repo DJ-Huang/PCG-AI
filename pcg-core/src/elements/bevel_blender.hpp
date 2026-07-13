@@ -297,6 +297,9 @@ struct BevelParams {
     struct OutputMesh {
         std::vector<Vec3> vertices;
         std::vector<int> triangles;
+        /// BMesh face index per output triangle (-1 for new geometry). Parallel to triangles (1 entry per tri).
+        std::vector<int> face_origins;
+        int current_face_origin = -1;
         std::unordered_map<std::string, int> vertex_cache;
 
         int get_vertex(const Vec3& v) {
@@ -319,6 +322,7 @@ struct BevelParams {
             triangles.push_back(a);
             triangles.push_back(b);
             triangles.push_back(c);
+            face_origins.push_back(current_face_origin);
         }
 
         /// Emit a quad with Blender loop order (no mesh-center reorientation).
@@ -516,6 +520,7 @@ data::PcgMeshData bevel_mesh_blender(
     BevelVMeshMethod vmesh_method = BevelVMeshMethod::Adj,
     bool (*is_cancel_requested)() = nullptr,
     const BevelEdgeSelection& edge_selection = {},
-    const data::PcgGeometry* geometry = nullptr);
+    const data::PcgGeometry* geometry = nullptr,
+    data::PcgGeometry* out_geometry = nullptr);
 
 } // namespace pcg::internal::elements::bevel

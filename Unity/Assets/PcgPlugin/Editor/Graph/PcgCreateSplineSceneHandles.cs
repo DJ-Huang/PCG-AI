@@ -59,14 +59,23 @@ namespace DJTechEditor.PCG.Graph
         private static Texture2D IconSplineNormal => s_IconSplineNormal ??= MakeIcon(new(0.7f, 0.7f, 0.7f), DrawSplineIcon);
         private static Texture2D IconSplineActive => s_IconSplineActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawSplineIcon);
         private static Texture2D IconVertexNormal => s_IconVertexNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawVertexIcon);
+        private static Texture2D IconVertexActive => s_IconVertexActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawVertexIcon);
         private static Texture2D IconEdgeNormal => s_IconEdgeNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawEdgeIcon);
+        private static Texture2D IconEdgeActive => s_IconEdgeActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawEdgeIcon);
         private static Texture2D IconFaceNormal => s_IconFaceNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawFaceIcon);
+        private static Texture2D IconFaceActive => s_IconFaceActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawFaceIcon);
         private static Texture2D IconExit => s_IconExit ??= MakeIcon(new(0.85f, 0.5f, 0.4f), DrawExitIcon);
 
         private static Texture2D s_IconObjectNormal, s_IconObjectActive;
         private static Texture2D s_IconSplineNormal, s_IconSplineActive;
         private static Texture2D s_IconVertexNormal, s_IconEdgeNormal, s_IconFaceNormal;
+        private static Texture2D s_IconVertexActive, s_IconEdgeActive, s_IconFaceActive;
         private static Texture2D s_IconExit;
+
+        // --- Group viewer state ---
+        private static string s_SelectedGroupName;
+        private static readonly List<GroupInfo> s_AvailableGroups = new();
+        private static string s_LastParsedJson;
 
         private const int IconSize = 16;
 
@@ -255,6 +264,19 @@ namespace DJTechEditor.PCG.Graph
                 foreach (var (window, graphView, node) in splineNodes)
                     DrawNodeSpline(sceneView, window, graphView, node);
             }
+            else if (IsGroupDomain(ctx.Domain))
+            {
+                var groupNode = graphWindow.GraphView.selection.OfType<PcgManifestNodeView>().FirstOrDefault();
+                if (groupNode != null)
+                {
+                    DrawGroupViewerOverlay(graphWindow, groupNode);
+                    DrawNodeGroupHighlight(sceneView, graphWindow);
+                }
+                else
+                {
+                    DrawPcgModeStatusOverlay(graphWindow);
+                }
+            }
             else
             {
                 DrawPcgModeStatusOverlay(graphWindow);
@@ -314,10 +336,18 @@ namespace DJTechEditor.PCG.Graph
 
         private static void ExitPcgMode()
         {
+            if (s_LockedSelection != null)
+            {
+                var gv = s_LockedSelection.GetComponent<PcgGroupVisualizer>();
+                gv?.ClearHighlight();
+            }
             s_PcgModeActive = false;
             s_ActiveWindow = null;
             s_LockedSelection = null;
             s_SelectedPointByNode.Clear();
+            s_SelectedGroupName = null;
+            s_AvailableGroups.Clear();
+            s_LastParsedJson = null;
             Tools.current = s_PrevTool;
             RestoreHiddenRenderers();
         }
@@ -753,11 +783,33 @@ namespace DJTechEditor.PCG.Graph
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.SplineControlPoint);
                 GUI.enabled = true;
 
-                // Vertex / Edge / Face — disabled placeholders
-                GUI.enabled = false;
-                IconToolbarButton(IconVertexNormal, IconVertexNormal, "Vertex (not available)", false);
-                IconToolbarButton(IconEdgeNormal, IconEdgeNormal, "Edge (not available)", false);
-                IconToolbarButton(IconFaceNormal, IconFaceNormal, "Face (not available)", false);
+                // Vertex / Edge / Face — group viewer modes
+                bool vertexEnabled = ctx.SupportsDomain(SceneEditDomain.Vertex);
+                GUI.enabled = vertexEnabled;
+                if (IconToolbarButton(IconVertexActive, IconVertexNormal, "Vertex Group View",
+                        ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Vertex))
+                {
+                    s_SelectedGroupName = null;
+                    window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Vertex);
+                }
+
+                bool edgeEnabled = ctx.SupportsDomain(SceneEditDomain.Edge);
+                GUI.enabled = edgeEnabled;
+                if (IconToolbarButton(IconEdgeActive, IconEdgeNormal, "Edge Group View",
+                        ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Edge))
+                {
+                    s_SelectedGroupName = null;
+                    window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Edge);
+                }
+
+                bool faceEnabled = ctx.SupportsDomain(SceneEditDomain.Face);
+                GUI.enabled = faceEnabled;
+                if (IconToolbarButton(IconFaceActive, IconFaceNormal, "Face Group View",
+                        ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Face))
+                {
+                    s_SelectedGroupName = null;
+                    window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Face);
+                }
                 GUI.enabled = true;
 
                 GUILayout.Space(4);
@@ -1438,6 +1490,273 @@ namespace DJTechEditor.PCG.Graph
                     ? parsed
                     : defaultValue,
             };
+        }
+
+        // ─── Group Viewer ─────────────────────────────────────────
+
+        [System.Serializable]
+        private class GroupJsonEntry
+        {
+            public string name;
+            public string domain;
+            public int count;
+            public long[] members;
+        }
+
+        [System.Serializable]
+        private class GroupJsonWrapper
+        {
+            public GroupJsonEntry[] groups;
+        }
+
+        private struct GroupInfo
+        {
+            public string name;
+            public string domain;
+            public int count;
+            public long[] members;
+        }
+
+        private static bool IsGroupDomain(SceneEditDomain domain) =>
+            domain == SceneEditDomain.Vertex ||
+            domain == SceneEditDomain.Edge ||
+            domain == SceneEditDomain.Face;
+
+        private static string DomainToString(SceneEditDomain domain) => domain switch
+        {
+            SceneEditDomain.Vertex => "point",
+            SceneEditDomain.Edge => "edge",
+            SceneEditDomain.Face => "face",
+            _ => "unknown",
+        };
+
+        private static void ParseGroupsFromJson(string json, List<GroupInfo> output)
+        {
+            output.Clear();
+            if (string.IsNullOrEmpty(json))
+                return;
+            try
+            {
+                var root = JsonUtility.FromJson<GroupJsonWrapper>(json);
+                if (root?.groups == null)
+                    return;
+                foreach (var g in root.groups)
+                {
+                    output.Add(new GroupInfo
+                    {
+                        name = g.name,
+                        domain = g.domain,
+                        count = g.count,
+                        members = g.members,
+                    });
+                }
+            }
+            catch
+            {
+                // JSON may not be in expected format
+            }
+        }
+
+        private static void DrawGroupViewerOverlay(PcgGraphEditorWindow window, PcgManifestNodeView node)
+        {
+            var ctx = window.GraphView.SceneEditContext;
+            var domainStr = DomainToString(ctx.Domain);
+
+            var anchor = FindPreviewAnchor(window);
+            if (anchor == null)
+            {
+                DrawGroupViewerMessage("No preview anchor found.\nAdd a PcgGraphComponent to the scene.");
+                return;
+            }
+
+            var gv = anchor.GetComponent<PcgGroupVisualizer>();
+            var json = gv != null ? gv.ResultJson : null;
+            if (string.IsNullOrEmpty(json))
+            {
+                DrawGroupViewerMessage($"No group data available.\nCook the graph to see {domainStr} groups.");
+                return;
+            }
+
+            // Re-parse only if JSON changed
+            if (json != s_LastParsedJson)
+            {
+                ParseGroupsFromJson(json, s_AvailableGroups);
+                s_LastParsedJson = json;
+            }
+
+            var filtered = s_AvailableGroups.Where(g => g.domain == domainStr).ToList();
+
+            // Clear stale selection
+            if (!string.IsNullOrEmpty(s_SelectedGroupName) &&
+                !filtered.Any(g => g.name == s_SelectedGroupName))
+            {
+                s_SelectedGroupName = null;
+                gv?.ClearHighlight();
+            }
+
+            Handles.BeginGUI();
+            try
+            {
+                const float width = 300f;
+                const float height = 80f;
+
+                var area = new Rect(
+                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    SceneOverlayMargin + 30f,
+                    width,
+                    height);
+                GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
+
+                GUILayout.BeginArea(area);
+                GUILayout.Space(6f);
+                GUILayout.Label($"{node.NodeType} — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
+
+                if (filtered.Count == 0)
+                {
+                    GUILayout.Label($"No {domainStr} groups in cooked result.", EditorStyles.miniLabel);
+                }
+                else
+                {
+                    var labels = filtered.Select(g => $"{g.name} ({g.count})").ToArray();
+                    var currentIdx = filtered.FindIndex(g => g.name == s_SelectedGroupName);
+                    var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
+                    if (newIdx != currentIdx)
+                    {
+                        if (newIdx >= 0 && newIdx < filtered.Count)
+                        {
+                            var group = filtered[newIdx];
+                            s_SelectedGroupName = group.name;
+                            gv?.HighlightGroup(group.name, group.domain);
+                        }
+                        else
+                        {
+                            s_SelectedGroupName = null;
+                            gv?.ClearHighlight();
+                        }
+                        SceneView.RepaintAll();
+                    }
+                }
+
+                GUILayout.EndArea();
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawGroupViewerMessage(string message)
+        {
+            Handles.BeginGUI();
+            try
+            {
+                const float width = 300f;
+                const float height = 70f;
+                var area = new Rect(
+                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    SceneOverlayMargin + 30f,
+                    width,
+                    height);
+                GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
+
+                GUILayout.BeginArea(area);
+                GUILayout.Space(6f);
+                GUILayout.Label(message, EditorStyles.wordWrappedLabel);
+                GUILayout.EndArea();
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawNodeGroupHighlight(SceneView sceneView, PcgGraphEditorWindow window)
+        {
+            if (string.IsNullOrEmpty(s_SelectedGroupName))
+                return;
+
+            var ctx = window.GraphView.SceneEditContext;
+            var anchor = FindPreviewAnchor(window);
+            if (anchor == null)
+                return;
+
+            var mf = anchor.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null)
+                return;
+
+            var mesh = mf.sharedMesh;
+            var vertices = mesh.vertices;
+            var triangles = mesh.triangles;
+            var l2w = anchor.localToWorldMatrix;
+
+            var domainStr = DomainToString(ctx.Domain);
+            var group = s_AvailableGroups.FirstOrDefault(
+                g => g.name == s_SelectedGroupName && g.domain == domainStr);
+            if (group.members == null || group.members.Length == 0)
+                return;
+
+            if (ctx.Domain == SceneEditDomain.Edge)
+            {
+                Handles.color = new Color(0f, 1f, 0.8f, 0.9f);
+                foreach (var key in group.members)
+                {
+                    int a = (int)(key / 1000000);
+                    int b = (int)(key % 1000000);
+                    if (a < 0 || b < 0 || a >= vertices.Length || b >= vertices.Length)
+                        continue;
+                    var p0 = l2w.MultiplyPoint(vertices[a]);
+                    var p1 = l2w.MultiplyPoint(vertices[b]);
+                    Handles.DrawAAPolyLine(4f, p0, p1);
+                }
+            }
+            else if (ctx.Domain == SceneEditDomain.Face)
+            {
+                // Filled translucent triangles
+                Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
+                foreach (var faceIdx in group.members)
+                {
+                    int baseIdx = (int)faceIdx * 3;
+                    if (triangles == null || baseIdx + 2 >= triangles.Length)
+                        continue;
+                    int v0 = triangles[baseIdx];
+                    int v1 = triangles[baseIdx + 1];
+                    int v2 = triangles[baseIdx + 2];
+                    if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
+                        continue;
+                    var p0 = l2w.MultiplyPoint(vertices[v0]);
+                    var p1 = l2w.MultiplyPoint(vertices[v1]);
+                    var p2 = l2w.MultiplyPoint(vertices[v2]);
+                    Handles.DrawAAConvexPolygon(p0, p1, p2);
+                }
+                // Bright edges on top
+                Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
+                foreach (var faceIdx in group.members)
+                {
+                    int baseIdx = (int)faceIdx * 3;
+                    if (triangles == null || baseIdx + 2 >= triangles.Length)
+                        continue;
+                    int v0 = triangles[baseIdx];
+                    int v1 = triangles[baseIdx + 1];
+                    int v2 = triangles[baseIdx + 2];
+                    if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
+                        continue;
+                    var p0 = l2w.MultiplyPoint(vertices[v0]);
+                    var p1 = l2w.MultiplyPoint(vertices[v1]);
+                    var p2 = l2w.MultiplyPoint(vertices[v2]);
+                    Handles.DrawAAPolyLine(2f, p0, p1, p2, p0);
+                }
+            }
+            else if (ctx.Domain == SceneEditDomain.Vertex)
+            {
+                Handles.color = new Color(1f, 0.3f, 0.3f, 0.9f);
+                foreach (var ptIdx in group.members)
+                {
+                    if (ptIdx < 0 || ptIdx >= vertices.Length)
+                        continue;
+                    var p = l2w.MultiplyPoint(vertices[(int)ptIdx]);
+                    Handles.SphereHandleCap(0, p, Quaternion.identity, 0.02f, EventType.Repaint);
+                }
+            }
         }
     }
 }

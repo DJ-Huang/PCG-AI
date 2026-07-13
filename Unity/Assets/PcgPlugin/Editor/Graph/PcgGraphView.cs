@@ -69,10 +69,13 @@ namespace DJTechEditor.PCG.Graph
         private bool m_PendingCommit;
         private PcgGraphNodeBase m_ActiveRadialMenuNode;
         private PcgNodeInfoPanel m_InfoPanel;
+        private Dictionary<string, PcgNodeMeshStats> m_NodeMeshStats = new();
+        private string m_LastStatsJson;
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
 
         private static readonly SceneEditDomain[] s_SplineDomains = { SceneEditDomain.SplineControlPoint };
+        private static readonly SceneEditDomain[] s_GroupDomains = { SceneEditDomain.Vertex, SceneEditDomain.Edge, SceneEditDomain.Face };
 
         private PcgSceneEditContext m_SceneEditContext = PcgSceneEditContext.ObjectMode;
 
@@ -111,6 +114,55 @@ namespace DJTechEditor.PCG.Graph
         public void HideNodeInfoPanel()
         {
             m_InfoPanel?.Hide();
+        }
+
+        internal bool TryGetNodeMeshStats(string nodeId, out PcgNodeMeshStats stats)
+        {
+            var json = ResolveCookResultJson();
+            if (json != m_LastStatsJson)
+            {
+                m_LastStatsJson = json;
+                m_NodeMeshStats.Clear();
+                if (!string.IsNullOrEmpty(json))
+                {
+                    try
+                    {
+                        var wrapper = JsonUtility.FromJson<NodeStatsWrapper>(json);
+                        if (wrapper?.node_stats != null)
+                        {
+                            foreach (var entry in wrapper.node_stats)
+                                m_NodeMeshStats[entry.node_id] = new PcgNodeMeshStats
+                                {
+                                    pointCount = entry.point_count,
+                                    faceCount = entry.face_count,
+                                    triangleCount = entry.triangle_count,
+                                };
+                        }
+                    }
+                    catch { /* JSON shape mismatch — silently skip */ }
+                }
+            }
+            return m_NodeMeshStats.TryGetValue(nodeId, out stats);
+        }
+
+        private string ResolveCookResultJson()
+        {
+            if (m_HostWindow is PcgGraphEditorWindow window)
+            {
+                var assetPath = window.CurrentAssetPath;
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    foreach (var component in UnityEngine.Object.FindObjectsOfType<PcgGraphComponent>())
+                    {
+                        if (component == null || component.GraphAsset == null)
+                            continue;
+                        var componentPath = UnityEditor.AssetDatabase.GetAssetPath(component.GraphAsset);
+                        if (componentPath == assetPath)
+                            return component.LastCookResultJson;
+                    }
+                }
+            }
+            return null;
         }
 
         public PcgGraphView()
@@ -371,13 +423,37 @@ namespace DJTechEditor.PCG.Graph
         private void UpdateSceneEditContext()
         {
             var selected = selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
-            if (selected is PcgManifestNodeView manifestNode && manifestNode.NodeType == "CreateSpline")
+            if (selected is PcgManifestNodeView manifestNode)
             {
-                m_SceneEditContext = new PcgSceneEditContext(
-                    SceneEditLevel.Component,
-                    SceneEditDomain.SplineControlPoint,
-                    selected.NodeId,
-                    s_SplineDomains);
+                if (manifestNode.NodeType == "CreateSpline")
+                {
+                    m_SceneEditContext = new PcgSceneEditContext(
+                        SceneEditLevel.Component,
+                        SceneEditDomain.SplineControlPoint,
+                        selected.NodeId,
+                        s_SplineDomains);
+                }
+                else if (manifestNode.NodeType == "GroupCreate" || manifestNode.NodeType == "GroupCombine")
+                {
+                    var nodeData = manifestNode.CollectData();
+                    var domainStr = nodeData?.GetRaw("domain")?.ToString() ?? "edge";
+                    var defaultDomain = domainStr switch
+                    {
+                        "edge" => SceneEditDomain.Edge,
+                        "face" => SceneEditDomain.Face,
+                        "point" => SceneEditDomain.Vertex,
+                        _ => SceneEditDomain.Edge,
+                    };
+                    m_SceneEditContext = new PcgSceneEditContext(
+                        SceneEditLevel.Component,
+                        defaultDomain,
+                        selected.NodeId,
+                        s_GroupDomains);
+                }
+                else
+                {
+                    m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+                }
             }
             else
             {
@@ -862,5 +938,28 @@ namespace DJTechEditor.PCG.Graph
 
             return change;
         }
+    }
+
+    public struct PcgNodeMeshStats
+    {
+        public int pointCount;
+        public int faceCount;
+        public int triangleCount;
+    }
+
+    [System.Serializable]
+    public class NodeStatsWrapper
+    {
+        public NodeStatEntry[] node_stats;
+    }
+
+    [System.Serializable]
+    public class NodeStatEntry
+    {
+        public string node_id;
+        public string node_type;
+        public int point_count;
+        public int face_count;
+        public int triangle_count;
     }
 }

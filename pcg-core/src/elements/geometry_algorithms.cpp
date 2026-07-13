@@ -68,16 +68,18 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
         if (!options.include_unshared && edge.face1 < 0)
             continue;
 
-        if (!options.from_face_group.empty()) {
+        if (!options.from_face_groups.empty()) {
             bool touches = false;
-            if (edge.face0 >= 0 &&
-                input.groups().contains(geometry::GroupDomain::Face, options.from_face_group,
-                                        edge.face0))
-                touches = true;
-            if (edge.face1 >= 0 &&
-                input.groups().contains(geometry::GroupDomain::Face, options.from_face_group,
-                                        edge.face1))
-                touches = true;
+            if (edge.face0 >= 0) {
+                for (const auto& grp : options.from_face_groups)
+                    if (input.groups().contains(geometry::GroupDomain::Face, grp, edge.face0)) {
+                        touches = true; break; }
+            }
+            if (!touches && edge.face1 >= 0) {
+                for (const auto& grp : options.from_face_groups)
+                    if (input.groups().contains(geometry::GroupDomain::Face, grp, edge.face1)) {
+                        touches = true; break; }
+            }
             if (!touches)
                 continue;
         }

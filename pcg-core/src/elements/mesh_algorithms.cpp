@@ -335,7 +335,7 @@ data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int s
     }
 }
 
-data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amount, int segments,
+data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amount, int segments,
                                  BevelMethod method, BevelOffsetType offset_type,
                                  bool clamp_overlap, double angle_limit_deg, float profile,
                                  BevelMiter miter_outer, BevelMiter miter_inner,
@@ -358,9 +358,85 @@ data::PcgMeshData bevel_geometry(const data::PcgGeometry& geometry, double amoun
             mesh.add_triangle(i0, face[i], face[i + 1]);
     }
 
-    return bevel_mesh(mesh, amount, segments, method, offset_type, clamp_overlap, angle_limit_deg,
-                      profile, miter_outer, miter_inner, vmesh_method, is_cancel_requested,
-                      edge_selection, &geometry);
+    if (method == BevelMethod::VertexPush) {
+        // VertexPush only moves vertices; preserve geometry topology + groups.
+        data::PcgMeshData result_mesh = bevel_mesh_vertex_push(mesh, amount, segments);
+        data::PcgGeometry result = geometry;
+        auto& pts = result.points_mut();
+        for (size_t i = 0; i < pts.size() && i < result_mesh.vertices().size(); ++i) {
+            pts[i] = {result_mesh.vertices()[i].x,
+                      result_mesh.vertices()[i].y,
+                      result_mesh.vertices()[i].z};
+        }
+        return result;
+    }
+
+    data::PcgGeometry out_geom;
+    const data::PcgMeshData result_mesh = bevel::bevel_mesh_blender(
+        mesh, amount, segments,
+        bevel::BevelOffsetType(offset_type),
+        clamp_overlap, angle_limit_deg, profile,
+        bevel::BevelMiter(miter_outer),
+        bevel::BevelMiter(miter_inner),
+        bevel::BevelVMeshMethod(vmesh_method),
+        is_cancel_requested,
+        edge_selection,
+        &geometry,
+        &out_geom);
+
+    if (!out_geom.points().empty()) {
+        out_geom.detail() = geometry.detail();
+        return out_geom;
+    }
+
+    // Fallback: fast paths (e.g. axis-aligned box) return PcgMeshData without
+    // populating out_geometry. Convert the mesh result back to geometry.
+    if (!result_mesh.vertices().empty()) {
+        data::PcgGeometry fallback = data::geometry_from_mesh(result_mesh);
+        fallback.detail() = geometry.detail();
+        return fallback;
+    }
+
+    return geometry;
+}
+
+data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
+                                    double translate_x, double translate_y, double translate_z,
+                                    double rotation_x_deg, double rotation_y_deg, double rotation_z_deg,
+                                    double scale_x, double scale_y, double scale_z)
+{
+    data::PcgGeometry out = geometry;
+    const double rx = rotation_x_deg * 3.14159265358979323846 / 180.0;
+    const double ry = rotation_y_deg * 3.14159265358979323846 / 180.0;
+    const double rz = rotation_z_deg * 3.14159265358979323846 / 180.0;
+
+    const auto rot_x = [&](double x, double y, double z) {
+        const double c = std::cos(rx), s = std::sin(rx);
+        return data::PcgVec3{x, y * c - z * s, y * s + z * c};
+    };
+    const auto rot_y = [&](double x, double y, double z) {
+        const double c = std::cos(ry), s = std::sin(ry);
+        return data::PcgVec3{x * c + z * s, y, -x * s + z * c};
+    };
+    const auto rot_z = [&](double x, double y, double z) {
+        const double c = std::cos(rz), s = std::sin(rz);
+        return data::PcgVec3{x * c - y * s, x * s + y * c, z};
+    };
+
+    for (auto& p : out.points_mut()) {
+        data::PcgVec3 v = rot_x(p.x, p.y, p.z);
+        v = rot_y(v.x, v.y, v.z);
+        v = rot_z(v.x, v.y, v.z);
+        v.x *= scale_x;
+        v.y *= scale_y;
+        v.z *= scale_z;
+        v.x += translate_x;
+        v.y += translate_y;
+        v.z += translate_z;
+        p = v;
+    }
+
+    return out;
 }
 
 } // namespace pcg::internal::elements

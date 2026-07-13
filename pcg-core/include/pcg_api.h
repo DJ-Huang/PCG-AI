@@ -56,11 +56,13 @@ typedef enum {
     PCG_RESULT_KIND_POINTS = 3
 } PcgResultKind;
 
-/* Mesh binary header: magic 'PCGM', version, vertex_count, index_count (16 bytes),
- * followed by float32 xyz positions and uint32 triangle indices. */
+/* Mesh binary header: magic 'PCGM', version, vertex_count, index_count, flags (20 bytes v2).
+ * v1 (16 bytes, no flags) is supported for backward-compatible reading only.
+ * v2 header is followed by float32 xyz positions, uint32 triangle indices,
+ * and optionally float32 normals (when flags & 0x1). */
 #define PCG_MESH_BINARY_MAGIC 0x4D474350u
-#define PCG_MESH_BINARY_VERSION 1u
-#define PCG_MESH_BINARY_HEADER_SIZE 16
+#define PCG_MESH_BINARY_VERSION 2u
+#define PCG_MESH_BINARY_HEADER_SIZE 20
 
 /* Point binary header (v6 data-plane target):
  * [magic|version|point_count|flags] (16 bytes)

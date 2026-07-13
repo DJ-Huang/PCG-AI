@@ -181,18 +181,20 @@ int main()
 
     // Chamfer (seg=1): profile insertion is now active (edge_has_face), but
     // profile winding may be incorrect on some edges — known bevel bug.
-    const PcgMeshData partial1 = bevel_geometry(
+    const PcgGeometry partial1_geo = bevel_geometry(
         box_grouped, 0.1, 1, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
         BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, group_sel);
+    const PcgMeshData partial1 = triangulate_geometry(partial1_geo);
     if (partial1.vertices().size() <= box.points().size()) fail("partial seg1 verts");
     const int bad1 = manifold_winding_bad_count(partial1);
     if (bad1 != 0)
         std::printf("WARN: partial seg1 manifold bad=%d (known bevel profile winding bug)\n", bad1);
     if (signed_volume(partial1) <= 0.0) fail("partial seg1 volume");
 
-    const PcgMeshData partial = bevel_geometry(
+    const PcgGeometry partial_geo = bevel_geometry(
         box_grouped, 0.1, 3, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
         BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, group_sel);
+    const PcgMeshData partial = triangulate_geometry(partial_geo);
     if (partial.vertices().size() <= box.points().size()) fail("partial bevel verts");
 
     const int bad = manifold_winding_bad_count(partial);
@@ -205,9 +207,10 @@ int main()
     // Full-edge bevel must stay clean under the centroid heuristic.
     bevel::BevelEdgeSelection all_sel;
     all_sel.exclude_unshared = true;
-    const PcgMeshData full = bevel_geometry(
+    const PcgGeometry full_geo = bevel_geometry(
         box, 0.1, 3, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
         BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, all_sel);
+    const PcgMeshData full = triangulate_geometry(full_geo);
     if (outward_flip_ratio(full) >= 0.05)
         fail("full-edge bevel normals");
 

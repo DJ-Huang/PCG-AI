@@ -613,7 +613,17 @@
             { "value": "xz", "label": "XZ" },
             { "value": "yz", "label": "YZ" }
           ]
-        }
+        },
+        "shadeMode": {
+          "type": "enum",
+          "default": "auto",
+          "options": [
+            { "value": "auto", "label": "Auto (Group + Angle)" },
+            { "value": "smooth", "label": "Smooth" },
+            { "value": "flat", "label": "Flat" }
+          ]
+        },
+        "cuspAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 }
       }
     },
     {

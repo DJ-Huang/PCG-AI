@@ -11,7 +11,7 @@
       "id": "n118",
       "type": "GroupCreate",
       "position": { "x": 351, "y": 286 },
-      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "profile_corner", "__nodeTitle": ""}
+      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
     },
     {
       "id": "n101",

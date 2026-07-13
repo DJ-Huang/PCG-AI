@@ -25,8 +25,20 @@ PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const ch
 
 /// Builds lightweight group statistics JSON for execution results.
 /// Output format: {"groups": [{"name": "side", "domain": "face", "count": 24, "members": [0,1,2,...]}, ...]}
+/// Face group members are remapped from geometry face indices to mesh triangle indices
+/// (fan-triangulation: an N-gon face at tri offset T produces triangles T..T+N-3).
 nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
 {
+    // Build face-index → first-mesh-triangle mapping
+    std::vector<int> face_to_tri;
+    face_to_tri.reserve(geometry.faces().size());
+    int tri_offset = 0;
+    for (const auto& face : geometry.faces()) {
+        face_to_tri.push_back(tri_offset);
+        if (face.size() >= 3)
+            tri_offset += static_cast<int>(face.size()) - 2;
+    }
+
     auto groups = nlohmann::json::array();
     static const char* kDomainNames[] = {"point", "edge", "face"};
     for (int d = 0; d < 3; ++d) {
@@ -34,12 +46,25 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
             auto memberArray = nlohmann::json::array();
-            for (int id : members)
-                memberArray.push_back(id);
+            for (int id : members) {
+                if (d == static_cast<int>(geometry::GroupDomain::Face)) {
+                    // Expand face index into constituent mesh triangles
+                    if (id >= 0 && id < static_cast<int>(face_to_tri.size())) {
+                        const auto& face = geometry.faces()[static_cast<size_t>(id)];
+                        const int first_tri = face_to_tri[static_cast<size_t>(id)];
+                        const int tri_count = face.size() >= 3
+                            ? static_cast<int>(face.size()) - 2 : 0;
+                        for (int t = 0; t < tri_count; ++t)
+                            memberArray.push_back(first_tri + t);
+                    }
+                } else {
+                    memberArray.push_back(id);
+                }
+            }
             groups.push_back({
                 {"name", name},
                 {"domain", kDomainNames[d]},
-                {"count", static_cast<int>(members.size())},
+                {"count", static_cast<int>(memberArray.size())},
                 {"members", std::move(memberArray)},
             });
         }
@@ -163,6 +188,53 @@ void gather_inputs(const Graph& graph,
     code = PCG_OK;
 }
 
+/// Collect per-node mesh statistics (Houdini-style geometry info).
+/// Returns a JSON array: [{"node_id", "node_type", "point_count", "face_count", "triangle_count"}, ...]
+nlohmann::json build_node_stats(
+    const NodeOutputMap& outputs,
+    const std::unordered_map<std::string, const GraphNode*>& node_by_id)
+{
+    auto stats = nlohmann::json::array();
+    for (const auto& [node_id, collection] : outputs) {
+        const auto it = node_by_id.find(node_id);
+        const std::string node_type = it != node_by_id.end() ? it->second->type : "";
+
+        int point_count = 0;
+        int face_count = 0;
+        int triangle_count = 0;
+
+        if (const auto* geom = collection.primary_geometry()) {
+            point_count = static_cast<int>(geom->points().size());
+            face_count = static_cast<int>(geom->faces().size());
+            for (const auto& face : geom->faces()) {
+                if (face.size() >= 3)
+                    triangle_count += static_cast<int>(face.size()) - 2;
+            }
+        } else if (const auto* mesh = collection.primary_mesh()) {
+            point_count = static_cast<int>(mesh->vertices().size());
+            triangle_count = static_cast<int>(mesh->triangles().size()) / 3;
+        } else if (const auto pts = collection.find_points_shared("out")) {
+            point_count = static_cast<int>(pts->points().size());
+        } else {
+            for (const auto& item : collection.items()) {
+                if (item.points) {
+                    point_count = static_cast<int>(item.points->points().size());
+                    break;
+                }
+            }
+        }
+
+        stats.push_back({
+            {"node_id", node_id},
+            {"node_type", node_type},
+            {"point_count", point_count},
+            {"face_count", face_count},
+            {"triangle_count", triangle_count},
+        });
+    }
+    return stats;
+}
+
 } // namespace
 
 PcgResultCode execute_graph(const Graph& graph,
@@ -281,6 +353,8 @@ PcgResultCode execute_graph(const Graph& graph,
         }
     }
 
+    auto node_stats = build_node_stats(outputs, node_by_id);
+
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
     for (const auto& node : graph.nodes) {
@@ -329,6 +403,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.point_sidecar = out_item->payload;
         out_result.json = nlohmann::json::object();
         out_result.mesh = data::PcgMeshData{};
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -337,20 +412,27 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Json;
         out_result.json = primary;
         out_result.mesh = data::PcgMeshData{};
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
     if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
         out_result.kind = GraphResultKind::Mesh;
-        out_result.mesh = data::triangulate_geometry(*geometry);
+        const auto& d = geometry->detail();
+        out_result.mesh = data::compute_split_normals(*geometry,
+            data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
     if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
         out_result.kind = GraphResultKind::Mesh;
-        out_result.mesh = data::triangulate_geometry(*geometry);
+        const auto& d = geometry->detail();
+        out_result.mesh = data::compute_split_normals(*geometry,
+            data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -358,6 +440,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
@@ -365,12 +448,14 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
+        out_result.json["node_stats"] = node_stats;
         return PCG_OK;
     }
 
     out_result.kind = GraphResultKind::Json;
     out_result.json = sink_output.primary_json();
     out_result.mesh = data::PcgMeshData{};
+    out_result.json["node_stats"] = node_stats;
     return PCG_OK;
 }
 

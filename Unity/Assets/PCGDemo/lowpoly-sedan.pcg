@@ -2,6 +2,18 @@
   "version": "1.0",
   "nodes": [
     {
+      "id": "body_path",
+      "type": "CreateSpline",
+      "position": { "x": 200, "y": 0 },
+      "data": {"mode": "line", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":4.2,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "body_profile",
+      "type": "CreateSpline",
+      "position": { "x": 420, "y": 0 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.9,\"y\":0,\"z\":0},{\"x\":0.95,\"y\":0.2,\"z\":0},{\"x\":0.85,\"y\":0.5,\"z\":0},{\"x\":0.6,\"y\":0.78,\"z\":0},{\"x\":0.25,\"y\":0.9,\"z\":0},{\"x\":-0.25,\"y\":0.9,\"z\":0},{\"x\":-0.6,\"y\":0.78,\"z\":0},{\"x\":-0.85,\"y\":0.5,\"z\":0},{\"x\":-0.95,\"y\":0.2,\"z\":0},{\"x\":-0.9,\"y\":0,\"z\":0}]", "editPlane": "xy", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
       "id": "body_t",
       "type": "TransformMesh",
       "position": { "x": 200, "y": 640 },
@@ -23,13 +35,13 @@
       "id": "cabin_sweep",
       "type": "SweepAlongSpline",
       "position": { "x": 200, "y": 960 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 0.85, "profilePlane": "xy", "__nodeTitle": ""}
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 0.85, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     },
     {
       "id": "cabin_group",
       "type": "GroupCreate",
       "position": { "x": 200, "y": 1120 },
-      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "profile_corner", "__nodeTitle": ""}
+      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
     },
     {
       "id": "cabin_bevel",
@@ -53,7 +65,7 @@
       "id": "wheel_mesh",
       "type": "SweepAlongSpline",
       "position": { "x": 200, "y": 1760 },
-      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.4, "columns": 20, "sampleSpacing": 0.3, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "__nodeTitle": ""}
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.4, "columns": 20, "sampleSpacing": 0.3, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     },
     {
       "id": "wheel_fl",
@@ -142,32 +154,20 @@
     {
       "id": "body_bevel",
       "type": "BevelMesh",
-      "position": { "x": 211, "y": 487 },
-      "data": {"method": "edge", "offsetType": "offset", "amount": 0.06, "segments": 2, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
+      "position": { "x": 200, "y": 509.5 },
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.1, "segments": 3, "clampOverlap": true, "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "bevel_edges", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
     },
     {
-      "id": "body_path",
-      "type": "CreateSpline",
-      "position": { "x": 200, "y": 0 },
-      "data": {"mode": "line", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":4.2,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
-    },
-    {
-      "id": "body_profile",
-      "type": "CreateSpline",
-      "position": { "x": 420, "y": 0 },
-      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.9,\"y\":0,\"z\":0},{\"x\":0.95,\"y\":0.2,\"z\":0},{\"x\":0.85,\"y\":0.5,\"z\":0},{\"x\":0.6,\"y\":0.78,\"z\":0},{\"x\":0.25,\"y\":0.9,\"z\":0},{\"x\":-0.25,\"y\":0.9,\"z\":0},{\"x\":-0.6,\"y\":0.78,\"z\":0},{\"x\":-0.85,\"y\":0.5,\"z\":0},{\"x\":-0.95,\"y\":0.2,\"z\":0},{\"x\":-0.9,\"y\":0,\"z\":0}]", "editPlane": "xy", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+      "id": "body_group",
+      "type": "GroupCreate",
+      "position": { "x": 187.5, "y": 320 },
+      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
     },
     {
       "id": "body_sweep",
       "type": "SweepAlongSpline",
       "position": { "x": 200, "y": 160 },
-      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "__nodeTitle": ""}
-    },
-    {
-      "id": "body_group",
-      "type": "GroupCreate",
-      "position": { "x": 200, "y": 320 },
-      "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "profile_corner", "__nodeTitle": ""}
+      "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.4, "radius": 1, "columns": 16, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
     }
   ],
   "edges": [

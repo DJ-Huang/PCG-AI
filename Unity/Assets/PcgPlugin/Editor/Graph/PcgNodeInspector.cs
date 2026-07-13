@@ -184,16 +184,50 @@ namespace DJTechEditor.PCG.Graph
                     }
                 }
 
-                m_Body.Add(new Label("Mesh Vertex/Edge/Face: disabled (authoring source not confirmed)")
+                if (node is PcgManifestNodeView groupNode &&
+                    (groupNode.NodeType == "GroupCreate" || groupNode.NodeType == "GroupCombine"))
                 {
-                    style =
+                    if (ctx.IsComponentMode && ctx.Domain != SceneEditDomain.None &&
+                        ctx.Domain != SceneEditDomain.SplineControlPoint)
                     {
-                        color = new Color(0.4f, 0.4f, 0.4f),
-                        fontSize = 9,
-                        marginBottom = 6,
-                        whiteSpace = WhiteSpace.Normal,
-                    },
-                });
+                        m_Body.Add(new Label($"Group viewer: {ctx.Domain} — select groups in Scene View overlay")
+                        {
+                            style =
+                            {
+                                color = new Color(0.55f, 0.85f, 1f),
+                                fontSize = 10,
+                                marginBottom = 6,
+                                whiteSpace = WhiteSpace.Normal,
+                            },
+                        });
+                    }
+                    else
+                    {
+                        m_Body.Add(new Label("Enter PCG Mode, then use V/E/F toolbar buttons to view group elements")
+                        {
+                            style =
+                            {
+                                color = new Color(0.6f, 0.5f, 0.3f),
+                                fontSize = 10,
+                                marginBottom = 6,
+                                whiteSpace = WhiteSpace.Normal,
+                            },
+                        });
+                    }
+                }
+                else
+                {
+                    m_Body.Add(new Label("Mesh Vertex/Edge/Face: disabled (authoring source not confirmed)")
+                    {
+                        style =
+                        {
+                            color = new Color(0.4f, 0.4f, 0.4f),
+                            fontSize = 9,
+                            marginBottom = 6,
+                            whiteSpace = WhiteSpace.Normal,
+                        },
+                    });
+                }
 
                 if (node is PcgManifestNodeView manifestNode)
                     ShowManifestProperties(manifestNode);

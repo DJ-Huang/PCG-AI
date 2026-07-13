@@ -80,6 +80,8 @@ struct SweepAlongSplineOptions {
     double scale_start = 1.0;
     double scale_end = 1.0;
     std::string profile_plane = "xy";
+    std::string shade_mode = "auto";
+    double cusp_angle_deg = 30.0;
 };
 
 struct TransformMeshOptions {
