@@ -580,8 +580,6 @@
         { "name": "side", "domain": "face", "label": "Side surfaces" },
         { "name": "cap_start", "domain": "face", "label": "Start cap", "condition": "capStart" },
         { "name": "cap_end", "domain": "face", "label": "End cap", "condition": "capEnd" },
-        { "name": "seam", "domain": "edge", "label": "Profile seam edges" },
-        { "name": "profile_corner", "domain": "edge", "label": "Profile corner edges" },
         { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
       ],
       "properties": {

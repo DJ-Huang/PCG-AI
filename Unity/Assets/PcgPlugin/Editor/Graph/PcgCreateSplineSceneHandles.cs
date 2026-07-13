@@ -1610,12 +1610,14 @@ namespace DJTechEditor.PCG.Graph
                 ? s_AvailableGroups.Where(g => g.domain == domainStr).ToList()
                 : new List<GroupInfo>();
 
-            bool HasInCooked(string name) => cookedGroups.Any(g => g.name == name);
+            // Filter to only groups that exist in cooked mesh
+            var outputInCooked = outputFiltered.Where(g => cookedGroups.Any(cg => cg.name == g.name)).ToList();
+            var inputInCooked = inputGroups.Where(g => cookedGroups.Any(cg => cg.name == g.name)).ToList();
 
             // Clear stale selection
             if (!string.IsNullOrEmpty(s_SelectedGroupName) &&
-                !outputFiltered.Any(g => g.name == s_SelectedGroupName) &&
-                !inputGroups.Any(g => g.name == s_SelectedGroupName))
+                !outputInCooked.Any(g => g.name == s_SelectedGroupName) &&
+                !inputInCooked.Any(g => g.name == s_SelectedGroupName))
             {
                 s_SelectedGroupName = null;
                 gv?.ClearHighlight();
@@ -1623,8 +1625,8 @@ namespace DJTechEditor.PCG.Graph
 
             // Compute dynamic height
             int rowCount = 0;
-            if (outputFiltered.Count > 0) rowCount++;
-            if (inputGroups.Count > 0) rowCount++;
+            if (outputInCooked.Count > 0) rowCount++;
+            if (inputInCooked.Count > 0) rowCount++;
             if (rowCount == 0) rowCount = 1;
             float height = 24f + rowCount * 22f + 6f;
 
@@ -1643,49 +1645,39 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.Space(4f);
                 GUILayout.Label($"{node.NodeType} — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
 
-                if (outputFiltered.Count > 0)
+                if (outputInCooked.Count > 0)
                 {
                     GUILayout.Label("Output:", EditorStyles.miniLabel);
-                    var labels = outputFiltered.Select(g =>
-                        HasInCooked(g.name) ? $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})"
-                                            : $"{g.name} (not in cooked mesh)").ToArray();
-                    var currentIdx = outputFiltered.FindIndex(g => g.name == s_SelectedGroupName);
+                    var labels = outputInCooked.Select(g => $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})").ToArray();
+                    var currentIdx = outputInCooked.FindIndex(g => g.name == s_SelectedGroupName);
                     var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
                     if (newIdx != currentIdx)
                     {
-                        var group = outputFiltered[newIdx];
+                        var group = outputInCooked[newIdx];
                         s_SelectedGroupName = group.name;
-                        if (HasInCooked(group.name))
-                            gv?.HighlightGroup(group.name, group.domain);
-                        else
-                            gv?.ClearHighlight();
+                        gv?.HighlightGroup(group.name, group.domain);
                         SceneView.RepaintAll();
                     }
                 }
 
-                if (inputGroups.Count > 0)
+                if (inputInCooked.Count > 0)
                 {
                     GUILayout.Label("Input:", EditorStyles.miniLabel);
-                    var labels = inputGroups.Select(g =>
-                        HasInCooked(g.name) ? $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})"
-                                            : $"{g.name} (not in cooked mesh)").ToArray();
-                    var currentIdx = inputGroups.FindIndex(g => g.name == s_SelectedGroupName);
+                    var labels = inputInCooked.Select(g => $"{g.name} ({cookedGroups.First(cg => cg.name == g.name).count})").ToArray();
+                    var currentIdx = inputInCooked.FindIndex(g => g.name == s_SelectedGroupName);
                     var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
                     if (newIdx != currentIdx)
                     {
-                        var group = inputGroups[newIdx];
+                        var group = inputInCooked[newIdx];
                         s_SelectedGroupName = group.name;
-                        if (HasInCooked(group.name))
-                            gv?.HighlightGroup(group.name, group.domain);
-                        else
-                            gv?.ClearHighlight();
+                        gv?.HighlightGroup(group.name, group.domain);
                         SceneView.RepaintAll();
                     }
                 }
 
-                if (outputFiltered.Count == 0 && inputGroups.Count == 0)
+                if (outputInCooked.Count == 0 && inputInCooked.Count == 0)
                 {
-                    GUILayout.Label($"No {domainStr} groups for this node.", EditorStyles.miniLabel);
+                    GUILayout.Label($"No {domainStr} groups in cooked mesh.", EditorStyles.miniLabel);
                 }
 
                 GUILayout.EndArea();
