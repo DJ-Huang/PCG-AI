@@ -5,56 +5,39 @@
       "id": "box",
       "type": "CreateBoxMesh",
       "position": { "x": 0, "y": 0 },
-      "data": {
-        "width": 2.0,
-        "height": 2.0,
-        "depth": 2.0
-      }
+      "data": {"width": 2, "height": 2, "depth": 2, "__nodeTitle": ""}
     },
     {
       "id": "color",
       "type": "VertexColor",
       "position": { "x": 0, "y": 160 },
-      "data": {
-        "r": 0.4,
-        "g": 0.5,
-        "b": 0.8,
-        "a": 1.0
-      }
-    },
-    {
-      "id": "subdiv",
-      "type": "SubdivideMesh",
-      "position": { "x": 0, "y": 320 },
-      "data": {
-        "levels": 2
-      }
+      "data": {"r": 0.4, "g": 0.5, "b": 0.8, "a": 1, "__nodeTitle": ""}
     },
     {
       "id": "bevel",
       "type": "BevelMesh",
       "position": { "x": 0, "y": 480 },
-      "data": {
-        "method": "edge",
-        "amount": 0.08,
-        "segments": 3,
-        "angleLimit": 25,
-        "profile": 0.7
-      }
+      "data": {"method": "edge", "offsetType": "offset", "amount": 0.08, "segments": 3, "clampOverlap": true, "angleLimit": 25, "profile": 0.7, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "edgeGroup": "", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
     },
     {
       "id": "out",
       "type": "Output",
       "position": { "x": 0, "y": 640 },
-      "data": {
-        "label": "Subdivide Loop Test"
-      }
+      "data": {"label": "Subdivide Method Test", "__nodeTitle": ""}
+    },
+    {
+      "id": "subdiv",
+      "type": "SubdivideMesh",
+      "position": { "x": 0, "y": 320 },
+      "data": {"levels": 1, "method": "catmullClark", "__nodeTitle": ""}
     }
   ],
   "edges": [
-    { "id": "e1", "source": "box", "target": "color", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e2", "source": "color", "target": "subdiv", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e3", "source": "subdiv", "target": "bevel", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e4", "source": "bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+    {"id": "e1", "source": "box", "target": "color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e2", "source": "color", "target": "subdiv", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e3", "source": "subdiv", "target": "bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e4", "source": "bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+  ],
+  "parameters": [
   ]
 }

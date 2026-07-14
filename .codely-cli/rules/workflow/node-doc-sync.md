@@ -1,0 +1,52 @@
+---
+description: 修改 PCG 节点（新增/修改/删除）时强制同步 docs/node-reference.md
+---
+
+# 节点变更 → 文档同步
+
+## 触发条件
+
+当对 PCG 节点执行以下任一操作时，**必须**同步更新 `docs/node-reference.md`：
+
+- **新增节点**：在 `schema/node-manifest.json` 添加新节点定义，或在 `pcg-core/src/elements/` 新增 Element 类
+- **修改节点**：变更节点的 inputs/outputs Pin、properties（增删改属性、改默认值/范围）、category、outputGroups
+- **删除节点**：从 manifest 移除节点，或从 element_registry 注销
+
+## 检查清单
+
+完成 C++ / manifest 改动后，逐项对照 `docs/node-reference.md`：
+
+1. **节点计数**：文档头部的节点总数与 manifest `nodes` 数组长度一致
+2. **目录（TOC）**：每个节点在 TOC 中有对应条目，按文档中的类别顺序排列
+3. **Pin 数据类型表**：若新增 pinType，在类型表中补充
+4. **节点条目**：每个节点包含完整的：
+   - 类别标注
+   - 功能描述
+   - 输入 Pin 表（id / label / pinType / 说明）
+   - 输出 Pin 表
+   - 输出组表（若有 `outputGroups`）
+   - 属性表（属性名 / 类型 / 默认值 / 范围 / 说明）
+   - 执行逻辑
+   - 用法示例（JSON）
+   - 典型连接提示
+5. **类别章节**：新增 category 时在文档中创建对应 `## 类别` 章节
+6. **常见节点组合**：若新增节点改变了典型工作流，更新或追加组合示例
+
+## 验证
+
+更新完成后运行验证：
+
+```bash
+# 节点计数校验
+grep -c '"type":' schema/node-manifest.json
+grep -c '^### ' docs/node-reference.md  # 应 = manifest 节点数 + 组合示例数
+
+# TOC 条目数校验
+grep -c '^  - \[' docs/node-reference.md  # 应 = 节点数
+```
+
+## 禁止
+
+- 改了 manifest / C++ 节点逻辑但不更新 `docs/node-reference.md`
+- 文档中记录了 manifest 不存在的属性或 Pin（文档先于实现时除外，需标注"规划中"）
+- 节点总数与 manifest 不一致

@@ -272,7 +272,16 @@
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "properties": {
-        "levels": { "type": "integer", "default": 1, "minimum": 0, "maximum": 4 }
+        "levels": { "type": "integer", "default": 1, "minimum": 0, "maximum": 4 },
+        "method": {
+          "type": "enum",
+          "default": "catmullClark",
+          "options": [
+            { "value": "catmullClark", "label": "Catmull-Clark" },
+            { "value": "loop", "label": "Loop" },
+            { "value": "simple", "label": "Simple (Linear)" }
+          ]
+        }
       }
     },
     {

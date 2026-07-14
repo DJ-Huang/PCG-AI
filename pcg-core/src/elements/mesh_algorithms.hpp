@@ -69,8 +69,16 @@ struct RevolveGeometryOptions {
 data::PcgGeometry revolve_geometry(const data::PcgSplineData& profile,
                                   const RevolveGeometryOptions& options);
 
-data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels);
-data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int levels);
+enum class SubdivideMethod {
+    CatmullClark,
+    Loop,
+    Simple,
+};
+
+data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels,
+                                 SubdivideMethod method = SubdivideMethod::CatmullClark);
+data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int levels,
+                                     SubdivideMethod method = SubdivideMethod::CatmullClark);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, const NoiseDeformOptions& options);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,
                                     NoiseDeformType noise_type, int seed);

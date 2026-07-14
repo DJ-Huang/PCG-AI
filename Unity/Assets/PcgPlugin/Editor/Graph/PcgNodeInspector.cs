@@ -683,7 +683,10 @@ namespace DJTechEditor.PCG.Graph
         {
             var field = new IntegerField { value = Convert.ToInt32(val ?? 0, CultureInfo.InvariantCulture) };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -691,7 +694,10 @@ namespace DJTechEditor.PCG.Graph
         {
             var field = new FloatField { value = Convert.ToSingle(val ?? 0f, CultureInfo.InvariantCulture) };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -705,7 +711,10 @@ namespace DJTechEditor.PCG.Graph
             };
             var field = new Toggle { value = b };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -739,6 +748,7 @@ namespace DJTechEditor.PCG.Graph
                     if (idx >= 0 && idx < values.Count)
                         onSet(values[idx]);
                 });
+                NotifyGraphChanged();
             });
             return popup;
         }
@@ -774,7 +784,10 @@ namespace DJTechEditor.PCG.Graph
         {
             var field = new TextField { value = val?.ToString() ?? "" };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 

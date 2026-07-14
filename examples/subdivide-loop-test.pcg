@@ -27,7 +27,8 @@
       "type": "SubdivideMesh",
       "position": { "x": 0, "y": 320 },
       "data": {
-        "levels": 2
+        "levels": 2,
+        "method": "catmullClark"
       }
     },
     {
@@ -47,7 +48,7 @@
       "type": "Output",
       "position": { "x": 0, "y": 640 },
       "data": {
-        "label": "Subdivide Loop Test"
+        "label": "Subdivide Method Test"
       }
     }
   ],

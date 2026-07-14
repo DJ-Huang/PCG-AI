@@ -335,7 +335,8 @@ int main()
 
     if (!expect_outward_normals(
             pcg::internal::elements::subdivide_mesh(
-                pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1))) {
+                pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1,
+                pcg::internal::elements::SubdivideMethod::Simple))) {
         std::printf("FAIL: subdivided mesh triangle normals point inward\n");
         return 1;
     }
@@ -618,7 +619,8 @@ int main()
             cone.add_triangle(center, v1, v0);
         }
 
-        const auto cone_subdiv = pcg::internal::elements::subdivide_mesh(cone, 1);
+        const auto cone_subdiv = pcg::internal::elements::subdivide_mesh(cone, 1,
+            pcg::internal::elements::SubdivideMethod::Simple);
         const auto cone_beveled = pcg::internal::elements::bevel_mesh(
             cone_subdiv, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
             pcg::internal::elements::BevelOffsetType::Offset, true);

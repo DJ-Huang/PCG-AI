@@ -59,19 +59,17 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing node");
 
         const int levels = ctx.node->data.value("levels", 1);
-
-        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
-            if (!geometry->points().empty()) {
-                emit_geometry(ctx, subdivide_geometry(*geometry, levels));
-                return PCG_OK;
-            }
-        }
+        const std::string method_str = ctx.node->data.value("method", std::string("catmullClark"));
+        const SubdivideMethod method =
+            method_str == "loop" ? SubdivideMethod::Loop :
+            method_str == "simple" ? SubdivideMethod::Simple :
+            SubdivideMethod::CatmullClark;
 
         const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "SubdivideMesh missing mesh input");
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing mesh input");
 
-        emit_mesh(ctx, subdivide_mesh(mesh, levels));
+        emit_mesh(ctx, subdivide_mesh(mesh, levels, method));
         return PCG_OK;
     }
 };
