@@ -1724,7 +1724,7 @@
 
 **类别**：Mesh
 
-**功能**：对网格执行倒角/斜切操作，支持两种方法和两种偏移类型。
+**功能**：对网格执行倒角/斜切操作。当前已支持能力按 Blender 4.5 Bevel 子集对齐参数命名与 Inspector 分区；边选择保留 Houdini PolyBevel 风格 Group。
 
 **输入 Pin**：
 
@@ -1738,35 +1738,37 @@
 |--------|------|------|
 | `out` | Mesh | `SpatialMesh` |
 
-**属性**：
+**属性**（Inspector：Group → 主区 → Profile / Geometry / Advanced 折叠）：
 
 | 属性名 | 类型 | 默认值 | 范围 | 说明 |
 |--------|------|--------|------|------|
-| `method` | enum | `"edge"` | `edge` / `vertexPush` | 倒角方法。`edge` = 边倒角（Blender 风格），`vertexPush` = 顶点收缩 |
-| `offsetType` | enum | `"offset"` | `offset` / `width` | 偏移类型。`offset` = 偏移距离，`width` = 倒角宽度 |
-| `amount` | number | 0.1 | ≥ 0, ≤ 1.0 | 倒角量 |
-| `segments` | integer | 2 | 1 ~ 8 | 倒角分段数。越大越圆滑 |
-| `clampOverlap` | boolean | true | — | 是否钳制重叠（防止倒角量过大导致几何翻转） |
-| `angleLimit` | number | 30.0 | 0 ~ 180 | 角度限制。仅对相邻面夹角 ≥ 此值的边进行倒角 |
-| `profile` | number | 0.5 | 0 ~ 1 | 倒角轮廓形状。0.5 = 圆弧，0 = 凹陷，1 = 凸起 |
-| `miterOuter` | enum | `"sharp"` | `sharp` / `patch` / `arc` | 外拐角处理方式 |
-| `miterInner` | enum | `"sharp"` | `sharp` / `patch` / `arc` | 内拐角处理方式 |
-| `vmeshMethod` | enum | `"adj"` | `adj` / `cutoff` | 顶点网格方法。`adj` = Catmull-Clark 邻接，`cutoff` = 截断 |
-| `edgeGroup` | groupSelect | `""` | 上游可用边组 | 限制倒角范围到指定边组。留空 = 所有边 |
-| `excludeUnshared` | boolean | true | — | 是否排除边界边（只有一侧面的边） |
-| `excludeGroups` | groupMultiSelect | `"cap_start,cap_end"` | 上游可用组 | 排除指定组中的边不参与倒角 |
+| `edgeGroup` | groupSelect | `""` | 上游可用边组 | Houdini 风格 Group。空 = 全部候选边；命名组只允许组内边；未知组不倒角 |
+| `offsetType` | enum | `"offset"` | `offset` / `width` | Width Type。`offset` = 偏移距离，`width` = 倒角宽度 |
+| `amount` | number | 0.1 | ≥ 0, ≤ 1.0 | Amount |
+| `segments` | integer | 2 | 1 ~ 8 | Segments |
+| `limitMethod` | enum | `"angle"` | `none` / `angle` | Limit Method。`angle` 再按 `angleLimit` 过滤；`none` 不过滤角度 |
+| `angleLimit` | number | 30.0 | 0 ~ 180 | Angle。仅当 `limitMethod=angle` 时显示/生效 |
+| `profile` | number | 0.5 | 0 ~ 1 | Profile Shape。0.5 = 圆弧 |
+| `miterOuter` | enum | `"sharp"` | `sharp` / `patch` / `arc` | Miter Outer |
+| `miterInner` | enum | `"sharp"` | `sharp` / `patch` / `arc` | Miter Inner |
+| `vmeshMethod` | enum | `"adj"` | `adj` / `cutoff` | Intersections。`adj` ≈ Grid Fill，`cutoff` = Cutoff |
+| `clampOverlap` | boolean | true | — | Clamp Overlap |
+| `method` | enum | `"edge"` | `edge` / `vertexPush` | Advanced/Legacy。`vertexPush` 沿顶点法线推点，**不是** Blender Vertices Bevel |
+| `excludeUnshared` | boolean | true | — | 排除边界边（单侧面） |
+| `excludeGroups` | groupMultiSelect | `"cap_start,cap_end"` | 上游可用组 | 排除指定组 |
+
+**选择流水线**：`edgeGroup` 候选 → `excludeUnshared` / `excludeGroups` → `limitMethod`（Angle / None）。
+
+**旧图兼容**：节点 data 中缺少 `limitMethod` 时：空 Group → Angle；非空 Group → None（保持历史“组内跳过角度过滤”行为）。新节点默认写入 `limitMethod=angle`。
+
+**当前不支持（勿当成已对齐）**：Blender Custom Profile、Depth/Percent/Absolute、Loop Slide、Harden Normals、Mark Seam/Sharp、Material Index、Face Strength；Houdini Viewport Reselect / edge-loop 点选。
 
 **执行逻辑**：
 1. 读取输入网格（空则报错）
-2. 若 `edgeGroup` 非空，仅对指定边组中的边进行倒角；否则考虑所有边
-3. `excludeGroups` 中的边组被排除；`excludeUnshared` 控制是否排除边界边
-4. `angleLimit` 过滤：仅对相邻面夹角 ≥ 此值的边倒角
-5. 根据 `method` 选择边倒角或顶点收缩算法
-6. 根据 `offsetType` 解释 `amount`：`offset` = 顶点沿法线偏移距离，`width` = 倒角后两条新边之间的距离
-7. `segments` 控制每条倒角边的分段数；`profile` 控制倒角轮廓形状
-8. `miterOuter` / `miterInner` 控制拐角处的连接方式
-9. `clampOverlap` 启用时自动缩放 amount 防止自交
-10. 输出倒角后的网格
+2. 按上表选择流水线选出要倒角的边
+3. `method=edge` 走 Blender 风格边倒角；`vertexPush` 走 Legacy 顶点推移
+4. `offsetType` 解释 `amount`；`segments` / `profile` / miter / clamp 控制形状
+5. 输出倒角后的网格
 
 **用法示例**：
 
@@ -1776,13 +1778,13 @@
   "type": "BevelMesh",
   "position": { "x": 600, "y": 0 },
   "data": {
-    "method": "edge",
     "offsetType": "offset",
     "amount": 0.2,
     "segments": 3,
-    "clampOverlap": true,
+    "limitMethod": "angle",
     "angleLimit": 30,
-    "profile": 0.5
+    "profile": 0.5,
+    "clampOverlap": true
   }
 }
 ```

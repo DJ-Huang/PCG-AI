@@ -1,6 +1,8 @@
 ---
 alwaysApply: false
 description: 禁止使用 Air 模型 Subagent
+globs:
+  - '**/*'
 ---
 # 禁止使用 Air 模型 Subagent
 

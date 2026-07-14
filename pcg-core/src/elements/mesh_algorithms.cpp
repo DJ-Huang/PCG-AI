@@ -1,6 +1,7 @@
 #include "elements/mesh_algorithms.hpp"
 #include "elements/bevel_blender.hpp"
 #include "elements/element_utils.hpp"
+#include "geometry/bmesh.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -758,156 +759,168 @@ data::PcgMeshData subdivide_loop(const data::PcgMeshData& mesh, int levels) {
     return current;
 }
 
-// ── Catmull-Clark subdivision ────────────────────────────────────────────────
+// ── Catmull-Clark subdivision (polygon faces, not triangle soup) ─────────────
+// Triangle-CC leaves ~41° fake creases inside former quads after L1, which
+// angle-based bevel then treats as hard edges (CC_L1 bad_edges). Run CC on
+// coplanar-merged n-gons so a box stays 6 quads → 24 quads with only silhouette
+// creases above sharpAngle.
 data::PcgMeshData subdivide_catmull_clark(const data::PcgMeshData& mesh, int levels) {
     data::PcgMeshData current = mesh;
     levels = std::clamp(levels, 0, 4);
 
     for (int level = 0; level < levels; ++level) {
-        const WeldedMesh w = weld_mesh_for_subd(current);
-        if (w.nt == 0) break;
+        geometry::BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 2.0;
+        opts.sharp_angle_deg = 180.0; // not used for topology
+        const geometry::BMesh bm = geometry::bmesh_from_mesh(current, opts);
+        if (bm.faces.empty() || bm.verts.empty())
+            break;
 
-        // Build edge → adjacent face indices and vertex → adjacent face indices
-        std::unordered_map<int64_t, std::vector<int>> edge_faces;
-        std::vector<std::vector<int>> vert_faces(static_cast<size_t>(w.nv));
-        std::vector<std::unordered_set<int>> vneigh(static_cast<size_t>(w.nv));
+        const int nv = static_cast<int>(bm.verts.size());
+        const int nf = static_cast<int>(bm.faces.size());
 
-        for (int ti = 0; ti < w.nt; ++ti) {
-            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
-            edge_faces[ek64(a, b)].push_back(ti);
-            edge_faces[ek64(b, c)].push_back(ti);
-            edge_faces[ek64(c, a)].push_back(ti);
-            vert_faces[a].push_back(ti);
-            vert_faces[b].push_back(ti);
-            vert_faces[c].push_back(ti);
-            vneigh[a].insert(b); vneigh[b].insert(a);
-            vneigh[b].insert(c); vneigh[c].insert(b);
-            vneigh[c].insert(a); vneigh[a].insert(c);
+        auto to_local = [](const geometry::Vec3& v) -> Vec3 { return {v.x, v.y, v.z}; };
+
+        std::vector<Vec3> positions(static_cast<size_t>(nv));
+        for (int i = 0; i < nv; ++i)
+            positions[static_cast<size_t>(i)] = to_local(bm.verts[static_cast<size_t>(i)]);
+
+        // Incident faces / neighbors from polygon loops
+        std::vector<std::vector<int>> vert_faces(static_cast<size_t>(nv));
+        std::vector<std::unordered_set<int>> vneigh(static_cast<size_t>(nv));
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(loop.size());
+            for (int i = 0; i < n; ++i) {
+                const int a = loop[static_cast<size_t>(i)];
+                const int b = loop[static_cast<size_t>((i + 1) % n)];
+                vert_faces[static_cast<size_t>(a)].push_back(fi);
+                vneigh[static_cast<size_t>(a)].insert(b);
+                vneigh[static_cast<size_t>(b)].insert(a);
+            }
         }
 
         auto is_bnd_edge = [&](int a, int b) {
-            const auto it = edge_faces.find(ek64(a, b));
-            return it == edge_faces.end() || it->second.size() < 2;
+            const auto it = bm.edges.find(geometry::edge_key(a, b));
+            return it == bm.edges.end() || it->second.face1 < 0;
         };
 
-        // 1. Face points: one per triangle
-        std::vector<Vec3> face_pts(static_cast<size_t>(w.nt));
-        for (int ti = 0; ti < w.nt; ++ti) {
-            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
-            face_pts[static_cast<size_t>(ti)] = scale(add(add(w.positions[a], w.positions[b]), w.positions[c]), 1.0 / 3.0);
+        // 1. Face points
+        std::vector<Vec3> face_pts(static_cast<size_t>(nf));
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            Vec3 sum{0, 0, 0};
+            for (int vi : loop)
+                sum = add(sum, positions[static_cast<size_t>(vi)]);
+            face_pts[static_cast<size_t>(fi)] =
+                scale(sum, 1.0 / static_cast<double>(loop.size()));
         }
 
         // 2. Edge points
         std::unordered_map<int64_t, int> edge_pt_idx;
         std::vector<Vec3> edge_pt_pos;
-        std::vector<int> edge_pt_a, edge_pt_b;
+        edge_pt_pos.reserve(bm.edges.size());
 
         auto get_edge_pt = [&](int a, int b) -> int {
-            const int64_t key = ek64(a, b);
-            auto it = edge_pt_idx.find(key);
-            if (it != edge_pt_idx.end()) return it->second;
+            const int64_t key = geometry::edge_key(a, b);
+            const auto it = edge_pt_idx.find(key);
+            if (it != edge_pt_idx.end())
+                return it->second;
 
-            Vec3 ep;
-            const auto& faces = edge_faces[key];
-            const Vec3 mid = scale(add(w.positions[a], w.positions[b]), 0.5);
-            if (faces.size() >= 2) {
-                // Interior: (midpoint + avg_face_pts) / 2
-                const Vec3 favg = scale(add(face_pts[static_cast<size_t>(faces[0])],
-                                            face_pts[static_cast<size_t>(faces[1])]), 0.5);
+            const Vec3 mid = scale(add(positions[static_cast<size_t>(a)],
+                                       positions[static_cast<size_t>(b)]), 0.5);
+            Vec3 ep = mid;
+            const auto eit = bm.edges.find(key);
+            if (eit != bm.edges.end() && eit->second.face0 >= 0 && eit->second.face1 >= 0) {
+                const Vec3 favg = scale(
+                    add(face_pts[static_cast<size_t>(eit->second.face0)],
+                        face_pts[static_cast<size_t>(eit->second.face1)]),
+                    0.5);
                 ep = scale(add(mid, favg), 0.5);
-            } else if (faces.size() == 1) {
-                // Boundary edge: simple midpoint
-                ep = mid;
-            } else {
-                ep = mid;
             }
 
             const int idx = static_cast<int>(edge_pt_pos.size());
             edge_pt_pos.push_back(ep);
-            edge_pt_a.push_back(a);
-            edge_pt_b.push_back(b);
             edge_pt_idx[key] = idx;
             return idx;
         };
 
-        // Touch all edges
-        for (int ti = 0; ti < w.nt; ++ti) {
-            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
-            get_edge_pt(a, b);
-            get_edge_pt(b, c);
-            get_edge_pt(c, a);
-        }
+        for (const auto& entry : bm.edges)
+            get_edge_pt(entry.second.v0, entry.second.v1);
 
         // 3. Vertex points
-        std::vector<Vec3> vert_pt(static_cast<size_t>(w.nv));
-        for (int vi = 0; vi < w.nv; ++vi) {
-            const Vec3& p = w.positions[vi];
+        std::vector<Vec3> vert_pt(static_cast<size_t>(nv));
+        for (int vi = 0; vi < nv; ++vi) {
+            const Vec3& p = positions[static_cast<size_t>(vi)];
             const auto& vf = vert_faces[static_cast<size_t>(vi)];
-            const int n = static_cast<int>(vf.size());
+            if (vf.empty()) {
+                vert_pt[static_cast<size_t>(vi)] = p;
+                continue;
+            }
 
-            if (n == 0) { vert_pt[static_cast<size_t>(vi)] = p; continue; }
-
-            // Boundary check
             std::vector<int> bn;
             for (int nb : vneigh[static_cast<size_t>(vi)])
-                if (is_bnd_edge(vi, nb)) bn.push_back(nb);
+                if (is_bnd_edge(vi, nb))
+                    bn.push_back(nb);
 
             if (bn.size() >= 2) {
-                // Boundary vertex: V' = 3/4*V + 1/8*(prev + next)
-                vert_pt[static_cast<size_t>(vi)] = add(scale(p, 0.75),
-                    scale(add(w.positions[bn[0]], w.positions[bn[1]]), 0.125));
+                vert_pt[static_cast<size_t>(vi)] = add(
+                    scale(p, 0.75),
+                    scale(add(positions[static_cast<size_t>(bn[0])],
+                              positions[static_cast<size_t>(bn[1])]),
+                          0.125));
             } else {
-                // Interior: V' = (n-3)/n * V + 1/n * F + 2/n * R
-                // F = avg(adjacent face points), R = avg(adjacent edge midpoints)
-                Vec3 fsum = {0, 0, 0};
+                const int nval = static_cast<int>(vneigh[static_cast<size_t>(vi)].size());
+                if (nval == 0) {
+                    vert_pt[static_cast<size_t>(vi)] = p;
+                    continue;
+                }
+                Vec3 fsum{0, 0, 0};
                 for (int fi : vf)
                     fsum = add(fsum, face_pts[static_cast<size_t>(fi)]);
-                const Vec3 F = scale(fsum, 1.0 / n);
+                // Average unique incident face points (vf may list a face once per loop visit)
+                const Vec3 Q = scale(fsum, 1.0 / static_cast<double>(vf.size()));
 
-                Vec3 rsum = {0, 0, 0};
+                Vec3 rsum{0, 0, 0};
                 for (int nb : vneigh[static_cast<size_t>(vi)])
-                    rsum = add(rsum, scale(add(w.positions[vi], w.positions[nb]), 0.5));
-                const int nval = static_cast<int>(vneigh[static_cast<size_t>(vi)].size());
+                    rsum = add(rsum, scale(add(p, positions[static_cast<size_t>(nb)]), 0.5));
                 const Vec3 R = scale(rsum, 1.0 / nval);
 
                 const double m1 = static_cast<double>(nval - 3) / nval;
                 const double m2 = 1.0 / nval;
                 const double m3 = 2.0 / nval;
-                vert_pt[static_cast<size_t>(vi)] = add(add(scale(p, m1), scale(F, m2)), scale(R, m3));
+                vert_pt[static_cast<size_t>(vi)] =
+                    add(add(scale(p, m1), scale(Q, m2)), scale(R, m3));
             }
         }
 
-        // 4. Build output mesh
-        // Vertices: [0, nv) = vertex points
-        //           [nv, nv+nedge) = edge points
-        //           [nv+nedge, nv+nedge+nt) = face points
+        // 4. Emit: [0,nv) verts, [nv,nv+ne) edges, [nv+ne, ...) face points
         data::PcgMeshData next;
-        for (int vi = 0; vi < w.nv; ++vi)
+        for (int vi = 0; vi < nv; ++vi)
             next.add_vertex(to_vertex(vert_pt[static_cast<size_t>(vi)]));
         for (const auto& p : edge_pt_pos)
             next.add_vertex(to_vertex(p));
-        const int ep_base = w.nv;
-        const int fp_base = w.nv + static_cast<int>(edge_pt_pos.size());
+        const int ep_base = nv;
+        const int fp_base = nv + static_cast<int>(edge_pt_pos.size());
         for (const auto& p : face_pts)
             next.add_vertex(to_vertex(p));
 
-        // 5. Generate faces: each triangle → 3 quads (6 triangles)
-        for (int ti = 0; ti < w.nt; ++ti) {
-            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
-            const int e_ab = ep_base + get_edge_pt(a, b);
-            const int e_bc = ep_base + get_edge_pt(b, c);
-            const int e_ca = ep_base + get_edge_pt(c, a);
-            const int fp = fp_base + ti;
-
-            // Quad around a: (a, e_ab, fp, e_ca)
-            next.add_triangle(a, e_ab, fp);
-            next.add_triangle(a, fp, e_ca);
-            // Quad around b: (b, e_bc, fp, e_ab)
-            next.add_triangle(b, fp, e_ab);
-            next.add_triangle(b, e_bc, fp);
-            // Quad around c: (c, e_ca, fp, e_bc)
-            next.add_triangle(c, e_ca, fp);
-            next.add_triangle(c, fp, e_bc);
+        // 5. Each n-gon → n quads (2 tris), CCW: (v, e_next, fp, e_prev)
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(loop.size());
+            if (n < 3)
+                continue;
+            const int fp = fp_base + fi;
+            for (int i = 0; i < n; ++i) {
+                const int v = loop[static_cast<size_t>(i)];
+                const int v_next = loop[static_cast<size_t>((i + 1) % n)];
+                const int v_prev = loop[static_cast<size_t>((i + n - 1) % n)];
+                const int e_next = ep_base + get_edge_pt(v, v_next);
+                const int e_prev = ep_base + get_edge_pt(v_prev, v);
+                next.add_triangle(v, e_next, fp);
+                next.add_triangle(v, fp, e_prev);
+            }
         }
 
         current = std::move(next);
@@ -984,8 +997,7 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
 {
     // Shared-vertex triangulation: geometry.points() are already welded, so use
     // them directly to ensure BMesh (from geometry) and WeldedMesh (from mesh)
-    // share the same vertex indices. Per-face duplication (triangulate_geometry)
-    // reorders vertices on re-weld, breaking the index alignment.
+    // share the same vertex indices.
     data::PcgMeshData mesh;
     for (const auto& p : geometry.points())
         mesh.add_vertex({p.x, p.y, p.z});

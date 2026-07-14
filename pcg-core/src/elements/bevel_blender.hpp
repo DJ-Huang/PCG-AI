@@ -180,7 +180,7 @@ Vec3 get_profile_point(const Profile& pro, int i, int nseg, int bp_seg);
 float find_profile_fullness(int seg, float super_r, float profile_param);
 
 /// Fill ProfileSpacing with evenly-spaced superellipse chord coordinates.
-void set_profile_spacing(int seg, float super_r, ProfileSpacing& pro_spacing);
+void set_profile_spacing(int seg, float super_r, float profile, ProfileSpacing& pro_spacing);
 
 // ── Core Bevel Structures ──────────────────────────────────────────────────
 
@@ -500,11 +500,20 @@ bool on_cap_plane_x(const Vec3& p, const CapExtents& cap, double tol);
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+/// Limit Method — Blender Bevel subset (None / Angle). Weight / Vertex Group out of scope.
+enum class BevelLimitMethod {
+    None,
+    Angle,
+};
+
 /// Main bevel function — completely aligned with Blender's BM_mesh_bevel pipeline.
 struct BevelEdgeSelection {
     std::string edge_group;
     bool exclude_unshared = true;
     std::vector<std::string> exclude_groups;
+    /// When false, empty group → Angle and non-empty group → None (legacy graph behavior).
+    bool limit_method_explicit = false;
+    BevelLimitMethod limit_method = BevelLimitMethod::Angle;
 };
 
 data::PcgMeshData bevel_mesh_blender(

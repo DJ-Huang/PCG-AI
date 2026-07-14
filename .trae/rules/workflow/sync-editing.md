@@ -20,6 +20,7 @@ description: sync/ 编辑与多平台适配
 | Cursor | `sync/rules/`、`sync/extensions/MySkills/skills/` | `sync/rules/gates/` → `.cursor/rules/gates/*.md` | `setup.bat` 复制 rules；skills junction 到 user |
 | Trae | 同上 | gate 经 `setup.bat` 转为 `.trae/rules/` | 同上 |
 | Codely CLI | 同上 | `rule-router-gate.md` 作手册 | skills junction；rules 复制到目标 `.codely-cli/rules/` |
+| OpenCode | 同上 | `.opencode/rules/*.mdc` + `opencode.json` 自动更新 | skills/commands junction 到 `~/.config/opencode/`；rules 复制 + `instructions` 写入 |
 
 ## 按修改类型的检查清单
 

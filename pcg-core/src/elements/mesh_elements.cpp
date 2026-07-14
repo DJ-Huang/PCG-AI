@@ -116,6 +116,16 @@ public:
         edge_selection.edge_group = ctx.node->data.value("edgeGroup", std::string(""));
         edge_selection.exclude_unshared = ctx.node->data.value("excludeUnshared", true);
         edge_selection.exclude_groups = parse_name_list(ctx.node->data, "excludeGroups");
+        // New graphs write limitMethod. Old graphs without the field keep legacy semantics:
+        // empty Group → Angle, non-empty Group → None (skip angle filter).
+        if (ctx.node->data.contains("limitMethod")) {
+            edge_selection.limit_method_explicit = true;
+            const std::string limit_str =
+                ctx.node->data.value("limitMethod", std::string("angle"));
+            edge_selection.limit_method =
+                limit_str == "none" ? bevel::BevelLimitMethod::None
+                                    : bevel::BevelLimitMethod::Angle;
+        }
 
         emit_geometry(ctx, bevel_geometry(geometry, amount, segments, method, offset_type, clamp_overlap,
                                         angle_limit, profile, miter_outer, miter_inner, vmesh_method,

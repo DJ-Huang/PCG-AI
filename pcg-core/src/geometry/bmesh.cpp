@@ -7,8 +7,8 @@
 #include <cmath>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
-
 namespace pcg::internal::geometry {
 namespace {
 
@@ -459,6 +459,10 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
     if (geometry.points().empty() || geometry.faces().empty())
         return result;
 
+    // Geometry faces are already merged n-gons (from geometry_from_mesh or
+    // upstream nodes). Take them directly — do NOT re-triangulate and re-merge,
+    // because fan triangulation of n-gons with collinear vertices produces
+    // degenerate triangles whose zero-length normals prevent coplanar merging.
     result.verts.reserve(geometry.points().size());
     for (const auto& p : geometry.points())
         result.verts.push_back({p.x, p.y, p.z});

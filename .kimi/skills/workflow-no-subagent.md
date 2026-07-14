@@ -1,5 +1,5 @@
 ---
-alwaysApply: false
+name: workflow-no-subagent
 description: 禁止使用 Air 模型 Subagent
 ---
 # 禁止使用 Air 模型 Subagent

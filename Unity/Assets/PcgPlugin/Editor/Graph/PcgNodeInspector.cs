@@ -25,6 +25,8 @@ namespace DJTechEditor.PCG.Graph
         private ScrollView m_Body;
         private PcgGraphNodeBase m_CurrentNode;
         private bool m_IsRebuilding;
+        // Foldout state keyed by "nodeId|sectionId" — survives Inspector rebuild within session.
+        private static readonly Dictionary<string, bool> s_SectionExpanded = new();
 
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
         {
@@ -248,7 +250,13 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            // Split properties into group-related and regular
+            if (def.inspectorSections != null && def.inspectorSections.Count > 0)
+            {
+                ShowSectionedManifestProperties(node, def);
+                return;
+            }
+
+            // Legacy path: Groups then Parameters; no layout metadata required.
             var groupProps = new List<(string key, ManifestPropertyDef prop)>();
             var regularProps = new List<(string key, ManifestPropertyDef prop)>();
             foreach (var (key, prop) in def.properties)
@@ -259,7 +267,6 @@ namespace DJTechEditor.PCG.Graph
                     regularProps.Add((key, prop));
             }
 
-            // Groups section
             if (groupProps.Count > 0)
             {
                 AddSectionHeader("Groups");
@@ -287,11 +294,99 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
 
-            // Parameters section
             if (groupProps.Count > 0 && regularProps.Count > 0)
                 AddSectionHeader("Parameters");
             foreach (var (key, prop) in regularProps)
                 m_Body.Add(CreatePropertyRow(node, key, prop));
+        }
+
+        private void ShowSectionedManifestProperties(PcgManifestNodeView node, ManifestNodeDef def)
+        {
+            var props = def.properties
+                .Select(kv => (key: kv.Key, prop: kv.Value))
+                .OrderBy(p => p.prop.hasOrder ? p.prop.order : int.MaxValue)
+                .ThenBy(p => p.key)
+                .ToList();
+
+            // Sticky top: properties without a section (e.g. Houdini-style Group).
+            var topProps = props.Where(p => string.IsNullOrEmpty(p.prop.section)).ToList();
+            foreach (var (key, prop) in topProps)
+            {
+                if (!IsPropertyVisible(node, prop))
+                    continue;
+                m_Body.Add(CreatePropertyRow(node, key, prop, rebuildOnChange: IsVisibilityDriver(def, key)));
+            }
+
+            if (topProps.Any(p => p.prop.type is "groupSelect" or "groupMultiSelect"))
+            {
+                var available = ResolveUpstreamGroups(node.NodeId);
+                if (available.Count > 0)
+                {
+                    m_Body.Add(new Label($"{available.Count} group{(available.Count != 1 ? "s" : "")} available from upstream")
+                    {
+                        style = { color = new Color(0.4f, 0.66f, 0.4f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4 },
+                    });
+                }
+            }
+
+            foreach (var section in def.inspectorSections)
+            {
+                var sectionProps = props
+                    .Where(p => p.prop.section == section.id && IsPropertyVisible(node, p.prop))
+                    .ToList();
+                if (sectionProps.Count == 0)
+                    continue;
+
+                VisualElement container = m_Body;
+                if (section.foldout)
+                {
+                    var foldoutKey = $"{node.NodeId}|{section.id}";
+                    if (!s_SectionExpanded.TryGetValue(foldoutKey, out var expanded))
+                        expanded = section.defaultExpanded;
+
+                    var foldout = new Foldout
+                    {
+                        text = string.IsNullOrEmpty(section.label) ? section.id : section.label,
+                        value = expanded,
+                    };
+                    foldout.style.marginTop = 4;
+                    foldout.RegisterValueChangedCallback(evt => s_SectionExpanded[foldoutKey] = evt.newValue);
+                    m_Body.Add(foldout);
+                    container = foldout;
+                }
+
+                foreach (var (key, prop) in sectionProps)
+                    container.Add(CreatePropertyRow(node, key, prop, rebuildOnChange: IsVisibilityDriver(def, key)));
+            }
+        }
+
+        private static bool IsVisibilityDriver(ManifestNodeDef def, string key) =>
+            def.properties.Values.Any(p =>
+                !string.IsNullOrEmpty(p.visibleWhenProperty) && p.visibleWhenProperty == key);
+
+        private static bool IsPropertyVisible(PcgManifestNodeView node, ManifestPropertyDef prop)
+        {
+            if (string.IsNullOrEmpty(prop.visibleWhenProperty))
+                return true;
+
+            var current = node.CollectData().GetRaw(prop.visibleWhenProperty)?.ToString();
+            if (string.IsNullOrEmpty(current) &&
+                PcgNodeManifest.TryGet(node.NodeType, out var def) &&
+                def.properties.TryGetValue(prop.visibleWhenProperty, out var driver))
+            {
+                current = driver.defaultValue?.ToString() ?? "";
+            }
+
+            return string.Equals(current ?? "", prop.visibleWhenEquals ?? "", StringComparison.Ordinal);
+        }
+
+        private void ScheduleInspectorRebuild(PcgManifestNodeView node)
+        {
+            schedule.Execute(() =>
+            {
+                if (m_CurrentNode == node)
+                    ShowNode(node);
+            }).ExecuteLater(1);
         }
 
         private void AddSectionHeader(string title)
@@ -313,7 +408,12 @@ namespace DJTechEditor.PCG.Graph
             });
         }
 
-        private VisualElement CreatePropertyRow(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
+        /// <summary>
+        /// Two-row layout matching other nodes: header (label + promote + bind), then full-width value.
+        /// Sectioned Inspectors also use this path so sliders/enums are not crushed beside decorate controls.
+        /// </summary>
+        private VisualElement CreatePropertyRow(
+            PcgManifestNodeView node, string key, ManifestPropertyDef prop, bool rebuildOnChange = false)
         {
             var container = new VisualElement
             {
@@ -323,6 +423,16 @@ namespace DJTechEditor.PCG.Graph
                     flexShrink = 0,
                 },
             };
+
+            Action<object> setValueOverride = null;
+            if (rebuildOnChange)
+            {
+                setValueOverride = v =>
+                {
+                    node.SetPropertyValue(key, v);
+                    ScheduleInspectorRebuild(node);
+                };
+            }
 
             // Row 1: label + promote button + bind dropdown
             var headerRow = new VisualElement
@@ -334,7 +444,7 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
 
-            var label = new Label(key)
+            var label = new Label(string.IsNullOrEmpty(prop.displayName) ? key : prop.displayName)
             {
                 style =
                 {
@@ -384,20 +494,32 @@ namespace DJTechEditor.PCG.Graph
                 if (container.childCount > 1)
                     container.RemoveAt(container.childCount - 1);
                 var binding = m_Blackboard.FindBinding(node.NodeId, key);
-                container.Add(CreateValueField(key, prop, node, binding));
+                container.Add(CreateValueField(key, prop, node, binding, setValueOverride));
             });
             headerRow.Add(bindPopup);
             container.Add(headerRow);
 
-            // Row 2: value or bound label
-            var binding = m_Blackboard.FindBinding(node.NodeId, key);
-            container.Add(CreateValueField(key, prop, node, binding));
+            // Row 2: value or bound label (full width — not crushed beside + / bind)
+            var currentBindingForValue = m_Blackboard.FindBinding(node.NodeId, key);
+            container.Add(CreateValueField(key, prop, node, currentBindingForValue, setValueOverride));
             return container;
         }
 
-        private VisualElement CreateValueField(string key, ManifestPropertyDef prop, PcgManifestNodeView node, PcgGraphParameter binding)
+        private VisualElement CreateValueField(
+            string key,
+            ManifestPropertyDef prop,
+            PcgManifestNodeView node,
+            PcgGraphParameter binding,
+            Action<object> setValueOverride = null)
         {
             var wrapper = new VisualElement { style = { marginTop = 2 } };
+            Action<object> apply = v =>
+            {
+                if (setValueOverride != null)
+                    setValueOverride(v);
+                else
+                    node.SetPropertyValue(key, v);
+            };
 
             if (binding != null)
             {
@@ -457,9 +579,9 @@ namespace DJTechEditor.PCG.Graph
                     newValue =>
                     {
                         if (isInteger)
-                            node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
+                            apply(Mathf.RoundToInt(newValue));
                         else
-                            node.SetPropertyValue(key, newValue);
+                            apply(newValue);
                         NotifyGraphChanged();
                     },
                     onDragBegin: () => m_GraphView.BeginDrag("Change Property"),
@@ -473,9 +595,9 @@ namespace DJTechEditor.PCG.Graph
                         m_GraphView.WithUndo("Change Property", () =>
                         {
                             if (isInteger)
-                                node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
+                                apply(Mathf.RoundToInt(newValue));
                             else
-                                node.SetPropertyValue(key, newValue);
+                                apply(newValue);
                         });
                         NotifyGraphChanged();
                     }));
@@ -484,14 +606,14 @@ namespace DJTechEditor.PCG.Graph
 
             VisualElement field = prop.type switch
             {
-                "integer" => MakeIntField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "number" => MakeFloatField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "boolean" => MakeToggleField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "enum" => MakeEnumField(key, prop, currentVal, v => node.SetPropertyValue(key, v)),
-                "texture2d" => MakeTextureField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => node.SetPropertyValue(key, v)),
-                "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => node.SetPropertyValue(key, v)),
-                _ => MakeTextField(key, currentVal, v => node.SetPropertyValue(key, v)),
+                "integer" => MakeIntField(key, currentVal, v => apply(v)),
+                "number" => MakeFloatField(key, currentVal, v => apply(v)),
+                "boolean" => MakeToggleField(key, currentVal, v => apply(v)),
+                "enum" => MakeEnumField(key, prop, currentVal, v => apply(v)),
+                "texture2d" => MakeTextureField(key, currentVal, v => apply(v)),
+                "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => apply(v)),
+                "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => apply(v)),
+                _ => MakeTextField(key, currentVal, v => apply(v)),
             };
             wrapper.Add(field);
             return wrapper;

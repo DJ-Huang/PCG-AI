@@ -11,22 +11,21 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 
 **跳过**：纯 Q&A、仅文档、仅 Git、纯 `vault_search` / `rule_search`、纯 GitLab（改读 `workflow/gitlab.md`）、HMIRP 手册（`create-hmirp-doc` Skill）、用户明确禁止改仓库。
 
-## 1. 域名（四选一）
+## 1. 域名（三选一）
 
 | 域名 | 强信号关键词 |
 |------|----------------|
-| **PCG-AI** | pcg, pcg-core, node-manifest, .pcg, GraphView, PcgPlugin, libPcgCore, UnknownNode, bevel, sweep, bmesh, group_table |
 | **Unity 渲染** | hmirp, unity, shader, hlsl, 渲染管线, render feature, pass, 材质, 光照, 后处理, stable, Runtime.Stable, FRP, sync-tj, 合并 URP |
 | **ComfyUI** | comfyui, custom node, ta-toolkit, node_base, tensor |
-| **通用** | （未命中上述域名强信号的开发任务，自动归入） |
+| **通用** | （未命中上述两个域名强信号的开发任务，自动归入） |
 
 弱信号 → 让用户选域（Cursor 用 `AskQuestion`，Trae/Codely 在对话中追问）。未命中任何强信号 → 自动 **通用**，不跳过后续步骤。
 
 ## 2. rule_search（每次写产品代码前必做）
 
-路由规则**唯一真源**：Obsidian `Rules/`（`VAULT_ROOT/Rules`）。**例外**：PCG-AI 项目级规则存于本地 `.codely-cli/rules/pcg-ai.md`，直接 `Read` 加载。
+路由规则**唯一真源**：Obsidian `Rules/`（`VAULT_ROOT/Rules`）。
 
-**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.codely-cli/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录；项目级规则文件如 `pcg-ai.md` 放 `rules/` 根目录，不放子目录）。
+**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.codely-cli/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
 
 **每次**修改产品路径（见 `gates/codely-pre-code-gate`）**之前**：
 
@@ -34,11 +33,9 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 2. 命中后按需 `vault_get_chunk(chunk_id=…)` 读完整规则正文
 3. 不得跳过；不得仅用本会话旧结果代替
 4. **通用**域名 `rule_search` 可能 `no hit` — 此时回执写 `no hit (general domain)`，**但 vault_search 仍必须执行**
-5. **PCG-AI** 域名：跳过 `rule_search`，直接 `Read .codely-cli/rules/pcg-ai.md`；回执写 `local:pcg-ai.md`
 
 | 域名 | 意图 | 应命中 rule_id（检索词示例） |
 |------|------|------------------------------|
-| PCG-AI | 始终 | `local:pcg-ai.md`（直接 Read，不走 `rule_search`） |
 | Unity | 始终 | `core/role`, `core/anti-ai-trace` |
 | Unity | 写码 | `core/hmirp-rendering-agent` |
 | Unity | 架构/文档/模块说明 | `agents/ta-render-expert` |

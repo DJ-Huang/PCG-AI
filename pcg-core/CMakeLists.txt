@@ -168,6 +168,12 @@ target_include_directories(test_bridge_bevel PRIVATE src)
 
 add_test(NAME test_bridge_bevel COMMAND test_bridge_bevel WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_bevel_manifold tests/test_bevel_manifold.cpp)
+target_link_libraries(test_bevel_manifold PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_bevel_manifold PRIVATE src)
+
+add_test(NAME test_bevel_manifold COMMAND test_bevel_manifold WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_split_normals tests/test_split_normals.cpp)
 target_link_libraries(test_split_normals PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_split_normals PRIVATE src)
@@ -261,4 +267,5 @@ target_link_libraries(test_boolean_bevel_chain PRIVATE PcgCoreStatic nlohmann_js
 target_include_directories(test_boolean_bevel_chain PRIVATE src)
 
 add_test(NAME test_boolean_bevel_chain COMMAND test_boolean_bevel_chain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 

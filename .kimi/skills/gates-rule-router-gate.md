@@ -1,18 +1,16 @@
 ---
-alwaysApply: true
+name: gates-rule-router-gate
 description: 开发任务强制规则路由（域名 + rule_search + vault_search）
-globs:
-  - '**/*'
 ---
 # Rule router gate
 
-**手册**：`~/.cursor/skills/rule-router/SKILL.mdc`
+**手册**：`~/.kimi/skills/rule-router/SKILL.md`
 
 ## 何时执行
 
 用户任务含 **写/改/实现/调试/review/审查/重构/优化** 等开发意图，或显式 `/rule-router`。
 
-**跳过**：纯 Q&A、仅文档、仅 Git、纯 `vault_search` / `rule_search`、纯 GitLab（改读 `workflow/gitlab.mdc`）、HMIRP 手册（`create-hmirp-doc` Skill）、用户明确禁止改仓库。
+**跳过**：纯 Q&A、仅文档、仅 Git、纯 `vault_search` / `rule_search`、纯 GitLab（改读 `workflow/gitlab.md`）、HMIRP 手册（`create-hmirp-doc` Skill）、用户明确禁止改仓库。
 
 ## 1. 域名（三选一）
 
@@ -28,7 +26,7 @@ globs:
 
 路由规则**唯一真源**：Obsidian `Rules/`（`VAULT_ROOT/Rules`）。
 
-**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.cursor/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
+**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.kimi/skills/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
 
 **每次**修改产品路径（见 `gates/codely-pre-code-gate`）**之前**：
 
@@ -48,7 +46,7 @@ globs:
 | ComfyUI | review | `reviews/comfyui-review-rules`, `agents/comfyui-expert` |
 | 通用 | — | （无域专属规则，`no hit` 正常） |
 
-**AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.cursor/rules/gates/`，由 `setup.bat` 同步，不迁入 Vault。
+**AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.kimi/skills/gates/`，由 `setup.bat` 同步，不迁入 Vault。
 
 **完整 rule_id 清单**（维护者）：Obsidian `Rules/meta/rules-vault-index`（`rag_index: false`，直接 Read 或维护时查阅）。
 

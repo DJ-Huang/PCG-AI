@@ -1,3 +1,7 @@
+---
+name: workflow-sync-editing
+description: sync/ 编辑与多平台适配
+---
 # sync/ 编辑与多平台适配
 
 > **适用范围**：修改 `sync/` 下任意内容（rules、skills、adapters、config、scripts）时必读。
@@ -27,13 +31,13 @@
 - [ ] **Gate**（`gates/`）改后 → `setup.bat` 同步到目标工程。
 - [ ] 新增/删除 rule_id → 更新 gate §2、`rule-router-gate.md`、Vault `Rules/meta/rules-vault-index`；Skill 触发词变更时更新 `Rules/meta/skills-trigger-index`。
 - [ ] **禁止**在 `sync/rules/` 恢复 `core/`、`agents/`、`reviews/` 目录。
-- [ ] 改门禁（`gates/rule-router-gate.md`、`codely-pre-code-gate.md`、`file-write-integrity.md`、`codely-shared.md`）→ 对照现有 gate 的 frontmatter（`description`、`alwaysApply`）与占位符 `.codely-cli/rules`、`~/.codely-cli/extensions/MySkills/skills`（由 `scripts/rule-format.mjs` 在同步时替换）。
+- [ ] 改门禁（`gates/rule-router-gate.md`、`codely-pre-code-gate.md`、`file-write-integrity.md`、`codely-shared.md`）→ 对照现有 gate 的 frontmatter（`description`、`alwaysApply`）与占位符 `.kimi/skills`、`~/.kimi/skills`（由 `scripts/rule-format.mjs` 在同步时替换）。
 - [ ] 文中工具名使用 Codely 原生名时 → 在 `gates/codely-shared.md` 补 Cursor/Trae 映射或降级说明（参考现有表格写法）。
 
 ### 改 Skill（`sync/extensions/MySkills/skills/`）
 
 - [ ] 符合 `STANDARDS.md` 七段格式；`description` 含触发词。
-- [ ] 引用规则用相对路径或 `.codely-cli/rules`，**不复制**规则正文到 Skill。
+- [ ] 引用规则用相对路径或 `.kimi/skills`，**不复制**规则正文到 Skill。
 - [ ] 出现 `activate_skill`、`ask_user`、`codely_agent_*` 等 → 确认 `codely-shared` 有等价路径。
 - [ ] 新增 Skill → 更新 `extensions/MySkills/skills/index.md`。
 

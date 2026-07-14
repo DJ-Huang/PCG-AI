@@ -1,5 +1,5 @@
 ---
-alwaysApply: true
+name: gates-codely-shared
 description: 资产路径、加载契约、多平台工具映射与开发任务总览
 ---
 
@@ -15,11 +15,11 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 |------|------|
 
-| Rules gate（AlwaysApply） | `.trae/rules/gates/`（`setup.bat` 同步） |
+| Rules gate（AlwaysApply） | `.kimi/skills/gates/`（`setup.bat` 同步） |
 
 | Rules 路由正文 | Obsidian `VAULT_ROOT/Rules/`（`rule_search`，唯一真源） |
 
-| Skills | `~/.trae/skills/`（user 目录全局联接） |
+| Skills | `~/.kimi/skills/`（user 目录全局联接） |
 
 | 记忆 | `AGENTS.md`（真源 `CODELY.md`） |
 
@@ -47,7 +47,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 
 
-纯 Q&A、文档、Git、同步等 → `Read` `.trae/rules/workflow/` 或对应 Skill，无需完整路由。
+纯 Q&A、文档、Git、同步等 → `Read` `.kimi/skills/workflow/` 或对应 Skill，无需完整路由。
 
 
 
@@ -57,7 +57,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 - **开发任务** → `rule-router-gate` + **`rule_search`** + `vault_search`；每次改产品代码 → `codely-pre-code-gate`
 
-- **非开发任务** → 直接 `Read` `.trae/rules/workflow/` 等
+- **非开发任务** → 直接 `Read` `.kimi/skills/workflow/` 等
 
 
 
@@ -79,7 +79,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 | `ask_user` | `AskQuestion` |
 
-| `activate_skill('name')` | `Read` `~/.trae/skills/name/SKILL.md` |
+| `activate_skill('name')` | `Read` `~/.kimi/skills/name/SKILL.md` |
 
 | Vault 规则 | `user-vault-rag.rule_search`（仅 `Rules/`） |
 
@@ -99,7 +99,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 |--------|--------|
 
-| `activate_skill('name')` | `Read` `~/.trae/skills/name/SKILL.md` |
+| `activate_skill('name')` | `Read` `~/.kimi/skills/name/SKILL.md` |
 
 | `ask_user` | 对话追问并给出选项 |
 
@@ -119,11 +119,11 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 |------|------|
 
-| 开发路由 | `rule-router` Skill 或 `.trae/rules/gates/rule-router-gate.md` |
+| 开发路由 | `rule-router` Skill 或 `.kimi/skills/gates/rule-router-gate.md` |
 
-| Skills | `~/.trae/skills/<name>/SKILL.md` |
+| Skills | `~/.kimi/skills/<name>/SKILL.md` |
 
-| Rules gate | `.trae/rules/gates/` |
+| Rules gate | `.kimi/skills/gates/` |
 
 | Rules 正文 | Obsidian `Rules/` via `rule_search` |
 

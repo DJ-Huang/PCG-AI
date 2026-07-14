@@ -290,31 +290,85 @@
       "category": "Mesh",
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "inspectorSections": [
+        { "id": "main", "label": "Bevel", "foldout": false },
+        { "id": "profile", "label": "Profile", "foldout": true, "defaultExpanded": true },
+        { "id": "geometry", "label": "Geometry", "foldout": true, "defaultExpanded": true },
+        { "id": "advanced", "label": "Advanced", "foldout": true, "defaultExpanded": false }
+      ],
       "properties": {
-        "method": {
-          "type": "enum",
-          "default": "edge",
-          "options": [
-            { "value": "edge", "label": "Edge (Blender)" },
-            { "value": "vertexPush", "label": "Vertex Push" }
-          ]
+        "edgeGroup": {
+          "type": "groupSelect",
+          "default": "",
+          "groupDomain": "edge",
+          "displayName": "Group",
+          "order": 0
         },
         "offsetType": {
           "type": "enum",
           "default": "offset",
+          "displayName": "Width Type",
+          "section": "main",
+          "order": 10,
           "options": [
             { "value": "offset", "label": "Offset" },
             { "value": "width", "label": "Width" }
           ]
         },
-        "amount": { "type": "number", "default": 0.1, "minimum": 0, "maximum": 1.0 },
-        "segments": { "type": "integer", "default": 2, "minimum": 1, "maximum": 8 },
-        "clampOverlap": { "type": "boolean", "default": true },
-        "angleLimit": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
-        "profile": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 },
+        "amount": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 1.0,
+          "displayName": "Amount",
+          "section": "main",
+          "order": 20
+        },
+        "segments": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "displayName": "Segments",
+          "section": "main",
+          "order": 30
+        },
+        "limitMethod": {
+          "type": "enum",
+          "default": "angle",
+          "displayName": "Limit Method",
+          "section": "main",
+          "order": 40,
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "angle", "label": "Angle" }
+          ]
+        },
+        "angleLimit": {
+          "type": "number",
+          "default": 30.0,
+          "minimum": 0,
+          "maximum": 180,
+          "displayName": "Angle",
+          "section": "main",
+          "order": 50,
+          "visibleWhen": { "property": "limitMethod", "equals": "angle" }
+        },
+        "profile": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "displayName": "Shape",
+          "section": "profile",
+          "order": 10
+        },
         "miterOuter": {
           "type": "enum",
           "default": "sharp",
+          "displayName": "Miter Outer",
+          "section": "geometry",
+          "order": 10,
           "options": [
             { "value": "sharp", "label": "Sharp" },
             { "value": "patch", "label": "Patch" },
@@ -324,6 +378,9 @@
         "miterInner": {
           "type": "enum",
           "default": "sharp",
+          "displayName": "Miter Inner",
+          "section": "geometry",
+          "order": 20,
           "options": [
             { "value": "sharp", "label": "Sharp" },
             { "value": "patch", "label": "Patch" },
@@ -333,14 +390,46 @@
         "vmeshMethod": {
           "type": "enum",
           "default": "adj",
+          "displayName": "Intersections",
+          "section": "geometry",
+          "order": 30,
           "options": [
-            { "value": "adj", "label": "ADJ (Catmull-Clark)" },
+            { "value": "adj", "label": "Grid Fill" },
             { "value": "cutoff", "label": "Cutoff" }
           ]
         },
-        "edgeGroup": { "type": "groupSelect", "default": "", "groupDomain": "edge" },
-        "excludeUnshared": { "type": "boolean", "default": true },
-        "excludeGroups": { "type": "groupMultiSelect", "default": "cap_start,cap_end" }
+        "clampOverlap": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Clamp Overlap",
+          "section": "geometry",
+          "order": 40
+        },
+        "method": {
+          "type": "enum",
+          "default": "edge",
+          "displayName": "Legacy Method",
+          "section": "advanced",
+          "order": 10,
+          "options": [
+            { "value": "edge", "label": "Edge (Blender)" },
+            { "value": "vertexPush", "label": "Vertex Push (Legacy)" }
+          ]
+        },
+        "excludeUnshared": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Exclude Unshared",
+          "section": "advanced",
+          "order": 20
+        },
+        "excludeGroups": {
+          "type": "groupMultiSelect",
+          "default": "cap_start,cap_end",
+          "displayName": "Exclude Groups",
+          "section": "advanced",
+          "order": 30
+        }
       }
     },
     {

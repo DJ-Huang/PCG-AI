@@ -365,13 +365,14 @@ float find_profile_fullness(int seg, float super_r, float profile_param) {
     return 2.3635f * profile_param + 0.000152f * seg - 0.6060f;
 }
 
-void set_profile_spacing(int seg, float super_r, ProfileSpacing& pro_spacing) {
+void set_profile_spacing(int seg, float super_r, float profile, ProfileSpacing& pro_spacing) {
     if (seg <= 1) {
         pro_spacing.xvals.clear();
         pro_spacing.yvals.clear();
         pro_spacing.xvals_2.clear();
         pro_spacing.yvals_2.clear();
         pro_spacing.seg_2 = 0;
+        pro_spacing.fullness = 0.0f;
         return;
     }
 
@@ -389,7 +390,9 @@ void set_profile_spacing(int seg, float super_r, ProfileSpacing& pro_spacing) {
         find_even_superellipse_chords(seg_2, super_r, pro_spacing.xvals_2, pro_spacing.yvals_2);
     }
 
-    pro_spacing.fullness = find_profile_fullness(seg, super_r, 0.5f);
+    // Blender: fullness = f(bp->profile, nseg) — NOT a hardcoded 0.5.
+    // Wrong fullness places Adj VMesh center off the profile curve → crossed corners.
+    pro_spacing.fullness = find_profile_fullness(seg, super_r, profile);
 }
 
 Vec3 get_profile_point(const Profile& pro, int i, int nseg, int bp_seg) {
@@ -1071,6 +1074,8 @@ void offset_meet(BevelParams& bp,
 
         Vec3 sum_dir = add(dir1, dir2);
         Vec3 norm_perp1 = normalize(cross(sum_dir, norm_v));
+        // See general-case note: disk order requires flipped perp vs Blender.
+        norm_perp1 = negate(norm_perp1);
         double d = std::max(e1->offset_r, e2->offset_l);
         d = d / std::cos(ang / 2.0);
         meetco = add(v_co, scale(norm_perp1, d));
@@ -1102,9 +1107,14 @@ void offset_meet(BevelParams& bp,
             norm_v2 = normalize(cross(dir2, dir2p));
         }
 
-        // Perpendicular vectors pointing into face
+        // Perpendicular vectors pointing into the face.
+        // Our BMesh disk cycles are CW when viewed along the outward vertex normal
+        // (Blender's are CCW), so the Blender cross(dir, no) formula yields
+        // OUTWARD offsets here. Negate to match Blender inward BoundVert placement.
         Vec3 norm_perp1 = normalize(cross(dir1, norm_v1));
         Vec3 norm_perp2 = normalize(cross(dir2, norm_v2));
+        norm_perp1 = negate(norm_perp1);
+        norm_perp2 = negate(norm_perp2);
 
         // Offset lines
         Vec3 off1a = add(v_co, scale(norm_perp1, e1->offset_r));
@@ -1154,6 +1164,8 @@ Vec3 offset_in_plane(EdgeHalf* e, const Vec3& plane_no, bool left, int v_idx,
     Vec3 dir = sub(other_co, v_co);
     Vec3 norm_perp = normalize(cross(dir, plane_no));
     if (!left) norm_perp = negate(norm_perp);
+    // Match offset_meet: disk CW vs Blender CCW → flip into-face direction.
+    norm_perp = negate(norm_perp);
 
     float offset = left ? e->offset_l : e->offset_r;
     return add(v_co, scale(norm_perp, offset));
@@ -1926,14 +1938,16 @@ float geometry_collide_offset(BevelParams& bp, BevVert* bv, EdgeHalf* eb) {
     EdgeHalf* ec = nullptr;
     float kc = 0.0f;
 
-    // Find beveled edge at vc that shares a face with eb
+    // Find the EdgeHalf at vc that points back to vb (the other end of eb).
+    // ec = next edge (CCW) at the OTHER end, not at this end.
     for (auto& bv_other : bp.bevverts) {
         if (bv_other.v_idx != vc_idx) continue;
         for (auto& eh : bv_other.edges) {
             if (!eh.is_bev) continue;
             if (eh.edge_v1 == vb_idx) {
-                // This is the other end of eb
-                ec = ea->next;
+                // eh is the reverse EdgeHalf at vc pointing back to vb.
+                // ec = next edge at vc (CCW), mirroring ea at this end.
+                ec = eh.next;
                 if (ec && ec->is_bev)
                     kc = ec->offset_l_spec;
                 break;
@@ -2539,9 +2553,28 @@ std::unique_ptr<VMesh> adj_vmesh(BevelParams& bp, BevVert* bv) {
 
     // Subdivide until reaching target segments
     std::unique_ptr<VMesh> vm1 = std::move(vm0);
-    do {
+    while (vm1->seg < nseg) {
         vm1 = cubic_subdiv(bp, vm1.get());
-    } while (vm1->seg < nseg);
+    }
+
+    // For odd seg values, cubic_subdiv overshoots to the next power of 2.
+    // Resample the boundary ring at the target seg and re-apply symmetry.
+    if (vm1->seg != nseg) {
+        vm1->seg = nseg;
+        BoundVert* bndv = vm1->boundstart;
+        for (int i = 0; i < n_bndv; i++) {
+            const int inext = (i + 1) % n_bndv;
+            for (int k = 0; k <= nseg; k++) {
+                Vec3 co = get_profile_point(bndv->profile, k, nseg, bp.seg);
+                vm1->at(i, 0, k).co = co;
+                if (k >= nseg / 2 + 1 && k < nseg) {
+                    vm1->at(inext, nseg - k, 0).co = co;
+                }
+            }
+            bndv = bndv->next;
+        }
+        vmesh_copy_equiv_verts(vm1.get());
+    }
 
     return vm1;
 }
@@ -2758,16 +2791,23 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
                 for (int k = 0; k <= ns; k++) {
                     if (j == 0 && (k == 0 || k == ns)) continue;
                     vm_out->at(i, j, k).co = vm_adj->at(i, j, k).co;
-                    vm_out->at(i, j, k).valid = vm_adj->at(i, j, k).valid;
+                    vm_out->at(i, j, k).valid = true;
                 }
             }
         }
 
         // Create F_VERT quads with Blender loop order (v1,v2,v3,v4) — no mesh-center flip.
+        // VMesh quads: generate ALL rings including j=0 (boundary). The face
+        // rebuild inserts BoundVert positions only (vstart==vend for box corners),
+        // so face polygon edges are the full-span edges shared with edge strips.
+        // VMesh j=0 quad boundary ring edges are shared with edge strip side edges.
         const int odd = ns % 2;
+        // Encode BevVert index as negative face_origin for VMesh triangles.
+        const int vm_origin = -static_cast<int>(bv - &bp.bevverts[0]) - 1;
         bndv = vm_out->boundstart;
         do {
             const int i = bndv->index;
+            const Vec3 vert_pos = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
             for (int j = 0; j < ns2; j++) {
                 for (int k = 0; k < ns2 + odd; k++) {
                     const Vec3 v1 = vm_out->at(i, j, k).co;
@@ -2776,13 +2816,17 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
                     const Vec3 v4 = vm_out->at(i, j + 1, k).co;
                     if (length_squared(sub(v1, v2)) > 1e-16 ||
                         length_squared(sub(v3, v4)) > 1e-16) {
-                        bp.output.add_oriented_quad(v1, v2, v3, v4, vert_normal);
+                        const Vec3 quad_center = scale(add(add(v1, v2), add(v3, v4)), 0.25);
+                        const Vec3 outward = normalize(sub(quad_center, vert_pos));
+                        bp.output.current_face_origin = vm_origin;
+                        bp.output.add_oriented_quad(v1, v2, v3, v4, outward);
+                        bp.output.current_face_origin = -1;
                     }
                 }
             }
         } while ((bndv = bndv->next) != vm_out->boundstart);
 
-        // Center ngon once (Blender builds it after the ring loop).
+        // Center ngon (Blender builds it after the ring loop).
         if (odd) {
             std::vector<Vec3> center_verts;
             center_verts.reserve(static_cast<size_t>(n));
@@ -2866,23 +2910,16 @@ void build_edge_polygons(BevelParams& bp, BevVert* bv1, BevVert* bv2, EdgeHalf* 
 
         if (!collapsed_left && !collapsed_right) {
             bp.output.add_oriented_quad(v0, v1, v2, v3, desired_normal);
-            return;
-        }
-
-        if (collapsed_left && collapsed_right) {
+        } else if (collapsed_left && collapsed_right) {
             if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v1, v2)) > 1e-16)
                 bp.output.add_oriented_triangle(v0, v1, v2, desired_normal);
-            return;
-        }
-        if (collapsed_left) {
-            // v0 == v3: degenerate quad becomes triangle (v0, v1, v2).
+        } else if (collapsed_left) {
             if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v1, v2)) > 1e-16)
                 bp.output.add_oriented_triangle(v0, v1, v2, desired_normal);
-            return;
+        } else {
+            if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v0, v3)) > 1e-16)
+                bp.output.add_oriented_triangle(v0, v1, v3, desired_normal);
         }
-        // collapsed_right: v1 == v2 → triangle (v0, v1, v3).
-        if (length_squared(sub(v0, v1)) > 1e-16 && length_squared(sub(v0, v3)) > 1e-16)
-            bp.output.add_oriented_triangle(v0, v1, v3, desired_normal);
     };
 
     Vec3 v0 = e->leftv->nv.co;
@@ -2916,6 +2953,28 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
                 return &edge;
         }
         return nullptr;
+    };
+
+    // When the face loop contains a vertex that IS a BevVert but the face's
+    // adjacent loop vertex is not directly connected (e.g. the loop vertex is
+    // a subdivision midpoint on an edge that was merged in the BMesh), find
+    // the edge whose direction is closest to the target vertex.
+    auto find_nearest_edge_half = [&](BevVert* bv, int target_v,
+                                      const std::vector<Vec3>& positions) -> EdgeHalf* {
+        if (!bv) return nullptr;
+        const Vec3& vp = positions[static_cast<size_t>(bv->v_idx)];
+        const Vec3 target_dir = normalize(sub(positions[static_cast<size_t>(target_v)], vp));
+        EdgeHalf* best = nullptr;
+        double best_dot = -2.0;
+        for (auto& eh : bv->edges) {
+            Vec3 dir = normalize(sub(positions[static_cast<size_t>(eh.edge_v1)], vp));
+            double d = dot(dir, target_dir);
+            if (d > best_dot) {
+                best_dot = d;
+                best = &eh;
+            }
+        }
+        return best;
     };
 
     auto count_ccw_edges_between = [](EdgeHalf* from, EdgeHalf* to) -> int {
@@ -2963,6 +3022,17 @@ void rebuild_faces_bmesh(BevelParams& bp, const geometry::BMesh& bmesh, const We
             VMesh* vm = bv ? bv->vmesh.get() : nullptr;
             EdgeHalf* edge = find_edge_half(bv, next_v);
             EdgeHalf* edge_prev = find_edge_half(bv, prev_v);
+            // If direct edge lookup fails (face loop vertex not in BevVert edge
+            // list — e.g. subdivision midpoint on a merged edge), fall back to
+            // nearest edge by direction. This ensures we use the offset-moved
+            // BoundVert position instead of the original unmoved position,
+            // preventing vertex-index splits that create boundary edges.
+            if (bv && vm && vm->boundstart) {
+                if (!edge)
+                    edge = find_nearest_edge_half(bv, next_v, welded.positions);
+                if (!edge_prev)
+                    edge_prev = find_nearest_edge_half(bv, prev_v, welded.positions);
+            }
             if (!bv || !vm || !vm->boundstart || !edge || !edge_prev) {
                 push_distinct(welded.positions[static_cast<size_t>(curr_v)]);
                 continue;
@@ -3160,29 +3230,47 @@ std::unordered_set<int64_t> select_hard_edges(const geometry::BMesh& bmesh,
                                               const BevelEdgeSelection& selection,
                                               const data::PcgGeometry* geometry)
 {
-    std::unordered_set<int64_t> hard_edges;
+    // Pipeline: Group candidates → Exclude → Limit Method (Angle/None).
+    // Empty edge_group = all BMesh edges. Unknown group must not fall back to all edges.
+    BevelLimitMethod limit = selection.limit_method;
+    if (!selection.limit_method_explicit)
+        limit = selection.edge_group.empty() ? BevelLimitMethod::Angle : BevelLimitMethod::None;
 
-    if (!selection.edge_group.empty() && geometry) {
+    std::unordered_set<int64_t> candidates;
+
+    if (!selection.edge_group.empty()) {
+        if (!geometry)
+            return {};
         const auto selected =
             geometry->groups().eval(geometry::GroupDomain::Edge, selection.edge_group);
         for (int64_t key : selected) {
             const auto it = bmesh.edges.find(key);
             if (it == bmesh.edges.end())
                 continue;
-            if (!edge_excluded(bmesh, it->second, selection))
-                hard_edges.insert(key);
+            if (edge_excluded(bmesh, it->second, selection))
+                continue;
+            candidates.insert(key);
         }
-        return hard_edges;
+    } else {
+        for (const auto& entry : bmesh.edges) {
+            if (edge_excluded(bmesh, entry.second, selection))
+                continue;
+            candidates.insert(entry.first);
+        }
     }
 
-    for (const auto& entry : bmesh.edges) {
-        if (!entry.second.sharp)
-            continue;
-        if (edge_excluded(bmesh, entry.second, selection))
-            continue;
-        hard_edges.insert(entry.first);
-    }
+    if (limit == BevelLimitMethod::None)
+        return candidates;
 
+    std::unordered_set<int64_t> hard_edges;
+    for (int64_t key : candidates) {
+        const auto it = bmesh.edges.find(key);
+        if (it == bmesh.edges.end())
+            continue;
+        if (!it->second.sharp)
+            continue;
+        hard_edges.insert(key);
+    }
     return hard_edges;
 }
 
@@ -3224,8 +3312,12 @@ data::PcgMeshData bevel_mesh_blender(
         else if (std::abs(super_r - PRO_LINE_R) < 1e-4) super_r = PRO_LINE_R;
     }
 
-    // 1. Build BMesh (weld + coplanar merge + sharp edges)
+    // 1. Build BMesh from geometry (faces already merged by geometry_from_mesh).
+    //    Coplanar merge threshold is set higher than the sharp edge threshold so
+    //    that subdivision artifacts (e.g. CC's 26.75° at sub-face boundaries)
+    //    are merged into single faces, not beveled as hard edges.
     geometry::BMeshBuildOptions bmesh_opts;
+    bmesh_opts.merge_coplanar_angle_deg = std::max(angle_limit_deg + 5.0, 30.0);
     bmesh_opts.sharp_angle_deg = angle_limit_deg;
     const geometry::BMesh bmesh = geometry
         ? geometry::bmesh_from_geometry(*geometry, bmesh_opts)
@@ -3280,7 +3372,7 @@ data::PcgMeshData bevel_mesh_blender(
     bp.hard_edges = hard_edges;
 
     // Set profile spacing
-    set_profile_spacing(segments, super_r, bp.pro_spacing);
+    set_profile_spacing(segments, super_r, profile, bp.pro_spacing);
 
     // 5. Build BevVerts
     // Find all vertices that are endpoints of hard edges
@@ -3449,60 +3541,71 @@ data::PcgMeshData bevel_mesh_blender(
         return mesh;
     rebuild_faces_bmesh(bp, bmesh, welded);
 
-    // Fix opposite-winding edges between strip and face polygon triangles.
-    bp.output.fix_winding();
-
     log_bevel_stage("after_face_rebuild", bp.output, diag_cap);
 
-    // 12. Skip degenerate triangles (two identical vertices) and geometric duplicates
-    //     (different vertex indices but same 3 positions — happens when VMesh inner
-    //     cap and face rebuild produce the same corner triangle).
+    // 12. Vertex-level weld + degenerate/duplicate triangle removal.
+    //     VMesh quads and face rebuild polygons both reference boundary points
+    //     but may compute slightly different positions for the same logical
+    //     vertex. get_vertex (1e-6) can split them into different indices.
+    //     Weld at 1e-5 precision to merge these, then remove degenerate and
+    //     duplicate triangles.
     {
-        std::vector<int> deduped;
-        deduped.reserve(bp.output.triangles.size());
-        std::vector<int> deduped_origins;
-        deduped_origins.reserve(bp.output.face_origins.size());
-
-        // Build position keys for geometric dedup
+        // Step A: weld vertices at 1e-5 precision.
         auto pos_key = [](const Vec3& v) -> std::string {
             auto q = [](double val) { return static_cast<int64_t>(std::llround(val / 1e-5)); };
             return std::to_string(q(v.x)) + ',' + std::to_string(q(v.y)) + ',' + std::to_string(q(v.z));
         };
 
+        std::unordered_map<std::string, int> weld_map;
+        std::vector<int> remap(bp.output.vertices.size(), -1);
+        std::vector<Vec3> welded_verts;
+
+        for (size_t vi = 0; vi < bp.output.vertices.size(); ++vi) {
+            const std::string key = pos_key(bp.output.vertices[vi]);
+            auto it = weld_map.find(key);
+            if (it != weld_map.end()) {
+                remap[vi] = it->second;
+            } else {
+                int new_idx = static_cast<int>(welded_verts.size());
+                welded_verts.push_back(bp.output.vertices[vi]);
+                weld_map[key] = new_idx;
+                remap[vi] = new_idx;
+            }
+        }
+
+        // Step B: remap triangle indices + remove degenerate and duplicate triangles.
+        std::vector<int> deduped;
+        deduped.reserve(bp.output.triangles.size());
+        std::vector<int> deduped_origins;
+        deduped_origins.reserve(bp.output.face_origins.size());
+
+        auto tri_key = [](int a, int b, int c) -> std::string {
+            int arr[3] = {a, b, c};
+            std::sort(arr, arr + 3);
+            return std::to_string(arr[0]) + ',' + std::to_string(arr[1]) + ',' + std::to_string(arr[2]);
+        };
         std::unordered_map<std::string, size_t> seen_geo;
 
-        const size_t tris_before_dedup = bp.output.triangles.size() / 3;
-        int skipped_index_degenerate = 0;
+        const size_t tris_before = bp.output.triangles.size() / 3;
+        int skipped_degenerate = 0;
         int replaced_geo = 0;
 
         for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
             if (bevel_cancel_requested(bp))
                 return mesh;
-            int ia = bp.output.triangles[i];
-            int ib = bp.output.triangles[i + 1];
-            int ic = bp.output.triangles[i + 2];
+            int ia = remap[bp.output.triangles[i]];
+            int ib = remap[bp.output.triangles[i + 1]];
+            int ic = remap[bp.output.triangles[i + 2]];
+
             if (ia == ib || ib == ic || ia == ic) {
-                ++skipped_index_degenerate;
+                ++skipped_degenerate;
                 continue;
             }
 
-            const auto& va = bp.output.vertices[static_cast<size_t>(ia)];
-            const auto& vb = bp.output.vertices[static_cast<size_t>(ib)];
-            const auto& vc = bp.output.vertices[static_cast<size_t>(ic)];
-            std::array<std::string, 3> pk = {
-                pos_key(va), pos_key(vb), pos_key(vc)
-            };
-            std::sort(pk.begin(), pk.end());
-            std::string geo_key = pk[0] + '|' + pk[1] + '|' + pk[2];
+            std::string geo_key = tri_key(ia, ib, ic);
             auto it = seen_geo.find(geo_key);
             if (it != seen_geo.end()) {
                 ++replaced_geo;
-                const size_t old = it->second;
-                deduped[old] = ia;
-                deduped[old + 1] = ib;
-                deduped[old + 2] = ic;
-                deduped_origins[old / 3] = (i / 3 < bp.output.face_origins.size())
-                    ? bp.output.face_origins[i / 3] : -1;
                 continue;
             }
             seen_geo.emplace(geo_key, deduped.size());
@@ -3513,19 +3616,28 @@ data::PcgMeshData bevel_mesh_blender(
             deduped_origins.push_back((i / 3 < bp.output.face_origins.size())
                 ? bp.output.face_origins[i / 3] : -1);
         }
+
+        bp.output.vertices = std::move(welded_verts);
         bp.output.triangles = std::move(deduped);
         bp.output.face_origins = std::move(deduped_origins);
+        bp.output.vertex_cache.clear();
 
         if (bevel_diag_enabled()) {
             std::fprintf(stderr,
-                         "[PCG_BEVEL_DIAG] dedup before_tris=%zu after_tris=%zu "
-                         "skipped_index=%d replaced_geo=%d\n",
-                         tris_before_dedup, bp.output.triangles.size() / 3,
-                         skipped_index_degenerate, replaced_geo);
+                         "[PCG_BEVEL_DIAG] weld+dedup before_tris=%zu after_tris=%zu "
+                         "skipped_degenerate=%d replaced_geo=%d\n",
+                         tris_before, bp.output.triangles.size() / 3,
+                         skipped_degenerate, replaced_geo);
         }
     }
 
     log_bevel_stage("after_dedup", bp.output, diag_cap);
+
+    // Enforce opposite winding on every manifold edge, then flip the whole mesh
+    // if signed volume is negative. Local add_oriented_* references are enough
+    // for convex cases; Sweep/sedan (non-convex) otherwise leaves opposite-
+    // winding edges between VMesh, strips, and face rebuild.
+    bp.output.fix_winding();
 
     // 13. Build output PcgGeometry with propagated face groups (if requested)
     if (out_geometry && geometry) {

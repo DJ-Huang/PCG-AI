@@ -46,3 +46,4 @@ web/pcg-editor/node_modules/
 .codely/clipboard/
 .codely-cli/auto-saves/
 .codely-cli/tool-outputs/
+.opencode/node_modules/
