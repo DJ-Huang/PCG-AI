@@ -296,6 +296,40 @@ PCG_API PcgResultCode pcg_execute_graph_v7(const char* json,
                                            char* err_buf,
                                            int err_buf_size);
 
+/**
+ * Same as v7, plus optional best-effort geometry_binary export.
+ * out_geometry_buf is filled only when Sink produced native PcgGeometry and the
+ * buffer is large enough. On skip/failure *out_geometry_bytes_written stays 0
+ * and Mesh/Points cooks still return PCG_OK when otherwise successful.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v8(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           const PcgSplineSlot* splines,
+                                           int spline_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           void* out_points_buf,
+                                           int out_points_buf_size,
+                                           int* out_point_count,
+                                           uint32_t* out_point_attr_flags,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           PcgCookStats* out_stats,
+                                           char* out_perf_json,
+                                           int out_perf_json_size,
+                                           void* out_geometry_buf,
+                                           int out_geometry_buf_size,
+                                           int* out_geometry_bytes_written,
+                                           char* err_buf,
+                                           int err_buf_size);
+
 /** Clears the session-scoped per-node cook cache. */
 PCG_API void pcg_cook_cache_clear(void);
 

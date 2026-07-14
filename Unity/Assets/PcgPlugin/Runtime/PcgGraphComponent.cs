@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -47,6 +48,10 @@ namespace DJTechRuntime.PCG
         private string m_LastCookKey;
         private bool m_HasAppliedCookResult;
         private ulong m_LastMeshBinaryHash;
+        private PcgPolygonPreviewData m_PolygonPreview;
+
+        /// <summary>Cached Sink n-gon topology for Scene View polygon wire (null when unavailable).</summary>
+        public PcgPolygonPreviewData PolygonPreview => m_PolygonPreview;
 
 #if UNITY_EDITOR
         private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
@@ -287,7 +292,9 @@ namespace DJTechRuntime.PCG
                 m_PreviewCookPending = false;
                 if (m_Document == null)
                     RefreshDocument();
-                if (Run(skipDocumentRefresh: true))
+                // Sync cook so Mesh + PolygonPreview (n-gon wire) apply atomically.
+                // Async immediate was returning before ApplyExecutionResult ran.
+                if (Run(skipDocumentRefresh: true, forceSynchronous: true))
                 {
                     m_NextEditModeCookTime = Time.realtimeSinceStartup + editModeCookInterval;
 #if UNITY_EDITOR
@@ -395,14 +402,17 @@ namespace DJTechRuntime.PCG
 
         public bool Run() => Run(skipDocumentRefresh: false);
 
-        public bool Run(bool skipDocumentRefresh)
+        public bool Run(bool skipDocumentRefresh) =>
+            Run(skipDocumentRefresh, forceSynchronous: false);
+
+        public bool Run(bool skipDocumentRefresh, bool forceSynchronous)
         {
             if (m_CookInProgress)
                 return false;
 
             if (m_AsyncCookInProgress)
             {
-                if (ShouldUseAsyncCook())
+                if (ShouldUseAsyncCook() || forceSynchronous)
                     CancelAsyncCook(null, log: false);
                 else
                     return false;
@@ -420,7 +430,7 @@ namespace DJTechRuntime.PCG
             m_CookInProgress = true;
             try
             {
-                return RunInternal();
+                return RunInternal(forceSynchronous);
             }
             finally
             {
@@ -428,7 +438,7 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private bool RunInternal()
+        private bool RunInternal(bool forceSynchronous = false)
         {
             string json = null;
 #if UNITY_EDITOR
@@ -461,7 +471,7 @@ namespace DJTechRuntime.PCG
             var splines = PcgSplineResolver.CollectFromGraphJson(
                 json, gameObject, m_SplineBindings, previewSplineBindings);
 
-            if (ShouldUseAsyncCook())
+            if (!forceSynchronous && ShouldUseAsyncCook())
             {
                 StartAsyncCook(json, textures, meshes, splines);
                 return true;
@@ -529,6 +539,7 @@ namespace DJTechRuntime.PCG
 
         private bool ApplyExecutionResult(PcgGraphExecuteResult result)
         {
+            m_PolygonPreview = null;
             var kind = PcgResultParser.DetectKind(result);
 
 #if UNITY_EDITOR
@@ -563,6 +574,37 @@ namespace DJTechRuntime.PCG
                         ApplyMesh(mesh);
                         m_LastMeshBinaryHash = binHash;
                     }
+
+                    if (result.GeometryBinary != null && result.GeometryBinary.Length > 0)
+                    {
+                        if (PcgResultParser.TryParseGeometryBinary(
+                                result.GeometryBinary, out var polygon, out var geometryError))
+                        {
+                            m_PolygonPreview = polygon;
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[PCG] Failed to parse geometry binary for polygon wire: {geometryError}");
+                        }
+                    }
+#if UNITY_EDITOR
+                    else
+                    {
+                        var exportHint = "";
+                        if (!string.IsNullOrEmpty(result.Json) &&
+                            result.Json.Contains("\"geometry_export\""))
+                        {
+                            exportHint = " json.geometry_export present.";
+                        }
+
+                        Debug.LogWarning(
+                            "[PCG] Mesh cook has no geometry_binary — Scene polygon wire empty. " +
+                            $"verts={result.VertexCount} idx={result.IndexCount}.{exportHint} " +
+                            "Normal for SubdivideMesh / other mesh-only nodes with no upstream Geometry. " +
+                            "CreateBoxMesh / Sweep / Bevel / GroupCreate should export geometry — if not, bug. " +
+                            "Check '[PCG] Run uses node preview' for the previewed node.");
+                    }
+#endif
                     break;
                 }
 
@@ -666,18 +708,61 @@ namespace DJTechRuntime.PCG
             }, token);
         }
 
+        /// <summary>
+        /// Stops any in-flight async cook and waits for native ExecuteGraph before
+        /// callers clear cook caches (preview node switch / Clear Preview).
+        /// </summary>
+        public void CancelAsyncCookForPreviewSwitch()
+        {
+            CancelAsyncCook(null, log: false);
+        }
+
         private bool CancelAsyncCook(string reason, bool log = true)
         {
-            if (!m_AsyncCookInProgress)
+            var task = m_AsyncCookTask;
+            if (!m_AsyncCookInProgress && task == null)
                 return false;
 
+            // Ask the in-flight Task.Run cook to stop, then WAIT for native ExecuteGraph
+            // to finish. Dropping the Task reference without Wait races the next cook against
+            // g_cook_cache / static cancel flag — Mesh may still apply, GeometryBinary often becomes 0
+            // (cyan polygon wire empty on node Preview).
             PcgNative.RequestCancel();
             m_AsyncCookCts?.Cancel();
+
             m_AsyncCookInProgress = false;
             m_AsyncCookTask = null;
-            m_AsyncCookCts?.Dispose();
+            // Invalidate generation so a late Pump cannot apply a raced result.
+            m_AsyncCookGeneration++;
+            var cts = m_AsyncCookCts;
             m_AsyncCookCts = null;
             m_LastAsyncCookStatus = "cancelled";
+
+            if (task != null)
+            {
+                try
+                {
+                    if (!task.Wait(TimeSpan.FromSeconds(30)))
+                    {
+#if UNITY_EDITOR
+                        Debug.LogWarning("[PCG] Timed out waiting for cancelled async cook to finish.");
+#endif
+                    }
+                }
+                catch (AggregateException)
+                {
+                    // Expected when RequestCancel / CTS cancels the worker.
+                }
+                catch (Exception ex)
+                {
+#if UNITY_EDITOR
+                    Debug.LogWarning($"[PCG] Wait for cancelled cook failed: {ex.Message}");
+#endif
+                }
+            }
+
+            cts?.Dispose();
+            PcgNative.ClearCancel();
 
 #if UNITY_EDITOR
             if (log && !string.IsNullOrEmpty(reason))
@@ -783,6 +868,7 @@ namespace DJTechRuntime.PCG
         {
             InvalidateCookResult();
             ClearGeneratedMesh();
+            m_PolygonPreview = null;
         }
 
         // --- Result rendering ---

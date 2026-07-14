@@ -249,6 +249,7 @@ namespace DJTechEditor.PCG.Graph
             }
 
             DrawPcgModeToolbar(sceneView, graphWindow);
+            DrawPolygonWireOverlay(graphWindow);
 
             var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
             foreach (var node in graphWindow.GraphView.selection.OfType<PcgManifestNodeView>())
@@ -1782,6 +1783,73 @@ namespace DJTechEditor.PCG.Graph
             finally
             {
                 Handles.EndGUI();
+            }
+        }
+
+        private static void DrawPolygonWireOverlay(PcgGraphEditorWindow window)
+        {
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            var anchor = FindPreviewAnchor(window);
+            if (anchor == null)
+                return;
+
+            var component = anchor.GetComponent<PcgGraphComponent>();
+            if (component == null)
+                return;
+
+            // Only n-gon geometry_binary. Never draw MeshFilter triangles here — that shows
+            // fan diagonals and looks like "preview forced triangulation".
+            var preview = component.PolygonPreview;
+            if (preview == null || preview.FaceCount <= 0 ||
+                preview.Points == null || preview.FaceOffsets == null || preview.FaceIndices == null)
+                return;
+
+            var points = preview.Points;
+            var offsets = preview.FaceOffsets;
+            var indices = preview.FaceIndices;
+            var l2w = anchor.localToWorldMatrix;
+            var drawn = new HashSet<ulong>();
+
+            var prevColor = Handles.color;
+            var prevZTest = Handles.zTest;
+            try
+            {
+                // LessEqual: respect depth buffer so back faces are occluded by the Lit mesh.
+                Handles.color = new Color(0f, 0.75f, 0.85f, 0.85f);
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+
+                for (var fi = 0; fi < preview.FaceCount; fi++)
+                {
+                    var start = offsets[fi];
+                    var end = fi + 1 < preview.FaceCount ? offsets[fi + 1] : indices.Length;
+                    if (end - start < 3 || start < 0 || end > indices.Length)
+                        continue;
+
+                    for (var i = start; i < end; i++)
+                    {
+                        var a = indices[i];
+                        var b = indices[i + 1 < end ? i + 1 : start];
+                        if (a == b || a < 0 || b < 0 || a >= points.Length || b >= points.Length)
+                            continue;
+
+                        var lo = a < b ? a : b;
+                        var hi = a < b ? b : a;
+                        var key = ((ulong)(uint)lo << 32) | (uint)hi;
+                        if (!drawn.Add(key))
+                            continue;
+
+                        var p0 = l2w.MultiplyPoint(points[a]);
+                        var p1 = l2w.MultiplyPoint(points[b]);
+                        Handles.DrawAAPolyLine(4f, p0, p1);
+                    }
+                }
+            }
+            finally
+            {
+                Handles.color = prevColor;
+                Handles.zTest = prevZTest;
             }
         }
 

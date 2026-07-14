@@ -6,10 +6,13 @@ namespace DJTechEditor.PCG.Graph
 {
     /// <summary>
     /// Builds an upstream-only subgraph for Houdini-style per-node scene preview.
-    /// The target node becomes the execution sink (no downstream nodes).
+    /// The target node is wired into a synthetic Output so the executor always treats
+    /// that node as the graph sink (stable geometry_binary / Mesh cook for wire overlay).
     /// </summary>
     public static class PcgGraphPreviewSubgraph
     {
+        public const string PreviewSinkNodeId = "__pcg_preview_sink__";
+
         public static bool TryBuildUpstream(
             PcgGraphDocument source,
             string targetNodeId,
@@ -31,7 +34,8 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
-            if (!source.nodes.Any(n => n.id == targetNodeId))
+            var targetNode = source.nodes.FirstOrDefault(n => n.id == targetNodeId);
+            if (targetNode == null)
             {
                 error = $"Preview node '{targetNodeId}' was not found in the graph.";
                 return false;
@@ -91,6 +95,32 @@ namespace DJTechEditor.PCG.Graph
                     if (!string.IsNullOrEmpty(param.targetNode) && included.Contains(param.targetNode))
                         subgraph.parameters.Add(param);
                 }
+            }
+
+            // Prefer an Output sink so C++ executor does not rely on document-order fallback.
+            // When previewing Output itself, the node is already the preferred sink.
+            if (targetNode.type != "Output")
+            {
+                var sourceHandle = "out";
+                var downstream = source.edges.FirstOrDefault(e => e.source == targetNodeId);
+                if (downstream != null && !string.IsNullOrEmpty(downstream.sourceHandle))
+                    sourceHandle = downstream.sourceHandle;
+
+                subgraph.nodes.Add(new PcgGraphNodeRecord
+                {
+                    id = PreviewSinkNodeId,
+                    type = "Output",
+                    position = targetNode.position,
+                    data = new PcgNodeData(),
+                });
+                subgraph.edges.Add(new PcgGraphEdgeRecord
+                {
+                    id = $"{PreviewSinkNodeId}_edge",
+                    source = targetNodeId,
+                    target = PreviewSinkNodeId,
+                    sourceHandle = sourceHandle,
+                    targetHandle = "in",
+                });
             }
 
             return true;

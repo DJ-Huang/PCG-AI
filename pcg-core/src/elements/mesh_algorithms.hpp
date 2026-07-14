@@ -54,6 +54,9 @@ struct NoiseDeformOptions {
 
 data::PcgMeshData create_box_mesh(double width, double height, double depth);
 
+/// Box as 8 shared corners + 6 quads (canonical Geometry; triangulate only at Sink).
+data::PcgGeometry create_box_geometry(double width, double height, double depth);
+
 data::PcgMeshData create_cylinder_mesh(double radius, double height,
                                        int radial_segments, int height_segments,
                                        bool cap_top, bool cap_bottom);

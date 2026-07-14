@@ -261,6 +261,38 @@ data::PcgMeshData create_box_mesh(double width, double height, double depth)
     return mesh;
 }
 
+data::PcgGeometry create_box_geometry(double width, double height, double depth)
+{
+    const double hx = std::max(width, 0.0) * 0.5;
+    const double hy = std::max(height, 0.0) * 0.5;
+    const double hz = std::max(depth, 0.0) * 0.5;
+
+    data::PcgGeometry geo;
+    // Shared corners. Face loops are CCW when viewed from outside so fan
+    // triangulation (i0,i,i+1) yields outward normals — same as add_quad after
+    // its index swap. Do NOT copy add_quad's pre-swap CW vertex order here.
+    geo.points_mut() = {
+        {-hx, -hy, -hz}, // 0
+        { hx, -hy, -hz}, // 1
+        { hx,  hy, -hz}, // 2
+        {-hx,  hy, -hz}, // 3
+        {-hx, -hy,  hz}, // 4
+        { hx, -hy,  hz}, // 5
+        { hx,  hy,  hz}, // 6
+        {-hx,  hy,  hz}, // 7
+    };
+    // +X, -X, +Y, -Y, +Z, -Z
+    geo.faces_mut() = {
+        {1, 2, 6, 5},
+        {4, 7, 3, 0},
+        {3, 7, 6, 2},
+        {4, 0, 1, 5},
+        {4, 5, 6, 7},
+        {1, 0, 3, 2},
+    };
+    return geo;
+}
+
 data::PcgMeshData create_cylinder_mesh(double radius, double height,
                                        int radial_segments, int height_segments,
                                        bool cap_top, bool cap_bottom)

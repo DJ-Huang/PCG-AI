@@ -1,0 +1,21 @@
+{
+    "name": "PcgPlugin.Editor.Tests",
+    "rootNamespace": "DJTechEditor.PCG.Tests",
+    "references": [
+        "PcgPlugin.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

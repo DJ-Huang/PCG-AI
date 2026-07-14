@@ -65,6 +65,7 @@ namespace DJTechRuntime.PCG
                 CookNodesExecuted = source.CookNodesExecuted,
                 CookNodesSkipped = source.CookNodesSkipped,
                 MeshBinary = source.MeshBinary != null ? (byte[])source.MeshBinary.Clone() : null,
+                GeometryBinary = source.GeometryBinary != null ? (byte[])source.GeometryBinary.Clone() : null,
                 PointBinary = source.PointBinary != null ? (byte[])source.PointBinary.Clone() : null,
                 Perf = ClonePerf(source.Perf),
             };

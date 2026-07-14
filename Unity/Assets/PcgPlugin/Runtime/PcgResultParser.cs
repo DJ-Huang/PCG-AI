@@ -529,5 +529,282 @@ namespace DJTechRuntime.PCG
 
             return scatterPoints;
         }
+
+        public const uint GeometryBinaryMagic = 0x47475043u;
+        public const uint GeometryBinaryVersion = 2u;
+        public const int GeometryBinaryHeaderSize = 16;
+        private const uint GeometryChunkPoints = 1u;
+        private const uint GeometryChunkFaceOffsets = 2u;
+        private const uint GeometryChunkFaceIndices = 3u;
+
+        public static bool TryParseGeometryBinary(
+            byte[] data, out PcgPolygonPreviewData preview, out string error)
+        {
+            preview = null;
+            error = null;
+
+            if (data == null || data.Length < GeometryBinaryHeaderSize)
+            {
+                error = "Geometry binary payload is too small.";
+                return false;
+            }
+
+            try
+            {
+                var offset = 0;
+                var magic = ReadUInt32(data, ref offset);
+                if (magic != GeometryBinaryMagic)
+                {
+                    error = $"Invalid geometry binary magic: 0x{magic:X8}";
+                    return false;
+                }
+
+                var version = ReadUInt32(data, ref offset);
+                if (version != GeometryBinaryVersion)
+                {
+                    error = $"Unsupported geometry binary version: {version}";
+                    return false;
+                }
+
+                var pointCountU = ReadUInt32(data, ref offset);
+                var faceCountU = ReadUInt32(data, ref offset);
+                if (pointCountU > int.MaxValue || faceCountU > int.MaxValue)
+                {
+                    error = "Geometry binary header counts overflow.";
+                    return false;
+                }
+
+                var pointCount = checked((int)pointCountU);
+                var faceCount = checked((int)faceCountU);
+                Vector3[] points = null;
+                int[] faceOffsets = null;
+                int[] faceIndices = null;
+                var sawPoints = false;
+                var sawOffsets = false;
+                var sawIndices = false;
+
+                while (offset + 8 <= data.Length)
+                {
+                    var chunkId = ReadUInt32(data, ref offset);
+                    var chunkSizeU = ReadUInt32(data, ref offset);
+                    if (chunkSizeU > int.MaxValue)
+                    {
+                        error = "Geometry chunk size overflow.";
+                        return false;
+                    }
+
+                    var chunkSize = checked((int)chunkSizeU);
+                    var chunkEnd = checked(offset + chunkSize);
+                    if (chunkEnd < offset || chunkEnd > data.Length)
+                    {
+                        error = "Geometry chunk extends past buffer.";
+                        return false;
+                    }
+
+                    if (chunkId == GeometryChunkPoints)
+                    {
+                        if (sawPoints)
+                        {
+                            error = "Duplicate POINTS chunk.";
+                            return false;
+                        }
+
+                        var expectedBytes = checked(pointCount * 12);
+                        if (chunkSize != expectedBytes)
+                        {
+                            error = $"POINTS chunk bytes mismatch: {chunkSize} != {expectedBytes}";
+                            return false;
+                        }
+
+                        points = new Vector3[pointCount];
+                        for (var i = 0; i < pointCount; i++)
+                        {
+                            var x = ReadFloat(data, ref offset);
+                            var y = ReadFloat(data, ref offset);
+                            var z = ReadFloat(data, ref offset);
+                            points[i] = new Vector3(x, y, z);
+                        }
+
+                        sawPoints = true;
+                    }
+                    else if (chunkId == GeometryChunkFaceOffsets)
+                    {
+                        if (sawOffsets)
+                        {
+                            error = "Duplicate FACE_OFFSETS chunk.";
+                            return false;
+                        }
+
+                        var expectedBytes = checked(faceCount * 4);
+                        if (chunkSize != expectedBytes)
+                        {
+                            error = $"FACE_OFFSETS chunk bytes mismatch: {chunkSize} != {expectedBytes}";
+                            return false;
+                        }
+
+                        faceOffsets = new int[faceCount];
+                        for (var i = 0; i < faceCount; i++)
+                        {
+                            var value = ReadUInt32(data, ref offset);
+                            if (value > int.MaxValue)
+                            {
+                                error = "FACE_OFFSETS value overflow.";
+                                return false;
+                            }
+
+                            faceOffsets[i] = (int)value;
+                        }
+
+                        sawOffsets = true;
+                    }
+                    else if (chunkId == GeometryChunkFaceIndices)
+                    {
+                        if (sawIndices)
+                        {
+                            error = "Duplicate FACE_INDICES chunk.";
+                            return false;
+                        }
+
+                        if ((chunkSize & 3) != 0)
+                        {
+                            error = "FACE_INDICES chunk size is not a multiple of 4.";
+                            return false;
+                        }
+
+                        var indexCount = chunkSize / 4;
+                        faceIndices = new int[indexCount];
+                        for (var i = 0; i < indexCount; i++)
+                        {
+                            var value = ReadUInt32(data, ref offset);
+                            if (value > int.MaxValue)
+                            {
+                                error = "FACE_INDICES value overflow.";
+                                return false;
+                            }
+
+                            faceIndices[i] = (int)value;
+                        }
+
+                        sawIndices = true;
+                    }
+                    else
+                    {
+                        // GROUPS / TRIANGULATION / unknown — skip by size; not used for wire.
+                        offset = chunkEnd;
+                    }
+
+                    if (offset != chunkEnd)
+                        offset = chunkEnd;
+                }
+
+                if (!sawPoints)
+                {
+                    error = "Missing POINTS chunk.";
+                    return false;
+                }
+
+                if (!sawOffsets)
+                {
+                    error = "Missing FACE_OFFSETS chunk.";
+                    return false;
+                }
+
+                if (!sawIndices)
+                {
+                    error = "Missing FACE_INDICES chunk.";
+                    return false;
+                }
+
+                if (faceCount > 0 && faceOffsets[0] != 0)
+                {
+                    error = "FACE_OFFSETS[0] must be 0.";
+                    return false;
+                }
+
+                for (var i = 0; i < faceCount; i++)
+                {
+                    var start = faceOffsets[i];
+                    var end = i + 1 < faceCount ? faceOffsets[i + 1] : faceIndices.Length;
+                    if (start < 0 || end < 0 || start > end || end > faceIndices.Length)
+                    {
+                        error = "FACE_OFFSETS are out of range.";
+                        return false;
+                    }
+
+                    if (i + 1 < faceCount && faceOffsets[i + 1] <= start)
+                    {
+                        error = "FACE_OFFSETS must be strictly increasing.";
+                        return false;
+                    }
+
+                    if (end - start < 3)
+                    {
+                        error = "Each face must have at least 3 indices.";
+                        return false;
+                    }
+
+                    for (var j = start; j < end; j++)
+                    {
+                        var idx = faceIndices[j];
+                        if (idx < 0 || idx >= pointCount)
+                        {
+                            error = $"Face index {idx} out of range for pointCount={pointCount}.";
+                            return false;
+                        }
+                    }
+                }
+
+                preview = new PcgPolygonPreviewData(points, faceOffsets, faceIndices);
+                return true;
+            }
+            catch (OverflowException)
+            {
+                error = "Geometry binary integer overflow.";
+                preview = null;
+                return false;
+            }
+            catch (Exception ex)
+            {
+                error = $"Geometry binary parse failed: {ex.GetType().Name}";
+                preview = null;
+                return false;
+            }
+        }
+
+        private static uint ReadUInt32(byte[] data, ref int offset)
+        {
+            if (offset < 0 || checked(offset + 4) > data.Length)
+                throw new IndexOutOfRangeException();
+            var value = BitConverter.ToUInt32(data, offset);
+            offset += 4;
+            return value;
+        }
+
+        private static float ReadFloat(byte[] data, ref int offset)
+        {
+            if (offset < 0 || checked(offset + 4) > data.Length)
+                throw new IndexOutOfRangeException();
+            var value = BitConverter.ToSingle(data, offset);
+            offset += 4;
+            return value;
+        }
+    }
+
+    /// <summary>
+    /// Cached Sink polygon topology for Scene View wire overlay (pre-triangulation).
+    /// </summary>
+    public sealed class PcgPolygonPreviewData
+    {
+        public PcgPolygonPreviewData(Vector3[] points, int[] faceOffsets, int[] faceIndices)
+        {
+            Points = points ?? Array.Empty<Vector3>();
+            FaceOffsets = faceOffsets ?? Array.Empty<int>();
+            FaceIndices = faceIndices ?? Array.Empty<int>();
+        }
+
+        public Vector3[] Points { get; }
+        public int[] FaceOffsets { get; }
+        public int[] FaceIndices { get; }
+        public int FaceCount => FaceOffsets.Length;
     }
 }

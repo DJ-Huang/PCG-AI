@@ -21,10 +21,23 @@ namespace DJTechEditor.PCG
             EditorApplication.QueuePlayerLoopUpdate();
         }
 
+        public static void CancelPreviewCooksForWindow(PcgGraphEditorWindow window)
+        {
+            foreach (var component in ComponentsForWindow(window))
+                component.CancelAsyncCookForPreviewSwitch();
+        }
+
         public static void NotifyGraphChanged(PcgGraphEditorWindow window, bool immediate = false)
         {
+            foreach (var component in ComponentsForWindow(window))
+                component.RequestPreviewCook(immediate);
+        }
+
+        private static System.Collections.Generic.IEnumerable<PcgGraphComponent> ComponentsForWindow(
+            PcgGraphEditorWindow window)
+        {
             if (window == null || !window.HasLoadedGraph)
-                return;
+                yield break;
 
             var assetPath = window.CurrentAssetPath;
             var assetGuid = window.selectedGuid;
@@ -43,7 +56,7 @@ namespace DJTechEditor.PCG
                 if (!component.SupportsEditModePreview())
                     continue;
 
-                component.RequestPreviewCook(immediate);
+                yield return component;
             }
         }
 

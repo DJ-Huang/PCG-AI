@@ -103,7 +103,8 @@ public:
         opts.scale_end = ctx.node->data.value("scaleEnd", 1.0);
         opts.profile_plane = ctx.node->data.value("profilePlane", "auto");
 
-        emit_mesh(ctx, extrude_along_spline(splines, profile_mesh, opts));
+        emit_geometry(ctx, data::geometry_from_mesh(
+            extrude_along_spline(splines, profile_mesh, opts)));
         return PCG_OK;
     }
 };
@@ -216,7 +217,8 @@ public:
         opts.weld_epsilon = ctx.node->data.value("weldEpsilon", 1e-4);
         opts.center = ctx.node->data.value("center", true);
 
-        emit_mesh(ctx, extract_cross_section_profile(mesh, opts));
+        emit_geometry(ctx, data::geometry_from_mesh(
+            extract_cross_section_profile(mesh, opts)));
         return PCG_OK;
     }
 };
@@ -246,7 +248,8 @@ public:
         opts.align_to_tangent = ctx.node->data.value("alignToTangent", true);
         opts.scale = ctx.node->data.value("scale", 1.0);
 
-        emit_mesh(ctx, instance_along_spline(splines, prototype, opts));
+        emit_geometry(ctx, data::geometry_from_mesh(
+            instance_along_spline(splines, prototype, opts)));
         return PCG_OK;
     }
 };

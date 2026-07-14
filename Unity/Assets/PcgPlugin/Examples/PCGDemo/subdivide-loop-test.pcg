@@ -20,16 +20,16 @@
       "data": {"label": "Subdivide Method Test", "__nodeTitle": ""}
     },
     {
-      "id": "subdiv",
-      "type": "SubdivideMesh",
-      "position": { "x": 0, "y": 155 },
-      "data": {"levels": 1, "method": "simple", "__nodeTitle": ""}
-    },
-    {
       "id": "bevel",
       "type": "BevelMesh",
       "position": { "x": 0, "y": 239 },
       "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.08, "segments": 3, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": false, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
+    },
+    {
+      "id": "subdiv",
+      "type": "SubdivideMesh",
+      "position": { "x": 0, "y": 155 },
+      "data": {"levels": 2, "method": "simple", "__nodeTitle": ""}
     }
   ],
   "edges": [

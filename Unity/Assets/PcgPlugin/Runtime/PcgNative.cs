@@ -82,6 +82,7 @@ namespace DJTechRuntime.PCG
         public const int OutJsonBufSize = 8 * 1024 * 1024;
         public const int OutMeshBufSize = 8 * 1024 * 1024;
         public const int OutPointsBufSize = 8 * 1024 * 1024;
+        public const int OutGeometryBufSize = 8 * 1024 * 1024;
         public const int OutPerfBufSize = 64 * 1024;
 
         public static string GetVersion()
@@ -210,6 +211,36 @@ namespace DJTechRuntime.PCG
             StringBuilder errBuf,
             int errBufSize);
 
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v8(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            NativeSplineSlot[] splines,
+            int spline_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            byte[] outPointsBuf,
+            int outPointsBufSize,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
+            byte[] outGeometryBuf,
+            int outGeometryBufSize,
+            out int outGeometryBytesWritten,
+            StringBuilder errBuf,
+            int errBufSize);
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         private static extern void pcg_cook_cache_clear();
 
@@ -279,6 +310,7 @@ namespace DJTechRuntime.PCG
             var jsonBuf = new byte[OutJsonBufSize];
             var meshBuf = new byte[OutMeshBufSize];
             var pointsBuf = new byte[OutPointsBufSize];
+            var geometryBuf = new byte[OutGeometryBufSize];
             var perfBuf = new byte[OutPerfBufSize];
 
             var hasTextures = textures != null && textures.Count > 0;
@@ -296,6 +328,7 @@ namespace DJTechRuntime.PCG
             uint pointAttrFlags;
             int vertexCount;
             int indexCount;
+            int geometryBytesWritten;
             NativeCookStats cookStats;
 
             try
@@ -365,7 +398,7 @@ namespace DJTechRuntime.PCG
                     }
                 }
 
-                rc = (PcgResultCode)pcg_execute_graph_v7(
+                rc = (PcgResultCode)pcg_execute_graph_v8(
                     json,
                     seed,
                     nativeTextures,
@@ -388,6 +421,9 @@ namespace DJTechRuntime.PCG
                     out cookStats,
                     perfBuf,
                     perfBuf.Length,
+                    geometryBuf,
+                    geometryBuf.Length,
+                    out geometryBytesWritten,
                     errBuf,
                     ErrBufSize);
             }
@@ -415,12 +451,23 @@ namespace DJTechRuntime.PCG
                 });
             }
 
+#if UNITY_EDITOR
+            if (geometryBytesWritten <= 0 && kind == (int)PcgExecuteKind.Mesh && vertexCount > 0)
+            {
+                Debug.Log(
+                    $"[PcgNative] Mesh cook geometry_bytes=0 (verts={vertexCount}, idx={indexCount}, " +
+                    $"previewSink={(json != null && json.Contains("__pcg_preview_sink__"))}).");
+            }
+#endif
+
             return BuildSuccessResult(
                 rc,
                 (PcgExecuteKind)kind,
                 jsonBuf,
                 meshBuf,
                 pointsBuf,
+                geometryBuf,
+                geometryBytesWritten,
                 pointCount,
                 pointAttrFlags,
                 vertexCount,
@@ -480,6 +527,8 @@ namespace DJTechRuntime.PCG
             byte[] jsonBuf,
             byte[] meshBuf,
             byte[] pointsBuf,
+            byte[] geometryBuf,
+            int geometryBytesWritten,
             int pointCount,
             uint pointAttrFlags,
             int vertexCount,
@@ -489,6 +538,20 @@ namespace DJTechRuntime.PCG
         {
             var copySw = System.Diagnostics.Stopwatch.StartNew();
             PcgGraphExecuteResult result;
+            byte[] geometryBinary = null;
+            if (geometryBytesWritten > 0)
+            {
+                if (geometryBuf != null && geometryBytesWritten <= geometryBuf.Length)
+                {
+                    geometryBinary = new byte[geometryBytesWritten];
+                    Buffer.BlockCopy(geometryBuf, 0, geometryBinary, 0, geometryBytesWritten);
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"[PcgNative] Ignoring invalid geometryBytesWritten={geometryBytesWritten} (bufferLength={geometryBuf?.Length ?? 0})");
+                }
+            }
 
             if (executeKind == PcgExecuteKind.Mesh)
             {
@@ -499,6 +562,7 @@ namespace DJTechRuntime.PCG
                 {
                     Kind = executeKind,
                     MeshBinary = meshBinary,
+                    GeometryBinary = geometryBinary,
                     Json = ReadNullTerminatedUtf8(jsonBuf),
                     VertexCount = vertexCount,
                     IndexCount = indexCount,
@@ -538,6 +602,7 @@ namespace DJTechRuntime.PCG
                     PointCount = pointCount,
                     PointAttrFlags = pointAttrFlags,
                     MeshBinary = meshBinary,
+                    GeometryBinary = geometryBinary,
                     VertexCount = vertexCount,
                     IndexCount = indexCount,
                     Json = ReadNullTerminatedUtf8(jsonBuf),
@@ -553,6 +618,7 @@ namespace DJTechRuntime.PCG
                 {
                     Kind = executeKind,
                     Json = Encoding.UTF8.GetString(jsonBuf, 0, length),
+                    GeometryBinary = geometryBinary,
                     CookNodesExecuted = cookStats.nodes_executed,
                     CookNodesSkipped = cookStats.nodes_skipped,
                 };
@@ -608,6 +674,7 @@ namespace DJTechRuntime.PCG
         public PcgExecuteKind Kind = PcgExecuteKind.None;
         public string Json;
         public byte[] MeshBinary;
+        public byte[] GeometryBinary;
         public byte[] PointBinary;
         public int PointCount;
         public uint PointAttrFlags;

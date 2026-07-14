@@ -23,28 +23,21 @@ public:
         if (width < 0.0 || height < 0.0 || depth < 0.0)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateBoxMesh dimensions must be >= 0");
 
-        data::PcgMeshData mesh = create_box_mesh(width, height, depth);
+        data::PcgGeometry geometry = create_box_geometry(width, height, depth);
 
-        // Merge optional input mesh
-        if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in"))
-        {
-            const int vertex_offset = static_cast<int>(mesh.vertices().size());
-            for (const auto& v : input->vertices())
-                mesh.vertices_mut().push_back(v);
-            for (int idx : input->triangles())
-                mesh.triangles_mut().push_back(idx + vertex_offset);
-        }
-        else if (const nlohmann::json* input = ctx.inputs.find_json("in"))
-        {
+        // Merge optional Geometry/Mesh input (Geometry preferred).
+        if (auto input_geometry = ctx.inputs.find_geometry_shared("in")) {
+            geometry = data::merge_geometries(geometry, *input_geometry, "in_");
+        } else if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in")) {
+            geometry = data::merge_geometries(geometry, data::geometry_from_mesh(*input), "in_");
+        } else if (const nlohmann::json* input = ctx.inputs.find_json("in")) {
             const data::PcgMeshData input_mesh = parse_mesh_input(*input);
-            const int vertex_offset = static_cast<int>(mesh.vertices().size());
-            for (const auto& v : input_mesh.vertices())
-                mesh.vertices_mut().push_back(v);
-            for (int idx : input_mesh.triangles())
-                mesh.triangles_mut().push_back(idx + vertex_offset);
+            if (!input_mesh.vertices().empty())
+                geometry = data::merge_geometries(
+                    geometry, data::geometry_from_mesh(input_mesh), "in_");
         }
 
-        emit_mesh(ctx, std::move(mesh));
+        emit_geometry(ctx, std::move(geometry));
         return PCG_OK;
     }
 };
@@ -65,11 +58,12 @@ public:
             method_str == "simple" ? SubdivideMethod::Simple :
             SubdivideMethod::CatmullClark;
 
-        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "SubdivideMesh missing mesh input");
-        if (mesh.vertices().empty())
+        const data::PcgGeometry geometry =
+            get_geometry_input(ctx, "in", "SubdivideMesh missing mesh input");
+        if (geometry.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SubdivideMesh missing mesh input");
 
-        emit_mesh(ctx, subdivide_mesh(mesh, levels, method));
+        emit_geometry(ctx, subdivide_geometry(geometry, levels, method));
         return PCG_OK;
     }
 };
@@ -145,8 +139,9 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing node");
 
-        const data::PcgMeshData mesh = get_mesh_input(ctx, "in", "MeshNoiseDeform missing mesh input");
-        if (mesh.vertices().empty())
+        const data::PcgGeometry geometry =
+            get_geometry_input(ctx, "in", "MeshNoiseDeform missing mesh input");
+        if (geometry.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform missing mesh input");
 
         NoiseDeformOptions opts;
@@ -182,7 +177,21 @@ public:
         if (opts.noise_type == NoiseDeformType::Texture && !opts.texture)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshNoiseDeform requires a connected ImageTexture");
 
-        emit_mesh(ctx, noise_deform_mesh(mesh, opts));
+        // Triangulate with shared vertices (preserves point order for position write-back),
+        // deform, then copy displaced positions back to geometry.
+        data::PcgMeshData mesh = data::triangulate_geometry_shared(geometry);
+        mesh = noise_deform_mesh(mesh, opts);
+
+        data::PcgGeometry out = geometry;
+        auto& points = out.points_mut();
+        const auto& verts = mesh.vertices();
+        for (size_t i = 0; i < points.size() && i < verts.size(); ++i) {
+            points[i].x = verts[i].x;
+            points[i].y = verts[i].y;
+            points[i].z = verts[i].z;
+        }
+
+        emit_geometry(ctx, std::move(out));
         return PCG_OK;
     }
 };
@@ -252,7 +261,7 @@ public:
                 mesh.triangles_mut().push_back(idx + vertex_offset);
         }
 
-        emit_mesh(ctx, std::move(mesh));
+        emit_geometry(ctx, data::geometry_from_mesh(mesh));
         return PCG_OK;
     }
 };

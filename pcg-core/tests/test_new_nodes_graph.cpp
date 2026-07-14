@@ -99,8 +99,8 @@ int main()
         auto r = execute_graph(graph, 42);
         expect(r.code == PCG_OK, "graph1: cylinder → output succeeds");
         expect(r.kind == PCG_RESULT_KIND_MESH, "graph1: result is mesh");
-        expect(r.vertex_count == 18, "graph1: 18 vertices");
-        expect(r.index_count == 96, "graph1: 96 indices");
+        expect(r.vertex_count == 48, "graph1: 48 vertices (split normals)");
+        expect(r.index_count == 84, "graph1: 84 indices (28 triangles)");
     }
 
     // --- Test 2: CreateSpline → RevolveMesh → BevelMesh → Output ---

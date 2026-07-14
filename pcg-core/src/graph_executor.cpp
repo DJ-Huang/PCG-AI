@@ -10,6 +10,7 @@
 #include <chrono>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -172,13 +173,15 @@ void gather_inputs(const Graph& graph,
             continue;
         }
 
-        if (auto mesh = upstream.find_mesh_shared(source_pin)) {
-            inputs.add_mesh_shared(pin, mesh);
+        // Prefer Geometry over Mesh: mesh-first wrongly drops n-gon when both exist,
+        // and mesh-only mid nodes (e.g. SubdivideMesh) must not hide upstream Geometry.
+        if (auto geometry = upstream.find_geometry_shared(source_pin)) {
+            inputs.add_geometry_shared(pin, geometry);
             continue;
         }
 
-        if (auto geometry = upstream.find_geometry_shared(source_pin)) {
-            inputs.add_geometry_shared(pin, geometry);
+        if (auto mesh = upstream.find_mesh_shared(source_pin)) {
+            inputs.add_mesh_shared(pin, mesh);
             continue;
         }
 
@@ -191,12 +194,12 @@ void gather_inputs(const Graph& graph,
 
         const nlohmann::json primary = upstream.primary_json();
         if (!primary.is_object() || primary.empty()) {
-            if (auto mesh = upstream.primary_mesh_shared()) {
-                inputs.add_mesh_shared(pin, mesh);
-                continue;
-            }
             if (auto geometry = upstream.primary_geometry_shared()) {
                 inputs.add_geometry_shared(pin, geometry);
+                continue;
+            }
+            if (auto mesh = upstream.primary_mesh_shared()) {
+                inputs.add_mesh_shared(pin, mesh);
                 continue;
             }
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
@@ -461,27 +464,58 @@ PcgResultCode execute_graph(const Graph& graph,
         return PCG_OK;
     }
 
-    if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
+    if (auto geometry = sink_output.find_geometry_shared("out")) {
         out_result.kind = GraphResultKind::Mesh;
+        out_result.source_geometry = geometry;
         const auto& d = geometry->detail();
         out_result.mesh = data::compute_split_normals(*geometry,
             data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["geometry_export"] = "sink_geometry";
         return PCG_OK;
     }
 
-    if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
+    if (auto geometry = sink_output.primary_geometry_shared()) {
         out_result.kind = GraphResultKind::Mesh;
+        out_result.source_geometry = geometry;
         const auto& d = geometry->detail();
         out_result.mesh = data::compute_split_normals(*geometry,
             data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["geometry_export"] = "sink_geometry";
         return PCG_OK;
     }
+
+    auto try_salvage_upstream_geometry = [&]() {
+        // BFS from sink along reverse edges; prefer nearest Geometry for Scene wire.
+        std::queue<std::string> frontier;
+        std::unordered_set<std::string> visited{sink->id};
+        frontier.push(sink->id);
+        while (!frontier.empty()) {
+            const std::string current = frontier.front();
+            frontier.pop();
+            for (const auto& edge : graph.edges) {
+                if (edge.target != current || visited.count(edge.source))
+                    continue;
+                visited.insert(edge.source);
+                const auto up = outputs.find(edge.source);
+                if (up == outputs.end())
+                    continue;
+                if (auto geometry = up->second.primary_geometry_shared()) {
+                    out_result.source_geometry = geometry;
+                    out_result.json["geometry_export"] = "salvaged_upstream";
+                    out_result.json["geometry_export_from"] = edge.source;
+                    return;
+                }
+                frontier.push(edge.source);
+            }
+        }
+        out_result.json["geometry_export"] = "mesh_only";
+    };
 
     if (const data::PcgMeshData* mesh = sink_output.find_mesh("out")) {
         out_result.kind = GraphResultKind::Mesh;
@@ -491,6 +525,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json["node_groups"] = per_node_groups;
         if (!mesh->metadata().raw().empty())
             out_result.json["mesh_metadata"] = mesh->metadata().raw();
+        try_salvage_upstream_geometry();
         return PCG_OK;
     }
 
@@ -502,6 +537,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json["node_groups"] = per_node_groups;
         if (!mesh->metadata().raw().empty())
             out_result.json["mesh_metadata"] = mesh->metadata().raw();
+        try_salvage_upstream_geometry();
         return PCG_OK;
     }
 
