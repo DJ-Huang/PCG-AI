@@ -240,6 +240,144 @@ double superellipse_co(double x, float r, bool rbig) {
     return 1.0 - std::pow(1.0 - std::pow(1.0 - x, r), 1.0 / r);
 }
 
+/// Find xnew > x0 so that distance((x0,y0), (xnew, ynew)) = dtarget.
+/// False position Illinois method (Blender find_superellipse_chord_endpoint).
+static double find_superellipse_chord_endpoint(double x0, double dtarget, float r, bool rbig)
+{
+    double y0 = superellipse_co(x0, r, rbig);
+    const double tol = 1e-13;
+    const int maxiter = 10;
+
+    double xmin = x0 + M_SQRT2 / 2.0 * dtarget;
+    xmin = std::min(xmin, 1.0);
+    double xmax = x0 + dtarget;
+    xmax = std::min(xmax, 1.0);
+    double ymin = superellipse_co(xmin, r, rbig);
+    double ymax = superellipse_co(xmax, r, rbig);
+
+    double dmaxerr = std::sqrt(std::pow((xmax - x0), 2) + std::pow((ymax - y0), 2)) - dtarget;
+    double dminerr = std::sqrt(std::pow((xmin - x0), 2) + std::pow((ymin - y0), 2)) - dtarget;
+
+    double xnew = xmax - dmaxerr * (xmax - xmin) / (dmaxerr - dminerr);
+    bool lastupdated_upper = true;
+
+    for (int iter = 0; iter < maxiter; iter++) {
+        double ynew = superellipse_co(xnew, r, rbig);
+        double dnewerr = std::sqrt(std::pow((xnew - x0), 2) + std::pow((ynew - y0), 2)) - dtarget;
+        if (std::fabs(dnewerr) < tol) {
+            break;
+        }
+        if (dnewerr < 0) {
+            xmin = xnew;
+            ymin = ynew;
+            dminerr = dnewerr;
+            if (!lastupdated_upper) {
+                xnew = (dmaxerr / 2 * xmin - dminerr * xmax) / (dmaxerr / 2 - dminerr);
+            }
+            else {
+                xnew = xmax - dmaxerr * (xmax - xmin) / (dmaxerr - dminerr);
+            }
+            lastupdated_upper = false;
+        }
+        else {
+            xmax = xnew;
+            ymax = ynew;
+            dmaxerr = dnewerr;
+            if (lastupdated_upper) {
+                xnew = (dmaxerr * xmin - dminerr / 2 * xmax) / (dmaxerr - dminerr / 2);
+            }
+            else {
+                xnew = xmax - dmaxerr * (xmax - xmin) / (dmaxerr - dminerr);
+            }
+            lastupdated_upper = true;
+        }
+    }
+    return xnew;
+}
+
+/// General-case even chord spacing (Blender find_even_superellipse_chords_general).
+/// Works on first half only, then mirrors along x=y diagonal.
+static void find_even_superellipse_chords_general(int seg, float r,
+                                                   std::vector<double>& xvals,
+                                                   std::vector<double>& yvals)
+{
+    const int smoothitermax = 10;
+    const double error_tol = 1e-7;
+    int imax = (seg + 1) / 2 - 1;
+
+    bool seg_odd = seg % 2;
+
+    bool rbig;
+    double mx;
+    if (r > 1.0f) {
+        rbig = true;
+        mx = std::pow(0.5, 1.0 / r);
+    }
+    else {
+        rbig = false;
+        mx = 1 - std::pow(0.5, 1.0 / r);
+    }
+
+    for (int i = 0; i <= imax; i++) {
+        xvals[i] = i * mx / seg * 2;
+        yvals[i] = superellipse_co(xvals[i], r, rbig);
+    }
+    yvals[0] = 1;
+
+    for (int iter = 0; iter < smoothitermax; iter++) {
+        double sum = 0.0;
+        double dmin = 2.0;
+        double dmax = 0.0;
+        for (int i = 0; i < imax; i++) {
+            double d = std::sqrt(std::pow((xvals[i + 1] - xvals[i]), 2) +
+                                  std::pow((yvals[i + 1] - yvals[i]), 2));
+            sum += d;
+            dmax = std::max(d, dmax);
+            dmin = std::min(d, dmin);
+        }
+        double davg;
+        if (seg_odd) {
+            sum += M_SQRT2 / 2 * (yvals[imax] - xvals[imax]);
+            davg = sum / (imax + 0.5);
+        }
+        else {
+            sum += std::sqrt(std::pow((xvals[imax] - mx), 2) +
+                              std::pow((yvals[imax] - mx), 2));
+            davg = sum / (imax + 1.0);
+        }
+
+        bool precision_reached = true;
+        if (dmax - davg > error_tol)
+            precision_reached = false;
+        if (dmin - davg < error_tol)
+            precision_reached = false;
+        if (precision_reached)
+            break;
+
+        for (int i = 1; i <= imax; i++) {
+            xvals[i] = find_superellipse_chord_endpoint(xvals[i - 1], davg, r, rbig);
+            yvals[i] = superellipse_co(xvals[i], r, rbig);
+        }
+    }
+
+    if (!seg_odd) {
+        xvals[imax + 1] = mx;
+        yvals[imax + 1] = mx;
+    }
+    for (int i = imax + 1; i <= seg; i++) {
+        yvals[i] = xvals[seg - i];
+        xvals[i] = yvals[seg - i];
+    }
+
+    if (!rbig) {
+        for (int i = 0; i <= seg; i++) {
+            double temp = xvals[i];
+            xvals[i] = 1.0 - yvals[i];
+            yvals[i] = 1.0 - temp;
+        }
+    }
+}
+
 void find_even_superellipse_chords(int seg, float super_r,
                                    std::vector<double>& xvals,
                                    std::vector<double>& yvals)
@@ -247,104 +385,66 @@ void find_even_superellipse_chords(int seg, float super_r,
     xvals.resize(seg + 1);
     yvals.resize(seg + 1);
 
-    bool rbig = (super_r > 1.0f);
+    bool seg_odd = seg % 2;
+    int n2 = seg / 2;
 
-    xvals[0] = 0.0;
-    yvals[0] = 1.0;
-    xvals[seg] = 1.0;
-    yvals[seg] = 0.0;
-
-    if (seg <= 1)
+    if (super_r == PRO_LINE_R) {
+        for (int i = 0; i <= seg; i++) {
+            xvals[i] = static_cast<double>(i) / seg;
+            yvals[i] = 1.0 - static_cast<double>(i) / seg;
+        }
         return;
-
-    // Iterative search: find x values such that chord lengths are equal
-    // Blender uses a binary search approach
-    double total_len = 0.0;
-    std::vector<double> t_params(seg + 1);
-    t_params[0] = 0.0;
-    t_params[seg] = 1.0;
-
-    // Start with uniform parameter distribution
-    for (int i = 1; i < seg; i++)
-        t_params[i] = static_cast<double>(i) / seg;
-
-    // Iteratively adjust for even chord spacing
-    for (int iter = 0; iter < 50; iter++) {
-        // Compute chord lengths
-        std::vector<double> chord_lens(seg);
-        total_len = 0.0;
-        for (int i = 0; i < seg; i++) {
-            double x0 = t_params[i];
-            double x1 = t_params[i + 1];
-            double y0 = superellipse_co(x0, super_r, rbig);
-            double y1 = superellipse_co(x1, super_r, rbig);
-            // Mirror if not rbig
-            if (!rbig) {
-                y0 = 1.0 - y0;
-                y1 = 1.0 - y1;
-            }
-            double dx = x1 - x0;
-            double dy = y1 - y0;
-            chord_lens[i] = std::sqrt(dx * dx + dy * dy);
-            total_len += chord_lens[i];
+    }
+    if (super_r == PRO_CIRCLE_R) {
+        double temp = M_PI_2 / seg;
+        for (int i = 0; i <= seg; i++) {
+            xvals[i] = std::sin(i * temp);
+            yvals[i] = std::cos(i * temp);
         }
-
-        // Target: each chord should be total_len / seg
-        double target = total_len / seg;
-
-        // Adjust parameters using Newton-like correction
-        double max_err = 0.0;
-        for (int i = 1; i < seg; i++) {
-            // Compute cumulative length up to i
-            double cum_len = 0.0;
-            for (int j = 0; j < i; j++)
-                cum_len += chord_lens[j];
-
-            double target_cum = target * i;
-            double error = target_cum - cum_len;
-
-            // Estimate derivative of cumulative length w.r.t. t_params[i]
-            double dx = t_params[i + 1] - t_params[i - 1];
-            if (std::abs(dx) > 1e-10) {
-                double y_prev = superellipse_co(t_params[i - 1], super_r, rbig);
-                double y_next = superellipse_co(t_params[i + 1], super_r, rbig);
-                if (!rbig) {
-                    y_prev = 1.0 - y_prev;
-                    y_next = 1.0 - y_next;
-                }
-                double dy = y_next - y_prev;
-                double dl_dt = std::sqrt(dx * dx + dy * dy) / dx;
-                if (dl_dt > 1e-10)
-                    t_params[i] += error / dl_dt * 0.5; // damped
+        return;
+    }
+    if (super_r == PRO_SQUARE_IN_R) {
+        if (!seg_odd) {
+            for (int i = 0; i <= n2; i++) {
+                xvals[i] = 0.0;
+                yvals[i] = 1.0 - static_cast<double>(i) / n2;
+                xvals[seg - i] = yvals[i];
+                yvals[seg - i] = xvals[i];
             }
-
-            t_params[i] = std::clamp(t_params[i], 1e-10, 1.0 - 1e-10);
-            max_err = std::max(max_err, std::abs(error));
         }
-
-        if (max_err < 1e-8)
-            break;
+        else {
+            double temp = 1.0 / (n2 + M_SQRT2 / 2.0);
+            for (int i = 0; i <= n2; i++) {
+                xvals[i] = 0.0;
+                yvals[i] = 1.0 - static_cast<double>(i) * temp;
+                xvals[seg - i] = yvals[i];
+                yvals[seg - i] = xvals[i];
+            }
+        }
+        return;
+    }
+    if (super_r == PRO_SQUARE_R) {
+        if (!seg_odd) {
+            for (int i = 0; i <= n2; i++) {
+                xvals[i] = static_cast<double>(i) / n2;
+                yvals[i] = 1.0;
+                xvals[seg - i] = yvals[i];
+                yvals[seg - i] = xvals[i];
+            }
+        }
+        else {
+            double temp = 1.0 / (n2 + M_SQRT2 / 2);
+            for (int i = 0; i <= n2; i++) {
+                xvals[i] = static_cast<double>(i) * temp;
+                yvals[i] = 1.0;
+                xvals[seg - i] = yvals[i];
+                yvals[seg - i] = xvals[i];
+            }
+        }
+        return;
     }
 
-    // Convert parameters to x/y values
-    for (int i = 0; i <= seg; i++) {
-        double t = t_params[i];
-        double y = superellipse_co(t, super_r, rbig);
-        if (!rbig) y = 1.0 - y;
-
-        // For rbig: x = t, y = superellipse_co(t, r, true)
-        // For !rbig: x = 1-t, y = 1 - superellipse_co(1-t, r, false)
-        // Actually, Blender's convention:
-        // rbig (r > 1): x goes 0→1, y goes 1→0
-        // !rbig (r <= 1): mirror
-        if (rbig) {
-            xvals[i] = t;
-            yvals[i] = y;
-        } else {
-            xvals[i] = 1.0 - t;
-            yvals[i] = y;
-        }
-    }
+    find_even_superellipse_chords_general(seg, super_r, xvals, yvals);
 }
 
 float find_profile_fullness(int seg, float super_r, float profile_param) {
