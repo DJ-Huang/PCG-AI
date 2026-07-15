@@ -8,22 +8,22 @@
       "data": {"label": "Subdivide Method Test", "__nodeTitle": ""}
     },
     {
+      "id": "box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0.5, "y": 78 },
+      "data": {"width": 2, "height": 2, "depth": 2, "__nodeTitle": ""}
+    },
+    {
       "id": "bevel",
       "type": "BevelMesh",
       "position": { "x": 0, "y": 240.5 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.08, "segments": 3, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.1, "segments": 3, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": ""}
     },
     {
       "id": "subdiv",
       "type": "SubdivideMesh",
       "position": { "x": 0.5, "y": 141.5 },
-      "data": {"levels": 1, "method": "simple", "__nodeTitle": ""}
-    },
-    {
-      "id": "box",
-      "type": "CreateBoxMesh",
-      "position": { "x": 0.5, "y": 78 },
-      "data": {"width": 2, "height": 2, "depth": 2, "__nodeTitle": ""}
+      "data": {"levels": 1, "method": "catmullClark", "__nodeTitle": ""}
     }
   ],
   "edges": [
