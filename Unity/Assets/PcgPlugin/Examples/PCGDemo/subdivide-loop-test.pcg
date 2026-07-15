@@ -20,16 +20,16 @@
       "data": {"label": "Subdivide Method Test", "__nodeTitle": ""}
     },
     {
-      "id": "bevel",
-      "type": "BevelMesh",
-      "position": { "x": 0, "y": 239 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.08, "segments": 3, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": false, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
-    },
-    {
       "id": "subdiv",
       "type": "SubdivideMesh",
       "position": { "x": 0, "y": 155 },
-      "data": {"levels": 2, "method": "simple", "__nodeTitle": ""}
+      "data": {"levels": 1, "method": "simple", "__nodeTitle": ""}
+    },
+    {
+      "id": "bevel",
+      "type": "BevelMesh",
+      "position": { "x": 0, "y": 240.5 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.08, "segments": 3, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -39,6 +39,6 @@
     {"id": "e325", "source": "subdiv", "target": "bevel", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
-    {"id": "p1", "name": "profile", "type": "number", "default": 0.508, "exposed": true, "targetNode": "bevel", "targetProperty": "profile", "hasRange": true, "min": 0, "max": 1}
+    {"id": "p1", "name": "profile", "type": "number", "default": 0.5, "exposed": true, "targetNode": "bevel", "targetProperty": "profile", "hasRange": true, "min": 0, "max": 1}
   ]
 }

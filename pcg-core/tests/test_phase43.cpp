@@ -653,6 +653,53 @@ int main()
         std::printf("PASS: cone subdiv+bevel (disk cycle regression)\n");
     }
 
+    // ── Simple subdivision on n-gon geometry (Blender parity) ──────────────
+    // Box: 8 verts, 6 quad faces, 12 edges.
+    // Simple L1: +12 edge midpoints +6 face centers = 26 verts, 6×4=24 quad faces.
+    {
+        const auto box_geo = pcg::internal::elements::create_box_geometry(2.0, 2.0, 2.0);
+        const auto subdiv = pcg::internal::elements::subdivide_geometry(
+            box_geo, 1, pcg::internal::elements::SubdivideMethod::Simple);
+
+        // 8 original + 12 edge midpoints + 6 face centers
+        if (subdiv.points().size() != 26) {
+            std::printf("FAIL: Simple subdiv L1 box expected 26 points, got %zu\n",
+                        subdiv.points().size());
+            return 1;
+        }
+        // 6 faces × 4 sub-quads = 24 faces
+        if (subdiv.faces().size() != 24) {
+            std::printf("FAIL: Simple subdiv L1 box expected 24 faces, got %zu\n",
+                        subdiv.faces().size());
+            return 1;
+        }
+        // All sub-faces should be quads
+        for (size_t i = 0; i < subdiv.faces().size(); ++i) {
+            if (subdiv.faces()[i].size() != 4) {
+                std::printf("FAIL: Simple subdiv L1 face %zu expected 4 corners, got %zu\n",
+                            i, subdiv.faces()[i].size());
+                return 1;
+            }
+        }
+        // Triangulated output should have outward normals
+        const auto tri = pcg::internal::data::triangulate_geometry_shared(subdiv);
+        if (!expect_outward_normals(tri)) {
+            std::printf("FAIL: Simple subdiv L1 geometry normals point inward\n");
+            return 1;
+        }
+        std::printf("PASS: Simple subdiv L1 on n-gon geometry (26 pts, 24 quads, outward normals)\n");
+
+        // L2: each quad face → 4 sub-quads; 24×4=96 faces
+        const auto subdiv2 = pcg::internal::elements::subdivide_geometry(
+            box_geo, 2, pcg::internal::elements::SubdivideMethod::Simple);
+        if (subdiv2.faces().size() != 96) {
+            std::printf("FAIL: Simple subdiv L2 box expected 96 faces, got %zu\n",
+                        subdiv2.faces().size());
+            return 1;
+        }
+        std::printf("PASS: Simple subdiv L2 on n-gon geometry (96 quads)\n");
+    }
+
     std::printf("PASS: phase43 mesh pipeline\n");
     return 0;
 }

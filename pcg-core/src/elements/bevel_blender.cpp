@@ -785,25 +785,30 @@ void add_clean_output_to_mesh(const BevelParams::OutputMesh& output, data::PcgMe
         return std::to_string(q(v.x)) + ',' + std::to_string(q(v.y)) + ',' + std::to_string(q(v.z));
     };
 
-    for (size_t i = 0; i + 2 < output.triangles.size(); i += 3) {
-        const int ia = output.triangles[i];
-        const int ib = output.triangles[i + 1];
-        const int ic = output.triangles[i + 2];
-        if (ia == ib || ib == ic || ia == ic)
-            continue;
-        const Vec3& a = output.vertices[static_cast<size_t>(ia)];
-        const Vec3& b = output.vertices[static_cast<size_t>(ib)];
-        const Vec3& c = output.vertices[static_cast<size_t>(ic)];
-        if (length_squared(cross(sub(b, a), sub(c, a))) < 1e-20)
-            continue;
+    // Fan-triangulate from faces (derived cache may be stale).
+    for (const auto& face : output.faces) {
+        if (face.verts.size() < 3) continue;
+        const int i0 = face.verts[0];
+        for (size_t i = 1; i + 1 < face.verts.size(); ++i) {
+            const int ia = i0;
+            const int ib = face.verts[i];
+            const int ic = face.verts[i + 1];
+            if (ia == ib || ib == ic || ia == ic)
+                continue;
+            const Vec3& a = output.vertices[static_cast<size_t>(ia)];
+            const Vec3& b = output.vertices[static_cast<size_t>(ib)];
+            const Vec3& c = output.vertices[static_cast<size_t>(ic)];
+            if (length_squared(cross(sub(b, a), sub(c, a))) < 1e-20)
+                continue;
 
-        std::array<std::string, 3> keys = {pos_key(a), pos_key(b), pos_key(c)};
-        std::sort(keys.begin(), keys.end());
-        const std::string geo_key = keys[0] + '|' + keys[1] + '|' + keys[2];
-        if (seen_geo.count(geo_key))
-            continue;
-        seen_geo.insert(geo_key);
-        result.add_triangle(ia, ib, ic);
+            std::array<std::string, 3> keys = {pos_key(a), pos_key(b), pos_key(c)};
+            std::sort(keys.begin(), keys.end());
+            const std::string geo_key = keys[0] + '|' + keys[1] + '|' + keys[2];
+            if (seen_geo.count(geo_key))
+                continue;
+            seen_geo.insert(geo_key);
+            result.add_triangle(ia, ib, ic);
+        }
     }
 }
 
@@ -2629,20 +2634,14 @@ void bevel_build_cutoff(BevelParams& bp, BevVert* bv) {
         if (build_center_face)
             face_verts.push_back(vm->at(i, 1, 1).co);
 
-        for (size_t f = 1; f + 1 < face_verts.size(); ++f) {
-            bp.output.add_oriented_triangle(
-                face_verts[0], face_verts[f], face_verts[f + 1], vert_normal);
-        }
+        bp.output.add_oriented_polygon(face_verts, vert_normal);
     } while ((bndv = bndv->next) != vm->boundstart);
 
     if (build_center_face && n_bndv >= 3) {
         std::vector<Vec3> center_verts;
         for (int i = 0; i < n_bndv; i++)
             center_verts.push_back(vm->at(i, 1, 0).co);
-        for (size_t f = 1; f + 1 < center_verts.size(); ++f) {
-            bp.output.add_oriented_triangle(
-                center_verts[0], center_verts[f], center_verts[f + 1], vert_normal);
-        }
+        bp.output.add_oriented_polygon(center_verts, vert_normal);
     }
 }
 
@@ -2670,9 +2669,7 @@ void bevel_build_poly(BevelParams& bp, BevVert* bv) {
         return;
 
     Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
-    for (size_t f = 1; f + 1 < poly.size(); ++f) {
-        bp.output.add_oriented_triangle(poly[0], poly[f], poly[f + 1], normal);
-    }
+    bp.output.add_oriented_polygon(poly, normal);
 }
 
 /// Build a triangle fan (Blender bevel_build_trifan L6342).
@@ -2692,14 +2689,13 @@ void bevel_build_trifan(BevelParams& bp, BevVert* bv) {
 
         Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
 
+        std::vector<Vec3> poly;
+        poly.push_back(center);
         bndv = vm->boundstart;
-        Vec3 prev = bndv->nv.co;
-        bndv = bndv->next;
         do {
-            Vec3 curr = bndv->nv.co;
-            bp.output.add_oriented_triangle(center, prev, curr, normal);
-            prev = curr;
+            poly.push_back(bndv->nv.co);
         } while ((bndv = bndv->next) != vm->boundstart);
+        bp.output.add_oriented_polygon(poly, normal);
         return;
     }
 
@@ -3543,12 +3539,10 @@ data::PcgMeshData bevel_mesh_blender(
 
     log_bevel_stage("after_face_rebuild", bp.output, diag_cap);
 
-    // 12. Vertex-level weld + degenerate/duplicate triangle removal.
-    //     VMesh quads and face rebuild polygons both reference boundary points
-    //     but may compute slightly different positions for the same logical
-    //     vertex. get_vertex (1e-6) can split them into different indices.
-    //     Weld at 1e-5 precision to merge these, then remove degenerate and
-    //     duplicate triangles.
+    // 12. Vertex-level weld + face cleanup + cyclic dedup.
+    //     Faces are the single source of truth. After welding vertices and
+    //     cleaning face loops, rebuild_triangles_from_faces() derives the
+    //     flat triangle buffer for legacy consumers.
     {
         // Step A: weld vertices at 1e-5 precision.
         auto pos_key = [](const Vec3& v) -> std::string {
@@ -3573,60 +3567,95 @@ data::PcgMeshData bevel_mesh_blender(
             }
         }
 
-        // Step B: remap triangle indices + remove degenerate and duplicate triangles.
-        std::vector<int> deduped;
-        deduped.reserve(bp.output.triangles.size());
-        std::vector<int> deduped_origins;
-        deduped_origins.reserve(bp.output.face_origins.size());
-
-        auto tri_key = [](int a, int b, int c) -> std::string {
-            int arr[3] = {a, b, c};
-            std::sort(arr, arr + 3);
-            return std::to_string(arr[0]) + ',' + std::to_string(arr[1]) + ',' + std::to_string(arr[2]);
+        // Step B: remap face indices, fold dups, remove degenerate,
+        //         cyclic dedup. Then rebuild_triangles_from_faces().
+        auto cyclic_canonical = [](const std::vector<int>& verts) -> std::string {
+            int n = static_cast<int>(verts.size());
+            int min_start = 0;
+            for (int i = 1; i < n; ++i) {
+                for (int j = 0; j < n; ++j) {
+                    if (verts[(i + j) % n] < verts[(min_start + j) % n]) { min_start = i; break; }
+                    if (verts[(i + j) % n] > verts[(min_start + j) % n]) break;
+                }
+            }
+            std::string key;
+            for (int j = 0; j < n; ++j)
+                key += std::to_string(verts[(min_start + j) % n]) + ",";
+            return key;
         };
-        std::unordered_map<std::string, size_t> seen_geo;
 
-        const size_t tris_before = bp.output.triangles.size() / 3;
+        std::vector<BevelParams::OutputFace> cleaned_faces;
+        std::unordered_map<std::string, size_t> seen_face_keys;
         int skipped_degenerate = 0;
         int replaced_geo = 0;
 
-        for (size_t i = 0; i + 2 < bp.output.triangles.size(); i += 3) {
+        for (const auto& face : bp.output.faces) {
             if (bevel_cancel_requested(bp))
                 return mesh;
-            int ia = remap[bp.output.triangles[i]];
-            int ib = remap[bp.output.triangles[i + 1]];
-            int ic = remap[bp.output.triangles[i + 2]];
 
-            if (ia == ib || ib == ic || ia == ic) {
+            // Remap indices
+            std::vector<int> remapped;
+            remapped.reserve(face.verts.size());
+            for (int v : face.verts)
+                remapped.push_back(remap[v]);
+
+            // Fold consecutive dups
+            std::vector<int> clean;
+            for (int v : remapped) {
+                if (!clean.empty() && v == clean.back()) continue;
+                clean.push_back(v);
+            }
+            // Remove last if == first
+            if (clean.size() > 1 && clean.front() == clean.back())
+                clean.pop_back();
+            if (clean.size() < 3) {
                 ++skipped_degenerate;
                 continue;
             }
 
-            std::string geo_key = tri_key(ia, ib, ic);
-            auto it = seen_geo.find(geo_key);
-            if (it != seen_geo.end()) {
+            // Check >= 3 distinct vertices
+            std::unordered_set<int> distinct(clean.begin(), clean.end());
+            if (distinct.size() < 3) {
+                ++skipped_degenerate;
+                continue;
+            }
+
+            // Newell area check (zero-area face)
+            Vec3 normal_accum{};
+            for (size_t i = 0; i < clean.size(); ++i) {
+                const Vec3& curr = welded_verts[clean[i]];
+                const Vec3& next = welded_verts[clean[(i + 1) % clean.size()]];
+                normal_accum.x += (curr.y - next.y) * (curr.z + next.z);
+                normal_accum.y += (curr.z - next.z) * (curr.x + next.x);
+                normal_accum.z += (curr.x - next.x) * (curr.y + next.y);
+            }
+            if (length_squared(normal_accum) < 1e-20) {
+                ++skipped_degenerate;
+                continue;
+            }
+
+            // Cyclic dedup
+            std::string canon = cyclic_canonical(clean);
+            auto it = seen_face_keys.find(canon);
+            if (it != seen_face_keys.end()) {
                 ++replaced_geo;
                 continue;
             }
-            seen_geo.emplace(geo_key, deduped.size());
-
-            deduped.push_back(ia);
-            deduped.push_back(ib);
-            deduped.push_back(ic);
-            deduped_origins.push_back((i / 3 < bp.output.face_origins.size())
-                ? bp.output.face_origins[i / 3] : -1);
+            seen_face_keys.emplace(canon, cleaned_faces.size());
+            cleaned_faces.push_back({std::move(clean), face.origin});
         }
 
         bp.output.vertices = std::move(welded_verts);
-        bp.output.triangles = std::move(deduped);
-        bp.output.face_origins = std::move(deduped_origins);
+        bp.output.faces = std::move(cleaned_faces);
         bp.output.vertex_cache.clear();
+        bp.output.rebuild_triangles_from_faces();
 
         if (bevel_diag_enabled()) {
             std::fprintf(stderr,
-                         "[PCG_BEVEL_DIAG] weld+dedup before_tris=%zu after_tris=%zu "
+                         "[PCG_BEVEL_DIAG] weld+dedup faces_before=%zu faces_after=%zu "
                          "skipped_degenerate=%d replaced_geo=%d\n",
-                         tris_before, bp.output.triangles.size() / 3,
+                         bp.output.faces.size() + skipped_degenerate + replaced_geo,
+                         bp.output.faces.size(),
                          skipped_degenerate, replaced_geo);
         }
     }
@@ -3634,34 +3663,30 @@ data::PcgMeshData bevel_mesh_blender(
     log_bevel_stage("after_dedup", bp.output, diag_cap);
 
     // Enforce opposite winding on every manifold edge, then flip the whole mesh
-    // if signed volume is negative. Local add_oriented_* references are enough
-    // for convex cases; Sweep/sedan (non-convex) otherwise leaves opposite-
-    // winding edges between VMesh, strips, and face rebuild.
+    // if signed volume is negative. fix_winding operates on polygon faces;
+    // rebuild_triangles_from_faces() syncs the derived triangle cache afterwards.
     bp.output.fix_winding();
+    bp.output.rebuild_triangles_from_faces();
 
-    // 13. Build output PcgGeometry with propagated face groups (if requested)
+    // 13. Build output PcgGeometry with n-gon faces and propagated face groups.
     if (out_geometry && geometry) {
         data::PcgGeometry& geom = *out_geometry;
         for (const auto& v : bp.output.vertices)
             geom.points_mut().push_back({v.x, v.y, v.z});
 
-        const size_t ntri = bp.output.triangles.size() / 3;
-        for (size_t t = 0; t < ntri; ++t) {
-            const int i0 = bp.output.triangles[t * 3];
-            const int i1 = bp.output.triangles[t * 3 + 1];
-            const int i2 = bp.output.triangles[t * 3 + 2];
-            geom.faces_mut().push_back({i0, i1, i2});
-
-            const int origin = (t < bp.output.face_origins.size())
-                ? bp.output.face_origins[t] : -1;
+        for (const auto& face : bp.output.faces) {
+            if (face.verts.size() < 3) continue;
+            geom.faces_mut().push_back(face.verts);
+            const int origin = face.origin;
             if (origin >= 0 && origin < static_cast<int>(bmesh.faces.size())) {
+                const int face_idx = static_cast<int>(geom.faces().size()) - 1;
                 for (const std::string& g : bmesh.faces[static_cast<size_t>(origin)].groups)
-                    geom.groups().add(geometry::GroupDomain::Face, g, static_cast<int>(t));
+                    geom.groups().add(geometry::GroupDomain::Face, g, face_idx);
             }
         }
     }
 
-    // 14. Convert output to PcgMeshData
+    // 14. Convert output to PcgMeshData (triangles derived from faces).
     data::PcgMeshData result;
     for (const auto& v : bp.output.vertices) {
         result.add_vertex({v.x, v.y, v.z});

@@ -180,6 +180,12 @@ target_include_directories(test_bevel_manifold PRIVATE src)
 
 add_test(NAME test_bevel_manifold COMMAND test_bevel_manifold WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_bevel_polygon tests/test_bevel_polygon.cpp)
+target_link_libraries(test_bevel_polygon PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_bevel_polygon PRIVATE src)
+
+add_test(NAME test_bevel_polygon COMMAND test_bevel_polygon WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_split_normals tests/test_split_normals.cpp)
 target_link_libraries(test_split_normals PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_split_normals PRIVATE src)

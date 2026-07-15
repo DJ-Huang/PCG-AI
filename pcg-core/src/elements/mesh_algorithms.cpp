@@ -971,10 +971,89 @@ data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels, Subd
     }
 }
 
+// ── Simple subdivision on n-gon geometry (Blender Simple parity) ────────────
+// Works directly on polygon faces: adds edge midpoints (shared) and a face
+// center vertex per face, then connects (vi, mid_i, center, mid_{i-1}) into
+// quads. This preserves n-gon topology instead of fan-triangulating first.
+data::PcgGeometry subdivide_simple_geometry(const data::PcgGeometry& geometry, int levels)
+{
+    data::PcgGeometry current = geometry;
+    levels = std::clamp(levels, 0, 4);
+
+    for (int level = 0; level < levels; ++level) {
+        data::PcgGeometry next;
+        const auto& pts = current.points();
+        const auto& faces = current.faces();
+
+        // Copy original vertices
+        for (const auto& p : pts)
+            next.points_mut().push_back(p);
+
+        // Shared edge midpoints
+        std::unordered_map<int64_t, int> edge_mids;
+        auto get_edge_mid = [&](int a, int b) -> int {
+            const int64_t key = geometry::edge_key(a, b);
+            const auto it = edge_mids.find(key);
+            if (it != edge_mids.end())
+                return it->second;
+            const auto& pa = pts[static_cast<size_t>(a)];
+            const auto& pb = pts[static_cast<size_t>(b)];
+            const int idx = static_cast<int>(next.points().size());
+            next.points_mut().push_back({
+                (pa.x + pb.x) * 0.5,
+                (pa.y + pb.y) * 0.5,
+                (pa.z + pb.z) * 0.5,
+            });
+            edge_mids[key] = idx;
+            return idx;
+        };
+
+        for (const auto& face : faces) {
+            const int n = static_cast<int>(face.size());
+            if (n < 3) continue;
+
+            // Face center (centroid)
+            data::PcgVec3 center{0, 0, 0};
+            for (int vi : face) {
+                center.x += pts[static_cast<size_t>(vi)].x;
+                center.y += pts[static_cast<size_t>(vi)].y;
+                center.z += pts[static_cast<size_t>(vi)].z;
+            }
+            center.x /= n; center.y /= n; center.z /= n;
+            const int center_idx = static_cast<int>(next.points().size());
+            next.points_mut().push_back(center);
+
+            // Edge midpoints for this face
+            std::vector<int> mids(static_cast<size_t>(n));
+            for (int i = 0; i < n; ++i)
+                mids[static_cast<size_t>(i)] = get_edge_mid(
+                    face[static_cast<size_t>(i)],
+                    face[static_cast<size_t>((i + 1) % n)]);
+
+            // Sub-faces: (vi, mid_i, center, mid_{i-1})
+            for (int i = 0; i < n; ++i) {
+                const int vi = face[static_cast<size_t>(i)];
+                const int mid_next = mids[static_cast<size_t>(i)];
+                const int mid_prev = mids[static_cast<size_t>((i + n - 1) % n)];
+                next.faces_mut().push_back({vi, mid_next, center_idx, mid_prev});
+            }
+        }
+
+        current = std::move(next);
+    }
+    return current;
+}
+
 data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int levels, SubdivideMethod method)
 {
     if (geometry.points().empty() || geometry.faces().empty())
         return geometry;
+
+    if (method == SubdivideMethod::Simple) {
+        data::PcgGeometry out = subdivide_simple_geometry(geometry, levels);
+        out.detail() = geometry.detail();
+        return out;
+    }
 
     data::PcgMeshData mesh;
     for (const auto& p : geometry.points())
@@ -1080,6 +1159,7 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
         return fallback;
     }
 
+    // No-op / cancel / amount<=eps: return original geometry (preserves groups/loops).
     return geometry;
 }
 
