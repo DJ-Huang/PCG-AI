@@ -1085,6 +1085,9 @@ cp examples/my-demo.pcg Unity/Assets/PCGDemo/
 | 2026-07-12 | SweepAlongSpline 不创建 edge group | edge group 导致 bevel 选边冲突 |
 | 2026-07-12 | Split Normal 只在 Sink 执行，不改 bevel 核心 | bevel 依赖共享顶点索引对齐 |
 | 2026-07-12 | Split Normal 邻接从 polygon loop 构建，非 triangle edge | fan diagonal 不是真实几何边 |
+| 2026-07-15 | PcgGeometry 必须原生支持所有属性通道（color/UV/normal/materialName 等） | 缺通道导致 geometry→mesh→geometry round-trip，三角化 n-gon 面破坏拓扑；正确做法是扩展 PcgGeometry 字段 |
+| 2026-07-15 | 中间节点禁止 `emit_mesh()`，必须 `emit_geometry()` | emit_mesh 输出三角化网格，下游 bevel/subdivide/boolean 丢失 n-gon 信息 |
+| 2026-07-15 | 三角化只允许在 Sink / binary / 算法内部计算 | 中间节点三角化结果传播到下游会破坏 polygon 拓扑链 |
 
 ### 11.3 工程决策
 

@@ -15,6 +15,8 @@ alwaysApply: false
 
 > 项目级规则：完整正文见 `.codely-cli/rules/pcg-ai.md`（Codely/Cursor/Trae 共用）。本文件为 Trae 薄适配。
 
+**P0 铁律**：节点输出必须 `emit_geometry()`，禁止 `emit_mesh()` 中间输出；禁止 geometry→mesh→geometry round-trip 绕过缺失属性；新增属性必须先扩展 PcgGeometry 字段。详见 `.codely-cli/rules/pcg-ai.md` §「P0 铁律」。
+
 开发 / 改节点 / 编图前：
 
 1. **Read `.codely-cli/rules/pcg-ai.md`**（项目级规则，不再走 `rule_search`）

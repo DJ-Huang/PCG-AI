@@ -48,6 +48,14 @@ public:
     const std::vector<PcgColor>& colors() const { return colors_; }
     void set_colors(std::vector<PcgColor> c) { colors_ = std::move(c); has_colors_ = true; }
 
+    bool has_uvs() const { return has_uvs_; }
+    const std::vector<PcgVec2>& uvs() const { return uvs_; }
+    void set_uvs(std::vector<PcgVec2> u) { uvs_ = std::move(u); has_uvs_ = true; }
+
+    bool has_material() const { return has_material_; }
+    const std::string& material_name() const { return material_name_; }
+    void set_material_name(std::string m) { material_name_ = std::move(m); has_material_ = true; }
+
 private:
     std::vector<PcgVec3> points_;
     std::vector<std::vector<int>> faces_;
@@ -55,6 +63,10 @@ private:
     GeometryDetailMeta detail_;
     std::vector<PcgColor> colors_;
     bool has_colors_ = false;
+    std::vector<PcgVec2> uvs_;
+    bool has_uvs_ = false;
+    std::string material_name_;
+    bool has_material_ = false;
 };
 
 /// Fan-triangulate n-gon faces for display / legacy mesh nodes.

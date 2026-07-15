@@ -16,6 +16,8 @@ constexpr uint32_t kChunkGroupDefs = 4u;
 constexpr uint32_t kChunkGroupMembers = 5u;
 constexpr uint32_t kChunkTriangulation = 6u;
 constexpr uint32_t kChunkColors = 7u;
+constexpr uint32_t kChunkUVs = 8u;
+constexpr uint32_t kChunkMaterial = 9u;
 
 struct Writer {
     uint8_t* base = nullptr;
@@ -83,6 +85,10 @@ int geometry_binary_size(const PcgGeometry& geometry)
 
     if (geometry.has_colors())
         size += 8 + static_cast<int>(geometry.points().size()) * 16;
+    if (geometry.has_uvs())
+        size += 8 + static_cast<int>(geometry.points().size()) * 16;
+    if (geometry.has_material())
+        size += 8 + static_cast<int>(geometry.material_name().size()) + 1;
     return size;
 }
 
@@ -207,6 +213,28 @@ bool write_geometry_binary(const PcgGeometry& geometry, void* buffer, int buffer
             return false;
     }
 
+    if (geometry.has_uvs()) {
+        if (!write_chunk(kChunkUVs, [&] {
+                for (const auto& uv : geometry.uvs()) {
+                    const float uv_arr[2] = {static_cast<float>(uv.u), static_cast<float>(uv.v)};
+                    if (!w.write(uv_arr, 8))
+                        return false;
+                }
+                return true;
+            }))
+            return false;
+    }
+
+    if (geometry.has_material()) {
+        if (!write_chunk(kChunkMaterial, [&] {
+                const std::string& name = geometry.material_name();
+                if (!w.write(name.c_str(), static_cast<int>(name.size()) + 1))
+                    return false;
+                return true;
+            }))
+            return false;
+    }
+
     return true;
 }
 
@@ -304,6 +332,28 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
                 colors.push_back(PcgColor{rgba[0], rgba[1], rgba[2], rgba[3]});
             }
             geometry.set_colors(std::move(colors));
+        } else if (chunk_id == kChunkUVs) {
+            std::vector<PcgVec2> uvs;
+            const int uv_count = chunk_size / 8;
+            uvs.reserve(static_cast<size_t>(uv_count));
+            for (int i = 0; i < uv_count; ++i) {
+                float uv_arr[2];
+                if (!r.read(uv_arr, 8))
+                    return false;
+                uvs.push_back(PcgVec2{uv_arr[0], uv_arr[1]});
+            }
+            geometry.set_uvs(std::move(uvs));
+        } else if (chunk_id == kChunkMaterial) {
+            std::string name;
+            while (r.offset < chunk_end) {
+                char ch = 0;
+                if (!r.read(&ch, 1))
+                    return false;
+                if (ch == '\0')
+                    break;
+                name.push_back(ch);
+            }
+            geometry.set_material_name(std::move(name));
         } else {
             r.offset = chunk_end;
         }

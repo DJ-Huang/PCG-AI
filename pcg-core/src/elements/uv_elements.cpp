@@ -13,8 +13,6 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "UVTexture missing node");
 
-        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "UVTexture missing mesh input");
-
         const std::string projection = ctx.node->data.value("projection", "planar");
         const std::string axis = ctx.node->data.value("axis", "y");
         const double scale_u = ctx.node->data.value("scaleU", 1.0);
@@ -22,6 +20,15 @@ public:
         const double offset_u = ctx.node->data.value("offsetU", 0.0);
         const double offset_v = ctx.node->data.value("offsetV", 0.0);
 
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            data::PcgGeometry out = *geometry;
+            out.set_uvs(generate_uv_geometry(*geometry, projection, axis,
+                                             scale_u, scale_v, offset_u, offset_v));
+            emit_geometry(ctx, std::move(out));
+            return PCG_OK;
+        }
+
+        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "UVTexture missing mesh input");
         generate_uv(mesh, projection, axis, scale_u, scale_v, offset_u, offset_v);
         emit_mesh(ctx, std::move(mesh));
         return PCG_OK;
@@ -36,8 +43,6 @@ public:
     {
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ProjectTexture missing node");
-
-        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "ProjectTexture missing mesh input");
 
         const nlohmann::json* tex_json = ctx.inputs.find_json("texture");
         if (!tex_json) {
@@ -57,6 +62,16 @@ public:
         const double offset_u = ctx.node->data.value("offsetU", 0.0);
         const double offset_v = ctx.node->data.value("offsetV", 0.0);
 
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            data::PcgGeometry out = *geometry;
+            out.set_uvs(project_texture_uv_geometry(*geometry, direction,
+                                                     scale_u, scale_v, offset_u, offset_v,
+                                                     repeat_x, repeat_y));
+            emit_geometry(ctx, std::move(out));
+            return PCG_OK;
+        }
+
+        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "ProjectTexture missing mesh input");
         project_texture_uv(mesh, direction, scale_u, scale_v,
                            offset_u, offset_v, repeat_x, repeat_y);
         emit_mesh(ctx, std::move(mesh));

@@ -334,6 +334,21 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         mesh.set_colors(std::move(render_colors));
     }
 
+    // Copy per-point UVs to render vertices
+    if (geometry.has_uvs()) {
+        const auto& geo_uvs = geometry.uvs();
+        std::vector<PcgVec2> render_uvs(render_positions.size(), PcgVec2{0,0});
+        for (const auto& [key, idx] : render_vertex_map) {
+            if (key.point_index >= 0 && static_cast<size_t>(key.point_index) < geo_uvs.size())
+                render_uvs[static_cast<size_t>(idx)] = geo_uvs[static_cast<size_t>(key.point_index)];
+        }
+        mesh.set_uvs(std::move(render_uvs));
+    }
+
+    // Propagate material name
+    if (geometry.has_material())
+        mesh.metadata().set("material", nlohmann::json(geometry.material_name()));
+
     return mesh;
 }
 
@@ -375,6 +390,39 @@ PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
             }
         }
         geo.set_colors(std::move(pt_colors));
+    }
+
+    // Map mesh UVs back to geometry points (same weld pattern as colors)
+    if (mesh.has_uvs()) {
+        const auto& mesh_verts = mesh.vertices();
+        const auto& mesh_uvs = mesh.uvs();
+        std::vector<PcgVec2> pt_uvs(geo.points().size(), PcgVec2{0,0});
+        std::unordered_map<std::string, int> pos_to_pt;
+        const double eps = opts.weld_eps;
+        const auto quantize = [eps](double v) -> int64_t {
+            return static_cast<int64_t>(std::llround(v / eps));
+        };
+        for (size_t i = 0; i < mesh_verts.size() && i < mesh_uvs.size(); ++i) {
+            const auto& v = mesh_verts[i];
+            const std::string key = std::to_string(quantize(v.x)) + ',' +
+                                    std::to_string(quantize(v.y)) + ',' +
+                                    std::to_string(quantize(v.z));
+            auto it = pos_to_pt.find(key);
+            if (it == pos_to_pt.end()) {
+                const int idx = static_cast<int>(pos_to_pt.size());
+                pos_to_pt[key] = idx;
+                if (static_cast<size_t>(idx) < pt_uvs.size())
+                    pt_uvs[static_cast<size_t>(idx)] = mesh_uvs[i];
+            }
+        }
+        geo.set_uvs(std::move(pt_uvs));
+    }
+
+    // Propagate material name
+    if (mesh.metadata().has("material")) {
+        const nlohmann::json& mat = mesh.metadata().get("material");
+        if (mat.is_string())
+            geo.set_material_name(mat.get<std::string>());
     }
 
     return geo;
@@ -466,6 +514,24 @@ PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const s
         }
         merged.set_colors(std::move(merged_colors));
     }
+
+    // Merge per-point UVs
+    if (a.has_uvs() || b.has_uvs()) {
+        std::vector<PcgVec2> merged_uvs = a.has_uvs() ? a.uvs() : std::vector<PcgVec2>();
+        merged_uvs.resize(merged.points().size(), PcgVec2{0.0, 0.0});
+        for (size_t i = 0; i < b.points().size(); ++i) {
+            const size_t dst = static_cast<size_t>(point_offset) + i;
+            if (b.has_uvs() && i < b.uvs().size())
+                merged_uvs[dst] = b.uvs()[i];
+        }
+        merged.set_uvs(std::move(merged_uvs));
+    }
+
+    // Propagate material name (first writer wins)
+    if (a.has_material())
+        merged.set_material_name(a.material_name());
+    else if (b.has_material())
+        merged.set_material_name(b.material_name());
 
     return merged;
 }

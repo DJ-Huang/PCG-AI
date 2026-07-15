@@ -42,9 +42,16 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "AssignMaterial missing node");
 
-        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "AssignMaterial missing mesh input");
-
         const std::string material_name = ctx.node->data.value("materialName", "");
+
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            data::PcgGeometry out = *geometry;
+            out.set_material_name(material_name);
+            emit_geometry(ctx, std::move(out));
+            return PCG_OK;
+        }
+
+        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "AssignMaterial missing mesh input");
         assign_material(mesh, material_name);
         emit_mesh(ctx, std::move(mesh));
         return PCG_OK;
