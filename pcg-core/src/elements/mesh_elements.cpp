@@ -243,25 +243,20 @@ public:
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateCylinderMesh invalid parameters");
 
-        if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in"))
-        {
-            const int vertex_offset = static_cast<int>(mesh.vertices().size());
-            for (const auto& v : input->vertices())
-                mesh.vertices_mut().push_back(v);
-            for (int idx : input->triangles())
-                mesh.triangles_mut().push_back(idx + vertex_offset);
-        }
-        else if (const nlohmann::json* input = ctx.inputs.find_json("in"))
-        {
+        data::PcgGeometry geometry = data::geometry_from_mesh(mesh);
+
+        if (auto input_geometry = ctx.inputs.find_geometry_shared("in")) {
+            geometry = data::merge_geometries(geometry, *input_geometry, "in_");
+        } else if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in")) {
+            geometry = data::merge_geometries(geometry, data::geometry_from_mesh(*input), "in_");
+        } else if (const nlohmann::json* input = ctx.inputs.find_json("in")) {
             const data::PcgMeshData input_mesh = parse_mesh_input(*input);
-            const int vertex_offset = static_cast<int>(mesh.vertices().size());
-            for (const auto& v : input_mesh.vertices())
-                mesh.vertices_mut().push_back(v);
-            for (int idx : input_mesh.triangles())
-                mesh.triangles_mut().push_back(idx + vertex_offset);
+            if (!input_mesh.vertices().empty())
+                geometry = data::merge_geometries(
+                    geometry, data::geometry_from_mesh(input_mesh), "in_");
         }
 
-        emit_geometry(ctx, data::geometry_from_mesh(mesh));
+        emit_geometry(ctx, std::move(geometry));
         return PCG_OK;
     }
 };

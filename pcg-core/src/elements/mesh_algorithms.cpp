@@ -646,6 +646,7 @@ data::PcgMeshData subdivide_simple(const data::PcgMeshData& mesh, int levels) {
             next.add_vertex(v);
 
         std::unordered_map<int, int> edge_midpoints;
+        std::vector<std::pair<int, int>> mid_parents;
         const auto& verts = current.vertices();
         const auto& tris = current.triangles();
 
@@ -660,6 +661,7 @@ data::PcgMeshData subdivide_simple(const data::PcgMeshData& mesh, int levels) {
             const int index = static_cast<int>(next.vertices().size());
             next.add_vertex(to_vertex(scale(add(va, vb), 0.5)));
             edge_midpoints[key] = index;
+            mid_parents.push_back({a, b});
             return index;
         };
 
@@ -675,6 +677,47 @@ data::PcgMeshData subdivide_simple(const data::PcgMeshData& mesh, int levels) {
             next.add_triangle(ab, b, bc);
             next.add_triangle(ca, bc, c);
             next.add_triangle(ab, bc, ca);
+        }
+
+        // Propagate per-vertex attributes: originals keep indices, midpoints average parents.
+        const int orig_count = static_cast<int>(current.vertices().size());
+        if (current.has_colors()) {
+            const auto& sc = current.colors();
+            std::vector<data::PcgColor> oc(next.vertices().size(), data::PcgColor{1,1,1,1});
+            for (int i = 0; i < orig_count && i < static_cast<int>(sc.size()); ++i)
+                oc[static_cast<size_t>(i)] = sc[static_cast<size_t>(i)];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ca = sc[static_cast<size_t>(mid_parents[i].first)];
+                const auto& cb = sc[static_cast<size_t>(mid_parents[i].second)];
+                oc[static_cast<size_t>(orig_count + i)] =
+                    {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+            }
+            next.set_colors(std::move(oc));
+        }
+        if (current.has_uvs()) {
+            const auto& su = current.uvs();
+            std::vector<data::PcgVec2> ou(next.vertices().size());
+            for (int i = 0; i < orig_count && i < static_cast<int>(su.size()); ++i)
+                ou[static_cast<size_t>(i)] = su[static_cast<size_t>(i)];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ua = su[static_cast<size_t>(mid_parents[i].first)];
+                const auto& ub = su[static_cast<size_t>(mid_parents[i].second)];
+                ou[static_cast<size_t>(orig_count + i)] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+            }
+            next.set_uvs(std::move(ou));
+        }
+        if (current.has_normals()) {
+            const auto& sn = current.normals();
+            std::vector<data::PcgVertex> on(next.vertices().size());
+            for (int i = 0; i < orig_count && i < static_cast<int>(sn.size()); ++i)
+                on[static_cast<size_t>(i)] = sn[static_cast<size_t>(i)];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& na = sn[static_cast<size_t>(mid_parents[i].first)];
+                const auto& nb = sn[static_cast<size_t>(mid_parents[i].second)];
+                on[static_cast<size_t>(orig_count + i)] =
+                    {(na.x+nb.x)*0.5, (na.y+nb.y)*0.5, (na.z+nb.z)*0.5};
+            }
+            next.set_normals(std::move(on));
         }
 
         current = std::move(next);
@@ -786,6 +829,7 @@ data::PcgMeshData subdivide_loop(const data::PcgMeshData& mesh, int levels) {
             next.add_triangle(ca, bc, c);
             next.add_triangle(ab, bc, ca);
         }
+        propagate_attributes(current, next, w, odd_a, odd_b);
         current = std::move(next);
     }
     return current;
@@ -955,6 +999,119 @@ data::PcgMeshData subdivide_catmull_clark(const data::PcgMeshData& mesh, int lev
             }
         }
 
+        // Propagate per-vertex attributes through CC subdivision.
+        if (current.has_colors() || current.has_uvs() || current.has_normals()) {
+            // Map bmesh vert → first original mesh vertex (by position).
+            std::unordered_map<std::string, int> pos_to_orig;
+            for (size_t i = 0; i < current.vertices().size(); ++i) {
+                const std::string key = position_key(to_vec3(current.vertices()[i]));
+                pos_to_orig.try_emplace(key, static_cast<int>(i));
+            }
+            auto orig_idx = [&](int bm_vi) -> int {
+                const std::string key = position_key(to_local(bm.verts[static_cast<size_t>(bm_vi)]));
+                auto it = pos_to_orig.find(key);
+                return it != pos_to_orig.end() ? it->second : -1;
+            };
+
+            if (current.has_colors()) {
+                const auto& sc = current.colors();
+                std::vector<data::PcgColor> oc(next.vertices().size(), data::PcgColor{1,1,1,1});
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = orig_idx(vi);
+                    if (oi >= 0 && oi < static_cast<int>(sc.size()))
+                        oc[static_cast<size_t>(vi)] = sc[static_cast<size_t>(oi)];
+                }
+                for (const auto& entry : bm.edges) {
+                    const auto it = edge_pt_idx.find(entry.first);
+                    if (it == edge_pt_idx.end()) continue;
+                    const int ei = it->second;
+                    const int oa = orig_idx(entry.second.v0), ob = orig_idx(entry.second.v1);
+                    const auto& ca = oa >= 0 && oa < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(oa)] : data::PcgColor{};
+                    const auto& cb = ob >= 0 && ob < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(ob)] : data::PcgColor{};
+                    oc[static_cast<size_t>(nv + ei)] =
+                        {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+                }
+                for (int fi = 0; fi < nf; ++fi) {
+                    const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                    data::PcgColor avg{0,0,0,0}; int count = 0;
+                    for (int vi : loop) {
+                        const int oi = orig_idx(vi);
+                        if (oi >= 0 && oi < static_cast<int>(sc.size())) {
+                            avg.r += sc[static_cast<size_t>(oi)].r; avg.g += sc[static_cast<size_t>(oi)].g;
+                            avg.b += sc[static_cast<size_t>(oi)].b; avg.a += sc[static_cast<size_t>(oi)].a; ++count;
+                        }
+                    }
+                    if (count > 0) { avg.r /= count; avg.g /= count; avg.b /= count; avg.a /= count; }
+                    oc[static_cast<size_t>(fp_base + fi)] = avg;
+                }
+                next.set_colors(std::move(oc));
+            }
+            if (current.has_uvs()) {
+                const auto& su = current.uvs();
+                std::vector<data::PcgVec2> ou(next.vertices().size());
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = orig_idx(vi);
+                    if (oi >= 0 && oi < static_cast<int>(su.size()))
+                        ou[static_cast<size_t>(vi)] = su[static_cast<size_t>(oi)];
+                }
+                for (const auto& entry : bm.edges) {
+                    const auto it = edge_pt_idx.find(entry.first);
+                    if (it == edge_pt_idx.end()) continue;
+                    const int ei = it->second;
+                    const int oa = orig_idx(entry.second.v0), ob = orig_idx(entry.second.v1);
+                    const auto& ua = oa >= 0 && oa < static_cast<int>(su.size()) ? su[static_cast<size_t>(oa)] : data::PcgVec2{};
+                    const auto& ub = ob >= 0 && ob < static_cast<int>(su.size()) ? su[static_cast<size_t>(ob)] : data::PcgVec2{};
+                    ou[static_cast<size_t>(nv + ei)] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+                }
+                for (int fi = 0; fi < nf; ++fi) {
+                    const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                    data::PcgVec2 avg{0,0}; int count = 0;
+                    for (int vi : loop) {
+                        const int oi = orig_idx(vi);
+                        if (oi >= 0 && oi < static_cast<int>(su.size())) {
+                            avg.u += su[static_cast<size_t>(oi)].u; avg.v += su[static_cast<size_t>(oi)].v; ++count;
+                        }
+                    }
+                    if (count > 0) { avg.u /= count; avg.v /= count; }
+                    ou[static_cast<size_t>(fp_base + fi)] = avg;
+                }
+                next.set_uvs(std::move(ou));
+            }
+            if (current.has_normals()) {
+                const auto& sn = current.normals();
+                std::vector<data::PcgVertex> on(next.vertices().size());
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = orig_idx(vi);
+                    if (oi >= 0 && oi < static_cast<int>(sn.size()))
+                        on[static_cast<size_t>(vi)] = sn[static_cast<size_t>(oi)];
+                }
+                for (const auto& entry : bm.edges) {
+                    const auto it = edge_pt_idx.find(entry.first);
+                    if (it == edge_pt_idx.end()) continue;
+                    const int ei = it->second;
+                    const int oa = orig_idx(entry.second.v0), ob = orig_idx(entry.second.v1);
+                    const auto& na = oa >= 0 && oa < static_cast<int>(sn.size()) ? sn[static_cast<size_t>(oa)] : data::PcgVertex{};
+                    const auto& nb = ob >= 0 && ob < static_cast<int>(sn.size()) ? sn[static_cast<size_t>(ob)] : data::PcgVertex{};
+                    on[static_cast<size_t>(nv + ei)] =
+                        {(na.x+nb.x)*0.5, (na.y+nb.y)*0.5, (na.z+nb.z)*0.5};
+                }
+                for (int fi = 0; fi < nf; ++fi) {
+                    const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                    data::PcgVertex avg{0,0,0}; int count = 0;
+                    for (int vi : loop) {
+                        const int oi = orig_idx(vi);
+                        if (oi >= 0 && oi < static_cast<int>(sn.size())) {
+                            avg.x += sn[static_cast<size_t>(oi)].x; avg.y += sn[static_cast<size_t>(oi)].y;
+                            avg.z += sn[static_cast<size_t>(oi)].z; ++count;
+                        }
+                    }
+                    if (count > 0) { avg.x /= count; avg.y /= count; avg.z /= count; }
+                    on[static_cast<size_t>(fp_base + fi)] = avg;
+                }
+                next.set_normals(std::move(on));
+            }
+        }
+
         current = std::move(next);
     }
     return current;
@@ -991,6 +1148,9 @@ data::PcgGeometry subdivide_simple_geometry(const data::PcgGeometry& geometry, i
 
         // Shared edge midpoints
         std::unordered_map<int64_t, int> edge_mids;
+        std::vector<std::pair<int, int>> mid_parents;
+        std::vector<int> mid_indices;
+        std::vector<std::pair<int, std::vector<int>>> face_centers; // {center_idx, face_verts}
         auto get_edge_mid = [&](int a, int b) -> int {
             const int64_t key = geometry::edge_key(a, b);
             const auto it = edge_mids.find(key);
@@ -1005,6 +1165,8 @@ data::PcgGeometry subdivide_simple_geometry(const data::PcgGeometry& geometry, i
                 (pa.z + pb.z) * 0.5,
             });
             edge_mids[key] = idx;
+            mid_parents.push_back({a, b});
+            mid_indices.push_back(idx);
             return idx;
         };
 
@@ -1037,6 +1199,58 @@ data::PcgGeometry subdivide_simple_geometry(const data::PcgGeometry& geometry, i
                 const int mid_prev = mids[static_cast<size_t>((i + n - 1) % n)];
                 next.faces_mut().push_back({vi, mid_next, center_idx, mid_prev});
             }
+
+            face_centers.push_back({center_idx, face});
+        }
+
+        // Propagate per-vertex attributes: originals keep indices,
+        // edge midpoints (at actual indices) average parents,
+        // face centers average face vertex attributes.
+        if (current.has_colors()) {
+            const auto& sc = current.colors();
+            std::vector<data::PcgColor> oc(next.points().size(), data::PcgColor{1,1,1,1});
+            for (size_t i = 0; i < current.points().size() && i < sc.size(); ++i)
+                oc[i] = sc[i];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ca = sc[static_cast<size_t>(mid_parents[i].first)];
+                const auto& cb = sc[static_cast<size_t>(mid_parents[i].second)];
+                oc[static_cast<size_t>(mid_indices[i])] =
+                    {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+            }
+            for (const auto& fc : face_centers) {
+                data::PcgColor avg{0,0,0,0}; int count = 0;
+                for (int vi : fc.second) {
+                    if (vi >= 0 && vi < static_cast<int>(sc.size())) {
+                        avg.r += sc[static_cast<size_t>(vi)].r; avg.g += sc[static_cast<size_t>(vi)].g;
+                        avg.b += sc[static_cast<size_t>(vi)].b; avg.a += sc[static_cast<size_t>(vi)].a; ++count;
+                    }
+                }
+                if (count > 0) { avg.r /= count; avg.g /= count; avg.b /= count; avg.a /= count; }
+                oc[static_cast<size_t>(fc.first)] = avg;
+            }
+            next.set_colors(std::move(oc));
+        }
+        if (current.has_uvs()) {
+            const auto& su = current.uvs();
+            std::vector<data::PcgVec2> ou(next.points().size());
+            for (size_t i = 0; i < current.points().size() && i < su.size(); ++i)
+                ou[i] = su[i];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ua = su[static_cast<size_t>(mid_parents[i].first)];
+                const auto& ub = su[static_cast<size_t>(mid_parents[i].second)];
+                ou[static_cast<size_t>(mid_indices[i])] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+            }
+            for (const auto& fc : face_centers) {
+                data::PcgVec2 avg{0,0}; int count = 0;
+                for (int vi : fc.second) {
+                    if (vi >= 0 && vi < static_cast<int>(su.size())) {
+                        avg.u += su[static_cast<size_t>(vi)].u; avg.v += su[static_cast<size_t>(vi)].v; ++count;
+                    }
+                }
+                if (count > 0) { avg.u /= count; avg.v /= count; }
+                ou[static_cast<size_t>(fc.first)] = avg;
+            }
+            next.set_uvs(std::move(ou));
         }
 
         current = std::move(next);
@@ -1207,6 +1421,64 @@ data::PcgGeometry subdivide_catmull_clark_geometry(const data::PcgGeometry& geom
             }
         }
 
+        // Propagate per-vertex attributes (bmesh vert i = geometry point i, no weld).
+        if (current.has_colors()) {
+            const auto& sc = current.colors();
+            std::vector<data::PcgColor> oc(next.points().size(), data::PcgColor{1,1,1,1});
+            for (int vi = 0; vi < nv && vi < static_cast<int>(sc.size()); ++vi)
+                oc[static_cast<size_t>(vi)] = sc[static_cast<size_t>(vi)];
+            for (const auto& entry : bm.edges) {
+                const auto it = edge_pt_idx.find(entry.first);
+                if (it == edge_pt_idx.end()) continue;
+                const int ei = it->second;
+                const int a = entry.second.v0, b = entry.second.v1;
+                const auto& ca = a < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(a)] : data::PcgColor{};
+                const auto& cb = b < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(b)] : data::PcgColor{};
+                oc[static_cast<size_t>(nv + ei)] =
+                    {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+            }
+            for (int fi = 0; fi < nf; ++fi) {
+                const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                data::PcgColor avg{0,0,0,0}; int count = 0;
+                for (int vi : loop) {
+                    if (vi < static_cast<int>(sc.size())) {
+                        avg.r += sc[static_cast<size_t>(vi)].r; avg.g += sc[static_cast<size_t>(vi)].g;
+                        avg.b += sc[static_cast<size_t>(vi)].b; avg.a += sc[static_cast<size_t>(vi)].a; ++count;
+                    }
+                }
+                if (count > 0) { avg.r /= count; avg.g /= count; avg.b /= count; avg.a /= count; }
+                oc[static_cast<size_t>(fp_base + fi)] = avg;
+            }
+            next.set_colors(std::move(oc));
+        }
+        if (current.has_uvs()) {
+            const auto& su = current.uvs();
+            std::vector<data::PcgVec2> ou(next.points().size());
+            for (int vi = 0; vi < nv && vi < static_cast<int>(su.size()); ++vi)
+                ou[static_cast<size_t>(vi)] = su[static_cast<size_t>(vi)];
+            for (const auto& entry : bm.edges) {
+                const auto it = edge_pt_idx.find(entry.first);
+                if (it == edge_pt_idx.end()) continue;
+                const int ei = it->second;
+                const int a = entry.second.v0, b = entry.second.v1;
+                const auto& ua = a < static_cast<int>(su.size()) ? su[static_cast<size_t>(a)] : data::PcgVec2{};
+                const auto& ub = b < static_cast<int>(su.size()) ? su[static_cast<size_t>(b)] : data::PcgVec2{};
+                ou[static_cast<size_t>(nv + ei)] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+            }
+            for (int fi = 0; fi < nf; ++fi) {
+                const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                data::PcgVec2 avg{0,0}; int count = 0;
+                for (int vi : loop) {
+                    if (vi < static_cast<int>(su.size())) {
+                        avg.u += su[static_cast<size_t>(vi)].u; avg.v += su[static_cast<size_t>(vi)].v; ++count;
+                    }
+                }
+                if (count > 0) { avg.u /= count; avg.v /= count; }
+                ou[static_cast<size_t>(fp_base + fi)] = avg;
+            }
+            next.set_uvs(std::move(ou));
+        }
+
         next.detail() = current.detail();
         current = std::move(next);
     }
@@ -1324,9 +1596,6 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
 
     if (!out_geom.points().empty()) {
         out_geom.detail() = geometry.detail();
-        if (geometry.has_colors())
-            out_geom.set_colors(std::vector<data::PcgColor>(
-                out_geom.points().size(), data::PcgColor{1.0, 1.0, 1.0, 1.0}));
         return out_geom;
     }
 
@@ -1335,9 +1604,6 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
     if (!result_mesh.vertices().empty()) {
         data::PcgGeometry fallback = data::geometry_from_mesh(result_mesh);
         fallback.detail() = geometry.detail();
-        if (geometry.has_colors())
-            fallback.set_colors(std::vector<data::PcgColor>(
-                fallback.points().size(), data::PcgColor{1.0, 1.0, 1.0, 1.0}));
         return fallback;
     }
 

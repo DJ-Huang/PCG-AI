@@ -920,50 +920,6 @@ void add_clean_output_to_mesh(const BevelParams::OutputMesh& output, data::PcgMe
     }
 }
 
-Vec3 project_to_rounded_box(const Vec3& point, const Vec3& min_v, const Vec3& max_v, double radius)
-{
-    const Vec3 center = scale(add(min_v, max_v), 0.5);
-    const Vec3 half = scale(sub(max_v, min_v), 0.5);
-    const double r = std::min({radius, half.x, half.y, half.z});
-    if (r <= 1e-9)
-        return point;
-
-    const Vec3 inner{half.x - r, half.y - r, half.z - r};
-    const Vec3 local = sub(point, center);
-    const double local_len = std::sqrt(length_squared(local));
-    if (local_len <= 1e-12)
-        return point;
-
-    const Vec3 dir = scale(local, 1.0 / local_len);
-    double hi = std::numeric_limits<double>::max();
-    for (int axis = 0; axis < 3; ++axis) {
-        const double d = std::abs(dir[axis]);
-        if (d > 1e-12)
-            hi = std::min(hi, half[axis] / d);
-    }
-    if (!std::isfinite(hi))
-        return point;
-
-    auto sdf = [&](double distance) {
-        const Vec3 p = scale(dir, distance);
-        const Vec3 outside{
-            std::max(std::abs(p.x) - inner.x, 0.0),
-            std::max(std::abs(p.y) - inner.y, 0.0),
-            std::max(std::abs(p.z) - inner.z, 0.0)};
-        return std::sqrt(length_squared(outside)) - r;
-    };
-
-    double lo = 0.0;
-    for (int i = 0; i < 48; ++i) {
-        const double mid = 0.5 * (lo + hi);
-        if (sdf(mid) > 0.0)
-            hi = mid;
-        else
-            lo = mid;
-    }
-    return add(center, scale(dir, 0.5 * (lo + hi)));
-}
-
 void split_inward_face_fans(BevelParams::OutputMesh& output, const Vec3& center)
 {
     auto orientation = [&](int ia, int ib, int ic) {
@@ -4378,6 +4334,32 @@ data::PcgMeshData bevel_mesh_blender(
                 for (const std::string& g : bmesh.faces[static_cast<size_t>(origin)].groups)
                     geom.groups().add(geometry::GroupDomain::Face, g, face_idx);
             }
+        }
+
+        // Propagate vertex colors: match output vertex positions to source bmesh
+        // verts (which correspond 1:1 to geometry points when merge_coplanar=0).
+        // Non-beveled vertices keep their original positions → exact match.
+        // Beveled vertices have new positions → default to white.
+        if (geometry->has_colors()) {
+            const auto& src_colors = geometry->colors();
+            auto pos_key5 = [](const auto& v) -> std::string {
+                auto q = [](double val) { return static_cast<int64_t>(std::llround(val / 1e-5)); };
+                return std::to_string(q(v.x)) + ',' + std::to_string(q(v.y)) + ',' + std::to_string(q(v.z));
+            };
+            std::unordered_map<std::string, data::PcgColor> pos_to_color;
+            for (size_t i = 0; i < bmesh.verts.size() && i < src_colors.size(); ++i) {
+                const std::string key = pos_key5(bmesh.verts[i]);
+                pos_to_color.try_emplace(key, src_colors[i]);
+            }
+            std::vector<data::PcgColor> out_colors(geom.points().size(), data::PcgColor{1,1,1,1});
+            for (size_t i = 0; i < geom.points().size(); ++i) {
+                const Vec3 v{geom.points()[i].x, geom.points()[i].y, geom.points()[i].z};
+                const std::string key = pos_key5(v);
+                auto it = pos_to_color.find(key);
+                if (it != pos_to_color.end())
+                    out_colors[i] = it->second;
+            }
+            geom.set_colors(std::move(out_colors));
         }
     }
 

@@ -362,6 +362,10 @@ PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
     // Map mesh vertex colors back to geometry points. bmesh_from_mesh welds
     // positions, so multiple mesh vertices may map to one geometry point;
     // first writer wins (consistent with weld_mesh's first-wins semantics).
+    //
+    // WARNING: The quantization and key format below MUST stay in sync with
+    // bmesh.cpp::weld_mesh (same eps, same llround + "x,y,z" string key).
+    // Changing either side without the other will silently break color mapping.
     if (mesh.has_colors()) {
         const auto& mesh_verts = mesh.vertices();
         const auto& mesh_colors = mesh.colors();
