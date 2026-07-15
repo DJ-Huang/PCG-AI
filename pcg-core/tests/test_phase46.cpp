@@ -30,12 +30,20 @@ double outward_flip_ratio(const PcgMeshData& mesh)
 {
     if (mesh.vertices().empty() || mesh.triangles().size() < 3)
         return 1.0;
-    double cx = 0, cy = 0, cz = 0;
+    double min_x = mesh.vertices()[0].x, max_x = min_x;
+    double min_y = mesh.vertices()[0].y, max_y = min_y;
+    double min_z = mesh.vertices()[0].z, max_z = min_z;
     for (const auto& v : mesh.vertices()) {
-        cx += v.x; cy += v.y; cz += v.z;
+        min_x = std::min(min_x, static_cast<double>(v.x));
+        max_x = std::max(max_x, static_cast<double>(v.x));
+        min_y = std::min(min_y, static_cast<double>(v.y));
+        max_y = std::max(max_y, static_cast<double>(v.y));
+        min_z = std::min(min_z, static_cast<double>(v.z));
+        max_z = std::max(max_z, static_cast<double>(v.z));
     }
-    const double inv = 1.0 / static_cast<double>(mesh.vertices().size());
-    cx *= inv; cy *= inv; cz *= inv;
+    const double cx = (min_x + max_x) * 0.5;
+    const double cy = (min_y + max_y) * 0.5;
+    const double cz = (min_z + max_z) * 0.5;
     int flipped = 0, total = 0;
     for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
         const auto& a = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i])];

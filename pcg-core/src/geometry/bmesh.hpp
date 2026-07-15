@@ -50,7 +50,8 @@ struct BMeshDiskEntry {
 
 struct BMeshBuildOptions {
     double weld_eps = 1e-6;
-    /// Merge coplanar triangles within this angle (degrees).
+    /// Merge coplanar faces within this angle (degrees).
+    /// Applied by both bmesh_from_mesh (tris) and bmesh_from_geometry (n-gons).
     double merge_coplanar_angle_deg = 2.0;
     /// Mark edges sharper than this as bevel candidates (degrees).
     double sharp_angle_deg = 30.0;
@@ -70,6 +71,8 @@ int64_t edge_key(int a, int b);
 BMesh bmesh_from_mesh(const data::PcgMeshData& mesh, const BMeshBuildOptions& options = {});
 
 /// Build BMesh from canonical geometry; preserves edge/face groups.
+/// Also merges adjacent coplanar n-gons (merge_coplanar_angle_deg) and dissolves
+/// valence-2 collinear boundary verts (Simple-subdiv edge mids).
 BMesh bmesh_from_geometry(const data::PcgGeometry& geometry,
                             const BMeshBuildOptions& options = {});
 

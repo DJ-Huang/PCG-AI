@@ -206,6 +206,177 @@ void mark_sharp_edges(BMesh& mesh, double sharp_angle_deg) {
     }
 }
 
+/// Merge adjacent coplanar n-gon faces (Simple subdiv → 4 quads per cube face, etc.).
+/// triangle_indices / groups from each source face are unioned into the survivor.
+void merge_coplanar_faces(BMesh& mesh, double merge_angle_deg) {
+    const int face_count = static_cast<int>(mesh.faces.size());
+    if (face_count < 2)
+        return;
+
+    const double cos_merge = std::cos(merge_angle_deg * kPi / 180.0);
+
+    std::unordered_map<int64_t, std::vector<int>> edge_faces;
+    for (int fi = 0; fi < face_count; ++fi) {
+        const auto& verts = mesh.faces[static_cast<size_t>(fi)].verts;
+        const int n = static_cast<int>(verts.size());
+        for (int i = 0; i < n; ++i) {
+            const int a = verts[static_cast<size_t>(i)];
+            const int b = verts[static_cast<size_t>((i + 1) % n)];
+            edge_faces[edge_key(a, b)].push_back(fi);
+        }
+    }
+
+    std::vector<Vec3> normals(static_cast<size_t>(face_count));
+    for (int fi = 0; fi < face_count; ++fi)
+        normals[static_cast<size_t>(fi)] =
+            face_normal_from_loop(mesh, mesh.faces[static_cast<size_t>(fi)].verts);
+
+    UnionFind uf(face_count);
+    for (const auto& entry : edge_faces) {
+        const std::vector<int>& faces = entry.second;
+        if (faces.size() != 2)
+            continue;
+        const int f0 = faces[0];
+        const int f1 = faces[1];
+        if (length_squared(normals[static_cast<size_t>(f0)]) < 1e-20 ||
+            length_squared(normals[static_cast<size_t>(f1)]) < 1e-20)
+            continue;
+        if (dot(normals[static_cast<size_t>(f0)], normals[static_cast<size_t>(f1)]) >= cos_merge)
+            uf.unite(f0, f1);
+    }
+
+    std::unordered_map<int, std::vector<int>> groups;
+    for (int fi = 0; fi < face_count; ++fi)
+        groups[uf.find(fi)].push_back(fi);
+
+    if (static_cast<int>(groups.size()) == face_count)
+        return;
+
+    std::vector<BMeshFace> merged;
+    merged.reserve(groups.size());
+
+    for (auto& entry : groups) {
+        std::vector<int>& members = entry.second;
+        if (members.size() == 1) {
+            merged.push_back(std::move(mesh.faces[static_cast<size_t>(members[0])]));
+            continue;
+        }
+
+        std::unordered_map<int64_t, int> edge_use;
+        for (int fi : members) {
+            const auto& verts = mesh.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(verts.size());
+            for (int i = 0; i < n; ++i) {
+                const int a = verts[static_cast<size_t>(i)];
+                const int b = verts[static_cast<size_t>((i + 1) % n)];
+                edge_use[edge_key(a, b)]++;
+            }
+        }
+
+        std::unordered_map<int, std::vector<int>> boundary_adj;
+        for (int fi : members) {
+            const auto& verts = mesh.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(verts.size());
+            for (int i = 0; i < n; ++i) {
+                const int a = verts[static_cast<size_t>(i)];
+                const int b = verts[static_cast<size_t>((i + 1) % n)];
+                if (edge_use[edge_key(a, b)] == 1) {
+                    boundary_adj[a].push_back(b);
+                    boundary_adj[b].push_back(a);
+                }
+            }
+        }
+
+        std::vector<int> loop = trace_boundary_loop(boundary_adj, mesh.verts);
+        if (loop.size() < 3) {
+            for (int fi : members)
+                merged.push_back(std::move(mesh.faces[static_cast<size_t>(fi)]));
+            continue;
+        }
+
+        const Vec3 ref_n = normals[static_cast<size_t>(members.front())];
+        const Vec3 loop_n = face_normal_from_loop(mesh, loop);
+        if (dot(ref_n, loop_n) < 0.0)
+            std::reverse(loop.begin(), loop.end());
+
+        BMeshFace face;
+        face.verts = std::move(loop);
+        for (int fi : members) {
+            auto& src = mesh.faces[static_cast<size_t>(fi)];
+            face.triangle_indices.insert(face.triangle_indices.end(),
+                                         src.triangle_indices.begin(),
+                                         src.triangle_indices.end());
+            face.groups.insert(src.groups.begin(), src.groups.end());
+        }
+        merged.push_back(std::move(face));
+    }
+
+    mesh.faces = std::move(merged);
+}
+
+/// Remove valence-2 vertices that sit collinear on face boundaries (edge mids
+/// left by Simple subdivision after coplanar merge). Restores clean cube edges.
+void dissolve_collinear_valence2_verts(BMesh& mesh) {
+    constexpr double kCosColinear = 0.999999; // ~0.08°
+
+    auto rebuild_neighbors = [&](std::vector<std::unordered_set<int>>& nbrs) {
+        nbrs.assign(mesh.verts.size(), {});
+        for (const auto& face : mesh.faces) {
+            const int n = static_cast<int>(face.verts.size());
+            for (int i = 0; i < n; ++i) {
+                const int a = face.verts[static_cast<size_t>(i)];
+                const int b = face.verts[static_cast<size_t>((i + 1) % n)];
+                if (a < 0 || b < 0 || a >= static_cast<int>(nbrs.size()) ||
+                    b >= static_cast<int>(nbrs.size()))
+                    continue;
+                nbrs[static_cast<size_t>(a)].insert(b);
+                nbrs[static_cast<size_t>(b)].insert(a);
+            }
+        }
+    };
+
+    std::vector<std::unordered_set<int>> nbrs;
+    rebuild_neighbors(nbrs);
+
+    for (int pass = 0; pass < 64; ++pass) {
+        std::unordered_set<int> remove;
+        for (int vi = 0; vi < static_cast<int>(nbrs.size()); ++vi) {
+            if (nbrs[static_cast<size_t>(vi)].size() != 2)
+                continue;
+            auto it = nbrs[static_cast<size_t>(vi)].begin();
+            const int a = *it++;
+            const int b = *it;
+            const Vec3 u = normalize(sub(mesh.verts[static_cast<size_t>(vi)],
+                                         mesh.verts[static_cast<size_t>(a)]));
+            const Vec3 v = normalize(sub(mesh.verts[static_cast<size_t>(b)],
+                                         mesh.verts[static_cast<size_t>(vi)]));
+            if (length_squared(u) < 1e-20 || length_squared(v) < 1e-20)
+                continue;
+            if (dot(u, v) >= kCosColinear)
+                remove.insert(vi);
+        }
+        if (remove.empty())
+            break;
+
+        bool any = false;
+        for (auto& face : mesh.faces) {
+            std::vector<int> cleaned;
+            cleaned.reserve(face.verts.size());
+            for (int v : face.verts) {
+                if (remove.count(v) == 0)
+                    cleaned.push_back(v);
+            }
+            if (cleaned.size() >= 3 && cleaned.size() < face.verts.size()) {
+                face.verts = std::move(cleaned);
+                any = true;
+            }
+        }
+        if (!any)
+            break;
+        rebuild_neighbors(nbrs);
+    }
+}
+
 } // namespace
 
 void build_disk_cycles(BMesh& mesh) {
@@ -459,10 +630,10 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
     if (geometry.points().empty() || geometry.faces().empty())
         return result;
 
-    // Geometry faces are already merged n-gons (from geometry_from_mesh or
-    // upstream nodes). Take them directly — do NOT re-triangulate and re-merge,
-    // because fan triangulation of n-gons with collinear vertices produces
-    // degenerate triangles whose zero-length normals prevent coplanar merging.
+    // Take n-gon faces directly (no fan re-triangulation — collinear verts on
+    // loops yield zero-area tris that break angle-based merging).
+    // Then merge adjacent coplanar faces (Simple subdiv leaves 4 quads / face)
+    // and dissolve valence-2 collinear edge midpoints so bevel sees clean edges.
     result.verts.reserve(geometry.points().size());
     for (const auto& p : geometry.points())
         result.verts.push_back({p.x, p.y, p.z});
@@ -475,8 +646,7 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
         result.faces.push_back(std::move(bm_face));
     }
 
-    build_edges(result);
-
+    // Attach face groups before merge so survivors union group names.
     for (const std::string& group_name : geometry.groups().group_names(GroupDomain::Face)) {
         const auto& members = geometry.groups().members(GroupDomain::Face, group_name);
         for (int fi : members) {
@@ -485,6 +655,13 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
             result.faces[static_cast<size_t>(fi)].groups.insert(group_name);
         }
     }
+
+    if (options.merge_coplanar_angle_deg > 0.0) {
+        merge_coplanar_faces(result, options.merge_coplanar_angle_deg);
+        dissolve_collinear_valence2_verts(result);
+    }
+
+    build_edges(result);
 
     for (const std::string& group_name : geometry.groups().group_names(GroupDomain::Edge)) {
         const auto& members = geometry.groups().members(GroupDomain::Edge, group_name);

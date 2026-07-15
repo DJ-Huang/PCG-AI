@@ -4,6 +4,7 @@
 #include "elements/mesh_algorithms.hpp"
 #include "geometry/bmesh.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -13,16 +14,24 @@
 
 namespace {
 
+using pcg::internal::data::PcgGeometry;
 using pcg::internal::data::PcgMeshData;
 using pcg::internal::data::PcgVertex;
+using pcg::internal::data::triangulate_geometry_shared;
 using pcg::internal::elements::BevelMethod;
 using pcg::internal::elements::BevelMiter;
 using pcg::internal::elements::BevelOffsetType;
 using pcg::internal::elements::BevelVMeshMethod;
 using pcg::internal::elements::SubdivideMethod;
+using pcg::internal::elements::bevel_geometry;
 using pcg::internal::elements::bevel_mesh;
+using pcg::internal::elements::create_box_geometry;
 using pcg::internal::elements::create_box_mesh;
+using pcg::internal::elements::subdivide_geometry;
 using pcg::internal::elements::subdivide_mesh;
+using pcg::internal::geometry::BMesh;
+using pcg::internal::geometry::BMeshBuildOptions;
+using pcg::internal::geometry::bmesh_from_geometry;
 
 // ── Helpers (mirrors test_phase43.cpp) ──────────────────────────────────────
 
@@ -343,6 +352,91 @@ int run_tests() {
                 BevelVMeshMethod::Adj);
             check(expect_closed(result, label), label);
             check(expect_outward(result, label), label);
+        }
+    }
+
+    // ── Group 8: Simple subdiv n-gon → bevel_geometry (V39 regression) ─────
+    // Geometry path must coplanar-merge + dissolve edge mids before bevel;
+    // otherwise Adj VMesh collapses corners (~0.27 inward at amount=0.08).
+    {
+        const PcgGeometry box = create_box_geometry(2.0, 2.0, 2.0);
+        const PcgGeometry simple1 = subdivide_geometry(box, 1, SubdivideMethod::Simple);
+
+        BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 35.0;
+        opts.sharp_angle_deg = 30.0;
+        const BMesh bm = bmesh_from_geometry(simple1, opts);
+        check(bm.faces.size() == 6 && bm.edges.size() == 12,
+              "simple_L1 BMesh merges to 6 faces / 12 edges");
+        if (bm.faces.size() != 6 || bm.edges.size() != 12) {
+            std::printf("FAIL: simple_L1 BMesh faces=%zu edges=%zu (want 6/12)\n",
+                        bm.faces.size(), bm.edges.size());
+        }
+
+        // Match subdivide-loop-test.pcg: amount=0.08 seg=3 profile=0.5 adj.
+        // Pre-fix deepest≈0.27 independent of amount; post-fix must track O(amount).
+        const PcgGeometry beveled = bevel_geometry(
+            simple1, 0.08, 3, BevelMethod::Edge, BevelOffsetType::Offset, true,
+            30.0, 0.5f, BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj);
+        const PcgMeshData mesh = triangulate_geometry_shared(beveled);
+        double deepest = 0.0;
+        for (const auto& v : mesh.vertices()) {
+            const double shell = std::max({std::abs(v.x), std::abs(v.y), std::abs(v.z)});
+            deepest = std::max(deepest, std::max(0.0, 1.0 - shell));
+        }
+        const bool inset_ok = deepest < 0.05;
+        check(inset_ok, "simple_L1 bevel_geometry deepest_inward < 0.05");
+        if (!inset_ok) {
+            std::printf("FAIL: simple_L1 bevel deepest_inward=%.4f (want < 0.05)\n", deepest);
+        } else {
+            std::printf("PASS: simple_L1 bevel_geometry deepest_inward=%.4f\n", deepest);
+        }
+        // Blender-style subdivide -> bevel keeps long strips where source subdivision
+        // lines cross a narrow bevel. Reject only the more extreme V39 needle strips.
+        double max_quad_aspect = 0.0;
+        for (const auto& face : beveled.faces()) {
+            if (face.size() != 4)
+                continue;
+            double lens[4];
+            for (int e = 0; e < 4; ++e) {
+                const auto& a = beveled.points()[static_cast<size_t>(face[static_cast<size_t>(e)])];
+                const auto& b = beveled.points()[static_cast<size_t>(face[static_cast<size_t>((e + 1) % 4)])];
+                const double dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+                lens[e] = std::sqrt(dx * dx + dy * dy + dz * dz);
+            }
+            const double mn = std::min({lens[0], lens[1], lens[2], lens[3]});
+            const double mx = std::max({lens[0], lens[1], lens[2], lens[3]});
+            if (mn > 1e-9)
+                max_quad_aspect = std::max(max_quad_aspect, mx / mn);
+        }
+        check(max_quad_aspect < 50.0, "simple_L1 bevel no needle quads aspect>=50");
+        std::printf("%s: simple_L1 bevel max_quad_aspect=%.2f (want < 50)\n",
+                    max_quad_aspect < 50.0 ? "PASS" : "FAIL", max_quad_aspect);
+        check(beveled.points().size() <= 160,
+              "simple_L1 bevel Blender-like topology budget <= 160 vertices");
+        std::printf("%s: simple_L1 bevel vertices=%zu (want <= 160)\n",
+                    beveled.points().size() <= 160 ? "PASS" : "FAIL",
+                    beveled.points().size());
+        check(expect_closed(mesh, "simple_L1 bevel_geometry closed", false),
+              "simple_L1 bevel_geometry closed");
+    }
+
+    // ── Group 9: Cube corner no projection (Plan C11/AC4) ───────────────────
+    // Verify that removing project_to_rounded_box + tri_corner snap path
+    // maintains closed manifold for axis-aligned cube + profile=0.5.
+    {
+        const auto box = create_box_mesh(2.0, 2.0, 2.0);
+        for (int seg : {1, 2, 3, 4}) {
+            char label[128];
+            std::snprintf(label, sizeof(label),
+                "cube_corner_no_proj seg=%d prof=0.5", seg);
+            const auto result = bevel_mesh(box, 0.08, seg,
+                BevelMethod::Edge, BevelOffsetType::Offset, true,
+                30.0, 0.5f, BevelMiter::Sharp, BevelMiter::Sharp,
+                BevelVMeshMethod::Adj);
+            // AC4: closed manifold (bad_edges==0, boundary==0, dup==0, vol>0).
+            // Outward normals not asserted — pre-existing fastpath test doesn't either.
+            check(expect_closed(result, label), label);
         }
     }
 
