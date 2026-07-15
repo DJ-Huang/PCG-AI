@@ -44,11 +44,17 @@ public:
     GeometryDetailMeta& detail() { return detail_; }
     const GeometryDetailMeta& detail() const { return detail_; }
 
+    bool has_colors() const { return has_colors_; }
+    const std::vector<PcgColor>& colors() const { return colors_; }
+    void set_colors(std::vector<PcgColor> c) { colors_ = std::move(c); has_colors_ = true; }
+
 private:
     std::vector<PcgVec3> points_;
     std::vector<std::vector<int>> faces_;
     geometry::GroupTable groups_;
     GeometryDetailMeta detail_;
+    std::vector<PcgColor> colors_;
+    bool has_colors_ = false;
 };
 
 /// Fan-triangulate n-gon faces for display / legacy mesh nodes.

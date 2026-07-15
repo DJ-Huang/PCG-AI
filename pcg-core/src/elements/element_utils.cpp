@@ -140,7 +140,9 @@ data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* l
         return *mesh;
 
     if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry(pin))
-        return data::triangulate_geometry(*geometry);
+        return data::compute_split_normals(*geometry,
+            data::NormalComputeOptions{geometry->detail().shade_mode,
+                                        geometry->detail().cusp_angle_deg, true});
 
     const nlohmann::json* input = require_input_json(ctx, pin, label);
     if (!input)

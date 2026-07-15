@@ -13,13 +13,20 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "VertexColor missing node");
 
-        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "VertexColor missing mesh input");
-
         const double r = ctx.node->data.value("r", 1.0);
         const double g = ctx.node->data.value("g", 1.0);
         const double b = ctx.node->data.value("b", 1.0);
         const double a = ctx.node->data.value("a", 1.0);
 
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            data::PcgGeometry out = *geometry;
+            out.set_colors(std::vector<data::PcgColor>(
+                out.points().size(), data::PcgColor{r, g, b, a}));
+            emit_geometry(ctx, std::move(out));
+            return PCG_OK;
+        }
+
+        data::PcgMeshData mesh = get_mesh_input(ctx, "in", "VertexColor missing mesh input");
         vertex_color_mesh(mesh, r, g, b, a);
         emit_mesh(ctx, std::move(mesh));
         return PCG_OK;

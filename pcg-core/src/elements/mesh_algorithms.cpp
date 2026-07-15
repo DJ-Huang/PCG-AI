@@ -1324,6 +1324,9 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
 
     if (!out_geom.points().empty()) {
         out_geom.detail() = geometry.detail();
+        if (geometry.has_colors())
+            out_geom.set_colors(std::vector<data::PcgColor>(
+                out_geom.points().size(), data::PcgColor{1.0, 1.0, 1.0, 1.0}));
         return out_geom;
     }
 
@@ -1332,6 +1335,9 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
     if (!result_mesh.vertices().empty()) {
         data::PcgGeometry fallback = data::geometry_from_mesh(result_mesh);
         fallback.detail() = geometry.detail();
+        if (geometry.has_colors())
+            fallback.set_colors(std::vector<data::PcgColor>(
+                fallback.points().size(), data::PcgColor{1.0, 1.0, 1.0, 1.0}));
         return fallback;
     }
 

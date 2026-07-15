@@ -468,12 +468,55 @@ data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformM
 
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b)
 {
-    data::PcgMeshData out = a;
-    const int offset = static_cast<int>(out.vertices().size());
+    if (a.vertices().empty())
+        return b;
+    if (b.vertices().empty())
+        return a;
+
+    data::PcgMeshData out;
+    const int a_verts = static_cast<int>(a.vertices().size());
+
+    for (const auto& v : a.vertices())
+        out.vertices_mut().push_back(v);
     for (const auto& v : b.vertices())
         out.vertices_mut().push_back(v);
+
+    for (int idx : a.triangles())
+        out.triangles_mut().push_back(idx);
     for (int idx : b.triangles())
-        out.triangles_mut().push_back(idx + offset);
+        out.triangles_mut().push_back(idx + a_verts);
+
+    if (a.has_normals() && b.has_normals()) {
+        std::vector<data::PcgVertex> normals;
+        normals.reserve(out.vertices().size());
+        for (const auto& n : a.normals())
+            normals.push_back(n);
+        for (const auto& n : b.normals())
+            normals.push_back(n);
+        out.set_normals(std::move(normals));
+    }
+
+    if (a.has_colors() && b.has_colors()) {
+        std::vector<data::PcgColor> colors;
+        colors.reserve(out.vertices().size());
+        for (const auto& c : a.colors())
+            colors.push_back(c);
+        for (const auto& c : b.colors())
+            colors.push_back(c);
+        out.set_colors(std::move(colors));
+    }
+
+    if (a.has_uvs() && b.has_uvs()) {
+        std::vector<data::PcgVec2> uvs;
+        uvs.reserve(out.vertices().size());
+        for (const auto& uv : a.uvs())
+            uvs.push_back(uv);
+        for (const auto& uv : b.uvs())
+            uvs.push_back(uv);
+        out.set_uvs(std::move(uvs));
+    }
+
+    out.metadata() = a.metadata();
     return out;
 }
 

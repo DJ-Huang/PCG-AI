@@ -39,6 +39,7 @@ namespace DJTechEditor.PCG.Graph
 
         private static bool s_PcgModeActive;
         private static PcgGraphEditorWindow s_ActiveWindow;
+        private static PcgGraphComponent s_ActiveComponent;
         private static GameObject s_LockedSelection;
         private static bool s_SelectionGuard;
         private static Tool s_PrevTool;
@@ -233,18 +234,38 @@ namespace DJTechEditor.PCG.Graph
             if (Application.isPlaying)
                 return;
 
-            var graphWindow = FindGraphWindow();
+            // Show the toolbar/entry when the selected object has a PcgGraphComponent,
+            // regardless of whether a Graph Editor window is open.
+            var component = Selection.activeGameObject?.GetComponent<PcgGraphComponent>();
 
-            if (graphWindow == null)
+            if (component == null || component.GraphAsset == null)
             {
                 if (s_PcgModeActive)
                     ExitPcgMode();
                 return;
             }
 
+            var graphWindow = FindGraphWindowForComponent(component);
+
             if (!s_PcgModeActive)
             {
-                DrawPcgModeEntryOverlay(sceneView, graphWindow);
+                DrawPcgModeEntryOverlay(sceneView, graphWindow, component);
+                return;
+            }
+
+            // In PCG mode, keep using the active window. If selection changed to
+            // a different component, exit so the user can re-enter with the new one.
+            if (s_ActiveComponent != null && s_ActiveComponent != component)
+            {
+                ExitPcgMode();
+                DrawPcgModeEntryOverlay(sceneView, graphWindow, component);
+                return;
+            }
+
+            if (graphWindow == null)
+            {
+                ExitPcgMode();
+                DrawPcgModeEntryOverlay(sceneView, null, component);
                 return;
             }
 
@@ -302,31 +323,43 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static PcgGraphEditorWindow FindGraphWindow()
+        private static PcgGraphEditorWindow FindGraphWindowForComponent(PcgGraphComponent component)
         {
-            if (s_PcgModeActive && s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph)
+            if (component == null || component.GraphAsset == null)
+                return null;
+
+            var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
+            var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
+
+            // If already in PCG mode, keep using the active window if it matches.
+            if (s_PcgModeActive && s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph &&
+                s_ActiveWindow.MatchesGraphAsset(assetPath, assetGuid))
                 return s_ActiveWindow;
 
             foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
             {
-                if (window != null && window.HasLoadedGraph && window.GraphView != null)
+                if (window != null && window.HasLoadedGraph && window.GraphView != null &&
+                    window.MatchesGraphAsset(assetPath, assetGuid))
                     return window;
             }
             return null;
         }
 
-        private static void EnterPcgMode(PcgGraphEditorWindow window)
+        private static void EnterPcgMode(PcgGraphEditorWindow window, PcgGraphComponent component)
         {
             s_PcgModeActive = true;
             s_ActiveWindow = window;
+            s_ActiveComponent = component;
             // Re-derive context from current selection instead of resetting to
             // Object/None. If a node (e.g. GroupCreate) was already selected,
             // the toolbar activates the correct domain on entry.
-            window.GraphView.RefreshSceneEditContext();
+            if (window != null && window.GraphView != null)
+                window.GraphView.RefreshSceneEditContext();
 
             s_OthersDisplay = OthersDisplayMode.HideOthers;
 
-            var anchor = FindPreviewAnchor(window);
+            // Use the selected component's transform as the preview anchor directly.
+            var anchor = component != null ? component.transform : FindPreviewAnchor(window);
             if (anchor != null)
             {
                 s_LockedSelection = anchor.gameObject;
@@ -338,6 +371,19 @@ namespace DJTechEditor.PCG.Graph
             s_PrevTool = Tools.current;
             Tools.current = Tool.None;
             ApplyOthersDisplayMode();
+
+            // Frame the Scene View on the selected object.
+            if (s_LockedSelection != null)
+            {
+                var renderers = s_LockedSelection.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0)
+                {
+                    var bounds = renderers[0].bounds;
+                    for (var i = 1; i < renderers.Length; i++)
+                        bounds.Encapsulate(renderers[i].bounds);
+                    SceneView.lastActiveSceneView?.Frame(bounds, false);
+                }
+            }
         }
 
         private static void ExitPcgMode()
@@ -349,6 +395,7 @@ namespace DJTechEditor.PCG.Graph
             }
             s_PcgModeActive = false;
             s_ActiveWindow = null;
+            s_ActiveComponent = null;
             s_LockedSelection = null;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
@@ -728,7 +775,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawPcgModeEntryOverlay(SceneView sceneView, PcgGraphEditorWindow window)
+        private static void DrawPcgModeEntryOverlay(SceneView sceneView, PcgGraphEditorWindow window, PcgGraphComponent component)
         {
             Handles.BeginGUI();
             try
@@ -744,13 +791,41 @@ namespace DJTechEditor.PCG.Graph
 
                 GUILayout.BeginArea(area);
                 GUILayout.Space(6f);
-                var assetName = window.CurrentAssetPath;
+                var assetName = window != null ? window.CurrentAssetPath : null;
+                if (string.IsNullOrEmpty(assetName) && component != null && component.GraphAsset != null)
+                    assetName = AssetDatabase.GetAssetPath(component.GraphAsset);
                 if (string.IsNullOrEmpty(assetName))
                     assetName = "untitled";
                 GUILayout.Label($"PCG: {assetName}", EditorStyles.boldLabel);
                 if (GUILayout.Button("Enter PCG Mode", GUILayout.Height(24f)))
                 {
-                    EnterPcgMode(window);
+                    // If no graph window is open, open one as a tab next to
+                    // the Scene View — same as Shader Graph.
+                    if (window == null && component != null && component.GraphAsset != null)
+                    {
+                        var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
+                        var guid = AssetDatabase.AssetPathToGUID(assetPath);
+
+                        // Focus existing window with the same graph if one is open.
+                        foreach (var w in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
+                        {
+                            if (w.selectedGuid == guid)
+                            {
+                                window = w;
+                                break;
+                            }
+                        }
+
+                        if (window == null)
+                        {
+                            window = EditorWindow.GetWindow<PcgGraphEditorWindow>(typeof(SceneView));
+                            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/PcgPlugin/Editor/Icons/pcg-icon-16.png");
+                            window.titleContent = new GUIContent("PCG Graph", icon);
+                            window.Initialize(guid);
+                        }
+                    }
+                    if (window != null)
+                        EnterPcgMode(window, component);
                     sceneView.Repaint();
                 }
                 GUILayout.EndArea();
@@ -1428,6 +1503,10 @@ namespace DJTechEditor.PCG.Graph
 
         private static Transform FindPreviewAnchor(PcgGraphEditorWindow window)
         {
+            // When in PCG mode with a known active component, use it directly.
+            if (s_ActiveComponent != null)
+                return s_ActiveComponent.transform;
+
             var assetPath = window.CurrentAssetPath;
             var assetGuid = window.selectedGuid;
             foreach (var component in Object.FindObjectsOfType<PcgGraphComponent>())

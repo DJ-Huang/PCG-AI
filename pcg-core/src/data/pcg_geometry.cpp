@@ -321,13 +321,63 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         mesh.add_vertex({v.x, v.y, v.z});
     mesh.set_normals(std::move(render_normals));
 
+    // Copy per-point colors to render vertices
+    if (geometry.has_colors()) {
+        const auto& geo_colors = geometry.colors();
+        std::vector<PcgColor> render_colors(render_positions.size(), PcgColor{1,1,1,1});
+
+        // Build render vertex → source point index mapping
+        for (const auto& [key, idx] : render_vertex_map) {
+            if (key.point_index >= 0 && static_cast<size_t>(key.point_index) < geo_colors.size())
+                render_colors[static_cast<size_t>(idx)] = geo_colors[static_cast<size_t>(key.point_index)];
+        }
+        mesh.set_colors(std::move(render_colors));
+    }
+
     return mesh;
 }
 
 PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
 {
-    const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh);
-    return geometry::geometry_from_bmesh(bmesh);
+    geometry::BMeshBuildOptions opts;
+    opts.merge_coplanar_angle_deg = 0.0;
+    const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh, opts);
+    PcgGeometry geo = geometry::geometry_from_bmesh(bmesh);
+
+    // Map mesh vertex colors back to geometry points. bmesh_from_mesh welds
+    // positions, so multiple mesh vertices may map to one geometry point;
+    // first writer wins (consistent with weld_mesh's first-wins semantics).
+    if (mesh.has_colors()) {
+        const auto& mesh_verts = mesh.vertices();
+        const auto& mesh_colors = mesh.colors();
+        std::vector<PcgColor> pt_colors(geo.points().size(), PcgColor{1,1,1,1});
+        // Build position → geometry point index (reuse bmesh weld result)
+        // bmesh.verts are welded positions; we need the reverse map.
+        // weld_mesh inside bmesh_from_mesh does first-wins, so we replicate:
+        std::unordered_map<std::string, int> pos_to_pt;
+        const double eps = opts.weld_eps;
+        const auto quantize = [eps](double v) -> int64_t {
+            return static_cast<int64_t>(std::llround(v / eps));
+        };
+        for (size_t i = 0; i < mesh_verts.size() && i < mesh_colors.size(); ++i) {
+            const auto& v = mesh_verts[i];
+            const std::string key = std::to_string(quantize(v.x)) + ',' +
+                                    std::to_string(quantize(v.y)) + ',' +
+                                    std::to_string(quantize(v.z));
+            auto it = pos_to_pt.find(key);
+            if (it == pos_to_pt.end()) {
+                // Find matching bmesh vert index
+                // bmesh.verts should be in the same order as first-wins weld
+                const int idx = static_cast<int>(pos_to_pt.size());
+                pos_to_pt[key] = idx;
+                if (static_cast<size_t>(idx) < pt_colors.size())
+                    pt_colors[static_cast<size_t>(idx)] = mesh_colors[i];
+            }
+        }
+        geo.set_colors(std::move(pt_colors));
+    }
+
+    return geo;
 }
 
 std::vector<int64_t> geometry_edge_keys(const PcgGeometry& geometry)
@@ -403,6 +453,18 @@ PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const s
                 }
             }
         }
+    }
+
+    // Merge per-point colors
+    if (a.has_colors() || b.has_colors()) {
+        std::vector<PcgColor> merged_colors = a.has_colors() ? a.colors() : std::vector<PcgColor>();
+        merged_colors.resize(merged.points().size(), PcgColor{1.0, 1.0, 1.0, 1.0});
+        for (size_t i = 0; i < b.points().size(); ++i) {
+            const size_t dst = static_cast<size_t>(point_offset) + i;
+            if (b.has_colors() && i < b.colors().size())
+                merged_colors[dst] = b.colors()[i];
+        }
+        merged.set_colors(std::move(merged_colors));
     }
 
     return merged;

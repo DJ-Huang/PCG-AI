@@ -15,6 +15,7 @@ constexpr uint32_t kChunkFaceIndices = 3u;
 constexpr uint32_t kChunkGroupDefs = 4u;
 constexpr uint32_t kChunkGroupMembers = 5u;
 constexpr uint32_t kChunkTriangulation = 6u;
+constexpr uint32_t kChunkColors = 7u;
 
 struct Writer {
     uint8_t* base = nullptr;
@@ -79,6 +80,9 @@ int geometry_binary_size(const PcgGeometry& geometry)
 
     const PcgMeshData tri = triangulate_geometry(geometry);
     size += 8 + static_cast<int>(tri.triangles().size()) * 4;
+
+    if (geometry.has_colors())
+        size += 8 + static_cast<int>(geometry.points().size()) * 16;
     return size;
 }
 
@@ -190,6 +194,19 @@ bool write_geometry_binary(const PcgGeometry& geometry, void* buffer, int buffer
         }))
         return false;
 
+    if (geometry.has_colors()) {
+        if (!write_chunk(kChunkColors, [&] {
+                for (const auto& c : geometry.colors()) {
+                    const float rgba[4] = {static_cast<float>(c.r), static_cast<float>(c.g),
+                                            static_cast<float>(c.b), static_cast<float>(c.a)};
+                    if (!w.write(rgba, 16))
+                        return false;
+                }
+                return true;
+            }))
+            return false;
+    }
+
     return true;
 }
 
@@ -276,6 +293,17 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
                 if (!r.read_u32(group_members[static_cast<size_t>(i)]))
                     return false;
             }
+        } else if (chunk_id == kChunkColors) {
+            std::vector<PcgColor> colors;
+            const int color_count = chunk_size / 16;
+            colors.reserve(static_cast<size_t>(color_count));
+            for (int i = 0; i < color_count; ++i) {
+                float rgba[4];
+                if (!r.read(rgba, 16))
+                    return false;
+                colors.push_back(PcgColor{rgba[0], rgba[1], rgba[2], rgba[3]});
+            }
+            geometry.set_colors(std::move(colors));
         } else {
             r.offset = chunk_end;
         }

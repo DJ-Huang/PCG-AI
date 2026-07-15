@@ -20,7 +20,7 @@
       "data": {
         "mode": "catmullRom",
         "closed": false,
-        "subdivisions": 12,
+        "subdivisions": 16,
         "controlPoints": "[{\"x\":0.1,\"y\":0.0,\"z\":0},{\"x\":0.5,\"y\":0.05,\"z\":0},{\"x\":1.1,\"y\":0.2,\"z\":0},{\"x\":1.4,\"y\":0.4,\"z\":0},{\"x\":1.5,\"y\":0.5,\"z\":0},{\"x\":1.5,\"y\":2.4,\"z\":0},{\"x\":1.45,\"y\":2.65,\"z\":0},{\"x\":1.25,\"y\":2.85,\"z\":0},{\"x\":0.9,\"y\":3.0,\"z\":0},{\"x\":0.6,\"y\":3.1,\"z\":0},{\"x\":0.55,\"y\":3.3,\"z\":0},{\"x\":0.6,\"y\":3.5,\"z\":0},{\"x\":0.5,\"y\":3.6,\"z\":0},{\"x\":0.15,\"y\":3.65,\"z\":0}]",
         "editPlane": "none"
       }
@@ -53,7 +53,7 @@
       "position": { "x": 200, "y": 160 },
       "data": {
         "axis": "y",
-        "segments": 16,
+        "segments": 32,
         "capStart": true,
         "capEnd": true
       }
@@ -66,7 +66,7 @@
         "surfaceShape": "circle",
         "radius": 0.06,
         "columns": 8,
-        "sampleSpacing": 0.2,
+        "sampleSpacing": 0.3,
         "capStart": true,
         "capEnd": true,
         "upY": 1,
@@ -135,7 +135,7 @@
       "data": {
         "mode": "catmullRom",
         "closed": true,
-        "subdivisions": 16,
+        "subdivisions": 8,
         "controlPoints": "[{\"x\":0.4,\"y\":0,\"z\":0},{\"x\":0.283,\"y\":0,\"z\":0.283},{\"x\":0,\"y\":0,\"z\":0.4},{\"x\":-0.283,\"y\":0,\"z\":0.283},{\"x\":-0.4,\"y\":0,\"z\":0},{\"x\":-0.283,\"y\":0,\"z\":-0.283},{\"x\":0,\"y\":0,\"z\":-0.4},{\"x\":0.283,\"y\":0,\"z\":-0.283}]",
         "editPlane": "none"
       }
@@ -148,7 +148,7 @@
         "surfaceShape": "circle",
         "radius": 0.04,
         "columns": 12,
-        "sampleSpacing": 0.15,
+        "sampleSpacing": 0.3,
         "capStart": false,
         "capEnd": false,
         "upX": 0,
@@ -265,8 +265,8 @@
       "position": { "x": 200, "y": 1600 },
       "data": {
         "method": "edge",
-        "amount": 0.08,
-        "segments": 3,
+        "amount": 0.05,
+        "segments": 2,
         "angleLimit": 25,
         "profile": 0.7
       }
