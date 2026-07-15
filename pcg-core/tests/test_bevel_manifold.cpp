@@ -356,8 +356,9 @@ int run_tests() {
     }
 
     // ── Group 8: Simple subdiv n-gon → bevel_geometry (V39 regression) ─────
-    // Geometry path must coplanar-merge + dissolve edge mids before bevel;
-    // otherwise Adj VMesh collapses corners (~0.27 inward at amount=0.08).
+    // Explicitly opt-in to merge+dissolve cleanup: this test verifies that
+    // coplanar merge + collinear dissolve restores clean cube edges (6F/12E).
+    // Production bevel path keeps merge=0 and does not set dissolve_collinear.
     {
         const PcgGeometry box = create_box_geometry(2.0, 2.0, 2.0);
         const PcgGeometry simple1 = subdivide_geometry(box, 1, SubdivideMethod::Simple);
@@ -365,6 +366,7 @@ int run_tests() {
         BMeshBuildOptions opts;
         opts.merge_coplanar_angle_deg = 35.0;
         opts.sharp_angle_deg = 30.0;
+        opts.dissolve_collinear = true;
         const BMesh bm = bmesh_from_geometry(simple1, opts);
         check(bm.faces.size() == 6 && bm.edges.size() == 12,
               "simple_L1 BMesh merges to 6 faces / 12 edges");

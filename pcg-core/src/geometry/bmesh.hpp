@@ -55,6 +55,11 @@ struct BMeshBuildOptions {
     double merge_coplanar_angle_deg = 2.0;
     /// Mark edges sharper than this as bevel candidates (degrees).
     double sharp_angle_deg = 30.0;
+    /// Dissolve valence-2 collinear boundary vertices (Simple-subdiv edge mids).
+    /// Only effective when merge_coplanar_angle_deg > 0. Default false:
+    /// dissolve is opt-in because it removes topologically meaningful vertices
+    /// from Boolean CSG output and other non-bevel paths.
+    bool dissolve_collinear = false;
 };
 
 struct BMesh {
@@ -71,8 +76,8 @@ int64_t edge_key(int a, int b);
 BMesh bmesh_from_mesh(const data::PcgMeshData& mesh, const BMeshBuildOptions& options = {});
 
 /// Build BMesh from canonical geometry; preserves edge/face groups.
-/// Also merges adjacent coplanar n-gons (merge_coplanar_angle_deg) and dissolves
-/// valence-2 collinear boundary verts (Simple-subdiv edge mids).
+/// Merges adjacent coplanar n-gons (merge_coplanar_angle_deg).
+/// Dissolves valence-2 collinear boundary verts only when dissolve_collinear=true.
 BMesh bmesh_from_geometry(const data::PcgGeometry& geometry,
                             const BMeshBuildOptions& options = {});
 

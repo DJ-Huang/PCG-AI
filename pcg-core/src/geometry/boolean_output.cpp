@@ -14,14 +14,11 @@ data::PcgGeometry finalize_boolean_output(const BooleanResult& result,
     if (mode == DetriangulateMode::None)
         return result.geometry;
 
-    // Use BMesh to merge coplanar triangles
+    // Use BMesh to merge coplanar triangles.
+    // merge=0: detriangulate is a no-op (identity round-trip through BMesh).
+    // This preserves the raw CSG triangle output without merging or dissolving.
     BMeshBuildOptions opts;
-    if (mode == DetriangulateMode::All) {
-        opts.merge_coplanar_angle_deg = 2.0;
-    } else {
-        // Unchanged: only merge non-seam triangles
-        opts.merge_coplanar_angle_deg = 2.0;
-    }
+    opts.merge_coplanar_angle_deg = 0.0;
 
     BMesh bm = bmesh_from_geometry(result.geometry, opts);
     data::PcgGeometry out = geometry_from_bmesh(bm);

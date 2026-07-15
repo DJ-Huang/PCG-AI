@@ -632,8 +632,9 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
 
     // Take n-gon faces directly (no fan re-triangulation — collinear verts on
     // loops yield zero-area tris that break angle-based merging).
-    // Then merge adjacent coplanar faces (Simple subdiv leaves 4 quads / face)
-    // and dissolve valence-2 collinear edge midpoints so bevel sees clean edges.
+    // Then merge adjacent coplanar faces (Simple subdiv leaves 4 quads / face).
+    // Dissolve of valence-2 collinear edge midpoints is opt-in (default off):
+    // it removes topologically meaningful vertices from Boolean/GroupCreate paths.
     result.verts.reserve(geometry.points().size());
     for (const auto& p : geometry.points())
         result.verts.push_back({p.x, p.y, p.z});
@@ -658,7 +659,8 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry, const BMeshBuildOpt
 
     if (options.merge_coplanar_angle_deg > 0.0) {
         merge_coplanar_faces(result, options.merge_coplanar_angle_deg);
-        dissolve_collinear_valence2_verts(result);
+        if (options.dissolve_collinear)
+            dissolve_collinear_valence2_verts(result);
     }
 
     build_edges(result);
