@@ -44,6 +44,22 @@ namespace DJTechEditor.PCG.Graph
         private static bool s_SelectionGuard;
         private static Tool s_PrevTool;
 
+        // Wire overlay edge cache — rebuilt only when preview data changes
+        private static PcgPolygonPreviewData s_WirePreviewCache;
+        private static int[] s_WireEdgePairs; // flat: [a0, b0, a1, b1, ...]
+
+        // Blender-style screen-space thick wire: expand edges → camera-facing quads, 1× DrawMeshNow.
+        // Width is pixels (EditorPrefs); not N× DrawAAPolyLine (that was the V58 stall).
+        private const string WireWidthPrefsKey = "Pcg.PolygonWire.WidthPx";
+        private const float WireWidthPxDefault = 3f;
+        private static readonly Color s_WireColor = new(0f, 0.75f, 0.85f, 0.85f);
+        private static Mesh s_WireMesh;
+        private static Material s_WireMaterial;
+        private static Vector3[] s_WireVerts;
+        private static Color[] s_WireColors;
+        private static int[] s_WireTris;
+        private static int s_WireBuiltEdgeCount;
+
         private enum OthersDisplayMode
         {
             ShowAll,
@@ -270,7 +286,7 @@ namespace DJTechEditor.PCG.Graph
             }
 
             DrawPcgModeToolbar(sceneView, graphWindow);
-            DrawPolygonWireOverlay(graphWindow);
+            DrawPolygonWireOverlay(sceneView, graphWindow);
 
             var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
             foreach (var node in graphWindow.GraphView.selection.OfType<PcgManifestNodeView>())
@@ -327,6 +343,12 @@ namespace DJTechEditor.PCG.Graph
         {
             if (component == null || component.GraphAsset == null)
                 return null;
+
+            // Fast path: in PCG mode the active window/component pair is already known;
+            // skip per-frame AssetDatabase.GetAssetPath / AssetPathToGUID lookups.
+            if (s_PcgModeActive && s_ActiveComponent == component &&
+                s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph)
+                return s_ActiveWindow;
 
             var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
             var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
@@ -397,6 +419,9 @@ namespace DJTechEditor.PCG.Graph
             s_ActiveWindow = null;
             s_ActiveComponent = null;
             s_LockedSelection = null;
+            s_WirePreviewCache = null;
+            s_WireEdgePairs = null;
+            s_WireBuiltEdgeCount = 0;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
             s_SelectedGroupSource = null;
@@ -1865,9 +1890,13 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawPolygonWireOverlay(PcgGraphEditorWindow window)
+        private static void DrawPolygonWireOverlay(SceneView sceneView, PcgGraphEditorWindow window)
         {
             if (Event.current.type != EventType.Repaint)
+                return;
+
+            var cam = sceneView != null ? sceneView.camera : null;
+            if (cam == null)
                 return;
 
             var anchor = FindPreviewAnchor(window);
@@ -1885,51 +1914,252 @@ namespace DJTechEditor.PCG.Graph
                 preview.Points == null || preview.FaceOffsets == null || preview.FaceIndices == null)
                 return;
 
-            var points = preview.Points;
-            var offsets = preview.FaceOffsets;
-            var indices = preview.FaceIndices;
+            // Rebuild unique edge list only when preview data changes (new cook),
+            // not every frame. Eliminates per-frame HashSet allocation + dedup loop.
+            if (!ReferenceEquals(preview, s_WirePreviewCache))
+            {
+                s_WirePreviewCache = preview;
+                s_WireEdgePairs = BuildUniqueEdgePairs(preview);
+            }
+
+            if (s_WireEdgePairs == null || s_WireEdgePairs.Length < 2)
+                return;
+
+            if (!EnsureWireDrawResources())
+            {
+                // Shader missing: fall back to 1px batched DrawLines (still 1 draw call).
+                DrawPolygonWireOverlayThinFallback(anchor, preview.Points);
+                return;
+            }
+
+            var edgeCount = s_WireEdgePairs.Length / 2;
+            var vertCount = edgeCount * 4;
+            var indexCount = edgeCount * 6;
+            EnsureWireBuffers(edgeCount, vertCount, indexCount);
+
+            var widthPx = EditorPrefs.GetFloat(WireWidthPrefsKey, WireWidthPxDefault);
+            if (widthPx < 0.5f)
+                widthPx = 0.5f;
+
+            ExpandEdgesToCameraFacingQuads(
+                preview.Points,
+                anchor.localToWorldMatrix,
+                cam,
+                widthPx,
+                edgeCount);
+
+            s_WireMesh.Clear(false);
+            s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+            s_WireMesh.SetColors(s_WireColors, 0, vertCount);
+            s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+
+            s_WireMaterial.SetPass(0);
+            Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
+        }
+
+        private static void DrawPolygonWireOverlayThinFallback(Transform anchor, Vector3[] points)
+        {
+            var linePoints = new Vector3[s_WireEdgePairs.Length];
             var l2w = anchor.localToWorldMatrix;
-            var drawn = new HashSet<ulong>();
+            for (var i = 0; i < s_WireEdgePairs.Length; i++)
+                linePoints[i] = l2w.MultiplyPoint(points[s_WireEdgePairs[i]]);
 
             var prevColor = Handles.color;
             var prevZTest = Handles.zTest;
             try
             {
-                // LessEqual: respect depth buffer so back faces are occluded by the Lit mesh.
-                Handles.color = new Color(0f, 0.75f, 0.85f, 0.85f);
+                Handles.color = s_WireColor;
                 Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
-
-                for (var fi = 0; fi < preview.FaceCount; fi++)
-                {
-                    var start = offsets[fi];
-                    var end = fi + 1 < preview.FaceCount ? offsets[fi + 1] : indices.Length;
-                    if (end - start < 3 || start < 0 || end > indices.Length)
-                        continue;
-
-                    for (var i = start; i < end; i++)
-                    {
-                        var a = indices[i];
-                        var b = indices[i + 1 < end ? i + 1 : start];
-                        if (a == b || a < 0 || b < 0 || a >= points.Length || b >= points.Length)
-                            continue;
-
-                        var lo = a < b ? a : b;
-                        var hi = a < b ? b : a;
-                        var key = ((ulong)(uint)lo << 32) | (uint)hi;
-                        if (!drawn.Add(key))
-                            continue;
-
-                        var p0 = l2w.MultiplyPoint(points[a]);
-                        var p1 = l2w.MultiplyPoint(points[b]);
-                        Handles.DrawAAPolyLine(4f, p0, p1);
-                    }
-                }
+                Handles.DrawLines(linePoints);
             }
             finally
             {
                 Handles.color = prevColor;
                 Handles.zTest = prevZTest;
             }
+        }
+
+        private static bool EnsureWireDrawResources()
+        {
+            if (s_WireMesh == null)
+            {
+                s_WireMesh = new Mesh { name = "PcgPolygonWireOverlay", hideFlags = HideFlags.HideAndDontSave };
+                s_WireMesh.MarkDynamic();
+            }
+
+            if (s_WireMaterial == null)
+            {
+                var shader = Shader.Find("Hidden/Internal-Colored");
+                if (shader == null)
+                    return false;
+
+                s_WireMaterial = new Material(shader)
+                {
+                    name = "PcgPolygonWireOverlay",
+                    hideFlags = HideFlags.HideAndDontSave,
+                };
+                s_WireMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                s_WireMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                s_WireMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+                s_WireMaterial.SetInt("_ZWrite", 0);
+                // LessEqual: respect depth so back edges are occluded by the Lit mesh.
+                s_WireMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual);
+            }
+
+            return true;
+        }
+
+        private static void EnsureWireBuffers(int edgeCount, int vertCount, int indexCount)
+        {
+            if (s_WireVerts == null || s_WireVerts.Length < vertCount)
+            {
+                s_WireVerts = new Vector3[vertCount];
+                s_WireColors = new Color[vertCount];
+                s_WireBuiltEdgeCount = 0;
+            }
+
+            if (s_WireTris == null || s_WireTris.Length < indexCount)
+            {
+                s_WireTris = new int[indexCount];
+                s_WireBuiltEdgeCount = 0;
+            }
+
+            // Indices and colors are deterministic from edgeCount — fill once per size.
+            if (s_WireBuiltEdgeCount == edgeCount)
+                return;
+
+            for (var e = 0; e < edgeCount; e++)
+            {
+                var vi = e * 4;
+                s_WireColors[vi] = s_WireColor;
+                s_WireColors[vi + 1] = s_WireColor;
+                s_WireColors[vi + 2] = s_WireColor;
+                s_WireColors[vi + 3] = s_WireColor;
+
+                var ti = e * 6;
+                s_WireTris[ti] = vi;
+                s_WireTris[ti + 1] = vi + 1;
+                s_WireTris[ti + 2] = vi + 2;
+                s_WireTris[ti + 3] = vi + 1;
+                s_WireTris[ti + 4] = vi + 3;
+                s_WireTris[ti + 5] = vi + 2;
+            }
+
+            s_WireBuiltEdgeCount = edgeCount;
+        }
+
+        /// <summary>
+        /// Expand each unique edge into a camera-facing screen-space quad (Blender polyline style).
+        /// Half-width = widthPx * world-units-per-pixel at the edge midpoint.
+        /// </summary>
+        private static void ExpandEdgesToCameraFacingQuads(
+            Vector3[] points,
+            Matrix4x4 l2w,
+            Camera cam,
+            float widthPx,
+            int edgeCount)
+        {
+            var camPos = cam.transform.position;
+            var camFwd = cam.transform.forward;
+            var camUp = cam.transform.up;
+            var camRight = cam.transform.right;
+            var pixelHeight = Mathf.Max(1f, cam.pixelHeight);
+            var ortho = cam.orthographic;
+            var orthoWorldPerPixel = ortho ? (2f * cam.orthographicSize / pixelHeight) : 0f;
+            var tanHalfFov = ortho
+                ? 0f
+                : Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+
+            for (var e = 0; e < edgeCount; e++)
+            {
+                var a = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2]]);
+                var b = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2 + 1]]);
+                var mid = (a + b) * 0.5f;
+                var dir = b - a;
+                var lenSq = dir.sqrMagnitude;
+                if (lenSq < 1e-12f)
+                {
+                    var vi0 = e * 4;
+                    s_WireVerts[vi0] = a;
+                    s_WireVerts[vi0 + 1] = a;
+                    s_WireVerts[vi0 + 2] = a;
+                    s_WireVerts[vi0 + 3] = a;
+                    continue;
+                }
+
+                dir *= 1f / Mathf.Sqrt(lenSq);
+
+                var toCam = camPos - mid;
+                var perp = Vector3.Cross(dir, toCam);
+                if (perp.sqrMagnitude < 1e-10f)
+                {
+                    perp = Vector3.Cross(dir, camUp);
+                    if (perp.sqrMagnitude < 1e-10f)
+                        perp = Vector3.Cross(dir, camRight);
+                }
+
+                perp.Normalize();
+
+                float worldPerPixel;
+                if (ortho)
+                {
+                    worldPerPixel = orthoWorldPerPixel;
+                }
+                else
+                {
+                    var dist = Vector3.Dot(mid - camPos, camFwd);
+                    if (dist < 0.01f)
+                        dist = 0.01f;
+                    worldPerPixel = dist * tanHalfFov * 2f / pixelHeight;
+                }
+
+                var half = perp * (widthPx * 0.5f * worldPerPixel);
+                var vi = e * 4;
+                s_WireVerts[vi] = a + half;
+                s_WireVerts[vi + 1] = a - half;
+                s_WireVerts[vi + 2] = b + half;
+                s_WireVerts[vi + 3] = b - half;
+            }
+        }
+
+        /// <summary>
+        /// Extracts unique undirected edges from polygon preview data as flat
+        /// index pairs: [a0, b0, a1, b1, ...]. Called only when preview changes.
+        /// </summary>
+        private static int[] BuildUniqueEdgePairs(PcgPolygonPreviewData preview)
+        {
+            var offsets = preview.FaceOffsets;
+            var indices = preview.FaceIndices;
+            var pointCount = preview.Points.Length;
+            var drawn = new HashSet<ulong>();
+            var pairs = new List<int>(offsets.Length * 4);
+
+            for (var fi = 0; fi < preview.FaceCount; fi++)
+            {
+                var start = offsets[fi];
+                var end = fi + 1 < preview.FaceCount ? offsets[fi + 1] : indices.Length;
+                if (end - start < 3 || start < 0 || end > indices.Length)
+                    continue;
+
+                for (var i = start; i < end; i++)
+                {
+                    var a = indices[i];
+                    var b = indices[i + 1 < end ? i + 1 : start];
+                    if (a == b || a < 0 || b < 0 || a >= pointCount || b >= pointCount)
+                        continue;
+
+                    var lo = a < b ? a : b;
+                    var hi = a < b ? b : a;
+                    var key = ((ulong)(uint)lo << 32) | (uint)hi;
+                    if (!drawn.Add(key))
+                        continue;
+
+                    pairs.Add(lo);
+                    pairs.Add(hi);
+                }
+            }
+
+            return pairs.Count > 0 ? pairs.ToArray() : null;
         }
 
         private static void DrawNodeGroupHighlight(SceneView sceneView, PcgGraphEditorWindow window)
