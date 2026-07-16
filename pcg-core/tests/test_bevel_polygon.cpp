@@ -793,22 +793,54 @@ int run_tests() {
         std::printf("  Oracle dump (CC L2): verts=%zu faces=%zu bad_edges=%d -> %s\n",
             cc_result.points().size(), cc_result.faces().size(), cc_bad, dump_cc);
 
-        // car.pcg body_subdiv -> body_bevel parameters. This is the V59 fixture
-        // where edge strips and non-tri-corner VMeshes must match Blender.
+        // car.pcg body_subdiv -> body_bevel parameters with dimensions baked
+        // into CreateBoxMesh geometry (not represented as object scale).
         const char* dump_car = std::getenv("PCG_BEVEL_DUMP_CAR");
-        if (!dump_car) dump_car = "/tmp/pcg-bevel-pcg-car-cc2.json";
+        if (!dump_car) dump_car = "/tmp/pcg-bevel-pcg-car-cc1.json";
         const auto car_cc = subdivide_geometry(
-            create_box_geometry(4.2, 0.8, 1.8), 2, SubdivideMethod::CatmullClark);
+            create_box_geometry(4.2, 0.8, 1.8), 1, SubdivideMethod::CatmullClark);
+        if (const char* dump_car_input = std::getenv("PCG_BEVEL_DUMP_CAR_INPUT")) {
+            dump_geometry_oracle(car_cc, dump_car_input, 4.2, 0.0, 0, 0.7f, 30.0, 0.8, 1.8);
+        }
+        if (const char* dump_car_seg1 = std::getenv("PCG_BEVEL_DUMP_CAR_SEG1")) {
+            const auto car_seg1 = bevel_geometry(car_cc, 0.25, 1,
+                BevelMethod::Edge, BevelOffsetType::Offset, true,
+                30.0, 0.7f, BevelMiter::Sharp, BevelMiter::Sharp,
+                BevelVMeshMethod::Adj);
+            dump_geometry_oracle(car_seg1, dump_car_seg1, 4.2, 0.25, 1, 0.7f, 30.0, 0.8, 1.8);
+        }
         const auto car_result = bevel_geometry(car_cc, 0.25, 5,
             BevelMethod::Edge, BevelOffsetType::Offset, true,
             30.0, 0.7f, BevelMiter::Sharp, BevelMiter::Sharp,
             BevelVMeshMethod::Adj);
         const auto car_stats = analyze_faces(car_result);
         const int car_bad = count_bad_edges(car_result);
+        double car_max_x = 0.0;
+        double car_max_y = 0.0;
+        double car_max_z = 0.0;
+        for (const auto& point : car_result.points()) {
+            car_max_x = std::max(car_max_x, std::abs(static_cast<double>(point.x)));
+            car_max_y = std::max(car_max_y, std::abs(static_cast<double>(point.y)));
+            car_max_z = std::max(car_max_z, std::abs(static_cast<double>(point.z)));
+        }
         dump_geometry_oracle(car_result, dump_car, 4.2, 0.25, 5, 0.7f, 30.0, 0.8, 1.8);
-        std::printf("  Oracle dump (car CC L2): verts=%zu faces=%zu bad_edges=%d zero=%d -> %s\n",
+        std::printf("  Oracle dump (car CC L1): verts=%zu faces=%zu bad_edges=%d zero=%d -> %s\n",
             car_result.points().size(), car_result.faces().size(), car_bad,
             car_stats.zero_area, dump_car);
+        check(car_result.points().size() == 330, "car CC L1 baked-size vertex count");
+        check(car_result.faces().size() == 334, "car CC L1 baked-size face count");
+        check(car_stats.tri_faces == 20, "car CC L1 baked-size triangle count");
+        check(car_stats.quad_faces == 306, "car CC L1 baked-size quad count");
+        check(car_stats.ngon_faces == 8, "car CC L1 baked-size pentagon count");
+        check(car_bad == 0, "car CC L1 manifold");
+        check(car_stats.degenerate == 0 && car_stats.zero_area == 0,
+              "car CC L1 no degenerate faces");
+        check(std::abs(car_max_x - 1.64815545) < 1e-5,
+              "car CC L1 baked-size X extent");
+        check(std::abs(car_max_y - 0.33580250) < 1e-5,
+              "car CC L1 baked-size Y extent");
+        check(std::abs(car_max_z - 0.72547156) < 1e-5,
+              "car CC L1 baked-size Z extent");
     }
 
     return failures;

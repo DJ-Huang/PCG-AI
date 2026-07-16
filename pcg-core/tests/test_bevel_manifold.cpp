@@ -446,7 +446,7 @@ int run_tests() {
     {
         const PcgGeometry body = create_box_geometry(4.2, 0.8, 1.8);
         const PcgGeometry subdivided = subdivide_geometry(
-            body, 2, SubdivideMethod::CatmullClark);
+            body, 1, SubdivideMethod::CatmullClark);
         BMeshBuildOptions body_opts;
         body_opts.merge_coplanar_angle_deg = 0.0;
         body_opts.sharp_angle_deg = 30.0;
@@ -474,8 +474,8 @@ int run_tests() {
             subdivided, 0.25, 5, BevelMethod::Edge, BevelOffsetType::Offset, true,
             30.0, 0.7f, BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj);
         const PcgMeshData mesh = triangulate_geometry_shared(beveled);
-        check(expect_closed(mesh, "car body CC_L2 seg=5 amount=0.25"),
-              "car body CC_L2 seg=5 amount=0.25");
+        check(expect_closed(mesh, "car body CC_L1 seg=5 amount=0.25"),
+              "car body CC_L1 seg=5 amount=0.25");
     }
 
     return failures;

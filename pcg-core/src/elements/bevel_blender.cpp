@@ -113,7 +113,7 @@ int isect_line_line_v3(const Vec3& p1, const Vec3& p2,
 
     if (length_squared(sub(r_i1, r_i2)) < 1e-12)
         return 1;
-    return 0;
+    return 2;
 }
 
 bool isect_line_plane_v3(Vec3& isect_co,
@@ -1285,8 +1285,6 @@ void offset_meet(BevelParams& bp,
 
         Vec3 sum_dir = add(dir1, dir2);
         Vec3 norm_perp1 = normalize(cross(sum_dir, norm_v));
-        // See general-case note: disk order requires flipped perp vs Blender.
-        norm_perp1 = negate(norm_perp1);
         double d = std::max(e1->offset_r, e2->offset_l);
         d = d / std::cos(ang / 2.0);
         meetco = add(v_co, scale(norm_perp1, d));
@@ -1318,14 +1316,9 @@ void offset_meet(BevelParams& bp,
             norm_v2 = normalize(cross(dir2, dir2p));
         }
 
-        // Perpendicular vectors pointing into the face.
-        // Our BMesh disk cycles are CW when viewed along the outward vertex normal
-        // (Blender's are CCW), so the Blender cross(dir, no) formula yields
-        // OUTWARD offsets here. Negate to match Blender inward BoundVert placement.
+        // Perpendicular vectors pointing into the face (Blender disk handedness).
         Vec3 norm_perp1 = normalize(cross(dir1, norm_v1));
         Vec3 norm_perp2 = normalize(cross(dir2, norm_v2));
-        norm_perp1 = negate(norm_perp1);
-        norm_perp2 = negate(norm_perp2);
 
         // Offset lines
         Vec3 off1a = add(v_co, scale(norm_perp1, e1->offset_r));
@@ -1337,16 +1330,17 @@ void offset_meet(BevelParams& bp,
         Vec3 isect2;
         int isect_kind = isect_line_line_v3(off1a, off1b, off2a, off2b, meetco, isect2);
 
-        if (isect_kind == 0) {
-            // Lines don't meet at a single point
-            if (isect_kind == 2) {
-                // Collinear
-                meetco = off1a;
-            } else {
-                // Skew lines: use midpoint of closest points
-                meetco = mid(meetco, isect2);
-            }
+        if (bevel_diag_enabled() && bp.positions->size() == 26) {
+            std::fprintf(stderr,
+                         "[PCG_BEVEL_DIAG] offset_meet v=%d between=%d kind=%d e1=%d e2=%d\n",
+                         v_idx, edges_between ? 1 : 0, isect_kind,
+                         e1->edge_v1, e2->edge_v1);
         }
+
+        if (isect_kind == 0)
+            meetco = off1a;
+        else if (isect_kind == 2 && edges_between)
+            meetco = mid(meetco, isect2);
 
         // Check: if one offset is 0, don't go outside that edge (Blender offset_meet L2030).
         if (e1->offset_r == 0.0f) {
@@ -1375,8 +1369,6 @@ Vec3 offset_in_plane(EdgeHalf* e, const Vec3& plane_no, bool left, int v_idx,
     Vec3 dir = sub(other_co, v_co);
     Vec3 norm_perp = normalize(cross(dir, plane_no));
     if (!left) norm_perp = negate(norm_perp);
-    // Match offset_meet: disk CW vs Blender CCW → flip into-face direction.
-    norm_perp = negate(norm_perp);
 
     float offset = left ? e->offset_l : e->offset_r;
     return add(v_co, scale(norm_perp, offset));
@@ -1421,21 +1413,85 @@ bool eh_on_plane(EdgeHalf* e, int v_idx, const BevelParams& bp) {
     return nearly_parallel(n1, n2);
 }
 
+Vec3 bmesh_vertex_normal(const BevelParams& bp, int vertex_index) {
+    if (!bp.bmesh)
+        return {0.0, 0.0, 0.0};
+
+    Vec3 normal{};
+    for (int face_index = 0;
+         face_index < static_cast<int>(bp.bmesh->faces.size());
+         ++face_index) {
+        const auto& loop = bp.bmesh->faces[static_cast<size_t>(face_index)].verts;
+        const int count = static_cast<int>(loop.size());
+        for (int i = 0; i < count; ++i) {
+            if (loop[static_cast<size_t>(i)] != vertex_index)
+                continue;
+            const Vec3& previous =
+                (*bp.positions)[static_cast<size_t>(loop[static_cast<size_t>((i + count - 1) % count)])];
+            const Vec3& current = (*bp.positions)[static_cast<size_t>(vertex_index)];
+            const Vec3& next =
+                (*bp.positions)[static_cast<size_t>(loop[static_cast<size_t>((i + 1) % count)])];
+            const Vec3 incoming = normalize(sub(current, previous));
+            const Vec3 outgoing = normalize(sub(next, current));
+            const double corner_angle =
+                std::acos(std::clamp(-dot(incoming, outgoing), -1.0, 1.0));
+            normal = madd(normal, bmesh_face_normal(bp, face_index), corner_angle);
+            break;
+        }
+    }
+    return normalize(normal);
+}
+
+/// Blender offset_meet_edge. One of the two offsets is expected to be zero.
+static bool offset_meet_edge(EdgeHalf* first,
+                             EdgeHalf* second,
+                             int vertex_index,
+                             const BevelParams& bp,
+                             Vec3& meeting_point,
+                             double* result_angle) {
+    const Vec3& vertex = (*bp.positions)[static_cast<size_t>(vertex_index)];
+    const Vec3 first_direction = normalize(sub(
+        (*bp.positions)[static_cast<size_t>(first->edge_v1)], vertex));
+    const Vec3 second_direction = normalize(sub(
+        (*bp.positions)[static_cast<size_t>(second->edge_v1)], vertex));
+
+    double angle = angle_normalized_v3v3(first_direction, second_direction);
+    constexpr double kGoodAngle = 0.1;
+    if (std::abs(angle) < kGoodAngle) {
+        if (result_angle)
+            *result_angle = 0.0;
+        return false;
+    }
+
+    if (dot(cross(first_direction, second_direction),
+            bmesh_vertex_normal(bp, vertex_index)) < 0.0) {
+        angle = 2.0 * M_PI - angle;
+        if (result_angle)
+            *result_angle = angle;
+        return false;
+    }
+    if (result_angle)
+        *result_angle = angle;
+    if (std::abs(angle - M_PI) < kGoodAngle)
+        return false;
+
+    const double sine = std::sin(angle);
+    meeting_point = vertex;
+    if (first->offset_r == 0.0f)
+        meeting_point = madd(meeting_point, first_direction, second->offset_l / sine);
+    else
+        meeting_point = madd(meeting_point, second_direction, first->offset_r / sine);
+    return true;
+}
+
 /// Check if good to use offset_on_edge_between (Blender good_offset_on_edge_between).
 bool good_offset_on_edge_between(EdgeHalf* e1, EdgeHalf* e2, EdgeHalf* emid,
                                   int v_idx, const BevelParams& bp)
 {
-    const auto& positions = *bp.positions;
-    Vec3 v_co = positions[static_cast<size_t>(v_idx)];
-    Vec3 d1 = normalize(sub(positions[static_cast<size_t>(e1->edge_v1)], v_co));
-    Vec3 d2 = normalize(sub(positions[static_cast<size_t>(e2->edge_v1)], v_co));
-    Vec3 dm = normalize(sub(positions[static_cast<size_t>(emid->edge_v1)], v_co));
-
-    // Check that emid is between e1 and e2
-    double cross_1m = dot(cross(d1, dm), vertex_normal({*bp.positions, *bp.triangles}, v_idx));
-    double cross_m2 = dot(cross(dm, d2), vertex_normal({*bp.positions, *bp.triangles}, v_idx));
-
-    return cross_1m > 0 && cross_m2 > 0;
+    Vec3 meeting_point;
+    double angle = 0.0;
+    return offset_meet_edge(e1, emid, v_idx, bp, meeting_point, &angle) &&
+           offset_meet_edge(emid, e2, v_idx, bp, meeting_point, &angle);
 }
 
 /// Calculate offset on an edge between two beveled edges (Blender offset_on_edge_between).
@@ -1444,42 +1500,32 @@ bool offset_on_edge_between(EdgeHalf* e1, EdgeHalf* e2, EdgeHalf* emid,
                              int v_idx, const BevelParams& bp,
                              Vec3& r_co, float& r_sinratio)
 {
-    const auto& positions = *bp.positions;
-    Vec3 v_co = positions[static_cast<size_t>(v_idx)];
+    Vec3 first_meeting;
+    Vec3 second_meeting;
+    double first_angle = 0.0;
+    double second_angle = 0.0;
+    const bool first_ok =
+        offset_meet_edge(e1, emid, v_idx, bp, first_meeting, &first_angle);
+    const bool second_ok =
+        offset_meet_edge(emid, e2, v_idx, bp, second_meeting, &second_angle);
 
-    Vec3 dir1 = normalize(sub(v_co, positions[static_cast<size_t>(e1->edge_v1)]));
-    Vec3 dir2 = normalize(sub(positions[static_cast<size_t>(e2->edge_v1)], v_co));
-    Vec3 dir_mid = normalize(sub(positions[static_cast<size_t>(emid->edge_v1)], v_co));
-
-    // Angle between e1 and emid
-    double ang1 = angle_v3v3v3(positions[static_cast<size_t>(e1->edge_v1)], v_co,
-                                positions[static_cast<size_t>(emid->edge_v1)]);
-    // Angle between emid and e2
-    double ang2 = angle_v3v3v3(positions[static_cast<size_t>(emid->edge_v1)], v_co,
-                                positions[static_cast<size_t>(e2->edge_v1)]);
-
-    if (ang1 < BEVEL_EPSILON_ANG || ang2 < BEVEL_EPSILON_ANG)
-        return false;
-
-    // sin ratio: how the offset splits between the two sides
-    double sin1 = std::sin(ang1);
-    double sin2 = std::sin(ang2);
-    r_sinratio = static_cast<float>(sin2 / (sin1 + sin2));
-
-    // The offset point is on emid, at distance determined by the sine rule
-    double d = e1->offset_r;
-    double offset_on_mid = d * sin1 / (sin1 + sin2);
-    // Also add the other offset
-    double d2 = e2->offset_l;
-    offset_on_mid += d2 * sin2 / (sin1 + sin2);
-
-    // Actually, Blender computes it differently:
-    // The meet point is where the offset lines from e1 and e2 would hit emid
-    // Using sine rule: offset_on_mid = e1->offset_r * sin(ang1) / sin(ang1+ang2)
-    // But actually need the combined approach
-    double combined_offset = (d * sin1 + d2 * sin2) / (sin1 + sin2);
-    r_co = add(v_co, scale(dir_mid, combined_offset));
-    return true;
+    if (first_ok && second_ok) {
+        r_co = mid(first_meeting, second_meeting);
+        r_sinratio = first_angle == 0.0
+                         ? 1.0f
+                         : static_cast<float>(std::sin(second_angle) /
+                                              std::sin(first_angle));
+        return true;
+    }
+    if (first_ok)
+        r_co = first_meeting;
+    else if (second_ok)
+        r_co = second_meeting;
+    else
+        r_co = slide_dist((*bp.positions)[static_cast<size_t>(v_idx)],
+                          (*bp.positions)[static_cast<size_t>(emid->edge_v1)],
+                          e1->offset_r);
+    return false;
 }
 
 } // anonymous namespace
@@ -1631,69 +1677,133 @@ void adjust_miter_inner_coords(BevelParams& bp, BevVert* bv, EdgeHalf* emiter) {
     } while (v != vstart);
 }
 
-bool adjust_the_cycle_or_chain_fast(BoundVert* vstart, int np, bool iscycle) {
-    if (np < 2)
+bool solve_least_squares(const std::vector<std::vector<double>>& matrix,
+                         const std::vector<double>& rhs,
+                         std::vector<double>& solution) {
+    if (matrix.empty() || matrix[0].empty() || matrix.size() != rhs.size())
         return false;
 
-    std::vector<float> g(static_cast<size_t>(np));
-    float spec_sum = 0.0f;
-    BoundVert* v = vstart;
-    for (int i = 0; i < np; i++) {
-        g[static_cast<size_t>(i)] = v->sinratio;
-        if (iscycle || v->adjchain)
-            spec_sum += v->efirst ? v->efirst->offset_r : 0.0f;
-        else
-            spec_sum += v->elast ? v->elast->offset_l : 0.0f;
-        v = v->adjchain;
-        if (!v)
-            return false;
-    }
-
-    float gprod = 1.0f;
-    float gprod_sum = 1.0f;
-    std::vector<float> g_prod(static_cast<size_t>(np));
-    for (int i = np - 1; i > 0; i--) {
-        gprod *= g[static_cast<size_t>(i)];
-        g_prod[static_cast<size_t>(i)] = gprod;
-        gprod_sum += gprod;
-    }
-    g_prod[0] = 1.0f;
-    if (iscycle) {
-        gprod *= g[0];
-        if (std::abs(gprod - 1.0f) > BEVEL_EPSILON_BIG)
-            return false;
-    }
-    if (gprod_sum == 0.0f)
-        return false;
-
-    float p = spec_sum / gprod_sum;
-    v = vstart;
-    for (int i = 0; i < np; i++) {
-        if (iscycle || v->adjchain) {
-            EdgeHalf* eright = v->efirst;
-            EdgeHalf* eleft = v->elast;
-            if (eright)
-                eright->offset_r = g_prod[static_cast<size_t>((i + 1) % np)] * p;
-            if ((iscycle || v != vstart) && eleft)
-                eleft->offset_l = v->sinratio * (eright ? eright->offset_r : p);
-        } else if (v->elast) {
-            v->elast->offset_l = p;
+    const int rows = static_cast<int>(matrix.size());
+    const int columns = static_cast<int>(matrix[0].size());
+    std::vector<std::vector<double>> normal(
+        static_cast<size_t>(columns), std::vector<double>(static_cast<size_t>(columns), 0.0));
+    std::vector<double> projected(static_cast<size_t>(columns), 0.0);
+    for (int row = 0; row < rows; ++row) {
+        for (int i = 0; i < columns; ++i) {
+            projected[static_cast<size_t>(i)] +=
+                matrix[static_cast<size_t>(row)][static_cast<size_t>(i)] *
+                rhs[static_cast<size_t>(row)];
+            for (int j = 0; j < columns; ++j) {
+                normal[static_cast<size_t>(i)][static_cast<size_t>(j)] +=
+                    matrix[static_cast<size_t>(row)][static_cast<size_t>(i)] *
+                    matrix[static_cast<size_t>(row)][static_cast<size_t>(j)];
+            }
         }
-        v = v->adjchain;
-        if (!v)
-            break;
     }
+
+    for (int column = 0; column < columns; ++column) {
+        int pivot = column;
+        for (int row = column + 1; row < columns; ++row) {
+            if (std::abs(normal[static_cast<size_t>(row)][static_cast<size_t>(column)]) >
+                std::abs(normal[static_cast<size_t>(pivot)][static_cast<size_t>(column)])) {
+                pivot = row;
+            }
+        }
+        if (std::abs(normal[static_cast<size_t>(pivot)][static_cast<size_t>(column)]) < 1e-12)
+            return false;
+        if (pivot != column) {
+            std::swap(normal[static_cast<size_t>(pivot)], normal[static_cast<size_t>(column)]);
+            std::swap(projected[static_cast<size_t>(pivot)], projected[static_cast<size_t>(column)]);
+        }
+
+        const double diagonal = normal[static_cast<size_t>(column)][static_cast<size_t>(column)];
+        for (int j = column; j < columns; ++j)
+            normal[static_cast<size_t>(column)][static_cast<size_t>(j)] /= diagonal;
+        projected[static_cast<size_t>(column)] /= diagonal;
+
+        for (int row = 0; row < columns; ++row) {
+            if (row == column)
+                continue;
+            const double factor = normal[static_cast<size_t>(row)][static_cast<size_t>(column)];
+            for (int j = column; j < columns; ++j) {
+                normal[static_cast<size_t>(row)][static_cast<size_t>(j)] -=
+                    factor * normal[static_cast<size_t>(column)][static_cast<size_t>(j)];
+            }
+            projected[static_cast<size_t>(row)] -=
+                factor * projected[static_cast<size_t>(column)];
+        }
+    }
+
+    solution = std::move(projected);
     return true;
 }
 
 void adjust_the_cycle_or_chain(BoundVert* vstart, bool iscycle) {
-    int np = 0;
+    std::vector<BoundVert*> chain;
     BoundVert* v = vstart;
     do {
-        np++;
+        chain.push_back(v);
         v = v->adjchain;
     } while (v && v != vstart);
-    adjust_the_cycle_or_chain_fast(vstart, np, iscycle);
+
+    const int count = static_cast<int>(chain.size());
+    if (count < 2)
+        return;
+
+    const int row_count = iscycle ? 3 * count : 3 * count - 3;
+    std::vector<std::vector<double>> matrix(
+        static_cast<size_t>(row_count), std::vector<double>(static_cast<size_t>(count), 0.0));
+    std::vector<double> rhs(static_cast<size_t>(row_count), 0.0);
+    constexpr double kMatchSpecWeight = 0.2;
+
+    for (int i = 0; i < count; ++i) {
+        v = chain[static_cast<size_t>(i)];
+        if (iscycle || i < count - 1) {
+            BoundVert* next = v->adjchain;
+            if (!v->efirst || !v->elast || !next || !next->elast)
+                return;
+
+            matrix[static_cast<size_t>(i)][static_cast<size_t>(i)] += 1.0;
+            if (iscycle) {
+                const int previous = i > 0 ? i - 1 : count - 1;
+                matrix[static_cast<size_t>(previous)][static_cast<size_t>(i)] -= v->sinratio;
+            } else if (i > 0) {
+                matrix[static_cast<size_t>(i - 1)][static_cast<size_t>(i)] -= v->sinratio;
+            }
+
+            int row = iscycle ? count + 2 * i : count - 1 + 2 * i;
+            matrix[static_cast<size_t>(row)][static_cast<size_t>(i)] += kMatchSpecWeight;
+            rhs[static_cast<size_t>(row)] +=
+                kMatchSpecWeight * static_cast<double>(v->efirst->offset_r);
+
+            ++row;
+            const int next_parameter = i == count - 1 ? 0 : i + 1;
+            matrix[static_cast<size_t>(row)][static_cast<size_t>(next_parameter)] +=
+                kMatchSpecWeight * static_cast<double>(next->sinratio);
+            rhs[static_cast<size_t>(row)] +=
+                kMatchSpecWeight * static_cast<double>(next->elast->offset_l);
+        } else {
+            if (!v->elast)
+                return;
+            matrix[static_cast<size_t>(i - 1)][static_cast<size_t>(i)] -= 1.0;
+        }
+    }
+
+    std::vector<double> solution;
+    if (!solve_least_squares(matrix, rhs, solution))
+        return;
+
+    for (int i = 0; i < count; ++i) {
+        v = chain[static_cast<size_t>(i)];
+        const float value = static_cast<float>(solution[static_cast<size_t>(i)]);
+        if (iscycle || i < count - 1) {
+            v->efirst->offset_r = value;
+            if (iscycle || i > 0)
+                v->elast->offset_l = v->sinratio * value;
+        } else {
+            v->elast->offset_l = value;
+        }
+    }
 }
 
 void adjust_offsets(BevelParams& bp) {
@@ -1896,7 +2006,7 @@ void build_boundary_terminal_edge(BevelParams& bp, BevVert* bv, EdgeHalf* efirst
         if (bp.profile < 0.25f)
             d *= std::sqrt(2.0f);
 
-        for (EdgeHalf* e_iter = e->next; e_iter != efirst; e_iter = e_iter->next) {
+        for (EdgeHalf* e_iter = e->next; e_iter->next != efirst; e_iter = e_iter->next) {
             co = slide_dist((*bp.positions)[static_cast<size_t>(bv->v_idx)],
                            (*bp.positions)[static_cast<size_t>(e_iter->edge_v1)], d);
             if (construct) {
@@ -2245,13 +2355,13 @@ namespace {
 
 /// Project a point onto an edge (Blender project_to_edge L2246).
 Vec3 project_to_edge(const Vec3& e_v0, const Vec3& e_v1, const Vec3& start, const Vec3& end) {
-    Vec3 edge_dir = sub(e_v1, e_v0);
-    double len_sq = length_squared(edge_dir);
-    if (len_sq < 1e-12) return e_v0;
-
-    double t = dot(sub(start, e_v0), edge_dir) / len_sq;
-    t = std::clamp(t, 0.0, 1.0);
-    return add(e_v0, scale(edge_dir, t));
+    Vec3 projected;
+    Vec3 profile_projected;
+    if (isect_line_line_v3(e_v0, e_v1, start, end,
+                           projected, profile_projected) == 0) {
+        return e_v0;
+    }
+    return projected;
 }
 
 void set_profile_params(BevelParams& bp, BevVert* bv, BoundVert* bndv) {
@@ -2417,6 +2527,45 @@ void move_profile_plane(BoundVert* bndv, const Vec3& vertex_co)
         profile.plane_no = no;
     }
     profile.special_params = true;
+}
+
+/// Move both profile planes to the shared weld plane (Blender
+/// move_weld_profile_planes).  The boundary points and original vertex define
+/// the plane on which the two projected profiles are most likely to meet.
+void move_weld_profile_planes(BoundVert* bndv1,
+                              BoundVert* bndv2,
+                              const Vec3& vertex_co)
+{
+    Profile& profile1 = bndv1->profile;
+    Profile& profile2 = bndv2->profile;
+    if (length_squared(profile1.proj_dir) == 0.0 ||
+        length_squared(profile2.proj_dir) == 0.0) {
+        return;
+    }
+
+    const Vec3 d1 = sub(vertex_co, bndv1->nv.co);
+    const Vec3 d2 = sub(vertex_co, bndv2->nv.co);
+    const Vec3 no_raw = cross(d1, d2);
+    const Vec3 no2_raw = cross(d1, profile1.proj_dir);
+    const Vec3 no3_raw = cross(d2, profile2.proj_dir);
+    const double l1 = length(no_raw);
+    const double l2 = length(no2_raw);
+    const double l3 = length(no3_raw);
+
+    if (l1 != 0.0 && (l2 != 0.0 || l3 != 0.0)) {
+        const Vec3 no = normalize(no_raw);
+        const Vec3 no2 = normalize(no2_raw);
+        const Vec3 no3 = normalize(no3_raw);
+        const double dot1 = std::abs(dot(no, no2));
+        const double dot2 = std::abs(dot(no, no3));
+        if (std::abs(dot1 - 1.0) > BEVEL_EPSILON)
+            profile1.plane_no = no;
+        if (std::abs(dot2 - 1.0) > BEVEL_EPSILON)
+            profile2.plane_no = no;
+    }
+
+    profile1.special_params = true;
+    profile2.special_params = true;
 }
 
 void calculate_profile(BevelParams& bp, BoundVert* bndv) {
@@ -3156,6 +3305,60 @@ static int tri_corner_test(const BevelParams& bp, const BevVert* bv) {
     return 1;
 }
 
+/// Return the boundary vertex that starts a Blender-style pipe VMesh, or null.
+/// A pipe has three or four beveled edges with two collinear pipe edges and all
+/// incident face planes parallel to the pipe direction.
+static BoundVert* pipe_test(const BevelParams& bp, BevVert* bv) {
+    VMesh* vm = bv->vmesh.get();
+    if (!vm || vm->count < 3 || vm->count > 4 ||
+        bv->selcount < 3 || bv->selcount > 4) {
+        return nullptr;
+    }
+
+    BoundVert* pipe_start = vm->boundstart;
+    Vec3 pipe_direction{};
+    do {
+        BoundVert* middle = pipe_start->next;
+        BoundVert* opposite = middle->next;
+        if (pipe_start->ebev && middle->ebev && opposite->ebev) {
+            const Vec3& vertex = (*bp.positions)[static_cast<size_t>(bv->v_idx)];
+            const Vec3& first_other =
+                (*bp.positions)[static_cast<size_t>(pipe_start->ebev->edge_v1)];
+            const Vec3& opposite_other =
+                (*bp.positions)[static_cast<size_t>(opposite->ebev->edge_v1)];
+            const Vec3 first_direction = normalize(sub(vertex, first_other));
+            const Vec3 opposite_direction = normalize(sub(opposite_other, vertex));
+            if (angle_normalized_v3v3(first_direction, opposite_direction) <
+                BEVEL_EPSILON_ANG) {
+                pipe_direction = first_direction;
+                break;
+            }
+        }
+        pipe_start = pipe_start->next;
+    } while (pipe_start != vm->boundstart);
+
+    if (length_squared(pipe_direction) <= BEVEL_EPSILON_SQ)
+        return nullptr;
+
+    for (const EdgeHalf& edge : bv->edges) {
+        const double face_dot = edge.fnext >= 0
+                                    ? std::abs(dot(pipe_direction,
+                                                   bmesh_face_normal(bp, edge.fnext)))
+                                    : 0.0;
+        if (edge.fnext >= 0 && face_dot > BEVEL_EPSILON_BIG) {
+            if (bevel_diag_enabled()) {
+                std::fprintf(stderr,
+                             "[PCG_BEVEL_DIAG] pipe_reject v=%d face=%d dot=%.9f\n",
+                             bv->v_idx, edge.fnext, face_dot);
+            }
+            return nullptr;
+        }
+    }
+    if (bevel_diag_enabled())
+        std::fprintf(stderr, "[PCG_BEVEL_DIAG] pipe_accept v=%d\n", bv->v_idx);
+    return pipe_start;
+}
+
 /// Build cube-corner VMesh and transform to world space (Blender tri_corner_adj_vmesh).
 static std::unique_ptr<VMesh> tri_corner_adj_vmesh(BevelParams& bp, const BevVert* bv) {
     const BoundVert* bndv = bv->vmesh->boundstart;
@@ -3239,6 +3442,79 @@ std::unique_ptr<VMesh> adj_vmesh(BevelParams& bp, BevVert* bv) {
     }
 
     return vm1;
+}
+
+static Vec3 closest_to_line_segment(const Vec3& point,
+                                    const Vec3& start,
+                                    const Vec3& end) {
+    const Vec3 direction = sub(end, start);
+    const double length_sq = length_squared(direction);
+    if (length_sq <= 1e-20)
+        return start;
+    const double factor =
+        std::clamp(dot(sub(point, start), direction) / length_sq, 0.0, 1.0);
+    return madd(start, direction, factor);
+}
+
+/// Snap a coordinate to the pipe profile in its perpendicular cross-section.
+static void snap_to_pipe_profile(const BevelParams& bp,
+                                 BoundVert* pipe_start,
+                                 bool midline,
+                                 Vec3& coordinate) {
+    const Profile& profile = pipe_start->profile;
+    if (length_squared(sub(profile.start, profile.end)) <= BEVEL_EPSILON_SQ) {
+        coordinate = profile.start;
+        return;
+    }
+
+    const EdgeHalf* edge = pipe_start->ebev;
+    const Vec3 edge_direction = normalize(sub(
+        (*bp.positions)[static_cast<size_t>(edge->edge_v0)],
+        (*bp.positions)[static_cast<size_t>(edge->edge_v1)]));
+    const Vec3 start_plane = closest_to_plane(coordinate, edge_direction, profile.start);
+    const Vec3 end_plane = closest_to_plane(coordinate, edge_direction, profile.end);
+    const Vec3 middle_plane = closest_to_plane(coordinate, edge_direction, profile.middle);
+
+    Mat4 map;
+    Mat4 inverse;
+    if (make_unit_square_map(start_plane, middle_plane, end_plane, map) &&
+        invert_m4(map, inverse)) {
+        Vec3 profile_coordinate = mul_m4v3(inverse, coordinate);
+        snap_to_superellipsoid(profile_coordinate, profile.super_r, midline);
+        coordinate = mul_m4v3(map, profile_coordinate);
+    } else {
+        coordinate = closest_to_line_segment(coordinate, start_plane, end_plane);
+    }
+}
+
+/// Blender pipe_adj_vmesh: build the normal ADJ mesh, then constrain its
+/// interior vertices to the cross-section of the pair of collinear pipe edges.
+static std::unique_ptr<VMesh> pipe_adj_vmesh(BevelParams& bp,
+                                             BevVert* bv,
+                                             BoundVert* pipe_start) {
+    auto vm = adj_vmesh(bp, bv);
+    const int boundary_count = bv->vmesh->count;
+    const int segments = bv->vmesh->seg;
+    const int half_segments = segments / 2;
+    const int first_pipe_index = pipe_start->index;
+    const int second_pipe_index = pipe_start->next->next->index;
+
+    for (int i = 0; i < boundary_count; ++i) {
+        for (int j = 1; j <= half_segments; ++j) {
+            for (int k = 0; k <= half_segments; ++k) {
+                if (!is_canon(vm.get(), i, j, k))
+                    continue;
+                const bool even = (segments % 2) == 0;
+                const bool midline =
+                    even && k == half_segments &&
+                    ((i == 0 && j == half_segments) ||
+                     i == first_pipe_index || i == second_pipe_index);
+                snap_to_pipe_profile(bp, pipe_start, midline, vm->at(i, j, k).co);
+            }
+        }
+    }
+    vmesh_copy_equiv_verts(vm.get());
+    return vm;
 }
 
 /// Build cutoff VMesh corner caps (Blender bevel_build_cutoff).
@@ -3330,33 +3606,33 @@ void bevel_build_poly(BevelParams& bp, BevVert* bv) {
 }
 
 /// Build a triangle fan (Blender bevel_build_trifan L6342).
-/// Terminal selcount==1 keeps legacy center fan (profile-aware poly caused strip winding clash).
-/// Poly kind uses profile-aware bevel_build_poly.
+/// Blender first builds the same profile-aware polygon as bevel_build_poly,
+/// then repeatedly splits it from the vertex preceding the polygon start.
 void bevel_build_trifan(BevelParams& bp, BevVert* bv) {
-    if (bv->selcount == 1) {
-        VMesh* vm = bv->vmesh.get();
-        const int n = vm->count;
+    VMesh* vm = bv->vmesh.get();
+    const int ns = vm->seg;
 
-        Vec3 center{0, 0, 0};
-        BoundVert* bndv = vm->boundstart;
-        do {
-            center = add(center, bndv->nv.co);
-        } while ((bndv = bndv->next) != vm->boundstart);
-        center = scale(center, 1.0 / n);
+    std::vector<Vec3> poly;
+    BoundVert* bndv = vm->boundstart;
+    do {
+        poly.push_back(bndv->nv.co);
+        if (bndv->ebev && ns > 1) {
+            const int i = bndv->index;
+            for (int k = 1; k < ns; ++k) {
+                const NewVert& nv = vm->at(i, 0, k);
+                if (nv.valid)
+                    poly.push_back(nv.co);
+            }
+        }
+    } while ((bndv = bndv->next) != vm->boundstart);
 
-        Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
-
-        std::vector<Vec3> poly;
-        poly.push_back(center);
-        bndv = vm->boundstart;
-        do {
-            poly.push_back(bndv->nv.co);
-        } while ((bndv = bndv->next) != vm->boundstart);
-        bp.output.add_oriented_polygon(poly, normal);
+    if (poly.size() < 3)
         return;
-    }
 
-    bevel_build_poly(bp, bv);
+    const Vec3 normal = vertex_normal({*bp.positions, *bp.triangles}, bv->v_idx);
+    const Vec3& fan_vertex = poly.back();
+    for (size_t i = 0; i + 2 < poly.size(); ++i)
+        bp.output.add_oriented_triangle(fan_vertex, poly[i], poly[i + 1], normal);
 }
 
 /// Build VMesh — the core function that creates the corner mesh.
@@ -3369,6 +3645,13 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
     const bool weld = (bv->selcount == 2) && (n == 2);
     BoundVert* weld1 = nullptr;
     BoundVert* weld2 = nullptr;
+
+    if (bevel_diag_enabled()) {
+        std::fprintf(stderr,
+                     "[PCG_BEVEL_DIAG] vmesh_input v=%d edges=%d selected=%d bounds=%d kind=%d\n",
+                     bv->v_idx, bv->edgecount, bv->selcount, n,
+                     static_cast<int>(vm->mesh_kind));
+    }
 
     // Allocate mesh array
     vm->mesh.assign(static_cast<size_t>(n) * (ns2 + 1) * (ns + 1), NewVert{});
@@ -3386,6 +3669,13 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
                 weld2 = bndv;
         }
     } while ((bndv = bndv->next) != vm->boundstart);
+
+    if (weld && weld1 && weld2) {
+        set_profile_params(bp, bv, weld1);
+        set_profile_params(bp, bv, weld2);
+        move_weld_profile_planes(
+            weld1, weld2, (*bp.positions)[static_cast<size_t>(bv->v_idx)]);
+    }
 
     if (bv->selcount == 1 && bv->edgecount >= 3 && vm->boundstart->ebev) {
         set_profile_params(bp, bv, vm->boundstart);
@@ -3418,8 +3708,18 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
     if (weld && weld1 && weld2) {
         vm->mesh_kind = MeshKind::None;
         for (int k = 1; k < ns; ++k) {
-            const Vec3 co = mid(vm->at(weld1->index, 0, k).co,
-                                vm->at(weld2->index, 0, ns - k).co);
+            const Vec3& co1 = vm->at(weld1->index, 0, k).co;
+            const Vec3& co2 = vm->at(weld2->index, 0, ns - k).co;
+            Vec3 co;
+            if (weld1->profile.super_r == PRO_LINE_R &&
+                weld2->profile.super_r != PRO_LINE_R) {
+                co = co2;
+            } else if (weld2->profile.super_r == PRO_LINE_R &&
+                       weld1->profile.super_r != PRO_LINE_R) {
+                co = co1;
+            } else {
+                co = mid(co1, co2);
+            }
             vm->at(weld1->index, 0, k).co = co;
             vm->at(weld1->index, 0, k).valid = true;
             vm->at(weld2->index, 0, ns - k).co = co;
@@ -3435,7 +3735,10 @@ void build_vmesh(BevelParams& bp, BevVert* bv) {
         bevel_build_poly(bp, bv);
         break;
     case MeshKind::Adj: {
-        auto vm_adj = adj_vmesh(bp, bv);
+        BoundVert* pipe_start = nullptr;
+        if ((n == 3 || n == 4) && ns > 1)
+            pipe_start = pipe_test(bp, bv);
+        auto vm_adj = pipe_start ? pipe_adj_vmesh(bp, bv, pipe_start) : adj_vmesh(bp, bv);
 
         // Copy final vmesh into bv->vmesh and create output triangles
         VMesh* vm_out = bv->vmesh.get();

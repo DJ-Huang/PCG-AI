@@ -382,8 +382,8 @@ void dissolve_collinear_valence2_verts(BMesh& mesh) {
 void build_disk_cycles(BMesh& mesh) {
     mesh.disk_cycles.clear();
 
-    // Collect face-loop entries: for each vertex V in each face loop [..., A, V, B, ...],
-    // the disk cycle at V goes: edge-to-A → face → edge-to-B (CCW from outside).
+    // Collect face-loop entries for each vertex V in [..., A, V, B, ...].
+    // Blender's find_bevel_edge_order walks edge-to-B -> face -> edge-to-A.
     struct LoopEntry {
         int prev_v;   // edge (prev_v → V) precedes V in the face loop
         int next_v;   // edge (V → next_v) follows V in the face loop
@@ -440,20 +440,19 @@ void build_disk_cycles(BMesh& mesh) {
             }
         }
 
-        // Convert ordered loop entries to disk entries.
-        // ordered[i] = (prev_v, next_v, face)
-        //   → edge at position i goes to prev_v
-        //   → face between this edge and next = ordered[i].face
-        //   → face between previous edge and this = ordered[(i-1+n)%n].face
+        // Convert the chained face-loop order to Blender's disk handedness.
+        // ordered[i] = (prev_v=A, next_v=B, face=F) contributes B -> F -> A,
+        // so the edge cycle traverses the entries in reverse order.
         const int n = static_cast<int>(ordered.size());
         std::vector<BMeshDiskEntry> disk;
         disk.reserve(ordered.size());
-        for (int i = 0; i < n; ++i) {
-            const int prev_i = (i + n - 1) % n;
+        for (int j = 0; j < n; ++j) {
+            const int i = n - 1 - j;
+            const int next_i = (i + 1) % n;
             disk.push_back({
-                ordered[static_cast<size_t>(i)].prev_v,          // other_v
-                ordered[static_cast<size_t>(prev_i)].face,        // fprev
-                ordered[static_cast<size_t>(i)].face              // fnext
+                ordered[static_cast<size_t>(i)].next_v,   // other_v
+                ordered[static_cast<size_t>(next_i)].face, // fprev
+                ordered[static_cast<size_t>(i)].face       // fnext
             });
         }
 
@@ -471,15 +470,34 @@ Vec3 face_normal_from_loop(const BMesh& mesh, const std::vector<int>& loop) {
     if (loop.size() < 3)
         return {0.0, 0.0, 0.0};
 
-    const Vec3& a = mesh.verts[static_cast<size_t>(loop[0])];
-    for (size_t i = 1; i + 1 < loop.size(); ++i) {
-        const Vec3& b = mesh.verts[static_cast<size_t>(loop[i])];
-        const Vec3& c = mesh.verts[static_cast<size_t>(loop[i + 1])];
-        const Vec3 n = cross(sub(b, a), sub(c, a));
-        if (length_squared(n) > 1e-20)
-            return normalize(n);
+    if (loop.size() == 3) {
+        const Vec3& a = mesh.verts[static_cast<size_t>(loop[0])];
+        const Vec3& b = mesh.verts[static_cast<size_t>(loop[1])];
+        const Vec3& c = mesh.verts[static_cast<size_t>(loop[2])];
+        return normalize(cross(sub(b, a), sub(c, a)));
     }
-    return {0.0, 0.0, 0.0};
+
+    // Match Blender's BM_face_calc_normal. Non-planar quads use the two
+    // diagonals; taking the first triangle changes bevel angle selection.
+    if (loop.size() == 4) {
+        const Vec3& a = mesh.verts[static_cast<size_t>(loop[0])];
+        const Vec3& b = mesh.verts[static_cast<size_t>(loop[1])];
+        const Vec3& c = mesh.verts[static_cast<size_t>(loop[2])];
+        const Vec3& d = mesh.verts[static_cast<size_t>(loop[3])];
+        return normalize(cross(sub(a, c), sub(b, d)));
+    }
+
+    // Blender uses Newell's method for general polygons.
+    Vec3 normal{0.0, 0.0, 0.0};
+    for (size_t i = 0; i < loop.size(); ++i) {
+        const Vec3& prev = mesh.verts[static_cast<size_t>(loop[i])];
+        const Vec3& curr =
+            mesh.verts[static_cast<size_t>(loop[(i + 1) % loop.size()])];
+        normal.x += (prev.y - curr.y) * (prev.z + curr.z);
+        normal.y += (prev.z - curr.z) * (prev.x + curr.x);
+        normal.z += (prev.x - curr.x) * (prev.y + curr.y);
+    }
+    return normalize(normal);
 }
 
 Vec3 face_normal(const BMesh& mesh, int face_index) {

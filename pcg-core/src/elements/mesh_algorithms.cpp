@@ -1485,10 +1485,9 @@ data::PcgGeometry subdivide_catmull_clark_geometry(const data::PcgGeometry& geom
 
     // Blender's Subdivision Surface modifier outputs vertices evaluated on the
     // Catmull-Clark limit surface, not the final control cage. Keep the L-level
-    // topology, but move each control vertex to its analytic limit position.
-    // For an interior vertex of valence n:
-    //   (n^2 P + 2 * sum(edge-neighbor P) + sum(face points)) / (n * (n + 5))
-    // Boundary vertices use the cubic B-spline limit rule.
+    // topology and apply OpenSubdiv's Catmark smooth limit mask to its vertices.
+    // The face term is the opposite vertex of each incident refined quad; using
+    // the face centroid here changes the stencil and over-shrinks the surface.
     if (levels > 0 && !current.points().empty()) {
         geometry::BMeshBuildOptions opts;
         opts.merge_coplanar_angle_deg = 0.0;
@@ -1503,20 +1502,15 @@ data::PcgGeometry subdivide_catmull_clark_geometry(const data::PcgGeometry& geom
                 positions[static_cast<size_t>(i)] = {p.x, p.y, p.z};
             }
 
-            std::vector<Vec3> face_points(static_cast<size_t>(nf));
             std::vector<std::vector<int>> vertex_faces(static_cast<size_t>(nv));
             std::vector<std::unordered_set<int>> vertex_neighbors(static_cast<size_t>(nv));
             std::vector<std::vector<int>> boundary_neighbors(static_cast<size_t>(nv));
 
             for (int fi = 0; fi < nf; ++fi) {
                 const auto& face = bm.faces[static_cast<size_t>(fi)].verts;
-                Vec3 sum{0, 0, 0};
                 for (int vi : face) {
-                    sum = add(sum, positions[static_cast<size_t>(vi)]);
                     vertex_faces[static_cast<size_t>(vi)].push_back(fi);
                 }
-                face_points[static_cast<size_t>(fi)] =
-                    scale(sum, 1.0 / static_cast<double>(face.size()));
             }
 
             for (const auto& entry : bm.edges) {
@@ -1543,19 +1537,44 @@ data::PcgGeometry subdivide_catmull_clark_geometry(const data::PcgGeometry& geom
                 } else {
                     const auto& neighbors = vertex_neighbors[static_cast<size_t>(vi)];
                     const int n = static_cast<int>(neighbors.size());
-                    if (n > 0 && !vertex_faces[static_cast<size_t>(vi)].empty()) {
+                    if (n == 2) {
+                        // OpenSubdiv treats a smooth valence-two vertex as a corner.
+                        limit = p;
+                    } else if (n > 0 &&
+                               vertex_faces[static_cast<size_t>(vi)].size() ==
+                                   static_cast<size_t>(n)) {
                         Vec3 edge_sum{0, 0, 0};
                         for (int neighbor : neighbors)
                             edge_sum = add(edge_sum, positions[static_cast<size_t>(neighbor)]);
+
                         Vec3 face_sum{0, 0, 0};
-                        for (int fi : vertex_faces[static_cast<size_t>(vi)])
-                            face_sum = add(face_sum, face_points[static_cast<size_t>(fi)]);
-                        const double denominator = static_cast<double>(n * (n + 5));
-                        limit = scale(
-                            add(add(scale(p, static_cast<double>(n * n)),
-                                    scale(edge_sum, 2.0)),
-                                face_sum),
-                            1.0 / denominator);
+                        bool valid_refined_quads = true;
+                        for (int fi : vertex_faces[static_cast<size_t>(vi)]) {
+                            const auto& face = bm.faces[static_cast<size_t>(fi)].verts;
+                            if (face.size() != 4) {
+                                valid_refined_quads = false;
+                                break;
+                            }
+                            const auto it = std::find(face.begin(), face.end(), vi);
+                            if (it == face.end()) {
+                                valid_refined_quads = false;
+                                break;
+                            }
+                            const size_t corner = static_cast<size_t>(it - face.begin());
+                            const int opposite = face[(corner + 2) % 4];
+                            face_sum = add(face_sum, positions[static_cast<size_t>(opposite)]);
+                        }
+
+                        if (valid_refined_quads) {
+                            const double face_weight =
+                                1.0 / static_cast<double>(n * (n + 5));
+                            const double edge_weight = 4.0 * face_weight;
+                            const double vertex_weight =
+                                1.0 - static_cast<double>(n) * (edge_weight + face_weight);
+                            limit = add(add(scale(p, vertex_weight),
+                                            scale(edge_sum, edge_weight)),
+                                        scale(face_sum, face_weight));
+                        }
                     }
                 }
                 output_points[static_cast<size_t>(vi)] = {limit.x, limit.y, limit.z};

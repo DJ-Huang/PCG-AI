@@ -275,6 +275,11 @@ def main():
 
     bm_sel = bmesh.from_edit_mesh(obj.data)
     bm_sel.edges.ensure_lookup_table()
+    origin_layer = bm_sel.verts.layers.int.get("pcg_origin")
+    if origin_layer is None:
+        origin_layer = bm_sel.verts.layers.int.new("pcg_origin")
+    for vert in bm_sel.verts:
+        vert[origin_layer] = vert.index
     angle_threshold = math.radians(args["angle_limit"])
     for e in bm_sel.edges:
         # Compute dihedral angle between the two faces sharing this edge
@@ -290,6 +295,10 @@ def main():
             # Boundary edge — select it
             e.select = True
     selected_edge_count = sum(1 for edge in bm_sel.edges if edge.select)
+    selected_edges = sorted(
+        [sorted((edge.verts[0].index, edge.verts[1].index))
+         for edge in bm_sel.edges if edge.select]
+    )
     selected_degree = {}
     for edge in bm_sel.edges:
         if not edge.select:
@@ -329,6 +338,9 @@ def main():
 
     verts = [list(v.co) for v in bm.verts]
     faces = [[v.index for v in f.verts] for f in bm.faces]
+    output_origin_layer = bm.verts.layers.int.get("pcg_origin")
+    vertex_origins = ([v[output_origin_layer] for v in bm.verts]
+                      if output_origin_layer is not None else [])
 
     # Compute metrics
     edge_inc = compute_edge_incidence(faces)
@@ -371,6 +383,7 @@ def main():
                 "face_count": input_face_count,
                 "edge_count": input_edge_count,
                 "selected_edge_count": selected_edge_count,
+                "selected_edges": selected_edges,
                 "selected_vertex_count": len(selected_degree),
                 "selected_degree_histogram": selected_degree_histogram,
             },
@@ -389,6 +402,7 @@ def main():
         # faces_canonical keeps Blender's original vertex indices, so retain the
         # matching vertex array as well as the order-independent sorted copy.
         "vertices": [quantize_vec3(v) for v in verts],
+        "vertex_origins": vertex_origins,
         "vertices_sorted": sorted_verts,
         "faces": faces,
         "faces_canonical": [list(f) for f in canonical_faces],
