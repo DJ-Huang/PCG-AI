@@ -253,7 +253,8 @@ double max_corner_quad_planarity_error(const PcgGeometry& geom) {
 
 void dump_geometry_oracle(const PcgGeometry& geom, const char* output_path,
                            double cube_size, double amount, int segments,
-                           float profile, double angle_limit)
+                           float profile, double angle_limit,
+                           double height = 0.0, double depth = 0.0)
 {
     std::FILE* f = std::fopen(output_path, "w");
     if (!f) return;
@@ -337,14 +338,16 @@ void dump_geometry_oracle(const PcgGeometry& geom, const char* output_path,
     }
 
     // Corner patches
-    double half = cube_size / 2.0;
+    if (height <= 0.0) height = cube_size;
+    if (depth <= 0.0) depth = cube_size;
+    const std::array<double, 3> half = {cube_size / 2.0, height / 2.0, depth / 2.0};
     double radius = 0.3;
 
     std::fprintf(f, "{\n");
     std::fprintf(f, "  \"metadata\": {\n");
     std::fprintf(f, "    \"source\": \"PCG\",\n");
-    std::fprintf(f, "    \"params\": {\"size\": %.1f, \"amount\": %.4f, \"segments\": %d, \"profile\": %.4f, \"angle_limit\": %.1f}\n",
-        cube_size, amount, segments, profile, angle_limit);
+    std::fprintf(f, "    \"params\": {\"dimensions\": [%.4f, %.4f, %.4f], \"amount\": %.4f, \"segments\": %d, \"profile\": %.4f, \"angle_limit\": %.1f}\n",
+        cube_size, height, depth, amount, segments, profile, angle_limit);
     std::fprintf(f, "  },\n");
     std::fprintf(f, "  \"geometry\": {\n");
     std::fprintf(f, "    \"vert_count\": %zu,\n", pts.size());
@@ -358,11 +361,35 @@ void dump_geometry_oracle(const PcgGeometry& geom, const char* output_path,
     std::fprintf(f, "    \"nonmanifold_edge_count\": %d\n", nonmanifold);
     std::fprintf(f, "  },\n");
 
+    // Original vertex order is required to resolve faces_canonical indices.
+    std::fprintf(f, "  \"vertices\": [");
+    for (size_t i = 0; i < pts.size(); ++i) {
+        if (i > 0) std::fprintf(f, ", ");
+        std::fprintf(f, "[%.10f, %.10f, %.10f]",
+                     static_cast<double>(pts[i].x),
+                     static_cast<double>(pts[i].y),
+                     static_cast<double>(pts[i].z));
+    }
+    std::fprintf(f, "],\n");
+
     // Sorted vertices
     std::fprintf(f, "  \"vertices_sorted\": [");
     for (size_t i = 0; i < sorted_verts.size(); ++i) {
         if (i > 0) std::fprintf(f, ", ");
         std::fprintf(f, "[%.10f, %.10f, %.10f]", sorted_verts[i][0], sorted_verts[i][1], sorted_verts[i][2]);
+    }
+    std::fprintf(f, "],\n");
+
+    // Preserve original cycles for reproducing the Sink fan triangulation.
+    std::fprintf(f, "  \"faces\": [");
+    for (size_t i = 0; i < faces.size(); ++i) {
+        if (i > 0) std::fprintf(f, ", ");
+        std::fprintf(f, "[");
+        for (size_t j = 0; j < faces[i].size(); ++j) {
+            if (j > 0) std::fprintf(f, ", ");
+            std::fprintf(f, "%d", faces[i][j]);
+        }
+        std::fprintf(f, "]");
     }
     std::fprintf(f, "],\n");
 
@@ -385,7 +412,7 @@ void dump_geometry_oracle(const PcgGeometry& geom, const char* output_path,
     for (int sx = -1; sx <= 1; sx += 2)
     for (int sy = -1; sy <= 1; sy += 2)
     for (int sz = -1; sz <= 1; sz += 2) {
-        double cx = sx * half, cy = sy * half, cz = sz * half;
+        double cx = sx * half[0], cy = sy * half[1], cz = sz * half[2];
         std::vector<int> local_indices;
         std::vector<std::array<double,3>> local_verts;
         std::map<int, int> vert_map;
@@ -765,6 +792,23 @@ int run_tests() {
         dump_geometry_oracle(cc_result, dump_cc, 2.0, 0.08, 3, 0.7f, 25.0);
         std::printf("  Oracle dump (CC L2): verts=%zu faces=%zu bad_edges=%d -> %s\n",
             cc_result.points().size(), cc_result.faces().size(), cc_bad, dump_cc);
+
+        // car.pcg body_subdiv -> body_bevel parameters. This is the V59 fixture
+        // where edge strips and non-tri-corner VMeshes must match Blender.
+        const char* dump_car = std::getenv("PCG_BEVEL_DUMP_CAR");
+        if (!dump_car) dump_car = "/tmp/pcg-bevel-pcg-car-cc2.json";
+        const auto car_cc = subdivide_geometry(
+            create_box_geometry(4.2, 0.8, 1.8), 2, SubdivideMethod::CatmullClark);
+        const auto car_result = bevel_geometry(car_cc, 0.25, 5,
+            BevelMethod::Edge, BevelOffsetType::Offset, true,
+            30.0, 0.7f, BevelMiter::Sharp, BevelMiter::Sharp,
+            BevelVMeshMethod::Adj);
+        const auto car_stats = analyze_faces(car_result);
+        const int car_bad = count_bad_edges(car_result);
+        dump_geometry_oracle(car_result, dump_car, 4.2, 0.25, 5, 0.7f, 30.0, 0.8, 1.8);
+        std::printf("  Oracle dump (car CC L2): verts=%zu faces=%zu bad_edges=%d zero=%d -> %s\n",
+            car_result.points().size(), car_result.faces().size(), car_bad,
+            car_stats.zero_area, dump_car);
     }
 
     return failures;

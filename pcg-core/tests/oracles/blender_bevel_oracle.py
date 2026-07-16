@@ -90,16 +90,16 @@ def find_cube_corners(verts, size):
     return corners
 
 
-def extract_corner_patches(verts, faces, edge_inc, cube_size, radius=0.3):
+def extract_corner_patches(verts, faces, edge_inc, dimensions, radius=0.3):
     """
     For each cube corner octant, extract the local patch of vertices and faces
     within `radius` of that corner position.
     """
-    half = cube_size / 2.0
+    half = Vector((dimensions[0] / 2.0, dimensions[1] / 2.0, dimensions[2] / 2.0))
     octants = [(sx, sy, sz) for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
     patches = {}
     for octant in octants:
-        center = Vector((octant[0] * half, octant[1] * half, octant[2] * half))
+        center = Vector((octant[0] * half.x, octant[1] * half.y, octant[2] * half.z))
         # Find vertices near this corner
         local_verts = []
         vert_map = {}  # global_idx → local_idx
@@ -159,6 +159,9 @@ def parse_args():
         argv = []
     args = {
         "size": 2.0,
+        "width": None,
+        "height": None,
+        "depth": None,
         "subdivide": "none",
         "subdivide_levels": 1,
         "amount": 0.08,
@@ -181,6 +184,12 @@ def parse_args():
             v = argv[i + 1]
             if k == "size":
                 args["size"] = float(v)
+            elif k == "width":
+                args["width"] = float(v)
+            elif k == "height":
+                args["height"] = float(v)
+            elif k == "depth":
+                args["depth"] = float(v)
             elif k == "subdivide":
                 args["subdivide"] = v
             elif k == "subdivide-levels":
@@ -226,6 +235,23 @@ def main():
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
 
+    dimensions = (
+        args["width"] if args["width"] is not None else args["size"],
+        args["height"] if args["height"] is not None else args["size"],
+        args["depth"] if args["depth"] is not None else args["size"],
+    )
+    bm_scale = bmesh.from_edit_mesh(obj.data)
+    scale = Vector((
+        dimensions[0] / args["size"],
+        dimensions[1] / args["size"],
+        dimensions[2] / args["size"],
+    ))
+    for vert in bm_scale.verts:
+        vert.co.x *= scale.x
+        vert.co.y *= scale.y
+        vert.co.z *= scale.z
+    bmesh.update_edit_mesh(obj.data)
+
     # Subdivide
     if args["subdivide"] != "none":
         levels = args["subdivide_levels"]
@@ -263,6 +289,19 @@ def main():
         elif len(faces) == 1:
             # Boundary edge — select it
             e.select = True
+    selected_edge_count = sum(1 for edge in bm_sel.edges if edge.select)
+    selected_degree = {}
+    for edge in bm_sel.edges:
+        if not edge.select:
+            continue
+        for vert in edge.verts:
+            selected_degree[vert.index] = selected_degree.get(vert.index, 0) + 1
+    selected_degree_histogram = {}
+    for degree in selected_degree.values():
+        selected_degree_histogram[degree] = selected_degree_histogram.get(degree, 0) + 1
+    input_vert_count = len(bm_sel.verts)
+    input_face_count = len(bm_sel.faces)
+    input_edge_count = len(bm_sel.edges)
     bmesh.update_edit_mesh(obj.data)
 
     # Bevel
@@ -309,7 +348,7 @@ def main():
         aabb = {"min": [0, 0, 0], "max": [0, 0, 0]}
 
     # Per-corner patches
-    corner_patches = extract_corner_patches(verts, faces, edge_inc, args["size"])
+    corner_patches = extract_corner_patches(verts, faces, edge_inc, dimensions)
 
     # Canonical sort of vertices (quantized) for deterministic output
     sorted_verts = sorted([quantize_vec3(v) for v in verts])
@@ -327,6 +366,14 @@ def main():
             "blender_binary_path": bl_bin,
             "params": args,
             "note": "Oracle generated with Blender 4.4.3; PCG source aligns to 5.3-alpha worktree bmesh_bevel.cc. Version mismatch caveat applies.",
+            "input_geometry": {
+                "vert_count": input_vert_count,
+                "face_count": input_face_count,
+                "edge_count": input_edge_count,
+                "selected_edge_count": selected_edge_count,
+                "selected_vertex_count": len(selected_degree),
+                "selected_degree_histogram": selected_degree_histogram,
+            },
         },
         "geometry": {
             "vert_count": len(verts),
@@ -339,7 +386,11 @@ def main():
             "boundary_edge_count": sum(1 for v in edge_inc.values() if v == 1),
             "nonmanifold_edge_count": sum(1 for v in edge_inc.values() if v > 2),
         },
+        # faces_canonical keeps Blender's original vertex indices, so retain the
+        # matching vertex array as well as the order-independent sorted copy.
+        "vertices": [quantize_vec3(v) for v in verts],
         "vertices_sorted": sorted_verts,
+        "faces": faces,
         "faces_canonical": [list(f) for f in canonical_faces],
         "corner_patches": corner_patches,
     }

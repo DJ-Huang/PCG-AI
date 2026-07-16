@@ -442,6 +442,42 @@ int run_tests() {
         }
     }
 
+    // car.pcg body_subdiv -> body_bevel exact parameter regression.
+    {
+        const PcgGeometry body = create_box_geometry(4.2, 0.8, 1.8);
+        const PcgGeometry subdivided = subdivide_geometry(
+            body, 2, SubdivideMethod::CatmullClark);
+        BMeshBuildOptions body_opts;
+        body_opts.merge_coplanar_angle_deg = 0.0;
+        body_opts.sharp_angle_deg = 30.0;
+        const BMesh body_bmesh = bmesh_from_geometry(subdivided, body_opts);
+        int selected_edges = 0;
+        std::unordered_map<int, int> selected_degree;
+        for (const auto& entry : body_bmesh.edges) {
+            if (!entry.second.sharp)
+                continue;
+            ++selected_edges;
+            ++selected_degree[entry.second.v0];
+            ++selected_degree[entry.second.v1];
+        }
+        std::array<int, 5> degree_hist{};
+        for (const auto& entry : selected_degree) {
+            if (entry.second >= 0 && entry.second < static_cast<int>(degree_hist.size()))
+                ++degree_hist[static_cast<size_t>(entry.second)];
+        }
+        std::printf("car body input: verts=%zu faces=%zu edges=%zu selected=%d "
+                    "selectedVerts=%zu degree={1:%d,2:%d,3:%d,4:%d}\n",
+                    body_bmesh.verts.size(), body_bmesh.faces.size(),
+                    body_bmesh.edges.size(), selected_edges, selected_degree.size(),
+                    degree_hist[1], degree_hist[2], degree_hist[3], degree_hist[4]);
+        const PcgGeometry beveled = bevel_geometry(
+            subdivided, 0.25, 5, BevelMethod::Edge, BevelOffsetType::Offset, true,
+            30.0, 0.7f, BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj);
+        const PcgMeshData mesh = triangulate_geometry_shared(beveled);
+        check(expect_closed(mesh, "car body CC_L2 seg=5 amount=0.25"),
+              "car body CC_L2 seg=5 amount=0.25");
+    }
+
     return failures;
 }
 

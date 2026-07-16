@@ -5,9 +5,49 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <unordered_map>
 
 namespace pcg::internal::data {
+
+namespace {
+
+size_t stable_fan_start(const PcgGeometry& geometry, const std::vector<int>& face)
+{
+    if (face.size() <= 3)
+        return 0;
+
+    const auto& points = geometry.points();
+    size_t best_start = 0;
+    double best_min_cross_sq = -1.0;
+    for (size_t start = 0; start < face.size(); ++start) {
+        const auto& p0 = points[static_cast<size_t>(face[start])];
+        double min_cross_sq = std::numeric_limits<double>::max();
+        for (size_t offset = 1; offset + 1 < face.size(); ++offset) {
+            const auto& p1 = points[static_cast<size_t>(
+                face[(start + offset) % face.size()])];
+            const auto& p2 = points[static_cast<size_t>(
+                face[(start + offset + 1) % face.size()])];
+            const double ux = p1.x - p0.x;
+            const double uy = p1.y - p0.y;
+            const double uz = p1.z - p0.z;
+            const double vx = p2.x - p0.x;
+            const double vy = p2.y - p0.y;
+            const double vz = p2.z - p0.z;
+            const double cx = uy * vz - uz * vy;
+            const double cy = uz * vx - ux * vz;
+            const double cz = ux * vy - uy * vx;
+            min_cross_sq = std::min(min_cross_sq, cx * cx + cy * cy + cz * cz);
+        }
+        if (min_cross_sq > best_min_cross_sq) {
+            best_min_cross_sq = min_cross_sq;
+            best_start = start;
+        }
+    }
+    return best_start;
+}
+
+} // namespace
 
 PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
 {
@@ -25,9 +65,13 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
             local.push_back(static_cast<int>(mesh.vertices().size()));
             mesh.add_vertex({p.x, p.y, p.z});
         }
-        const int i0 = local[0];
-        for (size_t i = 1; i + 1 < local.size(); ++i)
-            mesh.add_triangle(i0, local[i], local[i + 1]);
+        const size_t start = stable_fan_start(geometry, face);
+        const int i0 = local[start];
+        for (size_t offset = 1; offset + 1 < local.size(); ++offset) {
+            mesh.add_triangle(i0,
+                              local[(start + offset) % local.size()],
+                              local[(start + offset + 1) % local.size()]);
+        }
     }
 
     return mesh;
@@ -41,9 +85,13 @@ PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry)
     for (const auto& face : geometry.faces()) {
         if (face.size() < 3)
             continue;
-        const int i0 = face[0];
-        for (size_t i = 1; i + 1 < face.size(); ++i)
-            mesh.add_triangle(i0, face[i], face[i + 1]);
+        const size_t start = stable_fan_start(geometry, face);
+        const int i0 = face[start];
+        for (size_t offset = 1; offset + 1 < face.size(); ++offset) {
+            mesh.add_triangle(i0,
+                              face[(start + offset) % face.size()],
+                              face[(start + offset + 1) % face.size()]);
+        }
     }
     return mesh;
 }
@@ -248,7 +296,7 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         return idx;
     };
 
-    // Generate triangles in fan order (same as triangulate_geometry_shared)
+    // Generate triangles using the same stable fan as triangulate_geometry_shared.
     // and record source corner for each triangle vertex
     struct TriCorner {
         int triangle_index;
@@ -261,13 +309,13 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         if (face.size() < 3)
             continue;
         const int base = face_corner_offset[fi];
-        const int i0 = face[0];
-        const int corner0 = base + 0;
-        for (size_t i = 1; i + 1 < face.size(); ++i) {
-            const int v1 = face[i];
-            const int v2 = face[i + 1];
-            const int c1 = base + static_cast<int>(i);
-            const int c2 = base + static_cast<int>(i + 1);
+        const size_t start = stable_fan_start(geometry, face);
+        const int corner0 = base + static_cast<int>(start);
+        for (size_t offset = 1; offset + 1 < face.size(); ++offset) {
+            const size_t i1 = (start + offset) % face.size();
+            const size_t i2 = (start + offset + 1) % face.size();
+            const int c1 = base + static_cast<int>(i1);
+            const int c2 = base + static_cast<int>(i2);
 
             const int ri0 = get_render_vertex(corner0);
             const int ri1 = get_render_vertex(c1);

@@ -14,15 +14,18 @@ globs:
 
 **跳过**：纯 Q&A、仅文档、仅 Git、纯 `vault_search` / `rule_search`、纯 GitLab（改读 `workflow/gitlab.md`）、HMIRP 手册（`create-hmirp-doc` Skill）、用户明确禁止改仓库。
 
-## 1. 域名（三选一）
+## 1. 域名（四选一）
 
 | 域名 | 强信号关键词 |
 |------|----------------|
 | **Unity 渲染** | hmirp, unity, shader, hlsl, 渲染管线, render feature, pass, 材质, 光照, 后处理, stable, Runtime.Stable, FRP, sync-tj, 合并 URP |
 | **ComfyUI** | comfyui, custom node, ta-toolkit, node_base, tensor |
-| **通用** | （未命中上述两个域名强信号的开发任务，自动归入） |
+| **PCG** | pcg, .pcg, PcgGeometry, BevelMesh, SweepAlongSpline, pcg-graph, pcg-core, MergeMesh, RevolveMesh, 编图 |
+| **通用** | （未命中上述域名强信号的开发任务，自动归入） |
 
 弱信号 → 让用户选域（Cursor 用 `AskQuestion`，Trae/Codely 在对话中追问）。未命中任何强信号 → 自动 **通用**，不跳过后续步骤。
+
+> PCG 与 Unity 同时出现时（如「Unity 里跑 .pcg」）：优先 **PCG**（编图/节点/几何连线）；仅改 Unity Editor UI 且无 graph 语义时用 Unity 渲染。
 
 ## 2. rule_search（每次写产品代码前必做）
 
@@ -32,7 +35,7 @@ globs:
 
 **每次**修改产品路径（见 `gates/codely-pre-code-gate`）**之前**：
 
-1. `user-vault-rag.rule_search(query=任务技术关键词 + 意图, domain=unity|comfyui, top_k=10)`（**通用**域名传 `domain=null`）
+1. `user-vault-rag.rule_search(query=任务技术关键词 + 意图, domain=unity|comfyui|pcg, top_k=10)`（**通用**域名传 `domain=null`）
 2. 命中后按需 `vault_get_chunk(chunk_id=…)` 读完整规则正文
 3. 不得跳过；不得仅用本会话旧结果代替
 4. **通用**域名 `rule_search` 可能 `no hit` — 此时回执写 `no hit (general domain)`，**但 vault_search 仍必须执行**
@@ -46,6 +49,8 @@ globs:
 | Unity | 调试 | `agents/test-engineer` |
 | ComfyUI | 始终 | `core/comfyui`, `core/anti-ai-trace` |
 | ComfyUI | review | `reviews/comfyui-review-rules`, `agents/comfyui-expert` |
+| PCG | 始终 / 编图 | `pcg/index`, `pcg/assembly-bevel` |
+| PCG | 按模型类型 | `pcg/vehicle`, `pcg/bridge`, `pcg/spiral-staircase`, `pcg/scatter` |
 | 通用 | — | （无域专属规则，`no hit` 正常） |
 
 **AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.opencode/rules/gates/`，由 `setup.bat` 同步，不迁入 Vault。

@@ -2150,15 +2150,16 @@ float geometry_collide_offset(BevelParams& bp, BevVert* bv, EdgeHalf* eb) {
     float kc = 0.0f;
 
     // Find the EdgeHalf at vc that points back to vb (the other end of eb).
-    // ec = next edge (CCW) at the OTHER end, not at this end.
+        // The reverse half-edge flips disk-cycle orientation at the opposite endpoint.
     for (auto& bv_other : bp.bevverts) {
         if (bv_other.v_idx != vc_idx) continue;
         for (auto& eh : bv_other.edges) {
             if (!eh.is_bev) continue;
             if (eh.edge_v1 == vb_idx) {
                 // eh is the reverse EdgeHalf at vc pointing back to vb.
-                // ec = next edge at vc (CCW), mirroring ea at this end.
-                ec = eh.next;
+                // Blender uses the previous disk-cycle edge at the opposite
+                // endpoint because the half-edge direction is reversed there.
+                ec = eh.prev;
                 if (ec && ec->is_bev)
                     kc = ec->offset_l_spec;
                 break;
@@ -2204,25 +2205,34 @@ float geometry_collide_offset(BevelParams& bp, BevVert* bv, EdgeHalf* eb) {
 }
 
 void bevel_limit_offset(BevelParams& bp) {
+    const float requested_offset = static_cast<float>(bp.offset);
+    float limited_offset = static_cast<float>(bp.offset);
     for (auto& bv : bp.bevverts) {
         for (auto& e : bv.edges) {
-            if (!e.is_bev) continue;
-            float limit = geometry_collide_offset(bp, &bv, &e);
-            e.offset_l = std::min(e.offset_l, limit);
-            e.offset_r = std::min(e.offset_r, limit);
-
-            // Also propagate to the other end
-            for (auto& bv2 : bp.bevverts) {
-                if (bv2.v_idx != e.edge_v1) continue;
-                for (auto& e2 : bv2.edges) {
-                    if (e2.is_bev && e2.edge_v1 == bv.v_idx) {
-                        e2.offset_l = std::min(e2.offset_l, limit);
-                        e2.offset_r = std::min(e2.offset_r, limit);
-                    }
-                }
-            }
+            limited_offset = std::min(
+                limited_offset, geometry_collide_offset(bp, &bv, &e));
         }
     }
+
+    if (limited_offset >= bp.offset)
+        return;
+
+    if (bevel_diag_enabled()) {
+        std::fprintf(stderr,
+                     "[PCG_BEVEL_DIAG] clamp requested=%.9f limited=%.9f\n",
+                     requested_offset, limited_offset);
+    }
+
+    const float offset_factor = limited_offset / static_cast<float>(bp.offset);
+    for (auto& bv : bp.bevverts) {
+        for (auto& e : bv.edges) {
+            e.offset_l_spec *= offset_factor;
+            e.offset_r_spec *= offset_factor;
+            e.offset_l *= offset_factor;
+            e.offset_r *= offset_factor;
+        }
+    }
+    bp.offset = limited_offset;
 }
 
 } // anonymous namespace
@@ -3180,7 +3190,7 @@ std::unique_ptr<VMesh> adj_vmesh(BevelParams& bp, BevVert* bv) {
     int nseg = bv->vmesh->seg;
 
     // Cube corner special case: build in unit space + snap to superellipsoid (Blender adj_vmesh:5089).
-    if (n_bndv == 3 && tri_corner_test(bp, bv) != -1 && bp.pro_super_r != PRO_SQUARE_IN_R) {
+    if (n_bndv == 3 && tri_corner_test(bp, bv) == 1 && bp.pro_super_r != PRO_SQUARE_IN_R) {
         return tri_corner_adj_vmesh(bp, bv);
     }
 
@@ -4111,13 +4121,16 @@ data::PcgMeshData bevel_mesh_blender(
         bp.bevverts.push_back(std::move(bv));
     }
 
-    // 6. Build boundaries (first pass: construct=true)
+    // 6. Build boundaries immediately only when overlap limiting is disabled.
+    // Blender delays the first boundary build until after bevel_limit_offset when
+    // clamp overlap is enabled; building twice appends duplicate BoundVerts.
     for (auto& bv : bp.bevverts) {
         if (bevel_cancel_requested(bp))
             return mesh;
         bv.vmesh = std::make_unique<VMesh>();
         bv.vmesh->seg = segments;
-        build_boundary(bp, &bv, true);
+        if (!clamp_overlap)
+            build_boundary(bp, &bv, true);
     }
 
     // 7. Limit offset (clamp_overlap)
@@ -4126,7 +4139,7 @@ data::PcgMeshData bevel_mesh_blender(
         for (auto& bv : bp.bevverts) {
             if (bevel_cancel_requested(bp))
                 return mesh;
-            build_boundary(bp, &bv, false);
+            build_boundary(bp, &bv, true);
         }
     }
 

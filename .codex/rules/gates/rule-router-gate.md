@@ -4,7 +4,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 ---
 # Rule router gate
 
-**手册**：`~/.trae/skills/rule-router/SKILL.md`
+**手册**：`~/.codex/skills/rule-router/SKILL.md`
 
 ## 何时执行
 
@@ -29,7 +29,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 
 路由规则**唯一真源**：Obsidian `Rules/`（`VAULT_ROOT/Rules`）。
 
-**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.trae/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
+**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.codex/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
 
 **每次**修改产品路径（见 `gates/codely-pre-code-gate`）**之前**：
 
@@ -51,7 +51,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 | PCG | 按模型类型 | `pcg/vehicle`, `pcg/bridge`, `pcg/spiral-staircase`, `pcg/scatter` |
 | 通用 | — | （无域专属规则，`no hit` 正常） |
 
-**AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.trae/rules/gates/`，由 `setup.bat` 同步，不迁入 Vault。
+**AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.codex/rules/gates/`，由 `setup.bat` 同步，不迁入 Vault。
 
 **完整 rule_id 清单**（维护者）：Obsidian `Rules/meta/rules-vault-index`（`rag_index: false`，直接 Read 或维护时查阅）。
 

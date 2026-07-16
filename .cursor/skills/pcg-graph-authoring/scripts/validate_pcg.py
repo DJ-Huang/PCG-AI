@@ -8,7 +8,13 @@ import sys
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+# Walk up from cwd to find the repo root (contains schema/node-manifest.json)
+_REPO_ROOT = Path.cwd()
+for _candidate in [Path.cwd(), *_REPO_ROOT.parents]:
+    if (_candidate / "schema" / "node-manifest.json").is_file():
+        _REPO_ROOT = _candidate
+        break
+REPO_ROOT = _REPO_ROOT
 MANIFEST_PATH = REPO_ROOT / "schema" / "node-manifest.json"
 
 ROW_STEP_Y = 160
@@ -34,7 +40,16 @@ def can_connect(src_type: str, tgt_type: str, src_handle: str, tgt_handle: str, 
     _, src_out = pin_maps(src_def)
     tgt_in, _ = pin_maps(tgt_def)
     src_pin = src_out.get(src_handle or "out", "SpatialPoint")
-    tgt_pin = tgt_in.get(tgt_handle or "in", "SpatialPoint")
+
+    tgt_pin = tgt_in.get(tgt_handle or "in")
+    if tgt_pin is None:
+        # Check for variadic input — any handle is accepted if pinType matches
+        for p in tgt_def.get("inputs", []):
+            if p.get("variadic"):
+                tgt_pin = p["pinType"]
+                break
+    if tgt_pin is None:
+        tgt_pin = "SpatialPoint"
     return src_pin == tgt_pin or src_pin == "Any" or tgt_pin == "Any"
 
 
@@ -113,6 +128,30 @@ def validate_graph(graph_path: Path, manifest: dict[str, dict]) -> int:
         )
     elif style == "mixed":
         warnings.append("layout is mixed; prefer clear top-down spine at x=200")
+
+    # Anti-pattern: MergeMesh (multi-input) → BevelMesh on assemblies
+    inbound: dict[str, list[str]] = {}
+    for edge in edges:
+        tgt_id = edge.get("target", "")
+        src_id = edge.get("source", "")
+        if tgt_id and src_id:
+            inbound.setdefault(tgt_id, []).append(src_id)
+
+    for node in nodes:
+        if node.get("type") != "BevelMesh":
+            continue
+        bevel_id = node["id"]
+        for pred_id in inbound.get(bevel_id, []):
+            pred = by_id.get(pred_id)
+            if not pred or pred.get("type") != "MergeMesh":
+                continue
+            merge_inputs = inbound.get(pred_id, [])
+            if len(merge_inputs) >= 2:
+                warnings.append(
+                    f"assembly anti-pattern: {pred_id}(MergeMesh, {len(merge_inputs)} inputs) "
+                    f"→ {bevel_id}(BevelMesh); bevel each part then merge "
+                    f"(see pcg-graph-authoring Bevel placement)"
+                )
 
     for msg in warnings:
         print(f"WARN: {msg}")

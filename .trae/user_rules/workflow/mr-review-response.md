@@ -157,14 +157,14 @@ gitlab_proxy(action="resolve_thread", discussion_id)  # 仅接受类
 MR Review 反馈处理
 ├── 低复杂度反馈 → 直接修改（本工作流完成）
 ├── 高复杂度反馈 → 建议 spec-driven（跳转双文件工作流）
-└── 需要重新 review → 建议 hmirp-code-review（跳转审查 Skill）
+└── 需要重新 review → 建议 code-review（跳转审查 Skill）
 ```
 
 | 场景 | 来源 | 跳转目标 | 触发条件 |
 |------|------|---------|---------|
 | 高复杂度修改 | 本工作流 Phase 3 | spec-driven | 修改涉及 ≥3 文件/多模块 |
-| 修改后需再审查 | 本工作流 Phase 5 | hmirp-code-review | 用户要求 Re-review |
-| 审查完收到反馈 | hmirp-code-review | 本工作流 | MR 被评论 |
+| 修改后需再审查 | 本工作流 Phase 5 | code-review | 用户要求 Re-review |
+| 审查完收到反馈 | code-review | 本工作流 | MR 被评论 |
 | spec 产出 MR 收到反馈 | spec-driven | 本工作流 | MR 被评论 |
 
 ---

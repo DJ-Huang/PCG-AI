@@ -32,6 +32,7 @@
 - FRP 目录结构原则：如果 tj URP 有某功能，FRP 必须保持 tj URP 的目录结构，在此基础上做扩展。禁止将 tj 文件移到其他路径或删掉后重写；tj 缺失的文件（如 MotionVectorsCommon.hlsl、MotionVectorPass.hlsl）必须补回并保持原路径。FRP 扩展通过 partial class（`.FRP.cs`）或新增文件实现，不修改 tj 原文件。
 - spec-driven 执行流程中知识库检索为 P0 强制：Phase 0 / Phase 2 每 Step / Phase 4 每 task 前 `vault_search`；结果写入 plan.md「📚 知识库约束」
 - 审查结果飞书通知应私发给 MR 作者，不应发到项目群。发消息前先检查 MR author 字段确定接收人。
+- **思考语言**：推理/思考过程必须用英文（节省 token，英文编码效率高于中文），最终回答用中文。代码注释保持英文。
 
 
 ## 目录与知识库

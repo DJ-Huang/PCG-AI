@@ -1482,6 +1482,86 @@ data::PcgGeometry subdivide_catmull_clark_geometry(const data::PcgGeometry& geom
         next.detail() = current.detail();
         current = std::move(next);
     }
+
+    // Blender's Subdivision Surface modifier outputs vertices evaluated on the
+    // Catmull-Clark limit surface, not the final control cage. Keep the L-level
+    // topology, but move each control vertex to its analytic limit position.
+    // For an interior vertex of valence n:
+    //   (n^2 P + 2 * sum(edge-neighbor P) + sum(face points)) / (n * (n + 5))
+    // Boundary vertices use the cubic B-spline limit rule.
+    if (levels > 0 && !current.points().empty()) {
+        geometry::BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 0.0;
+        opts.sharp_angle_deg = 180.0;
+        const geometry::BMesh bm = geometry::bmesh_from_geometry(current, opts);
+        const int nv = static_cast<int>(bm.verts.size());
+        const int nf = static_cast<int>(bm.faces.size());
+        if (nv == static_cast<int>(current.points().size())) {
+            std::vector<Vec3> positions(static_cast<size_t>(nv));
+            for (int i = 0; i < nv; ++i) {
+                const auto& p = bm.verts[static_cast<size_t>(i)];
+                positions[static_cast<size_t>(i)] = {p.x, p.y, p.z};
+            }
+
+            std::vector<Vec3> face_points(static_cast<size_t>(nf));
+            std::vector<std::vector<int>> vertex_faces(static_cast<size_t>(nv));
+            std::vector<std::unordered_set<int>> vertex_neighbors(static_cast<size_t>(nv));
+            std::vector<std::vector<int>> boundary_neighbors(static_cast<size_t>(nv));
+
+            for (int fi = 0; fi < nf; ++fi) {
+                const auto& face = bm.faces[static_cast<size_t>(fi)].verts;
+                Vec3 sum{0, 0, 0};
+                for (int vi : face) {
+                    sum = add(sum, positions[static_cast<size_t>(vi)]);
+                    vertex_faces[static_cast<size_t>(vi)].push_back(fi);
+                }
+                face_points[static_cast<size_t>(fi)] =
+                    scale(sum, 1.0 / static_cast<double>(face.size()));
+            }
+
+            for (const auto& entry : bm.edges) {
+                const auto& edge = entry.second;
+                vertex_neighbors[static_cast<size_t>(edge.v0)].insert(edge.v1);
+                vertex_neighbors[static_cast<size_t>(edge.v1)].insert(edge.v0);
+                if (edge.face1 < 0) {
+                    boundary_neighbors[static_cast<size_t>(edge.v0)].push_back(edge.v1);
+                    boundary_neighbors[static_cast<size_t>(edge.v1)].push_back(edge.v0);
+                }
+            }
+
+            auto& output_points = current.points_mut();
+            for (int vi = 0; vi < nv; ++vi) {
+                const Vec3& p = positions[static_cast<size_t>(vi)];
+                const auto& boundary = boundary_neighbors[static_cast<size_t>(vi)];
+                Vec3 limit = p;
+                if (boundary.size() >= 2) {
+                    limit = scale(
+                        add(scale(p, 4.0),
+                            add(positions[static_cast<size_t>(boundary[0])],
+                                positions[static_cast<size_t>(boundary[1])])),
+                        1.0 / 6.0);
+                } else {
+                    const auto& neighbors = vertex_neighbors[static_cast<size_t>(vi)];
+                    const int n = static_cast<int>(neighbors.size());
+                    if (n > 0 && !vertex_faces[static_cast<size_t>(vi)].empty()) {
+                        Vec3 edge_sum{0, 0, 0};
+                        for (int neighbor : neighbors)
+                            edge_sum = add(edge_sum, positions[static_cast<size_t>(neighbor)]);
+                        Vec3 face_sum{0, 0, 0};
+                        for (int fi : vertex_faces[static_cast<size_t>(vi)])
+                            face_sum = add(face_sum, face_points[static_cast<size_t>(fi)]);
+                        const double denominator = static_cast<double>(n * (n + 5));
+                        limit = scale(
+                            add(add(scale(p, static_cast<double>(n * n)),
+                                    scale(edge_sum, 2.0)),
+                                face_sum),
+                            1.0 / denominator);
+                    }
+                }
+                output_points[static_cast<size_t>(vi)] = {limit.x, limit.y, limit.z};
+            }
+        }
+    }
     return current;
 }
 
