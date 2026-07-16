@@ -2,203 +2,379 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "port",
-      "type": "CreateCylinderMesh",
-      "position": { "x": -240, "y": 0 },
-      "data": {"radius": 0.07, "height": 0.3, "radialSegments": 12, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": ""}
-    },
-    {
       "id": "body_profile",
       "type": "CreateSpline",
-      "position": { "x": 200, "y": 0 },
-      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 16, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.1,\"y\":0.0,\"z\":0},{\"x\":0.5,\"y\":0.05,\"z\":0},{\"x\":1.1,\"y\":0.2,\"z\":0},{\"x\":1.4,\"y\":0.4,\"z\":0},{\"x\":1.5,\"y\":0.5,\"z\":0},{\"x\":1.5,\"y\":2.4,\"z\":0},{\"x\":1.45,\"y\":2.65,\"z\":0},{\"x\":1.25,\"y\":2.85,\"z\":0},{\"x\":0.9,\"y\":3.0,\"z\":0},{\"x\":0.6,\"y\":3.1,\"z\":0},{\"x\":0.55,\"y\":3.3,\"z\":0},{\"x\":0.6,\"y\":3.5,\"z\":0},{\"x\":0.5,\"y\":3.6,\"z\":0},{\"x\":0.15,\"y\":3.65,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+      "position": { "x": -220, "y": 0 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 16, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.08,\"y\":0.0,\"z\":0},{\"x\":0.2,\"y\":0.02,\"z\":0},{\"x\":0.29,\"y\":0.08,\"z\":0},{\"x\":0.325,\"y\":0.16,\"z\":0},{\"x\":0.33,\"y\":0.24,\"z\":0},{\"x\":0.33,\"y\":0.92,\"z\":0},{\"x\":0.325,\"y\":1.0,\"z\":0},{\"x\":0.3,\"y\":1.08,\"z\":0},{\"x\":0.26,\"y\":1.14,\"z\":0},{\"x\":0.21,\"y\":1.18,\"z\":0},{\"x\":0.18,\"y\":1.21,\"z\":0},{\"x\":0.16,\"y\":1.24,\"z\":0},{\"x\":0.07,\"y\":1.25,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Tall Canister Profile"}
     },
     {
       "id": "hose_path",
       "type": "CreateSpline",
-      "position": { "x": 640, "y": 0 },
-      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.3,\"y\":3.85,\"z\":0},{\"x\":0.9,\"y\":3.5,\"z\":0.1},{\"x\":1.6,\"y\":2.6,\"z\":0.2},{\"x\":1.7,\"y\":1.2,\"z\":0.0},{\"x\":1.2,\"y\":0.3,\"z\":-0.3},{\"x\":0.2,\"y\":0.1,\"z\":-0.5},{\"x\":-1.2,\"y\":0.3,\"z\":-0.2},{\"x\":-1.6,\"y\":1.2,\"z\":0.1},{\"x\":-1.3,\"y\":2.6,\"z\":0.3},{\"x\":-0.3,\"y\":2.8,\"z\":0.1}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+      "position": { "x": 220, "y": 0 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 16, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-0.4,\"y\":1.36,\"z\":0.0},{\"x\":-0.52,\"y\":1.32,\"z\":0.02},{\"x\":-0.58,\"y\":1.05,\"z\":0.08},{\"x\":-0.58,\"y\":0.7,\"z\":0.2},{\"x\":-0.45,\"y\":0.52,\"z\":0.36},{\"x\":-0.12,\"y\":0.45,\"z\":0.43},{\"x\":0.3,\"y\":0.43,\"z\":0.36},{\"x\":0.48,\"y\":0.34,\"z\":0.12},{\"x\":0.45,\"y\":0.16,\"z\":-0.18},{\"x\":0.2,\"y\":0.06,\"z\":-0.38},{\"x\":-0.18,\"y\":0.05,\"z\":-0.42},{\"x\":-0.46,\"y\":0.16,\"z\":-0.3},{\"x\":-0.5,\"y\":0.3,\"z\":-0.2}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Wrapped Hose Path"}
     },
     {
-      "id": "port_xform",
-      "type": "TransformMesh",
-      "position": { "x": -240, "y": 160 },
-      "data": {"translateX": 0.15, "translateY": 3.85, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 90, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
-    },
-    {
-      "id": "body",
-      "type": "RevolveMesh",
-      "position": { "x": 200, "y": 160 },
-      "data": {"axis": "y", "segments": 32, "closeProfile": false, "capStart": true, "capEnd": true, "__nodeTitle": ""}
-    },
-    {
-      "id": "hose",
-      "type": "SweepAlongSpline",
-      "position": { "x": 640, "y": 160 },
-      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.06, "columns": 8, "sampleSpacing": 0.3, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 0.8, "scaleEnd": 0.8, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
-    },
-    {
-      "id": "port_bevel",
-      "type": "BevelMesh",
-      "position": { "x": -240, "y": 320 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.01, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.7, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
-    },
-    {
-      "id": "body_bevel",
-      "type": "BevelMesh",
-      "position": { "x": 200, "y": 320 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.08, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.7, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
-    },
-    {
-      "id": "hose_color",
-      "type": "VertexColor",
-      "position": { "x": 640, "y": 320 },
-      "data": {"r": 0.3, "g": 0.08, "b": 0.08, "a": 1, "__nodeTitle": ""}
-    },
-    {
-      "id": "stem",
-      "type": "CreateCylinderMesh",
-      "position": { "x": -240, "y": 480 },
-      "data": {"radius": 0.12, "height": 0.35, "radialSegments": 16, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": ""}
-    },
-    {
-      "id": "body_color",
-      "type": "VertexColor",
-      "position": { "x": 200, "y": 480 },
-      "data": {"r": 0.3, "g": 0.35, "b": 0.15, "a": 1, "__nodeTitle": ""}
-    },
-    {
-      "id": "cage_ring",
+      "id": "cage_upper_path",
       "type": "CreateSpline",
-      "position": { "x": 420, "y": 480 },
-      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.7,\"y\":3.15,\"z\":0},{\"x\":0.5,\"y\":3.15,\"z\":0.5},{\"x\":0,\"y\":3.15,\"z\":0.7},{\"x\":-0.5,\"y\":3.15,\"z\":0.5},{\"x\":-0.7,\"y\":3.15,\"z\":0},{\"x\":-0.5,\"y\":3.15,\"z\":-0.5},{\"x\":0,\"y\":3.15,\"z\":-0.7},{\"x\":0.5,\"y\":3.15,\"z\":-0.5}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+      "position": { "x": -660, "y": 480 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.34,\"y\":1.27,\"z\":0},{\"x\":0.2404,\"y\":1.27,\"z\":0.2404},{\"x\":0,\"y\":1.27,\"z\":0.34},{\"x\":-0.2404,\"y\":1.27,\"z\":0.2404},{\"x\":-0.34,\"y\":1.27,\"z\":0},{\"x\":-0.2404,\"y\":1.27,\"z\":-0.2404},{\"x\":0,\"y\":1.27,\"z\":-0.34},{\"x\":0.2404,\"y\":1.27,\"z\":-0.2404}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Upper Cage Band Path"}
+    },
+    {
+      "id": "cage_lower_path",
+      "type": "CreateSpline",
+      "position": { "x": -440, "y": 480 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.3,\"y\":1.07,\"z\":0},{\"x\":0.2121,\"y\":1.07,\"z\":0.2121},{\"x\":0,\"y\":1.07,\"z\":0.3},{\"x\":-0.2121,\"y\":1.07,\"z\":0.2121},{\"x\":-0.3,\"y\":1.07,\"z\":0},{\"x\":-0.2121,\"y\":1.07,\"z\":-0.2121},{\"x\":0,\"y\":1.07,\"z\":-0.3},{\"x\":0.2121,\"y\":1.07,\"z\":-0.2121}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Lower Cage Ring Path"}
+    },
+    {
+      "id": "cage_bar_path",
+      "type": "CreateSpline",
+      "position": { "x": -220, "y": 480 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.315,\"y\":1.18,\"z\":0},{\"x\":0.2227,\"y\":1.18,\"z\":0.2227},{\"x\":0,\"y\":1.18,\"z\":0.315},{\"x\":-0.2227,\"y\":1.18,\"z\":0.2227},{\"x\":-0.315,\"y\":1.18,\"z\":0},{\"x\":-0.2227,\"y\":1.18,\"z\":-0.2227},{\"x\":0,\"y\":1.18,\"z\":-0.315},{\"x\":0.2227,\"y\":1.18,\"z\":-0.2227}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Cage Bar Distribution"}
     },
     {
       "id": "cage_bar",
       "type": "CreateBoxMesh",
-      "position": { "x": 640, "y": 480 },
-      "data": {"width": 0.06, "height": 0.5, "depth": 0.1, "__nodeTitle": ""}
+      "position": { "x": 0, "y": 480 },
+      "data": {"width": 0.055, "height": 0.24, "depth": 0.045, "__nodeTitle": "Cage Bar"}
     },
     {
-      "id": "stem_xform",
-      "type": "TransformMesh",
-      "position": { "x": -240, "y": 640 },
-      "data": {"translateX": 0, "translateY": 3.825, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
+      "id": "shoulder_ring_path",
+      "type": "CreateSpline",
+      "position": { "x": 220, "y": 480 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.3,\"y\":1.02,\"z\":0},{\"x\":0.2121,\"y\":1.02,\"z\":0.2121},{\"x\":0,\"y\":1.02,\"z\":0.3},{\"x\":-0.2121,\"y\":1.02,\"z\":0.2121},{\"x\":-0.3,\"y\":1.02,\"z\":0},{\"x\":-0.2121,\"y\":1.02,\"z\":-0.2121},{\"x\":0,\"y\":1.02,\"z\":-0.3},{\"x\":0.2121,\"y\":1.02,\"z\":-0.2121}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Shoulder Ring Path"}
     },
     {
-      "id": "cage_bars",
-      "type": "InstanceAlongSpline",
-      "position": { "x": 420, "y": 640 },
-      "data": {"spacing": 0.35, "offset": 0, "includeEnd": false, "alignToTangent": true, "scale": 1, "__nodeTitle": ""}
+      "id": "base_ring_path",
+      "type": "CreateSpline",
+      "position": { "x": 440, "y": 480 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.3,\"y\":0.08,\"z\":0},{\"x\":0.2121,\"y\":0.08,\"z\":0.2121},{\"x\":0,\"y\":0.08,\"z\":0.3},{\"x\":-0.2121,\"y\":0.08,\"z\":0.2121},{\"x\":-0.3,\"y\":0.08,\"z\":0},{\"x\":-0.2121,\"y\":0.08,\"z\":-0.2121},{\"x\":0,\"y\":0.08,\"z\":-0.3},{\"x\":0.2121,\"y\":0.08,\"z\":-0.2121}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Base Ring Path"}
     },
     {
-      "id": "stem_bevel",
-      "type": "BevelMesh",
-      "position": { "x": -240, "y": 800 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.015, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.7, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
+      "id": "valve_base",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 0, "y": 960 },
+      "data": {"radius": 0.115, "height": 0.16, "radialSegments": 16, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": "Valve Base"}
+    },
+    {
+      "id": "valve_neck",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 220, "y": 960 },
+      "data": {"radius": 0.065, "height": 0.25, "radialSegments": 16, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": "Valve Neck"}
+    },
+    {
+      "id": "side_port",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 440, "y": 960 },
+      "data": {"radius": 0.055, "height": 0.3, "radialSegments": 16, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": "Side Port"}
+    },
+    {
+      "id": "port_coupler",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 660, "y": 960 },
+      "data": {"radius": 0.08, "height": 0.12, "radialSegments": 16, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": "Port Coupler"}
     },
     {
       "id": "wheel_rim_path",
       "type": "CreateSpline",
-      "position": { "x": -20, "y": 800 },
-      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 8, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.4,\"y\":0,\"z\":0},{\"x\":0.283,\"y\":0,\"z\":0.283},{\"x\":0,\"y\":0,\"z\":0.4},{\"x\":-0.283,\"y\":0,\"z\":0.283},{\"x\":-0.4,\"y\":0,\"z\":0},{\"x\":-0.283,\"y\":0,\"z\":-0.283},{\"x\":0,\"y\":0,\"z\":-0.4},{\"x\":0.283,\"y\":0,\"z\":-0.283}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+      "position": { "x": -660, "y": 960 },
+      "data": {"mode": "catmullRom", "closed": true, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0.17,\"y\":0,\"z\":0},{\"x\":0.1202,\"y\":0,\"z\":0.1202},{\"x\":0,\"y\":0,\"z\":0.17},{\"x\":-0.1202,\"y\":0,\"z\":0.1202},{\"x\":-0.17,\"y\":0,\"z\":0},{\"x\":-0.1202,\"y\":0,\"z\":-0.1202},{\"x\":0,\"y\":0,\"z\":-0.17},{\"x\":0.1202,\"y\":0,\"z\":-0.1202}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Handwheel Rim Path"}
     },
     {
-      "id": "wheel_spoke_a",
+      "id": "wheel_spoke",
       "type": "CreateBoxMesh",
-      "position": { "x": 200, "y": 800 },
-      "data": {"width": 0.72, "height": 0.04, "depth": 0.08, "__nodeTitle": ""}
-    },
-    {
-      "id": "wheel_spoke_b",
-      "type": "CreateBoxMesh",
-      "position": { "x": 420, "y": 800 },
-      "data": {"width": 0.72, "height": 0.04, "depth": 0.08, "__nodeTitle": ""}
+      "position": { "x": -440, "y": 960 },
+      "data": {"width": 0.3, "height": 0.022, "depth": 0.032, "__nodeTitle": "Handwheel Spoke"}
     },
     {
       "id": "wheel_hub",
       "type": "CreateCylinderMesh",
-      "position": { "x": 640, "y": 800 },
-      "data": {"radius": 0.06, "height": 0.1, "radialSegments": 12, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": ""}
+      "position": { "x": -220, "y": 960 },
+      "data": {"radius": 0.04, "height": 0.055, "radialSegments": 12, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": "Handwheel Hub"}
+    },
+    {
+      "id": "hose_nozzle",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 880, "y": 960 },
+      "data": {"radius": 0.055, "height": 0.11, "radialSegments": 16, "heightSegments": 1, "capTop": true, "capBottom": true, "__nodeTitle": "Hose End Coupler"}
+    },
+    {
+      "id": "body",
+      "type": "RevolveMesh",
+      "position": { "x": -220, "y": 160 },
+      "data": {"axis": "y", "segments": 32, "closeProfile": false, "capStart": true, "capEnd": true, "__nodeTitle": "Tall Canister Body"}
+    },
+    {
+      "id": "hose",
+      "type": "SweepAlongSpline",
+      "position": { "x": 220, "y": 160 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.035, "columns": 10, "sampleSpacing": 0.08, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Wrapped Hose"}
+    },
+    {
+      "id": "cage_upper_band",
+      "type": "SweepAlongSpline",
+      "position": { "x": -660, "y": 640 },
+      "data": {"surfaceShape": "rectangle", "profileWidth": 0.065, "profileHeight": 0.15, "radius": 1, "columns": 16, "sampleSpacing": 0.08, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Wide Upper Cage Band"}
+    },
+    {
+      "id": "cage_lower_ring",
+      "type": "SweepAlongSpline",
+      "position": { "x": -440, "y": 640 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.025, "columns": 12, "sampleSpacing": 0.08, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Lower Cage Ring"}
+    },
+    {
+      "id": "cage_bar_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 0, "y": 640 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.008, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.6, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Cage Bar Bevel"}
+    },
+    {
+      "id": "shoulder_ring",
+      "type": "SweepAlongSpline",
+      "position": { "x": 220, "y": 640 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.025, "columns": 12, "sampleSpacing": 0.08, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Shoulder Ring"}
+    },
+    {
+      "id": "base_ring",
+      "type": "SweepAlongSpline",
+      "position": { "x": 440, "y": 640 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.032, "columns": 12, "sampleSpacing": 0.08, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Base Reinforcement Ring"}
+    },
+    {
+      "id": "valve_base_xform",
+      "type": "TransformMesh",
+      "position": { "x": 220, "y": 1120 },
+      "data": {"translateX": 0, "translateY": 1.27, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Place Valve Base"}
+    },
+    {
+      "id": "valve_neck_xform",
+      "type": "TransformMesh",
+      "position": { "x": 440, "y": 1120 },
+      "data": {"translateX": 0, "translateY": 1.43, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Place Valve Neck"}
+    },
+    {
+      "id": "side_port_xform",
+      "type": "TransformMesh",
+      "position": { "x": 660, "y": 1120 },
+      "data": {"translateX": -0.15, "translateY": 1.36, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 90, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Place Side Port"}
+    },
+    {
+      "id": "port_coupler_xform",
+      "type": "TransformMesh",
+      "position": { "x": 880, "y": 1120 },
+      "data": {"translateX": -0.34, "translateY": 1.36, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 90, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Place Port Coupler"}
     },
     {
       "id": "wheel_rim",
       "type": "SweepAlongSpline",
-      "position": { "x": -20, "y": 960 },
-      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.04, "columns": 12, "sampleSpacing": 0.3, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
+      "position": { "x": -660, "y": 1120 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.026, "columns": 12, "sampleSpacing": 0.05, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Handwheel Rim"}
     },
     {
-      "id": "wheel_spoke_b_xform",
+      "id": "wheel_spoke_0",
       "type": "TransformMesh",
-      "position": { "x": 420, "y": 960 },
-      "data": {"translateX": 0, "translateY": 0, "translateZ": 0, "rotationX": 0, "rotationY": 90, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
+      "position": { "x": -440, "y": 1120 },
+      "data": {"translateX": 0, "translateY": 0, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Spoke 0"}
+    },
+    {
+      "id": "wheel_spoke_60",
+      "type": "TransformMesh",
+      "position": { "x": -220, "y": 1120 },
+      "data": {"translateX": 0, "translateY": 0, "translateZ": 0, "rotationX": 0, "rotationY": 60, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Spoke 60"}
+    },
+    {
+      "id": "wheel_spoke_120",
+      "type": "TransformMesh",
+      "position": { "x": 0, "y": 1120 },
+      "data": {"translateX": 0, "translateY": 0, "translateZ": 0, "rotationX": 0, "rotationY": 120, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Spoke 120"}
+    },
+    {
+      "id": "hose_nozzle_xform",
+      "type": "TransformMesh",
+      "position": { "x": 1100, "y": 1120 },
+      "data": {"translateX": -0.5, "translateY": 0.3, "translateZ": -0.24, "rotationX": 90, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Place Hose End"}
+    },
+    {
+      "id": "body_color",
+      "type": "VertexColor",
+      "position": { "x": -220, "y": 320 },
+      "data": {"r": 0.78, "g": 0.38, "b": 0.06, "a": 1, "__nodeTitle": "Worn Yellow Base"}
+    },
+    {
+      "id": "hose_color",
+      "type": "VertexColor",
+      "position": { "x": 220, "y": 320 },
+      "data": {"r": 0.07, "g": 0.08, "b": 0.07, "a": 1, "__nodeTitle": "Dark Hose"}
+    },
+    {
+      "id": "cage_upper_bevel",
+      "type": "BevelMesh",
+      "position": { "x": -660, "y": 800 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.015, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.6, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Upper Band Bevel"}
+    },
+    {
+      "id": "cage_bars",
+      "type": "InstanceAlongSpline",
+      "position": { "x": -220, "y": 800 },
+      "data": {"spacing": 0.31, "offset": 0, "includeEnd": false, "alignToTangent": true, "scale": 1, "__nodeTitle": "Cage Bars"}
+    },
+    {
+      "id": "shoulder_color",
+      "type": "VertexColor",
+      "position": { "x": 220, "y": 800 },
+      "data": {"r": 0.65, "g": 0.28, "b": 0.04, "a": 1, "__nodeTitle": "Shoulder Ring Color"}
+    },
+    {
+      "id": "base_color",
+      "type": "VertexColor",
+      "position": { "x": 440, "y": 800 },
+      "data": {"r": 0.5, "g": 0.2, "b": 0.035, "a": 1, "__nodeTitle": "Base Ring Color"}
+    },
+    {
+      "id": "valve_base_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 220, "y": 1280 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.012, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.65, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Valve Base Bevel"}
+    },
+    {
+      "id": "valve_neck_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 440, "y": 1280 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.01, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.65, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Valve Neck Bevel"}
+    },
+    {
+      "id": "side_port_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 660, "y": 1280 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.008, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.65, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Side Port Bevel"}
+    },
+    {
+      "id": "port_coupler_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 880, "y": 1280 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.01, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.65, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Coupler Bevel"}
     },
     {
       "id": "wheel_merge",
       "type": "MergeMesh",
-      "position": { "x": -20, "y": 1120 },
-      "data": {"__nodeTitle": ""}
+      "position": { "x": -330, "y": 1280 },
+      "data": {"__nodeTitle": "Handwheel Assembly"}
+    },
+    {
+      "id": "hose_nozzle_bevel",
+      "type": "BevelMesh",
+      "position": { "x": 1100, "y": 1280 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.008, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.65, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Hose End Bevel"}
+    },
+    {
+      "id": "cage_merge",
+      "type": "MergeMesh",
+      "position": { "x": -660, "y": 960 },
+      "data": {"__nodeTitle": "Protective Cage Assembly"}
+    },
+    {
+      "id": "valve_metal_merge",
+      "type": "MergeMesh",
+      "position": { "x": 550, "y": 1440 },
+      "data": {"__nodeTitle": "Valve Metal Assembly"}
     },
     {
       "id": "wheel_xform",
       "type": "TransformMesh",
-      "position": { "x": -20, "y": 1280 },
-      "data": {"translateX": 0, "translateY": 4.03, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
+      "position": { "x": -330, "y": 1440 },
+      "data": {"translateX": 0, "translateY": 1.63, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Place Handwheel"}
     },
     {
-      "id": "valve_merge",
-      "type": "MergeMesh",
-      "position": { "x": -20, "y": 1440 },
-      "data": {"__nodeTitle": ""}
+      "id": "hose_nozzle_color",
+      "type": "VertexColor",
+      "position": { "x": 1100, "y": 1440 },
+      "data": {"r": 0.22, "g": 0.22, "b": 0.18, "a": 1, "__nodeTitle": "Hose End Metal"}
+    },
+    {
+      "id": "cage_color",
+      "type": "VertexColor",
+      "position": { "x": -660, "y": 1120 },
+      "data": {"r": 0.68, "g": 0.3, "b": 0.05, "a": 1, "__nodeTitle": "Protective Cage Color"}
     },
     {
       "id": "valve_color",
       "type": "VertexColor",
-      "position": { "x": -20, "y": 1600 },
-      "data": {"r": 0.55, "g": 0.35, "b": 0.15, "a": 1, "__nodeTitle": ""}
+      "position": { "x": 550, "y": 1600 },
+      "data": {"r": 0.46, "g": 0.27, "b": 0.12, "a": 1, "__nodeTitle": "Valve Metal Color"}
+    },
+    {
+      "id": "wheel_color",
+      "type": "VertexColor",
+      "position": { "x": -330, "y": 1600 },
+      "data": {"r": 0.24, "g": 0.055, "b": 0.035, "a": 1, "__nodeTitle": "Dark Red Handwheel"}
     },
     {
       "id": "merge",
       "type": "MergeMesh",
       "position": { "x": 200, "y": 1760 },
-      "data": {"__nodeTitle": ""}
+      "data": {"__nodeTitle": "Biohazard Canister Assembly"}
     },
     {
       "id": "out",
       "type": "Output",
       "position": { "x": 200, "y": 1920 },
-      "data": {"label": "Biohazard Canister", "__nodeTitle": ""}
+      "data": {"label": "Biohazard Canister - Real Scale", "__nodeTitle": ""}
     }
   ],
   "edges": [
     {"id": "e1", "source": "body_profile", "target": "body", "sourceHandle": "out", "targetHandle": "profile"},
-    {"id": "e2", "source": "port", "target": "port_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e2", "source": "body", "target": "body_color", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e3", "source": "hose_path", "target": "hose", "sourceHandle": "out", "targetHandle": "backbone"},
-    {"id": "e4", "source": "port_xform", "target": "port_bevel", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e5", "source": "body", "target": "body_bevel", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e6", "source": "hose", "target": "hose_color", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e7", "source": "body_bevel", "target": "body_color", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e8", "source": "stem", "target": "stem_xform", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e9", "source": "cage_ring", "target": "cage_bars", "sourceHandle": "out", "targetHandle": "spline"},
-    {"id": "e10", "source": "cage_bar", "target": "cage_bars", "sourceHandle": "out", "targetHandle": "mesh"},
-    {"id": "e11", "source": "stem_xform", "target": "stem_bevel", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e12", "source": "wheel_rim_path", "target": "wheel_rim", "sourceHandle": "out", "targetHandle": "backbone"},
-    {"id": "e13", "source": "wheel_spoke_b", "target": "wheel_spoke_b_xform", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e14", "source": "wheel_rim", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e15", "source": "wheel_spoke_a", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e16", "source": "wheel_spoke_b_xform", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e17", "source": "wheel_hub", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e18", "source": "wheel_merge", "target": "wheel_xform", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e19", "source": "port_bevel", "target": "valve_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e20", "source": "stem_bevel", "target": "valve_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e21", "source": "wheel_xform", "target": "valve_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e22", "source": "valve_merge", "target": "valve_color", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e23", "source": "body_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e24", "source": "hose_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e25", "source": "valve_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e26", "source": "cage_bars", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e27", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e4", "source": "hose", "target": "hose_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e5", "source": "cage_upper_path", "target": "cage_upper_band", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e6", "source": "cage_upper_band", "target": "cage_upper_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e7", "source": "cage_lower_path", "target": "cage_lower_ring", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e8", "source": "cage_bar", "target": "cage_bar_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e9", "source": "cage_bar_path", "target": "cage_bars", "sourceHandle": "out", "targetHandle": "spline"},
+    {"id": "e10", "source": "cage_bar_bevel", "target": "cage_bars", "sourceHandle": "out", "targetHandle": "mesh"},
+    {"id": "e11", "source": "cage_upper_bevel", "target": "cage_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e12", "source": "cage_lower_ring", "target": "cage_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e13", "source": "cage_bars", "target": "cage_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e14", "source": "cage_merge", "target": "cage_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e15", "source": "shoulder_ring_path", "target": "shoulder_ring", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e16", "source": "shoulder_ring", "target": "shoulder_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e17", "source": "base_ring_path", "target": "base_ring", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e18", "source": "base_ring", "target": "base_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e19", "source": "valve_base", "target": "valve_base_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e20", "source": "valve_base_xform", "target": "valve_base_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e21", "source": "valve_neck", "target": "valve_neck_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e22", "source": "valve_neck_xform", "target": "valve_neck_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e23", "source": "side_port", "target": "side_port_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e24", "source": "side_port_xform", "target": "side_port_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e25", "source": "port_coupler", "target": "port_coupler_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e26", "source": "port_coupler_xform", "target": "port_coupler_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e27", "source": "valve_base_bevel", "target": "valve_metal_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e28", "source": "valve_neck_bevel", "target": "valve_metal_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e29", "source": "side_port_bevel", "target": "valve_metal_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e30", "source": "port_coupler_bevel", "target": "valve_metal_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e31", "source": "valve_metal_merge", "target": "valve_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e32", "source": "wheel_rim_path", "target": "wheel_rim", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e33", "source": "wheel_spoke", "target": "wheel_spoke_0", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e34", "source": "wheel_spoke", "target": "wheel_spoke_60", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e35", "source": "wheel_spoke", "target": "wheel_spoke_120", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e36", "source": "wheel_rim", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e37", "source": "wheel_spoke_0", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e38", "source": "wheel_spoke_60", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e39", "source": "wheel_spoke_120", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e40", "source": "wheel_hub", "target": "wheel_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e41", "source": "wheel_merge", "target": "wheel_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e42", "source": "wheel_xform", "target": "wheel_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e43", "source": "hose_nozzle", "target": "hose_nozzle_xform", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e44", "source": "hose_nozzle_xform", "target": "hose_nozzle_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e45", "source": "hose_nozzle_bevel", "target": "hose_nozzle_color", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e46", "source": "body_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e47", "source": "hose_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e48", "source": "cage_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e49", "source": "shoulder_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e50", "source": "base_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e51", "source": "valve_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e52", "source": "wheel_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e53", "source": "hose_nozzle_color", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e54", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
   ],
-  "parameters": [
-  ]
+  "parameters": []
 }
