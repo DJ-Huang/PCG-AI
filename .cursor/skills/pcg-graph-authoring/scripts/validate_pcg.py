@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import Counter, defaultdict
 from pathlib import Path
 
 
@@ -19,6 +20,10 @@ MANIFEST_PATH = REPO_ROOT / "schema" / "node-manifest.json"
 
 ROW_STEP_Y = 160
 HORIZONTAL_STEP_X = 200
+# Unity GraphView: pill ~61px + right title overlay up to 220px → need ≥320 same-row Δx
+COL_STEP_X = 320
+SAME_ROW_Y_TOL = ROW_STEP_Y * 0.5
+MIN_SAME_ROW_DX = COL_STEP_X * 0.9  # allow tiny float/rounding slack
 
 
 def load_manifest() -> dict[str, dict]:
@@ -60,11 +65,154 @@ def layout_style(nodes: list[dict]) -> str:
     ys = [n["position"]["y"] for n in nodes]
     x_range = max(xs) - min(xs)
     y_range = max(ys) - min(ys)
+    # Multi-lane assemblies are wide but still top-down if they span multiple rows.
+    if y_range >= ROW_STEP_Y * 1.5:
+        return "vertical"
     if y_range >= ROW_STEP_Y * 0.5 and y_range >= x_range:
         return "vertical"
     if x_range >= HORIZONTAL_STEP_X * 0.5 and x_range > y_range:
         return "horizontal"
     return "mixed"
+
+
+def _segments_cross(
+    ax: float, ay: float, bx: float, by: float,
+    cx: float, cy: float, dx: float, dy: float,
+) -> bool:
+    """Proper intersection of open segments AB and CD."""
+
+    def orient(px, py, qx, qy, rx, ry):
+        return (qy - py) * (rx - qx) - (qx - px) * (ry - qy)
+
+    o1 = orient(ax, ay, bx, by, cx, cy)
+    o2 = orient(ax, ay, bx, by, dx, dy)
+    o3 = orient(cx, cy, dx, dy, ax, ay)
+    o4 = orient(cx, cy, dx, dy, bx, by)
+    return o1 * o2 < 0 and o3 * o4 < 0
+
+
+def check_wire_crossings(nodes: list[dict], edges: list[dict], warnings: list[str]) -> None:
+    """Flag layouts with many geometric edge crossings or long diagonals."""
+    by_id = {n["id"]: n for n in nodes if "id" in n}
+    # Final assembly merge fan-in is allowed to be wide; exclude those tips→merge edges.
+    inbound_count: dict[str, int] = defaultdict(int)
+    for edge in edges:
+        inbound_count[edge.get("target", "")] += 1
+    assembly_merges = {nid for nid, c in inbound_count.items() if c >= 4}
+
+    segs: list[tuple[str, str, float, float, float, float]] = []
+    long_diag = 0
+    for edge in edges:
+        s = by_id.get(edge.get("source", ""))
+        t = by_id.get(edge.get("target", ""))
+        if not s or not t:
+            continue
+        sp, tp = s.get("position"), t.get("position")
+        if not isinstance(sp, dict) or not isinstance(tp, dict):
+            continue
+        if "x" not in sp or "y" not in sp or "x" not in tp or "y" not in tp:
+            continue
+        ax, ay, bx, by = sp["x"], sp["y"], tp["x"], tp["y"]
+        segs.append((s["id"], t["id"], ax, ay, bx, by))
+        if t["id"] in assembly_merges:
+            continue
+        # Long diagonal: spans ≥ 2 lane columns and ≥ 1 row (ignore final assembly fan-in)
+        if abs(bx - ax) >= COL_STEP_X * 2 and abs(by - ay) >= ROW_STEP_Y * 0.5:
+            long_diag += 1
+
+    crosses = 0
+    for i, (a_src, a_tgt, ax, ay, bx, by) in enumerate(segs):
+        for b_src, b_tgt, cx, cy, dx, dy in segs[i + 1 :]:
+            if {a_src, a_tgt} & {b_src, b_tgt}:
+                continue
+            if _segments_cross(ax, ay, bx, by, cx, cy, dx, dy):
+                crosses += 1
+
+    n_edges = max(len(segs), 1)
+    if crosses >= max(8, n_edges // 4):
+        warnings.append(
+            f"wire spaghetti risk: ~{crosses} edge crossings "
+            f"(prefer subsystem lanes so wires stay vertical; see pcg-graph-authoring layout)"
+        )
+    if long_diag >= max(6, n_edges // 5):
+        warnings.append(
+            f"wire spaghetti risk: {long_diag} long diagonal edges "
+            f"(|Δx|≥{COL_STEP_X * 2}); keep parent/child in the same lane"
+        )
+
+
+def node_title(node: dict) -> str:
+    data = node.get("data") or {}
+    raw = data.get("__nodeTitle")
+    if isinstance(raw, str):
+        return raw.strip()
+    return ""
+
+
+def check_same_row_spacing(nodes: list[dict], warnings: list[str]) -> None:
+    """Flag siblings whose right-side titles will overlap the next pill."""
+    positioned = [
+        n for n in nodes
+        if isinstance(n.get("position"), dict)
+        and "x" in n["position"]
+        and "y" in n["position"]
+    ]
+    for i, a in enumerate(positioned):
+        ax, ay = a["position"]["x"], a["position"]["y"]
+        for b in positioned[i + 1 :]:
+            bx, by = b["position"]["x"], b["position"]["y"]
+            if abs(ay - by) >= SAME_ROW_Y_TOL:
+                continue
+            dx = abs(ax - bx)
+            if dx < 1e-3:
+                warnings.append(
+                    f"same-row overlap: {a.get('id')} and {b.get('id')} share position "
+                    f"({ax}, {ay}); separate by ≥{COL_STEP_X} on X or different rows"
+                )
+            elif dx < MIN_SAME_ROW_DX:
+                warnings.append(
+                    f"same-row title overlap risk: {a.get('id')} ↔ {b.get('id')} "
+                    f"|Δx|={dx:.0f} < {COL_STEP_X} (Unity titles sit right of pills; "
+                    f"use COL_STEP_X={COL_STEP_X})"
+                )
+
+
+def check_display_titles(
+    nodes: list[dict],
+    manifest: dict[str, dict],
+    warnings: list[str],
+) -> None:
+    titles: list[tuple[str, str]] = []
+    by_type: dict[str, list[dict]] = defaultdict(list)
+
+    for node in nodes:
+        nid = node.get("id", "?")
+        ntype = node.get("type", "")
+        by_type[ntype].append(node)
+        title = node_title(node)
+        if title:
+            titles.append((title, nid))
+
+    title_counts = Counter(t for t, _ in titles)
+    for title, count in title_counts.items():
+        if count < 2:
+            continue
+        owners = [nid for t, nid in titles if t == title]
+        warnings.append(
+            f"duplicate __nodeTitle {title!r} on nodes: {', '.join(owners)}"
+        )
+
+    for ntype, group in by_type.items():
+        if len(group) < 2 or not ntype:
+            continue
+        missing = [n.get("id", "?") for n in group if not node_title(n)]
+        if not missing:
+            continue
+        default_name = (manifest.get(ntype) or {}).get("displayName") or ntype
+        warnings.append(
+            f"repeated type {ntype} ({len(group)} nodes) missing __nodeTitle on: "
+            f"{', '.join(missing)}; Unity will show {default_name!r} for all of them"
+        )
 
 
 def validate_graph(graph_path: Path, manifest: dict[str, dict]) -> int:
@@ -128,6 +276,10 @@ def validate_graph(graph_path: Path, manifest: dict[str, dict]) -> int:
         )
     elif style == "mixed":
         warnings.append("layout is mixed; prefer clear top-down spine at x=200")
+
+    check_same_row_spacing(nodes, warnings)
+    check_display_titles(nodes, manifest, warnings)
+    check_wire_crossings(nodes, edges, warnings)
 
     # Anti-pattern: MergeMesh (multi-input) → BevelMesh on assemblies
     inbound: dict[str, list[str]] = {}

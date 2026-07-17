@@ -1,6 +1,7 @@
 # PCG Graph Examples — Houdini Top-Down Layout
 
-All positions use: `SPINE_X=200`, `ROW_STEP_Y=160`, `BRANCH_X=220`.
+All positions use: `SPINE_X=200`, `ROW_STEP_Y=160`, `COL_STEP_X=320` (same-row `|Δx| ≥ 320`).
+Every node should set `data.__nodeTitle` (Unity shows that, not `id`).
 
 ## Linear mesh chain
 
@@ -11,13 +12,13 @@ All positions use: `SPINE_X=200`, `ROW_STEP_Y=160`, `BRANCH_X=220`.
   "version": "1.0",
   "nodes": [
     { "id": "box", "type": "CreateBoxMesh", "position": { "x": 200, "y": 0 },
-      "data": { "width": 3.0, "height": 1.5, "depth": 2.0 } },
+      "data": { "__nodeTitle": "Body Box", "width": 3.0, "height": 1.5, "depth": 2.0 } },
     { "id": "subdiv", "type": "SubdivideMesh", "position": { "x": 200, "y": 160 },
-      "data": { "levels": 1 } },
+      "data": { "__nodeTitle": "Body Subdiv", "levels": 1 } },
     { "id": "bevel", "type": "BevelMesh", "position": { "x": 200, "y": 320 },
-      "data": { "method": "edge", "amount": 0.08, "segments": 3 } },
+      "data": { "__nodeTitle": "Body Bevel", "method": "edge", "amount": 0.08, "segments": 3 } },
     { "id": "out", "type": "Output", "position": { "x": 200, "y": 480 },
-      "data": { "label": "Mesh" } }
+      "data": { "__nodeTitle": "Output", "label": "Mesh" } }
   ],
   "edges": [
     { "id": "e1", "source": "box", "target": "subdiv", "sourceHandle": "out", "targetHandle": "in" },
@@ -38,9 +39,9 @@ Row 0–4 on spine `x=200`, `y = 0, 160, 320, 480, 640`.
 Topology (unchanged from `bridge-demo.pcg`; **positions are top-down**):
 
 ```text
-row 0:  path (x=420)    deck_profile (x=-20)
-row 1:  pier_proto (x=-20)     deck / SweepAlongSpline (x=420)
-row 2:  piers / InstanceAlongSpline (x=420)
+row 0:  path (x=520)    deck_profile (x=-120)   ← |Δx| = 640 ≥ COL_STEP_X
+row 1:  pier_proto (x=-120)     deck / SweepAlongSpline (x=520)
+row 2:  piers / InstanceAlongSpline (x=520)
 row 3:  merge (x=200)
 row 4:  out (x=200)
 ```
@@ -50,28 +51,31 @@ row 4:  out (x=200)
   "version": "1.0",
   "nodes": [
     {
-      "id": "path", "type": "CreateSpline", "position": { "x": 420, "y": 0 },
+      "id": "path", "type": "CreateSpline", "position": { "x": 520, "y": 0 },
       "data": {
+        "__nodeTitle": "Deck Path",
         "mode": "catmullRom",
         "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":12,\"y\":3,\"z\":8},{\"x\":28,\"y\":0,\"z\":12},{\"x\":40,\"y\":0,\"z\":0}]",
         "subdivisions": 8, "editPlane": "none"
       }
     },
     {
-      "id": "deck_profile", "type": "CreateSpline", "position": { "x": -20, "y": 0 },
+      "id": "deck_profile", "type": "CreateSpline", "position": { "x": -120, "y": 0 },
       "data": {
+        "__nodeTitle": "Deck Profile",
         "mode": "polyline", "closed": true, "subdivisions": 1,
         "controlPoints": "[{\"x\":-3,\"y\":-0.2,\"z\":0},{\"x\":3,\"y\":-0.2,\"z\":0},{\"x\":3,\"y\":0.2,\"z\":0},{\"x\":-3,\"y\":0.2,\"z\":0}]",
         "editPlane": "xy", "sceneOffsetX": 0, "sceneOffsetY": -6, "sceneOffsetZ": 0
       }
     },
     {
-      "id": "pier_proto", "type": "CreateBoxMesh", "position": { "x": -20, "y": 160 },
-      "data": { "width": 1.2, "height": 7.0, "depth": 1.2 }
+      "id": "pier_proto", "type": "CreateBoxMesh", "position": { "x": -120, "y": 160 },
+      "data": { "__nodeTitle": "Pier Prototype", "width": 1.2, "height": 7.0, "depth": 1.2 }
     },
     {
-      "id": "deck", "type": "SweepAlongSpline", "position": { "x": 420, "y": 160 },
+      "id": "deck", "type": "SweepAlongSpline", "position": { "x": 520, "y": 160 },
       "data": {
+        "__nodeTitle": "Deck Sweep",
         "surfaceShape": "crossSection", "sampleSpacing": 0.8,
         "capStart": false, "capEnd": false,
         "upX": 0, "upY": 1, "upZ": 0, "twist": 0,
@@ -79,19 +83,20 @@ row 4:  out (x=200)
       }
     },
     {
-      "id": "piers", "type": "InstanceAlongSpline", "position": { "x": 420, "y": 320 },
+      "id": "piers", "type": "InstanceAlongSpline", "position": { "x": 520, "y": 320 },
       "data": {
+        "__nodeTitle": "Pier Instances",
         "spacing": 10.0, "offset": 5.0, "includeEnd": false,
         "alignToTangent": true, "scale": 1.0
       }
     },
     {
       "id": "merge", "type": "MergeMesh", "position": { "x": 200, "y": 480 },
-      "data": {}
+      "data": { "__nodeTitle": "Merge Bridge" }
     },
     {
       "id": "out", "type": "Output", "position": { "x": 200, "y": 640 },
-      "data": { "label": "Bridge" }
+      "data": { "__nodeTitle": "Output", "label": "Bridge" }
     }
   ],
   "edges": [
