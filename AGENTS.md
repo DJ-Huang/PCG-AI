@@ -5,12 +5,12 @@
 - **🚪 开发任务强制门禁（P0，不可跳过）**：任何涉及写码/改码的任务（implement/fix/refactor），**必须**在写第一行代码之前完成以下三步，**无论用户 plan 多详细**：
   1. `rule_search` — 查 `.codex/rules/gates/rule-router-gate.md` + `codely-pre-code-gate.md`，确认路由与编码前置规则
   2. `vault_search` — 按任务关键词检索 Vault 经验（踩坑、约束、平台能力）
-  3. 涉及 C#/Shader 改动时，额外查 Vault `Rules/core/hmirp-rendering-agent` §Stable 清洁约束
+  3. **仅当任务是 HMIRP 项目**（命中 `rule-router-gate` 的 HMIRP 强信号：hmirp/stable/FRP/HMICore 等）时，C#/Shader 改动才额外查 Vault `Rules/core/hmirp-rendering-agent` §Stable 清洁约束；**非 HMIRP 项目（如 PCG-AI 的 PCG/通用 C#、其它 Unity 渲染项目）不触发此规则**，避免噪声
   - **禁止**以"用户 plan 已足够详细"为由跳过以上步骤
   - **禁止**以"先 explore 再说"为由跳过——explore 可与检索并行，但检索不可省略
   - 违反 = 产出不可信，必须补检索后重新审查所有改动
 - **规则/技能加载**：见 `Documentation/references/skill-rule-loading-contract.md`；开发任务路由见 `.codex/rules/gates/rule-router-gate.md` + `.codex/rules/gates/codely-pre-code-gate.md`；Codely CLI 用 `rule-router-gate`（AlwaysApply gate，非 Skill）。
-- 写码时注意 Stable 清洁约束：见 Vault `Rules/core/hmirp-rendering-agent` §Stable；迁移评估前必须跑红线扫描（REQ-1~4），FAIL 禁止迁入
+- 写码时注意 Stable 清洁约束（**仅限 HMIRP 项目**）：见 Vault `Rules/core/hmirp-rendering-agent` §Stable；迁移评估前必须跑红线扫描（REQ-1~4），FAIL 禁止迁入。非 HMIRP 项目不套用此约束。
 - 架构/模块/系统概述类查询：用 `SemanticSearch` / `rg` / `Read` 在代码与文档中取证，交叉验证路径与符号定义
 - 路由冲突时（`ambiguous=true`），必须用 `ask_user` 让用户确认真实意图，禁止自动选择
 - 审查 MR 时不自行 Approve，不随意修改 MR 描述，需用户明确许可

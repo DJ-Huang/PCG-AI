@@ -9,7 +9,7 @@ using UnityEngine;
 namespace DJTechEditor.PCG.Graph
 {
     /// <summary>
-    /// Houdini-style Scene View editing for <see cref="PcgManifestNodeView"/> CreateSpline nodes
+    /// Houdini-style Scene View editing for spline authoring nodes
     /// selected in an open Graph Editor window.
     /// </summary>
     [InitializeOnLoad]
@@ -291,7 +291,7 @@ namespace DJTechEditor.PCG.Graph
             var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
             foreach (var node in graphWindow.GraphView.selection.OfType<PcgManifestNodeView>())
             {
-                if (node.NodeType == "CreateSpline")
+                if (IsEditableSplineNode(node.NodeType))
                     splineNodes.Add((graphWindow, graphWindow.GraphView, node));
             }
 
@@ -621,6 +621,9 @@ namespace DJTechEditor.PCG.Graph
             sceneView.Repaint();
             HandleUtility.Repaint();
         }
+
+        private static bool IsEditableSplineNode(string nodeType) =>
+            nodeType == "CreateSpline" || nodeType == "CreateBezierSpline";
 
         private static bool DrawTangentHandles(
             SceneView sceneView,
@@ -1040,7 +1043,7 @@ namespace DJTechEditor.PCG.Graph
 
                 GUILayout.BeginArea(area);
                 GUILayout.Space(6f);
-                GUILayout.Label($"Create Spline — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
+                GUILayout.Label($"{node.GetDisplayTitle()}", EditorStyles.boldLabel);
                 GUILayout.Label(
                     $"Points: {pointCount}   Selected: {selectedCount}",
                     EditorStyles.miniLabel);

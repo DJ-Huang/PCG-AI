@@ -626,6 +626,41 @@
       }
     },
     {
+      "type": "CreateBezierSpline",
+      "displayName": "Create Bezier Spline",
+      "category": "Spline",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "mode": {
+          "type": "enum", "default": "catmullRom",
+          "options": [{ "value": "catmullRom", "label": "Cubic Bezier / Hermite" }]
+        },
+        "closed": { "type": "boolean", "default": false },
+        "subdivisions": { "type": "integer", "default": 12, "minimum": 1, "maximum": 64 },
+        "controlPoints": {
+          "type": "string",
+          "default": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":3,\"y\":1,\"z\":0}]"
+        },
+        "tangents": {
+          "type": "string",
+          "default": "[{\"x\":1,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0}]"
+        },
+        "editPlane": {
+          "type": "enum", "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "xy", "label": "XY" },
+            { "value": "xz", "label": "XZ" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        },
+        "sceneOffsetX": { "type": "number", "default": 0 },
+        "sceneOffsetY": { "type": "number", "default": 0 },
+        "sceneOffsetZ": { "type": "number", "default": 0 }
+      }
+    },
+    {
       "type": "GetSplineData",
       "displayName": "Get Spline Data",
       "category": "Input",
@@ -808,6 +843,155 @@
         "scaleX": { "type": "number", "default": 1.0, "minimum": 0.001 },
         "scaleY": { "type": "number", "default": 1.0, "minimum": 0.001 },
         "scaleZ": { "type": "number", "default": 1.0, "minimum": 0.001 }
+      }
+    },
+    {
+      "type": "LoftMesh",
+      "displayName": "Loft Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "profiles", "label": "Profiles", "pinType": "SpatialSpline", "variadic": true }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "side", "domain": "face", "label": "Loft surface" },
+        { "name": "cap_start", "domain": "face", "label": "Start cap", "condition": "capStart" },
+        { "name": "cap_end", "domain": "face", "label": "End cap", "condition": "capEnd" },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
+      "properties": {
+        "columns": { "type": "integer", "default": 32, "minimum": 2, "maximum": 256 },
+        "sortAxis": {
+          "type": "enum", "default": "x",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "closedProfile": { "type": "boolean", "default": true },
+        "capStart": { "type": "boolean", "default": true },
+        "capEnd": { "type": "boolean", "default": true },
+        "autoAlign": { "type": "boolean", "default": true },
+        "shadeMode": {
+          "type": "enum", "default": "auto",
+          "options": [
+            { "value": "auto", "label": "Auto (Group + Angle)" },
+            { "value": "smooth", "label": "Smooth" },
+            { "value": "flat", "label": "Flat" }
+          ]
+        },
+        "cuspAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 }
+      }
+    },
+    {
+      "type": "MirrorMesh",
+      "displayName": "Mirror Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "axis": {
+          "type": "enum", "default": "z",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "offset": { "type": "number", "default": 0.0 },
+        "mergeOriginal": { "type": "boolean", "default": true },
+        "weldSeam": { "type": "boolean", "default": true },
+        "weldTolerance": { "type": "number", "default": 0.0001, "minimum": 0.00000001 }
+      }
+    },
+    {
+      "type": "FuseMesh",
+      "displayName": "Fuse Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "tolerance": { "type": "number", "default": 0.0001, "minimum": 0.00000001 },
+        "removeDegenerate": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "PolyExtrude",
+      "displayName": "Poly Extrude",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "extrude_top", "domain": "face", "label": "Extruded top", "dynamic": true },
+        { "name": "extrude_side", "domain": "face", "label": "Extruded sides", "dynamic": true },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
+      "properties": {
+        "faceGroup": { "type": "groupSelect", "groupDomain": "face", "default": "" },
+        "distance": { "type": "number", "default": 0.02 },
+        "inset": { "type": "number", "default": 0.0 },
+        "keepOriginal": { "type": "boolean", "default": false },
+        "topGroup": { "type": "string", "default": "extrude_top", "isGroupOutput": true, "groupDomain": "face" },
+        "sideGroup": { "type": "string", "default": "extrude_side", "isGroupOutput": true, "groupDomain": "face" }
+      }
+    },
+    {
+      "type": "CopyMesh",
+      "displayName": "Copy Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "mode": {
+          "type": "enum", "default": "circular",
+          "options": [
+            { "value": "circular", "label": "Circular" },
+            { "value": "linear", "label": "Linear" }
+          ]
+        },
+        "count": { "type": "integer", "default": 6, "minimum": 1, "maximum": 256 },
+        "axis": {
+          "type": "enum", "default": "x",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "angle": { "type": "number", "default": 360.0 },
+        "translateX": { "type": "number", "default": 0.0 },
+        "translateY": { "type": "number", "default": 0.0 },
+        "translateZ": { "type": "number", "default": 0.0 },
+        "centerX": { "type": "number", "default": 0.0 },
+        "centerY": { "type": "number", "default": 0.0 },
+        "centerZ": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "ShellMesh",
+      "displayName": "Shell Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "shell_outer", "domain": "face", "label": "Outer shell", "dynamic": true },
+        { "name": "shell_inner", "domain": "face", "label": "Inner shell", "dynamic": true },
+        { "name": "shell_rim", "domain": "face", "label": "Boundary walls", "dynamic": true },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
+      "properties": {
+        "thickness": { "type": "number", "default": 0.02, "minimum": 0.0001 },
+        "direction": {
+          "type": "enum", "default": "centered",
+          "options": [
+            { "value": "centered", "label": "Centered" },
+            { "value": "outward", "label": "Outward" },
+            { "value": "inward", "label": "Inward" }
+          ]
+        },
+        "closeBoundaries": { "type": "boolean", "default": true },
+        "outerGroup": { "type": "string", "default": "shell_outer", "isGroupOutput": true, "groupDomain": "face" },
+        "innerGroup": { "type": "string", "default": "shell_inner", "isGroupOutput": true, "groupDomain": "face" },
+        "rimGroup": { "type": "string", "default": "shell_rim", "isGroupOutput": true, "groupDomain": "face" }
       }
     },
     {

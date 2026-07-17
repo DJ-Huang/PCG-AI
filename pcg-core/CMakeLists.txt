@@ -76,6 +76,8 @@ set(PCG_CORE_SOURCES
     src/elements/material_elements.cpp
     src/elements/uv_algorithms.cpp
     src/elements/uv_elements.cpp
+    src/elements/vehicle_modeling_algorithms.cpp
+    src/elements/vehicle_modeling_elements.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
@@ -210,6 +212,12 @@ target_include_directories(test_new_nodes_graph PRIVATE src)
 
 add_test(NAME test_new_nodes_graph COMMAND test_new_nodes_graph WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_vehicle_modeling tests/test_vehicle_modeling.cpp)
+target_link_libraries(test_vehicle_modeling PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_vehicle_modeling PRIVATE src)
+
+add_test(NAME test_vehicle_modeling COMMAND test_vehicle_modeling WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_stone_arch_bridge tests/test_stone_arch_bridge.cpp)
 target_link_libraries(test_stone_arch_bridge PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_stone_arch_bridge PRIVATE src)
@@ -285,4 +293,3 @@ target_link_libraries(test_boolean_bevel_chain PRIVATE PcgCoreStatic nlohmann_js
 target_include_directories(test_boolean_bevel_chain PRIVATE src)
 
 add_test(NAME test_boolean_bevel_chain COMMAND test_boolean_bevel_chain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-

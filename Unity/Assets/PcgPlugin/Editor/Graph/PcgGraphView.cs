@@ -722,7 +722,7 @@ namespace DJTechEditor.PCG.Graph
             var selected = selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
             if (selected is PcgManifestNodeView manifestNode)
             {
-                if (manifestNode.NodeType == "CreateSpline")
+                if (manifestNode.NodeType == "CreateSpline" || manifestNode.NodeType == "CreateBezierSpline")
                 {
                     m_SceneEditContext = new PcgSceneEditContext(
                         SceneEditLevel.Component,

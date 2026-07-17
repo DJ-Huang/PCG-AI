@@ -51,7 +51,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 | 域名 | 意图 | 应命中 rule_id（检索词示例） |
 |------|------|------------------------------|
 | Unity | 始终 | `core/role`, `core/anti-ai-trace` |
-| Unity | 写码 | `core/hmirp-rendering-agent` |
+| Unity | 写码 | `core/hmirp-rendering-agent`（**仅 HMIRP 项目**触发；其它 Unity 渲染项目及非 HMIRP 的 C# 不触发 §Stable，避免噪声） |
 | Unity | 架构/文档/模块说明 | `agents/ta-render-expert` |
 | Unity | review | `reviews/hmirp-review-rules`, `agents/shader-expert` |
 | Unity | 调试 | `agents/test-engineer` |

@@ -151,7 +151,8 @@ namespace DJTechEditor.PCG.Graph
                     },
                 });
 
-                if (node is PcgManifestNodeView createSplineNode && createSplineNode.NodeType == "CreateSpline")
+                if (node is PcgManifestNodeView createSplineNode &&
+                    (createSplineNode.NodeType == "CreateSpline" || createSplineNode.NodeType == "CreateBezierSpline"))
                 {
                     if (ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
                     {

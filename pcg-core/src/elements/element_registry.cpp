@@ -9,6 +9,7 @@
 #include "elements/structural_elements.hpp"
 #include "elements/material_elements.hpp"
 #include "elements/uv_elements.hpp"
+#include "elements/vehicle_modeling_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -186,6 +187,7 @@ void register_builtin_elements()
     register_spline_mesh_elements(map);
     register_material_elements(map);
     register_uv_elements(map);
+    register_vehicle_modeling_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)
