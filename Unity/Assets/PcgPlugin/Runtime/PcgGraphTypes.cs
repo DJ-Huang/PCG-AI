@@ -115,12 +115,32 @@ namespace DJTechRuntime.PCG
     }
 
     [Serializable]
+    public class PcgSubgraphPort
+    {
+        public string id;
+        public string name;
+        public string pinType = "Any";
+    }
+
+    [Serializable]
+    public class PcgSubgraphDefinition
+    {
+        public string id;
+        public string name;
+        public List<PcgSubgraphPort> inputs = new();
+        public List<PcgSubgraphPort> outputs = new();
+        public List<PcgGraphNodeRecord> nodes = new();
+        public List<PcgGraphEdgeRecord> edges = new();
+    }
+
+    [Serializable]
     public class PcgGraphDocument
     {
         public string version = "1.0";
         public List<PcgGraphNodeRecord> nodes = new();
         public List<PcgGraphEdgeRecord> edges = new();
         public List<PcgGraphParameter> parameters = new();
+        public List<PcgSubgraphDefinition> subgraphs = new();
     }
 
     [Serializable]

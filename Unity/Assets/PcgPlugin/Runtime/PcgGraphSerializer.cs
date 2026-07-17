@@ -64,6 +64,15 @@ namespace DJTechRuntime.PCG
                 sb.Append(nl);
             }
 
+            sb.Append(indent).Append(']').Append(',').Append(nl);
+            sb.Append(indent).Append("\"subgraphs\": [").Append(nl);
+            for (var i = 0; i < doc.subgraphs.Count; i++)
+            {
+                AppendSubgraph(sb, doc.subgraphs[i], pretty, indent);
+                if (i < doc.subgraphs.Count - 1)
+                    sb.Append(',');
+                sb.Append(nl);
+            }
             sb.Append(indent).Append(']').Append(nl);
             sb.Append('}');
             return sb.ToString();
@@ -168,6 +177,25 @@ namespace DJTechRuntime.PCG
                     }
                 }
 
+                if (root.TryGetValue("subgraphs", out var subgraphsObj) && subgraphsObj is List<object> subgraphsList)
+                {
+                    foreach (var subgraphObj in subgraphsList)
+                    {
+                        if (subgraphObj is not Dictionary<string, object> subgraphDict)
+                            continue;
+                        var subgraph = new PcgSubgraphDefinition
+                        {
+                            id = GetString(subgraphDict, "id"),
+                            name = GetString(subgraphDict, "name"),
+                        };
+                        ParsePorts(subgraphDict, "inputs", subgraph.inputs);
+                        ParsePorts(subgraphDict, "outputs", subgraph.outputs);
+                        ParseNodes(subgraphDict, subgraph.nodes);
+                        ParseEdges(subgraphDict, subgraph.edges);
+                        doc.subgraphs.Add(subgraph);
+                    }
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -175,6 +203,108 @@ namespace DJTechRuntime.PCG
                 error = ex.Message;
                 return false;
             }
+        }
+
+        private static void ParseNodes(Dictionary<string, object> root, List<PcgGraphNodeRecord> output)
+        {
+            if (!root.TryGetValue("nodes", out var nodesObj) || nodesObj is not List<object> nodesList)
+                return;
+            foreach (var nodeObj in nodesList)
+            {
+                if (nodeObj is not Dictionary<string, object> nodeDict)
+                    continue;
+                var record = new PcgGraphNodeRecord
+                {
+                    id = GetString(nodeDict, "id"),
+                    type = GetString(nodeDict, "type"),
+                };
+                if (nodeDict.TryGetValue("position", out var posObj) && posObj is Dictionary<string, object> posDict)
+                    record.position = new PcgGraphPosition { x = GetFloat(posDict, "x"), y = GetFloat(posDict, "y") };
+                record.data = PcgNodeData.DefaultForType(record.type);
+                if (nodeDict.TryGetValue("data", out var dataObj) && dataObj is Dictionary<string, object> dataDict)
+                    MergeData(record.type, record.data, dataDict);
+                output.Add(record);
+            }
+        }
+
+        private static void ParseEdges(Dictionary<string, object> root, List<PcgGraphEdgeRecord> output)
+        {
+            if (!root.TryGetValue("edges", out var edgesObj) || edgesObj is not List<object> edgesList)
+                return;
+            foreach (var edgeObj in edgesList)
+            {
+                if (edgeObj is not Dictionary<string, object> edgeDict)
+                    continue;
+                output.Add(new PcgGraphEdgeRecord
+                {
+                    id = GetString(edgeDict, "id"), source = GetString(edgeDict, "source"),
+                    target = GetString(edgeDict, "target"),
+                    sourceHandle = GetString(edgeDict, "sourceHandle", "out"),
+                    targetHandle = GetString(edgeDict, "targetHandle", "in"),
+                });
+            }
+        }
+
+        private static void ParsePorts(Dictionary<string, object> root, string key, List<PcgSubgraphPort> output)
+        {
+            if (!root.TryGetValue(key, out var portsObj) || portsObj is not List<object> ports)
+                return;
+            foreach (var portObj in ports)
+            {
+                if (portObj is not Dictionary<string, object> port)
+                    continue;
+                output.Add(new PcgSubgraphPort
+                {
+                    id = GetString(port, "id"), name = GetString(port, "name"),
+                    pinType = GetString(port, "pinType", "Any"),
+                });
+            }
+        }
+
+        private static void AppendSubgraph(StringBuilder sb, PcgSubgraphDefinition subgraph, bool pretty, string indent)
+        {
+            var inner = pretty ? indent + "  " : "";
+            var deep = pretty ? inner + "  " : "";
+            var nl = pretty ? "\n" : "";
+            sb.Append(inner).Append('{').Append(nl);
+            sb.Append(deep).Append("\"id\": ").Append(JsonString(subgraph.id)).Append(',').Append(nl);
+            sb.Append(deep).Append("\"name\": ").Append(JsonString(subgraph.name)).Append(',').Append(nl);
+            AppendPorts(sb, "inputs", subgraph.inputs, pretty, deep);
+            sb.Append(',').Append(nl);
+            AppendPorts(sb, "outputs", subgraph.outputs, pretty, deep);
+            sb.Append(',').Append(nl);
+            sb.Append(deep).Append("\"nodes\": [").Append(nl);
+            for (var i = 0; i < subgraph.nodes.Count; i++)
+            {
+                AppendNode(sb, subgraph.nodes[i], pretty, deep);
+                if (i < subgraph.nodes.Count - 1) sb.Append(',');
+                sb.Append(nl);
+            }
+            sb.Append(deep).Append("],").Append(nl);
+            sb.Append(deep).Append("\"edges\": [").Append(nl);
+            for (var i = 0; i < subgraph.edges.Count; i++)
+            {
+                AppendEdge(sb, subgraph.edges[i], pretty, deep);
+                if (i < subgraph.edges.Count - 1) sb.Append(',');
+                sb.Append(nl);
+            }
+            sb.Append(deep).Append(']').Append(nl).Append(inner).Append('}');
+        }
+
+        private static void AppendPorts(StringBuilder sb, string key, List<PcgSubgraphPort> ports, bool pretty, string indent)
+        {
+            sb.Append(indent).Append('"').Append(key).Append("\": [");
+            for (var i = 0; i < ports.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                if (pretty) sb.Append(' ');
+                var port = ports[i];
+                sb.Append("{\"id\": ").Append(JsonString(port.id))
+                    .Append(", \"name\": ").Append(JsonString(port.name))
+                    .Append(", \"pinType\": ").Append(JsonString(port.pinType)).Append('}');
+            }
+            if (pretty && ports.Count > 0) sb.Append(' ');
+            sb.Append(']');
         }
 
         private static void MergeData(string type, PcgNodeData data, Dictionary<string, object> dict)

@@ -66,7 +66,8 @@ namespace DJTechEditor.PCG.Graph
             {
                 if (evt.clickCount >= 2)
                 {
-                    BeginRename();
+                    if (!HandleDoubleClick())
+                        BeginRename();
                     evt.StopPropagation();
                 }
             });
@@ -109,6 +110,8 @@ namespace DJTechEditor.PCG.Graph
         public string GetUserTitle() => m_UserTitle;
 
         public string GetDisplayTitle() => m_RightTitleLabel?.text ?? title;
+
+        protected virtual bool HandleDoubleClick() => false;
 
         public void SetUserTitle(string userTitle)
         {

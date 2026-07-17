@@ -24,6 +24,11 @@
       "type": "array",
       "description": "Graph-level parameters exposed to the runtime Inspector",
       "items": { "$ref": "#/$defs/parameter" }
+    },
+    "subgraphs": {
+      "type": "array",
+      "description": "Inline reusable graph definitions. Subgraph instance nodes reference these by data.subgraphId.",
+      "items": { "$ref": "#/$defs/subgraph" }
     }
   },
   "$defs": {
@@ -106,6 +111,29 @@
         "exposed": { "type": "boolean", "default": true, "description": "Whether to show on runtime Inspector" },
         "targetNode": { "type": "string", "description": "Node ID whose property this parameter overrides" },
         "targetProperty": { "type": "string", "description": "Property key in the target node's data" }
+      }
+    },
+    "subgraphPort": {
+      "type": "object",
+      "required": ["id", "name", "pinType"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "pinType": { "type": "string" }
+      }
+    },
+    "subgraph": {
+      "type": "object",
+      "required": ["id", "name", "inputs", "outputs", "nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
       }
     }
   }

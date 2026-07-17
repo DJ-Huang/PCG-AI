@@ -216,6 +216,12 @@ target_include_directories(test_stone_arch_bridge PRIVATE src)
 
 add_test(NAME test_stone_arch_bridge COMMAND test_stone_arch_bridge WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_subgraph tests/test_subgraph.cpp)
+target_link_libraries(test_subgraph PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_subgraph PRIVATE src)
+
+add_test(NAME test_subgraph COMMAND test_subgraph WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 # ── Phase 4.7: Boolean Mesh ─────────────────────────────
 
 add_executable(test_robust_predicates tests/test_robust_predicates.cpp)
@@ -279,5 +285,4 @@ target_link_libraries(test_boolean_bevel_chain PRIVATE PcgCoreStatic nlohmann_js
 target_include_directories(test_boolean_bevel_chain PRIVATE src)
 
 add_test(NAME test_boolean_bevel_chain COMMAND test_boolean_bevel_chain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-
 

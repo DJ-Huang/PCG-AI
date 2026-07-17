@@ -234,7 +234,9 @@ namespace DJTechEditor.PCG.Graph
             try
             {
                 var root = PcgMiniJson.Deserialize(json) as Dictionary<string, object>;
-                if (root?.TryGetValue("nodes", out var nodesObj) != true || nodesObj is not List<object> nodesList)
+                if (root == null ||
+                    !root.TryGetValue("nodes", out var nodesObj) ||
+                    nodesObj is not List<object> nodesList)
                 {
                     _loaded = true;
                     return;

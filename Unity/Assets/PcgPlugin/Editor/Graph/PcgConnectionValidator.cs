@@ -20,6 +20,9 @@ namespace DJTechEditor.PCG.Graph
             var sourceHandle = edge.output.userData as string ?? edge.output.portName;
             var targetHandle = edge.input.userData as string ?? edge.input.portName;
 
+            if (!ArePinTypesCompatible(sourceNode, targetNode, sourceHandle, targetHandle))
+                return false;
+
             return IsValidConnection(
                 sourceNode.NodeId,
                 targetNode.NodeId,
@@ -27,7 +30,23 @@ namespace DJTechEditor.PCG.Graph
                 targetNode.NodeType,
                 sourceHandle,
                 targetHandle,
-                existingEdges);
+                existingEdges,
+                skipTypeCheck: true);
+        }
+
+        public static bool ArePinTypesCompatible(
+            PcgGraphNodeBase source,
+            PcgGraphNodeBase target,
+            string sourceHandle,
+            string targetHandle)
+        {
+            var sourcePin = source is PcgSubgraphNodeView sourceSubgraph
+                ? sourceSubgraph.GetOutputPinType(sourceHandle)
+                : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
+            var targetPin = target is PcgSubgraphNodeView targetSubgraph
+                ? targetSubgraph.GetInputPinType(targetHandle)
+                : PcgNodeManifest.GetInputPinType(target.NodeType, targetHandle);
+            return sourcePin == "Any" || targetPin == "Any" || sourcePin == targetPin;
         }
 
         public static bool IsValidConnection(
@@ -37,14 +56,15 @@ namespace DJTechEditor.PCG.Graph
             string targetType,
             string sourceHandle,
             string targetHandle,
-            IEnumerable<Edge> existingEdges)
+            IEnumerable<Edge> existingEdges,
+            bool skipTypeCheck = false)
         {
             if (string.IsNullOrEmpty(sourceId) || string.IsNullOrEmpty(targetId))
                 return false;
             if (sourceId == targetId)
                 return false;
 
-            if (!PcgNodeManifest.CanConnect(sourceType, targetType, sourceHandle, targetHandle))
+            if (!skipTypeCheck && !PcgNodeManifest.CanConnect(sourceType, targetType, sourceHandle, targetHandle))
                 return false;
 
             var duplicateIn = existingEdges.Any(e =>

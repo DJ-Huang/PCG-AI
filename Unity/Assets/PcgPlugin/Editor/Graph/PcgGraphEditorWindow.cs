@@ -25,6 +25,8 @@ namespace DJTechEditor.PCG.Graph
         private PcgNodeInspector m_Inspector;
         private Button m_BlackboardToggle;
         private Button m_InspectorToggle;
+        private Button m_SubgraphBackButton;
+        private Label m_SubgraphBreadcrumb;
         private EnumField m_ScatterDisplayField;
         private string m_CurrentFilePath;
         private bool m_GraphLoaded;
@@ -346,6 +348,21 @@ namespace DJTechEditor.PCG.Graph
             toolbar.Add(MakeButton("Save", SaveGraph));
             toolbar.Add(MakeButton("Save As…", SaveAsGraph));
 
+            m_SubgraphBackButton = MakeButton("‹ Root", () => m_GraphView?.ExitSubgraph());
+            m_SubgraphBackButton.style.display = DisplayStyle.None;
+            toolbar.Add(m_SubgraphBackButton);
+            m_SubgraphBreadcrumb = new Label("Root")
+            {
+                style =
+                {
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                    marginLeft = 4,
+                    marginRight = 8,
+                    color = new Color(0.65f, 0.8f, 1f),
+                },
+            };
+            toolbar.Add(m_SubgraphBreadcrumb);
+
             m_PreviewStatusLabel = new Label
             {
                 style =
@@ -421,6 +438,7 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView = new PcgGraphView();
             m_GraphView.SetHostWindow(this);
             m_GraphView.SceneContextChanged += _ => m_GraphView.RefreshInspector();
+            m_GraphView.SubgraphNavigationChanged += _ => RefreshSubgraphBreadcrumb();
             if (!string.IsNullOrEmpty(m_Selected))
                 m_GraphView.viewDataKey = m_Selected;
 
@@ -438,6 +456,18 @@ namespace DJTechEditor.PCG.Graph
             contentRow.Add(m_Inspector);
 
             rootVisualElement.Add(contentRow);
+        }
+
+        private void RefreshSubgraphBreadcrumb()
+        {
+            if (m_SubgraphBackButton == null || m_SubgraphBreadcrumb == null || m_GraphView == null)
+                return;
+            m_SubgraphBackButton.style.display = m_GraphView.IsInsideSubgraph
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+            m_SubgraphBreadcrumb.text = m_GraphView.IsInsideSubgraph
+                ? m_GraphView.CurrentSubgraphPath
+                : "Root";
         }
 
         private void LoadDefaultGraph()
