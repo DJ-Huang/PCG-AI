@@ -46,12 +46,23 @@ namespace DJTechEditor.PCG.Graph
         [SerializeField]
         private string m_PreviewNodeLabel;
 
+        [SerializeField]
+        private string m_PreviewScopeSubgraphId;
+
+        [SerializeField]
+        private string[] m_PreviewInstanceChain;
+
         private Label m_PreviewStatusLabel;
         private Button m_ClearPreviewButton;
 
         public string selectedGuid => m_Selected;
 
         public string PreviewNodeId => m_PreviewNodeId;
+
+        public string PreviewScopeSubgraphId => m_PreviewScopeSubgraphId;
+
+        public IReadOnlyList<string> PreviewInstanceChain =>
+            m_PreviewInstanceChain ?? System.Array.Empty<string>();
 
         public string PreviewNodeLabel =>
             string.IsNullOrEmpty(m_PreviewNodeLabel) ? m_PreviewNodeId : m_PreviewNodeLabel;
@@ -78,28 +89,44 @@ namespace DJTechEditor.PCG.Graph
             return string.Equals(windowAssetPath, assetDatabasePath, System.StringComparison.OrdinalIgnoreCase);
         }
 
-        public void ToggleNodePreview(string nodeId, string nodeType, string displayTitle)
+        public void ToggleNodePreview(
+            string nodeId,
+            string nodeType,
+            string displayTitle,
+            string scopeSubgraphId = null,
+            string[] instanceChain = null)
         {
             if (string.IsNullOrEmpty(nodeId))
                 return;
 
-            if (m_PreviewNodeId == nodeId)
+            if (m_PreviewNodeId == nodeId &&
+                string.Equals(m_PreviewScopeSubgraphId, scopeSubgraphId, System.StringComparison.Ordinal))
             {
                 ClearNodePreview();
                 return;
             }
 
             var label = string.IsNullOrEmpty(displayTitle) ? nodeType : $"{displayTitle} ({nodeType})";
-            SetPreviewNode(nodeId, label);
+            if (!string.IsNullOrEmpty(scopeSubgraphId))
+                label = $"{label} @ {scopeSubgraphId}";
+            SetPreviewNode(nodeId, label, scopeSubgraphId, instanceChain);
         }
 
-        public void SetPreviewNode(string nodeId, string label)
+        public void SetPreviewNode(
+            string nodeId,
+            string label,
+            string scopeSubgraphId = null,
+            string[] instanceChain = null)
         {
             if (string.IsNullOrEmpty(nodeId))
                 return;
 
             m_PreviewNodeId = nodeId;
             m_PreviewNodeLabel = label;
+            m_PreviewScopeSubgraphId = scopeSubgraphId;
+            m_PreviewInstanceChain = instanceChain != null
+                ? (string[])instanceChain.Clone()
+                : System.Array.Empty<string>();
             OnPreviewNodeChanged();
         }
 
@@ -110,6 +137,8 @@ namespace DJTechEditor.PCG.Graph
 
             m_PreviewNodeId = null;
             m_PreviewNodeLabel = null;
+            m_PreviewScopeSubgraphId = null;
+            m_PreviewInstanceChain = null;
             OnPreviewNodeChanged(silent);
         }
 
@@ -117,6 +146,16 @@ namespace DJTechEditor.PCG.Graph
         {
             if (string.IsNullOrEmpty(m_PreviewNodeId) || m_GraphView == null)
                 return;
+
+            // Preview is scoped to the navigation level where it was set.
+            if (!string.Equals(
+                    m_PreviewScopeSubgraphId ?? "",
+                    m_GraphView.CurrentSubgraphId ?? "",
+                    System.StringComparison.Ordinal))
+            {
+                ClearNodePreview(silent: true);
+                return;
+            }
 
             var exists = false;
             foreach (var node in m_GraphView.nodes)
@@ -438,7 +477,11 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView = new PcgGraphView();
             m_GraphView.SetHostWindow(this);
             m_GraphView.SceneContextChanged += _ => m_GraphView.RefreshInspector();
-            m_GraphView.SubgraphNavigationChanged += _ => RefreshSubgraphBreadcrumb();
+            m_GraphView.SubgraphNavigationChanged += _ =>
+            {
+                RefreshSubgraphBreadcrumb();
+                ValidatePreviewNodeExists();
+            };
             if (!string.IsNullOrEmpty(m_Selected))
                 m_GraphView.viewDataKey = m_Selected;
 

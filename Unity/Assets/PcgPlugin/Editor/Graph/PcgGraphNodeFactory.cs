@@ -92,7 +92,8 @@ namespace DJTechEditor.PCG.Graph
             _ => "Subgraph",
         };
 
-        public event Action<string> OpenRequested;
+        /// <summary>Args: instanceNodeId, definitionId.</summary>
+        public event Action<string, string> OpenRequested;
 
         public string SubgraphDefinitionId => m_Definition.id;
 
@@ -170,7 +171,7 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_Kind != PcgSubgraphNodeKind.Instance)
                 return false;
-            OpenRequested?.Invoke(m_Definition.id);
+            OpenRequested?.Invoke(NodeId, m_Definition.id);
             return true;
         }
 

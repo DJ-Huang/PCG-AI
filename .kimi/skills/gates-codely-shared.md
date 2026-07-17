@@ -33,9 +33,9 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 
 
-1. **`gates/rule-router-gate`**：域名 → `rule_search` → `vault_search` → `Router（dev）` 回执
+1. **`gates/rule-router-gate`**：域名 → 检索账本判定（`fresh` / `reused` / `delta`）→ 按需 `rule_search` + `vault_search` → `Router（dev）` 回执
 
-2. **每次**改产品路径：`gates/codely-pre-code-gate`（`Rules（pre-code）` + `Vault（pre-code）`）
+2. **每次**改产品路径：`gates/codely-pre-code-gate` 检查账本有效性；同一连续写码批次只在首次或范围变化时输出 `Rules（pre-code）` + `Vault（pre-code）`
 
 3. **每次** `Write` / 整文件替换：`gates/file-write-integrity`（写后 `Read` 校验换行）
 
@@ -55,7 +55,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 
 
-- **开发任务** → `rule-router-gate` + **`rule_search`** + `vault_search`；每次改产品代码 → `codely-pre-code-gate`
+- **开发任务** → `rule-router-gate` 检查检索账本，按 `fresh` / `reused` / `delta` 调用 **`rule_search`** + `vault_search`；每次改产品代码 → `codely-pre-code-gate`
 
 - **非开发任务** → 直接 `Read` `.kimi/skills/workflow/` 等
 
@@ -130,4 +130,3 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 
 MCP（Cursor）：`%USERPROFILE%\.cursor\mcp.json`
-

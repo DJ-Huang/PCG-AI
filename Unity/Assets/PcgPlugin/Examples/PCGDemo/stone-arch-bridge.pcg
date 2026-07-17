@@ -175,7 +175,7 @@
   "subgraphs": [
     {
       "id": "subgraph_1",
-      "name": "Subgraph 1",
+      "name": "Bridge",
       "inputs": [ {"id": "in_1", "name": "backbone", "pinType": "SpatialSpline"}, {"id": "in_2", "name": "profile", "pinType": "SpatialSpline"} ],
       "outputs": [ {"id": "out_1", "name": "out", "pinType": "SpatialMesh"} ],
       "nodes": [

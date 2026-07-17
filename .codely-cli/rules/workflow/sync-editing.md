@@ -8,6 +8,8 @@
 1. **`sync/` 是唯一真源** — 禁止在 `.cursor/rules/`、`.trae/rules/`、目标仓 `.codely-cli/rules/` 等**生成物**上改共享正文。
 2. **共享行为一处改、多处同步** — 改完后对受影响目标工程跑 `setup.bat`；Skills 变更需重启 IDE。
 3. **薄适配与厚正文分离** — 跨工具相同的流程/约束写在 `sync/rules/` 或 `sync/extensions/MySkills/skills/`；仅某工具特有的映射写在对应适配层。
+4. **改动必须同步到所有受影响载体** — 改 `rule` / `skill` / `command` 时，先判断该能力在各工具中的承载形式，再同步修改所有对应真源；任何一处漏改都视为未完成。
+5. **无 command 的平台按 skill 承载 command 语义** — 对于没有独立 command 面的工具，`sync/commands/` 中的行为、参数和帮助文案必须同步落到对应 skill 正文，不能只改命令真源。
 
 ## 平台与输出（改前对照）
 
@@ -36,6 +38,14 @@
 - [ ] 引用规则用相对路径或 `.codely-cli/rules`，**不复制**规则正文到 Skill。
 - [ ] 出现 `activate_skill`、`ask_user`、`codely_agent_*` 等 → 确认 `codely-shared` 有等价路径。
 - [ ] 新增 Skill → 更新 `extensions/MySkills/skills/index.md`。
+
+### 改 Command（`sync/commands/`）
+
+- [ ] 先确认该 command 在哪些工具中有独立承载：Cursor / Trae / Codely CLI / OpenCode / 其他。
+- [ ] 只要 command 语义会被用户直接触发，就必须同步更新所有承载它的真源文件。
+- [ ] 对**无独立 command 面**的工具 → 同步把 command 语义、参数、默认值和帮助文案更新到对应 skill。
+- [ ] command 文案若引用规则或 skill 名称，需检查这些引用是否也要同步更新。
+- [ ] 改完后执行 `setup.bat`，确保各平台命令入口与 skill mirror 一致。
 
 ### 改适配层（`sync/adapters/`）
 

@@ -46,8 +46,13 @@ namespace DJTechEditor.PCG
                 var previewNodeId = window.PreviewNodeId;
                 if (!string.IsNullOrEmpty(previewNodeId))
                 {
-                    if (!PcgGraphPreviewSubgraph.TryBuildUpstream(
-                            liveDoc, previewNodeId, out var subgraph, out var previewError))
+                    if (!PcgGraphPreviewSubgraph.TryBuildPreviewCook(
+                            liveDoc,
+                            previewNodeId,
+                            window.PreviewScopeSubgraphId,
+                            window.PreviewInstanceChain,
+                            out var subgraph,
+                            out var previewError))
                     {
                         Debug.LogError($"[PCG] Node preview subgraph failed: {previewError}");
                         return null;

@@ -74,7 +74,9 @@ namespace DJTechEditor.PCG.Graph
         private string m_LastStatsJson;
         private PcgGraphDocument m_RootDocument;
         private string m_CurrentSubgraphId;
+        private string m_CurrentSubgraphInstanceId;
         private readonly List<string> m_SubgraphParents = new();
+        private readonly List<string> m_SubgraphParentInstances = new();
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
         public event Action<string> SubgraphNavigationChanged;
@@ -92,7 +94,22 @@ namespace DJTechEditor.PCG.Graph
 
         public EditorWindow HostWindow => m_HostWindow;
         public bool IsInsideSubgraph => !string.IsNullOrEmpty(m_CurrentSubgraphId);
+        public string CurrentSubgraphId => m_CurrentSubgraphId;
+        public string CurrentSubgraphInstanceId => m_CurrentSubgraphInstanceId;
         public string CurrentSubgraphName => FindSubgraph(m_CurrentSubgraphId)?.name ?? "Root";
+
+        /// <summary>Instance node ids from root down to the currently opened subgraph instance.</summary>
+        public string[] GetSubgraphInstanceChain()
+        {
+            if (!IsInsideSubgraph)
+                return System.Array.Empty<string>();
+            var chain = new List<string>(m_SubgraphParentInstances.Count + 1);
+            chain.AddRange(m_SubgraphParentInstances);
+            if (!string.IsNullOrEmpty(m_CurrentSubgraphInstanceId))
+                chain.Add(m_CurrentSubgraphInstanceId);
+            return chain.ToArray();
+        }
+
         public string CurrentSubgraphPath
         {
             get
@@ -352,30 +369,40 @@ namespace DJTechEditor.PCG.Graph
             if (m_SubgraphParents.Count > 0)
             {
                 m_CurrentSubgraphId = m_SubgraphParents[^1];
+                m_CurrentSubgraphInstanceId = m_SubgraphParentInstances.Count > 0
+                    ? m_SubgraphParentInstances[^1]
+                    : null;
                 m_SubgraphParents.RemoveAt(m_SubgraphParents.Count - 1);
+                if (m_SubgraphParentInstances.Count > 0)
+                    m_SubgraphParentInstances.RemoveAt(m_SubgraphParentInstances.Count - 1);
                 var parent = FindSubgraph(m_CurrentSubgraphId);
                 LoadScope(parent.nodes, parent.edges, new List<PcgGraphParameter>(), parent, clearUndo: false);
             }
             else
             {
                 m_CurrentSubgraphId = null;
+                m_CurrentSubgraphInstanceId = null;
                 LoadScope(m_RootDocument.nodes, m_RootDocument.edges, m_RootDocument.parameters, null, clearUndo: false);
             }
             SubgraphNavigationChanged?.Invoke(m_CurrentSubgraphId);
             FrameAll();
         }
 
-        private void EnterSubgraph(string id)
+        private void EnterSubgraph(string instanceNodeId, string definitionId)
         {
-            var definition = FindSubgraph(id);
+            var definition = FindSubgraph(definitionId);
             if (definition == null)
                 return;
             SaveVisibleScope();
             if (IsInsideSubgraph)
+            {
                 m_SubgraphParents.Add(m_CurrentSubgraphId);
-            m_CurrentSubgraphId = id;
+                m_SubgraphParentInstances.Add(m_CurrentSubgraphInstanceId);
+            }
+            m_CurrentSubgraphId = definitionId;
+            m_CurrentSubgraphInstanceId = instanceNodeId;
             LoadScope(definition.nodes, definition.edges, new List<PcgGraphParameter>(), definition, clearUndo: false);
-            SubgraphNavigationChanged?.Invoke(id);
+            SubgraphNavigationChanged?.Invoke(definitionId);
             FrameAll();
         }
 
@@ -660,7 +687,18 @@ namespace DJTechEditor.PCG.Graph
             if (node == null || m_HostWindow is not PcgGraphEditorWindow window)
                 return;
 
-            window.ToggleNodePreview(node.NodeId, node.NodeType, node.GetDisplayTitle());
+            if (node.NodeType == "SubgraphInput")
+            {
+                Debug.LogWarning("[PCG] SubgraphInput has no geometry to preview.");
+                return;
+            }
+
+            window.ToggleNodePreview(
+                node.NodeId,
+                node.NodeType,
+                node.GetDisplayTitle(),
+                CurrentSubgraphId,
+                GetSubgraphInstanceChain());
         }
 
         public void RefreshNodePreviewVisuals()
@@ -1038,7 +1076,9 @@ namespace DJTechEditor.PCG.Graph
         {
             m_RootDocument = doc ?? new PcgGraphDocument();
             m_CurrentSubgraphId = null;
+            m_CurrentSubgraphInstanceId = null;
             m_SubgraphParents.Clear();
+            m_SubgraphParentInstances.Clear();
             LoadScope(m_RootDocument.nodes, m_RootDocument.edges, m_RootDocument.parameters, null, clearUndo);
             SubgraphNavigationChanged?.Invoke(null);
         }
