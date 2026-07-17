@@ -12,6 +12,41 @@ namespace pcg::internal::data {
 
 namespace {
 
+void apply_face_materials(PcgMeshData& mesh,
+                          const PcgGeometry& geometry,
+                          const std::vector<int>& triangle_faces)
+{
+    if (triangle_faces.size() != mesh.triangles().size() / 3)
+        return;
+
+    std::vector<std::string> face_materials;
+    if (geometry.has_face_materials()) {
+        face_materials = geometry.face_materials();
+    } else if (geometry.has_material()) {
+        face_materials.assign(geometry.faces().size(), geometry.material_name());
+    } else {
+        return;
+    }
+
+    std::vector<std::string> slots;
+    std::unordered_map<std::string, uint32_t> slot_by_name;
+    std::vector<uint32_t> triangle_materials;
+    triangle_materials.reserve(triangle_faces.size());
+    for (int face_index : triangle_faces) {
+        std::string name;
+        if (face_index >= 0 && static_cast<size_t>(face_index) < face_materials.size())
+            name = face_materials[static_cast<size_t>(face_index)];
+        auto [it, inserted] = slot_by_name.emplace(name, static_cast<uint32_t>(slots.size()));
+        if (inserted)
+            slots.push_back(name);
+        triangle_materials.push_back(it->second);
+    }
+    mesh.set_materials(std::move(slots), std::move(triangle_materials));
+    if (mesh.material_slots().size() == 1)
+        mesh.metadata().set("material", nlohmann::json(mesh.material_slots().front()));
+    mesh.metadata().set("material_slots", nlohmann::json(mesh.material_slots()));
+}
+
 size_t stable_fan_start(const PcgGeometry& geometry, const std::vector<int>& face)
 {
     if (face.size() <= 3)
@@ -49,13 +84,47 @@ size_t stable_fan_start(const PcgGeometry& geometry, const std::vector<int>& fac
 
 } // namespace
 
+void PcgGeometry::set_material_name(std::string m)
+{
+    material_name_ = m;
+    has_material_ = true;
+    face_materials_.assign(faces_.size(), std::move(m));
+}
+
+std::vector<std::string>& PcgGeometry::face_materials_mut()
+{
+    face_materials_.resize(faces_.size());
+    return face_materials_;
+}
+
+void PcgGeometry::set_face_materials(std::vector<std::string> materials)
+{
+    if (materials.size() != faces_.size()) {
+        face_materials_.clear();
+        has_material_ = false;
+        material_name_.clear();
+        return;
+    }
+    face_materials_ = std::move(materials);
+    has_material_ = !face_materials_.empty();
+    material_name_.clear();
+    if (!face_materials_.empty()) {
+        const std::string& first = face_materials_.front();
+        if (std::all_of(face_materials_.begin(), face_materials_.end(),
+                        [&first](const std::string& value) { return value == first; }))
+            material_name_ = first;
+    }
+}
+
 PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
 {
     PcgMeshData mesh;
+    std::vector<int> triangle_faces;
     // Duplicate vertices per face for flat shading — each face gets its own
     // vertices so that Unity's RecalculateNormals() produces correct per-face
     // normals instead of smoothing across hard edges between adjacent faces.
-    for (const auto& face : geometry.faces()) {
+    for (size_t face_index = 0; face_index < geometry.faces().size(); ++face_index) {
+        const auto& face = geometry.faces()[face_index];
         if (face.size() < 3)
             continue;
         std::vector<int> local;
@@ -71,8 +140,11 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
             mesh.add_triangle(i0,
                               local[(start + offset) % local.size()],
                               local[(start + offset + 1) % local.size()]);
+            triangle_faces.push_back(static_cast<int>(face_index));
         }
     }
+
+    apply_face_materials(mesh, geometry, triangle_faces);
 
     return mesh;
 }
@@ -80,9 +152,11 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
 PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry)
 {
     PcgMeshData mesh;
+    std::vector<int> triangle_faces;
     for (const auto& p : geometry.points())
         mesh.add_vertex({p.x, p.y, p.z});
-    for (const auto& face : geometry.faces()) {
+    for (size_t face_index = 0; face_index < geometry.faces().size(); ++face_index) {
+        const auto& face = geometry.faces()[face_index];
         if (face.size() < 3)
             continue;
         const size_t start = stable_fan_start(geometry, face);
@@ -91,8 +165,10 @@ PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry)
             mesh.add_triangle(i0,
                               face[(start + offset) % face.size()],
                               face[(start + offset + 1) % face.size()]);
+            triangle_faces.push_back(static_cast<int>(face_index));
         }
     }
+    apply_face_materials(mesh, geometry, triangle_faces);
     return mesh;
 }
 
@@ -303,6 +379,7 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         int source_corner;
     };
     std::vector<std::array<TriCorner, 3>> triangle_corners;
+    std::vector<int> triangle_faces;
 
     for (size_t fi = 0; fi < faces.size(); ++fi) {
         const auto& face = faces[fi];
@@ -321,6 +398,7 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
             const int ri1 = get_render_vertex(c1);
             const int ri2 = get_render_vertex(c2);
             mesh.add_triangle(ri0, ri1, ri2);
+            triangle_faces.push_back(static_cast<int>(fi));
 
             // Accumulate area-weighted normal (unnormalized cross product)
             const auto& p0 = render_positions[static_cast<size_t>(ri0)];
@@ -393,9 +471,7 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         mesh.set_uvs(std::move(render_uvs));
     }
 
-    // Propagate material name
-    if (geometry.has_material())
-        mesh.metadata().set("material", nlohmann::json(geometry.material_name()));
+    apply_face_materials(mesh, geometry, triangle_faces);
 
     return mesh;
 }
@@ -470,8 +546,14 @@ PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
         geo.set_uvs(std::move(pt_uvs));
     }
 
-    // Propagate material name
-    if (mesh.metadata().has("material")) {
+    if (mesh.has_materials()) {
+        std::vector<std::string> face_materials;
+        face_materials.reserve(mesh.triangle_materials().size());
+        for (uint32_t slot : mesh.triangle_materials())
+            face_materials.push_back(mesh.material_slots()[slot]);
+        if (face_materials.size() == geo.faces().size())
+            geo.set_face_materials(std::move(face_materials));
+    } else if (mesh.metadata().has("material")) {
         const nlohmann::json& mat = mesh.metadata().get("material");
         if (mat.is_string())
             geo.set_material_name(mat.get<std::string>());
@@ -579,11 +661,19 @@ PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const s
         merged.set_uvs(std::move(merged_uvs));
     }
 
-    // Propagate material name (first writer wins)
-    if (a.has_material())
-        merged.set_material_name(a.material_name());
-    else if (b.has_material())
-        merged.set_material_name(b.material_name());
+    if (a.has_material() || b.has_material() || a.has_face_materials() || b.has_face_materials()) {
+        std::vector<std::string> merged_materials;
+        merged_materials.reserve(merged.faces().size());
+        if (a.has_face_materials())
+            merged_materials.insert(merged_materials.end(), a.face_materials().begin(), a.face_materials().end());
+        else
+            merged_materials.insert(merged_materials.end(), a.faces().size(), a.has_material() ? a.material_name() : "");
+        if (b.has_face_materials())
+            merged_materials.insert(merged_materials.end(), b.face_materials().begin(), b.face_materials().end());
+        else
+            merged_materials.insert(merged_materials.end(), b.faces().size(), b.has_material() ? b.material_name() : "");
+        merged.set_face_materials(std::move(merged_materials));
+    }
 
     return merged;
 }

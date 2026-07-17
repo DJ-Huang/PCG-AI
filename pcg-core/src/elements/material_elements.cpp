@@ -43,13 +43,18 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "AssignMaterial missing node");
 
         const std::string material_name = ctx.node->data.value("materialName", "");
+        const std::vector<std::string> face_groups = parse_name_list(ctx.node->data, "group");
 
         if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
             data::PcgGeometry out = *geometry;
-            out.set_material_name(material_name);
+            assign_material(out, material_name, face_groups);
             emit_geometry(ctx, std::move(out));
             return PCG_OK;
         }
+
+        if (!face_groups.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "AssignMaterial group selection requires geometry input");
 
         data::PcgMeshData mesh = get_mesh_input(ctx, "in", "AssignMaterial missing mesh input");
         assign_material(mesh, material_name);

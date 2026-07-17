@@ -35,6 +35,9 @@ namespace DJTechRuntime.PCG
         private List<PcgMeshBinding> m_MeshBindings = new();
 
         [SerializeField]
+        private List<PcgMaterialBinding> m_MaterialBindings = new();
+
+        [SerializeField]
         private List<PcgSplineBinding> m_SplineBindings = new();
 
         private float m_NextEditModeCookTime;
@@ -48,6 +51,7 @@ namespace DJTechRuntime.PCG
         private string m_LastCookKey;
         private bool m_HasAppliedCookResult;
         private ulong m_LastMeshBinaryHash;
+        private string[] m_LastMaterialNames = Array.Empty<string>();
         private PcgPolygonPreviewData m_PolygonPreview;
 
         /// <summary>Cached Sink n-gon topology for Scene View polygon wire (null when unavailable).</summary>
@@ -102,6 +106,7 @@ namespace DJTechRuntime.PCG
         public List<PcgParameterOverride> ParameterOverrides => m_ParameterOverrides;
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
         public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
+        public List<PcgMaterialBinding> MaterialBindings => m_MaterialBindings;
         public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
@@ -518,6 +523,7 @@ namespace DJTechRuntime.PCG
             m_LastCookKey = null;
             m_HasAppliedCookResult = false;
             m_LastMeshBinaryHash = 0;
+            m_LastMaterialNames = Array.Empty<string>();
         }
 
         private bool TryBuildExecutionJson(out string json)
@@ -562,16 +568,18 @@ namespace DJTechRuntime.PCG
                     var binHash = ComputeBinaryHash(result.MeshBinary);
                     if (binHash != 0 && binHash == m_LastMeshBinaryHash && m_GeneratedMesh != null)
                     {
-                        ApplyMesh(m_GeneratedMesh);
+                        ApplyMesh(m_GeneratedMesh, m_LastMaterialNames);
                     }
                     else
                     {
-                        if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out var meshError))
+                        if (!PcgResultParser.TryParseMeshBinary(
+                                result.MeshBinary, out var mesh, out var materialNames, out var meshError))
                         {
                             Debug.LogError($"[PCG] Failed to parse mesh result: {meshError}");
                             return false;
                         }
-                        ApplyMesh(mesh);
+                        ApplyMesh(mesh, materialNames);
+                        m_LastMaterialNames = materialNames;
                         m_LastMeshBinaryHash = binHash;
                     }
 
@@ -950,7 +958,7 @@ namespace DJTechRuntime.PCG
             ClearScatterDisplay();
         }
 
-        private void ApplyMesh(Mesh mesh)
+        private void ApplyMesh(Mesh mesh, IReadOnlyList<string> materialNames = null)
         {
             ClearGpuInstancingOnly();
 
@@ -967,7 +975,41 @@ namespace DJTechRuntime.PCG
             EnsureMeshComponents();
             m_MeshFilter.sharedMesh = mesh;
             if (m_MeshRenderer != null)
+            {
                 m_MeshRenderer.enabled = mesh != null;
+                ApplyMaterialBindings(materialNames);
+            }
+        }
+
+        private void ApplyMaterialBindings(IReadOnlyList<string> materialNames)
+        {
+            if (m_MeshRenderer == null)
+                return;
+
+            var fallback = meshMaterial != null ? meshMaterial : m_MeshRenderer.sharedMaterial;
+            if (materialNames == null || materialNames.Count == 0)
+            {
+                m_MeshRenderer.sharedMaterials = new[] { fallback };
+                return;
+            }
+
+            var resolved = new Material[materialNames.Count];
+            for (var slot = 0; slot < materialNames.Count; slot++)
+            {
+                resolved[slot] = fallback;
+                var name = materialNames[slot];
+                if (string.IsNullOrEmpty(name))
+                    continue;
+                foreach (var binding in m_MaterialBindings)
+                {
+                    if (binding != null && binding.material != null && binding.materialName == name)
+                    {
+                        resolved[slot] = binding.material;
+                        break;
+                    }
+                }
+            }
+            m_MeshRenderer.sharedMaterials = resolved;
         }
 
         private void EnsureMeshComponents()

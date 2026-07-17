@@ -64,12 +64,39 @@ public:
     }
 };
 
+class FaceGroupByNormalElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "FaceGroupByNormal"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "FaceGroupByNormal missing node");
+
+        const data::PcgGeometry input =
+            get_geometry_input(ctx, "in", "FaceGroupByNormal missing geometry input");
+        if (input.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "FaceGroupByNormal missing geometry input");
+
+        FaceGroupByNormalOptions opts;
+        opts.output_group = ctx.node->data.value("outputGroup", std::string("material_faces"));
+        opts.direction_x = ctx.node->data.value("directionX", 0.0);
+        opts.direction_y = ctx.node->data.value("directionY", 1.0);
+        opts.direction_z = ctx.node->data.value("directionZ", 0.0);
+        opts.spread_angle_deg = ctx.node->data.value("spreadAngle", 30.0);
+
+        emit_geometry(ctx, face_group_by_normal(input, opts));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("GroupCreate", std::make_unique<GroupCreateElement>());
     map.emplace("GroupCombine", std::make_unique<GroupCombineElement>());
+    map.emplace("FaceGroupByNormal", std::make_unique<FaceGroupByNormalElement>());
 }
 
 } // namespace pcg::internal::elements

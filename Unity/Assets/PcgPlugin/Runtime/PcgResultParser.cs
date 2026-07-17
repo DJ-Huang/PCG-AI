@@ -113,7 +113,14 @@ namespace DJTechRuntime.PCG
 
         public static unsafe bool TryParseMeshBinary(byte[] data, out Mesh mesh, out string error)
         {
+            return TryParseMeshBinary(data, out mesh, out _, out error);
+        }
+
+        public static unsafe bool TryParseMeshBinary(
+            byte[] data, out Mesh mesh, out string[] materialNames, out string error)
+        {
             mesh = null;
+            materialNames = Array.Empty<string>();
             error = null;
 
             if (data == null || data.Length < PcgNative.MeshBinaryHeaderSize)
@@ -147,10 +154,15 @@ namespace DJTechRuntime.PCG
                     bool hasNormals = false;
                     bool hasColors = false;
                     bool hasUVs = false;
+                    bool hasMaterials = false;
+                    int materialSectionSize = 0;
 
-                    if (version == PcgNative.MeshBinaryVersion2)
+                    if (version == PcgNative.MeshBinaryVersion2 ||
+                        version == PcgNative.MeshBinaryVersion3)
                     {
-                        headerSize = PcgNative.MeshBinaryV2HeaderSize;
+                        headerSize = version == PcgNative.MeshBinaryVersion3
+                            ? PcgNative.MeshBinaryV3HeaderSize
+                            : PcgNative.MeshBinaryV2HeaderSize;
                         if (data.Length < headerSize)
                         {
                             error = "Mesh binary v2 header truncated.";
@@ -160,6 +172,12 @@ namespace DJTechRuntime.PCG
                         hasNormals = (flags & PcgNative.MeshBinaryFlagHasNormals) != 0;
                         hasColors = (flags & PcgNative.MeshBinaryFlagHasColors) != 0;
                         hasUVs = (flags & PcgNative.MeshBinaryFlagHasUVs) != 0;
+                        hasMaterials = version == PcgNative.MeshBinaryVersion3 &&
+                            (flags & PcgNative.MeshBinaryFlagHasMaterials) != 0;
+                        if (version == PcgNative.MeshBinaryVersion3)
+                            materialSectionSize = *(int*)(ptr + 20);
+                        if (materialSectionSize < 0)
+                            throw new InvalidOperationException("Material section size is negative.");
                     }
                     else if (version == 1u)
                     {
@@ -178,6 +196,7 @@ namespace DJTechRuntime.PCG
                         required += vertexCount * 16;
                     if (hasUVs)
                         required += vertexCount * 8;
+                    required += materialSectionSize;
                     if (data.Length < required)
                     {
                         error = $"Mesh binary truncated (need {required} bytes, got {data.Length}).";
@@ -202,7 +221,66 @@ namespace DJTechRuntime.PCG
                     if (vertices.Length > 65535)
                         mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
                     mesh.vertices = vertices;
-                    mesh.triangles = triangles;
+
+                    var attributeEnd = indexOffset + indexCount * 4;
+                    if (hasNormals)
+                        attributeEnd += vertexCount * 12;
+                    if (hasColors)
+                        attributeEnd += vertexCount * 16;
+                    if (hasUVs)
+                        attributeEnd += vertexCount * 8;
+
+                    if (hasMaterials)
+                    {
+                        var sectionEnd = attributeEnd + materialSectionSize;
+                        var cursor = attributeEnd;
+                        if (cursor + 4 > sectionEnd)
+                            throw new InvalidOperationException("Material section is truncated.");
+                        var slotCount = *(int*)(ptr + cursor);
+                        cursor += 4;
+                        if (slotCount <= 0 || slotCount > indexCount / 3 + 1)
+                            throw new InvalidOperationException($"Invalid material slot count: {slotCount}.");
+                        materialNames = new string[slotCount];
+                        for (var slot = 0; slot < slotCount; slot++)
+                        {
+                            if (cursor + 4 > sectionEnd)
+                                throw new InvalidOperationException("Material name length is truncated.");
+                            var nameSize = *(int*)(ptr + cursor);
+                            cursor += 4;
+                            if (nameSize < 0 || cursor + nameSize > sectionEnd)
+                                throw new InvalidOperationException("Material name is truncated.");
+                            materialNames[slot] = nameSize == 0
+                                ? string.Empty
+                                : System.Text.Encoding.UTF8.GetString(data, cursor, nameSize);
+                            cursor += nameSize;
+                        }
+
+                        var submeshTriangles = new List<int>[slotCount];
+                        for (var slot = 0; slot < slotCount; slot++)
+                            submeshTriangles[slot] = new List<int>();
+                        for (var triangle = 0; triangle < indexCount / 3; triangle++)
+                        {
+                            if (cursor + 4 > sectionEnd)
+                                throw new InvalidOperationException("Triangle material table is truncated.");
+                            var slot = *(int*)(ptr + cursor);
+                            cursor += 4;
+                            if (slot < 0 || slot >= slotCount)
+                                throw new InvalidOperationException($"Invalid triangle material slot: {slot}.");
+                            var baseIndex = triangle * 3;
+                            submeshTriangles[slot].Add(triangles[baseIndex]);
+                            submeshTriangles[slot].Add(triangles[baseIndex + 1]);
+                            submeshTriangles[slot].Add(triangles[baseIndex + 2]);
+                        }
+                        if (cursor != sectionEnd)
+                            throw new InvalidOperationException("Material section has trailing bytes.");
+                        mesh.subMeshCount = slotCount;
+                        for (var slot = 0; slot < slotCount; slot++)
+                            mesh.SetTriangles(submeshTriangles[slot], slot, false);
+                    }
+                    else
+                    {
+                        mesh.triangles = triangles;
+                    }
 
                     if (hasNormals)
                     {

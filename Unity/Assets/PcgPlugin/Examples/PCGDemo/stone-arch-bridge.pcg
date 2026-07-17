@@ -209,15 +209,69 @@
       }
     },
     {
+      "id": "deck_material",
+      "type": "AssignMaterial",
+      "position": { "x": -460, "y": 1440 },
+      "data": {
+        "group": "",
+        "materialName": "bridge_deck"
+      }
+    },
+    {
+      "id": "arch_material",
+      "type": "AssignMaterial",
+      "position": { "x": -240, "y": 1440 },
+      "data": {
+        "group": "",
+        "materialName": "stone_arch"
+      }
+    },
+    {
+      "id": "left_abut_material",
+      "type": "AssignMaterial",
+      "position": { "x": -20, "y": 1440 },
+      "data": {
+        "group": "",
+        "materialName": "left_abutment"
+      }
+    },
+    {
+      "id": "right_abut_material",
+      "type": "AssignMaterial",
+      "position": { "x": 200, "y": 1440 },
+      "data": {
+        "group": "",
+        "materialName": "right_abutment"
+      }
+    },
+    {
+      "id": "left_railing_material",
+      "type": "AssignMaterial",
+      "position": { "x": 420, "y": 1440 },
+      "data": {
+        "group": "",
+        "materialName": "left_railing"
+      }
+    },
+    {
+      "id": "right_railing_material",
+      "type": "AssignMaterial",
+      "position": { "x": 640, "y": 1440 },
+      "data": {
+        "group": "",
+        "materialName": "right_railing"
+      }
+    },
+    {
       "id": "merge",
       "type": "MergeMesh",
-      "position": { "x": 200, "y": 1440 },
+      "position": { "x": 200, "y": 1600 },
       "data": {}
     },
     {
       "id": "noise",
       "type": "MeshNoiseDeform",
-      "position": { "x": 200, "y": 1600 },
+      "position": { "x": 200, "y": 1760 },
       "data": {
         "intensity": 0.015,
         "scale": 3.0,
@@ -229,7 +283,7 @@
     {
       "id": "output",
       "type": "Output",
-      "position": { "x": 200, "y": 1760 },
+      "position": { "x": 200, "y": 1920 },
       "data": {
         "label": "Stone Arch Bridge"
       }
@@ -248,14 +302,20 @@
     { "id": "e10", "source": "post_box", "target": "left_railing", "sourceHandle": "out", "targetHandle": "mesh" },
     { "id": "e11", "source": "right_rail_path", "target": "right_railing", "sourceHandle": "out", "targetHandle": "spline" },
     { "id": "e12", "source": "post_box", "target": "right_railing", "sourceHandle": "out", "targetHandle": "mesh" },
-    { "id": "e13", "source": "arch_deck", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e14", "source": "arch_bevel", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e15", "source": "left_abut", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e16", "source": "right_abut", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e17", "source": "left_railing", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e18", "source": "right_railing", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e13", "source": "arch_deck", "target": "deck_material", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e14", "source": "arch_bevel", "target": "arch_material", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e15", "source": "left_abut", "target": "left_abut_material", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e16", "source": "right_abut", "target": "right_abut_material", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e17", "source": "left_railing", "target": "left_railing_material", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e18", "source": "right_railing", "target": "right_railing_material", "sourceHandle": "out", "targetHandle": "in" },
     { "id": "e19", "source": "merge", "target": "noise", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e20", "source": "noise", "target": "output", "sourceHandle": "out", "targetHandle": "in" }
+    { "id": "e20", "source": "noise", "target": "output", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e21", "source": "deck_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e22", "source": "arch_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e23", "source": "left_abut_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e24", "source": "right_abut_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e25", "source": "left_railing_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e26", "source": "right_railing_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in" }
   ],
   "parameters": [
     { "id": "p1", "name": "bevelAmount", "type": "number", "default": 0.15, "exposed": true, "targetNode": "arch_bevel", "targetProperty": "amount", "hasRange": true, "min": 0.02, "max": 0.5 },

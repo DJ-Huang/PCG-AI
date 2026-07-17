@@ -24,7 +24,9 @@ int mesh_binary_size(const PcgMeshData& mesh)
 {
     const int vertex_count = static_cast<int>(mesh.vertices().size());
     const int index_count = static_cast<int>(mesh.triangles().size());
-    int size = kPcgMeshBinaryV2HeaderSize + vertex_count * 3 * static_cast<int>(sizeof(float)) +
+    const int header_size = mesh.has_materials() ? kPcgMeshBinaryV3HeaderSize
+                                                 : kPcgMeshBinaryV2HeaderSize;
+    int size = header_size + vertex_count * 3 * static_cast<int>(sizeof(float)) +
                index_count * static_cast<int>(sizeof(uint32_t));
     if (mesh.has_normals())
         size += vertex_count * 3 * static_cast<int>(sizeof(float));
@@ -32,12 +34,21 @@ int mesh_binary_size(const PcgMeshData& mesh)
         size += vertex_count * 4 * static_cast<int>(sizeof(float));
     if (mesh.has_uvs())
         size += vertex_count * 2 * static_cast<int>(sizeof(float));
+    if (mesh.has_materials()) {
+        size += 4;
+        for (const std::string& name : mesh.material_slots())
+            size += 4 + static_cast<int>(name.size());
+        size += static_cast<int>(mesh.triangle_materials().size()) * 4;
+    }
     return size;
 }
 
 bool write_mesh_binary(const PcgMeshData& mesh, void* buffer, int buffer_size)
 {
-    if (!buffer || buffer_size < kPcgMeshBinaryV2HeaderSize)
+    const bool write_materials = mesh.has_materials();
+    const int header_size = write_materials ? kPcgMeshBinaryV3HeaderSize
+                                            : kPcgMeshBinaryV2HeaderSize;
+    if (!buffer || buffer_size < header_size)
         return false;
 
     const int vertex_count = static_cast<int>(mesh.vertices().size());
@@ -48,16 +59,26 @@ bool write_mesh_binary(const PcgMeshData& mesh, void* buffer, int buffer_size)
 
     const uint32_t flags = mesh.has_normals() ? kPcgMeshBinaryFlagHasNormals : 0u;
     const uint32_t flags2 = flags | (mesh.has_colors() ? kPcgMeshBinaryFlagHasColors : 0u) |
-                            (mesh.has_uvs() ? kPcgMeshBinaryFlagHasUVs : 0u);
+                            (mesh.has_uvs() ? kPcgMeshBinaryFlagHasUVs : 0u) |
+                            (write_materials ? kPcgMeshBinaryFlagHasMaterials : 0u);
+
+    uint32_t material_section_size = 0;
+    if (write_materials) {
+        material_section_size = 4u + static_cast<uint32_t>(mesh.triangle_materials().size() * 4u);
+        for (const std::string& name : mesh.material_slots())
+            material_section_size += 4u + static_cast<uint32_t>(name.size());
+    }
 
     auto* bytes = static_cast<uint8_t*>(buffer);
     write_u32(bytes + 0, kPcgMeshBinaryMagic);
-    write_u32(bytes + 4, kPcgMeshBinaryVersion);
+    write_u32(bytes + 4, write_materials ? kPcgMeshBinaryVersion : 2u);
     write_u32(bytes + 8, static_cast<uint32_t>(vertex_count));
     write_u32(bytes + 12, static_cast<uint32_t>(index_count));
     write_u32(bytes + 16, flags2);
+    if (write_materials)
+        write_u32(bytes + 20, material_section_size);
 
-    int offset = kPcgMeshBinaryV2HeaderSize;
+    int offset = header_size;
     for (const auto& vertex : mesh.vertices()) {
         const float position[3] = {
             static_cast<float>(vertex.x),
@@ -107,6 +128,23 @@ bool write_mesh_binary(const PcgMeshData& mesh, void* buffer, int buffer_size)
             };
             std::memcpy(bytes + offset, u, sizeof(u));
             offset += static_cast<int>(sizeof(u));
+        }
+    }
+
+    if (write_materials) {
+        write_u32(bytes + offset, static_cast<uint32_t>(mesh.material_slots().size()));
+        offset += 4;
+        for (const std::string& name : mesh.material_slots()) {
+            write_u32(bytes + offset, static_cast<uint32_t>(name.size()));
+            offset += 4;
+            if (!name.empty()) {
+                std::memcpy(bytes + offset, name.data(), name.size());
+                offset += static_cast<int>(name.size());
+            }
+        }
+        for (uint32_t slot : mesh.triangle_materials()) {
+            write_u32(bytes + offset, slot);
+            offset += 4;
         }
     }
 
@@ -171,8 +209,9 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
         return true;
     }
 
-    if (version == 2u) {
-        if (buffer_size < kPcgMeshBinaryV2HeaderSize)
+    if (version == 2u || version == 3u) {
+        const int header_size = version == 3u ? kPcgMeshBinaryV3HeaderSize : kPcgMeshBinaryV2HeaderSize;
+        if (buffer_size < header_size)
             return false;
 
         uint32_t flags = 0;
@@ -182,14 +221,20 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
         const bool has_normals = (flags & kPcgMeshBinaryFlagHasNormals) != 0u;
         const bool has_colors  = (flags & kPcgMeshBinaryFlagHasColors)  != 0u;
         const bool has_uvs     = (flags & kPcgMeshBinaryFlagHasUVs)     != 0u;
+        const bool has_materials = version == 3u &&
+                                   (flags & kPcgMeshBinaryFlagHasMaterials) != 0u;
+        uint32_t material_section_size = 0;
+        if (version == 3u && !read_u32(bytes + 20, buffer_size - 20, material_section_size))
+            return false;
 
         const int vc = static_cast<int>(vertex_count);
-        const int required = kPcgMeshBinaryV2HeaderSize +
+        const int required = header_size +
                               vc * 3 * static_cast<int>(sizeof(float)) +
                               static_cast<int>(index_count) * static_cast<int>(sizeof(uint32_t)) +
                               (has_normals ? vc * 3 * static_cast<int>(sizeof(float)) : 0) +
                               (has_colors  ? vc * 4 * static_cast<int>(sizeof(float)) : 0) +
-                              (has_uvs     ? vc * 2 * static_cast<int>(sizeof(float)) : 0);
+                              (has_uvs     ? vc * 2 * static_cast<int>(sizeof(float)) : 0) +
+                              static_cast<int>(material_section_size);
         if (buffer_size < required)
             return false;
 
@@ -197,7 +242,7 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
             return false;
 
         out = PcgMeshData{};
-        int offset = kPcgMeshBinaryV2HeaderSize;
+        int offset = header_size;
 
         for (uint32_t i = 0; i < vertex_count; ++i) {
             float position[3] = {};
@@ -265,6 +310,42 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
                 });
             }
             out.set_uvs(std::move(uvs));
+        }
+
+        if (has_materials) {
+            const int section_end = offset + static_cast<int>(material_section_size);
+            uint32_t slot_count = 0;
+            if (section_end > buffer_size || !read_u32(bytes + offset, section_end - offset, slot_count))
+                return false;
+            offset += 4;
+            std::vector<std::string> slots;
+            slots.reserve(slot_count);
+            for (uint32_t i = 0; i < slot_count; ++i) {
+                uint32_t name_size = 0;
+                if (!read_u32(bytes + offset, section_end - offset, name_size))
+                    return false;
+                offset += 4;
+                if (name_size > static_cast<uint32_t>(section_end - offset))
+                    return false;
+                slots.emplace_back(reinterpret_cast<const char*>(bytes + offset), name_size);
+                offset += static_cast<int>(name_size);
+            }
+            std::vector<uint32_t> triangle_materials;
+            triangle_materials.reserve(index_count / 3u);
+            for (uint32_t i = 0; i < index_count / 3u; ++i) {
+                uint32_t slot = 0;
+                if (!read_u32(bytes + offset, section_end - offset, slot) || slot >= slot_count)
+                    return false;
+                offset += 4;
+                triangle_materials.push_back(slot);
+            }
+            if (offset != section_end)
+                return false;
+            out.set_materials(std::move(slots), std::move(triangle_materials));
+            if (!out.has_materials())
+                return false;
+        } else if (material_section_size != 0u) {
+            return false;
         }
 
         return true;

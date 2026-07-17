@@ -136,6 +136,62 @@ namespace DJTechEditor.PCG.Tests
             Assert.IsNull(preview);
         }
 
+        [Test]
+        public void U8_MeshBinaryV3_MaterialSlots_CreateSubMeshes()
+        {
+            var bytes = new List<byte>();
+            void U32(uint value) => bytes.AddRange(BitConverter.GetBytes(value));
+            void F32(float value) => bytes.AddRange(BitConverter.GetBytes(value));
+            void Utf8(string value)
+            {
+                var encoded = System.Text.Encoding.UTF8.GetBytes(value);
+                U32((uint)encoded.Length);
+                bytes.AddRange(encoded);
+            }
+
+            var materialBytes = new List<byte>();
+            void MaterialU32(uint value) => materialBytes.AddRange(BitConverter.GetBytes(value));
+            void MaterialUtf8(string value)
+            {
+                var encoded = System.Text.Encoding.UTF8.GetBytes(value);
+                MaterialU32((uint)encoded.Length);
+                materialBytes.AddRange(encoded);
+            }
+            MaterialU32(2);
+            MaterialUtf8("body");
+            MaterialUtf8("glass");
+            MaterialU32(0);
+            MaterialU32(1);
+
+            U32(PcgNative.MeshBinaryMagic);
+            U32(PcgNative.MeshBinaryVersion3);
+            U32(4);
+            U32(6);
+            U32(PcgNative.MeshBinaryFlagHasMaterials);
+            U32((uint)materialBytes.Count);
+            foreach (var position in new[]
+                     {
+                         new Vector3(0, 0, 0), new Vector3(1, 0, 0),
+                         new Vector3(1, 1, 0), new Vector3(0, 1, 0),
+                     })
+            {
+                F32(position.x);
+                F32(position.y);
+                F32(position.z);
+            }
+            foreach (var index in new uint[] { 0, 1, 2, 0, 2, 3 })
+                U32(index);
+            bytes.AddRange(materialBytes);
+
+            Assert.IsTrue(PcgResultParser.TryParseMeshBinary(
+                bytes.ToArray(), out var mesh, out var names, out var error), error);
+            CollectionAssert.AreEqual(new[] { "body", "glass" }, names);
+            Assert.AreEqual(2, mesh.subMeshCount);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, mesh.GetTriangles(0));
+            CollectionAssert.AreEqual(new[] { 0, 2, 3 }, mesh.GetTriangles(1));
+            UnityEngine.Object.DestroyImmediate(mesh);
+        }
+
         private static byte[] BuildOneQuadBinary(bool includeTriangulation, uint? omitChunkId = null)
         {
             return BuildCustomBinary(

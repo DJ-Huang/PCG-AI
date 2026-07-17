@@ -64,7 +64,7 @@ uint32_t read_flags(const std::vector<uint8_t>& mesh_buf)
         return 0;
     uint32_t version = 0;
     std::memcpy(&version, mesh_buf.data() + 4, 4);
-    if (version != 2)
+    if (version != 2 && version != 3)
         return 0;
     uint32_t flags = 0;
     std::memcpy(&flags, mesh_buf.data() + 16, 4);
@@ -255,6 +255,50 @@ int main()
         })";
         auto r = execute_graph(graph, 42);
         expect(r.code == PCG_OK, "graph7: invalid enum does not crash (fallback ok)");
+    }
+
+    // --- Test 8: FaceGroupByNormal drives a material override ---
+    {
+        const char* graph = R"({
+          "version": "1.0",
+          "nodes": [
+            {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":0},
+             "data": {"width": 2.0, "height": 2.0, "depth": 2.0}},
+            {"id": "top", "type": "FaceGroupByNormal", "position": {"x":200,"y":0},
+             "data": {"outputGroup": "top", "directionX": 0.0, "directionY": 1.0, "directionZ": 0.0, "spreadAngle": 5.0}},
+            {"id": "base", "type": "AssignMaterial", "position": {"x":400,"y":0},
+             "data": {"group": "", "materialName": "body"}},
+            {"id": "topMat", "type": "AssignMaterial", "position": {"x":600,"y":0},
+             "data": {"group": "top", "materialName": "top_paint"}},
+            {"id": "out", "type": "Output", "position": {"x":800,"y":0}, "data": {}}
+          ],
+          "edges": [
+            {"id": "e1", "source": "box", "target": "top", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e2", "source": "top", "target": "base", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e3", "source": "base", "target": "topMat", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e4", "source": "topMat", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+          ]
+        })";
+        auto r = execute_graph(graph, 42);
+        expect(r.code == PCG_OK, "graph8: normal group → material override succeeds");
+        expect((read_flags(r.mesh_buf) & 0x8u) != 0, "graph8: binary has materials flag");
+
+        pcg::internal::data::PcgMeshData mesh;
+        const bool parsed = pcg::internal::data::read_mesh_binary(
+            r.mesh_buf.data(), static_cast<int>(r.mesh_buf.size()), mesh);
+        expect(parsed, "graph8: multi-material binary parses");
+        if (parsed) {
+            expect(mesh.material_slots().size() == 2, "graph8: two material slots emitted");
+            int top_triangle_count = 0;
+            for (size_t i = 0; i < mesh.material_slots().size(); ++i) {
+                if (mesh.material_slots()[i] != "top_paint")
+                    continue;
+                for (uint32_t slot : mesh.triangle_materials())
+                    if (slot == i)
+                        ++top_triangle_count;
+            }
+            expect(top_triangle_count == 2, "graph8: top quad maps to two top-material triangles");
+        }
     }
 
     if (g_fail > 0) {

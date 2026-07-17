@@ -29,6 +29,13 @@ namespace DJTechRuntime.PCG
         public Mesh meshAsset;
     }
 
+    [Serializable]
+    public class PcgMaterialBinding
+    {
+        public string materialName;
+        public Material material;
+    }
+
     public enum PcgMeshBindingSource
     {
         Self = 0,

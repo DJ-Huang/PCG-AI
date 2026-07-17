@@ -80,6 +80,16 @@ uint64_t hash_mesh(const data::PcgMeshData& mesh)
         }
     }
 
+    h = hash_combine(h, mesh.has_materials() ? 1u : 0u);
+    if (mesh.has_materials()) {
+        for (const std::string& name : mesh.material_slots())
+            h = hash_combine(h, hash_string(name));
+        if (!mesh.triangle_materials().empty()) {
+            h = hash_bytes(mesh.triangle_materials().data(),
+                           mesh.triangle_materials().size() * sizeof(uint32_t), h);
+        }
+    }
+
     h = hash_combine(h, hash_json(mesh.metadata().raw()));
     return h;
 }
@@ -119,6 +129,14 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     h = hash_combine(h, static_cast<uint64_t>(detail.shade_mode));
     double cusp = detail.cusp_angle_deg;
     h = hash_bytes(&cusp, sizeof(double), h);
+
+    h = hash_combine(h, geometry.has_face_materials() ? 1u : 0u);
+    if (geometry.has_face_materials()) {
+        for (const std::string& name : geometry.face_materials())
+            h = hash_combine(h, hash_string(name));
+    } else if (geometry.has_material()) {
+        h = hash_combine(h, hash_string(geometry.material_name()));
+    }
 
     return h;
 }

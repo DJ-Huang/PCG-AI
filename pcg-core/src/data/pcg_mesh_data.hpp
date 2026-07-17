@@ -4,6 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <string>
 #include <vector>
 
 namespace pcg::internal::data {
@@ -51,6 +52,11 @@ public:
     const std::vector<PcgVec2>& uvs() const { return uvs_; }
     void set_uvs(std::vector<PcgVec2> uv);
 
+    bool has_materials() const { return !material_slots_.empty() && triangle_materials_.size() == triangles_.size() / 3; }
+    const std::vector<std::string>& material_slots() const { return material_slots_; }
+    const std::vector<uint32_t>& triangle_materials() const { return triangle_materials_; }
+    void set_materials(std::vector<std::string> slots, std::vector<uint32_t> triangle_materials);
+
     nlohmann::json to_json() const;
     static PcgMeshData from_json(const nlohmann::json& json);
 
@@ -64,6 +70,8 @@ private:
     bool has_colors_ = false;
     std::vector<PcgVec2> uvs_;
     bool has_uvs_ = false;
+    std::vector<std::string> material_slots_;
+    std::vector<uint32_t> triangle_materials_;
 };
 
 } // namespace pcg::internal::data

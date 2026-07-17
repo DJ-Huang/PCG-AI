@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **49 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **50 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -63,6 +63,7 @@
 - [Geometry 类别](#geometry-类别)
   - [GroupCreate](#groupcreate)
   - [GroupCombine](#groupcombine)
+  - [FaceGroupByNormal](#facegroupbynormal)
 - [Texture 类别](#texture-类别)
   - [ImageTexture](#imagetexture)
 - [Output 类别](#output-类别)
@@ -2212,6 +2213,20 @@ CreateSpline(profile) ──┘
 
 > 典型用途：将多个 GroupCreate 的输出合并为一个组，或用 subtract 排除某些边（如从 `profile_corner` 中减去 `cap_start` 的边）。
 
+### FaceGroupByNormal
+
+**类别**：Geometry
+
+**功能**：按面法线与目标方向的夹角建立 face group，适合选择顶面、底面或朝向特定方向的面，再交给 `AssignMaterial` 做局部材质覆盖。
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `outputGroup` | string | `material_faces` | 输出 face group 名称 |
+| `directionX/Y/Z` | number | `0/1/0` | 目标方向，会自动归一化 |
+| `spreadAngle` | number | `30` | 法线允许偏离目标方向的最大角度（0–180°） |
+
+典型连接：`Geometry → FaceGroupByNormal(outputGroup="top") → AssignMaterial(group="") → AssignMaterial(group="top") → Output`。
+
 ---
 
 ## Texture 类别
@@ -2507,15 +2522,16 @@ CreateSpline ──(profile)──┘
 
 ### AssignMaterial
 
-将材质名称写入 mesh metadata，供下游渲染器使用。
+向全部面或指定 face group 赋予材质名，并在 Unity 输出中生成对应 SubMesh。
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| group | groupMultiSelect (face) | "" | 逗号分隔的 face group；空值表示全部面 |
 | materialName | string | "" | 材质名称（空字符串允许） |
 
-**执行逻辑**：读取输入 mesh，将 `materialName` 写入 `mesh.metadata["material"]`，输出 mesh。
+**执行逻辑**：Geometry 输入时写入逐面材质属性；多个节点链式使用时，下游节点只覆盖命中 Group 的面，最后赋值获胜。Sink 将逐面属性展开为逐三角形材质槽，Mesh Binary v3 传给 Unity 并创建 SubMesh。Mesh-only 输入仅支持空 Group 的全局赋值。
 
-**范围限制**：仅保证 material name 穿过 native result JSON（`mesh_metadata.material`）。不保证 Unity 画面自动换材质。
+**Unity 绑定**：在 `PcgGraphComponent > Material Bindings` 中将 `materialName` 映射到 Unity `Material`。未映射和空名称使用 `Mesh Material` fallback。完整流程见 [多材质工作流](multi-material-workflow.md)。
 
 ---
 

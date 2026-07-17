@@ -2,6 +2,8 @@
 // classification, island union-find, and render mesh + normal generation.
 #include "data/pcg_geometry.hpp"
 #include "data/pcg_mesh_binary.hpp"
+#include "data/pcg_geometry_binary.hpp"
+#include "elements/material_algorithms.hpp"
 #include "cook_hash.hpp"
 
 #include <cmath>
@@ -496,6 +498,50 @@ int main()
                          vc * 2 * static_cast<int>(sizeof(float));   // uvs
         expect(worst_case >= actual, "sizing: worst-case >= actual (all flags)");
         expect(worst_case == actual, "sizing: worst-case == actual (all flags set)");
+    }
+
+    // --- Test 25: Houdini-style face group material assignment survives Sink + binary ---
+    {
+        PcgGeometry cube = make_cube();
+        cube.groups().add(GroupDomain::Face, "windows", 1);
+        cube.groups().add(GroupDomain::Face, "windows", 3);
+        pcg::internal::elements::assign_material(cube, "body", {});
+        pcg::internal::elements::assign_material(cube, "glass", {"windows"});
+
+        expect(cube.has_face_materials(), "materials: geometry has per-face channel");
+        expect(cube.face_materials()[0] == "body", "materials: unmatched face keeps body");
+        expect(cube.face_materials()[1] == "glass", "materials: group face gets glass");
+
+        PcgMeshData mesh = compute_split_normals(cube, {ShadeMode::Auto, 30.0, true});
+        expect(mesh.has_materials(), "materials: sink mesh has material table");
+        expect(mesh.material_slots().size() == 2, "materials: sink mesh has two slots");
+        int glass_triangles = 0;
+        for (uint32_t slot : mesh.triangle_materials()) {
+            if (mesh.material_slots()[slot] == "glass")
+                ++glass_triangles;
+        }
+        expect(glass_triangles == 4, "materials: two quad faces expand to four glass triangles");
+
+        std::vector<uint8_t> mesh_bytes(static_cast<size_t>(mesh_binary_size(mesh)));
+        expect(write_mesh_binary(mesh, mesh_bytes.data(), static_cast<int>(mesh_bytes.size())),
+               "materials: mesh binary v3 writes");
+        PcgMeshData restored_mesh;
+        expect(read_mesh_binary(mesh_bytes.data(), static_cast<int>(mesh_bytes.size()), restored_mesh),
+               "materials: mesh binary v3 reads");
+        expect(restored_mesh.material_slots() == mesh.material_slots(),
+               "materials: mesh slots round-trip");
+        expect(restored_mesh.triangle_materials() == mesh.triangle_materials(),
+               "materials: triangle slots round-trip");
+
+        std::vector<uint8_t> geometry_bytes(static_cast<size_t>(geometry_binary_size(cube)));
+        expect(write_geometry_binary(cube, geometry_bytes.data(), static_cast<int>(geometry_bytes.size())),
+               "materials: geometry binary writes face materials");
+        PcgGeometry restored_geometry;
+        expect(read_geometry_binary(geometry_bytes.data(), static_cast<int>(geometry_bytes.size()),
+                                    restored_geometry),
+               "materials: geometry binary reads face materials");
+        expect(restored_geometry.face_materials() == cube.face_materials(),
+               "materials: geometry face materials round-trip");
     }
 
     if (g_fail > 0) {

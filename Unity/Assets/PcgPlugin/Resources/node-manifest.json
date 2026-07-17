@@ -495,6 +495,21 @@
       }
     },
     {
+      "type": "FaceGroupByNormal",
+      "displayName": "Face Group by Normal",
+      "category": "Geometry",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputGroups": [{ "name": "outputGroup", "domain": "face", "label": "Output Group", "dynamic": true }],
+      "properties": {
+        "outputGroup": { "type": "string", "default": "material_faces", "displayName": "Output Group", "isGroupOutput": true },
+        "directionX": { "type": "number", "default": 0.0, "displayName": "Direction X" },
+        "directionY": { "type": "number", "default": 1.0, "displayName": "Direction Y" },
+        "directionZ": { "type": "number", "default": 0.0, "displayName": "Direction Z" },
+        "spreadAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180, "displayName": "Spread Angle" }
+      }
+    },
+    {
       "type": "MeshNoiseDeform",
       "displayName": "Mesh Noise Deform",
       "category": "Mesh",
@@ -956,6 +971,7 @@
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "properties": {
+        "group": { "type": "groupMultiSelect", "default": "", "groupDomain": "face" },
         "materialName": { "type": "string", "default": "" }
       }
     },

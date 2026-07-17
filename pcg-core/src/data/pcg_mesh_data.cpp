@@ -38,6 +38,25 @@ void PcgMeshData::set_uvs(std::vector<PcgVec2> uv)
     has_uvs_ = true;
 }
 
+void PcgMeshData::set_materials(std::vector<std::string> slots,
+                                std::vector<uint32_t> triangle_materials)
+{
+    if (slots.empty() || triangle_materials.size() != triangles_.size() / 3) {
+        material_slots_.clear();
+        triangle_materials_.clear();
+        return;
+    }
+    for (uint32_t slot : triangle_materials) {
+        if (slot >= slots.size()) {
+            material_slots_.clear();
+            triangle_materials_.clear();
+            return;
+        }
+    }
+    material_slots_ = std::move(slots);
+    triangle_materials_ = std::move(triangle_materials);
+}
+
 nlohmann::json PcgMeshData::to_json() const
 {
     nlohmann::json verts = nlohmann::json::array();
@@ -76,6 +95,10 @@ nlohmann::json PcgMeshData::to_json() const
             uv_arr.push_back(nlohmann::json{{"u", uv.u}, {"v", uv.v}});
         out["uvs"] = std::move(uv_arr);
     }
+    if (has_materials()) {
+        out["materialSlots"] = material_slots_;
+        out["triangleMaterials"] = triangle_materials_;
+    }
     return out;
 }
 
@@ -104,6 +127,21 @@ PcgMeshData PcgMeshData::from_json(const nlohmann::json& json)
 
     if (json.contains("metadata"))
         data.metadata_ = PcgMetadata::from_json(json["metadata"]);
+
+    if (json.contains("materialSlots") && json["materialSlots"].is_array() &&
+        json.contains("triangleMaterials") && json["triangleMaterials"].is_array()) {
+        std::vector<std::string> slots;
+        std::vector<uint32_t> triangle_materials;
+        for (const auto& item : json["materialSlots"]) {
+            if (item.is_string())
+                slots.push_back(item.get<std::string>());
+        }
+        for (const auto& item : json["triangleMaterials"]) {
+            if (item.is_number_unsigned() || item.is_number_integer())
+                triangle_materials.push_back(item.get<uint32_t>());
+        }
+        data.set_materials(std::move(slots), std::move(triangle_materials));
+    }
 
     if (json.contains("normals") && json["normals"].is_array()) {
         std::vector<PcgVertex> norms;

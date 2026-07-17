@@ -18,6 +18,7 @@ constexpr uint32_t kChunkTriangulation = 6u;
 constexpr uint32_t kChunkColors = 7u;
 constexpr uint32_t kChunkUVs = 8u;
 constexpr uint32_t kChunkMaterial = 9u;
+constexpr uint32_t kChunkFaceMaterials = 10u;
 
 struct Writer {
     uint8_t* base = nullptr;
@@ -89,6 +90,11 @@ int geometry_binary_size(const PcgGeometry& geometry)
         size += 8 + static_cast<int>(geometry.points().size()) * 16;
     if (geometry.has_material())
         size += 8 + static_cast<int>(geometry.material_name().size()) + 1;
+    if (geometry.has_face_materials()) {
+        size += 8;
+        for (const std::string& name : geometry.face_materials())
+            size += 4 + static_cast<int>(name.size());
+    }
     return size;
 }
 
@@ -235,6 +241,19 @@ bool write_geometry_binary(const PcgGeometry& geometry, void* buffer, int buffer
             return false;
     }
 
+    if (geometry.has_face_materials()) {
+        if (!write_chunk(kChunkFaceMaterials, [&] {
+                for (const std::string& name : geometry.face_materials()) {
+                    if (!w.write_u32(static_cast<uint32_t>(name.size())))
+                        return false;
+                    if (!name.empty() && !w.write(name.data(), static_cast<int>(name.size())))
+                        return false;
+                }
+                return true;
+            }))
+            return false;
+    }
+
     return true;
 }
 
@@ -264,6 +283,7 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
     };
     std::vector<GroupDef> group_defs;
     std::vector<uint32_t> group_members;
+    std::vector<std::string> face_materials;
 
     while (r.offset + 8 <= r.capacity) {
         uint32_t chunk_id = 0;
@@ -354,6 +374,20 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
                 name.push_back(ch);
             }
             geometry.set_material_name(std::move(name));
+        } else if (chunk_id == kChunkFaceMaterials) {
+            face_materials.clear();
+            face_materials.reserve(face_count);
+            for (uint32_t i = 0; i < face_count; ++i) {
+                uint32_t name_size = 0;
+                if (!r.read_u32(name_size) ||
+                    name_size > static_cast<uint32_t>(chunk_end - r.offset))
+                    return false;
+                face_materials.emplace_back(reinterpret_cast<const char*>(r.base + r.offset),
+                                            name_size);
+                r.offset += static_cast<int>(name_size);
+            }
+            if (r.offset != chunk_end)
+                return false;
         } else {
             r.offset = chunk_end;
         }
@@ -369,6 +403,9 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
         for (uint32_t i = start; i < end; ++i)
             face.push_back(static_cast<int>(face_indices[i]));
     }
+
+    if (!face_materials.empty())
+        geometry.set_face_materials(std::move(face_materials));
 
     size_t member_cursor = 0;
     for (const auto& def : group_defs) {

@@ -133,4 +133,59 @@ data::PcgGeometry group_combine(const data::PcgGeometry& input, const GroupCombi
     return result;
 }
 
+data::PcgGeometry face_group_by_normal(const data::PcgGeometry& input,
+                                       const FaceGroupByNormalOptions& options)
+{
+    data::PcgGeometry result = input;
+    result.groups().clear_group(geometry::GroupDomain::Face, options.output_group);
+
+    const double direction_length = std::sqrt(options.direction_x * options.direction_x
+        + options.direction_y * options.direction_y + options.direction_z * options.direction_z);
+    if (direction_length <= 1e-12 || options.output_group.empty())
+        return result;
+
+    const double dx = options.direction_x / direction_length;
+    const double dy = options.direction_y / direction_length;
+    const double dz = options.direction_z / direction_length;
+    const double spread = std::clamp(options.spread_angle_deg, 0.0, 180.0);
+    const double threshold = std::cos(spread * kPi / 180.0);
+
+    for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
+        const auto& face = input.faces()[face_index];
+        if (face.size() < 3)
+            continue;
+
+        double nx = 0.0;
+        double ny = 0.0;
+        double nz = 0.0;
+        bool valid = true;
+        for (size_t i = 0; i < face.size(); ++i) {
+            const int current_index = face[i];
+            const int next_index = face[(i + 1) % face.size()];
+            if (current_index < 0 || next_index < 0
+                || static_cast<size_t>(current_index) >= input.points().size()
+                || static_cast<size_t>(next_index) >= input.points().size()) {
+                valid = false;
+                break;
+            }
+            const auto& current = input.points()[static_cast<size_t>(current_index)];
+            const auto& next = input.points()[static_cast<size_t>(next_index)];
+            nx += (current.y - next.y) * (current.z + next.z);
+            ny += (current.z - next.z) * (current.x + next.x);
+            nz += (current.x - next.x) * (current.y + next.y);
+        }
+
+        const double normal_length = std::sqrt(nx * nx + ny * ny + nz * nz);
+        if (!valid || normal_length <= 1e-12)
+            continue;
+
+        const double alignment = (nx * dx + ny * dy + nz * dz) / normal_length;
+        if (alignment >= threshold)
+            result.groups().add(geometry::GroupDomain::Face, options.output_group,
+                                static_cast<int>(face_index));
+    }
+
+    return result;
+}
+
 } // namespace pcg::internal::elements

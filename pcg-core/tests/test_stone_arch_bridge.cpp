@@ -1,9 +1,11 @@
 #include "pcg_api.h"
+#include "data/pcg_mesh_binary.hpp"
 
 #include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 static std::string read_file(const char* path)
@@ -61,6 +63,30 @@ int main()
         std::printf("FAIL: mesh too small (%d verts)\n", vertex_count);
         return 1;
     }
+
+    pcg::internal::data::PcgMeshData mesh;
+    if (!pcg::internal::data::read_mesh_binary(
+            mesh_buf.data(), static_cast<int>(mesh_buf.size()), mesh)) {
+        std::printf("FAIL: could not parse output mesh binary\n");
+        return 1;
+    }
+
+    const std::unordered_set<std::string> expected_materials = {
+        "bridge_deck",
+        "stone_arch",
+        "left_abutment",
+        "right_abutment",
+        "left_railing",
+        "right_railing",
+    };
+    const std::unordered_set<std::string> actual_materials(
+        mesh.material_slots().begin(), mesh.material_slots().end());
+    if (actual_materials != expected_materials) {
+        std::printf("FAIL: expected 6 per-component material slots, got %zu\n",
+                    actual_materials.size());
+        return 1;
+    }
+    std::printf("PASS: all 6 bridge components have independent material slots\n");
 
     std::printf("PASS: all checks passed\n");
     return 0;

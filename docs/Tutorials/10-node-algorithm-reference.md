@@ -692,9 +692,9 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
 | 输入 | Mesh (pin "in") |
 | 输出 | Mesh (pin "out") |
 
-**算法**：在网格 metadata 中写入材质名称。
+**算法**：Geometry 路径向全部面或所选 face group 写入逐面材质名；Sink 三角化时建立稳定材质槽表与逐三角形槽索引。Mesh-only fallback 仅支持全局材质。
 
-**参数**：`materialName` (string)
+**参数**：`group` (face groupMultiSelect), `materialName` (string)
 
 ### 10.3 UVTexture
 

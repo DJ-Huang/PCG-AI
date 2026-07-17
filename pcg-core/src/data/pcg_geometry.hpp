@@ -54,7 +54,11 @@ public:
 
     bool has_material() const { return has_material_; }
     const std::string& material_name() const { return material_name_; }
-    void set_material_name(std::string m) { material_name_ = std::move(m); has_material_ = true; }
+    void set_material_name(std::string m);
+    bool has_face_materials() const { return face_materials_.size() == faces_.size(); }
+    const std::vector<std::string>& face_materials() const { return face_materials_; }
+    std::vector<std::string>& face_materials_mut();
+    void set_face_materials(std::vector<std::string> materials);
 
 private:
     std::vector<PcgVec3> points_;
@@ -67,6 +71,7 @@ private:
     bool has_uvs_ = false;
     std::string material_name_;
     bool has_material_ = false;
+    std::vector<std::string> face_materials_;
 };
 
 /// Fan-triangulate n-gon faces for display / legacy mesh nodes.

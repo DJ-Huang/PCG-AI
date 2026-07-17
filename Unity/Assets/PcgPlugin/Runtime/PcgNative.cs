@@ -23,10 +23,13 @@ namespace DJTechRuntime.PCG
         public const uint MeshBinaryMagic = 0x4D474350u;
         public const int MeshBinaryHeaderSize = 16;
         public const int MeshBinaryV2HeaderSize = 20;
+        public const int MeshBinaryV3HeaderSize = 24;
         public const uint MeshBinaryVersion2 = 2u;
+        public const uint MeshBinaryVersion3 = 3u;
         public const uint MeshBinaryFlagHasNormals = 0x1u;
         public const uint MeshBinaryFlagHasColors  = 0x2u;
         public const uint MeshBinaryFlagHasUVs     = 0x4u;
+        public const uint MeshBinaryFlagHasMaterials = 0x8u;
         public const uint PointBinaryMagic = 0x50544750u;
         public const int PointBinaryHeaderSize = 16;
 
@@ -501,13 +504,16 @@ namespace DJTechRuntime.PCG
             int normalSize = 0;
             int colorSize = 0;
             int uvSize = 0;
+            int materialSize = 0;
 
             if (meshBuf.Length >= MeshBinaryV2HeaderSize)
             {
                 var version = BitConverter.ToUInt32(meshBuf, 4);
-                if (version == MeshBinaryVersion2)
+                if (version == MeshBinaryVersion2 || version == MeshBinaryVersion3)
                 {
-                    headerSize = MeshBinaryV2HeaderSize;
+                    headerSize = version == MeshBinaryVersion3
+                        ? MeshBinaryV3HeaderSize
+                        : MeshBinaryV2HeaderSize;
                     var flags = BitConverter.ToUInt32(meshBuf, 16);
                     if ((flags & MeshBinaryFlagHasNormals) != 0)
                         normalSize = vertexCount * 12;
@@ -515,10 +521,12 @@ namespace DJTechRuntime.PCG
                         colorSize = vertexCount * 16;
                     if ((flags & MeshBinaryFlagHasUVs) != 0)
                         uvSize = vertexCount * 8;
+                    if (version == MeshBinaryVersion3)
+                        materialSize = BitConverter.ToInt32(meshBuf, 20);
                 }
             }
 
-            return headerSize + vertexCount * 12 + indexCount * 4 + normalSize + colorSize + uvSize;
+            return headerSize + vertexCount * 12 + indexCount * 4 + normalSize + colorSize + uvSize + materialSize;
         }
 
         private static (PcgResultCode code, PcgGraphExecuteResult result) BuildSuccessResult(

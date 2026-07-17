@@ -14,6 +14,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_CookModeProp;
         private SerializedProperty m_OverridesProp;
         private SerializedProperty m_MeshBindingsProp;
+        private SerializedProperty m_MaterialBindingsProp;
         private SerializedProperty m_ScatterPointScaleProp;
         private SerializedProperty m_ScatterPointMeshProp;
         private SerializedProperty m_ScatterDisplayModeProp;
@@ -28,6 +29,7 @@ namespace DJTechEditor.PCG
             m_CookModeProp = serializedObject.FindProperty("cookMode");
             m_OverridesProp = serializedObject.FindProperty("m_ParameterOverrides");
             m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
+            m_MaterialBindingsProp = serializedObject.FindProperty("m_MaterialBindings");
             m_ScatterPointScaleProp = serializedObject.FindProperty("scatterPointScale");
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
             m_ScatterDisplayModeProp = serializedObject.FindProperty("scatterDisplayMode");
@@ -111,6 +113,7 @@ namespace DJTechEditor.PCG
 
             DrawScatterSettings();
             DrawMeshBindings();
+            DrawMaterialBindings();
             DrawParameters();
 
             if (m_SliderReleasedThisFrame && m_Target.SupportsEditModePreview())
@@ -230,6 +233,16 @@ namespace DJTechEditor.PCG
             }
 
             EditorGUILayout.PropertyField(m_MeshBindingsProp, includeChildren: true);
+        }
+
+        private void DrawMaterialBindings()
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Material Bindings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Map Assign Material names to Unity Material assets. Unmapped or empty slots use Mesh Material.",
+                MessageType.Info);
+            EditorGUILayout.PropertyField(m_MaterialBindingsProp, includeChildren: true);
         }
 
         private bool GraphHasGetMeshData()
