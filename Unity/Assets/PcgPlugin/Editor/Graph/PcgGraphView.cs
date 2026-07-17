@@ -293,6 +293,10 @@ namespace DJTechEditor.PCG.Graph
                 if (nodeView != null)
                 {
                     evt.menu.AppendAction(
+                        "Rename",
+                        _ => nodeView.RequestRename());
+
+                    evt.menu.AppendAction(
                         "Preview in Scene",
                         _ => ToggleNodePreview(nodeView));
 
@@ -325,6 +329,20 @@ namespace DJTechEditor.PCG.Graph
 
         private PcgSubgraphDefinition FindSubgraph(string id) =>
             m_RootDocument?.subgraphs?.FirstOrDefault(subgraph => subgraph.id == id);
+
+        internal void RefreshSubgraphInstanceTitles(string subgraphId)
+        {
+            if (string.IsNullOrEmpty(subgraphId))
+                return;
+
+            foreach (var node in nodes.OfType<PcgSubgraphNodeView>())
+            {
+                if (node.NodeType == "Subgraph" && node.SubgraphDefinitionId == subgraphId)
+                    node.RefreshDefinitionTitle();
+            }
+
+            SubgraphNavigationChanged?.Invoke(m_CurrentSubgraphId);
+        }
 
         public void ExitSubgraph()
         {

@@ -94,6 +94,8 @@ namespace DJTechEditor.PCG.Graph
 
         public event Action<string> OpenRequested;
 
+        public string SubgraphDefinitionId => m_Definition.id;
+
         public string GetInputPinType(string handle) =>
             PortType(m_Kind == PcgSubgraphNodeKind.Output ? m_Definition.outputs : m_Definition.inputs, handle);
 
@@ -170,6 +172,31 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             OpenRequested?.Invoke(m_Definition.id);
             return true;
+        }
+
+        protected override void ApplyRenamedTitle(string newTitle)
+        {
+            if (m_Kind != PcgSubgraphNodeKind.Instance)
+            {
+                base.ApplyRenamedTitle(newTitle);
+                return;
+            }
+
+            var name = string.IsNullOrEmpty(newTitle) ? m_Definition.id : newTitle;
+            m_Definition.name = name;
+            title = name;
+            SetUserTitle("");
+
+            var graphView = GetFirstAncestorOfType<PcgGraphView>();
+            graphView?.RefreshSubgraphInstanceTitles(m_Definition.id);
+        }
+
+        internal void RefreshDefinitionTitle()
+        {
+            if (m_Kind != PcgSubgraphNodeKind.Instance)
+                return;
+            title = string.IsNullOrEmpty(m_Definition.name) ? m_Definition.id : m_Definition.name;
+            UpdateDisplayedTitle();
         }
     }
 }

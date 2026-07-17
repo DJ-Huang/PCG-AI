@@ -119,7 +119,11 @@ namespace DJTechEditor.PCG.Graph
             UpdateDisplayedTitle();
         }
 
+        public void RequestRename() => BeginRename();
+
         protected virtual string GetDefaultTitle() => title;
+
+        protected virtual void ApplyRenamedTitle(string newTitle) => SetUserTitle(newTitle);
 
         private void ConfigureHoudiniPortLayout()
         {
@@ -522,13 +526,13 @@ namespace DJTechEditor.PCG.Graph
             var newTitle = m_TitleEditor.value?.Trim() ?? "";
             if (graphView != null)
             {
-                graphView.WithUndo("Rename Node", () => SetUserTitle(newTitle));
+                graphView.WithUndo("Rename Node", () => ApplyRenamedTitle(newTitle));
                 graphView.NotifyDocumentChanged();
                 graphView.Inspector?.OnSelectionChanged();
             }
             else
             {
-                SetUserTitle(newTitle);
+                ApplyRenamedTitle(newTitle);
             }
 
             EndRename();
@@ -543,7 +547,7 @@ namespace DJTechEditor.PCG.Graph
             m_TitleEditor = null;
         }
 
-        private void UpdateDisplayedTitle()
+        protected void UpdateDisplayedTitle()
         {
             var finalTitle = string.IsNullOrEmpty(m_UserTitle) ? GetDefaultTitle() : m_UserTitle;
             if (string.IsNullOrEmpty(finalTitle))
