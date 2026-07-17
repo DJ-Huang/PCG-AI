@@ -78,6 +78,8 @@ set(PCG_CORE_SOURCES
     src/elements/uv_elements.cpp
     src/elements/vehicle_modeling_algorithms.cpp
     src/elements/vehicle_modeling_elements.cpp
+    src/elements/building_algorithms.cpp
+    src/elements/building_elements.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
@@ -229,6 +231,12 @@ target_link_libraries(test_subgraph PRIVATE PcgCoreStatic nlohmann_json::nlohman
 target_include_directories(test_subgraph PRIVATE src)
 
 add_test(NAME test_subgraph COMMAND test_subgraph WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_building_nodes tests/test_building_nodes.cpp)
+target_link_libraries(test_building_nodes PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_building_nodes PRIVATE src)
+
+add_test(NAME test_building_nodes COMMAND test_building_nodes WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # ── Phase 4.7: Boolean Mesh ─────────────────────────────
 

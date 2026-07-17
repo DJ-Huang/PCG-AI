@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **50 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **61 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -66,6 +66,10 @@
   - [FaceGroupByNormal](#facegroupbynormal)
 - [Texture 类别](#texture-类别)
   - [ImageTexture](#imagetexture)
+- [建筑生成核心节点](#建筑生成核心节点)
+  - [CopyMeshToPoints](#copymeshtopoints)
+  - [AttributeRandomize](#attributerandomize)
+  - [Switch](#switch)
 - [Output 类别](#output-类别)
   - [Output](#output)
 - [Material 类别](#material-类别)
@@ -2273,6 +2277,68 @@ CreateSpline(profile) ──┘
 
 ---
 
+## 建筑生成核心节点
+
+### CopyMeshToPoints
+
+**类别**：Mesh
+
+**功能**：将一份原型 Geometry 复制到输入点云的每个点，并合并为一份 Geometry。对应 Houdini `copytopoints`，中间过程保持 polygon、group、UV、color 与逐面材质，不做 geometry→mesh→geometry 往返。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `prototype` | Prototype | `SpatialMesh` | 要复制的原型 Geometry/Mesh |
+| `points` | Points | `SpatialPoint` | 放置点及点属性 |
+
+**输出 Pin**：`out`（`SpatialMesh`，内部保持 `PcgGeometry`）
+
+**点属性约定**：
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `P` | 点的 `x/y/z` | 实例平移 |
+| `pscale` | number | Houdini 风格统一缩放 |
+| `scale` | number / `[x,y,z]` / `{x,y,z}` | 统一或逐轴缩放，与 `pscale` 相乘 |
+| `scaleX/Y/Z` | number | 额外逐轴缩放 |
+| `rotationX/Y/Z`（或 `rx/ry/rz`） | number | XYZ 欧拉角，单位为度 |
+| `orient` | `[x,y,z,w]` / `{x,y,z,w}` | 四元数；存在时优先于 frame 属性 |
+| `nx/ny/nz` + `tx/ty/tz` | number | 与 `SampleAlongSpline` 一致的 normal/tangent frame |
+
+原型以自身局部原点为放置基准，不自动居中。每个副本先 scale，再应用欧拉旋转与 `orient`/frame，最后平移到点坐标。
+
+---
+
+### AttributeRandomize
+
+**类别**：Transform
+
+**功能**：以 `graph_seed + seed` 为确定性随机源，随机偏移点位置，并写入供 `CopyMeshToPoints` 消费的旋转与统一缩放属性。
+
+**输入/输出 Pin**：`in` → `out`，均为 `SpatialPoint`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `seed` | 0 | 节点随机种子，与 graph seed 组合 |
+| `translateX/Y/Z` | 0 | 各轴对称随机幅度 `[-value,+value]`，直接修改点坐标 |
+| `rotateX/Y/Z` | 0 | 各轴对称欧拉角幅度，写入 `rotationX/Y/Z` |
+| `scaleMin/scaleMax` | 1 / 1 | 统一缩放范围，写入 `scale`；上下限反置时自动交换 |
+
+相同 graph seed、节点 seed 和输入点序列必定得到相同结果。
+
+---
+
+### Switch
+
+**类别**：Flow
+
+**功能**：按整数 `index` 在固定四路 `in0`–`in3` 中选择一路 Geometry/Mesh 透传到 `out`。输入/输出 Pin 均为 `SpatialMesh`，内部会保持选中分支的 `PcgGeometry` 或 `PcgMeshData` 载荷。
+
+`index` 会 clamp 到 `[0,3]`；clamp 后对应输入未连接时执行失败。当前执行器按拓扑顺序计算所有上游分支，Switch 只负责选择结果，不提供惰性分支求值。
+
+---
+
 ## Output 类别
 
 ### Output
@@ -2316,6 +2382,17 @@ CreateSpline(profile) ──┘
 ---
 
 ## 常见节点组合
+
+### 建筑楼层 / 开间阵列
+
+最小建筑连线由点网格驱动，不需要手摆多份 Box：
+
+```text
+CreatePointGrid → AttributeRandomize → CopyMeshToPoints(points) → Output
+CreateBoxMesh ───────────────────────→ CopyMeshToPoints(prototype)
+```
+
+规整立面可将 `AttributeRandomize` 幅度保持为 0；错位塔可设置水平平移、Y 轴旋转与 scale 范围。可选部件使用 `Switch` 在多路 Geometry 中选通，再进入后续 Merge。
 
 ### 1. 基础点生成流水线
 

@@ -129,6 +129,24 @@
       }
     },
     {
+      "type": "AttributeRandomize",
+      "displayName": "Attribute Randomize",
+      "category": "Transform",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "seed": { "type": "integer", "default": 0 },
+        "translateX": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "translateY": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "translateZ": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "rotateX": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "rotateY": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "rotateZ": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "scaleMin": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "scaleMax": { "type": "number", "default": 1.0, "minimum": 0.000001 }
+      }
+    },
+    {
       "type": "ProjectPoints",
       "displayName": "Project Points",
       "category": "Transform",
@@ -967,6 +985,17 @@
       }
     },
     {
+      "type": "CopyMeshToPoints",
+      "displayName": "Copy Mesh To Points",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "prototype", "label": "Prototype", "pinType": "SpatialMesh" },
+        { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
+      ],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {}
+    },
+    {
       "type": "ShellMesh",
       "displayName": "Shell Mesh",
       "category": "Mesh",
@@ -1226,6 +1255,21 @@
         "path": { "type": "string", "displayName": "Output Path", "default": "Exports/$GRAPH.fbx" },
         "scale": { "type": "number", "displayName": "Scale", "default": 1.0, "minimum": 0.000001 },
         "generateNormals": { "type": "boolean", "displayName": "Generate Smooth Normals", "default": true }
+      }
+    },
+    {
+      "type": "Switch",
+      "displayName": "Switch",
+      "category": "Flow",
+      "inputs": [
+        { "id": "in0", "label": "Input 0", "pinType": "SpatialMesh" },
+        { "id": "in1", "label": "Input 1", "pinType": "SpatialMesh" },
+        { "id": "in2", "label": "Input 2", "pinType": "SpatialMesh" },
+        { "id": "in3", "label": "Input 3", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Output", "pinType": "SpatialMesh" }],
+      "properties": {
+        "index": { "type": "integer", "default": 0, "minimum": 0, "maximum": 3 }
       }
     },
     {
