@@ -53,7 +53,7 @@ namespace DJTechEditor.PCG
 
         private static void Tick()
         {
-            if (Application.isPlaying)
+            if (Application.isPlaying || !PcgGraphComponent.HasPendingEditModePreviewCooks())
                 return;
 
             PcgGraphComponent.TickAllEditModePreviewCooks();

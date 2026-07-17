@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -87,6 +88,35 @@ namespace DJTechRuntime.PCG
         public const int OutPointsBufSize = 8 * 1024 * 1024;
         public const int OutGeometryBufSize = 8 * 1024 * 1024;
         public const int OutPerfBufSize = 64 * 1024;
+
+        private sealed class RentedOutputBuffers : IDisposable
+        {
+            public readonly byte[] Json = ArrayPool<byte>.Shared.Rent(OutJsonBufSize);
+            public readonly byte[] Mesh = ArrayPool<byte>.Shared.Rent(OutMeshBufSize);
+            public readonly byte[] Points = ArrayPool<byte>.Shared.Rent(OutPointsBufSize);
+            public readonly byte[] Geometry = ArrayPool<byte>.Shared.Rent(OutGeometryBufSize);
+            public readonly byte[] Perf = ArrayPool<byte>.Shared.Rent(OutPerfBufSize);
+
+            public RentedOutputBuffers()
+            {
+                // Pool contents are undefined. Native writers null-terminate successful
+                // payloads, while these sentinels keep early-error perf reads empty.
+                Json[0] = 0;
+                Mesh[0] = 0;
+                Points[0] = 0;
+                Geometry[0] = 0;
+                Perf[0] = 0;
+            }
+
+            public void Dispose()
+            {
+                ArrayPool<byte>.Shared.Return(Json);
+                ArrayPool<byte>.Shared.Return(Mesh);
+                ArrayPool<byte>.Shared.Return(Points);
+                ArrayPool<byte>.Shared.Return(Geometry);
+                ArrayPool<byte>.Shared.Return(Perf);
+            }
+        }
 
         public static string GetVersion()
         {
@@ -310,11 +340,12 @@ namespace DJTechRuntime.PCG
         {
             ClearCancel();
             var errBuf = new StringBuilder(ErrBufSize);
-            var jsonBuf = new byte[OutJsonBufSize];
-            var meshBuf = new byte[OutMeshBufSize];
-            var pointsBuf = new byte[OutPointsBufSize];
-            var geometryBuf = new byte[OutGeometryBufSize];
-            var perfBuf = new byte[OutPerfBufSize];
+            using var outputBuffers = new RentedOutputBuffers();
+            var jsonBuf = outputBuffers.Json;
+            var meshBuf = outputBuffers.Mesh;
+            var pointsBuf = outputBuffers.Points;
+            var geometryBuf = outputBuffers.Geometry;
+            var perfBuf = outputBuffers.Perf;
 
             var hasTextures = textures != null && textures.Count > 0;
             var hasMeshes = meshes != null && meshes.Count > 0;
@@ -412,20 +443,20 @@ namespace DJTechRuntime.PCG
                     nativeSplines?.Length ?? 0,
                     out kind,
                     jsonBuf,
-                    jsonBuf.Length,
+                    OutJsonBufSize,
                     meshBuf,
-                    meshBuf.Length,
+                    OutMeshBufSize,
                     pointsBuf,
-                    pointsBuf.Length,
+                    OutPointsBufSize,
                     out pointCount,
                     out pointAttrFlags,
                     out vertexCount,
                     out indexCount,
                     out cookStats,
                     perfBuf,
-                    perfBuf.Length,
+                    OutPerfBufSize,
                     geometryBuf,
-                    geometryBuf.Length,
+                    OutGeometryBufSize,
                     out geometryBytesWritten,
                     errBuf,
                     ErrBufSize);

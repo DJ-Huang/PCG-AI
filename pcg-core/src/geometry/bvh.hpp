@@ -48,6 +48,9 @@ public:
     /// Get all triangle indices whose AABB overlaps the given box.
     std::vector<int> query_box(const AABB& box) const;
 
+    /// Get all triangle indices whose AABB is hit by a forward ray.
+    std::vector<int> query_ray(const Vec3& origin, const Vec3& direction) const;
+
     bool empty() const { return nodes_.empty(); }
     size_t node_count() const { return nodes_.size(); }
 
@@ -57,6 +60,8 @@ private:
 
     int build_recursive(std::vector<int>& tri_indices, int depth);
     void query_recursive(int node_idx, const AABB& box, std::vector<int>& out) const;
+    void query_ray_recursive(int node_idx, const Vec3& origin, const Vec3& direction,
+                             std::vector<int>& out) const;
     void cross_query_recursive(int node_a, const BVH& other, int node_b,
                                std::vector<std::pair<int, int>>& out) const;
 };

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace pcg::internal::geometry {
 
@@ -138,6 +139,60 @@ void BVH::query_recursive(int node_idx, const AABB& box, std::vector<int>& out) 
         if (node.left >= 0) query_recursive(node.left, box, out);
         if (node.right >= 0) query_recursive(node.right, box, out);
     }
+}
+
+namespace {
+
+bool ray_hits_box(const Vec3& origin, const Vec3& direction, const AABB& box)
+{
+    double t_min = 0.0;
+    double t_max = std::numeric_limits<double>::infinity();
+    const double origins[3] = {origin.x, origin.y, origin.z};
+    const double directions[3] = {direction.x, direction.y, direction.z};
+    const double mins[3] = {box.min.x, box.min.y, box.min.z};
+    const double maxs[3] = {box.max.x, box.max.y, box.max.z};
+    for (int axis = 0; axis < 3; ++axis) {
+        if (std::fabs(directions[axis]) <= 1e-20) {
+            if (origins[axis] < mins[axis] || origins[axis] > maxs[axis])
+                return false;
+            continue;
+        }
+        const double inv_direction = 1.0 / directions[axis];
+        double near_t = (mins[axis] - origins[axis]) * inv_direction;
+        double far_t = (maxs[axis] - origins[axis]) * inv_direction;
+        if (near_t > far_t) std::swap(near_t, far_t);
+        t_min = std::max(t_min, near_t);
+        t_max = std::min(t_max, far_t);
+        if (t_max < t_min) return false;
+    }
+    return t_max >= 0.0;
+}
+
+} // anonymous namespace
+
+std::vector<int> BVH::query_ray(const Vec3& origin, const Vec3& direction) const
+{
+    std::vector<int> result;
+    if (!nodes_.empty())
+        query_ray_recursive(0, origin, direction, result);
+    return result;
+}
+
+void BVH::query_ray_recursive(int node_idx, const Vec3& origin, const Vec3& direction,
+                              std::vector<int>& out) const
+{
+    const BVHNode& node = nodes_[node_idx];
+    if (!ray_hits_box(origin, direction, node.bounds)) return;
+
+    if (node.is_leaf()) {
+        for (int idx : node.tri_indices) {
+            if (ray_hits_box(origin, direction, tris_[idx].bounds))
+                out.push_back(tris_[idx].tri_index);
+        }
+        return;
+    }
+    if (node.left >= 0) query_ray_recursive(node.left, origin, direction, out);
+    if (node.right >= 0) query_ray_recursive(node.right, origin, direction, out);
 }
 
 std::vector<std::pair<int, int>> BVH::find_overlaps(const BVH& other) const

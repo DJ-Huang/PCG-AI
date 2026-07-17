@@ -543,13 +543,6 @@ PcgResultCode execute_graph_cached(const char* json,
     if (out_geometry_bytes_written)
         *out_geometry_bytes_written = 0;
 
-    const PcgResultCode validate_code = pcg_validate_graph(json, err_buf, err_buf_size);
-    if (validate_code != PCG_OK) {
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-        return validate_code;
-    }
-
     pcg::internal::Graph graph;
     const PcgResultCode parse_code =
         pcg::internal::parse_graph(json, graph, err_buf, err_buf_size);
@@ -663,13 +656,6 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
     if (out_kind)
         *out_kind = PCG_RESULT_KIND_NONE;
 
-    const PcgResultCode validate_code = pcg_validate_graph(json, err_buf, err_buf_size);
-    if (validate_code != PCG_OK) {
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-        return validate_code;
-    }
-
     pcg::internal::Graph graph;
     const PcgResultCode parse_code =
         pcg::internal::parse_graph(json, graph, err_buf, err_buf_size);
@@ -716,13 +702,6 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
     pcg::internal::write_error(err_buf, err_buf_size, "");
     if (out_kind)
         *out_kind = PCG_RESULT_KIND_NONE;
-
-    const PcgResultCode validate_code = pcg_validate_graph(json, err_buf, err_buf_size);
-    if (validate_code != PCG_OK) {
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-        return validate_code;
-    }
 
     pcg::internal::Graph graph;
     const PcgResultCode parse_code =
@@ -789,13 +768,6 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
     pcg::internal::write_error(err_buf, err_buf_size, "");
     if (out_kind)
         *out_kind = PCG_RESULT_KIND_NONE;
-
-    const PcgResultCode validate_code = pcg_validate_graph(json, err_buf, err_buf_size);
-    if (validate_code != PCG_OK) {
-        if (out_json && out_json_size > 0)
-            out_json[0] = '\0';
-        return validate_code;
-    }
 
     pcg::internal::Graph graph;
     const PcgResultCode parse_code =

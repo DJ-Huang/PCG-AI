@@ -139,26 +139,22 @@ std::vector<std::string> topological_order(const Graph& graph,
     return order;
 }
 
-void gather_inputs(const Graph& graph,
-                   const std::string& node_id,
+void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
                    const NodeOutputMap& outputs,
                    data::PcgDataCollection& inputs,
                    char* err_buf,
                    int err_buf_size,
                    PcgResultCode& code)
 {
-    for (const auto& edge : graph.edges) {
-        if (edge.target != node_id)
-            continue;
-
-        const auto it = outputs.find(edge.source);
+    for (const GraphEdge* edge : incoming_edges) {
+        const auto it = outputs.find(edge->source);
         if (it == outputs.end()) {
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
             return;
         }
 
-        const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
-        const std::string source_pin = edge.source_handle.empty() ? "out" : edge.source_handle;
+        const std::string pin = edge->target_handle.empty() ? "in" : edge->target_handle;
+        const std::string source_pin = edge->source_handle.empty() ? "out" : edge->source_handle;
         const data::PcgDataCollection& upstream = it->second;
 
         if (auto points = upstream.find_points_shared(source_pin)) {
@@ -261,9 +257,7 @@ nlohmann::json build_node_stats(
 
 /// Builds a flat array of per-node group stats: [{"node_id", "name", "domain", "count", "members", "edgeEndpoints"}, ...]
 /// Flattened (not nested) so Unity's JsonUtility can deserialize it.
-nlohmann::json build_per_node_groups(
-    const NodeOutputMap& outputs,
-    const std::unordered_map<std::string, const GraphNode*>& node_by_id)
+nlohmann::json build_per_node_groups(const NodeOutputMap& outputs)
 {
     auto result = nlohmann::json::array();
     for (const auto& [node_id, collection] : outputs) {
@@ -315,8 +309,20 @@ PcgResultCode execute_graph(const Graph& graph,
     }
 
     std::unordered_map<std::string, const GraphNode*> node_by_id;
+    node_by_id.reserve(graph.nodes.size());
     for (const auto& node : graph.nodes)
         node_by_id[node.id] = &node;
+
+    std::unordered_map<std::string, std::vector<const GraphEdge*>> incoming_by_node;
+    incoming_by_node.reserve(graph.nodes.size());
+    std::unordered_set<std::string> nodes_with_outgoing;
+    nodes_with_outgoing.reserve(graph.nodes.size());
+    for (const auto& edge : graph.edges) {
+        incoming_by_node[edge.target].push_back(&edge);
+        nodes_with_outgoing.insert(edge.source);
+    }
+
+    static const std::vector<const GraphEdge*> kNoIncomingEdges;
 
     std::unordered_map<std::string, uint64_t> output_hashes;
     NodeOutputMap outputs;
@@ -325,24 +331,26 @@ PcgResultCode execute_graph(const Graph& graph,
             return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
         const GraphNode* node = node_by_id[node_id];
+        const auto incoming_it = incoming_by_node.find(node_id);
+        const auto& incoming_edges = incoming_it != incoming_by_node.end()
+            ? incoming_it->second
+            : kNoIncomingEdges;
 
         std::vector<std::pair<std::string, uint64_t>> upstream_hashes;
-        for (const auto& edge : graph.edges) {
-            if (edge.target != node_id)
-                continue;
-
-            const auto it = output_hashes.find(edge.source);
+        upstream_hashes.reserve(incoming_edges.size());
+        for (const GraphEdge* edge : incoming_edges) {
+            const auto it = output_hashes.find(edge->source);
             if (it == output_hashes.end())
                 continue;
 
-            const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
+            const std::string pin = edge->target_handle.empty() ? "in" : edge->target_handle;
             std::string connection_key;
-            connection_key.reserve(pin.size() + edge.source.size() + edge.source_handle.size() + 2);
+            connection_key.reserve(pin.size() + edge->source.size() + edge->source_handle.size() + 2);
             connection_key.append(pin);
             connection_key.push_back('\0');
-            connection_key.append(edge.source);
+            connection_key.append(edge->source);
             connection_key.push_back('\0');
-            connection_key.append(edge.source_handle);
+            connection_key.append(edge->source_handle);
             upstream_hashes.emplace_back(std::move(connection_key), it->second);
         }
 
@@ -383,7 +391,7 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.is_cancel_requested = is_cancel_requested;
 
         PcgResultCode input_code = PCG_OK;
-        gather_inputs(graph, node_id, outputs, ctx.inputs, err_buf, err_buf_size, input_code);
+        gather_inputs(incoming_edges, outputs, ctx.inputs, err_buf, err_buf_size, input_code);
         if (input_code != PCG_OK)
             return input_code;
 
@@ -395,7 +403,14 @@ PcgResultCode execute_graph(const Graph& graph,
             return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
         outputs[node_id] = std::move(ctx.outputs);
-        const uint64_t out_hash = compute_output_hash(outputs[node_id]);
+        // Elements are deterministic for their node data, graph seed, runtime
+        // bindings, and upstream fingerprints. Reuse that dependency fingerprint
+        // instead of walking every produced vertex/face/attribute a second time.
+        // Legacy uncached entry points retain the deep output hash because they do
+        // not compute an input fingerprint.
+        const uint64_t out_hash = cache
+            ? input_hash
+            : compute_output_hash(outputs[node_id]);
         output_hashes[node_id] = out_hash;
 
         if (cache)
@@ -409,18 +424,12 @@ PcgResultCode execute_graph(const Graph& graph,
     }
 
     auto node_stats = build_node_stats(outputs, node_by_id);
-    auto per_node_groups = build_per_node_groups(outputs, node_by_id);
+    auto per_node_groups = build_per_node_groups(outputs);
 
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
     for (const auto& node : graph.nodes) {
-        bool has_outgoing = false;
-        for (const auto& edge : graph.edges) {
-            if (edge.source == node.id) {
-                has_outgoing = true;
-                break;
-            }
-        }
+        const bool has_outgoing = nodes_with_outgoing.count(node.id) != 0;
         if (!has_outgoing) {
             if (node.type == "Output" && !sink)
                 sink = &node;
@@ -512,20 +521,23 @@ PcgResultCode execute_graph(const Graph& graph,
         while (!frontier.empty()) {
             const std::string current = frontier.front();
             frontier.pop();
-            for (const auto& edge : graph.edges) {
-                if (edge.target != current || visited.count(edge.source))
+            const auto incoming_it = incoming_by_node.find(current);
+            if (incoming_it == incoming_by_node.end())
+                continue;
+            for (const GraphEdge* edge : incoming_it->second) {
+                if (visited.count(edge->source))
                     continue;
-                visited.insert(edge.source);
-                const auto up = outputs.find(edge.source);
+                visited.insert(edge->source);
+                const auto up = outputs.find(edge->source);
                 if (up == outputs.end())
                     continue;
                 if (auto geometry = up->second.primary_geometry_shared()) {
                     out_result.source_geometry = geometry;
                     out_result.json["geometry_export"] = "salvaged_upstream";
-                    out_result.json["geometry_export_from"] = edge.source;
+                    out_result.json["geometry_export_from"] = edge->source;
                     return;
                 }
-                frontier.push(edge.source);
+                frontier.push(edge->source);
             }
         }
         out_result.json["geometry_export"] = "mesh_only";

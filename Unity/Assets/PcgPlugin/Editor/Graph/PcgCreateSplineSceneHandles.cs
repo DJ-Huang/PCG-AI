@@ -44,6 +44,16 @@ namespace DJTechEditor.PCG.Graph
         private static bool s_SelectionGuard;
         private static Tool s_PrevTool;
 
+        // SceneView invokes duringSceneGui several times per frame. Resolve the selected
+        // component/window only when selection changes instead of hitting AssetDatabase
+        // and Resources.FindObjectsOfTypeAll on every layout/repaint event.
+        private static GameObject s_CachedSelection;
+        private static PcgGraphComponent s_CachedSelectionComponent;
+        private static PcgGraphAsset s_CachedSelectionGraphAsset;
+        private static string s_CachedSelectionAssetPath;
+        private static PcgGraphEditorWindow s_CachedSelectionWindow;
+        private static bool s_SelectionCacheDirty = true;
+
         // Wire overlay edge cache — rebuilt only when preview data changes
         private static PcgPolygonPreviewData s_WirePreviewCache;
         private static int[] s_WireEdgePairs; // flat: [a0, b0, a1, b1, ...]
@@ -244,6 +254,8 @@ namespace DJTechEditor.PCG.Graph
 
         private static void OnSelectionChanged()
         {
+            s_SelectionCacheDirty = true;
+
             if (!s_PcgModeActive || s_LockedSelection == null || s_SelectionGuard)
                 return;
 
@@ -262,7 +274,8 @@ namespace DJTechEditor.PCG.Graph
 
             // Show the toolbar/entry when the selected object has a PcgGraphComponent,
             // regardless of whether a Graph Editor window is open.
-            var component = Selection.activeGameObject?.GetComponent<PcgGraphComponent>();
+            RefreshSelectionCacheIfNeeded();
+            var component = s_CachedSelectionComponent;
 
             if (component == null || component.GraphAsset == null)
             {
@@ -271,7 +284,9 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            var graphWindow = FindGraphWindowForComponent(component);
+            var graphWindow = s_PcgModeActive && s_ActiveComponent == component
+                ? s_ActiveWindow
+                : s_CachedSelectionWindow;
 
             if (!s_PcgModeActive)
             {
@@ -349,6 +364,34 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
+        private static void RefreshSelectionCacheIfNeeded()
+        {
+            var selected = Selection.activeGameObject;
+            if (!s_SelectionCacheDirty && s_CachedSelection == selected)
+            {
+                // Reading the serialized reference is cheap and catches an Inspector
+                // graph reassignment without polling GetComponent/AssetDatabase.
+                var currentGraphAsset = s_CachedSelectionComponent != null
+                    ? s_CachedSelectionComponent.GraphAsset
+                    : null;
+                if (s_CachedSelectionGraphAsset == currentGraphAsset)
+                    return;
+            }
+
+            var component = selected != null ? selected.GetComponent<PcgGraphComponent>() : null;
+            var graphAsset = component != null ? component.GraphAsset : null;
+            s_CachedSelection = selected;
+            s_CachedSelectionComponent = component;
+            s_CachedSelectionGraphAsset = graphAsset;
+            s_CachedSelectionAssetPath = graphAsset != null
+                ? AssetDatabase.GetAssetPath(graphAsset)
+                : null;
+            // A null window is intentionally cached too. The entry button performs a
+            // fresh lookup when clicked, so an idle SceneView never polls globally.
+            s_CachedSelectionWindow = FindGraphWindowForComponent(component);
+            s_SelectionCacheDirty = false;
+        }
+
         private static PcgGraphEditorWindow FindGraphWindowForComponent(PcgGraphComponent component)
         {
             if (component == null || component.GraphAsset == null)
@@ -382,6 +425,7 @@ namespace DJTechEditor.PCG.Graph
             s_PcgModeActive = true;
             s_ActiveWindow = window;
             s_ActiveComponent = component;
+            s_CachedSelectionWindow = window;
             // Re-derive context from current selection instead of resetting to
             // Object/None. If a node (e.g. GroupCreate) was already selected,
             // the toolbar activates the correct domain on entry.
@@ -833,8 +877,8 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.BeginArea(area);
                 GUILayout.Space(6f);
                 var assetName = window != null ? window.CurrentAssetPath : null;
-                if (string.IsNullOrEmpty(assetName) && component != null && component.GraphAsset != null)
-                    assetName = AssetDatabase.GetAssetPath(component.GraphAsset);
+                if (string.IsNullOrEmpty(assetName) && s_CachedSelectionComponent == component)
+                    assetName = s_CachedSelectionAssetPath;
                 if (string.IsNullOrEmpty(assetName))
                     assetName = "untitled";
                 GUILayout.Label($"PCG: {assetName}", EditorStyles.boldLabel);

@@ -25,6 +25,7 @@ struct Result {
     int vertices = 0;
     int indices = 0;
     PcgCookStats stats{};
+    nlohmann::json perf = nlohmann::json::array();
     std::string error;
 };
 
@@ -32,6 +33,7 @@ Result execute(const char* graph)
 {
     std::vector<char> json(4 * 1024 * 1024);
     std::vector<unsigned char> mesh(16 * 1024 * 1024);
+    std::vector<char> perf(256 * 1024);
     char error[1024] = {};
     Result result;
     result.code = pcg_execute_graph_v7(
@@ -39,7 +41,9 @@ Result execute(const char* graph)
         &result.kind, json.data(), static_cast<int>(json.size()),
         mesh.data(), static_cast<int>(mesh.size()), nullptr, 0,
         nullptr, nullptr, &result.vertices, &result.indices,
-        &result.stats, nullptr, 0, error, sizeof(error));
+        &result.stats, perf.data(), static_cast<int>(perf.size()), error, sizeof(error));
+    if (perf[0] != '\0')
+        result.perf = nlohmann::json::parse(perf.data());
     result.error = error;
     return result;
 }
@@ -158,7 +162,7 @@ int main()
            preview.error.empty() ? "realistic sedan final MergeMesh preview executes" : preview.error.c_str());
     expect(preview.stats.nodes_executed == 1,
            "final MergeMesh preview executes only the synthetic output node");
-    expect(preview.stats.nodes_skipped == static_cast<int>(preview_nodes.size()) - 1,
+    expect(preview.stats.nodes_skipped + preview.stats.nodes_executed == sedan.stats.nodes_executed,
            "final MergeMesh preview reuses all unchanged upstream nodes");
 
     const double cold_ms =
@@ -167,6 +171,17 @@ int main()
         std::chrono::duration<double, std::milli>(preview_end - preview_start).count();
     std::printf("realistic sedan cold cook: %.2f ms; cached final MergeMesh preview: %.2f ms\n",
                 cold_ms, preview_ms);
+    auto slow_nodes = sedan.perf;
+    std::sort(slow_nodes.begin(), slow_nodes.end(), [](const auto& a, const auto& b) {
+        return a.value("ms", 0.0) > b.value("ms", 0.0);
+    });
+    std::printf("slowest realistic sedan nodes:\n");
+    for (size_t i = 0; i < std::min<size_t>(10, slow_nodes.size()); ++i) {
+        const auto& node = slow_nodes[i];
+        std::printf("  %s (%s): %.2f ms\n",
+                    node.value("id", "").c_str(), node.value("type", "").c_str(),
+                    node.value("ms", 0.0));
+    }
 
     return failures == 0 ? 0 : 1;
 }

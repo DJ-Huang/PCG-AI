@@ -58,6 +58,28 @@ void conform_triangle_edges(IMesh& mesh, double weld_epsilon)
     conformed.reserve(mesh.tris.size());
     const double eps2 = weld_epsilon * weld_epsilon;
 
+    // Only seam/intersection vertices that existed before conforming can split
+    // an edge. Index them along all three axes once, then query the dominant
+    // axis of each edge. The previous implementation scanned every vertex for
+    // every triangle edge (O(T*V)), which dominated production Boolean cooks.
+    std::vector<int> vertices_by_axis[3];
+    for (auto& indices : vertices_by_axis) {
+        indices.resize(candidate_vertex_count);
+        for (size_t i = 0; i < candidate_vertex_count; ++i)
+            indices[i] = static_cast<int>(i);
+    }
+    auto coord = [&mesh](int vertex, int axis) {
+        const Vec3& p = mesh.verts[static_cast<size_t>(vertex)].co;
+        return axis == 0 ? p.x : (axis == 1 ? p.y : p.z);
+    };
+    for (int axis = 0; axis < 3; ++axis) {
+        auto& indices = vertices_by_axis[axis];
+        std::sort(indices.begin(), indices.end(),
+                  [&coord, axis](int lhs, int rhs) {
+                      return coord(lhs, axis) < coord(rhs, axis);
+                  });
+    }
+
     for (const IMeshTri& tri : mesh.tris) {
         const int corners[3] = {tri.v0, tri.v1, tri.v2};
         std::vector<int> boundary;
@@ -74,9 +96,28 @@ void conform_triangle_edges(IMesh& mesh, double weld_epsilon)
             if (len2 <= eps2) continue;
 
             std::vector<std::pair<double, int>> points_on_edge;
-            for (size_t vi = 0; vi < candidate_vertex_count; ++vi) {
-                if (static_cast<int>(vi) == va || static_cast<int>(vi) == vb) continue;
-                const Vec3& p = mesh.verts[vi].co;
+            int axis = 0;
+            if (std::fabs(ab.y) > std::fabs(ab.x)) axis = 1;
+            if (std::fabs(ab.z) > std::fabs(axis == 0 ? ab.x : ab.y)) axis = 2;
+            const double a_axis = axis == 0 ? a.x : (axis == 1 ? a.y : a.z);
+            const double b_axis = axis == 0 ? b.x : (axis == 1 ? b.y : b.z);
+            const double range_min = std::min(a_axis, b_axis) - weld_epsilon;
+            const double range_max = std::max(a_axis, b_axis) + weld_epsilon;
+            const auto& candidates = vertices_by_axis[axis];
+            auto candidate = std::lower_bound(
+                candidates.begin(), candidates.end(), range_min,
+                [&coord, axis](int vertex, double value) {
+                    return coord(vertex, axis) < value;
+                });
+            const auto candidate_end = std::upper_bound(
+                candidate, candidates.end(), range_max,
+                [&coord, axis](double value, int vertex) {
+                    return value < coord(vertex, axis);
+                });
+            for (; candidate != candidate_end; ++candidate) {
+                const int vi = *candidate;
+                if (vi == va || vi == vb) continue;
+                const Vec3& p = mesh.verts[static_cast<size_t>(vi)].co;
                 const Vec3 ap{p.x - a.x, p.y - a.y, p.z - a.z};
                 const double t = (ap.x * ab.x + ap.y * ab.y + ap.z * ab.z) / len2;
                 if (t <= 1e-10 || t >= 1.0 - 1e-10) continue;
@@ -88,7 +129,7 @@ void conform_triangle_edges(IMesh& mesh, double weld_epsilon)
                 const double dy = p.y - closest.y;
                 const double dz = p.z - closest.z;
                 if (dx * dx + dy * dy + dz * dz <= eps2) {
-                    points_on_edge.emplace_back(t, static_cast<int>(vi));
+                    points_on_edge.emplace_back(t, vi);
                 }
             }
             std::sort(points_on_edge.begin(), points_on_edge.end());
@@ -251,8 +292,6 @@ SplitResult build_split_mesh(const data::PcgGeometry& geo_a,
     }
 
     for (const auto& inter : seg_intersections) {
-        int combined_a = inter.tri_a_idx;
-        int combined_b = inter.tri_b_idx + static_cast<int>(mesh_a.tris.size());
         int ip0 = combined.find_or_insert_vert(inter.overlap_p0, opts.weld_epsilon);
         int ip1 = combined.find_or_insert_vert(inter.overlap_p1, opts.weld_epsilon);
         if (ip0 != ip1) {

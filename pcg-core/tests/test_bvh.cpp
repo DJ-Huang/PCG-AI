@@ -104,6 +104,32 @@ void test_bvh_cross_query()
     }
 }
 
+void test_bvh_ray_query()
+{
+    std::vector<BVHTriangle> tris;
+    BVHTriangle near_tri;
+    near_tri.tri_index = 7;
+    near_tri.bounds.expand({2, -1, -1});
+    near_tri.bounds.expand({2, 1, 1});
+    tris.push_back(near_tri);
+
+    BVHTriangle behind_tri;
+    behind_tri.tri_index = 9;
+    behind_tri.bounds.expand({-3, -1, -1});
+    behind_tri.bounds.expand({-3, 1, 1});
+    tris.push_back(behind_tri);
+
+    BVH bvh;
+    bvh.build(tris);
+    const auto forward_hits = bvh.query_ray({0, 0, 0}, {1, 0.25, 0.125});
+    if (forward_hits.size() != 1 || forward_hits[0] != 7)
+        fail("BVH: forward ray should reject boxes behind its origin");
+
+    const auto miss = bvh.query_ray({0, 5, 0}, {1, 0.25, 0.125});
+    if (!miss.empty())
+        fail("BVH: ray should reject disjoint boxes");
+}
+
 void test_bvh_disjoint()
 {
     std::vector<BVHTriangle> tris_a, tris_b;
@@ -154,6 +180,7 @@ int main()
     test_aabb_basic();
     test_bvh_build_and_query();
     test_bvh_cross_query();
+    test_bvh_ray_query();
     test_bvh_disjoint();
     test_bvh_empty();
 
