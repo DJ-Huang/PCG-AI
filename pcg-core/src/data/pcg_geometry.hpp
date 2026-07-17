@@ -6,6 +6,7 @@
 #include "data/pcg_mesh_data.hpp"
 #include "geometry/group_table.hpp"
 
+#include <array>
 #include <vector>
 
 namespace pcg::internal::data {
@@ -74,7 +75,13 @@ private:
     std::vector<std::string> face_materials_;
 };
 
-/// Fan-triangulate n-gon faces for display / legacy mesh nodes.
+/// Triangulate one simple polygon and return local corner indices. Uses a
+/// constrained Delaunay triangulation so concave n-gons are handled correctly.
+/// Invalid/self-intersecting input falls back to the stable legacy fan.
+std::vector<std::array<int, 3>> triangulate_face_corners(
+    const std::vector<PcgVec3>& points, const std::vector<int>& face);
+
+/// Triangulate polygon faces for display / legacy mesh nodes.
 PcgMeshData triangulate_geometry(const PcgGeometry& geometry);
 
 /// Triangulate with shared vertices (preserves topology for manifold checks).

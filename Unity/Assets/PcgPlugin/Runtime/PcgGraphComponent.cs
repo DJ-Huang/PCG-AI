@@ -548,6 +548,12 @@ namespace DJTechRuntime.PCG
                     return false;
             }
 
+            if (!PcgGraphExecutionPolicy.TryPrepareJson(json, out json, out var prepareError))
+            {
+                Debug.LogError($"[PCG] Failed to prepare graph for execution: {prepareError}", this);
+                return false;
+            }
+
             var cookKey = PcgGraphCookCache.BuildKey(json, seed);
             if (TryReuseCachedCook(cookKey))
                 return true;

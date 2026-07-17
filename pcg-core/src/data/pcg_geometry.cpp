@@ -2,9 +2,12 @@
 
 #include "geometry/bmesh.hpp"
 
+#include <CDT.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <unordered_map>
 
@@ -47,12 +50,12 @@ void apply_face_materials(PcgMeshData& mesh,
     mesh.metadata().set("material_slots", nlohmann::json(mesh.material_slots()));
 }
 
-size_t stable_fan_start(const PcgGeometry& geometry, const std::vector<int>& face)
+size_t stable_fan_start(const std::vector<PcgVec3>& points,
+                        const std::vector<int>& face)
 {
     if (face.size() <= 3)
         return 0;
 
-    const auto& points = geometry.points();
     size_t best_start = 0;
     double best_min_cross_sq = -1.0;
     for (size_t start = 0; start < face.size(); ++start) {
@@ -83,6 +86,134 @@ size_t stable_fan_start(const PcgGeometry& geometry, const std::vector<int>& fac
 }
 
 } // namespace
+
+std::vector<std::array<int, 3>> triangulate_face_corners(
+    const std::vector<PcgVec3>& points, const std::vector<int>& face)
+{
+    if (face.size() < 3)
+        return {};
+    if (face.size() == 3)
+        return {{{0, 1, 2}}};
+
+    auto stable_fan = [&]() {
+        std::vector<std::array<int, 3>> triangles;
+        const size_t start = stable_fan_start(points, face);
+        triangles.reserve(face.size() - 2);
+        for (size_t offset = 1; offset + 1 < face.size(); ++offset) {
+            triangles.push_back({
+                static_cast<int>(start),
+                static_cast<int>((start + offset) % face.size()),
+                static_cast<int>((start + offset + 1) % face.size())});
+        }
+        return triangles;
+    };
+
+    PcgVec3 normal{};
+    for (size_t i = 0; i < face.size(); ++i) {
+        const int current_index = face[i];
+        const int next_index = face[(i + 1) % face.size()];
+        if (current_index < 0 || next_index < 0 ||
+            current_index >= static_cast<int>(points.size()) ||
+            next_index >= static_cast<int>(points.size())) {
+            return {};
+        }
+        const PcgVec3& current = points[static_cast<size_t>(current_index)];
+        const PcgVec3& next = points[static_cast<size_t>(next_index)];
+        normal.x += (current.y - next.y) * (current.z + next.z);
+        normal.y += (current.z - next.z) * (current.x + next.x);
+        normal.z += (current.x - next.x) * (current.y + next.y);
+    }
+    const double normal_length_sq =
+        normal.x * normal.x + normal.y * normal.y + normal.z * normal.z;
+    if (normal_length_sq <= 1e-24)
+        return stable_fan();
+
+    int drop_axis = 2;
+    const double abs_x = std::fabs(normal.x);
+    const double abs_y = std::fabs(normal.y);
+    const double abs_z = std::fabs(normal.z);
+    if (abs_x >= abs_y && abs_x >= abs_z) drop_axis = 0;
+    else if (abs_y >= abs_z) drop_axis = 1;
+
+    std::vector<CDT::V2d<double>> vertices;
+    vertices.reserve(face.size());
+    for (int point_index : face) {
+        const PcgVec3& point = points[static_cast<size_t>(point_index)];
+        if (drop_axis == 0) vertices.push_back({point.y, point.z});
+        else if (drop_axis == 1) vertices.push_back({point.x, point.z});
+        else vertices.push_back({point.x, point.y});
+    }
+
+    // Preserve the existing stable fan for convex polygons. It is valid there
+    // and avoids invoking CDT for the overwhelmingly common quad path.
+    double turn_sign = 0.0;
+    bool convex = true;
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        const auto& a = vertices[(i + vertices.size() - 1) % vertices.size()];
+        const auto& b = vertices[i];
+        const auto& c = vertices[(i + 1) % vertices.size()];
+        const double turn =
+            (b.x - a.x) * (c.y - b.y) -
+            (b.y - a.y) * (c.x - b.x);
+        if (std::fabs(turn) <= 1e-15)
+            continue;
+        if (turn_sign == 0.0)
+            turn_sign = turn;
+        else if (turn * turn_sign < 0.0) {
+            convex = false;
+            break;
+        }
+    }
+    if (convex)
+        return stable_fan();
+
+    std::vector<CDT::Edge> edges;
+    edges.reserve(face.size());
+    for (CDT::VertInd i = 0; i < vertices.size(); ++i)
+        edges.emplace_back(i, (i + 1) % vertices.size());
+
+    try {
+        CDT::Triangulation<double> cdt(
+            CDT::VertexInsertionOrder::AsProvided,
+            CDT::IntersectingConstraintEdges::NotAllowed, 0.0);
+        cdt.insertVertices(vertices);
+        cdt.insertEdges(edges);
+        cdt.eraseOuterTrianglesAndHoles();
+        if (cdt.vertices.size() != vertices.size() || cdt.triangles.empty())
+            return stable_fan();
+
+        std::vector<std::array<int, 3>> result;
+        result.reserve(cdt.triangles.size());
+        for (const CDT::Triangle& triangle : cdt.triangles) {
+            std::array<int, 3> corners{
+                static_cast<int>(triangle.vertices[0]),
+                static_cast<int>(triangle.vertices[1]),
+                static_cast<int>(triangle.vertices[2])};
+            const PcgVec3& a =
+                points[static_cast<size_t>(face[static_cast<size_t>(corners[0])])];
+            const PcgVec3& b =
+                points[static_cast<size_t>(face[static_cast<size_t>(corners[1])])];
+            const PcgVec3& c =
+                points[static_cast<size_t>(face[static_cast<size_t>(corners[2])])];
+            const double ux = b.x - a.x;
+            const double uy = b.y - a.y;
+            const double uz = b.z - a.z;
+            const double vx = c.x - a.x;
+            const double vy = c.y - a.y;
+            const double vz = c.z - a.z;
+            const double dot_normal =
+                (uy * vz - uz * vy) * normal.x +
+                (uz * vx - ux * vz) * normal.y +
+                (ux * vy - uy * vx) * normal.z;
+            if (dot_normal < 0.0)
+                std::swap(corners[1], corners[2]);
+            result.push_back(corners);
+        }
+        return result;
+    } catch (const std::exception&) {
+        return stable_fan();
+    }
+}
 
 void PcgGeometry::set_material_name(std::string m)
 {
@@ -134,12 +265,12 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
             local.push_back(static_cast<int>(mesh.vertices().size()));
             mesh.add_vertex({p.x, p.y, p.z});
         }
-        const size_t start = stable_fan_start(geometry, face);
-        const int i0 = local[start];
-        for (size_t offset = 1; offset + 1 < local.size(); ++offset) {
-            mesh.add_triangle(i0,
-                              local[(start + offset) % local.size()],
-                              local[(start + offset + 1) % local.size()]);
+        const auto triangles = triangulate_face_corners(geometry.points(), face);
+        for (const auto& triangle : triangles) {
+            mesh.add_triangle(
+                local[static_cast<size_t>(triangle[0])],
+                local[static_cast<size_t>(triangle[1])],
+                local[static_cast<size_t>(triangle[2])]);
             triangle_faces.push_back(static_cast<int>(face_index));
         }
     }
@@ -159,12 +290,12 @@ PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry)
         const auto& face = geometry.faces()[face_index];
         if (face.size() < 3)
             continue;
-        const size_t start = stable_fan_start(geometry, face);
-        const int i0 = face[start];
-        for (size_t offset = 1; offset + 1 < face.size(); ++offset) {
-            mesh.add_triangle(i0,
-                              face[(start + offset) % face.size()],
-                              face[(start + offset + 1) % face.size()]);
+        const auto triangles = triangulate_face_corners(geometry.points(), face);
+        for (const auto& triangle : triangles) {
+            mesh.add_triangle(
+                face[static_cast<size_t>(triangle[0])],
+                face[static_cast<size_t>(triangle[1])],
+                face[static_cast<size_t>(triangle[2])]);
             triangle_faces.push_back(static_cast<int>(face_index));
         }
     }
@@ -386,13 +517,11 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         if (face.size() < 3)
             continue;
         const int base = face_corner_offset[fi];
-        const size_t start = stable_fan_start(geometry, face);
-        const int corner0 = base + static_cast<int>(start);
-        for (size_t offset = 1; offset + 1 < face.size(); ++offset) {
-            const size_t i1 = (start + offset) % face.size();
-            const size_t i2 = (start + offset + 1) % face.size();
-            const int c1 = base + static_cast<int>(i1);
-            const int c2 = base + static_cast<int>(i2);
+        const auto triangles = triangulate_face_corners(points, face);
+        for (const auto& triangle : triangles) {
+            const int corner0 = base + triangle[0];
+            const int c1 = base + triangle[1];
+            const int c2 = base + triangle[2];
 
             const int ri0 = get_render_vertex(corner0);
             const int ri1 = get_render_vertex(c1);

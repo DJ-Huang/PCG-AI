@@ -520,7 +520,7 @@ Step 1: IMesh 构建（三角化 + weld + 量化 + 变换烘焙）
 Step 2: BVH broad-phase → 精确 tri_tri_intersect → 分割 + coplanar partition
 Step 3: Arrangement adjacency → winding number BFS 传播
 Step 4: CSG 分类（Union/Intersect/Subtract/Shatter）
-Step 5: BMesh detriangulate → PcgGeometry + outputGroups
+Step 5: source-face-aware BMesh detriangulate → PcgGeometry + outputGroups
 ```
 
 #### 6.4.2 精确算术
@@ -1123,8 +1123,8 @@ cp examples/my-demo.pcg Unity/Assets/PCGDemo/
 | Cook Hash | 参数 + 输入组合 hash（缓存键） | Houdini Lock |
 | bindingKey | 抽象 mesh 引用键（不绑场景路径） | UE PCG binding |
 | Sink | 图输出节点 / 输出阶段 | Houdini Output |
-| fan-triangulate | n-gon → triangles（质心扇形三角化） | — |
-| detriangulate | triangles → n-gon（合并共面三角形） | Houdini Detriangulate |
+| polygon triangulate | n-gon → triangles（凸面稳定 fan；凹面 constrained Delaunay） | Blender/Houdini polygon tessellation |
+| detriangulate | triangles → n-gon（仅重建同一输入 polygon；可限制为未切割面） | Houdini Boolean Detriangulate |
 | edge_key | 稳定边键 `minmax(v0, v1)` → int64 | — |
 | face_origins | triangle → BMesh face index 映射 | — |
 | unshared edge | 边界边（仅 1 个邻接面） | Houdini Unshared Edges |

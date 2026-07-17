@@ -1602,15 +1602,7 @@ data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int leve
     }
 
     // Loop: triangle-based, needs mesh conversion
-    data::PcgMeshData mesh;
-    for (const auto& p : geometry.points())
-        mesh.add_vertex({p.x, p.y, p.z});
-    for (const auto& face : geometry.faces()) {
-        if (face.size() < 3) continue;
-        const int i0 = face[0];
-        for (size_t i = 1; i + 1 < face.size(); ++i)
-            mesh.add_triangle(i0, face[i], face[i + 1]);
-    }
+    data::PcgMeshData mesh = data::triangulate_geometry_shared(geometry);
 
     const data::PcgMeshData result = subdivide_mesh(mesh, levels, method);
     data::PcgGeometry out = data::geometry_from_mesh(result);
@@ -1656,16 +1648,7 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
     // Shared-vertex triangulation: geometry.points() are already welded, so use
     // them directly to ensure BMesh (from geometry) and WeldedMesh (from mesh)
     // share the same vertex indices.
-    data::PcgMeshData mesh;
-    for (const auto& p : geometry.points())
-        mesh.add_vertex({p.x, p.y, p.z});
-    for (const auto& face : geometry.faces()) {
-        if (face.size() < 3)
-            continue;
-        const int i0 = face[0];
-        for (size_t i = 1; i + 1 < face.size(); ++i)
-            mesh.add_triangle(i0, face[i], face[i + 1]);
-    }
+    data::PcgMeshData mesh = data::triangulate_geometry_shared(geometry);
 
     if (method == BevelMethod::VertexPush) {
         // VertexPush only moves vertices; preserve geometry topology + groups.

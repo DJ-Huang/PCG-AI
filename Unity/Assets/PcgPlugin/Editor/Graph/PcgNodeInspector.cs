@@ -233,7 +233,11 @@ namespace DJTechEditor.PCG.Graph
                 }
 
                 if (node is PcgManifestNodeView manifestNode)
+                {
                     ShowManifestProperties(manifestNode);
+                    if (manifestNode.NodeType == "ExportFBX")
+                        m_Body.Add(CreateFbxExportActions(manifestNode));
+                }
             }
             finally
             {
@@ -759,6 +763,63 @@ namespace DJTechEditor.PCG.Graph
         }
 
         private void NotifyGraphChanged() => m_GraphView?.NotifyDocumentChanged();
+
+        private VisualElement CreateFbxExportActions(PcgManifestNodeView node)
+        {
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 8,
+                    paddingTop = 8,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.3f, 0.3f, 0.3f),
+                },
+            };
+
+            var browse = new Button(() =>
+            {
+                var current = node.CollectData().GetRaw("path")?.ToString();
+                var selected = PcgFbxExportController.BrowseForPath(current);
+                if (string.IsNullOrEmpty(selected))
+                    return;
+                m_GraphView.WithUndo("Choose FBX Export Path", () =>
+                    node.SetPropertyValue("path", selected));
+                NotifyGraphChanged();
+                ShowNode(node);
+            })
+            {
+                text = "Browse…",
+                tooltip = "Choose an FBX file. Project-relative paths remain portable.",
+            };
+            container.Add(browse);
+
+            var export = new Button(() =>
+            {
+                if (m_GraphView.HostWindow is PcgGraphEditorWindow window)
+                    PcgFbxExportController.Export(window, node);
+            })
+            {
+                text = "Export Now",
+                tooltip = "Cook this node's upstream geometry and write the FBX once.",
+            };
+            export.style.height = 28;
+            export.style.marginTop = 5;
+            export.style.unityFontStyleAndWeight = FontStyle.Bold;
+            container.Add(export);
+
+            container.Add(new Label("Editor-only ROP: preview and automatic cooks never write this file.")
+            {
+                style =
+                {
+                    color = new Color(0.55f, 0.7f, 0.55f),
+                    fontSize = 9,
+                    marginTop = 4,
+                    whiteSpace = WhiteSpace.Normal,
+                },
+            });
+            return container;
+        }
 
         private (List<string> options, List<string> paramIds, int currentIdx) BuildBindOptions(
             string nodeId, string propertyKey, string propType)

@@ -1216,6 +1216,19 @@
       }
     },
     {
+      "type": "ExportFBX",
+      "displayName": "FBX Export",
+      "category": "Output",
+      "editorOnly": true,
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputs": [],
+      "properties": {
+        "path": { "type": "string", "displayName": "Output Path", "default": "Exports/$GRAPH.fbx" },
+        "scale": { "type": "number", "displayName": "Scale", "default": 1.0, "minimum": 0.000001 },
+        "generateNormals": { "type": "boolean", "displayName": "Generate Smooth Normals", "default": true }
+      }
+    },
+    {
       "type": "Output",
       "displayName": "Output",
       "category": "Output",

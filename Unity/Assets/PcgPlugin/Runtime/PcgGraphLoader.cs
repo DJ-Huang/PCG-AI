@@ -88,6 +88,12 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines)
         {
+            if (!PcgGraphExecutionPolicy.TryPrepareJson(json, out json, out var prepareError))
+            {
+                Debug.LogError($"[PCG] Failed to prepare graph for execution: {prepareError}");
+                return null;
+            }
+
             // ExecuteGraph parses and validates the same document. A separate native
             // validation call doubled JSON parsing on every cook without adding safety.
             var (execCode, result) = PcgNative.ExecuteGraph(json, seed, textures, meshes, splines);

@@ -131,9 +131,11 @@ void finish_patch_cell_graph(const IMesh& mesh, CellsInfo& cinfo, PatchesInfo& p
 
 /// Extract output geometry from cells marked in_output_volume.
 data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo& pinfo,
-                                           const CellsInfo& cinfo, BooleanOp op);
+                                           const CellsInfo& cinfo, BooleanOp op,
+                                           std::vector<BooleanFaceOrigin>* face_origins = nullptr);
 
 /// Full CSG pipeline on already-subdivided IMesh.
-data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op);
+data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op,
+                                       std::vector<BooleanFaceOrigin>* face_origins = nullptr);
 
 } // namespace pcg::internal::geometry

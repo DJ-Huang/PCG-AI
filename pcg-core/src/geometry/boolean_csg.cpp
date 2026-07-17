@@ -17,6 +17,12 @@ namespace pcg::internal::geometry {
 
 namespace {
 
+int64_t face_origin_key(int source, int original_face)
+{
+    return (static_cast<int64_t>(source) << 32) |
+           static_cast<uint32_t>(original_face);
+}
+
 Vec3 tri_normal(const IMesh& mesh, int t)
 {
     const IMeshTri& tri = mesh.tris[t];
@@ -733,7 +739,8 @@ void propagate_windings(const IMesh& mesh, CellsInfo& cinfo, PatchesInfo& pinfo,
 }
 
 data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo& pinfo,
-                                           const CellsInfo& cinfo, BooleanOp op)
+                                           const CellsInfo& cinfo, BooleanOp op,
+                                           std::vector<BooleanFaceOrigin>* face_origins)
 {
     data::PcgGeometry out;
     std::unordered_map<int, int> vert_map;
@@ -748,12 +755,15 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
         return ni;
     };
 
-    auto emit_tri = [&](int v0, int v1, int v2, int source, int w_a, int w_b, bool is_seam) {
+    auto emit_tri = [&](int v0, int v1, int v2, int source, int original_face,
+                        int w_a, int w_b, bool is_seam) {
         int ov0 = get_vert(v0);
         int ov1 = get_vert(v1);
         int ov2 = get_vert(v2);
         out.faces_mut().push_back({ov0, ov1, ov2});
         const int face_idx = static_cast<int>(out.faces().size()) - 1;
+        if (face_origins)
+            face_origins->push_back({source, original_face, false});
 
         if (source == 0) {
             if (w_b > 0)
@@ -775,7 +785,8 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
     if (op == BooleanOp::Shatter) {
         for (int t = 0; t < static_cast<int>(mesh.tris.size()); ++t) {
             const IMeshTri& tri = mesh.tris[t];
-            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, 0, 0, tri.split_by_seam);
+            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, tri.orig_face,
+                     0, 0, tri.split_by_seam);
         }
         return out;
     }
@@ -825,9 +836,11 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
         }
 
         if (flip) {
-            emit_tri(tri.v0, tri.v2, tri.v1, tri.source, w_a, w_b, is_seam);
+            emit_tri(tri.v0, tri.v2, tri.v1, tri.source, tri.orig_face,
+                     w_a, w_b, is_seam);
         } else {
-            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, w_a, w_b, is_seam);
+            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, tri.orig_face,
+                     w_a, w_b, is_seam);
         }
     }
 
@@ -914,7 +927,9 @@ bool output_contains(BooleanOp op, bool in_a, bool in_b)
     return false;
 }
 
-data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
+data::PcgGeometry extract_sampled_boundary(
+    const IMesh& mesh, BooleanOp op,
+    std::vector<BooleanFaceOrigin>* face_origins)
 {
     data::PcgGeometry out;
     std::unordered_map<int, int> vert_map;
@@ -1005,6 +1020,8 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
         const int ov2 = get_vert(source_vertices[2]);
         out.faces_mut().push_back({ov0, ov1, ov2});
         const int face_index = static_cast<int>(out.faces().size()) - 1;
+        if (face_origins)
+            face_origins->push_back({tri.source, tri.orig_face, false});
 
         if (tri.source == 0) {
             out.groups().add(
@@ -1035,10 +1052,30 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
 
 } // anonymous namespace
 
-data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op)
+data::PcgGeometry classify_and_extract(
+    const IMesh& combined, BooleanOp op,
+    std::vector<BooleanFaceOrigin>* face_origins)
 {
+    if (face_origins)
+        face_origins->clear();
+
+    auto finalize_origins = [&]() {
+        if (!face_origins) return;
+        std::unordered_set<int64_t> changed_origins;
+        for (const IMeshTri& tri : combined.tris) {
+            if (tri.split_by_seam && tri.source >= 0 && tri.orig_face >= 0)
+                changed_origins.insert(face_origin_key(tri.source, tri.orig_face));
+        }
+        for (BooleanFaceOrigin& origin : *face_origins) {
+            origin.changed = origin.source < 0 || origin.original_face < 0 ||
+                changed_origins.count(face_origin_key(origin.source, origin.original_face)) != 0;
+        }
+    };
+
     if (op != BooleanOp::Shatter) {
-        return extract_sampled_boundary(combined, op);
+        data::PcgGeometry out = extract_sampled_boundary(combined, op, face_origins);
+        finalize_origins();
+        return out;
     }
 
     MeshTriTopology topo(combined);
@@ -1096,7 +1133,10 @@ data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op)
 
     propagate_windings(combined, cinfo, pinfo, ambient, op, nshapes, shape_fn, shape_ambient);
 
-    return extract_boolean_geometry(combined, pinfo, cinfo, op);
+    data::PcgGeometry out =
+        extract_boolean_geometry(combined, pinfo, cinfo, op, face_origins);
+    finalize_origins();
+    return out;
 }
 
 } // namespace pcg::internal::geometry

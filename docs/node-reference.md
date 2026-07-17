@@ -1976,7 +1976,7 @@
 | `treatAAs` | enum | `"solid"` | A 的几何类型：`solid`（实体）/ `surface`（表面） |
 | `treatBAs` | enum | `"solid"` | B 的几何类型：`solid`（实体）/ `surface`（表面） |
 | `useSelf` | boolean | false | 是否对 A 自身执行自布尔运算 |
-| `detriangulate` | enum | `"all"` | 去三角化：`all`（所有多边形）/ `unchanged`（仅未改变）/ `none`（不处理） |
+| `detriangulate` | enum | `"all"` | 去三角化：`all`（按输入面来源重建）/ `unchanged`（仅重建未被切割的输入面）/ `none`（保留三角） |
 | `weldEpsilon` | number | 0.0001 | 焊接容差（≥ 1e-8） |
 | `triangleBudget` | integer | 500000 | 三角形数量上限（≥ 1000） |
 
@@ -1989,7 +1989,7 @@
    - `subtract`：保留 A 外部的面，去除 A 内部的面
    - `shatter`：将 A 沿 B 的切割面碎裂为多个独立片
 4. 根据 `treatAAs`/`treatBAs` 调整整/表面模式下的内部/外部判定
-5. `detriangulate` 控制是否将共面三角形合并为多边形
+5. `detriangulate` 按 Houdini Boolean 语义重建输入面：`all` 只合并来自同一输入 polygon 的相邻三角；`unchanged` 进一步排除被交线切割的输入面；A-B seam 边不会被跨越
 6. 标记输出组（a_inside_b / a_outside_b / b_inside_a / b_outside_a / ab_seams）
 7. 若三角形数超过 `triangleBudget`，报错终止
 8. 输出布尔运算结果网格

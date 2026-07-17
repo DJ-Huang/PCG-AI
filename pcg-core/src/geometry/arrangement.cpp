@@ -365,7 +365,8 @@ BooleanResult execute_boolean(const data::PcgGeometry& a,
         return result;
     }
 
-    result.geometry = classify_and_extract(split.combined, opts.operation);
+    result.geometry = classify_and_extract(
+        split.combined, opts.operation, &result.face_origins);
     return result;
 }
 

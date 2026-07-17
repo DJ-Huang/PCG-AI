@@ -516,7 +516,7 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
    - `find_ambient_cell`：找外部 cell
    - `propagate_windings`：BFS 传播 winding number
    - `extract_boolean_geometry`：提取标记的 cell 面
-3. `finalize_boolean_output()`：可选去三角化（`detriangulate`）
+3. `finalize_boolean_output()`：依据 `source + orig_face` 重建输入 polygon；`unchanged` 跳过交线切割面，`ab_seams` 作为合并屏障
 
 输出包含 face groups：`a_inside_b`, `a_outside_b`, `b_inside_a`, `b_outside_a`, `ab_seams`。
 

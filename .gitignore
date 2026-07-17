@@ -38,6 +38,7 @@ pcg-core/.deps/
 pcg-core/build-debug/
 pcg-core/build-manual/
 pcg-core/build/
+pcg-fbx-exporter/build*/
 schema/graph-schema.json
 web/pcg-editor/dist/
 web/pcg-editor/node_modules/

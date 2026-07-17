@@ -60,6 +60,13 @@ struct BMeshBuildOptions {
     /// dissolve is opt-in because it removes topologically meaningful vertices
     /// from Boolean CSG output and other non-bevel paths.
     bool dissolve_collinear = false;
+    /// Optional per-face reconstruction key. When one key is supplied for
+    /// every input face, adjacent faces merge only when their non-negative keys
+    /// match. This is used by Boolean output to reconstruct one source polygon
+    /// without dissolving unrelated coplanar faces.
+    std::vector<int64_t> face_merge_keys;
+    /// Do not merge across edges that belong to any input edge group.
+    bool preserve_grouped_edges = false;
 };
 
 struct BMesh {
@@ -84,7 +91,7 @@ BMesh bmesh_from_geometry(const data::PcgGeometry& geometry,
 /// Convert BMesh back to canonical geometry (groups preserved).
 data::PcgGeometry geometry_from_bmesh(const BMesh& mesh);
 
-/// Fan-triangulate n-gon faces back to render mesh.
+/// Triangulate polygon faces back to render mesh.
 data::PcgMeshData mesh_from_bmesh(const BMesh& mesh);
 
 Vec3 face_normal(const BMesh& mesh, int face_index);

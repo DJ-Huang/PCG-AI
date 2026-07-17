@@ -38,7 +38,7 @@ def extract_cpp_types():
 
 
 def extract_manifest_types():
-    """Extract node type names from node-manifest.json."""
+    """Extract native types; Editor-only ROP nodes intentionally have no C++ element."""
     if not MANIFEST_PATH.is_file():
         print(f"ERROR: node-manifest.json not found: {MANIFEST_PATH}")
         sys.exit(1)
@@ -46,7 +46,11 @@ def extract_manifest_types():
     with open(MANIFEST_PATH, encoding="utf-8") as f:
         manifest = json.load(f)
 
-    return {node["type"] for node in manifest.get("nodes", [])}
+    return {
+        node["type"]
+        for node in manifest.get("nodes", [])
+        if not node.get("editorOnly", False)
+    }
 
 
 def load_manifest():

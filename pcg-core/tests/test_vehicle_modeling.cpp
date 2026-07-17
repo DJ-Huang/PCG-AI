@@ -1,7 +1,10 @@
 #include "pcg_api.h"
+#include "graph_executor.hpp"
+#include "graph_parser.hpp"
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -29,6 +32,12 @@ struct Result {
     std::string error;
 };
 
+struct InternalResult {
+    PcgResultCode code = PCG_OK;
+    pcg::internal::GraphExecutionResult output;
+    std::string error;
+};
+
 Result execute(const char* graph)
 {
     std::vector<char> json(4 * 1024 * 1024);
@@ -46,6 +55,44 @@ Result execute(const char* graph)
         result.perf = nlohmann::json::parse(perf.data());
     result.error = error;
     return result;
+}
+
+InternalResult execute_internal(const std::string& graph_json,
+                                pcg::internal::GraphCookCache* cache)
+{
+    InternalResult result;
+    char error[2048] = {};
+    pcg::internal::Graph graph;
+    result.code = pcg::internal::parse_graph(
+        graph_json.c_str(), graph, error, static_cast<int>(sizeof(error)));
+    if (result.code == PCG_OK) {
+        result.code = pcg::internal::execute_graph(
+            graph, 42, result.output, error, static_cast<int>(sizeof(error)),
+            nullptr, nullptr, nullptr, cache);
+    }
+    result.error = error;
+    return result;
+}
+
+double mesh_surface_area(const pcg::internal::data::PcgMeshData& mesh)
+{
+    double area = 0.0;
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        const auto& p0 = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i])];
+        const auto& p1 = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 1])];
+        const auto& p2 = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 2])];
+        const double ux = p1.x - p0.x;
+        const double uy = p1.y - p0.y;
+        const double uz = p1.z - p0.z;
+        const double vx = p2.x - p0.x;
+        const double vy = p2.y - p0.y;
+        const double vz = p2.z - p0.z;
+        const double cx = uy * vz - uz * vy;
+        const double cy = uz * vx - ux * vz;
+        const double cz = ux * vy - uy * vx;
+        area += 0.5 * std::sqrt(cx * cx + cy * cy + cz * cz);
+    }
+    return area;
 }
 
 } // namespace
@@ -103,6 +150,88 @@ int main()
     std::stringstream sedan_json;
     sedan_json << sedan_file.rdbuf();
     expect(sedan_file.good() || sedan_file.eof(), "realistic sedan fixture is readable");
+
+    // Node-level regression for the reported asset: preview Cut Front Arch in
+    // both modes. Source-aware detriangulation must restore polygons without
+    // changing the final triangulated surface.
+    auto cut_all_doc = nlohmann::json::parse(sedan_json.str());
+    std::string sedan_output_id;
+    for (const auto& node : cut_all_doc["nodes"]) {
+        if (node.value("type", "") == "Output") {
+            sedan_output_id = node.value("id", "");
+            break;
+        }
+    }
+    auto& cut_edges = cut_all_doc["edges"];
+    cut_edges.erase(
+        std::remove_if(cut_edges.begin(), cut_edges.end(),
+                       [&sedan_output_id](const auto& edge) {
+                           return edge.value("target", "") == sedan_output_id;
+                       }),
+        cut_edges.end());
+    cut_edges.push_back({
+        {"id", "__front_arch_preview_edge__"},
+        {"source", "sg_body"},
+        {"target", sedan_output_id},
+        {"sourceHandle", "mesh"},
+        {"targetHandle", "in"},
+    });
+
+    for (auto& subgraph : cut_all_doc["subgraphs"]) {
+        if (subgraph.value("id", "") != "body")
+            continue;
+        for (auto& edge : subgraph["edges"]) {
+            if (edge.value("target", "") == "body_sg_out") {
+                edge["source"] = "body_cut_front_arch";
+                edge["sourceHandle"] = "out";
+            }
+        }
+    }
+
+    auto cut_none_doc = cut_all_doc;
+    for (auto& subgraph : cut_none_doc["subgraphs"]) {
+        if (subgraph.value("id", "") != "body")
+            continue;
+        for (auto& node : subgraph["nodes"]) {
+            if (node.value("id", "") == "body_cut_front_arch") {
+                node["data"]["detriangulate"] = "none";
+                break;
+            }
+        }
+    }
+
+    pcg::internal::GraphCookCache cut_cache;
+    const auto cut_all = execute_internal(cut_all_doc.dump(), &cut_cache);
+    expect(cut_all.code == PCG_OK,
+           cut_all.error.empty() ? "Cut Front Arch All preview executes" : cut_all.error.c_str());
+    const auto cut_none = execute_internal(cut_none_doc.dump(), &cut_cache);
+    expect(cut_none.code == PCG_OK,
+           cut_none.error.empty() ? "Cut Front Arch None preview executes" : cut_none.error.c_str());
+
+    if (cut_all.output.source_geometry && cut_none.output.source_geometry) {
+        size_t all_ngons = 0;
+        for (const auto& face : cut_all.output.source_geometry->faces())
+            all_ngons += face.size() > 3 ? 1 : 0;
+        size_t none_ngons = 0;
+        for (const auto& face : cut_none.output.source_geometry->faces())
+            none_ngons += face.size() > 3 ? 1 : 0;
+        expect(all_ngons > 0, "Cut Front Arch All restores source-face n-gons");
+        expect(none_ngons == 0, "Cut Front Arch None keeps raw CSG triangles");
+
+        const double all_area = mesh_surface_area(cut_all.output.mesh);
+        const double none_area = mesh_surface_area(cut_none.output.mesh);
+        // The source loft contains practically-flat, not mathematically-flat,
+        // polygons. Reconstructing an n-gon may choose a different diagonal;
+        // match Houdini's "Assume seam polygons are flat" tolerance policy.
+        const double area_tolerance = 1e-5 * std::max(1.0, none_area);
+        std::printf("Cut Front Arch areas: all=%.9f none=%.9f delta=%.9f\n",
+                    all_area, none_area, all_area - none_area);
+        expect(std::fabs(all_area - none_area) <= area_tolerance,
+               "Cut Front Arch detriangulation preserves rendered surface area");
+    } else {
+        expect(false, "Cut Front Arch previews expose pre-triangulation geometry");
+    }
+
     pcg_cook_cache_clear();
     const auto cold_start = std::chrono::steady_clock::now();
     const auto sedan = execute(sedan_json.str().c_str());
