@@ -309,3 +309,11 @@ target_link_libraries(test_boolean_bevel_chain PRIVATE PcgCoreStatic nlohmann_js
 target_include_directories(test_boolean_bevel_chain PRIVATE src)
 
 add_test(NAME test_boolean_bevel_chain COMMAND test_boolean_bevel_chain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+# CTest is intentionally limited to focused functional regressions. Production
+# demo graphs belong in manual profiling, not in the build verification loop.
+get_property(PCG_FAST_TESTS DIRECTORY PROPERTY TESTS)
+set_tests_properties(${PCG_FAST_TESTS} PROPERTIES
+    LABELS "fast"
+    TIMEOUT 10
+)

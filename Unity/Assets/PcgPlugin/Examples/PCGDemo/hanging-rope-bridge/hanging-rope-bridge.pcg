@@ -1,0 +1,205 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "span_path",
+      "type": "CreateSpline",
+      "position": { "x": 200, "y": 0 },
+      "data": {"mode": "line", "closed": false, "subdivisions": 8, "startX": 0, "startY": 2.2, "startZ": 0, "endX": 20, "endY": 2.2, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":2.2,\"z\":0},{\"x\":20,\"y\":2.2,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Span Path"}
+    },
+    {
+      "id": "span_resample",
+      "type": "ResampleSpline",
+      "position": { "x": 200, "y": 160 },
+      "data": {"mode": "spacing", "spacing": 0.25, "pointCount": 32, "__nodeTitle": "Resample Span"}
+    },
+    {
+      "id": "sag_wrangle",
+      "type": "AttributeWrangle",
+      "position": { "x": 200, "y": 320 },
+      "data": {"runOver": "points", "expression": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);", "parameters": "{\"sag\":1.8}", "__nodeTitle": "Sag Wrangle"}
+    },
+    {
+      "id": "broken_blast",
+      "type": "Blast",
+      "position": { "x": 200, "y": 480 },
+      "data": {"entity": "points", "group": "", "expression": "@curveu >= chf(\"firstU\") && @curveu <= chf(\"secondU\") && chf(\"secondU\") > chf(\"firstU\")", "parameters": "{\"firstU\":0,\"secondU\":0}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Broken Blast"}
+    },
+    {
+      "id": "offset_l",
+      "type": "AttributeWrangle",
+      "position": { "x": -120, "y": 640 },
+      "data": {"runOver": "points", "expression": "@P.z -= chf(\"halfWidth\");", "parameters": "{\"halfWidth\":1.0}", "__nodeTitle": "Offset Rope L"}
+    },
+    {
+      "id": "offset_r",
+      "type": "AttributeWrangle",
+      "position": { "x": 520, "y": 640 },
+      "data": {"runOver": "points", "expression": "@P.z += chf(\"halfWidth\");", "parameters": "{\"halfWidth\":1.0}", "__nodeTitle": "Offset Rope R"}
+    },
+    {
+      "id": "plank_sample",
+      "type": "SampleAlongSpline",
+      "position": { "x": 200, "y": 640 },
+      "data": {"spacing": 0.55, "offset": 0.3, "includeEnd": false, "alignToTangent": true, "seed": 0, "__nodeTitle": "Plank Samples"}
+    },
+    {
+      "id": "rope_l",
+      "type": "SweepAlongSpline",
+      "position": { "x": -120, "y": 800 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.06, "columns": 10, "sampleSpacing": 0.2, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Rope L"}
+    },
+    {
+      "id": "rope_r",
+      "type": "SweepAlongSpline",
+      "position": { "x": 520, "y": 800 },
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.06, "columns": 10, "sampleSpacing": 0.2, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Rope R"}
+    },
+    {
+      "id": "plank_jitter",
+      "type": "AttributeRandomize",
+      "position": { "x": 200, "y": 800 },
+      "data": {"seed": 17, "translateX": 0, "translateY": 0, "translateZ": 0, "rotateX": 2, "rotateY": 0, "rotateZ": 8, "scaleMin": 1, "scaleMax": 1, "__nodeTitle": "Plank Jitter"}
+    },
+    {
+      "id": "plank_proto",
+      "type": "CreateBoxMesh",
+      "position": { "x": 840, "y": 800 },
+      "data": {"width": 1.8, "height": 0.08, "depth": 0.35, "__nodeTitle": "Plank Proto"}
+    },
+    {
+      "id": "plank_copy",
+      "type": "CopyMeshToPoints",
+      "position": { "x": 200, "y": 960 },
+      "data": {"__nodeTitle": "Plank Copy"}
+    },
+    {
+      "id": "mat_rope_l",
+      "type": "AssignMaterial",
+      "position": { "x": -120, "y": 960 },
+      "data": {"group": "", "materialName": "rope", "__nodeTitle": "Mat Rope L"}
+    },
+    {
+      "id": "mat_rope_r",
+      "type": "AssignMaterial",
+      "position": { "x": 520, "y": 960 },
+      "data": {"group": "", "materialName": "rope", "__nodeTitle": "Mat Rope R"}
+    },
+    {
+      "id": "mat_plank",
+      "type": "AssignMaterial",
+      "position": { "x": 200, "y": 1120 },
+      "data": {"group": "", "materialName": "plank", "__nodeTitle": "Mat Plank"}
+    },
+    {
+      "id": "post_fl",
+      "type": "CreateBoxMesh",
+      "position": { "x": -760, "y": 0 },
+      "data": {"width": 0.35, "height": 2.5, "depth": 0.35, "__nodeTitle": "Post FL"}
+    },
+    {
+      "id": "post_fl_xf",
+      "type": "TransformMesh",
+      "position": { "x": -760, "y": 160 },
+      "data": {"translateX": 0, "translateY": 1.25, "translateZ": -1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post FL Xform"}
+    },
+    {
+      "id": "post_fr",
+      "type": "CreateBoxMesh",
+      "position": { "x": -440, "y": 0 },
+      "data": {"width": 0.35, "height": 2.5, "depth": 0.35, "__nodeTitle": "Post FR"}
+    },
+    {
+      "id": "post_fr_xf",
+      "type": "TransformMesh",
+      "position": { "x": -440, "y": 160 },
+      "data": {"translateX": 0, "translateY": 1.25, "translateZ": 1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post FR Xform"}
+    },
+    {
+      "id": "post_rl",
+      "type": "CreateBoxMesh",
+      "position": { "x": -760, "y": 320 },
+      "data": {"width": 0.35, "height": 2.5, "depth": 0.35, "__nodeTitle": "Post RL"}
+    },
+    {
+      "id": "post_rl_xf",
+      "type": "TransformMesh",
+      "position": { "x": -760, "y": 480 },
+      "data": {"translateX": 20, "translateY": 1.25, "translateZ": -1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post RL Xform"}
+    },
+    {
+      "id": "post_rr",
+      "type": "CreateBoxMesh",
+      "position": { "x": -440, "y": 320 },
+      "data": {"width": 0.35, "height": 2.5, "depth": 0.35, "__nodeTitle": "Post RR"}
+    },
+    {
+      "id": "post_rr_xf",
+      "type": "TransformMesh",
+      "position": { "x": -440, "y": 480 },
+      "data": {"translateX": 20, "translateY": 1.25, "translateZ": 1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post RR Xform"}
+    },
+    {
+      "id": "posts_merge",
+      "type": "MergeMesh",
+      "position": { "x": -600, "y": 640 },
+      "data": {"__nodeTitle": "Posts Merge"}
+    },
+    {
+      "id": "mat_post",
+      "type": "AssignMaterial",
+      "position": { "x": -600, "y": 800 },
+      "data": {"group": "", "materialName": "post", "__nodeTitle": "Mat Post"}
+    },
+    {
+      "id": "bridge_merge",
+      "type": "MergeMesh",
+      "position": { "x": 200, "y": 1280 },
+      "data": {"__nodeTitle": "Bridge Merge"}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 200, "y": 1440 },
+      "data": {"label": "Output", "__nodeTitle": "Output"}
+    }
+  ],
+  "edges": [
+    {"id": "e_path_resample", "source": "span_path", "target": "span_resample", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_resample_sag", "source": "span_resample", "target": "sag_wrangle", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_sag_blast", "source": "sag_wrangle", "target": "broken_blast", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_blast_ol", "source": "broken_blast", "target": "offset_l", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_blast_or", "source": "broken_blast", "target": "offset_r", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_blast_sample", "source": "broken_blast", "target": "plank_sample", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_ol_rope", "source": "offset_l", "target": "rope_l", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e_or_rope", "source": "offset_r", "target": "rope_r", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e_sample_jitter", "source": "plank_sample", "target": "plank_jitter", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_jitter_copy", "source": "plank_jitter", "target": "plank_copy", "sourceHandle": "out", "targetHandle": "points"},
+    {"id": "e_proto_copy", "source": "plank_proto", "target": "plank_copy", "sourceHandle": "out", "targetHandle": "prototype"},
+    {"id": "e_fl_box", "source": "post_fl", "target": "post_fl_xf", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_fr_box", "source": "post_fr", "target": "post_fr_xf", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rl_box", "source": "post_rl", "target": "post_rl_xf", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rr_box", "source": "post_rr", "target": "post_rr_xf", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rope_l_mat", "source": "rope_l", "target": "mat_rope_l", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rope_r_mat", "source": "rope_r", "target": "mat_rope_r", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_plank_mat", "source": "plank_copy", "target": "mat_plank", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_posts_fl", "source": "post_fl_xf", "target": "posts_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_posts_fr", "source": "post_fr_xf", "target": "posts_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_posts_rl", "source": "post_rl_xf", "target": "posts_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_posts_rr", "source": "post_rr_xf", "target": "posts_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_posts_mat", "source": "posts_merge", "target": "mat_post", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_rope_l", "source": "mat_rope_l", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_rope_r", "source": "mat_rope_r", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_planks", "source": "mat_plank", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_posts", "source": "mat_post", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_out", "source": "bridge_merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+  ],
+  "parameters": [
+    {"id": "p1", "name": "PlankSpacing", "type": "number", "default": 0.55, "exposed": true, "targetNode": "plank_sample", "targetProperty": "spacing", "hasRange": true, "min": 0.3, "max": 1.5},
+    {"id": "p2", "name": "PlankJitter", "type": "number", "default": 8, "exposed": true, "targetNode": "plank_jitter", "targetProperty": "rotateZ", "hasRange": true, "min": 0, "max": 30},
+    {"id": "p3", "name": "RopeRadiusL", "type": "number", "default": 0.06, "exposed": true, "targetNode": "rope_l", "targetProperty": "radius", "hasRange": true, "min": 0.02, "max": 0.2},
+    {"id": "p4", "name": "RopeRadiusR", "type": "number", "default": 0.06, "exposed": true, "targetNode": "rope_r", "targetProperty": "radius", "hasRange": true, "min": 0.02, "max": 0.2}
+  ],
+  "subgraphs": [
+  ]
+}

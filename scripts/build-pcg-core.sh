@@ -5,9 +5,12 @@ set -euo pipefail
 CONFIGURATION="Release"
 COPY_TO_UNITY=false
 RUN_TESTS=false
+TEST_REGEX=""
 
 usage() {
-    echo "Usage: $0 [--config Debug|Release] [--copy-to-unity] [--run-tests]"
+    echo "Usage: $0 [--config Debug|Release] [--copy-to-unity] [--run-tests] [--test-regex <regex>]"
+    echo "  --run-tests          Run all focused functional tests (demo graphs excluded)"
+    echo "  --test-regex <regex> Run only matching focused tests"
     exit 1
 }
 
@@ -25,6 +28,15 @@ while [[ $# -gt 0 ]]; do
             RUN_TESTS=true
             shift
             ;;
+        --test-regex)
+            if [[ $# -lt 2 ]]; then
+                echo "Missing value for --test-regex"
+                usage
+            fi
+            TEST_REGEX="$2"
+            RUN_TESTS=true
+            shift 2
+            ;;
         -h|--help)
             usage
             ;;
@@ -39,16 +51,23 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORE_DIR="$ROOT/pcg-core"
 BUILD_DIR="$CORE_DIR/build"
 UNITY_PLUGINS="$ROOT/Unity/Assets/PcgPlugin/Plugins/macOS"
+JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 echo "==> Configuring pcg-core ($CONFIGURATION)"
 cmake -S "$CORE_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE="$CONFIGURATION"
 
 echo "==> Building pcg-core"
-cmake --build "$BUILD_DIR" --config "$CONFIGURATION" -j"$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+cmake --build "$BUILD_DIR" --config "$CONFIGURATION" -j"$JOBS"
 
 if $RUN_TESTS; then
-    echo "==> Running ctest"
-    ctest --test-dir "$BUILD_DIR" --output-on-failure
+    CTEST_ARGS=(--test-dir "$BUILD_DIR" --output-on-failure --label-regex fast --parallel "$JOBS")
+    if [[ -n "$TEST_REGEX" ]]; then
+        CTEST_ARGS+=(--tests-regex "$TEST_REGEX")
+        echo "==> Running focused ctest selection: $TEST_REGEX"
+    else
+        echo "==> Running all focused ctests"
+    fi
+    ctest "${CTEST_ARGS[@]}"
 fi
 
 # Single-config generators (Ninja/Make) place artifacts directly in build/.

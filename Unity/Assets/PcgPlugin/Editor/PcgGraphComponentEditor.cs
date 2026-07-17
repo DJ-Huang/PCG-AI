@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using DJTechRuntime.PCG;
+using Object = UnityEngine.Object;
 
 namespace DJTechEditor.PCG
 {
@@ -239,10 +240,216 @@ namespace DJTechEditor.PCG
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Material Bindings", EditorStyles.boldLabel);
+
+            EditorGUI.BeginChangeCheck();
+
+            var meshMaterialProp = serializedObject.FindProperty("meshMaterial");
+            if (meshMaterialProp != null)
+            {
+                EditorGUILayout.PropertyField(
+                    meshMaterialProp,
+                    new GUIContent(
+                        "Fallback Material",
+                        "Used when a slot has no binding or an empty material name."));
+            }
+
+            var names = CollectGraphMaterialNames();
+            SyncMaterialBindings(names);
+
+            if (names.Count == 0 && m_MaterialBindingsProp.arraySize == 0)
+            {
+                if (EditorGUI.EndChangeCheck())
+                    ApplyMaterialBindingChanges();
+                EditorGUILayout.HelpBox(
+                    "No AssignMaterial names in this graph. Add AssignMaterial nodes " +
+                    "(or Run once so cook slots appear), then assign Unity Materials here.",
+                    MessageType.Info);
+                return;
+            }
+
             EditorGUILayout.HelpBox(
-                "Map Assign Material names to Unity Material assets. Unmapped or empty slots use Mesh Material.",
+                "Each row is an AssignMaterial name from the graph (or last cook). " +
+                "Assign a Unity Material — changes apply immediately without re-running. " +
+                "Unmapped slots use Fallback Material.",
                 MessageType.Info);
-            EditorGUILayout.PropertyField(m_MaterialBindingsProp, includeChildren: true);
+
+            for (var i = 0; i < m_MaterialBindingsProp.arraySize; i++)
+            {
+                var element = m_MaterialBindingsProp.GetArrayElementAtIndex(i);
+                var nameProp = element.FindPropertyRelative("materialName");
+                var materialProp = element.FindPropertyRelative("material");
+                var name = nameProp.stringValue;
+                var inGraph = names.Contains(name);
+
+                EditorGUILayout.BeginHorizontal();
+                if (inGraph)
+                {
+                    EditorGUILayout.PrefixLabel(name);
+                }
+                else
+                {
+                    var options = BuildMaterialNamePopupOptions(names, name);
+                    var current = Mathf.Max(0, System.Array.IndexOf(options, name));
+                    var next = EditorGUILayout.Popup("Name", current, options);
+                    if (next >= 0 && next < options.Length && options[next] != name)
+                        nameProp.stringValue = options[next];
+                }
+
+                EditorGUILayout.PropertyField(materialProp, GUIContent.none);
+                if (!inGraph && GUILayout.Button("×", GUILayout.Width(22)))
+                {
+                    m_MaterialBindingsProp.DeleteArrayElementAtIndex(i);
+                    EditorGUILayout.EndHorizontal();
+                    break;
+                }
+
+                EditorGUILayout.EndHorizontal();
+            }
+
+            if (EditorGUI.EndChangeCheck())
+                ApplyMaterialBindingChanges();
+        }
+
+        private void ApplyMaterialBindingChanges()
+        {
+            serializedObject.ApplyModifiedProperties();
+            m_Target.RefreshAppliedMaterials();
+            SceneView.RepaintAll();
+        }
+
+        private List<string> CollectGraphMaterialNames()
+        {
+            var names = new List<string>();
+            var seen = new HashSet<string>();
+
+            void Add(string name)
+            {
+                if (string.IsNullOrEmpty(name) || !seen.Add(name))
+                    return;
+                names.Add(name);
+            }
+
+            void CollectFromNodes(IEnumerable<PcgGraphNodeRecord> nodes)
+            {
+                if (nodes == null)
+                    return;
+                foreach (var node in nodes)
+                {
+                    if (node?.type != "AssignMaterial")
+                        continue;
+                    Add(node.data?.GetRaw("materialName")?.ToString());
+                }
+            }
+
+            var doc = m_Target.Document;
+            if (doc != null)
+            {
+                CollectFromNodes(doc.nodes);
+                if (doc.subgraphs != null)
+                {
+                    foreach (var subgraph in doc.subgraphs)
+                        CollectFromNodes(subgraph?.nodes);
+                }
+
+                if (doc.parameters != null && m_Target.ParameterOverrides != null)
+                {
+                    var overridesById = new Dictionary<string, PcgParameterOverride>();
+                    foreach (var ov in m_Target.ParameterOverrides)
+                    {
+                        if (ov != null && !string.IsNullOrEmpty(ov.parameterId))
+                            overridesById[ov.parameterId] = ov;
+                    }
+
+                    foreach (var param in doc.parameters)
+                    {
+                        if (param == null || param.targetProperty != "materialName")
+                            continue;
+                        if (overridesById.TryGetValue(param.id, out var ov))
+                            Add(ov.GetValue()?.ToString());
+                        else
+                            Add(param.defaultValue);
+                    }
+                }
+            }
+
+            var lastCook = m_Target.LastMaterialNames;
+            if (lastCook != null)
+            {
+                foreach (var name in lastCook)
+                    Add(name);
+            }
+
+            names.Sort(System.StringComparer.Ordinal);
+            return names;
+        }
+
+        private void SyncMaterialBindings(List<string> names)
+        {
+            var materialByName = new Dictionary<string, Object>();
+            for (var i = 0; i < m_MaterialBindingsProp.arraySize; i++)
+            {
+                var element = m_MaterialBindingsProp.GetArrayElementAtIndex(i);
+                var name = element.FindPropertyRelative("materialName").stringValue;
+                if (string.IsNullOrEmpty(name) || materialByName.ContainsKey(name))
+                    continue;
+                materialByName[name] = element.FindPropertyRelative("material").objectReferenceValue;
+            }
+
+            // Keep graph/cook names first, then orphaned bindings that still have a Material.
+            var ordered = new List<string>(names);
+            for (var i = 0; i < m_MaterialBindingsProp.arraySize; i++)
+            {
+                var element = m_MaterialBindingsProp.GetArrayElementAtIndex(i);
+                var name = element.FindPropertyRelative("materialName").stringValue;
+                if (string.IsNullOrEmpty(name) || names.Contains(name))
+                    continue;
+                if (element.FindPropertyRelative("material").objectReferenceValue == null)
+                    continue;
+                if (!ordered.Contains(name))
+                    ordered.Add(name);
+            }
+
+            var needsSync = m_MaterialBindingsProp.arraySize != ordered.Count;
+            if (!needsSync)
+            {
+                for (var i = 0; i < ordered.Count; i++)
+                {
+                    var element = m_MaterialBindingsProp.GetArrayElementAtIndex(i);
+                    if (element.FindPropertyRelative("materialName").stringValue != ordered[i])
+                    {
+                        needsSync = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!needsSync)
+                return;
+
+            while (m_MaterialBindingsProp.arraySize < ordered.Count)
+                m_MaterialBindingsProp.InsertArrayElementAtIndex(m_MaterialBindingsProp.arraySize);
+            while (m_MaterialBindingsProp.arraySize > ordered.Count)
+                m_MaterialBindingsProp.DeleteArrayElementAtIndex(m_MaterialBindingsProp.arraySize - 1);
+
+            for (var i = 0; i < ordered.Count; i++)
+            {
+                var element = m_MaterialBindingsProp.GetArrayElementAtIndex(i);
+                var name = ordered[i];
+                element.FindPropertyRelative("materialName").stringValue = name;
+                materialByName.TryGetValue(name, out var material);
+                element.FindPropertyRelative("material").objectReferenceValue = material;
+            }
+        }
+
+        private static string[] BuildMaterialNamePopupOptions(List<string> names, string current)
+        {
+            var options = new List<string>(names.Count + 1);
+            options.AddRange(names);
+            if (!string.IsNullOrEmpty(current) && !names.Contains(current))
+                options.Insert(0, current);
+            if (options.Count == 0)
+                options.Add(string.IsNullOrEmpty(current) ? "(none)" : current);
+            return options.ToArray();
         }
 
         private bool GraphHasGetMeshData()

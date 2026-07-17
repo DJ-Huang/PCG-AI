@@ -52,7 +52,7 @@ namespace DJTechRuntime.PCG
         private string m_LastCookKey;
         private bool m_HasAppliedCookResult;
         private ulong m_LastMeshBinaryHash;
-        private string[] m_LastMaterialNames = Array.Empty<string>();
+        [SerializeField] private string[] m_LastMaterialNames = Array.Empty<string>();
         private PcgPolygonPreviewData m_PolygonPreview;
 
         /// <summary>Cached Sink n-gon topology for Scene View polygon wire (null when unavailable).</summary>
@@ -115,6 +115,22 @@ namespace DJTechRuntime.PCG
         public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
+
+        /// <summary>Material slot names from the last successful mesh cook (empty until Run).</summary>
+        public IReadOnlyList<string> LastMaterialNames => m_LastMaterialNames;
+
+        /// <summary>
+        /// Re-apply <see cref="MaterialBindings"/> / fallback to the current MeshRenderer
+        /// without re-cooking. No-op until a mesh cook has produced material slots.
+        /// </summary>
+        public void RefreshAppliedMaterials()
+        {
+            EnsureMeshComponents();
+            if (m_MeshRenderer == null)
+                return;
+
+            ApplyMaterialBindings(m_LastMaterialNames);
+        }
 
         public void SetScatterDisplayMode(PcgScatterDisplayMode mode, bool requestCook = true)
         {

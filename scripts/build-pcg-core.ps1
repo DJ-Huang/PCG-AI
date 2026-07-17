@@ -3,7 +3,8 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
     [switch]$CopyToUnity,
-    [switch]$RunTests
+    [switch]$RunTests,
+    [string]$TestRegex = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,9 +21,23 @@ Write-Host "==> Building pcg-core"
 cmake --build $BuildDir --config $Configuration
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-if ($RunTests) {
-    Write-Host "==> Running ctest"
-    ctest --test-dir $BuildDir -C $Configuration --output-on-failure
+if ($RunTests -or $TestRegex) {
+    $Jobs = if ($env:NUMBER_OF_PROCESSORS) { $env:NUMBER_OF_PROCESSORS } else { 4 }
+    $CTestArgs = @(
+        "--test-dir", $BuildDir,
+        "-C", $Configuration,
+        "--output-on-failure",
+        "--label-regex", "fast",
+        "--parallel", $Jobs
+    )
+    if ($TestRegex) {
+        $CTestArgs += @("--tests-regex", $TestRegex)
+        Write-Host "==> Running focused ctest selection: $TestRegex"
+    }
+    else {
+        Write-Host "==> Running all focused ctests"
+    }
+    ctest @CTestArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
