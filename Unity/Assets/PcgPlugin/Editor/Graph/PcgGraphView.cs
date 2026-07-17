@@ -224,7 +224,8 @@ namespace DJTechEditor.PCG.Graph
             m_State = PcgGraphState.Create();
 
             style.flexGrow = 1;
-            SetupZoom(ContentZoomer.DefaultMinScale, 4f);
+            // DefaultMinScale is 0.25; large graphs need deeper zoom-out for overview.
+            SetupZoom(0.05f, 4f);
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());

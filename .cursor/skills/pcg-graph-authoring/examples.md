@@ -119,3 +119,50 @@ row 4:  out (x=200)
 | Copy to Curves | `InstanceAlongSpline` |
 | Merge | `MergeMesh` |
 | Output / ROP display | `Output` |
+| Subnet | `Subgraph` + `subgraphs[]` definition |
+
+## Subgraph module (move mesh)
+
+Minimal **I/O wrapper** (tutorial shape). Prefer **part-sized** modules in real graphs — do not wrap 2–3 nodes just to hit a count.
+
+```json
+{
+  "version": "1.0",
+  "nodes": [
+    { "id": "box", "type": "CreateBoxMesh", "position": { "x": 200, "y": 0 },
+      "data": { "__nodeTitle": "Source Box", "sizeX": 2, "sizeY": 2, "sizeZ": 2 } },
+    { "id": "move_instance", "type": "Subgraph", "position": { "x": 200, "y": 160 },
+      "data": { "__nodeTitle": "Move Mesh", "subgraphId": "move_mesh" } },
+    { "id": "out", "type": "Output", "position": { "x": 200, "y": 320 },
+      "data": { "__nodeTitle": "Output", "label": "Mesh" } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "box", "target": "move_instance",
+      "sourceHandle": "out", "targetHandle": "geometry" },
+    { "id": "e2", "source": "move_instance", "target": "out",
+      "sourceHandle": "geometry", "targetHandle": "in" }
+  ],
+  "subgraphs": [
+    {
+      "id": "move_mesh",
+      "name": "Move Mesh",
+      "inputs": [{ "id": "geometry", "name": "Geometry", "pinType": "Mesh" }],
+      "outputs": [{ "id": "geometry", "name": "Geometry", "pinType": "Mesh" }],
+      "nodes": [
+        { "id": "input", "type": "SubgraphInput", "position": { "x": 200, "y": 0 },
+          "data": { "__nodeTitle": "In Geometry" } },
+        { "id": "transform", "type": "TransformMesh", "position": { "x": 200, "y": 160 },
+          "data": { "__nodeTitle": "Translate X", "translateX": 3, "translateY": 0, "translateZ": 0 } },
+        { "id": "output", "type": "SubgraphOutput", "position": { "x": 200, "y": 320 },
+          "data": { "__nodeTitle": "Out Geometry" } }
+      ],
+      "edges": [
+        { "id": "ie1", "source": "input", "target": "transform",
+          "sourceHandle": "geometry", "targetHandle": "in" },
+        { "id": "ie2", "source": "transform", "target": "output",
+          "sourceHandle": "out", "targetHandle": "geometry" }
+      ]
+    }
+  ]
+}
+```

@@ -305,8 +305,11 @@ PcgResultCode execute_graph(const Graph& graph,
 
     if (cache) {
         const uint64_t structure_hash = compute_graph_structure_hash(graph);
-        if (cache->structure_hash() != 0 && cache->structure_hash() != structure_hash)
-            cache->clear();
+        // Do not clear node entries when only the graph topology changes. Node
+        // input hashes below include incoming connection identity, parameters,
+        // seed, runtime bindings, and upstream output hashes. This makes entries
+        // safe to reuse across Editor preview subgraphs, where changing the sink
+        // would otherwise discard an expensive full-graph cook.
         cache->set_structure_hash(structure_hash);
         cache->reset_stats();
     }
@@ -333,7 +336,14 @@ PcgResultCode execute_graph(const Graph& graph,
                 continue;
 
             const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
-            upstream_hashes.emplace_back(pin + "\0" + edge.source, it->second);
+            std::string connection_key;
+            connection_key.reserve(pin.size() + edge.source.size() + edge.source_handle.size() + 2);
+            connection_key.append(pin);
+            connection_key.push_back('\0');
+            connection_key.append(edge.source);
+            connection_key.push_back('\0');
+            connection_key.append(edge.source_handle);
+            upstream_hashes.emplace_back(std::move(connection_key), it->second);
         }
 
         std::sort(upstream_hashes.begin(), upstream_hashes.end(),

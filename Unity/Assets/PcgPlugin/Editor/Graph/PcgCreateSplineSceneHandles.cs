@@ -59,6 +59,16 @@ namespace DJTechEditor.PCG.Graph
         private static Color[] s_WireColors;
         private static int[] s_WireTris;
         private static int s_WireBuiltEdgeCount;
+        private static int s_WireUploadedEdgeCount;
+        private static PcgPolygonPreviewData s_WireMeshPreviewCache;
+        private static Matrix4x4 s_WireLastLocalToWorld;
+        private static Vector3 s_WireLastCameraPosition;
+        private static Quaternion s_WireLastCameraRotation;
+        private static bool s_WireLastOrthographic;
+        private static float s_WireLastProjectionSize;
+        private static int s_WireLastPixelHeight;
+        private static float s_WireLastWidthPx;
+        private static bool s_WireMeshStateValid;
 
         private enum OthersDisplayMode
         {
@@ -422,6 +432,9 @@ namespace DJTechEditor.PCG.Graph
             s_WirePreviewCache = null;
             s_WireEdgePairs = null;
             s_WireBuiltEdgeCount = 0;
+            s_WireUploadedEdgeCount = 0;
+            s_WireMeshPreviewCache = null;
+            s_WireMeshStateValid = false;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
             s_SelectedGroupSource = null;
@@ -1944,20 +1957,71 @@ namespace DJTechEditor.PCG.Graph
             if (widthPx < 0.5f)
                 widthPx = 0.5f;
 
-            ExpandEdgesToCameraFacingQuads(
-                preview.Points,
-                anchor.localToWorldMatrix,
-                cam,
-                widthPx,
-                edgeCount);
+            var localToWorld = anchor.localToWorldMatrix;
+            if (NeedsWireMeshRebuild(preview, localToWorld, cam, widthPx))
+            {
+                ExpandEdgesToCameraFacingQuads(
+                    preview.Points,
+                    localToWorld,
+                    cam,
+                    widthPx,
+                    edgeCount);
 
-            s_WireMesh.Clear(false);
-            s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-            s_WireMesh.SetColors(s_WireColors, 0, vertCount);
-            s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+                if (s_WireUploadedEdgeCount != edgeCount)
+                {
+                    s_WireMesh.Clear(false);
+                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                    s_WireMesh.SetColors(s_WireColors, 0, vertCount);
+                    s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+                    s_WireUploadedEdgeCount = edgeCount;
+                }
+                else
+                {
+                    // Camera-facing vertices change while indices/colors do not.
+                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                }
+
+                RememberWireMeshState(preview, localToWorld, cam, widthPx);
+            }
 
             s_WireMaterial.SetPass(0);
             Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
+        }
+
+        private static bool NeedsWireMeshRebuild(
+            PcgPolygonPreviewData preview,
+            Matrix4x4 localToWorld,
+            Camera cam,
+            float widthPx)
+        {
+            if (!s_WireMeshStateValid || !ReferenceEquals(preview, s_WireMeshPreviewCache))
+                return true;
+
+            var projectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
+            return localToWorld != s_WireLastLocalToWorld ||
+                   cam.transform.position != s_WireLastCameraPosition ||
+                   cam.transform.rotation != s_WireLastCameraRotation ||
+                   cam.orthographic != s_WireLastOrthographic ||
+                   !Mathf.Approximately(projectionSize, s_WireLastProjectionSize) ||
+                   cam.pixelHeight != s_WireLastPixelHeight ||
+                   !Mathf.Approximately(widthPx, s_WireLastWidthPx);
+        }
+
+        private static void RememberWireMeshState(
+            PcgPolygonPreviewData preview,
+            Matrix4x4 localToWorld,
+            Camera cam,
+            float widthPx)
+        {
+            s_WireMeshPreviewCache = preview;
+            s_WireLastLocalToWorld = localToWorld;
+            s_WireLastCameraPosition = cam.transform.position;
+            s_WireLastCameraRotation = cam.transform.rotation;
+            s_WireLastOrthographic = cam.orthographic;
+            s_WireLastProjectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
+            s_WireLastPixelHeight = cam.pixelHeight;
+            s_WireLastWidthPx = widthPx;
+            s_WireMeshStateValid = true;
         }
 
         private static void DrawPolygonWireOverlayThinFallback(Transform anchor, Vector3[] points)
@@ -1988,6 +2052,8 @@ namespace DJTechEditor.PCG.Graph
             {
                 s_WireMesh = new Mesh { name = "PcgPolygonWireOverlay", hideFlags = HideFlags.HideAndDontSave };
                 s_WireMesh.MarkDynamic();
+                s_WireUploadedEdgeCount = 0;
+                s_WireMeshStateValid = false;
             }
 
             if (s_WireMaterial == null)

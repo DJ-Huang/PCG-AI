@@ -75,8 +75,12 @@ namespace DJTechRuntime.PCG
                     continue;
 
                 component.m_DeferredEnablePreviewCook = false;
-                if (component.SupportsEditModePreview())
-                    component.RequestPreviewCook(immediate: true);
+                // Never turn scene loading into a synchronous native cook. Components
+                // that explicitly disable async cooking keep their serialized preview
+                // until the user requests a cook; async components join the debounced
+                // queue and are started one at a time by the Editor scheduler.
+                if (component.SupportsEditModePreview() && component.ShouldUseAsyncCook())
+                    component.RequestPreviewCook(immediate: false);
             }
         }
 
@@ -147,7 +151,7 @@ namespace DJTechRuntime.PCG
         public static System.Action EditorAfterPreviewCookApplied;
 
         /// <summary>Last cook result JSON (contains groups + node_stats). Read by Graph Editor info panel.</summary>
-        public string LastCookResultJson;
+        [NonSerialized] public string LastCookResultJson;
 #endif
 
 #if UNITY_EDITOR
@@ -214,13 +218,26 @@ namespace DJTechRuntime.PCG
         /// <summary>Called by <c>PcgEditModeCookScheduler</c> in the Editor assembly.</summary>
         public static void TickAllEditModePreviewCooks()
         {
-            foreach (var component in s_EditModePreviewCooks.ToArray())
+            var components = s_EditModePreviewCooks
+                .Where(component => component != null)
+                .ToArray();
+
+            // Finish completed workers first so their results are applied before the
+            // next queued graph starts. Serializing native preview cooks avoids opening
+            // a scene with several expensive graphs competing for the same cache.
+            foreach (var component in components)
+                component.PumpAsyncCookCompletion();
+
+            var asyncCookActive = components.Any(component => component.m_AsyncCookInProgress);
+            foreach (var component in components)
             {
-                if (component != null)
-                {
-                    component.PumpAsyncCookCompletion();
-                    component.TickEditModePreviewCook();
-                }
+                if (asyncCookActive && !component.m_AsyncCookInProgress)
+                    continue;
+
+                var wasAsyncCooking = component.m_AsyncCookInProgress;
+                component.TickEditModePreviewCook();
+                if (!wasAsyncCooking && component.m_AsyncCookInProgress)
+                    asyncCookActive = true;
             }
         }
 
@@ -240,6 +257,16 @@ namespace DJTechRuntime.PCG
         {
             if (Application.isPlaying || !SupportsEditModePreview())
                 return;
+
+            // A superseded background cook may still be unwinding inside one
+            // native node. Never wait for it on the Editor thread; Pump will
+            // discard it by generation and the pending cook starts afterwards.
+            if (m_AsyncCookInProgress)
+            {
+                if (m_PreviewCookPending)
+                    m_NextEditModeCookTime = Time.realtimeSinceStartup + 0.05f;
+                return;
+            }
 
             if (EffectiveCookMode != PcgCookMode.OnParameterChange ||
                 !m_PreviewCookPending ||
@@ -292,18 +319,30 @@ namespace DJTechRuntime.PCG
             if (!SupportsEditModePreview())
                 return;
 
+            if (m_AsyncCookInProgress)
+            {
+                RequestAsyncCookCancellation(null, log: false);
+                m_PreviewCookPending = true;
+                m_NextEditModeCookTime = immediate
+                    ? Time.realtimeSinceStartup
+                    : Time.realtimeSinceStartup + editModeCookInterval;
+                return;
+            }
+
             if (immediate)
             {
                 m_PreviewCookPending = false;
                 if (m_Document == null)
                     RefreshDocument();
-                // Sync cook so Mesh + PolygonPreview (n-gon wire) apply atomically.
-                // Async immediate was returning before ApplyExecutionResult ran.
-                if (Run(skipDocumentRefresh: true, forceSynchronous: true))
+                // "Immediate" means start now. When async Editor cooking is enabled,
+                // Mesh + PolygonPreview are still applied atomically on completion,
+                // without freezing the main thread on a complex preview graph.
+                if (Run(skipDocumentRefresh: true))
                 {
                     m_NextEditModeCookTime = Time.realtimeSinceStartup + editModeCookInterval;
 #if UNITY_EDITOR
-                    EditorAfterPreviewCookApplied?.Invoke();
+                    if (!m_AsyncCookInProgress)
+                        EditorAfterPreviewCookApplied?.Invoke();
 #endif
                 }
                 return;
@@ -717,12 +756,34 @@ namespace DJTechRuntime.PCG
         }
 
         /// <summary>
-        /// Stops any in-flight async cook and waits for native ExecuteGraph before
-        /// callers clear cook caches (preview node switch / Clear Preview).
+        /// Marks an in-flight preview cook as obsolete and asks native execution to
+        /// cancel. The worker is deliberately not joined here: preview switching must
+        /// stay responsive even while a long-running native node is unwinding.
         /// </summary>
         public void CancelAsyncCookForPreviewSwitch()
         {
-            CancelAsyncCook(null, log: false);
+            RequestAsyncCookCancellation(null, log: false);
+        }
+
+        private bool RequestAsyncCookCancellation(string reason, bool log = true)
+        {
+            if (!m_AsyncCookInProgress || m_AsyncCookTask == null)
+                return false;
+
+            if (m_LastAsyncCookStatus == "cancelling")
+                return true;
+
+            PcgNative.RequestCancel();
+            m_AsyncCookCts?.Cancel();
+            // A completed result from the superseded request must never apply.
+            m_AsyncCookGeneration++;
+            m_LastAsyncCookStatus = "cancelling";
+
+#if UNITY_EDITOR
+            if (log && !string.IsNullOrEmpty(reason))
+                Debug.Log($"[PCG] Async cook cancellation requested ({reason}).");
+#endif
+            return true;
         }
 
         private bool CancelAsyncCook(string reason, bool log = true)
@@ -802,7 +863,10 @@ namespace DJTechRuntime.PCG
 
             var asyncResult = completedTask.Result;
             if (asyncResult == null || asyncResult.IsCancelled || asyncResult.Generation != m_AsyncCookGeneration)
+            {
+                m_LastAsyncCookStatus = "cancelled";
                 return;
+            }
 
             if (!string.IsNullOrEmpty(asyncResult.Error))
             {

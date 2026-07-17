@@ -176,12 +176,11 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView?.RefreshNodePreviewVisuals();
             RefreshPreviewToolbar();
 
-            // Cancel+Wait in-flight native cooks BEFORE clearing g_cook_cache.
-            // Clearing the native cache while async ExecuteGraph still runs was UB —
-            // Mesh could survive while geometry_binary export became 0 (empty cyan wire).
+            // Mark the old request obsolete without joining its native worker on the
+            // Editor thread. Keep both caches: the managed cache is keyed by complete
+            // preview JSON, while the native content-addressed cache can reuse unchanged
+            // upstream nodes when only the preview sink changes.
             PcgGraphEditorCookBridge.CancelPreviewCooksForWindow(this);
-            PcgGraphCookCache.Clear();
-            PcgNative.ClearCookCache();
             PcgGraphEditorCookBridge.NotifyGraphChanged(this, immediate: true);
 
             if (!silent)

@@ -2,1660 +2,83 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "body_profile_nose",
-      "type": "CreateBezierSpline",
+      "id": "sg_body",
+      "type": "Subgraph",
       "position": {
-        "x": 0.0,
-        "y": 0.0
+        "x": -600.0,
+        "y": 0
       },
       "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":-2.39,\"y\":0.38,\"z\":0},{\"x\":-2.39,\"y\":0.42,\"z\":0.48},{\"x\":-2.39,\"y\":0.72,\"z\":0.48},{\"x\":-2.39,\"y\":0.78,\"z\":0.36},{\"x\":-2.39,\"y\":0.8,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Nose Profile"
+        "__nodeTitle": "Body",
+        "subgraphId": "body"
       }
     },
     {
-      "id": "body_profile_front",
-      "type": "CreateBezierSpline",
+      "id": "sg_wheels",
+      "type": "Subgraph",
       "position": {
-        "x": 320.0,
-        "y": 0.0
+        "x": -280.0,
+        "y": 0
       },
       "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":-1.9,\"y\":0.38,\"z\":0},{\"x\":-1.9,\"y\":0.42,\"z\":0.82},{\"x\":-1.9,\"y\":0.88,\"z\":0.82},{\"x\":-1.9,\"y\":1.02,\"z\":0.55},{\"x\":-1.9,\"y\":1.07,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Front Profile"
+        "__nodeTitle": "Wheels",
+        "subgraphId": "wheels"
       }
     },
     {
-      "id": "body_profile_fender",
-      "type": "CreateBezierSpline",
+      "id": "sg_doors",
+      "type": "Subgraph",
       "position": {
-        "x": 640.0,
-        "y": 0.0
+        "x": 40.0,
+        "y": 0
       },
       "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":-1.15,\"y\":0.38,\"z\":0},{\"x\":-1.15,\"y\":0.42,\"z\":0.93},{\"x\":-1.15,\"y\":0.95,\"z\":0.93},{\"x\":-1.15,\"y\":1.22,\"z\":0.68},{\"x\":-1.15,\"y\":1.32,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Fender Profile"
+        "__nodeTitle": "Doors",
+        "subgraphId": "doors"
       }
     },
     {
-      "id": "body_profile_center",
-      "type": "CreateBezierSpline",
+      "id": "sg_glass",
+      "type": "Subgraph",
       "position": {
-        "x": 960.0,
-        "y": 0.0
+        "x": 360.0,
+        "y": 0
       },
       "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":0,\"y\":0.38,\"z\":0},{\"x\":0,\"y\":0.42,\"z\":0.93},{\"x\":0,\"y\":0.97,\"z\":0.93},{\"x\":0,\"y\":1.34,\"z\":0.74},{\"x\":0,\"y\":1.42,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Cabin Profile"
+        "__nodeTitle": "Glass",
+        "subgraphId": "glass"
       }
     },
     {
-      "id": "body_profile_rear_cabin",
-      "type": "CreateBezierSpline",
+      "id": "sg_seats",
+      "type": "Subgraph",
       "position": {
-        "x": 1280.0,
-        "y": 0.0
+        "x": 680.0,
+        "y": 0
       },
       "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":1.05,\"y\":0.38,\"z\":0},{\"x\":1.05,\"y\":0.42,\"z\":0.92},{\"x\":1.05,\"y\":0.94,\"z\":0.92},{\"x\":1.05,\"y\":1.27,\"z\":0.68},{\"x\":1.05,\"y\":1.36,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Rear Cabin Profile"
+        "__nodeTitle": "Seats",
+        "subgraphId": "seats"
       }
     },
     {
-      "id": "body_profile_rear",
-      "type": "CreateBezierSpline",
+      "id": "sg_details",
+      "type": "Subgraph",
       "position": {
-        "x": 1600.0,
-        "y": 0.0
+        "x": 1000.0,
+        "y": 0
       },
       "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":1.85,\"y\":0.38,\"z\":0},{\"x\":1.85,\"y\":0.42,\"z\":0.85},{\"x\":1.85,\"y\":0.86,\"z\":0.85},{\"x\":1.85,\"y\":1,\"z\":0.48},{\"x\":1.85,\"y\":1.08,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Rear Profile"
-      }
-    },
-    {
-      "id": "body_profile_tail",
-      "type": "CreateBezierSpline",
-      "position": {
-        "x": 1920.0,
-        "y": 0.0
-      },
-      "data": {
-        "mode": "catmullRom",
-        "closed": false,
-        "subdivisions": 12,
-        "controlPoints": "[{\"x\":2.39,\"y\":0.38,\"z\":0},{\"x\":2.39,\"y\":0.42,\"z\":0.52},{\"x\":2.39,\"y\":0.74,\"z\":0.52},{\"x\":2.39,\"y\":0.8,\"z\":0.3},{\"x\":2.39,\"y\":0.82,\"z\":0}]",
-        "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
-        "editPlane": "yz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Tail Profile"
-      }
-    },
-    {
-      "id": "body_loft",
-      "type": "LoftMesh",
-      "position": {
-        "x": 960.0,
-        "y": 160.0
-      },
-      "data": {
-        "columns": 32,
-        "sortAxis": "x",
-        "closedProfile": false,
-        "capStart": false,
-        "capEnd": false,
-        "autoAlign": true,
-        "shadeMode": "auto",
-        "cuspAngle": 30,
-        "__nodeTitle": "Body Loft"
-      }
-    },
-    {
-      "id": "body_mirror",
-      "type": "MirrorMesh",
-      "position": {
-        "x": 960.0,
-        "y": 320.0
-      },
-      "data": {
-        "axis": "z",
-        "offset": 0,
-        "mergeOriginal": true,
-        "weldSeam": true,
-        "weldTolerance": 0.0001,
-        "__nodeTitle": "Body Mirror"
-      }
-    },
-    {
-      "id": "body_seam_fuse",
-      "type": "FuseMesh",
-      "position": {
-        "x": 960.0,
-        "y": 480.0
-      },
-      "data": {
-        "tolerance": 0.0001,
-        "removeDegenerate": true,
-        "__nodeTitle": "Body Seam Fuse"
-      }
-    },
-    {
-      "id": "body_shell",
-      "type": "ShellMesh",
-      "position": {
-        "x": 960.0,
-        "y": 640.0
-      },
-      "data": {
-        "thickness": 0.025,
-        "direction": "inward",
-        "closeBoundaries": true,
-        "outerGroup": "body_outer",
-        "innerGroup": "body_inner",
-        "rimGroup": "body_rim",
-        "__nodeTitle": "Body Shell"
-      }
-    },
-    {
-      "id": "front_arch_cutter",
-      "type": "CreateCylinderMesh",
-      "position": {
-        "x": 2240.0,
-        "y": 480.0
-      },
-      "data": {
-        "radius": 0.405,
-        "height": 2.4,
-        "radialSegments": 48,
-        "heightSegments": 1,
-        "capTop": true,
-        "capBottom": true,
-        "__nodeTitle": "Front Arch Cutter"
-      }
-    },
-    {
-      "id": "front_arch_xform",
-      "type": "TransformMesh",
-      "position": {
-        "x": 2240.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": -1.53,
-        "translateY": 0.36,
-        "translateZ": 0,
-        "rotationX": 90,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Front Arch Xform"
-      }
-    },
-    {
-      "id": "body_cut_front_arch",
-      "type": "BooleanMesh",
-      "position": {
-        "x": 1600.0,
-        "y": 800.0
-      },
-      "data": {
-        "operation": "subtract",
-        "treatAAs": "solid",
-        "treatBAs": "solid",
-        "useSelf": false,
-        "detriangulate": "all",
-        "weldEpsilon": 0.0001,
-        "triangleBudget": 500000,
-        "__nodeTitle": "Cut Front Arch"
-      }
-    },
-    {
-      "id": "rear_arch_cutter",
-      "type": "CreateCylinderMesh",
-      "position": {
-        "x": 2560.0,
-        "y": 640.0
-      },
-      "data": {
-        "radius": 0.405,
-        "height": 2.4,
-        "radialSegments": 48,
-        "heightSegments": 1,
-        "capTop": true,
-        "capBottom": true,
-        "__nodeTitle": "Rear Arch Cutter"
-      }
-    },
-    {
-      "id": "rear_arch_xform",
-      "type": "TransformMesh",
-      "position": {
-        "x": 2560.0,
-        "y": 800.0
-      },
-      "data": {
-        "translateX": 1.53,
-        "translateY": 0.36,
-        "translateZ": 0,
-        "rotationX": 90,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Rear Arch Xform"
-      }
-    },
-    {
-      "id": "body_cut_rear_arch",
-      "type": "BooleanMesh",
-      "position": {
-        "x": 2080.0,
-        "y": 960.0
-      },
-      "data": {
-        "operation": "subtract",
-        "treatAAs": "solid",
-        "treatBAs": "solid",
-        "useSelf": false,
-        "detriangulate": "all",
-        "weldEpsilon": 0.0001,
-        "triangleBudget": 500000,
-        "__nodeTitle": "Cut Rear Arch"
-      }
-    },
-    {
-      "id": "front_window_cutter",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 2880.0,
-        "y": 480.0
-      },
-      "data": {
-        "width": 0.84,
-        "height": 0.38,
-        "depth": 0.3,
-        "__nodeTitle": "F Window Cutter"
-      }
-    },
-    {
-      "id": "front_window_cutter_xform",
-      "type": "TransformMesh",
-      "position": {
-        "x": 2880.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": -0.53,
-        "translateY": 1.12,
-        "translateZ": 0.88,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": -8,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "F Window Xform"
-      }
-    },
-    {
-      "id": "rear_window_cutter",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 3200.0,
-        "y": 480.0
-      },
-      "data": {
-        "width": 0.78,
-        "height": 0.36,
-        "depth": 0.3,
-        "__nodeTitle": "R Window Cutter"
-      }
-    },
-    {
-      "id": "rear_window_cutter_xform",
-      "type": "TransformMesh",
-      "position": {
-        "x": 3200.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": 0.48,
-        "translateY": 1.1,
-        "translateZ": 0.88,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 5,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "R Window Xform"
-      }
-    },
-    {
-      "id": "window_cutters_left",
-      "type": "MergeMesh",
-      "position": {
-        "x": 3040.0,
-        "y": 800.0
-      },
-      "data": {
-        "__nodeTitle": "Window Cutters L"
-      }
-    },
-    {
-      "id": "window_cutters_both",
-      "type": "MirrorMesh",
-      "position": {
-        "x": 3040.0,
-        "y": 960.0
-      },
-      "data": {
-        "axis": "z",
-        "offset": 0,
-        "mergeOriginal": true,
-        "weldSeam": false,
-        "weldTolerance": 0.0001,
-        "__nodeTitle": "Window Cutters Both"
-      }
-    },
-    {
-      "id": "body_cut_windows",
-      "type": "BooleanMesh",
-      "position": {
-        "x": 2560.0,
-        "y": 1120.0
-      },
-      "data": {
-        "operation": "subtract",
-        "treatAAs": "solid",
-        "treatBAs": "solid",
-        "useSelf": false,
-        "detriangulate": "all",
-        "weldEpsilon": 0.0001,
-        "triangleBudget": 500000,
-        "__nodeTitle": "Cut Windows"
-      }
-    },
-    {
-      "id": "body_final_fuse",
-      "type": "FuseMesh",
-      "position": {
-        "x": 2560.0,
-        "y": 1280.0
-      },
-      "data": {
-        "tolerance": 0.0001,
-        "removeDegenerate": true,
-        "__nodeTitle": "Body Final Fuse"
-      }
-    },
-    {
-      "id": "body_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 2560.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.58,
-        "g": 0.025,
-        "b": 0.035,
-        "a": 1,
-        "__nodeTitle": "Body Color"
-      }
-    },
-    {
-      "id": "body_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 2560.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "CarPaint_Red",
-        "__nodeTitle": "Body Material"
-      }
-    },
-    {
-      "id": "tire",
-      "type": "CreateCylinderMesh",
-      "position": {
-        "x": 3680.0,
-        "y": 320.0
-      },
-      "data": {
-        "radius": 0.36,
-        "height": 0.25,
-        "radialSegments": 48,
-        "heightSegments": 2,
-        "capTop": true,
-        "capBottom": true,
-        "__nodeTitle": "Tire Cylinder"
-      }
-    },
-    {
-      "id": "tire_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 3680.0,
-        "y": 480.0
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.035,
-        "segments": 3,
-        "limitMethod": "angle",
-        "angleLimit": 25,
-        "profile": 0.5,
-        "miterOuter": "arc",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "",
-        "__nodeTitle": "Tire Bevel"
-      }
-    },
-    {
-      "id": "tire_xform",
-      "type": "TransformMesh",
-      "position": {
-        "x": 3680.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0,
-        "rotationX": 90,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tire Xform"
-      }
-    },
-    {
-      "id": "tire_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 3680.0,
-        "y": 800.0
-      },
-      "data": {
-        "r": 0.025,
-        "g": 0.028,
-        "b": 0.032,
-        "a": 1,
-        "__nodeTitle": "Tire Color"
-      }
-    },
-    {
-      "id": "tire_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 3680.0,
-        "y": 960.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Rubber_Black",
-        "__nodeTitle": "Tire Material"
-      }
-    },
-    {
-      "id": "rim",
-      "type": "CreateCylinderMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 320.0
-      },
-      "data": {
-        "radius": 0.235,
-        "height": 0.27,
-        "radialSegments": 48,
-        "heightSegments": 1,
-        "capTop": true,
-        "capBottom": true,
-        "__nodeTitle": "Rim Cylinder"
-      }
-    },
-    {
-      "id": "rim_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 480.0
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 2,
-        "limitMethod": "angle",
-        "angleLimit": 25,
-        "profile": 0.5,
-        "miterOuter": "arc",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "",
-        "__nodeTitle": "Rim Bevel"
-      }
-    },
-    {
-      "id": "rim_xform",
-      "type": "TransformMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0,
-        "rotationX": 90,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Rim Xform"
-      }
-    },
-    {
-      "id": "rim_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 4000.0,
-        "y": 800.0
-      },
-      "data": {
-        "r": 0.58,
-        "g": 0.61,
-        "b": 0.66,
-        "a": 1,
-        "__nodeTitle": "Rim Color"
-      }
-    },
-    {
-      "id": "rim_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 4000.0,
-        "y": 960.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Alloy_Satin",
-        "__nodeTitle": "Rim Material"
-      }
-    },
-    {
-      "id": "spoke",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 4320.0,
-        "y": 320.0
-      },
-      "data": {
-        "width": 0.055,
-        "height": 0.25,
-        "depth": 0.045,
-        "__nodeTitle": "Spoke Box"
-      }
-    },
-    {
-      "id": "spoke_offset",
-      "type": "TransformMesh",
-      "position": {
-        "x": 4320.0,
-        "y": 480.0
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0.12,
-        "translateZ": 0.145,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Spoke Offset"
-      }
-    },
-    {
-      "id": "spokes_radial",
-      "type": "CopyMesh",
-      "position": {
-        "x": 4320.0,
-        "y": 640.0
-      },
-      "data": {
-        "mode": "circular",
-        "count": 10,
-        "axis": "z",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Spokes Radial"
-      }
-    },
-    {
-      "id": "spokes_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 4320.0,
-        "y": 800.0
-      },
-      "data": {
-        "r": 0.72,
-        "g": 0.74,
-        "b": 0.78,
-        "a": 1,
-        "__nodeTitle": "Spokes Color"
-      }
-    },
-    {
-      "id": "spokes_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 4320.0,
-        "y": 960.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Alloy_Bright",
-        "__nodeTitle": "Spokes Material"
-      }
-    },
-    {
-      "id": "wheel_origin",
-      "type": "MergeMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 1120.0
-      },
-      "data": {
-        "__nodeTitle": "Wheel Origin"
-      }
-    },
-    {
-      "id": "wheel_left_front",
-      "type": "TransformMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 1280.0
-      },
-      "data": {
-        "translateX": -1.53,
-        "translateY": 0.36,
-        "translateZ": 0.94,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "FL Wheel"
-      }
-    },
-    {
-      "id": "wheels_left",
-      "type": "CopyMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 1440.0
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "x",
-        "angle": 360,
-        "translateX": 3.06,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Wheels Left"
-      }
-    },
-    {
-      "id": "wheels_all",
-      "type": "MirrorMesh",
-      "position": {
-        "x": 4000.0,
-        "y": 1600.0
-      },
-      "data": {
-        "axis": "z",
-        "offset": 0,
-        "mergeOriginal": true,
-        "weldSeam": false,
-        "weldTolerance": 0.0001,
-        "__nodeTitle": "Wheels All"
-      }
-    },
-    {
-      "id": "front_door_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 4800.0,
-        "y": 480.0
-      },
-      "data": {
-        "width": 0.94,
-        "height": 0.52,
-        "depth": 0.022,
-        "__nodeTitle": "Front Door Box"
-      }
-    },
-    {
-      "id": "front_door_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 4800.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": -0.58,
-        "translateY": 0.69,
-        "translateZ": 0.938,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Front Door Place"
-      }
-    },
-    {
-      "id": "front_door_outer_group",
-      "type": "FaceGroupByNormal",
-      "position": {
-        "x": 4800.0,
-        "y": 800.0
-      },
-      "data": {
-        "outputGroup": "front_door_outer",
-        "directionX": 0,
-        "directionY": 0,
-        "directionZ": 1,
-        "spreadAngle": 5,
-        "__nodeTitle": "F Door Outer Grp"
-      }
-    },
-    {
-      "id": "front_door_panel",
-      "type": "PolyExtrude",
-      "position": {
-        "x": 4800.0,
-        "y": 960.0
-      },
-      "data": {
-        "faceGroup": "front_door_outer",
-        "distance": 0.008,
-        "inset": 0.025,
-        "keepOriginal": false,
-        "topGroup": "front_door_skin",
-        "sideGroup": "front_door_seam",
-        "__nodeTitle": "Front Door Panel"
-      }
-    },
-    {
-      "id": "rear_door_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 5120.0,
-        "y": 480.0
-      },
-      "data": {
-        "width": 0.9,
-        "height": 0.52,
-        "depth": 0.022,
-        "__nodeTitle": "Rear Door Box"
-      }
-    },
-    {
-      "id": "rear_door_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 5120.0,
-        "y": 640.0
-      },
-      "data": {
-        "translateX": 0.52,
-        "translateY": 0.69,
-        "translateZ": 0.938,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Rear Door Place"
-      }
-    },
-    {
-      "id": "rear_door_outer_group",
-      "type": "FaceGroupByNormal",
-      "position": {
-        "x": 5120.0,
-        "y": 800.0
-      },
-      "data": {
-        "outputGroup": "rear_door_outer",
-        "directionX": 0,
-        "directionY": 0,
-        "directionZ": 1,
-        "spreadAngle": 5,
-        "__nodeTitle": "R Door Outer Grp"
-      }
-    },
-    {
-      "id": "rear_door_panel",
-      "type": "PolyExtrude",
-      "position": {
-        "x": 5120.0,
-        "y": 960.0
-      },
-      "data": {
-        "faceGroup": "rear_door_outer",
-        "distance": 0.008,
-        "inset": 0.025,
-        "keepOriginal": false,
-        "topGroup": "rear_door_skin",
-        "sideGroup": "rear_door_seam",
-        "__nodeTitle": "Rear Door Panel"
-      }
-    },
-    {
-      "id": "doors_left",
-      "type": "MergeMesh",
-      "position": {
-        "x": 4960.0,
-        "y": 1120.0
-      },
-      "data": {
-        "__nodeTitle": "Doors Left"
-      }
-    },
-    {
-      "id": "doors_both",
-      "type": "MirrorMesh",
-      "position": {
-        "x": 4960.0,
-        "y": 1280.0
-      },
-      "data": {
-        "axis": "z",
-        "offset": 0,
-        "mergeOriginal": true,
-        "weldSeam": false,
-        "weldTolerance": 0.0001,
-        "__nodeTitle": "Doors Both"
-      }
-    },
-    {
-      "id": "doors_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 4960.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.48,
-        "g": 0.018,
-        "b": 0.028,
-        "a": 1,
-        "__nodeTitle": "Doors Color"
-      }
-    },
-    {
-      "id": "doors_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 4960.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "CarPaint_Red_Dark",
-        "__nodeTitle": "Doors Material"
-      }
-    },
-    {
-      "id": "front_side_glass_inner",
-      "type": "CreateBezierSpline",
-      "position": {
-        "x": 5600.0,
-        "y": 800.0
-      },
-      "data": {
-        "mode": "catmullRom",
-        "closed": true,
-        "subdivisions": 10,
-        "controlPoints": "[{\"x\":-1,\"y\":0.94,\"z\":0.942},{\"x\":-0.08,\"y\":0.94,\"z\":0.942},{\"x\":-0.12,\"y\":1.29,\"z\":0.942},{\"x\":-0.69,\"y\":1.34,\"z\":0.942}]",
-        "tangents": "[{\"x\":0.305,\"y\":-0.20000000000000007,\"z\":0},{\"x\":0.44,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.305,\"y\":0.20000000000000007,\"z\":0},{\"x\":-0.44,\"y\":-0.17500000000000004,\"z\":0}]",
-        "editPlane": "xy",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "F Side Glass In"
-      }
-    },
-    {
-      "id": "front_side_glass_outer",
-      "type": "CreateBezierSpline",
-      "position": {
-        "x": 5920.0,
-        "y": 800.0
-      },
-      "data": {
-        "mode": "catmullRom",
-        "closed": true,
-        "subdivisions": 10,
-        "controlPoints": "[{\"x\":-1,\"y\":0.94,\"z\":0.956},{\"x\":-0.08,\"y\":0.94,\"z\":0.956},{\"x\":-0.12,\"y\":1.29,\"z\":0.956},{\"x\":-0.69,\"y\":1.34,\"z\":0.956}]",
-        "tangents": "[{\"x\":0.305,\"y\":-0.20000000000000007,\"z\":0},{\"x\":0.44,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.305,\"y\":0.20000000000000007,\"z\":0},{\"x\":-0.44,\"y\":-0.17500000000000004,\"z\":0}]",
-        "editPlane": "xy",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "F Side Glass Out"
-      }
-    },
-    {
-      "id": "front_side_glass_loft",
-      "type": "LoftMesh",
-      "position": {
-        "x": 5760.0,
-        "y": 960.0
-      },
-      "data": {
-        "columns": 32,
-        "sortAxis": "z",
-        "closedProfile": true,
-        "capStart": true,
-        "capEnd": true,
-        "autoAlign": true,
-        "shadeMode": "auto",
-        "cuspAngle": 30,
-        "__nodeTitle": "F Side Glass Loft"
-      }
-    },
-    {
-      "id": "rear_side_glass_inner",
-      "type": "CreateBezierSpline",
-      "position": {
-        "x": 6240.0,
-        "y": 800.0
-      },
-      "data": {
-        "mode": "catmullRom",
-        "closed": true,
-        "subdivisions": 10,
-        "controlPoints": "[{\"x\":0.02,\"y\":0.94,\"z\":0.942},{\"x\":0.92,\"y\":0.94,\"z\":0.942},{\"x\":0.8,\"y\":1.22,\"z\":0.942},{\"x\":0.08,\"y\":1.29,\"z\":0.942}]",
-        "tangents": "[{\"x\":0.42000000000000004,\"y\":-0.17500000000000004,\"z\":0},{\"x\":0.39,\"y\":0.14,\"z\":0},{\"x\":-0.42000000000000004,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.39,\"y\":-0.14,\"z\":0}]",
-        "editPlane": "xy",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "R Side Glass In"
-      }
-    },
-    {
-      "id": "rear_side_glass_outer",
-      "type": "CreateBezierSpline",
-      "position": {
-        "x": 6560.0,
-        "y": 800.0
-      },
-      "data": {
-        "mode": "catmullRom",
-        "closed": true,
-        "subdivisions": 10,
-        "controlPoints": "[{\"x\":0.02,\"y\":0.94,\"z\":0.956},{\"x\":0.92,\"y\":0.94,\"z\":0.956},{\"x\":0.8,\"y\":1.22,\"z\":0.956},{\"x\":0.08,\"y\":1.29,\"z\":0.956}]",
-        "tangents": "[{\"x\":0.42000000000000004,\"y\":-0.17500000000000004,\"z\":0},{\"x\":0.39,\"y\":0.14,\"z\":0},{\"x\":-0.42000000000000004,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.39,\"y\":-0.14,\"z\":0}]",
-        "editPlane": "xy",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "R Side Glass Out"
-      }
-    },
-    {
-      "id": "rear_side_glass_loft",
-      "type": "LoftMesh",
-      "position": {
-        "x": 6400.0,
-        "y": 960.0
-      },
-      "data": {
-        "columns": 32,
-        "sortAxis": "z",
-        "closedProfile": true,
-        "capStart": true,
-        "capEnd": true,
-        "autoAlign": true,
-        "shadeMode": "auto",
-        "cuspAngle": 30,
-        "__nodeTitle": "R Side Glass Loft"
-      }
-    },
-    {
-      "id": "side_glass_left",
-      "type": "MergeMesh",
-      "position": {
-        "x": 6080.0,
-        "y": 1120.0
-      },
-      "data": {
-        "__nodeTitle": "Side Glass Left"
-      }
-    },
-    {
-      "id": "side_glass_both",
-      "type": "MirrorMesh",
-      "position": {
-        "x": 6080.0,
-        "y": 1280.0
-      },
-      "data": {
-        "axis": "z",
-        "offset": 0,
-        "mergeOriginal": true,
-        "weldSeam": false,
-        "weldTolerance": 0.0001,
-        "__nodeTitle": "Side Glass Both"
-      }
-    },
-    {
-      "id": "side_glass_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 6080.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.045,
-        "g": 0.085,
-        "b": 0.12,
-        "a": 0.72,
-        "__nodeTitle": "Side Glass Color"
-      }
-    },
-    {
-      "id": "side_glass_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 6080.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Glass_Smoked",
-        "__nodeTitle": "Side Glass Mat"
-      }
-    },
-    {
-      "id": "windshield",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 7040.0,
-        "y": 960.0
-      },
-      "data": {
-        "width": 0.035,
-        "height": 0.72,
-        "depth": 1.45,
-        "__nodeTitle": "Windshield Box"
-      }
-    },
-    {
-      "id": "windshield_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 7040.0,
-        "y": 1120.0
-      },
-      "data": {
-        "translateX": -0.91,
-        "translateY": 1.14,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": -50,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Windshield Place"
-      }
-    },
-    {
-      "id": "rear_glass",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 7360.0,
-        "y": 960.0
-      },
-      "data": {
-        "width": 0.035,
-        "height": 0.62,
-        "depth": 1.36,
-        "__nodeTitle": "Rear Glass Box"
-      }
-    },
-    {
-      "id": "rear_glass_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 7360.0,
-        "y": 1120.0
-      },
-      "data": {
-        "translateX": 1.11,
-        "translateY": 1.12,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 50,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Rear Glass Place"
-      }
-    },
-    {
-      "id": "front_rear_glass",
-      "type": "MergeMesh",
-      "position": {
-        "x": 7200.0,
-        "y": 1280.0
-      },
-      "data": {
-        "__nodeTitle": "Front/Rear Glass"
-      }
-    },
-    {
-      "id": "front_rear_glass_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 7200.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.035,
-        "g": 0.07,
-        "b": 0.1,
-        "a": 0.68,
-        "__nodeTitle": "FR Glass Color"
-      }
-    },
-    {
-      "id": "front_rear_glass_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 7200.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Glass_Smoked",
-        "__nodeTitle": "FR Glass Mat"
-      }
-    },
-    {
-      "id": "seat_base",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 7840.0,
-        "y": 640.0
-      },
-      "data": {
-        "width": 0.48,
-        "height": 0.16,
-        "depth": 0.46,
-        "__nodeTitle": "Seat Base"
-      }
-    },
-    {
-      "id": "seat_base_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 7840.0,
-        "y": 800.0
-      },
-      "data": {
-        "translateX": -0.15,
-        "translateY": 0.58,
-        "translateZ": -0.45,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Seat Base Place"
-      }
-    },
-    {
-      "id": "seat_back",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 8160.0,
-        "y": 640.0
-      },
-      "data": {
-        "width": 0.17,
-        "height": 0.6,
-        "depth": 0.46,
-        "__nodeTitle": "Seat Back"
-      }
-    },
-    {
-      "id": "seat_back_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 8160.0,
-        "y": 800.0
-      },
-      "data": {
-        "translateX": 0.16,
-        "translateY": 0.85,
-        "translateZ": -0.45,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": -8,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Seat Back Place"
-      }
-    },
-    {
-      "id": "seat_single",
-      "type": "MergeMesh",
-      "position": {
-        "x": 8000.0,
-        "y": 960.0
-      },
-      "data": {
-        "__nodeTitle": "Seat Single"
-      }
-    },
-    {
-      "id": "seat_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 8000.0,
-        "y": 1120.0
-      },
-      "data": {
-        "r": 0.47,
-        "g": 0.23,
-        "b": 0.1,
-        "a": 1,
-        "__nodeTitle": "Seat Color"
-      }
-    },
-    {
-      "id": "seat_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 8000.0,
-        "y": 1280.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Leather_Tan",
-        "__nodeTitle": "Seat Material"
-      }
-    },
-    {
-      "id": "seat_row_front",
-      "type": "CopyMesh",
-      "position": {
-        "x": 8000.0,
-        "y": 1440.0
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "z",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0.9,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Front Seat Row"
-      }
-    },
-    {
-      "id": "seats_all",
-      "type": "CopyMesh",
-      "position": {
-        "x": 8000.0,
-        "y": 1600.0
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "x",
-        "angle": 360,
-        "translateX": 0.88,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Seats All"
-      }
-    },
-    {
-      "id": "dashboard",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 8640.0,
-        "y": 1120.0
-      },
-      "data": {
-        "width": 0.28,
-        "height": 0.18,
-        "depth": 1.48,
-        "__nodeTitle": "Dashboard Box"
-      }
-    },
-    {
-      "id": "dashboard_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 8640.0,
-        "y": 1280.0
-      },
-      "data": {
-        "translateX": -0.76,
-        "translateY": 0.88,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": -8,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Dashboard Place"
-      }
-    },
-    {
-      "id": "dashboard_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 8640.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.055,
-        "g": 0.058,
-        "b": 0.062,
-        "a": 1,
-        "__nodeTitle": "Dashboard Color"
-      }
-    },
-    {
-      "id": "dashboard_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 8640.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Interior_Black",
-        "__nodeTitle": "Dashboard Mat"
-      }
-    },
-    {
-      "id": "headlight_bar",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 9120.0,
-        "y": 960.0
-      },
-      "data": {
-        "width": 0.055,
-        "height": 0.15,
-        "depth": 1.12,
-        "__nodeTitle": "Headlight Bar"
-      }
-    },
-    {
-      "id": "headlight_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 9120.0,
-        "y": 1120.0
-      },
-      "data": {
-        "translateX": -2.38,
-        "translateY": 0.73,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Headlight Place"
-      }
-    },
-    {
-      "id": "taillight_bar",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 9440.0,
-        "y": 960.0
-      },
-      "data": {
-        "width": 0.055,
-        "height": 0.13,
-        "depth": 1.18,
-        "__nodeTitle": "Taillight Bar"
-      }
-    },
-    {
-      "id": "taillight_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 9440.0,
-        "y": 1120.0
-      },
-      "data": {
-        "translateX": 2.38,
-        "translateY": 0.72,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Taillight Place"
-      }
-    },
-    {
-      "id": "lights_merge",
-      "type": "MergeMesh",
-      "position": {
-        "x": 9280.0,
-        "y": 1280.0
-      },
-      "data": {
-        "__nodeTitle": "Lights Merge"
-      }
-    },
-    {
-      "id": "lights_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 9280.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.95,
-        "g": 0.2,
-        "b": 0.08,
-        "a": 1,
-        "__nodeTitle": "Lights Color"
-      }
-    },
-    {
-      "id": "lights_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 9280.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Vehicle_Lights",
-        "__nodeTitle": "Lights Material"
-      }
-    },
-    {
-      "id": "front_grille",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 9920.0,
-        "y": 1120.0
-      },
-      "data": {
-        "width": 0.045,
-        "height": 0.24,
-        "depth": 0.82,
-        "__nodeTitle": "Front Grille Box"
-      }
-    },
-    {
-      "id": "front_grille_place",
-      "type": "TransformMesh",
-      "position": {
-        "x": 9920.0,
-        "y": 1280.0
-      },
-      "data": {
-        "translateX": -2.415,
-        "translateY": 0.5,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Grille Place"
-      }
-    },
-    {
-      "id": "front_grille_color",
-      "type": "VertexColor",
-      "position": {
-        "x": 9920.0,
-        "y": 1440.0
-      },
-      "data": {
-        "r": 0.018,
-        "g": 0.02,
-        "b": 0.024,
-        "a": 1,
-        "__nodeTitle": "Grille Color"
-      }
-    },
-    {
-      "id": "front_grille_material",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 9920.0,
-        "y": 1600.0
-      },
-      "data": {
-        "group": "",
-        "materialName": "Grille_Black",
-        "__nodeTitle": "Grille Material"
+        "__nodeTitle": "Details",
+        "subgraphId": "details"
       }
     },
     {
       "id": "vehicle_assembly",
       "type": "MergeMesh",
       "position": {
-        "x": 6737.8,
-        "y": 1760.0
+        "x": 200,
+        "y": 160
       },
       "data": {
         "__nodeTitle": "Vehicle Assembly"
@@ -1665,8 +88,8 @@
       "id": "vehicle_output",
       "type": "Output",
       "position": {
-        "x": 6737.8,
-        "y": 1920.0
+        "x": 200,
+        "y": 320
       },
       "data": {
         "__nodeTitle": "Vehicle Output"
@@ -1675,704 +98,2595 @@
   ],
   "edges": [
     {
-      "id": "e_001",
-      "source": "body_profile_nose",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_002",
-      "source": "body_profile_front",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_003",
-      "source": "body_profile_fender",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_004",
-      "source": "body_profile_center",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_005",
-      "source": "body_profile_rear_cabin",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_006",
-      "source": "body_profile_rear",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_007",
-      "source": "body_profile_tail",
-      "target": "body_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_008",
-      "source": "body_loft",
-      "target": "body_mirror",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_009",
-      "source": "body_mirror",
-      "target": "body_seam_fuse",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_010",
-      "source": "body_seam_fuse",
-      "target": "body_shell",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_011",
-      "source": "front_arch_cutter",
-      "target": "front_arch_xform",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_012",
-      "source": "body_shell",
-      "target": "body_cut_front_arch",
-      "sourceHandle": "out",
-      "targetHandle": "a"
-    },
-    {
-      "id": "e_013",
-      "source": "front_arch_xform",
-      "target": "body_cut_front_arch",
-      "sourceHandle": "out",
-      "targetHandle": "b"
-    },
-    {
-      "id": "e_014",
-      "source": "rear_arch_cutter",
-      "target": "rear_arch_xform",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_015",
-      "source": "body_cut_front_arch",
-      "target": "body_cut_rear_arch",
-      "sourceHandle": "out",
-      "targetHandle": "a"
-    },
-    {
-      "id": "e_016",
-      "source": "rear_arch_xform",
-      "target": "body_cut_rear_arch",
-      "sourceHandle": "out",
-      "targetHandle": "b"
-    },
-    {
-      "id": "e_017",
-      "source": "front_window_cutter",
-      "target": "front_window_cutter_xform",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_018",
-      "source": "rear_window_cutter",
-      "target": "rear_window_cutter_xform",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_019",
-      "source": "front_window_cutter_xform",
-      "target": "window_cutters_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_020",
-      "source": "rear_window_cutter_xform",
-      "target": "window_cutters_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_021",
-      "source": "window_cutters_left",
-      "target": "window_cutters_both",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_022",
-      "source": "body_cut_rear_arch",
-      "target": "body_cut_windows",
-      "sourceHandle": "out",
-      "targetHandle": "a"
-    },
-    {
-      "id": "e_023",
-      "source": "window_cutters_both",
-      "target": "body_cut_windows",
-      "sourceHandle": "out",
-      "targetHandle": "b"
-    },
-    {
-      "id": "e_024",
-      "source": "body_cut_windows",
-      "target": "body_final_fuse",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_025",
-      "source": "body_final_fuse",
-      "target": "body_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_026",
-      "source": "body_color",
-      "target": "body_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_027",
-      "source": "tire",
-      "target": "tire_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_028",
-      "source": "tire_bevel",
-      "target": "tire_xform",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_029",
-      "source": "tire_xform",
-      "target": "tire_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_030",
-      "source": "tire_color",
-      "target": "tire_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_031",
-      "source": "rim",
-      "target": "rim_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_032",
-      "source": "rim_bevel",
-      "target": "rim_xform",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_033",
-      "source": "rim_xform",
-      "target": "rim_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_034",
-      "source": "rim_color",
-      "target": "rim_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_035",
-      "source": "spoke",
-      "target": "spoke_offset",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_036",
-      "source": "spoke_offset",
-      "target": "spokes_radial",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_037",
-      "source": "spokes_radial",
-      "target": "spokes_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_038",
-      "source": "spokes_color",
-      "target": "spokes_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_039",
-      "source": "tire_material",
-      "target": "wheel_origin",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_040",
-      "source": "rim_material",
-      "target": "wheel_origin",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_041",
-      "source": "spokes_material",
-      "target": "wheel_origin",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_042",
-      "source": "wheel_origin",
-      "target": "wheel_left_front",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_043",
-      "source": "wheel_left_front",
-      "target": "wheels_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_044",
-      "source": "wheels_left",
-      "target": "wheels_all",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_045",
-      "source": "front_door_box",
-      "target": "front_door_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_046",
-      "source": "front_door_place",
-      "target": "front_door_outer_group",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_047",
-      "source": "front_door_outer_group",
-      "target": "front_door_panel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_048",
-      "source": "rear_door_box",
-      "target": "rear_door_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_049",
-      "source": "rear_door_place",
-      "target": "rear_door_outer_group",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_050",
-      "source": "rear_door_outer_group",
-      "target": "rear_door_panel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_051",
-      "source": "front_door_panel",
-      "target": "doors_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_052",
-      "source": "rear_door_panel",
-      "target": "doors_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_053",
-      "source": "doors_left",
-      "target": "doors_both",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_054",
-      "source": "doors_both",
-      "target": "doors_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_055",
-      "source": "doors_color",
-      "target": "doors_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_056",
-      "source": "front_side_glass_inner",
-      "target": "front_side_glass_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_057",
-      "source": "front_side_glass_outer",
-      "target": "front_side_glass_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_058",
-      "source": "rear_side_glass_inner",
-      "target": "rear_side_glass_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_059",
-      "source": "rear_side_glass_outer",
-      "target": "rear_side_glass_loft",
-      "sourceHandle": "out",
-      "targetHandle": "profiles"
-    },
-    {
-      "id": "e_060",
-      "source": "front_side_glass_loft",
-      "target": "side_glass_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_061",
-      "source": "rear_side_glass_loft",
-      "target": "side_glass_left",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_062",
-      "source": "side_glass_left",
-      "target": "side_glass_both",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_063",
-      "source": "side_glass_both",
-      "target": "side_glass_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_064",
-      "source": "side_glass_color",
-      "target": "side_glass_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_065",
-      "source": "windshield",
-      "target": "windshield_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_066",
-      "source": "rear_glass",
-      "target": "rear_glass_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_067",
-      "source": "windshield_place",
-      "target": "front_rear_glass",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_068",
-      "source": "rear_glass_place",
-      "target": "front_rear_glass",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_069",
-      "source": "front_rear_glass",
-      "target": "front_rear_glass_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_070",
-      "source": "front_rear_glass_color",
-      "target": "front_rear_glass_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_071",
-      "source": "seat_base",
-      "target": "seat_base_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_072",
-      "source": "seat_back",
-      "target": "seat_back_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_073",
-      "source": "seat_base_place",
-      "target": "seat_single",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_074",
-      "source": "seat_back_place",
-      "target": "seat_single",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_075",
-      "source": "seat_single",
-      "target": "seat_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_076",
-      "source": "seat_color",
-      "target": "seat_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_077",
-      "source": "seat_material",
-      "target": "seat_row_front",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_078",
-      "source": "seat_row_front",
-      "target": "seats_all",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_079",
-      "source": "dashboard",
-      "target": "dashboard_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_080",
-      "source": "dashboard_place",
-      "target": "dashboard_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_081",
-      "source": "dashboard_color",
-      "target": "dashboard_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_082",
-      "source": "headlight_bar",
-      "target": "headlight_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_083",
-      "source": "taillight_bar",
-      "target": "taillight_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_084",
-      "source": "headlight_place",
-      "target": "lights_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_085",
-      "source": "taillight_place",
-      "target": "lights_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_086",
-      "source": "lights_merge",
-      "target": "lights_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_087",
-      "source": "lights_color",
-      "target": "lights_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_088",
-      "source": "front_grille",
-      "target": "front_grille_place",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_089",
-      "source": "front_grille_place",
-      "target": "front_grille_color",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_090",
-      "source": "front_grille_color",
-      "target": "front_grille_material",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_091",
-      "source": "body_material",
+      "id": "e_root_sg_body",
+      "source": "sg_body",
       "target": "vehicle_assembly",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_092",
-      "source": "wheels_all",
+      "id": "e_root_sg_wheels",
+      "source": "sg_wheels",
       "target": "vehicle_assembly",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_093",
-      "source": "doors_material",
+      "id": "e_root_sg_doors",
+      "source": "sg_doors",
       "target": "vehicle_assembly",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_094",
-      "source": "side_glass_material",
+      "id": "e_root_sg_glass",
+      "source": "sg_glass",
       "target": "vehicle_assembly",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_095",
-      "source": "front_rear_glass_material",
+      "id": "e_root_sg_seats",
+      "source": "sg_seats",
       "target": "vehicle_assembly",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_096",
-      "source": "seats_all",
+      "id": "e_root_sg_details",
+      "source": "sg_details",
       "target": "vehicle_assembly",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_097",
-      "source": "dashboard_material",
-      "target": "vehicle_assembly",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_098",
-      "source": "lights_material",
-      "target": "vehicle_assembly",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_099",
-      "source": "front_grille_material",
-      "target": "vehicle_assembly",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_100",
+      "id": "e_root_out",
       "source": "vehicle_assembly",
       "target": "vehicle_output",
       "sourceHandle": "out",
       "targetHandle": "in"
+    }
+  ],
+  "subgraphs": [
+    {
+      "id": "body",
+      "name": "Body",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "body_profile_nose",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -1400.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":-2.39,\"y\":0.38,\"z\":0},{\"x\":-2.39,\"y\":0.42,\"z\":0.48},{\"x\":-2.39,\"y\":0.72,\"z\":0.48},{\"x\":-2.39,\"y\":0.78,\"z\":0.36},{\"x\":-2.39,\"y\":0.8,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Nose Profile"
+          }
+        },
+        {
+          "id": "body_profile_front",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -1080.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":-1.9,\"y\":0.38,\"z\":0},{\"x\":-1.9,\"y\":0.42,\"z\":0.82},{\"x\":-1.9,\"y\":0.88,\"z\":0.82},{\"x\":-1.9,\"y\":1.02,\"z\":0.55},{\"x\":-1.9,\"y\":1.07,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Front Profile"
+          }
+        },
+        {
+          "id": "body_profile_fender",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -760.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":-1.15,\"y\":0.38,\"z\":0},{\"x\":-1.15,\"y\":0.42,\"z\":0.93},{\"x\":-1.15,\"y\":0.95,\"z\":0.93},{\"x\":-1.15,\"y\":1.22,\"z\":0.68},{\"x\":-1.15,\"y\":1.32,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Fender Profile"
+          }
+        },
+        {
+          "id": "body_profile_center",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -440.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":0,\"y\":0.38,\"z\":0},{\"x\":0,\"y\":0.42,\"z\":0.93},{\"x\":0,\"y\":0.97,\"z\":0.93},{\"x\":0,\"y\":1.34,\"z\":0.74},{\"x\":0,\"y\":1.42,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Cabin Profile"
+          }
+        },
+        {
+          "id": "body_profile_rear_cabin",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -120.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":1.05,\"y\":0.38,\"z\":0},{\"x\":1.05,\"y\":0.42,\"z\":0.92},{\"x\":1.05,\"y\":0.94,\"z\":0.92},{\"x\":1.05,\"y\":1.27,\"z\":0.68},{\"x\":1.05,\"y\":1.36,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Rear Cabin Profile"
+          }
+        },
+        {
+          "id": "body_profile_rear",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": 200.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":1.85,\"y\":0.38,\"z\":0},{\"x\":1.85,\"y\":0.42,\"z\":0.85},{\"x\":1.85,\"y\":0.86,\"z\":0.85},{\"x\":1.85,\"y\":1,\"z\":0.48},{\"x\":1.85,\"y\":1.08,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Rear Profile"
+          }
+        },
+        {
+          "id": "body_profile_tail",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": 520.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": false,
+            "subdivisions": 12,
+            "controlPoints": "[{\"x\":2.39,\"y\":0.38,\"z\":0},{\"x\":2.39,\"y\":0.42,\"z\":0.52},{\"x\":2.39,\"y\":0.74,\"z\":0.52},{\"x\":2.39,\"y\":0.8,\"z\":0.3},{\"x\":2.39,\"y\":0.82,\"z\":0}]",
+            "tangents": "[{\"x\":0,\"y\":0.02,\"z\":0.62},{\"x\":0,\"y\":0.26,\"z\":0.06},{\"x\":0,\"y\":0.34,\"z\":-0.08},{\"x\":0,\"y\":0.14,\"z\":-0.48},{\"x\":0,\"y\":0.02,\"z\":-0.46}]",
+            "editPlane": "yz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Tail Profile"
+          }
+        },
+        {
+          "id": "front_arch_cutter",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 840.0,
+            "y": 0
+          },
+          "data": {
+            "radius": 0.405,
+            "height": 2.4,
+            "radialSegments": 48,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true,
+            "__nodeTitle": "Front Arch Cutter"
+          }
+        },
+        {
+          "id": "rear_arch_cutter",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 0
+          },
+          "data": {
+            "radius": 0.405,
+            "height": 2.4,
+            "radialSegments": 48,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true,
+            "__nodeTitle": "Rear Arch Cutter"
+          }
+        },
+        {
+          "id": "front_window_cutter",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1480.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.84,
+            "height": 0.38,
+            "depth": 0.3,
+            "__nodeTitle": "F Window Cutter"
+          }
+        },
+        {
+          "id": "rear_window_cutter",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1800.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.78,
+            "height": 0.36,
+            "depth": 0.3,
+            "__nodeTitle": "R Window Cutter"
+          }
+        },
+        {
+          "id": "body_loft",
+          "type": "LoftMesh",
+          "position": {
+            "x": -440.0,
+            "y": 160
+          },
+          "data": {
+            "columns": 32,
+            "sortAxis": "x",
+            "closedProfile": false,
+            "capStart": false,
+            "capEnd": false,
+            "autoAlign": true,
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "Body Loft"
+          }
+        },
+        {
+          "id": "front_arch_xform",
+          "type": "TransformMesh",
+          "position": {
+            "x": -120.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -1.53,
+            "translateY": 0.36,
+            "translateZ": 0,
+            "rotationX": 90,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Front Arch Xform"
+          }
+        },
+        {
+          "id": "rear_arch_xform",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 1.53,
+            "translateY": 0.36,
+            "translateZ": 0,
+            "rotationX": 90,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Rear Arch Xform"
+          }
+        },
+        {
+          "id": "front_window_cutter_xform",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -0.53,
+            "translateY": 1.12,
+            "translateZ": 0.88,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": -8,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "F Window Xform"
+          }
+        },
+        {
+          "id": "rear_window_cutter_xform",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 0.48,
+            "translateY": 1.1,
+            "translateZ": 0.88,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 5,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "R Window Xform"
+          }
+        },
+        {
+          "id": "body_mirror",
+          "type": "MirrorMesh",
+          "position": {
+            "x": 40.0,
+            "y": 320
+          },
+          "data": {
+            "axis": "z",
+            "offset": 0,
+            "mergeOriginal": true,
+            "weldSeam": true,
+            "weldTolerance": 0.0001,
+            "__nodeTitle": "Body Mirror"
+          }
+        },
+        {
+          "id": "window_cutters_left",
+          "type": "MergeMesh",
+          "position": {
+            "x": 360.0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Window Cutters L"
+          }
+        },
+        {
+          "id": "body_seam_fuse",
+          "type": "FuseMesh",
+          "position": {
+            "x": 40.0,
+            "y": 480
+          },
+          "data": {
+            "tolerance": 0.0001,
+            "removeDegenerate": true,
+            "__nodeTitle": "Body Seam Fuse"
+          }
+        },
+        {
+          "id": "window_cutters_both",
+          "type": "MirrorMesh",
+          "position": {
+            "x": 360.0,
+            "y": 480
+          },
+          "data": {
+            "axis": "z",
+            "offset": 0,
+            "mergeOriginal": true,
+            "weldSeam": false,
+            "weldTolerance": 0.0001,
+            "__nodeTitle": "Window Cutters Both"
+          }
+        },
+        {
+          "id": "body_shell",
+          "type": "ShellMesh",
+          "position": {
+            "x": 200.0,
+            "y": 640
+          },
+          "data": {
+            "thickness": 0.025,
+            "direction": "inward",
+            "closeBoundaries": true,
+            "outerGroup": "body_outer",
+            "innerGroup": "body_inner",
+            "rimGroup": "body_rim",
+            "__nodeTitle": "Body Shell"
+          }
+        },
+        {
+          "id": "body_cut_front_arch",
+          "type": "BooleanMesh",
+          "position": {
+            "x": 200.0,
+            "y": 800
+          },
+          "data": {
+            "operation": "subtract",
+            "treatAAs": "solid",
+            "treatBAs": "solid",
+            "useSelf": false,
+            "detriangulate": "all",
+            "weldEpsilon": 0.0001,
+            "triangleBudget": 500000,
+            "__nodeTitle": "Cut Front Arch"
+          }
+        },
+        {
+          "id": "body_cut_rear_arch",
+          "type": "BooleanMesh",
+          "position": {
+            "x": 200.0,
+            "y": 960
+          },
+          "data": {
+            "operation": "subtract",
+            "treatAAs": "solid",
+            "treatBAs": "solid",
+            "useSelf": false,
+            "detriangulate": "all",
+            "weldEpsilon": 0.0001,
+            "triangleBudget": 500000,
+            "__nodeTitle": "Cut Rear Arch"
+          }
+        },
+        {
+          "id": "body_cut_windows",
+          "type": "BooleanMesh",
+          "position": {
+            "x": 200.0,
+            "y": 1120
+          },
+          "data": {
+            "operation": "subtract",
+            "treatAAs": "solid",
+            "treatBAs": "solid",
+            "useSelf": false,
+            "detriangulate": "all",
+            "weldEpsilon": 0.0001,
+            "triangleBudget": 500000,
+            "__nodeTitle": "Cut Windows"
+          }
+        },
+        {
+          "id": "body_final_fuse",
+          "type": "FuseMesh",
+          "position": {
+            "x": 200.0,
+            "y": 1280
+          },
+          "data": {
+            "tolerance": 0.0001,
+            "removeDegenerate": true,
+            "__nodeTitle": "Body Final Fuse"
+          }
+        },
+        {
+          "id": "body_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 200.0,
+            "y": 1440
+          },
+          "data": {
+            "r": 0.58,
+            "g": 0.025,
+            "b": 0.035,
+            "a": 1,
+            "__nodeTitle": "Body Color"
+          }
+        },
+        {
+          "id": "body_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 1600
+          },
+          "data": {
+            "group": "",
+            "materialName": "CarPaint_Red",
+            "__nodeTitle": "Body Material"
+          }
+        },
+        {
+          "id": "body_sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200.0,
+            "y": 1760
+          },
+          "data": {
+            "__nodeTitle": "Body Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_001",
+          "source": "body_profile_nose",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_002",
+          "source": "body_profile_front",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_003",
+          "source": "body_profile_fender",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_004",
+          "source": "body_profile_center",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_005",
+          "source": "body_profile_rear_cabin",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_006",
+          "source": "body_profile_rear",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_007",
+          "source": "body_profile_tail",
+          "target": "body_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_008",
+          "source": "body_loft",
+          "target": "body_mirror",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_009",
+          "source": "body_mirror",
+          "target": "body_seam_fuse",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_010",
+          "source": "body_seam_fuse",
+          "target": "body_shell",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_011",
+          "source": "front_arch_cutter",
+          "target": "front_arch_xform",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_012",
+          "source": "body_shell",
+          "target": "body_cut_front_arch",
+          "sourceHandle": "out",
+          "targetHandle": "a"
+        },
+        {
+          "id": "e_013",
+          "source": "front_arch_xform",
+          "target": "body_cut_front_arch",
+          "sourceHandle": "out",
+          "targetHandle": "b"
+        },
+        {
+          "id": "e_014",
+          "source": "rear_arch_cutter",
+          "target": "rear_arch_xform",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_015",
+          "source": "body_cut_front_arch",
+          "target": "body_cut_rear_arch",
+          "sourceHandle": "out",
+          "targetHandle": "a"
+        },
+        {
+          "id": "e_016",
+          "source": "rear_arch_xform",
+          "target": "body_cut_rear_arch",
+          "sourceHandle": "out",
+          "targetHandle": "b"
+        },
+        {
+          "id": "e_017",
+          "source": "front_window_cutter",
+          "target": "front_window_cutter_xform",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_018",
+          "source": "rear_window_cutter",
+          "target": "rear_window_cutter_xform",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_019",
+          "source": "front_window_cutter_xform",
+          "target": "window_cutters_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_020",
+          "source": "rear_window_cutter_xform",
+          "target": "window_cutters_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_021",
+          "source": "window_cutters_left",
+          "target": "window_cutters_both",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_022",
+          "source": "body_cut_rear_arch",
+          "target": "body_cut_windows",
+          "sourceHandle": "out",
+          "targetHandle": "a"
+        },
+        {
+          "id": "e_023",
+          "source": "window_cutters_both",
+          "target": "body_cut_windows",
+          "sourceHandle": "out",
+          "targetHandle": "b"
+        },
+        {
+          "id": "e_024",
+          "source": "body_cut_windows",
+          "target": "body_final_fuse",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_025",
+          "source": "body_final_fuse",
+          "target": "body_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_026",
+          "source": "body_color",
+          "target": "body_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_body_to_out",
+          "source": "body_material",
+          "target": "body_sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    },
+    {
+      "id": "wheels",
+      "name": "Wheels",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "tire",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": -120.0,
+            "y": 0
+          },
+          "data": {
+            "radius": 0.36,
+            "height": 0.25,
+            "radialSegments": 48,
+            "heightSegments": 2,
+            "capTop": true,
+            "capBottom": true,
+            "__nodeTitle": "Tire Cylinder"
+          }
+        },
+        {
+          "id": "rim",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 200.0,
+            "y": 0
+          },
+          "data": {
+            "radius": 0.235,
+            "height": 0.27,
+            "radialSegments": 48,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true,
+            "__nodeTitle": "Rim Cylinder"
+          }
+        },
+        {
+          "id": "spoke",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 520.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.055,
+            "height": 0.25,
+            "depth": 0.045,
+            "__nodeTitle": "Spoke Box"
+          }
+        },
+        {
+          "id": "tire_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": -120.0,
+            "y": 160
+          },
+          "data": {
+            "edgeGroup": "",
+            "offsetType": "offset",
+            "amount": 0.035,
+            "segments": 3,
+            "limitMethod": "angle",
+            "angleLimit": 25,
+            "profile": 0.5,
+            "miterOuter": "arc",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": false,
+            "excludeGroups": "",
+            "__nodeTitle": "Tire Bevel"
+          }
+        },
+        {
+          "id": "rim_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200.0,
+            "y": 160
+          },
+          "data": {
+            "edgeGroup": "",
+            "offsetType": "offset",
+            "amount": 0.03,
+            "segments": 2,
+            "limitMethod": "angle",
+            "angleLimit": 25,
+            "profile": 0.5,
+            "miterOuter": "arc",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": false,
+            "excludeGroups": "",
+            "__nodeTitle": "Rim Bevel"
+          }
+        },
+        {
+          "id": "spoke_offset",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 0,
+            "translateY": 0.12,
+            "translateZ": 0.145,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Spoke Offset"
+          }
+        },
+        {
+          "id": "tire_xform",
+          "type": "TransformMesh",
+          "position": {
+            "x": -120.0,
+            "y": 320
+          },
+          "data": {
+            "translateX": 0,
+            "translateY": 0,
+            "translateZ": 0,
+            "rotationX": 90,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Tire Xform"
+          }
+        },
+        {
+          "id": "rim_xform",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 320
+          },
+          "data": {
+            "translateX": 0,
+            "translateY": 0,
+            "translateZ": 0,
+            "rotationX": 90,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Rim Xform"
+          }
+        },
+        {
+          "id": "spokes_radial",
+          "type": "CopyMesh",
+          "position": {
+            "x": 520.0,
+            "y": 320
+          },
+          "data": {
+            "mode": "circular",
+            "count": 10,
+            "axis": "z",
+            "angle": 360,
+            "translateX": 0,
+            "translateY": 0,
+            "translateZ": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0,
+            "__nodeTitle": "Spokes Radial"
+          }
+        },
+        {
+          "id": "tire_color",
+          "type": "VertexColor",
+          "position": {
+            "x": -120.0,
+            "y": 480
+          },
+          "data": {
+            "r": 0.025,
+            "g": 0.028,
+            "b": 0.032,
+            "a": 1,
+            "__nodeTitle": "Tire Color"
+          }
+        },
+        {
+          "id": "rim_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 200.0,
+            "y": 480
+          },
+          "data": {
+            "r": 0.58,
+            "g": 0.61,
+            "b": 0.66,
+            "a": 1,
+            "__nodeTitle": "Rim Color"
+          }
+        },
+        {
+          "id": "spokes_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 520.0,
+            "y": 480
+          },
+          "data": {
+            "r": 0.72,
+            "g": 0.74,
+            "b": 0.78,
+            "a": 1,
+            "__nodeTitle": "Spokes Color"
+          }
+        },
+        {
+          "id": "tire_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": -120.0,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "Rubber_Black",
+            "__nodeTitle": "Tire Material"
+          }
+        },
+        {
+          "id": "rim_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "Alloy_Satin",
+            "__nodeTitle": "Rim Material"
+          }
+        },
+        {
+          "id": "spokes_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 520.0,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "Alloy_Bright",
+            "__nodeTitle": "Spokes Material"
+          }
+        },
+        {
+          "id": "wheel_origin",
+          "type": "MergeMesh",
+          "position": {
+            "x": 200.0,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Wheel Origin"
+          }
+        },
+        {
+          "id": "wheel_left_front",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 960
+          },
+          "data": {
+            "translateX": -1.53,
+            "translateY": 0.36,
+            "translateZ": 0.94,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "FL Wheel"
+          }
+        },
+        {
+          "id": "wheels_left",
+          "type": "CopyMesh",
+          "position": {
+            "x": 200.0,
+            "y": 1120
+          },
+          "data": {
+            "mode": "linear",
+            "count": 2,
+            "axis": "x",
+            "angle": 360,
+            "translateX": 3.06,
+            "translateY": 0,
+            "translateZ": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0,
+            "__nodeTitle": "Wheels Left"
+          }
+        },
+        {
+          "id": "wheels_all",
+          "type": "MirrorMesh",
+          "position": {
+            "x": 200.0,
+            "y": 1280
+          },
+          "data": {
+            "axis": "z",
+            "offset": 0,
+            "mergeOriginal": true,
+            "weldSeam": false,
+            "weldTolerance": 0.0001,
+            "__nodeTitle": "Wheels All"
+          }
+        },
+        {
+          "id": "wheels_sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200.0,
+            "y": 1440
+          },
+          "data": {
+            "__nodeTitle": "Wheels Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_027",
+          "source": "tire",
+          "target": "tire_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_028",
+          "source": "tire_bevel",
+          "target": "tire_xform",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_029",
+          "source": "tire_xform",
+          "target": "tire_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_030",
+          "source": "tire_color",
+          "target": "tire_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_031",
+          "source": "rim",
+          "target": "rim_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_032",
+          "source": "rim_bevel",
+          "target": "rim_xform",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_033",
+          "source": "rim_xform",
+          "target": "rim_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_034",
+          "source": "rim_color",
+          "target": "rim_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_035",
+          "source": "spoke",
+          "target": "spoke_offset",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_036",
+          "source": "spoke_offset",
+          "target": "spokes_radial",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_037",
+          "source": "spokes_radial",
+          "target": "spokes_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_038",
+          "source": "spokes_color",
+          "target": "spokes_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_039",
+          "source": "tire_material",
+          "target": "wheel_origin",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_040",
+          "source": "rim_material",
+          "target": "wheel_origin",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_041",
+          "source": "spokes_material",
+          "target": "wheel_origin",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_042",
+          "source": "wheel_origin",
+          "target": "wheel_left_front",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_043",
+          "source": "wheel_left_front",
+          "target": "wheels_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_044",
+          "source": "wheels_left",
+          "target": "wheels_all",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_wheels_to_out",
+          "source": "wheels_all",
+          "target": "wheels_sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    },
+    {
+      "id": "doors",
+      "name": "Doors",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "front_door_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 40.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.94,
+            "height": 0.52,
+            "depth": 0.022,
+            "__nodeTitle": "Front Door Box"
+          }
+        },
+        {
+          "id": "rear_door_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 360.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.9,
+            "height": 0.52,
+            "depth": 0.022,
+            "__nodeTitle": "Rear Door Box"
+          }
+        },
+        {
+          "id": "front_door_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 40.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -0.58,
+            "translateY": 0.69,
+            "translateZ": 0.938,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Front Door Place"
+          }
+        },
+        {
+          "id": "rear_door_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 360.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 0.52,
+            "translateY": 0.69,
+            "translateZ": 0.938,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Rear Door Place"
+          }
+        },
+        {
+          "id": "front_door_outer_group",
+          "type": "FaceGroupByNormal",
+          "position": {
+            "x": 40.0,
+            "y": 320
+          },
+          "data": {
+            "outputGroup": "front_door_outer",
+            "directionX": 0,
+            "directionY": 0,
+            "directionZ": 1,
+            "spreadAngle": 5,
+            "__nodeTitle": "F Door Outer Grp"
+          }
+        },
+        {
+          "id": "rear_door_outer_group",
+          "type": "FaceGroupByNormal",
+          "position": {
+            "x": 360.0,
+            "y": 320
+          },
+          "data": {
+            "outputGroup": "rear_door_outer",
+            "directionX": 0,
+            "directionY": 0,
+            "directionZ": 1,
+            "spreadAngle": 5,
+            "__nodeTitle": "R Door Outer Grp"
+          }
+        },
+        {
+          "id": "front_door_panel",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 40.0,
+            "y": 480
+          },
+          "data": {
+            "faceGroup": "front_door_outer",
+            "distance": 0.008,
+            "inset": 0.025,
+            "keepOriginal": false,
+            "topGroup": "front_door_skin",
+            "sideGroup": "front_door_seam",
+            "__nodeTitle": "Front Door Panel"
+          }
+        },
+        {
+          "id": "rear_door_panel",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 360.0,
+            "y": 480
+          },
+          "data": {
+            "faceGroup": "rear_door_outer",
+            "distance": 0.008,
+            "inset": 0.025,
+            "keepOriginal": false,
+            "topGroup": "rear_door_skin",
+            "sideGroup": "rear_door_seam",
+            "__nodeTitle": "Rear Door Panel"
+          }
+        },
+        {
+          "id": "doors_left",
+          "type": "MergeMesh",
+          "position": {
+            "x": 200.0,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Doors Left"
+          }
+        },
+        {
+          "id": "doors_both",
+          "type": "MirrorMesh",
+          "position": {
+            "x": 200.0,
+            "y": 800
+          },
+          "data": {
+            "axis": "z",
+            "offset": 0,
+            "mergeOriginal": true,
+            "weldSeam": false,
+            "weldTolerance": 0.0001,
+            "__nodeTitle": "Doors Both"
+          }
+        },
+        {
+          "id": "doors_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 200.0,
+            "y": 960
+          },
+          "data": {
+            "r": 0.48,
+            "g": 0.018,
+            "b": 0.028,
+            "a": 1,
+            "__nodeTitle": "Doors Color"
+          }
+        },
+        {
+          "id": "doors_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 1120
+          },
+          "data": {
+            "group": "",
+            "materialName": "CarPaint_Red_Dark",
+            "__nodeTitle": "Doors Material"
+          }
+        },
+        {
+          "id": "doors_sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200.0,
+            "y": 1280
+          },
+          "data": {
+            "__nodeTitle": "Doors Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_045",
+          "source": "front_door_box",
+          "target": "front_door_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_046",
+          "source": "front_door_place",
+          "target": "front_door_outer_group",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_047",
+          "source": "front_door_outer_group",
+          "target": "front_door_panel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_048",
+          "source": "rear_door_box",
+          "target": "rear_door_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_049",
+          "source": "rear_door_place",
+          "target": "rear_door_outer_group",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_050",
+          "source": "rear_door_outer_group",
+          "target": "rear_door_panel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_051",
+          "source": "front_door_panel",
+          "target": "doors_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_052",
+          "source": "rear_door_panel",
+          "target": "doors_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_053",
+          "source": "doors_left",
+          "target": "doors_both",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_054",
+          "source": "doors_both",
+          "target": "doors_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_055",
+          "source": "doors_color",
+          "target": "doors_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_doors_to_out",
+          "source": "doors_material",
+          "target": "doors_sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    },
+    {
+      "id": "glass",
+      "name": "Glass",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "front_side_glass_inner",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -600.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": true,
+            "subdivisions": 10,
+            "controlPoints": "[{\"x\":-1,\"y\":0.94,\"z\":0.942},{\"x\":-0.08,\"y\":0.94,\"z\":0.942},{\"x\":-0.12,\"y\":1.29,\"z\":0.942},{\"x\":-0.69,\"y\":1.34,\"z\":0.942}]",
+            "tangents": "[{\"x\":0.305,\"y\":-0.20000000000000007,\"z\":0},{\"x\":0.44,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.305,\"y\":0.20000000000000007,\"z\":0},{\"x\":-0.44,\"y\":-0.17500000000000004,\"z\":0}]",
+            "editPlane": "xy",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "F Side Glass In"
+          }
+        },
+        {
+          "id": "front_side_glass_outer",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": -280.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": true,
+            "subdivisions": 10,
+            "controlPoints": "[{\"x\":-1,\"y\":0.94,\"z\":0.956},{\"x\":-0.08,\"y\":0.94,\"z\":0.956},{\"x\":-0.12,\"y\":1.29,\"z\":0.956},{\"x\":-0.69,\"y\":1.34,\"z\":0.956}]",
+            "tangents": "[{\"x\":0.305,\"y\":-0.20000000000000007,\"z\":0},{\"x\":0.44,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.305,\"y\":0.20000000000000007,\"z\":0},{\"x\":-0.44,\"y\":-0.17500000000000004,\"z\":0}]",
+            "editPlane": "xy",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "F Side Glass Out"
+          }
+        },
+        {
+          "id": "rear_side_glass_inner",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": 40.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": true,
+            "subdivisions": 10,
+            "controlPoints": "[{\"x\":0.02,\"y\":0.94,\"z\":0.942},{\"x\":0.92,\"y\":0.94,\"z\":0.942},{\"x\":0.8,\"y\":1.22,\"z\":0.942},{\"x\":0.08,\"y\":1.29,\"z\":0.942}]",
+            "tangents": "[{\"x\":0.42000000000000004,\"y\":-0.17500000000000004,\"z\":0},{\"x\":0.39,\"y\":0.14,\"z\":0},{\"x\":-0.42000000000000004,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.39,\"y\":-0.14,\"z\":0}]",
+            "editPlane": "xy",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "R Side Glass In"
+          }
+        },
+        {
+          "id": "rear_side_glass_outer",
+          "type": "CreateBezierSpline",
+          "position": {
+            "x": 360.0,
+            "y": 0
+          },
+          "data": {
+            "mode": "catmullRom",
+            "closed": true,
+            "subdivisions": 10,
+            "controlPoints": "[{\"x\":0.02,\"y\":0.94,\"z\":0.956},{\"x\":0.92,\"y\":0.94,\"z\":0.956},{\"x\":0.8,\"y\":1.22,\"z\":0.956},{\"x\":0.08,\"y\":1.29,\"z\":0.956}]",
+            "tangents": "[{\"x\":0.42000000000000004,\"y\":-0.17500000000000004,\"z\":0},{\"x\":0.39,\"y\":0.14,\"z\":0},{\"x\":-0.42000000000000004,\"y\":0.17500000000000004,\"z\":0},{\"x\":-0.39,\"y\":-0.14,\"z\":0}]",
+            "editPlane": "xy",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "R Side Glass Out"
+          }
+        },
+        {
+          "id": "windshield",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 680.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.035,
+            "height": 0.72,
+            "depth": 1.45,
+            "__nodeTitle": "Windshield Box"
+          }
+        },
+        {
+          "id": "rear_glass",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1000.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.035,
+            "height": 0.62,
+            "depth": 1.36,
+            "__nodeTitle": "Rear Glass Box"
+          }
+        },
+        {
+          "id": "front_side_glass_loft",
+          "type": "LoftMesh",
+          "position": {
+            "x": -280.0,
+            "y": 160
+          },
+          "data": {
+            "columns": 32,
+            "sortAxis": "z",
+            "closedProfile": true,
+            "capStart": true,
+            "capEnd": true,
+            "autoAlign": true,
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "F Side Glass Loft"
+          }
+        },
+        {
+          "id": "rear_side_glass_loft",
+          "type": "LoftMesh",
+          "position": {
+            "x": 40.0,
+            "y": 160
+          },
+          "data": {
+            "columns": 32,
+            "sortAxis": "z",
+            "closedProfile": true,
+            "capStart": true,
+            "capEnd": true,
+            "autoAlign": true,
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "R Side Glass Loft"
+          }
+        },
+        {
+          "id": "windshield_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 360.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -0.91,
+            "translateY": 1.14,
+            "translateZ": 0,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": -50,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Windshield Place"
+          }
+        },
+        {
+          "id": "rear_glass_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 680.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 1.11,
+            "translateY": 1.12,
+            "translateZ": 0,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 50,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Rear Glass Place"
+          }
+        },
+        {
+          "id": "side_glass_left",
+          "type": "MergeMesh",
+          "position": {
+            "x": 40.0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Side Glass Left"
+          }
+        },
+        {
+          "id": "front_rear_glass",
+          "type": "MergeMesh",
+          "position": {
+            "x": 360.0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Front/Rear Glass"
+          }
+        },
+        {
+          "id": "side_glass_both",
+          "type": "MirrorMesh",
+          "position": {
+            "x": 40.0,
+            "y": 480
+          },
+          "data": {
+            "axis": "z",
+            "offset": 0,
+            "mergeOriginal": true,
+            "weldSeam": false,
+            "weldTolerance": 0.0001,
+            "__nodeTitle": "Side Glass Both"
+          }
+        },
+        {
+          "id": "front_rear_glass_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 360.0,
+            "y": 480
+          },
+          "data": {
+            "r": 0.035,
+            "g": 0.07,
+            "b": 0.1,
+            "a": 0.68,
+            "__nodeTitle": "FR Glass Color"
+          }
+        },
+        {
+          "id": "side_glass_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 40.0,
+            "y": 640
+          },
+          "data": {
+            "r": 0.045,
+            "g": 0.085,
+            "b": 0.12,
+            "a": 0.72,
+            "__nodeTitle": "Side Glass Color"
+          }
+        },
+        {
+          "id": "front_rear_glass_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 360.0,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "Glass_Smoked",
+            "__nodeTitle": "FR Glass Mat"
+          }
+        },
+        {
+          "id": "side_glass_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 800
+          },
+          "data": {
+            "group": "",
+            "materialName": "Glass_Smoked",
+            "__nodeTitle": "Side Glass Mat"
+          }
+        },
+        {
+          "id": "glass_sg_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 280.0,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "Glass Merge"
+          }
+        },
+        {
+          "id": "glass_sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 280.0,
+            "y": 1120
+          },
+          "data": {
+            "__nodeTitle": "Glass Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_056",
+          "source": "front_side_glass_inner",
+          "target": "front_side_glass_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_057",
+          "source": "front_side_glass_outer",
+          "target": "front_side_glass_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_058",
+          "source": "rear_side_glass_inner",
+          "target": "rear_side_glass_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_059",
+          "source": "rear_side_glass_outer",
+          "target": "rear_side_glass_loft",
+          "sourceHandle": "out",
+          "targetHandle": "profiles"
+        },
+        {
+          "id": "e_060",
+          "source": "front_side_glass_loft",
+          "target": "side_glass_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_061",
+          "source": "rear_side_glass_loft",
+          "target": "side_glass_left",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_062",
+          "source": "side_glass_left",
+          "target": "side_glass_both",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_063",
+          "source": "side_glass_both",
+          "target": "side_glass_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_064",
+          "source": "side_glass_color",
+          "target": "side_glass_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_065",
+          "source": "windshield",
+          "target": "windshield_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_066",
+          "source": "rear_glass",
+          "target": "rear_glass_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_067",
+          "source": "windshield_place",
+          "target": "front_rear_glass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_068",
+          "source": "rear_glass_place",
+          "target": "front_rear_glass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_069",
+          "source": "front_rear_glass",
+          "target": "front_rear_glass_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_070",
+          "source": "front_rear_glass_color",
+          "target": "front_rear_glass_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_side_glass_material_to_glass_sg_merge",
+          "source": "side_glass_material",
+          "target": "glass_sg_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_front_rear_glass_material_to_glass_sg_merge",
+          "source": "front_rear_glass_material",
+          "target": "glass_sg_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_glass_sg_merge_to_out",
+          "source": "glass_sg_merge",
+          "target": "glass_sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    },
+    {
+      "id": "seats",
+      "name": "Seats",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "seat_base",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 40.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.48,
+            "height": 0.16,
+            "depth": 0.46,
+            "__nodeTitle": "Seat Base"
+          }
+        },
+        {
+          "id": "seat_back",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 360.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.17,
+            "height": 0.6,
+            "depth": 0.46,
+            "__nodeTitle": "Seat Back"
+          }
+        },
+        {
+          "id": "seat_base_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 40.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -0.15,
+            "translateY": 0.58,
+            "translateZ": -0.45,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Seat Base Place"
+          }
+        },
+        {
+          "id": "seat_back_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 360.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 0.16,
+            "translateY": 0.85,
+            "translateZ": -0.45,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": -8,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Seat Back Place"
+          }
+        },
+        {
+          "id": "seat_single",
+          "type": "MergeMesh",
+          "position": {
+            "x": 200.0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Seat Single"
+          }
+        },
+        {
+          "id": "seat_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 200.0,
+            "y": 480
+          },
+          "data": {
+            "r": 0.47,
+            "g": 0.23,
+            "b": 0.1,
+            "a": 1,
+            "__nodeTitle": "Seat Color"
+          }
+        },
+        {
+          "id": "seat_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "Leather_Tan",
+            "__nodeTitle": "Seat Material"
+          }
+        },
+        {
+          "id": "seat_row_front",
+          "type": "CopyMesh",
+          "position": {
+            "x": 200.0,
+            "y": 800
+          },
+          "data": {
+            "mode": "linear",
+            "count": 2,
+            "axis": "z",
+            "angle": 360,
+            "translateX": 0,
+            "translateY": 0,
+            "translateZ": 0.9,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0,
+            "__nodeTitle": "Front Seat Row"
+          }
+        },
+        {
+          "id": "seats_all",
+          "type": "CopyMesh",
+          "position": {
+            "x": 200.0,
+            "y": 960
+          },
+          "data": {
+            "mode": "linear",
+            "count": 2,
+            "axis": "x",
+            "angle": 360,
+            "translateX": 0.88,
+            "translateY": 0,
+            "translateZ": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0,
+            "__nodeTitle": "Seats All"
+          }
+        },
+        {
+          "id": "seats_sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200.0,
+            "y": 1120
+          },
+          "data": {
+            "__nodeTitle": "Seats Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_071",
+          "source": "seat_base",
+          "target": "seat_base_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_072",
+          "source": "seat_back",
+          "target": "seat_back_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_073",
+          "source": "seat_base_place",
+          "target": "seat_single",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_074",
+          "source": "seat_back_place",
+          "target": "seat_single",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_075",
+          "source": "seat_single",
+          "target": "seat_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_076",
+          "source": "seat_color",
+          "target": "seat_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_077",
+          "source": "seat_material",
+          "target": "seat_row_front",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_078",
+          "source": "seat_row_front",
+          "target": "seats_all",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_seats_to_out",
+          "source": "seats_all",
+          "target": "seats_sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    },
+    {
+      "id": "details",
+      "name": "Details",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "dashboard",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": -280.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.28,
+            "height": 0.18,
+            "depth": 1.48,
+            "__nodeTitle": "Dashboard Box"
+          }
+        },
+        {
+          "id": "headlight_bar",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 40.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.055,
+            "height": 0.15,
+            "depth": 1.12,
+            "__nodeTitle": "Headlight Bar"
+          }
+        },
+        {
+          "id": "taillight_bar",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 360.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.055,
+            "height": 0.13,
+            "depth": 1.18,
+            "__nodeTitle": "Taillight Bar"
+          }
+        },
+        {
+          "id": "front_grille",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 680.0,
+            "y": 0
+          },
+          "data": {
+            "width": 0.045,
+            "height": 0.24,
+            "depth": 0.82,
+            "__nodeTitle": "Front Grille Box"
+          }
+        },
+        {
+          "id": "dashboard_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": -280.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -0.76,
+            "translateY": 0.88,
+            "translateZ": 0,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": -8,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Dashboard Place"
+          }
+        },
+        {
+          "id": "headlight_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 40.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -2.38,
+            "translateY": 0.73,
+            "translateZ": 0,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Headlight Place"
+          }
+        },
+        {
+          "id": "taillight_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 360.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": 2.38,
+            "translateY": 0.72,
+            "translateZ": 0,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Taillight Place"
+          }
+        },
+        {
+          "id": "front_grille_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 680.0,
+            "y": 160
+          },
+          "data": {
+            "translateX": -2.415,
+            "translateY": 0.5,
+            "translateZ": 0,
+            "rotationX": 0,
+            "rotationY": 0,
+            "rotationZ": 0,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleZ": 1,
+            "__nodeTitle": "Grille Place"
+          }
+        },
+        {
+          "id": "dashboard_color",
+          "type": "VertexColor",
+          "position": {
+            "x": -120.0,
+            "y": 320
+          },
+          "data": {
+            "r": 0.055,
+            "g": 0.058,
+            "b": 0.062,
+            "a": 1,
+            "__nodeTitle": "Dashboard Color"
+          }
+        },
+        {
+          "id": "lights_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 200.0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Lights Merge"
+          }
+        },
+        {
+          "id": "front_grille_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 520.0,
+            "y": 320
+          },
+          "data": {
+            "r": 0.018,
+            "g": 0.02,
+            "b": 0.024,
+            "a": 1,
+            "__nodeTitle": "Grille Color"
+          }
+        },
+        {
+          "id": "dashboard_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": -120.0,
+            "y": 480
+          },
+          "data": {
+            "group": "",
+            "materialName": "Interior_Black",
+            "__nodeTitle": "Dashboard Mat"
+          }
+        },
+        {
+          "id": "lights_color",
+          "type": "VertexColor",
+          "position": {
+            "x": 200.0,
+            "y": 480
+          },
+          "data": {
+            "r": 0.95,
+            "g": 0.2,
+            "b": 0.08,
+            "a": 1,
+            "__nodeTitle": "Lights Color"
+          }
+        },
+        {
+          "id": "front_grille_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 520.0,
+            "y": 480
+          },
+          "data": {
+            "group": "",
+            "materialName": "Grille_Black",
+            "__nodeTitle": "Grille Material"
+          }
+        },
+        {
+          "id": "lights_material",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "Vehicle_Lights",
+            "__nodeTitle": "Lights Material"
+          }
+        },
+        {
+          "id": "details_sg_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 200.0,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Details Merge"
+          }
+        },
+        {
+          "id": "details_sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200.0,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "Details Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_079",
+          "source": "dashboard",
+          "target": "dashboard_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_080",
+          "source": "dashboard_place",
+          "target": "dashboard_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_081",
+          "source": "dashboard_color",
+          "target": "dashboard_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_082",
+          "source": "headlight_bar",
+          "target": "headlight_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_083",
+          "source": "taillight_bar",
+          "target": "taillight_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_084",
+          "source": "headlight_place",
+          "target": "lights_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_085",
+          "source": "taillight_place",
+          "target": "lights_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_086",
+          "source": "lights_merge",
+          "target": "lights_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_087",
+          "source": "lights_color",
+          "target": "lights_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_088",
+          "source": "front_grille",
+          "target": "front_grille_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_089",
+          "source": "front_grille_place",
+          "target": "front_grille_color",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_090",
+          "source": "front_grille_color",
+          "target": "front_grille_material",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_dashboard_material_to_details_sg_merge",
+          "source": "dashboard_material",
+          "target": "details_sg_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_lights_material_to_details_sg_merge",
+          "source": "lights_material",
+          "target": "details_sg_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_front_grille_material_to_details_sg_merge",
+          "source": "front_grille_material",
+          "target": "details_sg_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_details_sg_merge_to_out",
+          "source": "details_sg_merge",
+          "target": "details_sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
     }
   ]
 }

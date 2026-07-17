@@ -2,21 +2,22 @@
 name: pcg-graph-authoring
 description: >-
   Author PCG Graph JSON (.pcg) files for the PCG-AI repo with Houdini-style
-  top-to-bottom layout. Use when creating, editing, or scaffolding .pcg graphs,
-  bridge/spline/mesh/scatter demos, or when the user mentions PCG graph, node
+  top-to-bottom layout and module-level Subgraphs for large assemblies. Use when
+  creating, editing, or scaffolding .pcg graphs, bridge/spline/mesh/scatter
+  demos, Subgraph/Subnet packaging, or when the user mentions PCG graph, node
   wiring, bridge-demo, or Houdini layout.
 ---
 
 # PCG Graph Authoring (PCG-AI)
 
-Create `.pcg` files for this repo. **Layout is Houdini-style: data flows top → bottom**, not left → right.
+Create `.pcg` files for this repo. **Layout is Houdini-style: data flows top → bottom**, not left → right. Large multi-part assemblies use **Subgraphs for complete modules** (not for tiny stubs) — see [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first).
 
 ## Before writing
 
 1. Read `schema/node-manifest.json` — SSOT for node `type`, pin ids, pin types, property defaults.
 2. **[Mandatory] Load PCG rules via vault RAG** — `rule_search(query=装配倒角 OR 模型类型关键词, domain=pcg, top_k=10)`. Always expect `pcg/assembly-bevel` + `pcg/index`; open matching type (`pcg/vehicle`, `pcg/bridge`, …) with `vault_get_chunk` or Read `VAULT_ROOT/Rules/pcg/<name>.md`. If no matching type, derive from shape analysis and note the gap.
 3. Skim a similar example under `examples/` (see [examples.md](examples.md)) for **topology patterns** only (how nodes wire together), not for modeling strategy.
-4. Never invent node types or pin ids; copy from manifest.
+4. Never invent node types or pin ids; copy from manifest. `Subgraph` / `SubgraphInput` / `SubgraphOutput` are structural (see tutorial); ports come from the definition, not the manifest.
 
 ## Shape analysis (mandatory when user provides a reference image)
 
@@ -111,6 +112,123 @@ Otherwise: **bevel per part, then merge**.
 #### Per-part amount rule
 
 Scale `amount` to **that part’s** max dimension, not the whole assembly AABB. A hose with radius 0.06 needs ~0.005–0.015; a 3.7-tall canister body needs ~0.05–0.15. Sharing one post-merge amount is always wrong for mixed-scale assemblies.
+
+## Subgraph modularization (P0 — modules first, not count-first)
+
+Large assemblies must not stay as one flat spaghetti graph. Use **Subgraph** (Houdini Subnet style; see `docs/Tutorials/11-subgraphs.md`) to hide complete modules behind one node on the root canvas.
+
+**Prime rule**: encapsulate a **complete functional / model module** — never wrap nodes just to shrink a counter. Node-count thresholds only decide *when to ask* “which modules should become Subgraphs?”, not *how to slice*.
+
+### When to consider Subgraphs (soft triggers)
+
+| Soft signal | Meaning | Action |
+|-------------|---------|--------|
+| Root visible nodes ≈ **40+** | Canvas hard to read; titles/lanes collide | Plan modules; package the largest complete parts |
+| Root visible nodes ≈ **80+** | Flat authoring failure (e.g. sedan-scale) | **Must** package; root should mostly be Subgraph instances + final `MergeMesh` + `Output` |
+| Same part pattern × **≥ 2** instances | Wheel ×4, pier prototype, door L/R | One **definition**, multiple `Subgraph` instances (`data.subgraphId`) |
+| One lane tip already ≥ **~8–12** executable nodes | Natural module boundary (matches subsystem lanes) | Prefer that lane → one Subgraph |
+| User asks for Subgraph / reuse / cleaner root | Explicit intent | Follow module rules below |
+
+Counts are **heuristics**, not hard law. A clean 35-node single-spine graph can stay flat; a messy 30-node multi-part vehicle may still need modules.
+
+### What counts as a “complete module” (must pass)
+
+A candidate Subgraph should answer **yes** to most of these:
+
+1. **Nameable product part** — you can title it like a part, not an operator: `"FL Wheel"`, `"Body Shell"`, `"Hose Assembly"`, `"Deck + Bevel"`. If the best name is `"Transform Box"`, it is not a module.
+2. **Coherent I/O** — usually **0–2 inputs** (external mesh/spline/params) and **1 primary mesh output** (extra outs only when the parent truly needs them).
+3. **Finished enough to merge** — includes that part’s generate → (subdiv) → **bevel / place** chain so the root only **merges** modules (aligns with [Bevel placement](#bevel-placement-p0-for-assemblies)).
+4. **Independent edit unit** — an artist can open the Subgraph and tweak that part without touching unrelated geometry.
+5. **Reuse or size** — either referenced **≥ 2×**, or large enough alone that flattening hurts root readability.
+
+### ❌ Do not encapsulate (为封而封)
+
+| Anti-pattern | Why |
+|--------------|-----|
+| 2–4 node linear stubs (`Box → Transform`, `Sweep → Bevel` alone with no part context) | Noise; hides nothing meaningful |
+| Unrelated parts in one bag (`wheel + door + glass`) | Breaks module identity; edit/reuse becomes worse |
+| Mid-pipeline cuts (body sweep outside, body bevel inside) | Crosses bevel/assembly boundaries; hard to reason |
+| One mega-Subgraph holding “everything except Output” | Fake modularity — root still opaque |
+| Nesting > 2 levels without reuse need | Harder navigation; flatten unless definition is shared |
+| Splitting solely to meet a numeric quota | Thresholds trigger planning, not random cuts |
+
+### ✅ Good module boundaries (examples)
+
+| Model | Prefer Subgraph definitions | Keep on root |
+|-------|----------------------------|--------------|
+| Vehicle | `wheel` (tire+rim+spokes+origin), `body` (profiles→loft/sweep→bevel→arch), `doors`, `glass`, lights | Instances + `MergeMesh` → `Output` |
+| Bridge | `deck` (path+profile+sweep+bevel), `pier_proto` (if instanced) | Path may stay shared; `InstanceAlongSpline` + merge |
+| Canister | `body` (revolve+bevel), `hose` (path+sweep), `wheels` / fittings | Final assembly merge |
+| Scatter | Prototype mesh Subgraph if complex; scatter chain can stay flat if short | Spawner / Output |
+
+Reuse pattern: define `wheel` once; place `fl_wheel` / `fr_wheel` / … as separate `Subgraph` instances with different root-side `TransformMesh` **or** bake placement inside per-instance wrappers only when transforms differ and cannot be shared cleanly.
+
+### Decision checklist (before writing nodes)
+
+```text
+1. List modules from shape analysis / strategy rule (parts, not operators).
+2. Soft-trigger? (root size / reuse / lane size) → if no, stay flat.
+3. Each candidate: nameable? coherent I/O? finished to merge? → else keep flat or enlarge scope.
+4. Prefer fewer, larger modules over many tiny Subgraphs.
+5. Root graph goal: readable assembly sketch (lanes of Subgraph tips → Merge → Output).
+```
+
+Record the module plan in the reply (short table: module → approx node count → reused?) **before** writing JSON when soft triggers fire.
+
+### Subgraph JSON contract
+
+Definitions live in root `subgraphs[]`. Instances are ordinary nodes with `type: "Subgraph"` and `data.subgraphId`. Runtime flattens before cook (no separate executor). `SubgraphInput` / `SubgraphOutput` exist **only inside** definitions.
+
+```json
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "fl_wheel",
+      "type": "Subgraph",
+      "position": { "x": -120, "y": 320 },
+      "data": { "__nodeTitle": "FL Wheel", "subgraphId": "wheel" }
+    }
+  ],
+  "edges": [
+    { "id": "e_wheel_to_merge", "source": "fl_wheel", "target": "vehicle_merge",
+      "sourceHandle": "mesh", "targetHandle": "in" }
+  ],
+  "subgraphs": [
+    {
+      "id": "wheel",
+      "name": "Wheel",
+      "inputs": [],
+      "outputs": [{ "id": "mesh", "name": "Mesh", "pinType": "Mesh" }],
+      "nodes": [
+        { "id": "tire_sweep", "type": "SweepAlongSpline", "position": { "x": 200, "y": 0 },
+          "data": { "__nodeTitle": "Tire Sweep" } },
+        { "id": "wheel_out", "type": "SubgraphOutput", "position": { "x": 200, "y": 160 },
+          "data": { "__nodeTitle": "Wheel Out" } }
+      ],
+      "edges": [
+        { "id": "e_tire_out", "source": "tire_sweep", "target": "wheel_out",
+          "sourceHandle": "out", "targetHandle": "mesh" }
+      ]
+    }
+  ]
+}
+```
+
+(Illustration only — real wheel modules include tire/rim/spokes + placement; see examples.md for a full I/O wrapper.)
+
+| Rule | Detail |
+|------|--------|
+| `subgraphs[].id` | Stable snake_case definition id; instances set `data.subgraphId` to this |
+| Ports | `inputs[]` / `outputs[]` declare `id`, `name`, `pinType` (`Mesh`, `Spline`, … — match real pins) |
+| Interface wiring (P0) | `SubgraphInput` **edge `sourceHandle`** = `inputs[].id`; `SubgraphOutput` **edge `targetHandle`** = `outputs[].id` (runtime maps via handles — see `graph_parser.cpp`) |
+| Instance handles | Root edges use those same port ids as `targetHandle` / `sourceHandle` on the `Subgraph` node |
+| `__nodeTitle` | Required on instance **and** interior nodes (same display rules as root) |
+| Layout | Interior graphs use the same top-down + `COL_STEP_X` rules; one definition = one module spine/lanes |
+| Recursion | Forbidden (A→B→A rejected by parser) |
+| Storage | Inline in `.pcg` only — no external subgraph asset file |
+
+Minimal worked example (transform wrapper) is in [examples.md](examples.md#subgraph-module-move-mesh) and `docs/Tutorials/11-subgraphs.md`. Prefer **part-sized** modules over that minimal pattern in real models.
 
 ### Strategy rules consultation (mandatory)
 
@@ -292,7 +410,8 @@ When presenting parameters, use this compact format:
 {
   "version": "1.0",
   "nodes": [ { "id", "type", "position": { "x", "y" }, "data": { ... } } ],
-  "edges": [ { "id", "source", "target", "sourceHandle", "targetHandle" } ]
+  "edges": [ { "id", "source", "target", "sourceHandle", "targetHandle" } ],
+  "subgraphs": [ { "id", "name", "inputs", "outputs", "nodes", "edges" } ]
 }
 ```
 
@@ -305,6 +424,7 @@ When presenting parameters, use this compact format:
 | `edges` | `sourceHandle` / `targetHandle` = manifest pin `id` (e.g. `backbone`, `profile`, `a`, `b`) |
 | Pin compatibility | Output `pinType` must match input `pinType` (or `Output.in` = `Any`) |
 | Terminator | Every runnable graph ends with `Output` at the **bottom** |
+| `subgraphs` | Optional; required when any `type: "Subgraph"` instance exists — see [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first) |
 
 ## Node display names (P0 — Unity GraphView)
 
@@ -399,6 +519,7 @@ For multi-part assemblies (vehicle, bridge+details, canister+hose+…):
 6. Parallel sub-chains inside a lane (tire / rim / spokes → `wheel_origin`) get **sub-lanes** `lane_x ± k*COL_STEP_X`, then merge on the lane spine.
 7. Final `MergeMesh` + `Output` sit on the bottom row at the **center of all lane tips**.
 8. After placing, prefer parent and child with similar `x` (barycenter of parents for multi-parent nodes). Long diagonal edges across many lanes = failed layout — re-lane.
+9. When [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first) applies, each **lane tip** that is a complete module becomes one `Subgraph` instance on the root; interior nodes move into `subgraphs[]` with their own top-down layout.
 
 ```text
   [body profiles…]     [tire][rim][spoke]    [door boxes]
@@ -446,6 +567,8 @@ When **editing** old examples that use horizontal layout, dense X packing, or sp
 | MergeMesh | `out` → `in` (variadic — all inputs use `in`) |
 | Output | `out` → `in` |
 | Assembly Bevel | part → `BevelMesh` → `MergeMesh` (not Merge → Bevel) |
+| Subgraph instance | upstream `out` → instance **input port id**; instance **output port id** → downstream `in` |
+| Subgraph interior | `SubgraphInput` port id → first op; last op `out` → `SubgraphOutput` port id |
 
 ## Workflow
 
@@ -455,15 +578,16 @@ When **editing** old examples that use horizontal layout, dense X packing, or sp
 - [ ] 1. Strategy rules check (mandatory: `rule_search domain=pcg` → `pcg/assembly-bevel` + matching type under `Rules/pcg/`)
 - [ ] 2. Node selection (follow Node Selection Guide + strategy file; justify any deviation)
 - [ ] 2b. Bevel placement check — no MergeMesh→BevelMesh on multi-part assemblies; bevel per part then merge
+- [ ] 2c. **Subgraph module plan** — if soft triggers fire (root ≈40+/80+, reuse ≥2, fat lanes): list complete modules first; do **not** wrap stubs 为封而封 (see [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first))
 - [ ] 3. Parameter quality check (follow Parameter Quality Baselines; per-part bevel amounts)
-- [ ] 4. List nodes + edges from manifest
-- [ ] 5. Assign semantic ids, unique `__nodeTitle`, and **lane-based** top-down positions (`COL_STEP_X ≥ 320`; keep part chains vertical)
+- [ ] 4. List nodes + edges from manifest (root instances + each `subgraphs[]` definition)
+- [ ] 5. Assign semantic ids, unique `__nodeTitle`, and **lane-based** top-down positions (`COL_STEP_X ≥ 320`; keep part chains vertical; Subgraph interiors use the same rules)
 - [ ] 5b. Overlap + crossing check — no same-row `|Δx| < 320`; no duplicate `__nodeTitle`; no global topo-grid spaghetti across subsystems
-- [ ] 6. Fill `data` from manifest defaults + user params + `__nodeTitle`
+- [ ] 6. Fill `data` from manifest defaults + user params + `__nodeTitle` (+ `subgraphId` on instances)
 - [ ] 7. Parameter review with user (ask_user — present Tier 1 + relevant Tier 2; adjust if requested)
 - [ ] 7b. Save directory confirmation (ask_user — glob for .pcg / PCGDemo / Assets dirs, default to detected)
 - [ ] 8. Write file to confirmed directory (see File placement)
-- [ ] 9. Run validation script (treat Merge→Bevel assembly warnings as must-fix on new graphs)
+- [ ] 9. Run validation script (treat Merge→Bevel assembly warnings and “tiny Subgraph / flat mega-graph” warnings as must-fix on new graphs)
 - [ ] 10. If graph is a regression fixture, wire into pcg-core ctest
 ```
 
@@ -535,5 +659,7 @@ See [examples.md](examples.md) for full top-down graphs: linear mesh chain, scat
 |------|------|
 | `schema/node-manifest.json` | Node + pin definitions |
 | `schema/graph-schema.json` | v1 envelope (legacy enum; manifest is authoritative for types) |
+| `docs/Tutorials/11-subgraphs.md` | Subgraph JSON + Unity editor packaging |
+| `pcg-core/tests/test_subgraph.cpp` | Flatten / I/O / recursion guard |
 | `pcg-core/tests/test_phase45_spline.cpp` | Spline graph execution tests |
 | `Unity/Assets/PcgPlugin/Editor/Graph/PcgConnectionValidator.cs` | Pin type rules in editor |

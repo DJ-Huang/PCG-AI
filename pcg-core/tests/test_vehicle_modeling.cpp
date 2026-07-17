@@ -1,7 +1,10 @@
 #include "pcg_api.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -21,6 +24,7 @@ struct Result {
     int kind = 0;
     int vertices = 0;
     int indices = 0;
+    PcgCookStats stats{};
     std::string error;
 };
 
@@ -35,7 +39,7 @@ Result execute(const char* graph)
         &result.kind, json.data(), static_cast<int>(json.size()),
         mesh.data(), static_cast<int>(mesh.size()), nullptr, 0,
         nullptr, nullptr, &result.vertices, &result.indices,
-        nullptr, nullptr, 0, error, sizeof(error));
+        &result.stats, nullptr, 0, error, sizeof(error));
     result.error = error;
     return result;
 }
@@ -95,12 +99,74 @@ int main()
     std::stringstream sedan_json;
     sedan_json << sedan_file.rdbuf();
     expect(sedan_file.good() || sedan_file.eof(), "realistic sedan fixture is readable");
+    pcg_cook_cache_clear();
+    const auto cold_start = std::chrono::steady_clock::now();
     const auto sedan = execute(sedan_json.str().c_str());
+    const auto cold_end = std::chrono::steady_clock::now();
     expect(sedan.code == PCG_OK,
            sedan.error.empty() ? "realistic sedan graph executes end to end" : sedan.error.c_str());
     expect(sedan.kind == PCG_RESULT_KIND_MESH, "realistic sedan returns a Unity mesh");
     expect(sedan.vertices > 1000 && sedan.indices > 3000,
            "realistic sedan contains production-scale body and detail geometry");
+
+    auto preview_doc = nlohmann::json::parse(sedan_json.str());
+    std::string output_id;
+    for (const auto& node : preview_doc["nodes"]) {
+        if (node.value("type", "") == "Output") {
+            output_id = node.value("id", "");
+            break;
+        }
+    }
+    std::string preview_source_id;
+    for (const auto& edge : preview_doc["edges"]) {
+        if (edge.value("target", "") == output_id) {
+            preview_source_id = edge.value("source", "");
+            break;
+        }
+    }
+    expect(!output_id.empty() && !preview_source_id.empty(),
+           "realistic sedan output edge is available for node preview");
+
+    auto& preview_nodes = preview_doc["nodes"];
+    preview_nodes.erase(
+        std::remove_if(preview_nodes.begin(), preview_nodes.end(),
+                       [&output_id](const auto& node) { return node.value("id", "") == output_id; }),
+        preview_nodes.end());
+    auto& preview_edges = preview_doc["edges"];
+    preview_edges.erase(
+        std::remove_if(preview_edges.begin(), preview_edges.end(),
+                       [&output_id](const auto& edge) { return edge.value("target", "") == output_id; }),
+        preview_edges.end());
+    preview_nodes.push_back({
+        {"id", "__pcg_preview_sink__"},
+        {"type", "Output"},
+        {"data", nlohmann::json::object()},
+    });
+    preview_edges.push_back({
+        {"id", "__pcg_preview_sink___edge"},
+        {"source", preview_source_id},
+        {"target", "__pcg_preview_sink__"},
+        {"sourceHandle", "out"},
+        {"targetHandle", "in"},
+    });
+
+    const std::string preview_json = preview_doc.dump();
+    const auto preview_start = std::chrono::steady_clock::now();
+    const auto preview = execute(preview_json.c_str());
+    const auto preview_end = std::chrono::steady_clock::now();
+    expect(preview.code == PCG_OK,
+           preview.error.empty() ? "realistic sedan final MergeMesh preview executes" : preview.error.c_str());
+    expect(preview.stats.nodes_executed == 1,
+           "final MergeMesh preview executes only the synthetic output node");
+    expect(preview.stats.nodes_skipped == static_cast<int>(preview_nodes.size()) - 1,
+           "final MergeMesh preview reuses all unchanged upstream nodes");
+
+    const double cold_ms =
+        std::chrono::duration<double, std::milli>(cold_end - cold_start).count();
+    const double preview_ms =
+        std::chrono::duration<double, std::milli>(preview_end - preview_start).count();
+    std::printf("realistic sedan cold cook: %.2f ms; cached final MergeMesh preview: %.2f ms\n",
+                cold_ms, preview_ms);
 
     return failures == 0 ? 0 : 1;
 }
