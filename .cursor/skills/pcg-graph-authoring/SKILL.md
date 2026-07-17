@@ -2,15 +2,16 @@
 name: pcg-graph-authoring
 description: >-
   Author PCG Graph JSON (.pcg) files for the PCG-AI repo with Houdini-style
-  top-to-bottom layout and module-level Subgraphs for large assemblies. Use when
-  creating, editing, or scaffolding .pcg graphs, bridge/spline/mesh/scatter
-  demos, Subgraph/Subnet packaging, or when the user mentions PCG graph, node
+  top-to-bottom layout, module-level Subgraphs, and graph-level Parameters
+  (Blackboard) for Inspector controls. Use when creating, editing, or scaffolding
+  .pcg graphs, bridge/spline/mesh/scatter/building demos, Subgraph/Subnet
+  packaging, exposing Parameters, or when the user mentions PCG graph, node
   wiring, bridge-demo, or Houdini layout.
 ---
 
 # PCG Graph Authoring (PCG-AI)
 
-Create `.pcg` files for this repo. **Layout is Houdini-style: data flows top → bottom**, not left → right. Large multi-part assemblies use **Subgraphs for complete modules** (not for tiny stubs) — see [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first).
+Create `.pcg` files for this repo. **Layout is Houdini-style: data flows top → bottom**, not left → right. Large multi-part assemblies use **Subgraphs for complete modules** (not for tiny stubs) — see [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first). When the graph needs Inspector / HDA-like controls, write root **`parameters[]` (Graph Parameters)** bound to node properties — see [Parameter exposure](#parameter-exposure-ask-user-before-writing).
 
 ## Before writing
 
@@ -313,11 +314,20 @@ Bevel parameters must be proportional to model size. Too-small bevels are invisi
 
 ## Parameter exposure (ask user before writing)
 
-After filling `data` from defaults (Step 6), **present key parameters to the user** via `ask_user` before writing the file. This gives the user a chance to adjust values that affect visual quality and model proportions.
+Two different concepts — do not conflate them:
 
-### Tier 1 — Always expose
+| Concept | Where | Purpose |
+|---------|-------|---------|
+| **Authoring values** | Node `data` fields | Bake defaults into the graph while authoring |
+| **Graph Parameters** | Root `parameters[]` (Unity Blackboard / Component Inspector) | Runtime/Inspector overrides bound to `targetNode` + `targetProperty` |
 
-These are model-defining parameters that the user should always see, regardless of graph complexity:
+After filling `data` from defaults (Step 6): (1) review authoring values; (2) when the graph needs interactive controls, **create Graph Parameters** (see below) and `ask_user` which ones to add if ambiguous.
+
+### A. Authoring value review (Tier 1–3)
+
+Present Tier 1 + relevant Tier 2 via `ask_user` so the user can adjust baked defaults before write.
+
+#### Tier 1 — Always review
 
 | Parameter | Source node(s) | What to show | Default logic |
 |-----------|---------------|-------------|---------------|
@@ -325,9 +335,7 @@ These are model-defining parameters that the user should always see, regardless 
 | **Bevel amount + segments** | `BevelMesh` | Current `amount` / `segments` values | Auto from Parameter Quality Baselines table |
 | **Surface quality** | `SweepAlongSpline` `shadeMode` | auto / flat / smooth | Default `auto` (group + angle) |
 
-### Tier 2 — Conditionally expose
-
-Show these when the corresponding node type is present in the graph:
+#### Tier 2 — Conditionally review
 
 | Node type | Parameter | What to show | Default |
 |-----------|-----------|-------------|---------|
@@ -338,11 +346,13 @@ Show these when the corresponding node type is present in the graph:
 | `CreateCylinderMesh` | `radialSegments` | Circle smoothness | 16 |
 | `CreateSpline` (catmullRom) | `subdivisions` | Curve smoothness | 8–12 |
 | `InstanceAlongSpline` | `spacing` | Instance density | From model size |
+| `SampleAlongSpline` | `spacing` | Floor / instance density along path | From model size |
+| `AttributeRandomize` | `seed`, `translate*`, `scaleMin`/`scaleMax` | Layout jitter | From shape analysis |
+| `Switch` | `index` | Style / variant selector (0–3) | 0 |
+| `CopyMeshToPoints` | (via upstream points / prototype) | Prefer exposing upstream `spacing` / box size / `Switch.index` | — |
 | `SubdivideMesh` | `levels` | Subdivision depth pre-bevel | 1–2 |
 
-### Tier 3 — Optional (expose on request only)
-
-Not shown by default, but available if the user asks "expose more parameters":
+#### Tier 3 — Optional (expose on request only)
 
 | Node type | Parameter | What to show |
 |-----------|-----------|-------------|
@@ -354,35 +364,120 @@ Not shown by default, but available if the user asks "expose more parameters":
 | `SweepAlongSpline` | `twist, profileRoll` | Twist / roll degrees |
 | `CreateSpiralSpline` | `radius, pitch, turns` | Spiral parameters |
 | `MeshNoiseDeform` | `intensity, scale` | Noise displacement |
+| `CreateBoxMesh` | `width`, `height`, `depth` | Module / part size |
 
-### `ask_user` interaction pattern
+### B. Graph Parameters (`parameters[]`) — Inspector controls (P0 when needed)
 
-Use a **single `ask_user` call** with 1–3 questions. Never exceed 4 questions.
+Unity Blackboard / `PcgGraphComponent` reads root `parameters[]` and at cook time writes override values into `nodes[targetNode].data[targetProperty]` (`ApplyOverridesToDocument`). Reference: `examples/stone-arch-bridge.pcg`, `examples/bridge-demo.pcg`.
 
-**Question 1 (always)**: Present Tier 1 + relevant Tier 2 parameters as a summary, ask to confirm or adjust.
+#### When to create Graph Parameters (auto-detect)
+
+Create (or propose) Graph Parameters when **any** of these hold:
+
+| Signal | Examples |
+|--------|----------|
+| User asks for slider / Inspector / HDA-like controls | “要可调楼层数”“暴露参数” |
+| Generator / multi-style graph | floors density, `Switch.index`, random `seed`, module size |
+| Same property will be tweaked often after cook | `BevelMesh.amount`, `SampleAlongSpline.spacing`, `AttributeRandomize.translateX` |
+| Demo meant for artists without opening the node graph | Bridge bevel / railing spacing |
+
+**Do not** create Graph Parameters for one-shot static props with no expected tuning (empty `parameters: []` is fine, e.g. some canister demos).
+
+#### JSON contract (must match Unity serializer)
+
+```json
+"parameters": [
+  {
+    "id": "p1",
+    "name": "FloorSpacing",
+    "type": "number",
+    "default": 1.55,
+    "exposed": true,
+    "targetNode": "floors",
+    "targetProperty": "spacing",
+    "hasRange": true,
+    "min": 0.8,
+    "max": 3.0
+  }
+]
+```
+
+| Field | Rule |
+|-------|------|
+| `id` | Unique (`p1`, `p2`, … or semantic `floor_spacing`) |
+| `name` | Inspector display label (Title Case / camelCase ok) |
+| `type` | `integer` \| `number` \| `boolean` \| `string` — must match the manifest property type |
+| `default` | Native JSON value (`1.55`, `true`, `"wall"`) — **and** keep the same value baked in `nodes[].data` |
+| `exposed` | `true` for Component Inspector; `false` to keep binding without UI |
+| `targetNode` | Existing root `nodes[].id` (not Subgraph interior ids unless that node is on root after flatten — prefer root) |
+| `targetProperty` | Exact key in that node's `data` / manifest property name |
+| `hasRange` / `min` / `max` | For `number`/`integer` sliders; set `hasRange: true` when a sensible range exists |
+
+**Limits (current runtime):**
+
+- One Graph Parameter → **one** `targetNode` + `targetProperty`. To drive two nodes (e.g. L/R railing), emit **two** parameter entries (see stone-arch-bridge `railingSpacing` / `railingSpacingR`).
+- Parameters apply to **root** document nodes; do not invent multi-target or expression bindings.
+- Keep `default` synchronized with the target node's baked `data` value at write time.
+
+#### Candidate discovery (before ask_user)
+
+Scan the planned / existing graph and build a candidate table:
+
+| Candidate name | type | targetNode | targetProperty | default | range | Why |
+|----------------|------|------------|----------------|---------|-------|-----|
+| FloorSpacing | number | floors | spacing | 1.55 | 0.8–3.0 | tower density |
+| ModuleStyle | integer | module_switch | index | 0 | 0–1 | Switch styles |
+| JitterSeed | integer | jitter | seed | 17 | — | reproducible layout |
+
+Prefer **few high-leverage** params (typically 2–6). Skip internal wiring constants (tiny offsets, one-off glass transforms).
+
+#### `ask_user` — which Graph Parameters to add
+
+When candidates exist and the user has not already listed exact params:
+
+```
+type: "choice"
+header: "Graph Parameters"
+question: "检测到以下可暴露为 Inspector 参数（写入 parameters[]）。要添加哪些？\n\n{candidate table}"
+options:
+  - label: "推荐集（默认）"
+    description: "添加表格中标记为推荐的 2–6 个参数"
+  - label: "全部候选"
+    description: "表格中每一项都写入 parameters[]"
+  - label: "不添加 Graph Parameters"
+    description: "parameters: []；仅保留节点 data 默认值"
+  - label: "自定义"
+    description: "告诉我要哪些 name / 或要绑定的节点属性"
+```
+
+If the user already said e.g. “要 floors / seed / switch”，skip this choice and implement that list.
+
+If “自定义”: follow-up `ask_user` text; map answers to real `targetNode`/`targetProperty` from the graph — never invent property names not in the manifest.
+
+### Combined `ask_user` pattern (authoring + Graph Parameters)
+
+Use **one** `ask_user` when possible (max 4 questions). Prefer:
 
 ```
 type: "choice"
 header: "参数确认"
-question: "以下关键参数已自动填充，是否需要调整？\n\n{parameter summary table}"
+question: "以下关键节点默认值已填好；并检测到 Graph Parameter 候选。\n\n{authoring summary}\n\n{parameter candidates}"
 options:
-  - label: "确认，直接生成"
-    description: "使用当前参数直接生成 .pcg 文件"
-  - label: "调整部分参数"
-    description: "告诉我需要调整哪些参数"
-  - label: "暴露更多参数"
-    description: "显示 Tier 3 可选参数（材质、UV、高级 bevel 等）"
+  - label: "确认：用推荐 Graph Parameters 生成"
+    description: "写入推荐 parameters[] + 当前 data 默认值"
+  - label: "确认：不添加 Graph Parameters"
+    description: "parameters: []，仅用节点默认值生成"
+  - label: "调整节点默认值"
+    description: "先改 Tier 1/2 数值，再决定 Graph Parameters"
+  - label: "自定义 Graph Parameters / 暴露更多"
+    description: "自选候选，或展开 Tier 3"
 ```
 
-**If "调整部分参数"**: use a follow-up `ask_user` with `type: "text"` for the user to specify which parameters to change. Apply changes, then proceed.
+**If "调整节点默认值"**: text follow-up → apply → then Graph Parameters choice if still needed.
 
-**If "暴露更多参数"**: present Tier 3 parameters relevant to the graph as a second `ask_user` `choice` question. After user selects, apply changes, then proceed.
-
-**If "确认，直接生成"**: proceed to write file immediately.
+**If "暴露更多" / Tier 3**: second choice listing Tier 3 + remaining Graph Parameter candidates.
 
 ### Parameter summary format
-
-When presenting parameters, use this compact format:
 
 ```
 部件: 罐体 (RevolveMesh)
@@ -395,14 +490,19 @@ When presenting parameters, use this compact format:
   模型尺寸: ~1.5 × 3.7 × 1.5
   Bevel: amount=0.08, segments=2
   shadeMode: auto
+
+Graph Parameters（拟写入）:
+  p1 FloorSpacing → floors.spacing = 1.55 [0.8, 3]
+  p2 ModuleStyle → module_switch.index = 0 [0, 1]
 ```
 
 ### Rules
 
-1. **Never skip the `ask_user` step** for new graph creation. For **editing** existing graphs, skip if user only requested a specific change.
-2. **Max 4 questions per `ask_user` call**. If more parameters need confirmation, batch them into one `choice` question with a text fallback.
-3. **Only show parameters that exist in the graph**. If no BevelMesh, don't mention bevel parameters.
-4. **Apply user adjustments** before writing the file. Re-validate parameter quality baselines after adjustments.
+1. **Never skip the `ask_user` step** for new graph creation when Tier 1 applies **or** Graph Parameter candidates exist. For **editing** existing graphs, skip if the user only requested a specific change (unless they asked to add Parameters).
+2. **Max 4 questions per `ask_user` call**. Batch authoring + Graph Parameter decisions when possible.
+3. **Only propose parameters that exist on real nodes** in the graph. If no `BevelMesh`, don't mention bevel.
+4. **Apply user adjustments** to node `data` **and** `parameters[].default` before writing; keep them in sync.
+5. Re-validate Parameter Quality Baselines after adjustments; run `validate_pcg.py` (parameters target checks).
 
 ## Graph JSON contract
 
@@ -411,6 +511,7 @@ When presenting parameters, use this compact format:
   "version": "1.0",
   "nodes": [ { "id", "type", "position": { "x", "y" }, "data": { ... } } ],
   "edges": [ { "id", "source", "target", "sourceHandle", "targetHandle" } ],
+  "parameters": [ { "id", "name", "type", "default", "exposed", "targetNode", "targetProperty", "hasRange", "min", "max" } ],
   "subgraphs": [ { "id", "name", "inputs", "outputs", "nodes", "edges" } ]
 }
 ```
@@ -424,6 +525,7 @@ When presenting parameters, use this compact format:
 | `edges` | `sourceHandle` / `targetHandle` = manifest pin `id` (e.g. `backbone`, `profile`, `a`, `b`) |
 | Pin compatibility | Output `pinType` must match input `pinType` (or `Output.in` = `Any`) |
 | Terminator | Every runnable graph ends with `Output` at the **bottom** |
+| `parameters` | Optional Graph Parameters (Blackboard); see [Graph Parameters](#b-graph-parameters-parameters--inspector-controls-p0-when-needed). Use `[]` when none |
 | `subgraphs` | Optional; required when any `type: "Subgraph"` instance exists — see [Subgraph modularization](#subgraph-modularization-p0--modules-first-not-count-first) |
 
 ## Node display names (P0 — Unity GraphView)
@@ -584,10 +686,11 @@ When **editing** old examples that use horizontal layout, dense X packing, or sp
 - [ ] 5. Assign semantic ids, unique `__nodeTitle`, and **lane-based** top-down positions (`COL_STEP_X ≥ 320`; keep part chains vertical; Subgraph interiors use the same rules)
 - [ ] 5b. Overlap + crossing check — no same-row `|Δx| < 320`; no duplicate `__nodeTitle`; no global topo-grid spaghetti across subsystems
 - [ ] 6. Fill `data` from manifest defaults + user params + `__nodeTitle` (+ `subgraphId` on instances)
-- [ ] 7. Parameter review with user (ask_user — present Tier 1 + relevant Tier 2; adjust if requested)
+- [ ] 6b. **Graph Parameter candidates** — scan nodes for Inspector-worthy properties; build candidate table (see [Graph Parameters](#b-graph-parameters-parameters--inspector-controls-p0-when-needed))
+- [ ] 7. Parameter review with user (ask_user — Tier 1/2 authoring values **and** which Graph Parameters to write into `parameters[]`)
 - [ ] 7b. Save directory confirmation (ask_user — glob for .pcg / PCGDemo / Assets dirs, default to detected)
-- [ ] 8. Write file to confirmed directory (see File placement)
-- [ ] 9. Run validation script (treat Merge→Bevel assembly warnings and “tiny Subgraph / flat mega-graph” warnings as must-fix on new graphs)
+- [ ] 8. Write file to confirmed directory (include `parameters` array; keep defaults synced with target `data`)
+- [ ] 9. Run validation script (treat Merge→Bevel assembly warnings, “tiny Subgraph / flat mega-graph”, and **broken parameter bindings** as must-fix on new graphs)
 - [ ] 10. If graph is a regression fixture, wire into pcg-core ctest
 ```
 

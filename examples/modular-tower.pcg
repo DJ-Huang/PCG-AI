@@ -292,7 +292,8 @@
         "y": 1600
       },
       "data": {
-        "index": 0
+        "index": 0,
+        "__nodeTitle": "Module Style"
       }
     },
     {
@@ -458,7 +459,8 @@
         "y": 2080
       },
       "data": {
-        "label": "Modular Tower"
+        "label": "Modular Tower",
+        "__nodeTitle": "Tower Output"
       }
     }
   ],
@@ -672,6 +674,128 @@
       "target": "output",
       "sourceHandle": "out",
       "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "p1",
+      "name": "FloorSpacing",
+      "type": "number",
+      "default": 1.55,
+      "exposed": true,
+      "targetNode": "floors",
+      "targetProperty": "spacing",
+      "hasRange": true,
+      "min": 0.8,
+      "max": 3.0
+    },
+    {
+      "id": "p2",
+      "name": "ModuleStyle",
+      "type": "integer",
+      "default": 0,
+      "exposed": true,
+      "targetNode": "module_switch",
+      "targetProperty": "index",
+      "hasRange": true,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "p3",
+      "name": "JitterSeed",
+      "type": "integer",
+      "default": 17,
+      "exposed": true,
+      "targetNode": "jitter",
+      "targetProperty": "seed",
+      "hasRange": false,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "p4",
+      "name": "JitterXZ",
+      "type": "number",
+      "default": 3.8,
+      "exposed": true,
+      "targetNode": "jitter",
+      "targetProperty": "translateX",
+      "hasRange": true,
+      "min": 0.0,
+      "max": 6.0
+    },
+    {
+      "id": "p5",
+      "name": "ScaleMin",
+      "type": "number",
+      "default": 0.7,
+      "exposed": true,
+      "targetNode": "jitter",
+      "targetProperty": "scaleMin",
+      "hasRange": true,
+      "min": 0.4,
+      "max": 1.2
+    },
+    {
+      "id": "p6",
+      "name": "ScaleMax",
+      "type": "number",
+      "default": 1.35,
+      "exposed": true,
+      "targetNode": "jitter",
+      "targetProperty": "scaleMax",
+      "hasRange": true,
+      "min": 1.0,
+      "max": 2.0
+    },
+    {
+      "id": "p7",
+      "name": "FloorSpacingB",
+      "type": "number",
+      "default": 2.4,
+      "exposed": true,
+      "targetNode": "floors_b",
+      "targetProperty": "spacing",
+      "hasRange": true,
+      "min": 1.0,
+      "max": 4.0
+    },
+    {
+      "id": "p8",
+      "name": "JitterSeedB",
+      "type": "integer",
+      "default": 91,
+      "exposed": true,
+      "targetNode": "jitter_b",
+      "targetProperty": "seed",
+      "hasRange": false,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "p9",
+      "name": "ModuleWidth",
+      "type": "number",
+      "default": 7.0,
+      "exposed": true,
+      "targetNode": "module_long",
+      "targetProperty": "width",
+      "hasRange": true,
+      "min": 4.0,
+      "max": 12.0
+    },
+    {
+      "id": "p10",
+      "name": "TowerHeight",
+      "type": "number",
+      "default": 30.0,
+      "exposed": true,
+      "targetNode": "spine",
+      "targetProperty": "endY",
+      "hasRange": true,
+      "min": 10.0,
+      "max": 60.0
     }
   ]
 }

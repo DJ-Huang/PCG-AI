@@ -1,6 +1,6 @@
 {
-  "version": "1.4",
-  "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh + Phase 4.5 spline bridge). Pin types align with UE EPCGDataType.",
+  "version": "1.5",
+  "description": "Node definitions for PCG Graph editors (mesh, spline, and Houdini-style attribute/filter nodes). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
       "type": "SpawnPoints",
@@ -112,6 +112,79 @@
       "properties": {
         "attributeName": { "type": "string", "default": "tag" },
         "matchValue": { "type": "string", "default": "" }
+      }
+    },
+    {
+      "type": "AttributeWrangle",
+      "displayName": "Attribute Wrangle",
+      "category": "Attribute",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "Any" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "Any" }],
+      "properties": {
+        "runOver": {
+          "type": "enum",
+          "displayName": "Run Over",
+          "default": "points",
+          "options": [{ "value": "points", "label": "Points" }]
+        },
+        "expression": {
+          "type": "string",
+          "displayName": "VEXpression",
+          "default": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);",
+          "multiline": true,
+          "lines": 8
+        },
+        "parameters": {
+          "type": "string",
+          "displayName": "Parameters (JSON)",
+          "default": "{\"sag\": 3.0}",
+          "multiline": true,
+          "lines": 3
+        }
+      }
+    },
+    {
+      "type": "Blast",
+      "displayName": "Blast",
+      "category": "Filter",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "Any" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "Any" }],
+      "properties": {
+        "entity": {
+          "type": "enum",
+          "displayName": "Entity",
+          "default": "points",
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" }
+          ]
+        },
+        "group": { "type": "string", "displayName": "Group", "default": "" },
+        "expression": {
+          "type": "string",
+          "displayName": "Selection Expression",
+          "default": "@curveu >= 0.4 && @curveu <= 0.6",
+          "multiline": true,
+          "lines": 4
+        },
+        "parameters": {
+          "type": "string",
+          "displayName": "Parameters (JSON)",
+          "default": "{}",
+          "multiline": true,
+          "lines": 3
+        },
+        "deleteNonSelected": {
+          "type": "boolean",
+          "displayName": "Delete Non Selected",
+          "default": false
+        },
+        "removeUnusedPoints": {
+          "type": "boolean",
+          "displayName": "Remove Unused Points",
+          "default": true,
+          "visibleWhen": { "property": "entity", "equals": "primitives" }
+        }
       }
     },
     {

@@ -618,7 +618,7 @@ namespace DJTechEditor.PCG.Graph
                 "texture2d" => MakeTextureField(key, currentVal, v => apply(v)),
                 "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => apply(v)),
                 "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => apply(v)),
-                _ => MakeTextField(key, currentVal, v => apply(v)),
+                _ => MakeTextField(key, prop, currentVal, v => apply(v)),
             };
             wrapper.Add(field);
             return wrapper;
@@ -964,9 +964,19 @@ namespace DJTechEditor.PCG.Graph
             return field;
         }
 
-        private TextField MakeTextField(string key, object val, Action<string> onSet)
+        private TextField MakeTextField(
+            string key, ManifestPropertyDef prop, object val, Action<string> onSet)
         {
-            var field = new TextField { value = val?.ToString() ?? "" };
+            var field = new TextField
+            {
+                value = val?.ToString() ?? "",
+                multiline = prop.multiline,
+            };
+            if (prop.multiline)
+            {
+                field.style.minHeight = Math.Max(2, prop.lines) * 18;
+                field.style.whiteSpace = WhiteSpace.Normal;
+            }
             field.RegisterValueChangedCallback(evt =>
             {
                 m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));

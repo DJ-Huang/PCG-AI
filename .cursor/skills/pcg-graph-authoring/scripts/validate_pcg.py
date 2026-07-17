@@ -474,6 +474,114 @@ def validate_node_list(
                 )
 
 
+def validate_parameters(
+    parameters: object,
+    nodes: list,
+    manifest: dict[str, dict],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    """Validate root parameters[] bindings (Unity Blackboard / Graph Parameters)."""
+    if parameters is None:
+        return
+    if not isinstance(parameters, list):
+        errors.append("parameters must be an array")
+        return
+
+    node_by_id = {
+        n.get("id"): n
+        for n in nodes
+        if isinstance(n, dict) and isinstance(n.get("id"), str)
+    }
+    seen_ids: set[str] = set()
+    allowed_types = {"integer", "number", "boolean", "string"}
+
+    for i, param in enumerate(parameters):
+        if not isinstance(param, dict):
+            errors.append(f"parameters[{i}] must be an object")
+            continue
+
+        pid = param.get("id")
+        if not isinstance(pid, str) or not pid:
+            errors.append(f"parameters[{i}] missing string id")
+            continue
+        if pid in seen_ids:
+            errors.append(f"duplicate parameter id: {pid}")
+        seen_ids.add(pid)
+
+        name = param.get("name")
+        if not isinstance(name, str) or not name:
+            errors.append(f"parameter {pid}: missing string name")
+
+        ptype = param.get("type", "number")
+        if ptype not in allowed_types:
+            errors.append(
+                f"parameter {pid}: type {ptype!r} must be one of {sorted(allowed_types)}"
+            )
+
+        if "default" not in param:
+            errors.append(f"parameter {pid}: missing default")
+
+        target_node = param.get("targetNode")
+        target_prop = param.get("targetProperty")
+        if not isinstance(target_node, str) or not target_node:
+            errors.append(f"parameter {pid}: missing targetNode")
+            continue
+        if not isinstance(target_prop, str) or not target_prop:
+            errors.append(f"parameter {pid}: missing targetProperty")
+            continue
+
+        node = node_by_id.get(target_node)
+        if node is None:
+            errors.append(
+                f"parameter {pid}: targetNode {target_node!r} not found in root nodes"
+            )
+            continue
+
+        ntype = node.get("type")
+        if ntype in STRUCTURAL_TYPES:
+            warnings.append(
+                f"parameter {pid}: targetNode {target_node!r} is structural ({ntype}); "
+                "prefer binding to a concrete operator node"
+            )
+            continue
+
+        defn = manifest.get(ntype)
+        if not defn:
+            warnings.append(
+                f"parameter {pid}: target node type {ntype!r} not in manifest"
+            )
+            continue
+
+        props = defn.get("properties") or {}
+        if isinstance(props, dict) and target_prop not in props and target_prop != "__nodeTitle":
+            errors.append(
+                f"parameter {pid}: targetProperty {target_prop!r} not in "
+                f"{ntype} manifest properties"
+            )
+
+        node_data = node.get("data") if isinstance(node.get("data"), dict) else {}
+        if target_prop in node_data and "default" in param:
+            baked = node_data.get(target_prop)
+            default = param.get("default")
+            # Compare as strings to tolerate 1 vs 1.0
+            if str(baked) != str(default):
+                warnings.append(
+                    f"parameter {pid}: default {default!r} != "
+                    f"nodes[{target_node!r}].data[{target_prop!r}]={baked!r} "
+                    "(keep Graph Parameter default synced with baked data)"
+                )
+
+        if param.get("hasRange") and ptype in ("number", "integer"):
+            try:
+                lo = float(param.get("min", 0))
+                hi = float(param.get("max", 1))
+                if lo > hi:
+                    errors.append(f"parameter {pid}: min ({lo}) > max ({hi})")
+            except (TypeError, ValueError):
+                errors.append(f"parameter {pid}: hasRange requires numeric min/max")
+
+
 def validate_graph(graph_path: Path, manifest: dict[str, dict]) -> int:
     errors: list[str] = []
     warnings: list[str] = []
@@ -490,6 +598,8 @@ def validate_graph(graph_path: Path, manifest: dict[str, dict]) -> int:
     definitions = validate_subgraph_defs(graph.get("subgraphs") or [], errors, warnings)
     nodes = graph.get("nodes", [])
     edges = graph.get("edges", [])
+
+    validate_parameters(graph.get("parameters"), nodes, manifest, errors, warnings)
 
     validate_node_list(
         nodes, edges, manifest, definitions, "root", errors, warnings, require_output=True

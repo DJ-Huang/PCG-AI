@@ -1,4 +1,5 @@
 #include "elements/pcg_element.hpp"
+#include "elements/attribute_elements.hpp"
 #include "elements/primitive_elements.hpp"
 #include "elements/mesh_elements.hpp"
 #include "elements/geometry_elements.hpp"
@@ -178,6 +179,7 @@ void register_builtin_elements()
     map.emplace("SpawnPoints", std::make_unique<SpawnPointsElement>());
     map.emplace("PlaceInScene", std::make_unique<PlaceInSceneElement>());
     map.emplace("Output", std::make_unique<OutputElement>());
+    register_attribute_elements(map);
     register_phase41_elements(map);
     register_phase42_elements(map);
     register_mesh_elements(map);

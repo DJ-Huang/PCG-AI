@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **61 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **62 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -22,6 +22,9 @@
 - [Filter 类别](#filter-类别)
   - [DensityFilter](#densityfilter)
   - [AttributeFilter](#attributefilter)
+  - [Blast](#blast)
+- [Attribute 类别](#attribute-类别)
+  - [AttributeWrangle](#attributewrangle)
 - [Transform 类别](#transform-类别)
   - [TransformPoints](#transformpoints)
   - [ProjectPoints](#projectpoints)
@@ -556,6 +559,49 @@
 ```
 
 > 配合 `CopyAttributes` 使用：先给点打属性标签，再用 `AttributeFilter` 分类过滤。
+
+---
+
+### Blast
+
+**类别**：Filter
+
+**功能**：按 group 或标量表达式删除 Point、Spline point 或 Geometry point/primitive。Spline 中间删除会拆成多条 open spline，不跨缺口重连。
+
+**属性**：`entity` (`points`/`primitives`)、`group`、`expression`、`parameters`、`deleteNonSelected`、`removeUnusedPoints`。
+
+```json
+{
+  "id": "broken_u",
+  "type": "Blast",
+  "data": { "entity": "points", "expression": "@curveu >= 0.4 && @curveu <= 0.6" }
+}
+```
+
+完整表达式语法与数据类型行为见 [Attribute Wrangle 与 Blast](Tutorials/12-attribute-wrangle-and-blast.md)。
+
+---
+
+## Attribute 类别
+
+### AttributeWrangle
+
+**类别**：Attribute
+
+**功能**：以 Houdini 风格标量表达式逐点修改 `@P.x/y/z`；Point 输入还可读写任意数值 `@attribute`。支持只读 `@curveu`、元素编号、数学函数与 `chf("name")` 参数。
+
+```json
+{
+  "id": "gravity_sag",
+  "type": "AttributeWrangle",
+  "data": {
+    "expression": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);",
+    "parameters": "{\"sag\":3.0}"
+  }
+}
+```
+
+完整语法见 [Attribute Wrangle 与 Blast](Tutorials/12-attribute-wrangle-and-blast.md)。
 
 ---
 

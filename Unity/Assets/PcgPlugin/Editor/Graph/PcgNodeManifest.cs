@@ -48,6 +48,8 @@ namespace DJTechEditor.PCG.Graph
         public bool hasOrder;
         public string visibleWhenProperty;
         public string visibleWhenEquals;
+        public bool multiline;
+        public int lines = 1;
     }
 
     public class ManifestSectionDef
@@ -320,6 +322,10 @@ namespace DJTechEditor.PCG.Graph
                         // Optional Inspector layout metadata (opt-in; missing → legacy UI path)
                         propDef.displayName = GetString(propObj, "displayName");
                         propDef.section = GetString(propObj, "section");
+                        propDef.multiline = propObj.TryGetValue("multiline", out var multilineVal)
+                            && Convert.ToBoolean(multilineVal, CultureInfo.InvariantCulture);
+                        if (propObj.TryGetValue("lines", out var linesVal) && linesVal != null)
+                            propDef.lines = Math.Max(1, Convert.ToInt32(linesVal, CultureInfo.InvariantCulture));
                         if (propObj.TryGetValue("order", out var orderVal) && orderVal != null)
                         {
                             propDef.hasOrder = true;
