@@ -636,7 +636,7 @@ namespace DJTechEditor.PCG.Graph
                 foreach (var selIdx in selectedIndices)
                 {
                     var newLocal = WorldToLocal(worldPoints[selIdx] + delta, anchor) - sceneOffset;
-                    newLocal = ConstrainToEditPlane(newLocal, editPlane);
+                    newLocal = ConstrainToEditPlane(newLocal, points[selIdx], editPlane);
                     points[selIdx] = newLocal;
                 }
                 WritePointsToNode(node, points, usesExplicit);
@@ -740,7 +740,7 @@ namespace DJTechEditor.PCG.Graph
                     // raw direction scaled by the drag distance ratio.
                     var dragWorldDir = newOut - wp;
                     var newTangentLocal = WorldDirToLocalDir(dragWorldDir, anchor);
-                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, editPlane);
+                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, tangents[i], editPlane);
                     tangents[i] = newTangentLocal;
 
                     var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
@@ -764,7 +764,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     var dragWorldDir = wp - newIn;
                     var newTangentLocal = WorldDirToLocalDir(dragWorldDir, anchor);
-                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, editPlane);
+                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, tangents[i], editPlane);
                     tangents[i] = newTangentLocal;
 
                     var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
@@ -1277,7 +1277,11 @@ namespace DJTechEditor.PCG.Graph
                 return false;
 
             var insertIndex = segmentIndex + 1;
-            var localPoint = ConstrainToEditPlane(WorldToLocal(hitWorld, anchor) - sceneOffset, editPlane);
+            var localPoint = WorldToLocal(hitWorld, anchor) - sceneOffset;
+            var segEndIndex = (segmentIndex + 1) % points.Count;
+            var segT = SegmentBlendT(worldPoints[segmentIndex], worldPoints[segEndIndex], hitWorld);
+            var onSegment = Vector3.Lerp(points[segmentIndex], points[segEndIndex], segT);
+            localPoint = ConstrainToEditPlane(localPoint, onSegment, editPlane);
 
             graphView.WithUndo("Insert Spline Control Point", () =>
             {
@@ -1317,7 +1321,7 @@ namespace DJTechEditor.PCG.Graph
 
             var left = points[Mathf.Clamp(insertIndex - 1, 0, points.Count - 1)];
             var right = points[Mathf.Clamp(insertIndex, 0, points.Count - 1)];
-            var midpoint = ConstrainToEditPlane((left + right) * 0.5f, ReadEditPlane(nodeData));
+            var midpoint = (left + right) * 0.5f;
 
             graphView.WithUndo("Insert Spline Control Point", () =>
             {
@@ -1632,14 +1636,21 @@ namespace DJTechEditor.PCG.Graph
         private static string ReadEditPlane(PcgNodeData data) =>
             data?.GetRaw("editPlane")?.ToString() ?? "none";
 
-        private static Vector3 ConstrainToEditPlane(Vector3 local, string editPlane) =>
+        private static Vector3 ConstrainToEditPlane(Vector3 local, Vector3 original, string editPlane) =>
             editPlane switch
             {
-                "xy" => new Vector3(local.x, local.y, 0f),
-                "xz" => new Vector3(local.x, 0f, local.z),
-                "yz" => new Vector3(0f, local.y, local.z),
+                "xy" => new Vector3(local.x, local.y, original.z),
+                "xz" => new Vector3(local.x, original.y, local.z),
+                "yz" => new Vector3(original.x, local.y, local.z),
                 _ => local,
             };
+
+        private static float SegmentBlendT(Vector3 a, Vector3 b, Vector3 p)
+        {
+            var ab = b - a;
+            var lenSq = ab.sqrMagnitude;
+            return lenSq < 1e-8f ? 0f : Mathf.Clamp01(Vector3.Dot(p - a, ab) / lenSq);
+        }
 
         private static bool ReadBool(PcgNodeData data, string key, bool defaultValue)
         {

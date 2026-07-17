@@ -965,7 +965,7 @@
 | `endY` | number | 0 | — | 直线模式终点 Y |
 | `endZ` | number | 0 | — | 直线模式终点 Z |
 | `controlPoints` | string | `[{"x":0,"y":0,"z":0},...]` | — | JSON 格式的控制点列表 |
-| `editPlane` | enum | `"none"` | `none` / `xy` / `xz` / `yz` | 编辑平面约束 |
+| `editPlane` | enum | `"none"` | `none` / `xy` / `xz` / `yz` | 编辑平面约束（Scene 拖动时被锁定轴保持该点原分量，不归零） |
 | `sceneOffsetX` | number | 0 | — | 场景偏移 X |
 | `sceneOffsetY` | number | 0 | — | 场景偏移 Y |
 | `sceneOffsetZ` | number | 0 | — | 场景偏移 Z |

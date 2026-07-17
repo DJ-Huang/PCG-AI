@@ -826,17 +826,108 @@ namespace DJTechEditor.PCG.Graph
         public void RestoreFromUndoState()
         {
             m_SuppressUndo = true;
+
+            // Capture subgraph navigation so undo doesn't kick the user back to root.
+            var navParents = new List<string>(m_SubgraphParents);
+            var navParentInstances = new List<string>(m_SubgraphParentInstances);
+            var navCurrentId = m_CurrentSubgraphId;
+            var navCurrentInstanceId = m_CurrentSubgraphInstanceId;
+
+            // Capture selection + scene edit context so spline/group editing survives undo.
+            var selectedNodeIds = selection
+                .OfType<PcgGraphNodeBase>()
+                .Select(node => node.NodeId)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .ToList();
+            var prevContext = m_SceneEditContext;
+
             var state = EnsureUndoState();
             if (PcgGraphSerializer.TryFromJson(state.GraphJson, out var doc, out _))
+            {
                 LoadDocument(doc, clearUndo: false);
+                RestoreSubgraphNavigation(navParents, navParentInstances, navCurrentId, navCurrentInstanceId);
+            }
             state.HandleUndoRedo();
             m_SuppressUndo = false;
+
+            RestoreSelectionAndEditContext(selectedNodeIds, prevContext);
 
             RefreshInspector();
             NotifyDocumentChanged();
             if (m_HostWindow is PcgGraphEditorWindow window)
                 PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             SceneView.RepaintAll();
+        }
+
+        /// <summary>Re-enter the deepest still-existing subgraph in the previous
+        /// navigation chain after an undo restored the root document. Falls back
+        /// to a shallower ancestor if an intermediate definition was removed
+        /// (e.g., undo of Create Subgraph).</summary>
+        private void RestoreSubgraphNavigation(
+            List<string> parents,
+            List<string> parentInstances,
+            string currentId,
+            string currentInstanceId)
+        {
+            if (string.IsNullOrEmpty(currentId))
+                return;
+
+            var fullChain = new List<string>(parents) { currentId };
+            var fullInstances = new List<string>(parentInstances);
+            while (fullInstances.Count < fullChain.Count)
+                fullInstances.Add(null);
+            fullInstances[fullChain.Count - 1] = currentInstanceId;
+
+            var deepest = -1;
+            for (var i = 0; i < fullChain.Count; i++)
+            {
+                if (string.IsNullOrEmpty(fullChain[i]) || FindSubgraph(fullChain[i]) == null)
+                    break;
+                deepest = i;
+            }
+            if (deepest < 0)
+                return;
+
+            for (var i = 0; i < deepest; i++)
+            {
+                m_SubgraphParents.Add(fullChain[i]);
+                m_SubgraphParentInstances.Add(fullInstances[i]);
+            }
+            var targetId = fullChain[deepest];
+            m_CurrentSubgraphId = targetId;
+            m_CurrentSubgraphInstanceId = fullInstances[deepest];
+            var definition = FindSubgraph(targetId);
+            LoadScope(definition.nodes, definition.edges, new List<PcgGraphParameter>(), definition, clearUndo: false);
+            SubgraphNavigationChanged?.Invoke(targetId);
+        }
+
+        /// <summary>Re-select previously selected nodes after an undo restore and
+        /// re-establish the scene edit context (spline control point / group domain).
+        /// Prefers the exact previous context when its active node still exists so
+        /// manual domain switches survive; otherwise re-derives from selection.</summary>
+        private void RestoreSelectionAndEditContext(List<string> selectedNodeIds, PcgSceneEditContext prevContext)
+        {
+            if (selectedNodeIds.Count > 0)
+            {
+                ClearSelection();
+                foreach (var id in selectedNodeIds)
+                {
+                    var view = nodes.OfType<PcgGraphNodeBase>().FirstOrDefault(node => node.NodeId == id);
+                    if (view != null)
+                        AddToSelection(view);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(prevContext.ActiveNodeId) &&
+                nodes.OfType<PcgGraphNodeBase>().Any(node => node.NodeId == prevContext.ActiveNodeId))
+            {
+                m_SceneEditContext = prevContext;
+                SceneContextChanged?.Invoke(m_SceneEditContext);
+            }
+            else
+            {
+                UpdateSceneEditContext();
+            }
         }
 
         private void OnMouseMove(MouseMoveEvent evt)
