@@ -41,25 +41,25 @@
       "id": "plank_sample",
       "type": "SampleAlongSpline",
       "position": { "x": 200, "y": 640 },
-      "data": {"spacing": 0.55, "offset": 0.3, "includeEnd": false, "alignToTangent": true, "seed": 0, "__nodeTitle": "Plank Samples"}
+      "data": {"spacing": 1.261644, "offset": 0.3, "includeEnd": false, "alignToTangent": true, "seed": 0, "__nodeTitle": "Plank Samples"}
     },
     {
       "id": "rope_l",
       "type": "SweepAlongSpline",
       "position": { "x": -120, "y": 800 },
-      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.06, "columns": 10, "sampleSpacing": 0.2, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Rope L"}
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.1403429, "columns": 10, "sampleSpacing": 0.2, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Rope L"}
     },
     {
       "id": "rope_r",
       "type": "SweepAlongSpline",
       "position": { "x": 520, "y": 800 },
-      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.06, "columns": 10, "sampleSpacing": 0.2, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Rope R"}
+      "data": {"surfaceShape": "circle", "profileWidth": 6, "profileHeight": 0.4, "radius": 0.1145143, "columns": 10, "sampleSpacing": 0.2, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Rope R"}
     },
     {
       "id": "plank_jitter",
       "type": "AttributeRandomize",
       "position": { "x": 200, "y": 800 },
-      "data": {"seed": 17, "translateX": 0, "translateY": 0, "translateZ": 0, "rotateX": 2, "rotateY": 0, "rotateZ": 8, "scaleMin": 1, "scaleMax": 1, "__nodeTitle": "Plank Jitter"}
+      "data": {"seed": 17, "translateX": 0, "translateY": 0, "translateZ": 0, "rotateX": 2, "rotateY": 0, "rotateZ": 5.485714, "scaleMin": 1, "scaleMax": 1, "__nodeTitle": "Plank Jitter"}
     },
     {
       "id": "plank_proto",
