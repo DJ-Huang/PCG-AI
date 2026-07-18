@@ -11,8 +11,6 @@ namespace DJTechEditor.PCG
     {
         private const string DemoDirectory = "Assets/PCGDemo/TerrainPcgDemo";
         private const string TerrainDataPath = DemoDirectory + "/TerrainPcgDemoTerrain.asset";
-        private const string PreviewMeshPath = DemoDirectory + "/TerrainPcgDemoPreviewMesh.asset";
-        private const string PreviewMaterialPath = DemoDirectory + "/TerrainPcgDemoPreview.mat";
         private const string ScenePath = "Assets/Scenes/TerrainDemo.scene";
         private const string GenerateGraphPath =
             "Assets/PcgPlugin/Examples/PCGDemo/terrain-binding-demo.pcg";
@@ -69,15 +67,13 @@ namespace DJTechEditor.PCG
             var hostImportGraph = LoadGraphAsset(HostImportGraphPath);
 
             var terrainData = LoadOrCreateTerrainData();
-            var previewMaterial = LoadOrCreatePreviewMaterial();
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             CreateLighting();
             CreateCamera();
             var terrainObject = CreateTerrain(terrainData);
-            var generateMesh = CookGenerateGraph(generateGraph, terrainObject);
-            CreateMeshPreview(generateMesh, previewMaterial);
+            CookGenerateGraph(generateGraph, terrainObject);
             CreateHostImportGraph(hostImportGraph, terrainObject);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -88,9 +84,8 @@ namespace DJTechEditor.PCG
             AssetDatabase.Refresh();
             Debug.Log(
                 $"[PCG] Terrain binding demo ready: {ScenePath}\n" +
-                "- PCG Generate Graph writes HeightField → bound Terrain (writeCookResult)\n" +
-                "- PCG Host Import Graph reads Terrain → Mesh (readFromHost / GetTerrainData)\n" +
-                "- PCG Mesh Preview keeps the ConvertHeightField mesh path");
+                "- PCG Generate: PcgGraphComponent on Terrain, Host Output = Terrain\n" +
+                "- PCG Host Import Graph reads Terrain → Mesh (legacy binding or Self)");
         }
 
         private static PcgGraphAsset LoadGraphAsset(string assetPath)
@@ -147,29 +142,6 @@ namespace DJTechEditor.PCG
             return terrainData;
         }
 
-        private static Material LoadOrCreatePreviewMaterial()
-        {
-            var material = AssetDatabase.LoadAssetAtPath<Material>(PreviewMaterialPath);
-            if (material == null)
-            {
-                var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                if (shader == null)
-                    throw new System.InvalidOperationException(
-                        "No Lit shader is available for the PCG preview.");
-                material = new Material(shader);
-                AssetDatabase.CreateAsset(material, PreviewMaterialPath);
-            }
-
-            if (material.HasProperty("_BaseColor"))
-                material.SetColor("_BaseColor", new Color(0.17f, 0.42f, 0.21f));
-            else if (material.HasProperty("_Color"))
-                material.SetColor("_Color", new Color(0.17f, 0.42f, 0.21f));
-            if (material.HasProperty("_Smoothness"))
-                material.SetFloat("_Smoothness", 0.12f);
-            EditorUtility.SetDirty(material);
-            return material;
-        }
-
         private static void CreateLighting()
         {
             var lightObject = new GameObject("Sun");
@@ -205,41 +177,30 @@ namespace DJTechEditor.PCG
             return terrainObject;
         }
 
-        private static Mesh CookGenerateGraph(PcgGraphAsset projectGraph, GameObject terrainObject)
+        private static void CookGenerateGraph(PcgGraphAsset projectGraph, GameObject terrainObject)
         {
-            var graphObject = new GameObject("PCG Generate Graph");
-            var component = graphObject.AddComponent<PcgGraphComponent>();
+            var component = terrainObject.AddComponent<PcgGraphComponent>();
             AssignGraphForCook(component, projectGraph, GenerateGraphPath);
-
-            component.TerrainBindings.Add(new PcgTerrainBinding
-            {
-                bindingKey = "targetTerrain",
-                source = PcgTerrainBindingSource.SceneObject,
-                sceneObject = terrainObject,
-                readFromHost = false,
-                writeCookResult = true,
-            });
+            component.SetHostOutputMode(PcgHostOutputMode.Terrain, requestCook: false);
 
             if (!component.Run(skipDocumentRefresh: true, forceSynchronous: true))
                 throw new System.InvalidOperationException("Terrain generate graph cook failed.");
 
-            var meshFilter = graphObject.GetComponent<MeshFilter>();
-            if (meshFilter == null || meshFilter.sharedMesh == null)
+            if (component.TerrainApplyGeneration < 1)
                 throw new System.InvalidOperationException(
-                    "Terrain generate graph did not produce a preview mesh.");
-            var meshRenderer = graphObject.GetComponent<MeshRenderer>();
-            if (meshRenderer != null)
-                meshRenderer.enabled = false;
-            return meshFilter.sharedMesh;
+                    "Terrain generate graph did not write TerrainData.");
         }
 
         private static void CreateHostImportGraph(PcgGraphAsset projectGraph, GameObject terrainObject)
         {
+            // Import preview stays Mesh mode on a sibling object. Prefer putting
+            // GetTerrainData graphs on the Terrain itself; legacy bindings remain
+            // only when the component is not on a Terrain.
             var graphObject = new GameObject("PCG Host Import Graph");
             graphObject.transform.position = new Vector3(300f, 0f, 300f);
             var component = graphObject.AddComponent<PcgGraphComponent>();
             AssignGraphForCook(component, projectGraph, HostImportGraphPath);
-
+            component.SetHostOutputMode(PcgHostOutputMode.Mesh, requestCook: false);
             component.TerrainBindings.Add(new PcgTerrainBinding
             {
                 bindingKey = "targetTerrain",
@@ -249,7 +210,6 @@ namespace DJTechEditor.PCG
                 writeCookResult = false,
             });
 
-            // Import after generate so the mesh reflects the written Terrain heights.
             if (!component.Run(skipDocumentRefresh: true, forceSynchronous: true))
                 throw new System.InvalidOperationException("Host import graph cook failed.");
         }
@@ -293,27 +253,6 @@ namespace DJTechEditor.PCG
                     component.RefreshDocument();
                 }
             }
-        }
-
-        private static void CreateMeshPreview(Mesh generatedMesh, Material material)
-        {
-            var previewMesh = AssetDatabase.LoadAssetAtPath<Mesh>(PreviewMeshPath);
-            if (previewMesh == null)
-            {
-                previewMesh = Object.Instantiate(generatedMesh);
-                previewMesh.name = "TerrainPcgDemoPreviewMesh";
-                AssetDatabase.CreateAsset(previewMesh, PreviewMeshPath);
-            }
-            else
-            {
-                EditorUtility.CopySerialized(generatedMesh, previewMesh);
-            }
-            EditorUtility.SetDirty(previewMesh);
-
-            var previewObject = new GameObject("PCG Mesh Preview");
-            previewObject.transform.position = new Vector3(300f, 0f, 0f);
-            previewObject.AddComponent<MeshFilter>().sharedMesh = previewMesh;
-            previewObject.AddComponent<MeshRenderer>().sharedMaterial = material;
         }
 
         private static void EnsureFolder(string path)

@@ -46,23 +46,19 @@ or dependency is part of P0.
 
 ## Unity binding behavior
 
-`PcgGraphComponent.TerrainBindings` is parallel to Mesh and Material bindings.
-Each `PcgTerrainBinding` contains:
+`PcgGraphComponent` chooses a primary host output with `Host Output`:
 
-- `bindingKey`: stable graph-to-host name; `GetTerrainData.bindingKey` defaults to
-  `targetTerrain`.
-- `source`: `Self` or `SceneObject`.
-- `readFromHost`: imports TerrainData into the matching `GetTerrainData` node.
-- `writeCookResult`: applies the cooked HeightField sidecar to the bound Terrain.
+| Mode | Primary result | Host object |
+|---|---|---|
+| `Mesh` | MeshFilter / MeshRenderer (points/splines also) | Mesh Bindings; optional legacy Terrain import list only when not on a Terrain |
+| `Terrain` | This object's `TerrainData` | Put `PcgGraphComponent` on the Terrain GameObject — no Terrain Binding |
 
-Both directions can be enabled. A graph can therefore read a hand-edited Terrain,
-continue through HeightField Noise/Erode/Convert, update the Terrain, and retain
-the Convert-to-Mesh preview in one cook.
+For Terrain host mode, wire **HeightField → Output** (no `ConvertHeightField`).
+Cook writes heights into the Terrain on the same GameObject.
 
-For a Mesh Sink, Core walks upstream from the Sink and exports the nearest typed
-HeightField as a sidecar. For a pure HeightField Sink, that Sink output is the
-sidecar. A write-enabled binding fails visibly if the cook has no typed
-HeightField; it never substitutes the mesh as terrain data.
+`GetTerrainData` prefers the Terrain on the component's GameObject (Self). A legacy
+`TerrainBindings` list remains only as a Mesh-mode override when the component is
+not attached to a Terrain.
 
 ## Synchronization and coordinate rules
 
@@ -85,7 +81,7 @@ HeightField; it never substitutes the mesh as terrain data.
 
 | Phase | Payload | Status |
 |---|---|---|
-| P0 | Bidirectional height, required mask, binding UX, cache dirty/generation guard, Mesh preview coexistence | Implemented |
+| P0 | Bidirectional height, required mask, binding UX, cache dirty/generation guard, `Host Output` Mesh\|Terrain | Implemented |
 | P1 | Unity alphamap/splat ↔ named scalar layers | Reserved |
 | P2 | Tree/detail instances and stable TerrainLayer texture-name bindings | Reserved |
 | Future | Unreal Landscape adapter | Interface/DTO only |

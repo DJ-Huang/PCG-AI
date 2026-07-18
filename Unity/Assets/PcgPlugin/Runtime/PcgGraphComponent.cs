@@ -24,6 +24,9 @@ namespace DJTechRuntime.PCG
         [FormerlySerializedAs("executionMode")]
         [SerializeField] private PcgCookMode cookMode = PcgCookMode.OnParameterChange;
 
+        [SerializeField]
+        private PcgHostOutputMode hostOutputMode = PcgHostOutputMode.Mesh;
+
         [SerializeField, Min(0.05f)]
         private float editModeCookInterval = 0.15f;
         [SerializeField] private bool enableAsyncCookInEditor = true;
@@ -119,7 +122,26 @@ namespace DJTechRuntime.PCG
         public List<PcgMaterialBinding> MaterialBindings => m_MaterialBindings;
         public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
+        public PcgHostOutputMode HostOutputMode => hostOutputMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
+
+        public void SetHostOutputMode(PcgHostOutputMode mode, bool requestCook = true)
+        {
+            var changed = hostOutputMode != mode;
+            hostOutputMode = mode;
+            if (mode == PcgHostOutputMode.Terrain)
+                ClearGeneratedMesh();
+
+            if (!changed)
+                return;
+
+            InvalidateCookResult();
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            if (requestCook && SupportsEditModePreview())
+                RequestPreviewCook(immediate: true);
+        }
 
         /// <summary>Material slot names from the last successful mesh cook (empty until Run).</summary>
         public IReadOnlyList<string> LastMaterialNames => m_LastMaterialNames;
@@ -671,22 +693,13 @@ namespace DJTechRuntime.PCG
         {
             m_PolygonPreview = null;
             var kind = PcgResultParser.DetectKind(result);
-            PcgHostTerrainSurface terrainSurface = null;
-            if (HasTerrainOutputBindings())
-            {
-                if (!PcgHeightFieldBinaryParser.TryParse(
-                        result.HeightFieldBinary, out terrainSurface, out var terrainParseError))
-                {
-                    Debug.LogError(
-                        $"[PCG] Terrain output binding needs a typed HeightField result: {terrainParseError}",
-                        this);
-                    return false;
-                }
-            }
 
 #if UNITY_EDITOR
             LastCookResultJson = result.Json;
 #endif
+
+            if (hostOutputMode == PcgHostOutputMode.Terrain)
+                return ApplyTerrainHostResult(result, kind);
 
             switch (kind)
             {
@@ -792,73 +805,94 @@ namespace DJTechRuntime.PCG
                     break;
 
                 case PcgResultKind.HeightField:
-                    // A pure HeightField result is consumed by Terrain Bindings. Keep
-                    // any existing Convert->Mesh preview untouched.
-                    break;
+                    Debug.LogError(
+                        "[PCG] HeightField Output requires Host Output = Terrain " +
+                        "with PcgGraphComponent on the Terrain GameObject.",
+                        this);
+                    return false;
 
                 default:
                     Debug.LogError("[PCG] Unknown result JSON shape.");
                     return false;
             }
 
-            if (terrainSurface != null && !ApplyTerrainSurface(terrainSurface))
-                return false;
-
             return true;
         }
 
-        private bool HasTerrainOutputBindings()
+        private bool ApplyTerrainHostResult(PcgGraphExecuteResult result, PcgResultKind kind)
         {
-            if (m_TerrainBindings == null)
-                return false;
-            foreach (var binding in m_TerrainBindings)
+            ClearGeneratedMesh();
+            m_LastMeshBinaryHash = 0;
+            m_LastMaterialNames = Array.Empty<string>();
+
+            if (PcgTerrainBindingTable.ResolveSelfTerrain(gameObject) == null)
             {
-                if (binding != null && binding.writeCookResult)
-                    return true;
+                Debug.LogError(
+                    "[PCG] Host Output Mode = Terrain requires PcgGraphComponent on a GameObject with Terrain.",
+                    this);
+                return false;
             }
-            return false;
+
+            if (kind != PcgResultKind.HeightField &&
+                (result.HeightFieldBinary == null || result.HeightFieldBinary.Length == 0))
+            {
+                Debug.LogError(
+                    "[PCG] Host Output Mode = Terrain expects a HeightField Output " +
+                    "(wire HeightField → Output; do not Convert → Mesh).",
+                    this);
+                return false;
+            }
+
+            if (!PcgHeightFieldBinaryParser.TryParse(
+                    result.HeightFieldBinary, out var terrainSurface, out var terrainParseError))
+            {
+                Debug.LogError(
+                    $"[PCG] Terrain host mode needs a typed HeightField result: {terrainParseError}",
+                    this);
+                return false;
+            }
+
+            return ApplyTerrainSurface(terrainSurface);
         }
 
         private bool ApplyTerrainSurface(PcgHostTerrainSurface surface)
         {
-            var appliedAny = false;
-            foreach (var binding in m_TerrainBindings)
+            var terrain = PcgTerrainBindingTable.ResolveSelfTerrain(gameObject);
+            if (terrain == null)
             {
-                if (binding == null || !binding.writeCookResult)
-                    continue;
-
-                var terrain = PcgTerrainBindingTable.ResolveTerrain(binding, gameObject);
-                var adapter = new PcgUnityTerrainAdapter(terrain, transform);
-                if (!adapter.TryExportSurface(surface, out var report, out var error))
-                {
-                    Debug.LogError(
-                        $"[PCG] Terrain output '{binding.bindingKey}' failed: {error}", this);
-                    return false;
-                }
-
-                if (report.Applied)
-                {
-                    appliedAny = true;
-#if UNITY_EDITOR
-                    if (terrain != null && terrain.terrainData != null)
-                        UnityEditor.EditorUtility.SetDirty(terrain.terrainData);
-#endif
-                }
-
-                if (report.Resampled || report.ScaledFootprint || report.ClampedSamples > 0)
-                {
-                    Debug.Log(
-                        $"[PCG] Terrain '{binding.bindingKey}' applied " +
-                        $"({report.SourceResolutionX}x{report.SourceResolutionZ} -> " +
-                        $"{report.TargetResolution}x{report.TargetResolution}, " +
-                        $"resampled={report.Resampled}, scaledFootprint={report.ScaledFootprint}, " +
-                        $"clamped={report.ClampedSamples}).",
-                        this);
-                }
+                Debug.LogError(
+                    "[PCG] No Terrain on this GameObject. Attach PcgGraphComponent to the Terrain.",
+                    this);
+                return false;
             }
 
-            if (appliedAny)
+            var adapter = new PcgUnityTerrainAdapter(terrain, transform);
+            if (!adapter.TryExportSurface(surface, out var report, out var error))
+            {
+                Debug.LogError($"[PCG] Terrain output failed: {error}", this);
+                return false;
+            }
+
+            if (report.Applied)
+            {
                 m_TerrainApplyGeneration++;
+#if UNITY_EDITOR
+                if (terrain.terrainData != null)
+                    UnityEditor.EditorUtility.SetDirty(terrain.terrainData);
+#endif
+            }
+
+            if (report.Resampled || report.ScaledFootprint || report.ClampedSamples > 0)
+            {
+                Debug.Log(
+                    $"[PCG] Terrain applied " +
+                    $"({report.SourceResolutionX}x{report.SourceResolutionZ} -> " +
+                    $"{report.TargetResolution}x{report.TargetResolution}, " +
+                    $"resampled={report.Resampled}, scaledFootprint={report.ScaledFootprint}, " +
+                    $"clamped={report.ClampedSamples}).",
+                    this);
+            }
+
             return true;
         }
 

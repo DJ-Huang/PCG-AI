@@ -67,20 +67,11 @@ namespace DJTechEditor.PCG.Tests
             terrainData.SetHeights(0, 0, normalized);
 
             var terrainObject = Terrain.CreateTerrainGameObject(terrainData);
-            var host = new GameObject("PCG Host Terrain Input");
             try
             {
-                var binding = new PcgTerrainBinding
-                {
-                    bindingKey = "targetTerrain",
-                    source = PcgTerrainBindingSource.SceneObject,
-                    sceneObject = terrainObject,
-                    readFromHost = true,
-                    writeCookResult = false,
-                };
                 var graph = HostTerrainGraph();
                 var uploads = PcgTerrainResolver.CollectFromGraphJson(
-                    graph, host, new[] { binding });
+                    graph, terrainObject, null);
                 Assert.That(uploads, Has.Count.EqualTo(1));
                 Assert.That(uploads[0].Heights[8], Is.EqualTo(4f).Within(2e-4f));
                 Assert.That(uploads[0].Mask.All(value => value == 1f), Is.True);
@@ -100,7 +91,7 @@ namespace DJTechEditor.PCG.Tests
                 normalized[4, 4] = 0.9f;
                 terrainData.SetHeights(0, 0, normalized);
                 uploads = PcgTerrainResolver.CollectFromGraphJson(
-                    graph, host, new[] { binding });
+                    graph, terrainObject, null);
                 var second = PcgGraphLoader.Execute(graph, 42, null, null, null, uploads);
                 Assert.That(
                     PcgHeightFieldBinaryParser.TryParse(
@@ -113,14 +104,13 @@ namespace DJTechEditor.PCG.Tests
             }
             finally
             {
-                Object.DestroyImmediate(host);
                 Object.DestroyImmediate(terrainObject);
                 Object.DestroyImmediate(terrainData);
             }
         }
 
         [Test]
-        public void GraphComponent_AppliesHeightFieldToTerrainAndKeepsMeshPreview()
+        public void GraphComponent_TerrainMode_AppliesHeightFieldOnly()
         {
             var terrainData = new TerrainData
             {
@@ -129,28 +119,20 @@ namespace DJTechEditor.PCG.Tests
             };
             var terrainObject = Terrain.CreateTerrainGameObject(terrainData);
             terrainObject.transform.position = new Vector3(-4f, 0f, -4f);
-            var host = new GameObject("PCG Host Terrain Output");
             var asset = ScriptableObject.CreateInstance<PcgGraphAsset>();
             try
             {
                 asset.SetGraphJson(GeneratedTerrainGraph());
-                var component = host.AddComponent<PcgGraphComponent>();
+                var component = terrainObject.AddComponent<PcgGraphComponent>();
                 component.GraphAsset = asset;
-                component.TerrainBindings.Add(new PcgTerrainBinding
-                {
-                    bindingKey = "targetTerrain",
-                    source = PcgTerrainBindingSource.SceneObject,
-                    sceneObject = terrainObject,
-                    readFromHost = false,
-                    writeCookResult = true,
-                });
+                component.SetHostOutputMode(PcgHostOutputMode.Terrain, requestCook: false);
 
                 PcgGraphCookCache.Clear();
                 PcgNative.ClearCookCache();
                 Assert.That(component.Run(skipDocumentRefresh: false, forceSynchronous: true), Is.True);
                 Assert.That(component.TerrainApplyGeneration, Is.EqualTo(1));
-                Assert.That(host.GetComponent<MeshFilter>()?.sharedMesh, Is.Not.Null);
-                Assert.That(host.GetComponent<MeshFilter>().sharedMesh.vertexCount, Is.EqualTo(81));
+                Assert.That(terrainObject.GetComponent<MeshFilter>()?.sharedMesh, Is.Null,
+                    "Terrain host mode must not create a mesh preview.");
 
                 var heights = terrainData.GetHeights(0, 0, 9, 9);
                 Assert.That(heights[0, 0], Is.EqualTo(0.2f).Within(2e-5f));
@@ -163,7 +145,6 @@ namespace DJTechEditor.PCG.Tests
             }
             finally
             {
-                Object.DestroyImmediate(host);
                 Object.DestroyImmediate(terrainObject);
                 Object.DestroyImmediate(terrainData);
                 Object.DestroyImmediate(asset);
@@ -331,12 +312,10 @@ namespace DJTechEditor.PCG.Tests
   ""version"":""1.0"",
   ""nodes"":[
     {""id"":""base"",""type"":""HeightField"",""data"":{""sizeX"":8,""sizeZ"":8,""gridSpacing"":1,""initialHeight"":2,""initialMask"":1}},
-    {""id"":""convert"",""type"":""ConvertHeightField"",""data"":{}},
     {""id"":""out"",""type"":""Output"",""data"":{}}
   ],
   ""edges"":[
-    {""id"":""e1"",""source"":""base"",""target"":""convert""},
-    {""id"":""e2"",""source"":""convert"",""target"":""out""}
+    {""id"":""e1"",""source"":""base"",""target"":""out""}
   ]
 }";
     }

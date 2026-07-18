@@ -175,13 +175,26 @@ namespace DJTechRuntime.PCG
 
     public static class PcgTerrainBindingTable
     {
+        /// <summary>
+        /// Terrain host path: the PcgGraphComponent lives on the Terrain object.
+        /// </summary>
+        public static Terrain ResolveSelfTerrain(GameObject componentHost)
+        {
+            if (componentHost == null)
+                return null;
+            var terrain = componentHost.GetComponent<Terrain>();
+            if (terrain != null)
+                return terrain;
+            return componentHost.GetComponentInParent<Terrain>();
+        }
+
         public static Terrain ResolveTerrain(PcgTerrainBinding binding, GameObject componentHost)
         {
             if (binding == null)
-                return null;
+                return ResolveSelfTerrain(componentHost);
 
             if (binding.source == PcgTerrainBindingSource.Self)
-                return componentHost != null ? componentHost.GetComponent<Terrain>() : null;
+                return ResolveSelfTerrain(componentHost);
 
             return binding.sceneObject != null
                 ? binding.sceneObject.GetComponent<Terrain>()
@@ -456,22 +469,31 @@ namespace DJTechRuntime.PCG
                 return uploads;
             }
 
+            // Preferred path: PcgGraphComponent on the Terrain. Legacy TerrainBindings
+            // remain as a Mesh-mode override when the component is not on a Terrain.
+            var selfTerrain = PcgTerrainBindingTable.ResolveSelfTerrain(componentHost);
+
             foreach (var node in document.nodes)
             {
                 if (node == null || node.type != "GetTerrainData" || string.IsNullOrEmpty(node.id))
                     continue;
 
-                var bindingKey = node.data?.GetRaw("bindingKey")?.ToString() ?? "targetTerrain";
-                var binding = PcgTerrainBindingTable.FindBinding(bindingKey, bindings);
-                if (binding == null || !binding.readFromHost)
-                    continue;
-                var terrain = PcgTerrainBindingTable.ResolveTerrain(binding, componentHost);
+                Terrain terrain = selfTerrain;
+                if (terrain == null)
+                {
+                    var bindingKey = node.data?.GetRaw("bindingKey")?.ToString() ?? "targetTerrain";
+                    var binding = PcgTerrainBindingTable.FindBinding(bindingKey, bindings);
+                    if (binding == null || !binding.readFromHost)
+                        continue;
+                    terrain = PcgTerrainBindingTable.ResolveTerrain(binding, componentHost);
+                }
+
                 var adapter = new PcgUnityTerrainAdapter(
                     terrain,
                     componentHost != null ? componentHost.transform : null);
                 if (!adapter.TryImportSurface(out var surface, out var error))
                 {
-                    Debug.LogError($"[PCG] Terrain import '{bindingKey}' failed: {error}", componentHost);
+                    Debug.LogError($"[PCG] Terrain import '{node.id}' failed: {error}", componentHost);
                     continue;
                 }
 

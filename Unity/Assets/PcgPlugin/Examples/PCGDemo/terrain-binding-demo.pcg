@@ -4,7 +4,10 @@
     {
       "id": "terrain_base",
       "type": "HeightField",
-      "position": { "x": 200, "y": 0 },
+      "position": {
+        "x": 200,
+        "y": 0
+      },
       "data": {
         "orientation": "zx",
         "sampling": "corner",
@@ -24,7 +27,10 @@
     {
       "id": "terrain_macro",
       "type": "HeightFieldNoise",
-      "position": { "x": 200, "y": 160 },
+      "position": {
+        "x": 200,
+        "y": 160
+      },
       "data": {
         "noiseLayer": "height",
         "maskLayer": "mask",
@@ -47,7 +53,10 @@
     {
       "id": "terrain_detail",
       "type": "HeightFieldNoise",
-      "position": { "x": 200, "y": 320 },
+      "position": {
+        "x": 200,
+        "y": 320
+      },
       "data": {
         "noiseLayer": "height",
         "maskLayer": "mask",
@@ -70,7 +79,10 @@
     {
       "id": "terrain_highland_mask",
       "type": "HeightFieldMaskByFeature",
-      "position": { "x": 200, "y": 480 },
+      "position": {
+        "x": 200,
+        "y": 480
+      },
       "data": {
         "heightLayer": "height",
         "outputLayer": "mask",
@@ -93,7 +105,10 @@
     {
       "id": "terrain_terrace",
       "type": "HeightFieldTerrace",
-      "position": { "x": 200, "y": 640 },
+      "position": {
+        "x": 200,
+        "y": 640
+      },
       "data": {
         "heightLayer": "height",
         "maskLayer": "mask",
@@ -111,7 +126,10 @@
     {
       "id": "terrain_blur",
       "type": "HeightFieldBlur",
-      "position": { "x": 200, "y": 800 },
+      "position": {
+        "x": 200,
+        "y": 800
+      },
       "data": {
         "blurLayer": "height",
         "maskLayer": "mask",
@@ -125,7 +143,10 @@
     {
       "id": "terrain_erode",
       "type": "HeightFieldErode",
-      "position": { "x": 200, "y": 960 },
+      "position": {
+        "x": 200,
+        "y": 960
+      },
       "data": {
         "heightLayer": "height",
         "maskLayer": "mask",
@@ -151,43 +172,139 @@
       }
     },
     {
-      "id": "terrain_polygon",
-      "type": "ConvertHeightField",
-      "position": { "x": 200, "y": 1120 },
-      "data": {
-        "heightLayer": "height",
-        "density": 1,
-        "__nodeTitle": "Convert → Mesh Preview"
-      }
-    },
-    {
       "id": "terrain_output",
       "type": "Output",
-      "position": { "x": 200, "y": 1280 },
+      "position": {
+        "x": 200,
+        "y": 1120
+      },
       "data": {
-        "label": "Terrain Binding Demo",
-        "__nodeTitle": "Output (Mesh + Terrain)"
+        "label": "TerrainData",
+        "__nodeTitle": "Output (TerrainData)"
       }
     }
   ],
   "edges": [
-    {"id": "edge_base_macro", "source": "terrain_base", "target": "terrain_macro", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_macro_detail", "source": "terrain_macro", "target": "terrain_detail", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_detail_mask", "source": "terrain_detail", "target": "terrain_highland_mask", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_mask_terrace_in", "source": "terrain_highland_mask", "target": "terrain_terrace", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_mask_terrace_mask", "source": "terrain_highland_mask", "target": "terrain_terrace", "sourceHandle": "out", "targetHandle": "mask"},
-    {"id": "edge_terrace_blur", "source": "terrain_terrace", "target": "terrain_blur", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_mask_blur", "source": "terrain_highland_mask", "target": "terrain_blur", "sourceHandle": "out", "targetHandle": "mask"},
-    {"id": "edge_blur_erode", "source": "terrain_blur", "target": "terrain_erode", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_mask_erode", "source": "terrain_highland_mask", "target": "terrain_erode", "sourceHandle": "out", "targetHandle": "mask"},
-    {"id": "edge_erode_polygon", "source": "terrain_erode", "target": "terrain_polygon", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "edge_polygon_output", "source": "terrain_polygon", "target": "terrain_output", "sourceHandle": "out", "targetHandle": "in"}
+    {
+      "id": "edge_base_macro",
+      "source": "terrain_base",
+      "target": "terrain_macro",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_macro_detail",
+      "source": "terrain_macro",
+      "target": "terrain_detail",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_detail_mask",
+      "source": "terrain_detail",
+      "target": "terrain_highland_mask",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_mask_terrace_in",
+      "source": "terrain_highland_mask",
+      "target": "terrain_terrace",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_mask_terrace_mask",
+      "source": "terrain_highland_mask",
+      "target": "terrain_terrace",
+      "sourceHandle": "out",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_terrace_blur",
+      "source": "terrain_terrace",
+      "target": "terrain_blur",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_mask_blur",
+      "source": "terrain_highland_mask",
+      "target": "terrain_blur",
+      "sourceHandle": "out",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_blur_erode",
+      "source": "terrain_blur",
+      "target": "terrain_erode",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_mask_erode",
+      "source": "terrain_highland_mask",
+      "target": "terrain_erode",
+      "sourceHandle": "out",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_erode_output",
+      "source": "terrain_erode",
+      "target": "terrain_output",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
   ],
   "parameters": [
-    {"id": "macro_amplitude", "name": "Macro Amplitude", "type": "number", "default": 38, "exposed": true, "targetNode": "terrain_macro", "targetProperty": "amplitude", "hasRange": true, "min": 5, "max": 80},
-    {"id": "macro_feature_size", "name": "Macro Feature Size", "type": "number", "default": 88, "exposed": true, "targetNode": "terrain_macro", "targetProperty": "elementSize", "hasRange": true, "min": 16, "max": 192},
-    {"id": "detail_amplitude", "name": "Detail Amplitude", "type": "number", "default": 4.5, "exposed": true, "targetNode": "terrain_detail", "targetProperty": "amplitude", "hasRange": true, "min": 0, "max": 15},
-    {"id": "erosion_iterations", "name": "Erosion Iterations", "type": "integer", "default": 18, "exposed": true, "targetNode": "terrain_erode", "targetProperty": "iterations", "hasRange": true, "min": 1, "max": 80}
+    {
+      "id": "macro_amplitude",
+      "name": "Macro Amplitude",
+      "type": "number",
+      "default": 38,
+      "exposed": true,
+      "targetNode": "terrain_macro",
+      "targetProperty": "amplitude",
+      "hasRange": true,
+      "min": 5,
+      "max": 80
+    },
+    {
+      "id": "macro_feature_size",
+      "name": "Macro Feature Size",
+      "type": "number",
+      "default": 88,
+      "exposed": true,
+      "targetNode": "terrain_macro",
+      "targetProperty": "elementSize",
+      "hasRange": true,
+      "min": 16,
+      "max": 192
+    },
+    {
+      "id": "detail_amplitude",
+      "name": "Detail Amplitude",
+      "type": "number",
+      "default": 4.5,
+      "exposed": true,
+      "targetNode": "terrain_detail",
+      "targetProperty": "amplitude",
+      "hasRange": true,
+      "min": 0,
+      "max": 15
+    },
+    {
+      "id": "erosion_iterations",
+      "name": "Erosion Iterations",
+      "type": "integer",
+      "default": 18,
+      "exposed": true,
+      "targetNode": "terrain_erode",
+      "targetProperty": "iterations",
+      "hasRange": true,
+      "min": 1,
+      "max": 80
+    }
   ],
   "subgraphs": []
 }

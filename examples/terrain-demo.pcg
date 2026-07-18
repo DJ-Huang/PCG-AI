@@ -4,7 +4,10 @@
     {
       "id": "terrain_base",
       "type": "HeightField",
-      "position": { "x": 200, "y": 0 },
+      "position": {
+        "x": 200,
+        "y": 0
+      },
       "data": {
         "__nodeTitle": "Terrain Base",
         "orientation": "zx",
@@ -23,7 +26,10 @@
     {
       "id": "terrain_macro",
       "type": "HeightFieldNoise",
-      "position": { "x": 200, "y": 160 },
+      "position": {
+        "x": 200,
+        "y": 160
+      },
       "data": {
         "__nodeTitle": "Macro Landforms",
         "noiseLayer": "height",
@@ -46,7 +52,10 @@
     {
       "id": "terrain_detail",
       "type": "HeightFieldNoise",
-      "position": { "x": 200, "y": 320 },
+      "position": {
+        "x": 200,
+        "y": 320
+      },
       "data": {
         "__nodeTitle": "Rock Detail",
         "noiseLayer": "height",
@@ -69,7 +78,10 @@
     {
       "id": "terrain_highland_mask",
       "type": "HeightFieldMaskByFeature",
-      "position": { "x": 200, "y": 480 },
+      "position": {
+        "x": 200,
+        "y": 480
+      },
       "data": {
         "__nodeTitle": "Highland Feature Mask",
         "heightLayer": "height",
@@ -88,7 +100,10 @@
     {
       "id": "terrain_terrace",
       "type": "HeightFieldTerrace",
-      "position": { "x": 200, "y": 640 },
+      "position": {
+        "x": 200,
+        "y": 640
+      },
       "data": {
         "__nodeTitle": "Subtle Strata",
         "heightLayer": "height",
@@ -106,7 +121,10 @@
     {
       "id": "terrain_blur",
       "type": "HeightFieldBlur",
-      "position": { "x": 200, "y": 800 },
+      "position": {
+        "x": 200,
+        "y": 800
+      },
       "data": {
         "__nodeTitle": "Masked Strata Soften",
         "blurLayer": "height",
@@ -120,7 +138,10 @@
     {
       "id": "terrain_distort",
       "type": "HeightFieldDistortByNoise",
-      "position": { "x": 200, "y": 960 },
+      "position": {
+        "x": 200,
+        "y": 960
+      },
       "data": {
         "__nodeTitle": "Geological Edge Distortion",
         "distortLayers": "height",
@@ -141,7 +162,10 @@
     {
       "id": "terrain_erode",
       "type": "HeightFieldErode",
-      "position": { "x": 200, "y": 1120 },
+      "position": {
+        "x": 200,
+        "y": 1120
+      },
       "data": {
         "__nodeTitle": "Masked Hydro Thermal Erosion",
         "heightLayer": "height",
@@ -167,22 +191,15 @@
       }
     },
     {
-      "id": "terrain_polygon",
-      "type": "ConvertHeightField",
-      "position": { "x": 200, "y": 1280 },
-      "data": {
-        "__nodeTitle": "Terrain Polygon",
-        "heightLayer": "height",
-        "density": 1
-      }
-    },
-    {
       "id": "terrain_output",
       "type": "Output",
-      "position": { "x": 200, "y": 1440 },
+      "position": {
+        "x": 200,
+        "y": 1280
+      },
       "data": {
-        "__nodeTitle": "Terrain Output",
-        "label": "Terrain"
+        "label": "TerrainData",
+        "__nodeTitle": "Output (TerrainData)"
       }
     }
   ],
@@ -265,17 +282,10 @@
       "targetHandle": "mask"
     },
     {
-      "id": "edge_erode_polygon",
+      "id": "edge_erode_output",
       "source": "terrain_erode",
-      "sourceHandle": "out",
-      "target": "terrain_polygon",
-      "targetHandle": "in"
-    },
-    {
-      "id": "edge_polygon_output",
-      "source": "terrain_polygon",
-      "sourceHandle": "out",
       "target": "terrain_output",
+      "sourceHandle": "out",
       "targetHandle": "in"
     }
   ],

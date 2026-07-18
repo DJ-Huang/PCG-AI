@@ -20,6 +20,17 @@ namespace DJTechRuntime.PCG
         GpuInstancing = 1,
     }
 
+    /// <summary>
+    /// Primary host output for a <see cref="PcgGraphComponent"/>.
+    /// Mesh mode applies cook results to MeshFilter/MeshRenderer.
+    /// Terrain mode writes typed HeightField results to bound TerrainData only.
+    /// </summary>
+    public enum PcgHostOutputMode
+    {
+        Mesh = 0,
+        Terrain = 1,
+    }
+
     [Serializable]
     public class PcgMeshBinding
     {

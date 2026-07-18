@@ -13,6 +13,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_GraphAssetProp;
         private SerializedProperty m_SeedProp;
         private SerializedProperty m_CookModeProp;
+        private SerializedProperty m_HostOutputModeProp;
         private SerializedProperty m_OverridesProp;
         private SerializedProperty m_MeshBindingsProp;
         private SerializedProperty m_TerrainBindingsProp;
@@ -29,6 +30,7 @@ namespace DJTechEditor.PCG
             m_GraphAssetProp = serializedObject.FindProperty("graphAsset");
             m_SeedProp = serializedObject.FindProperty("seed");
             m_CookModeProp = serializedObject.FindProperty("cookMode");
+            m_HostOutputModeProp = serializedObject.FindProperty("hostOutputMode");
             m_OverridesProp = serializedObject.FindProperty("m_ParameterOverrides");
             m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
             m_TerrainBindingsProp = serializedObject.FindProperty("m_TerrainBindings");
@@ -58,6 +60,15 @@ namespace DJTechEditor.PCG
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(m_SeedProp);
             EditorGUILayout.PropertyField(m_CookModeProp);
+            if (m_HostOutputModeProp != null)
+            {
+                EditorGUILayout.PropertyField(
+                    m_HostOutputModeProp,
+                    new GUIContent(
+                        "Host Output",
+                        "Mesh: apply cook result to MeshFilter/MeshRenderer. " +
+                        "Terrain: write typed HeightField Output to bound TerrainData only."));
+            }
             var cookMode = (PcgCookMode)m_CookModeProp.enumValueIndex;
             var intervalProp = serializedObject.FindProperty("editModeCookInterval");
             if (cookMode == PcgCookMode.OnParameterChange)
@@ -77,6 +88,8 @@ namespace DJTechEditor.PCG
             if (EditorGUI.EndChangeCheck())
             {
                 serializedObject.ApplyModifiedProperties();
+                if (m_Target.HostOutputMode == PcgHostOutputMode.Terrain)
+                    m_Target.SetHostOutputMode(PcgHostOutputMode.Terrain, requestCook: false);
                 if (m_Target.SupportsEditModePreview())
                     m_Target.RequestPreviewCook(immediate: true);
                 serializedObject.Update();
@@ -115,8 +128,7 @@ namespace DJTechEditor.PCG
                 PcgGraphComponent.CancelAllEditModeAsyncCooks();
 
             DrawScatterSettings();
-            DrawMeshBindings();
-            DrawTerrainBindings();
+            DrawHostBindings();
             DrawMaterialBindings();
             DrawParameters();
 
@@ -133,6 +145,12 @@ namespace DJTechEditor.PCG
 
         private void DrawScatterSettings()
         {
+            var mode = m_HostOutputModeProp != null
+                ? (PcgHostOutputMode)m_HostOutputModeProp.enumValueIndex
+                : PcgHostOutputMode.Mesh;
+            if (mode == PcgHostOutputMode.Terrain)
+                return;
+
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Scatter Rendering", EditorStyles.boldLabel);
             EditorGUI.BeginChangeCheck();
@@ -216,10 +234,54 @@ namespace DJTechEditor.PCG
             EditorGUILayout.HelpBox($"Async cook status: {status}", type);
         }
 
-        private void DrawMeshBindings()
+        private void DrawHostBindings()
+        {
+            var mode = m_HostOutputModeProp != null
+                ? (PcgHostOutputMode)m_HostOutputModeProp.enumValueIndex
+                : PcgHostOutputMode.Mesh;
+
+            if (mode == PcgHostOutputMode.Terrain)
+            {
+                EditorGUILayout.Space();
+                EditorGUILayout.HelpBox(
+                    "Host Output = Terrain: attach this component to the Terrain GameObject. " +
+                    "Cook writes HeightField → this object's TerrainData (no Terrain Binding).",
+                    MessageType.Info);
+                if (m_Target != null &&
+                    PcgTerrainBindingTable.ResolveSelfTerrain(m_Target.gameObject) == null)
+                {
+                    EditorGUILayout.HelpBox(
+                        "No Terrain on this GameObject. Move PcgGraphComponent onto the Terrain.",
+                        MessageType.Warning);
+                }
+                DrawMeshBindings(collapsed: true);
+            }
+            else
+            {
+                DrawMeshBindings(collapsed: false);
+                // Legacy override only when GetTerrainData is present and the component
+                // is not already on a Terrain.
+                if (GraphHasGetTerrainData() &&
+                    (m_Target == null ||
+                     PcgTerrainBindingTable.ResolveSelfTerrain(m_Target.gameObject) == null))
+                {
+                    DrawTerrainBindingsLegacy();
+                }
+            }
+        }
+
+        private void DrawMeshBindings(bool collapsed)
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Mesh Bindings", EditorStyles.boldLabel);
+
+            if (collapsed)
+            {
+                EditorGUILayout.HelpBox(
+                    "Host Output = Terrain: Mesh Bindings are unused.",
+                    MessageType.Info);
+                return;
+            }
 
             if (GraphHasGetMeshData())
             {
@@ -239,23 +301,14 @@ namespace DJTechEditor.PCG
             EditorGUILayout.PropertyField(m_MeshBindingsProp, includeChildren: true);
         }
 
-        private void DrawTerrainBindings()
+        private void DrawTerrainBindingsLegacy()
         {
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Terrain Bindings", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Terrain Import (legacy)", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Read From Host uploads a bound Unity Terrain to GetTerrainData by bindingKey. " +
-                "Write Cook Result applies the nearest typed HeightField upstream of the Sink. " +
-                "Both can stay enabled while Convert HeightField continues to render the Mesh preview.",
+                "Preferred: put PcgGraphComponent on the Terrain so GetTerrainData imports Self. " +
+                "This list is only for importing a remote Terrain while Host Output = Mesh.",
                 MessageType.Info);
-
-            if (GraphHasGetTerrainData() && m_TerrainBindingsProp.arraySize == 0)
-            {
-                EditorGUILayout.HelpBox(
-                    "GetTerrainData can use a host Terrain: add a binding with " +
-                    "bindingKey = targetTerrain and enable Read From Host.",
-                    MessageType.Warning);
-            }
 
             EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(m_TerrainBindingsProp, includeChildren: true);
@@ -270,6 +323,12 @@ namespace DJTechEditor.PCG
 
         private void DrawMaterialBindings()
         {
+            var mode = m_HostOutputModeProp != null
+                ? (PcgHostOutputMode)m_HostOutputModeProp.enumValueIndex
+                : PcgHostOutputMode.Mesh;
+            if (mode == PcgHostOutputMode.Terrain)
+                return;
+
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Material Bindings", EditorStyles.boldLabel);
 
