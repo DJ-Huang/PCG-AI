@@ -710,7 +710,7 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
 - **cylindrical**：圆柱投影
 - **spherical**：球面投影
 
-`scaleU/V` 控制缩放，`offsetU/V` 控制偏移。
+`scaleU/V` 控制缩放，`offsetU/V` 控制偏移。Geometry 路径同时写 point UV 与 corner UV；未知投影（含遗留 `box`）拒绝执行。
 
 **参数**：`projection` (planar/cylindrical/spherical), `axis` (x/y/z), `scaleU`, `scaleV`, `offsetU`, `offsetV`
 

@@ -12,6 +12,7 @@ struct Geometry {
     std::vector<std::vector<uint32_t>> faces;
     std::vector<std::array<float, 4>> colors;
     std::vector<std::array<float, 2>> uvs;
+    std::vector<std::array<float, 2>> corner_uvs;
     std::string material;
     std::vector<std::string> face_materials;
 };

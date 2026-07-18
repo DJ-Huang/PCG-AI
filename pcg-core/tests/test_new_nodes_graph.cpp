@@ -237,7 +237,7 @@ int main()
         expect(r.code == PCG_ERR_EXECUTION, "graph6: missing texture → error");
     }
 
-    // --- Test 7: Invalid enum does not crash ---
+    // --- Test 7: Unsupported projection (bogus / legacy box) is rejected ---
     {
         const char* graph = R"({
           "version": "1.0",
@@ -254,7 +254,27 @@ int main()
           ]
         })";
         auto r = execute_graph(graph, 42);
-        expect(r.code == PCG_OK, "graph7: invalid enum does not crash (fallback ok)");
+        expect(r.code == PCG_ERR_EXECUTION, "graph7: unsupported projection is rejected");
+    }
+
+    // --- Test 7b: Legacy box projection is rejected (no fake constant UV) ---
+    {
+        const char* graph = R"({
+          "version": "1.0",
+          "nodes": [
+            {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":0},
+             "data": {"width": 2.0, "height": 2.0, "depth": 2.0}},
+            {"id": "uv", "type": "UVTexture", "position": {"x":200,"y":0},
+             "data": {"projection": "box", "axis": "y"}},
+            {"id": "out", "type": "Output", "position": {"x":400,"y":0}, "data": {}}
+          ],
+          "edges": [
+            {"id": "e1", "source": "box", "target": "uv", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e2", "source": "uv", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+          ]
+        })";
+        auto r = execute_graph(graph, 42);
+        expect(r.code == PCG_ERR_EXECUTION, "graph7b: box projection rejected until P4");
     }
 
     // --- Test 8: FaceGroupByNormal drives a material override ---

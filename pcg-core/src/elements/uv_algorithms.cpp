@@ -112,8 +112,9 @@ void generate_uv(data::PcgMeshData& mesh,
             uvs[i] = {u * scale_u + offset_u, v * scale_v + offset_v};
         }
     } else {
-        for (int i = 0; i < vc; ++i)
-            uvs[i] = {offset_u, offset_v};
+        // Unsupported projections (e.g. legacy "box") must not silently write constant UVs.
+        // Callers should reject unknown projections before invoking this helper.
+        return;
     }
 
     mesh.set_uvs(uvs);
@@ -269,8 +270,8 @@ std::vector<data::PcgVec2> generate_uv_geometry(const data::PcgGeometry& geometr
             uvs[static_cast<size_t>(i)] = {u * scale_u + offset_u, v * scale_v + offset_v};
         }
     } else {
-        for (int i = 0; i < vc; ++i)
-            uvs[static_cast<size_t>(i)] = {offset_u, offset_v};
+        // Unsupported — return empty so callers do not treat constant offset as a valid UV map.
+        return {};
     }
 
     return uvs;

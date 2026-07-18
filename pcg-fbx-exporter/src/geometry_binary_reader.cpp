@@ -15,6 +15,7 @@ constexpr uint32_t kColors = 7u;
 constexpr uint32_t kUvs = 8u;
 constexpr uint32_t kMaterial = 9u;
 constexpr uint32_t kFaceMaterials = 10u;
+constexpr uint32_t kCornerUvs = 11u;
 
 class Reader {
 public:
@@ -145,6 +146,16 @@ bool read_geometry_binary(const void* data, int size, Geometry& geometry, std::s
                 if (!reader.read(uv.data(), 8))
                     return false;
             }
+        } else if (chunk_id == kCornerUvs) {
+            if (chunk_size % 8u != 0u) {
+                error = "Corner UV chunk is not float2 aligned.";
+                return false;
+            }
+            geometry.corner_uvs.resize(chunk_size / 8u);
+            for (auto& uv : geometry.corner_uvs) {
+                if (!reader.read(uv.data(), 8))
+                    return false;
+            }
         } else if (chunk_id == kMaterial) {
             std::vector<char> text(chunk_size);
             if (!text.empty() && !reader.read(text.data(), static_cast<int>(text.size())))
@@ -199,6 +210,28 @@ bool read_geometry_binary(const void* data, int size, Geometry& geometry, std::s
     if (!geometry.face_materials.empty() && geometry.face_materials.size() != face_count) {
         error = "Face material count does not match face count.";
         return false;
+    }
+    if (!geometry.corner_uvs.empty()) {
+        size_t corner_count = 0;
+        for (const auto& face : geometry.faces)
+            corner_count += face.size();
+        if (geometry.corner_uvs.size() != corner_count) {
+            error = "Corner UV count does not match total face corners.";
+            return false;
+        }
+        // Assimp mesh UV is per-point; expand corner → point (first writer wins)
+        // when point UV channel is empty so exporters still emit UV0.
+        if (geometry.uvs.empty()) {
+            geometry.uvs.assign(point_count, {{0.f, 0.f}});
+            size_t cursor = 0;
+            for (const auto& face : geometry.faces) {
+                for (uint32_t index : face) {
+                    if (index < point_count)
+                        geometry.uvs[index] = geometry.corner_uvs[cursor];
+                    ++cursor;
+                }
+            }
+        }
     }
     return true;
 }

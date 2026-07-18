@@ -225,6 +225,8 @@ public:
 
 注意 `faces_` 的类型是 `vector<vector<int>>`——每个面是一个顶点索引数组，可以是三角形（3 个索引）或 n-gon（>3 个索引）。
 
+属性通道（2026-07-18）：`colors_`（point）、`uvs_`（point）、`corner_uvs_`（face-corner，渲染 UV 真源）、`face_materials_`。UV domain 详见 [13-uv-domain](13-uv-domain.md)。
+
 ### 4.3 三角化函数
 
 来源：`data/pcg_geometry.hpp`，commit `f50d744`：

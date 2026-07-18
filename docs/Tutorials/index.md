@@ -46,6 +46,7 @@ flowchart LR
 | 08 | [Unity GraphView 编辑器](08-unity-graph-editor.md) | 解释节点画布和 Scene 交互 | 07 | 打开 Graph Editor | 25 min |
 | 11 | [Subgraph / Subnet](11-subgraphs.md) | 打包局部图、定义接口并导航嵌套图 | 08 | 创建并运行一个 Subgraph | 20 min |
 | 12 | [Attribute Wrangle 与 Blast](12-attribute-wrangle-and-blast.md) | 用通用表达式实现悬链与按 U 断开 | 05 | 构建吊绳桥主索 | 20 min |
+| 13 | [UV Domain 契约](13-uv-domain.md) | 区分 point/corner UV 与三源阶段 | 04 | ctest UV 相关 | 15 min |
 | 09 | [端到端调试与验证](09-end-to-end-debug.md) | 全链路联调与故障诊断 | 08 | 端到端验证 | 30 min |
 | ref | [节点算法参考手册](10-node-algorithm-reference.md) | 全部 52 个节点的算法分析 | 05 | 查阅 | 按需 |
 
@@ -63,6 +64,7 @@ flowchart LR
 | Unity Editor | `Editor/Graph/PcgGraphEditorWindow.cs` | `Editor/Graph/PcgGraphView.cs` | 手动验证 | [08](08-unity-graph-editor.md) |
 | Subgraph | `GraphSubgraph` / `PcgSubgraphDefinition` | `graph_parser.cpp`, `PcgGraphView.cs` | `test_subgraph.cpp` | [11](11-subgraphs.md) |
 | Attribute Expression | `AttributeWrangle` / `Blast` | `expression.cpp`, `attribute_elements.cpp` | `test_attribute_nodes.cpp` | [12](12-attribute-wrangle-and-blast.md) |
+| UV Domain | `UVTexture` / `corner_uvs_` | `uv_elements.cpp`, `pcg_geometry.*` | `test_new_nodes_graph`, `test_split_normals` | [13](13-uv-domain.md) |
 | Web Editor | `web/pcg-editor/src/App.tsx` | `web/pcg-editor/src/nodes/ManifestNode.tsx` | 手动验证 | [09](09-end-to-end-debug.md) |
 | Build & CI | `pcg-core/CMakeLists.txt` | `scripts/build-pcg-core.ps1` | `ctest` | [09](09-end-to-end-debug.md) |
 

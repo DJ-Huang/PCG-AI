@@ -544,6 +544,58 @@ int main()
                "materials: geometry face materials round-trip");
     }
 
+    // --- Test 26: Corner UV domain — Sink prefers vertex UV; binary round-trips ---
+    {
+        PcgGeometry cube = make_cube();
+        std::vector<PcgVec2> point_uvs(cube.points().size(), PcgVec2{0.25, 0.25});
+        cube.set_uvs(point_uvs);
+
+        std::vector<PcgVec2> corner_uvs;
+        corner_uvs.reserve(static_cast<size_t>(cube.corner_count()));
+        for (size_t fi = 0; fi < cube.faces().size(); ++fi) {
+            for (size_t ci = 0; ci < cube.faces()[fi].size(); ++ci)
+                corner_uvs.push_back(PcgVec2{static_cast<double>(fi) * 0.1,
+                                             static_cast<double>(ci) * 0.1});
+        }
+        cube.set_corner_uvs(corner_uvs);
+        expect(cube.has_corner_uvs(), "corner-uv: flag set");
+        expect(static_cast<int>(cube.corner_uvs().size()) == cube.corner_count(),
+               "corner-uv: size matches corner count");
+
+        PcgMeshData mesh = compute_split_normals(cube, {ShadeMode::Flat, 30.0, true});
+        expect(mesh.has_uvs(), "corner-uv: sink mesh has uvs");
+        expect(mesh.uvs().size() == mesh.vertices().size(),
+               "corner-uv: sink uv count matches vertices");
+        // Flat cube: 24 render verts; first face corners should carry face0 UV pattern
+        bool found_corner_uv = false;
+        for (const auto& uv : mesh.uvs()) {
+            if (std::abs(uv.u) < 1e-9 && std::abs(uv.v) < 1e-9)
+                found_corner_uv = true;
+        }
+        expect(found_corner_uv, "corner-uv: sink uses corner values (not only point 0.25)");
+
+        std::vector<uint8_t> geometry_bytes(static_cast<size_t>(geometry_binary_size(cube)));
+        expect(write_geometry_binary(cube, geometry_bytes.data(),
+                                     static_cast<int>(geometry_bytes.size())),
+               "corner-uv: geometry binary writes");
+        PcgGeometry restored;
+        expect(read_geometry_binary(geometry_bytes.data(),
+                                    static_cast<int>(geometry_bytes.size()), restored),
+               "corner-uv: geometry binary reads");
+        expect(restored.has_corner_uvs(), "corner-uv: restored has corner uvs");
+        expect(restored.corner_uvs().size() == cube.corner_uvs().size(),
+               "corner-uv: corner count round-trips");
+        if (restored.corner_uvs().size() == cube.corner_uvs().size()) {
+            bool match = true;
+            for (size_t i = 0; i < cube.corner_uvs().size(); ++i) {
+                if (std::abs(restored.corner_uvs()[i].u - cube.corner_uvs()[i].u) > 1e-5 ||
+                    std::abs(restored.corner_uvs()[i].v - cube.corner_uvs()[i].v) > 1e-5)
+                    match = false;
+            }
+            expect(match, "corner-uv: corner values round-trip");
+        }
+    }
+
     if (g_fail > 0) {
         std::printf("\n%d tests FAILED\n", g_fail);
         return 1;

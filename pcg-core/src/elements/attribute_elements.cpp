@@ -495,6 +495,24 @@ data::PcgGeometry rebuild_geometry(const data::PcgGeometry& source,
             if (keep_points[index]) uvs.push_back(source.uvs()[index]);
         output.set_uvs(std::move(uvs));
     }
+    if (source.has_corner_uvs()) {
+        std::vector<data::PcgVec2> corner_uvs;
+        corner_uvs.reserve(static_cast<size_t>(output.corner_count()));
+        size_t corner_cursor = 0;
+        for (size_t face_index = 0; face_index < source.faces().size(); ++face_index) {
+            const size_t face_corners = source.faces()[face_index].size();
+            if (keep_faces[face_index] && face_remap[face_index] >= 0) {
+                for (size_t c = 0; c < face_corners; ++c) {
+                    if (corner_cursor + c < source.corner_uvs().size())
+                        corner_uvs.push_back(source.corner_uvs()[corner_cursor + c]);
+                    else
+                        corner_uvs.push_back(data::PcgVec2{0.0, 0.0});
+                }
+            }
+            corner_cursor += face_corners;
+        }
+        output.set_corner_uvs(std::move(corner_uvs));
+    }
     if (source.has_face_materials()) output.set_face_materials(std::move(face_materials));
     else if (source.has_material()) output.set_material_name(source.material_name());
     return output;

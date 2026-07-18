@@ -2666,7 +2666,7 @@ CreateSpline ──(profile)──┘
 
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| projection | enum | planar | 投射方式：planar / cylindrical / spherical |
+| projection | enum | planar | 投射方式：planar / cylindrical / spherical（`box` 已关闭，P4 再实现真盒体投影） |
 | axis | enum | y | 投射轴：x / y / z |
 | scaleU | number | 1.0 | U 方向缩放 |
 | scaleV | number | 1.0 | V 方向缩放 |
@@ -2677,8 +2677,10 @@ CreateSpline ──(profile)──┘
 - Planar：将 mesh AABB 归一化到 [0,1]，取垂直于 axis 的两个坐标作为 UV。
 - Cylindrical：U = atan2 角度 / 2π + 0.5，V = 轴向坐标归一化。
 - Spherical：U = 经度，V = 纬度（基于顶点到中心的方向向量）。
+- Geometry 路径写入 **point UV**，并展开为 **corner（vertex）UV**；Sink 优先 corner → Mesh UV0。
+- 未知 / 遗留 `box` 投影返回执行错误（禁止静默写常数 UV）。
 
-**范围限制**：应放在最后一个拓扑修改节点之后。不支持 UV1/UV2 或 lightmap unwrap。
+**范围限制**：应放在最后一个拓扑修改节点之后。不支持 UV Flatten/Pack、lightmap unwrap；`uv2` 仅 P5。
 
 ### ProjectTexture
 

@@ -215,6 +215,44 @@ std::vector<std::array<int, 3>> triangulate_face_corners(
     }
 }
 
+void PcgGeometry::set_corner_uvs(std::vector<PcgVec2> u)
+{
+    const int expected = corner_count();
+    if (static_cast<int>(u.size()) != expected) {
+        corner_uvs_.clear();
+        has_corner_uvs_ = false;
+        return;
+    }
+    corner_uvs_ = std::move(u);
+    has_corner_uvs_ = true;
+}
+
+int PcgGeometry::corner_count() const
+{
+    int count = 0;
+    for (const auto& face : faces_)
+        count += static_cast<int>(face.size());
+    return count;
+}
+
+void PcgGeometry::expand_point_uvs_to_corners()
+{
+    if (!has_uvs_)
+        return;
+    const auto& pts_uv = uvs_;
+    std::vector<PcgVec2> corners;
+    corners.reserve(static_cast<size_t>(corner_count()));
+    for (const auto& face : faces_) {
+        for (int point_index : face) {
+            if (point_index >= 0 && static_cast<size_t>(point_index) < pts_uv.size())
+                corners.push_back(pts_uv[static_cast<size_t>(point_index)]);
+            else
+                corners.push_back(PcgVec2{0.0, 0.0});
+        }
+    }
+    set_corner_uvs(std::move(corners));
+}
+
 void PcgGeometry::set_material_name(std::string m)
 {
     material_name_ = m;
@@ -589,8 +627,21 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         mesh.set_colors(std::move(render_colors));
     }
 
-    // Copy per-point UVs to render vertices
-    if (geometry.has_uvs()) {
+    // Copy UVs to render vertices: corner (vertex) domain wins over point UV.
+    if (geometry.has_corner_uvs() &&
+        static_cast<int>(geometry.corner_uvs().size()) == total_corners) {
+        const auto& geo_corner_uvs = geometry.corner_uvs();
+        std::vector<PcgVec2> render_uvs(render_positions.size(), PcgVec2{0, 0});
+        for (int corner_id = 0; corner_id < total_corners; ++corner_id) {
+            const auto& ci = corners[static_cast<size_t>(corner_id)];
+            RenderKey key{ci.point_index, find(corner_id)};
+            auto it = render_vertex_map.find(key);
+            if (it != render_vertex_map.end())
+                render_uvs[static_cast<size_t>(it->second)] =
+                    geo_corner_uvs[static_cast<size_t>(corner_id)];
+        }
+        mesh.set_uvs(std::move(render_uvs));
+    } else if (geometry.has_uvs()) {
         const auto& geo_uvs = geometry.uvs();
         std::vector<PcgVec2> render_uvs(render_positions.size(), PcgVec2{0,0});
         for (const auto& [key, idx] : render_vertex_map) {
@@ -788,6 +839,26 @@ PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const s
                 merged_uvs[dst] = b.uvs()[i];
         }
         merged.set_uvs(std::move(merged_uvs));
+    }
+
+    // Merge corner (vertex) UVs — concatenate in face order
+    if (a.has_corner_uvs() || b.has_corner_uvs()) {
+        std::vector<PcgVec2> merged_corner_uvs;
+        merged_corner_uvs.reserve(static_cast<size_t>(merged.corner_count()));
+        if (a.has_corner_uvs()) {
+            merged_corner_uvs.insert(merged_corner_uvs.end(),
+                                     a.corner_uvs().begin(), a.corner_uvs().end());
+        } else {
+            merged_corner_uvs.resize(static_cast<size_t>(a.corner_count()), PcgVec2{0.0, 0.0});
+        }
+        if (b.has_corner_uvs()) {
+            merged_corner_uvs.insert(merged_corner_uvs.end(),
+                                     b.corner_uvs().begin(), b.corner_uvs().end());
+        } else {
+            merged_corner_uvs.resize(merged_corner_uvs.size() + static_cast<size_t>(b.corner_count()),
+                                     PcgVec2{0.0, 0.0});
+        }
+        merged.set_corner_uvs(std::move(merged_corner_uvs));
     }
 
     if (a.has_material() || b.has_material() || a.has_face_materials() || b.has_face_materials()) {

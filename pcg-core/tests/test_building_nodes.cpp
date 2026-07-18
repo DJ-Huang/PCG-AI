@@ -58,7 +58,7 @@ int main()
       "nodes":[
         {"id":"prototype","type":"CreateBoxMesh","data":{"width":1.0,"height":2.0,"depth":1.0}},
         {"id":"group","type":"GroupCreate","data":{"outputGroup":"facade_edges","domain":"edge","mode":"angle","minEdgeAngle":30.0}},
-        {"id":"uv","type":"UVTexture","data":{"projection":"box","axis":"y","scaleU":1.0,"scaleV":1.0,"offsetU":0.0,"offsetV":0.0}},
+        {"id":"uv","type":"UVTexture","data":{"projection":"planar","axis":"y","scaleU":1.0,"scaleV":1.0,"offsetU":0.0,"offsetV":0.0}},
         {"id":"color","type":"VertexColor","data":{"r":0.2,"g":0.4,"b":0.8,"a":1.0}},
         {"id":"material","type":"AssignMaterial","data":{"materialName":"facade"}},
         {"id":"grid","type":"CreatePointGrid","data":{"pointCountX":2,"pointCountY":2,"spacing":4.0}},
@@ -87,6 +87,10 @@ int main()
                "point count times prototype face count");
         expect(copied.source_geometry->has_uvs() && copied.source_geometry->uvs().size() == 32,
                "CopyMeshToPoints preserves UVs");
+        expect(copied.source_geometry->has_corner_uvs() &&
+                   copied.source_geometry->corner_uvs().size() ==
+                       static_cast<size_t>(copied.source_geometry->corner_count()),
+               "CopyMeshToPoints preserves corner UVs");
         expect(copied.source_geometry->has_colors() && copied.source_geometry->colors().size() == 32,
                "CopyMeshToPoints preserves colors");
         expect(copied.source_geometry->has_face_materials() &&

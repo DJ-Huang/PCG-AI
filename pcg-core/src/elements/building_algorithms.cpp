@@ -295,6 +295,15 @@ data::PcgGeometry copy_geometry_to_points(const data::PcgGeometry& prototype,
         output.set_uvs(std::move(uvs));
     }
 
+    if (prototype.has_corner_uvs()) {
+        std::vector<data::PcgVec2> corner_uvs;
+        corner_uvs.reserve(prototype.corner_uvs().size() * copy_count);
+        for (size_t copy = 0; copy < copy_count; ++copy)
+            corner_uvs.insert(corner_uvs.end(),
+                              prototype.corner_uvs().begin(), prototype.corner_uvs().end());
+        output.set_corner_uvs(std::move(corner_uvs));
+    }
+
     if (prototype.has_face_materials()) {
         std::vector<std::string> materials;
         materials.reserve(prototype.face_materials().size() * copy_count);

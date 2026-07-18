@@ -53,6 +53,16 @@ public:
     const std::vector<PcgVec2>& uvs() const { return uvs_; }
     void set_uvs(std::vector<PcgVec2> u) { uvs_ = std::move(u); has_uvs_ = true; }
 
+    /// Corner (vertex/face-corner) UV — render source of truth (Houdini vertex UV).
+    /// Size must equal total corner count (sum of face sizes). Point UV remains a
+    /// continuous intermediate field; Sink prefers corner UV when present.
+    bool has_corner_uvs() const { return has_corner_uvs_; }
+    const std::vector<PcgVec2>& corner_uvs() const { return corner_uvs_; }
+    void set_corner_uvs(std::vector<PcgVec2> u);
+    int corner_count() const;
+    /// Expand per-point UV onto every face corner that references that point.
+    void expand_point_uvs_to_corners();
+
     bool has_material() const { return has_material_; }
     const std::string& material_name() const { return material_name_; }
     void set_material_name(std::string m);
@@ -70,6 +80,8 @@ private:
     bool has_colors_ = false;
     std::vector<PcgVec2> uvs_;
     bool has_uvs_ = false;
+    std::vector<PcgVec2> corner_uvs_;
+    bool has_corner_uvs_ = false;
     std::string material_name_;
     bool has_material_ = false;
     std::vector<std::string> face_materials_;

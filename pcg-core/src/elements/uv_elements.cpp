@@ -3,6 +3,14 @@
 #include "elements/element_utils.hpp"
 
 namespace pcg::internal::elements {
+namespace {
+
+bool is_supported_projection(const std::string& projection)
+{
+    return projection == "planar" || projection == "cylindrical" || projection == "spherical";
+}
+
+} // namespace
 
 class UVTextureElement final : public IPcgElement {
 public:
@@ -14,6 +22,13 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "UVTexture missing node");
 
         const std::string projection = ctx.node->data.value("projection", "planar");
+        if (!is_supported_projection(projection)) {
+            const std::string message =
+                "UVTexture unsupported projection '" + projection +
+                "' (box deferred; use planar/cylindrical/spherical)";
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, message.c_str());
+        }
+
         const std::string axis = ctx.node->data.value("axis", "y");
         const double scale_u = ctx.node->data.value("scaleU", 1.0);
         const double scale_v = ctx.node->data.value("scaleV", 1.0);
@@ -24,6 +39,7 @@ public:
             data::PcgGeometry out = *geometry;
             out.set_uvs(generate_uv_geometry(*geometry, projection, axis,
                                              scale_u, scale_v, offset_u, offset_v));
+            out.expand_point_uvs_to_corners();
             emit_geometry(ctx, std::move(out));
             return PCG_OK;
         }
@@ -67,6 +83,7 @@ public:
             out.set_uvs(project_texture_uv_geometry(*geometry, direction,
                                                      scale_u, scale_v, offset_u, offset_v,
                                                      repeat_x, repeat_y));
+            out.expand_point_uvs_to_corners();
             emit_geometry(ctx, std::move(out));
             return PCG_OK;
         }

@@ -19,6 +19,7 @@ constexpr uint32_t kChunkColors = 7u;
 constexpr uint32_t kChunkUVs = 8u;
 constexpr uint32_t kChunkMaterial = 9u;
 constexpr uint32_t kChunkFaceMaterials = 10u;
+constexpr uint32_t kChunkCornerUVs = 11u;
 
 struct Writer {
     uint8_t* base = nullptr;
@@ -87,7 +88,9 @@ int geometry_binary_size(const PcgGeometry& geometry)
     if (geometry.has_colors())
         size += 8 + static_cast<int>(geometry.points().size()) * 16;
     if (geometry.has_uvs())
-        size += 8 + static_cast<int>(geometry.points().size()) * 16;
+        size += 8 + static_cast<int>(geometry.points().size()) * 8;
+    if (geometry.has_corner_uvs())
+        size += 8 + geometry.corner_count() * 8;
     if (geometry.has_material())
         size += 8 + static_cast<int>(geometry.material_name().size()) + 1;
     if (geometry.has_face_materials()) {
@@ -231,6 +234,18 @@ bool write_geometry_binary(const PcgGeometry& geometry, void* buffer, int buffer
             return false;
     }
 
+    if (geometry.has_corner_uvs()) {
+        if (!write_chunk(kChunkCornerUVs, [&] {
+                for (const auto& uv : geometry.corner_uvs()) {
+                    const float uv_arr[2] = {static_cast<float>(uv.u), static_cast<float>(uv.v)};
+                    if (!w.write(uv_arr, 8))
+                        return false;
+                }
+                return true;
+            }))
+            return false;
+    }
+
     if (geometry.has_material()) {
         if (!write_chunk(kChunkMaterial, [&] {
                 const std::string& name = geometry.material_name();
@@ -284,6 +299,7 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
     std::vector<GroupDef> group_defs;
     std::vector<uint32_t> group_members;
     std::vector<std::string> face_materials;
+    std::vector<PcgVec2> deferred_corner_uvs;
 
     while (r.offset + 8 <= r.capacity) {
         uint32_t chunk_id = 0;
@@ -363,6 +379,16 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
                 uvs.push_back(PcgVec2{uv_arr[0], uv_arr[1]});
             }
             geometry.set_uvs(std::move(uvs));
+        } else if (chunk_id == kChunkCornerUVs) {
+            deferred_corner_uvs.clear();
+            const int uv_count = chunk_size / 8;
+            deferred_corner_uvs.reserve(static_cast<size_t>(uv_count));
+            for (int i = 0; i < uv_count; ++i) {
+                float uv_arr[2];
+                if (!r.read(uv_arr, 8))
+                    return false;
+                deferred_corner_uvs.push_back(PcgVec2{uv_arr[0], uv_arr[1]});
+            }
         } else if (chunk_id == kChunkMaterial) {
             std::string name;
             while (r.offset < chunk_end) {
@@ -406,6 +432,9 @@ bool read_geometry_binary(const void* buffer, int buffer_size, PcgGeometry& out)
 
     if (!face_materials.empty())
         geometry.set_face_materials(std::move(face_materials));
+
+    if (!deferred_corner_uvs.empty())
+        geometry.set_corner_uvs(std::move(deferred_corner_uvs));
 
     size_t member_cursor = 0;
     for (const auto& def : group_defs) {
