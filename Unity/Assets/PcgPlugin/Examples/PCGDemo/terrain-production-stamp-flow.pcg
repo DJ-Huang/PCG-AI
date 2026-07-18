@@ -1,0 +1,517 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "terrain_base",
+      "type": "HeightField",
+      "position": { "x": 200, "y": 0 },
+      "data": {
+        "__nodeTitle": "Terrain Base",
+        "orientation": "zx",
+        "sampling": "corner",
+        "divisionMode": "bySize",
+        "gridSpacing": 1.0,
+        "gridSamples": 257,
+        "sizeX": 256.0,
+        "sizeZ": 256.0,
+        "centerX": 0.0,
+        "centerY": 0.0,
+        "centerZ": 0.0,
+        "initialHeight": 0.0,
+        "initialMask": 0.0
+      }
+    },
+    {
+      "id": "terrain_macro",
+      "type": "HeightFieldNoise",
+      "position": { "x": 200, "y": 160 },
+      "data": {
+        "__nodeTitle": "Macro Landforms",
+        "noiseLayer": "height",
+        "maskLayer": "mask",
+        "noiseType": "perlin",
+        "fractal": "hybridTerrain",
+        "centerNoise": true,
+        "amplitude": 42.0,
+        "elementSize": 96.0,
+        "scaleX": 1.0,
+        "scaleZ": 0.85,
+        "offsetX": 0.0,
+        "offsetZ": 0.0,
+        "maxOctaves": 6,
+        "lacunarity": 2.0,
+        "roughness": 0.52,
+        "seed": 41
+      }
+    },
+    {
+      "id": "terrain_detail",
+      "type": "HeightFieldNoise",
+      "position": { "x": 200, "y": 320 },
+      "data": {
+        "__nodeTitle": "Rock Detail",
+        "noiseLayer": "height",
+        "maskLayer": "mask",
+        "noiseType": "perlin",
+        "fractal": "standard",
+        "centerNoise": true,
+        "amplitude": 5.5,
+        "elementSize": 12.0,
+        "scaleX": 1.0,
+        "scaleZ": 1.0,
+        "offsetX": 17.0,
+        "offsetZ": -23.0,
+        "maxOctaves": 4,
+        "lacunarity": 2.15,
+        "roughness": 0.48,
+        "seed": 173
+      }
+    },
+    {
+      "id": "terrain_pattern",
+      "type": "HeightFieldPattern",
+      "position": { "x": 200, "y": 480 },
+      "data": {
+        "__nodeTitle": "Concentric Mesa Stamp",
+        "patternLayer": "height",
+        "maskLayer": "mask",
+        "combine": "add",
+        "blend": 1.0,
+        "height": 12.0,
+        "baseHeight": 0.0,
+        "postBlurRadius": 1.5,
+        "pattern": "ramp",
+        "rotate": 0.0,
+        "size": 72.0,
+        "scaleX": 1.0,
+        "scaleZ": 1.0,
+        "centerX": 0.0,
+        "centerZ": 0.0,
+        "phase": 0.0,
+        "rampMode": "concentric",
+        "rampRepeat": false,
+        "rampMirror": false,
+        "riseOverRun": 0.45,
+        "stepHeight": 2.0,
+        "stepReferenceHeight": 0.0,
+        "stripeWidth": 0.5
+      }
+    },
+    {
+      "id": "stamp_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 520, "y": 480 },
+      "data": {
+        "__nodeTitle": "Stamp Volume Box",
+        "width": 56.0,
+        "height": 80.0,
+        "depth": 56.0
+      }
+    },
+    {
+      "id": "stamp_place",
+      "type": "TransformMesh",
+      "position": { "x": 520, "y": 640 },
+      "data": {
+        "__nodeTitle": "Stamp Volume Place",
+        "translateX": 0.0,
+        "translateY": 48.0,
+        "translateZ": 0.0,
+        "rotationX": 0.0,
+        "rotationY": 18.0,
+        "rotationZ": 0.0,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "scaleZ": 1.0
+      }
+    },
+    {
+      "id": "terrain_stamp_mask",
+      "type": "HeightFieldMaskByObject",
+      "position": { "x": 200, "y": 800 },
+      "data": {
+        "__nodeTitle": "Object Stamp Mask",
+        "heightLayer": "height",
+        "outputLayer": "mask",
+        "combine": "replace",
+        "blend": 1.0,
+        "maskingByGeometry": "above",
+        "invertMask": false,
+        "maxRayDistance": 200.0,
+        "value": 1.0,
+        "blurMethod": "gaussian",
+        "blurRadius": 4.0
+      }
+    },
+    {
+      "id": "terrain_feature_mask",
+      "type": "HeightFieldMaskByFeature",
+      "position": { "x": 200, "y": 960 },
+      "data": {
+        "__nodeTitle": "Highland Feature Mask",
+        "heightLayer": "height",
+        "outputLayer": "mask",
+        "maskLayer": "mask",
+        "combine": "multiply",
+        "blend": 1.0,
+        "invert": false,
+        "maskByHeight": true,
+        "minHeight": -8.0,
+        "maxHeight": 48.0,
+        "heightFeather": 5.0,
+        "maskBySlope": true,
+        "minSlopeAngle": 4.0,
+        "maxSlopeAngle": 58.0,
+        "slopeFeather": 6.0,
+        "smoothRadius": 2
+      }
+    },
+    {
+      "id": "terrain_terrace",
+      "type": "HeightFieldTerrace",
+      "position": { "x": 200, "y": 1120 },
+      "data": {
+        "__nodeTitle": "Masked Strata Terrace",
+        "heightLayer": "height",
+        "maskLayer": "mask",
+        "minHeight": -8.0,
+        "maxHeight": 48.0,
+        "fade": 0.6,
+        "maxStepSize": 4.5,
+        "stepOffset": 0.0,
+        "smoothEdges": 0.25,
+        "outputMesaLayer": "mesa",
+        "outputCliffLayer": "cliffs"
+      }
+    },
+    {
+      "id": "terrain_blur",
+      "type": "HeightFieldBlur",
+      "position": { "x": 200, "y": 1280 },
+      "data": {
+        "__nodeTitle": "Masked Strata Soften",
+        "blurLayer": "height",
+        "maskLayer": "mask",
+        "method": "gaussian",
+        "iterations": 1,
+        "radius": 0.7,
+        "maskAware": true
+      }
+    },
+    {
+      "id": "terrain_distort",
+      "type": "HeightFieldDistortByNoise",
+      "position": { "x": 200, "y": 1440 },
+      "data": {
+        "__nodeTitle": "Geological Edge Distort",
+        "distortLayers": "height",
+        "maskLayer": "mask",
+        "noiseType": "curl",
+        "amplitude": 2.0,
+        "elementSize": 40.0,
+        "scaleX": 1.0,
+        "scaleZ": 0.9,
+        "offsetX": 9.0,
+        "offsetZ": -13.0,
+        "roughness": 0.48,
+        "maxOctaves": 4,
+        "substeps": 3,
+        "seed": 257
+      }
+    },
+    {
+      "id": "terrain_erode",
+      "type": "HeightFieldErode",
+      "position": { "x": 200, "y": 1600 },
+      "data": {
+        "__nodeTitle": "Hydro Thermal Erode",
+        "heightLayer": "height",
+        "maskLayer": "mask",
+        "debrisLayer": "debris",
+        "sedimentLayer": "sediment",
+        "flowLayer": "flow",
+        "flowDirectionLayer": "flowdir",
+        "iterations": 20,
+        "seed": 311,
+        "erodability": 1.0,
+        "flowForce": 0.85,
+        "rainfallCoverage": 0.035,
+        "erosionRate": 0.16,
+        "depositionRate": 0.1,
+        "sedimentCapacity": 1.2,
+        "evaporationRate": 0.14,
+        "weatheringForce": 0.05,
+        "cutAngle": 35.0,
+        "reposeAngle": 28.0,
+        "addDebrisToHeight": true,
+        "addSedimentToHeight": true
+      }
+    },
+    {
+      "id": "terrain_slump",
+      "type": "HeightFieldSlump",
+      "position": { "x": 200, "y": 1760 },
+      "data": {
+        "__nodeTitle": "Debris Slump",
+        "heightLayer": "height",
+        "maskLayer": "mask",
+        "materialLayer": "debris",
+        "flowLayer": "flow",
+        "flowDirLayer": "flowdir",
+        "slumpMode": "smooth",
+        "spreadIterations": 16,
+        "spreadRate": 1.0,
+        "reposeAngle": 28.0,
+        "heightFactor": 1.0,
+        "quantization": 0.0,
+        "calculateFlowFields": true,
+        "flowSmoothingIterations": 1,
+        "allowMaterialOutflow": true,
+        "addToBedrock": true,
+        "seed": 419
+      }
+    },
+    {
+      "id": "terrain_flow",
+      "type": "HeightFieldFlowField",
+      "position": { "x": 200, "y": 1920 },
+      "data": {
+        "__nodeTitle": "Drainage Flow Field",
+        "heightLayer": "height",
+        "waterLayer": "water",
+        "flowLayer": "flow",
+        "flowDirLayer": "flowdir",
+        "maskLayer": "mask",
+        "slumpMode": "smooth",
+        "rainAmount": 0.55,
+        "rainDensity": 1.0,
+        "spreadIterations": 28,
+        "smoothingIterations": 2,
+        "copyToMask": true,
+        "maskScale": 1.0,
+        "adjustHeight": false,
+        "adjustHeightScale": 1.0,
+        "seed": 503
+      }
+    },
+    {
+      "id": "terrain_output",
+      "type": "Output",
+      "position": { "x": 200, "y": 2080 },
+      "data": {
+        "__nodeTitle": "Output (TerrainData)",
+        "label": "TerrainData"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_base_macro",
+      "source": "terrain_base",
+      "sourceHandle": "out",
+      "target": "terrain_macro",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_macro_detail",
+      "source": "terrain_macro",
+      "sourceHandle": "out",
+      "target": "terrain_detail",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_detail_pattern",
+      "source": "terrain_detail",
+      "sourceHandle": "out",
+      "target": "terrain_pattern",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_box_place",
+      "source": "stamp_box",
+      "sourceHandle": "out",
+      "target": "stamp_place",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_pattern_stamp",
+      "source": "terrain_pattern",
+      "sourceHandle": "out",
+      "target": "terrain_stamp_mask",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_place_stamp",
+      "source": "stamp_place",
+      "sourceHandle": "out",
+      "target": "terrain_stamp_mask",
+      "targetHandle": "geometry"
+    },
+    {
+      "id": "edge_stamp_feature",
+      "source": "terrain_stamp_mask",
+      "sourceHandle": "out",
+      "target": "terrain_feature_mask",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_feature_terrace_in",
+      "source": "terrain_feature_mask",
+      "sourceHandle": "out",
+      "target": "terrain_terrace",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_feature_terrace_mask",
+      "source": "terrain_feature_mask",
+      "sourceHandle": "out",
+      "target": "terrain_terrace",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_terrace_blur",
+      "source": "terrain_terrace",
+      "sourceHandle": "out",
+      "target": "terrain_blur",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_feature_blur_mask",
+      "source": "terrain_feature_mask",
+      "sourceHandle": "out",
+      "target": "terrain_blur",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_blur_distort",
+      "source": "terrain_blur",
+      "sourceHandle": "out",
+      "target": "terrain_distort",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_feature_distort_mask",
+      "source": "terrain_feature_mask",
+      "sourceHandle": "out",
+      "target": "terrain_distort",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_distort_erode",
+      "source": "terrain_distort",
+      "sourceHandle": "out",
+      "target": "terrain_erode",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_feature_erode_mask",
+      "source": "terrain_feature_mask",
+      "sourceHandle": "out",
+      "target": "terrain_erode",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_erode_slump",
+      "source": "terrain_erode",
+      "sourceHandle": "out",
+      "target": "terrain_slump",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_feature_slump_mask",
+      "source": "terrain_feature_mask",
+      "sourceHandle": "out",
+      "target": "terrain_slump",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_slump_flow",
+      "source": "terrain_slump",
+      "sourceHandle": "out",
+      "target": "terrain_flow",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_flow_output",
+      "source": "terrain_flow",
+      "sourceHandle": "out",
+      "target": "terrain_output",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "macro_amplitude",
+      "name": "Macro Amplitude",
+      "type": "number",
+      "default": 42.0,
+      "exposed": true,
+      "hasRange": true,
+      "min": 5.0,
+      "max": 80.0,
+      "targetNode": "terrain_macro",
+      "targetProperty": "amplitude"
+    },
+    {
+      "id": "detail_amplitude",
+      "name": "Detail Amplitude",
+      "type": "number",
+      "default": 5.5,
+      "exposed": true,
+      "hasRange": true,
+      "min": 0.0,
+      "max": 15.0,
+      "targetNode": "terrain_detail",
+      "targetProperty": "amplitude"
+    },
+    {
+      "id": "pattern_height",
+      "name": "Pattern Height",
+      "type": "number",
+      "default": 12.0,
+      "exposed": true,
+      "hasRange": true,
+      "min": 0.0,
+      "max": 40.0,
+      "targetNode": "terrain_pattern",
+      "targetProperty": "height"
+    },
+    {
+      "id": "erosion_iterations",
+      "name": "Erosion Iterations",
+      "type": "integer",
+      "default": 20,
+      "exposed": true,
+      "hasRange": true,
+      "min": 1,
+      "max": 80,
+      "targetNode": "terrain_erode",
+      "targetProperty": "iterations"
+    },
+    {
+      "id": "slump_iterations",
+      "name": "Slump Iterations",
+      "type": "integer",
+      "default": 16,
+      "exposed": true,
+      "hasRange": true,
+      "min": 1,
+      "max": 80,
+      "targetNode": "terrain_slump",
+      "targetProperty": "spreadIterations"
+    },
+    {
+      "id": "flow_rain",
+      "name": "Flow Rain Amount",
+      "type": "number",
+      "default": 0.55,
+      "exposed": true,
+      "hasRange": true,
+      "min": 0.0,
+      "max": 2.0,
+      "targetNode": "terrain_flow",
+      "targetProperty": "rainAmount"
+    }
+  ],
+  "subgraphs": []
+}
