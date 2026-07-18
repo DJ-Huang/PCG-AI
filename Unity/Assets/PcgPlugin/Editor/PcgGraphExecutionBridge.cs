@@ -16,6 +16,30 @@ namespace DJTechEditor.PCG
         static PcgGraphExecutionBridge()
         {
             PcgGraphComponent.EditorBuildExecutionJson = BuildExecutionJson;
+            PcgGraphComponent.EditorIsNodePreviewActive = IsNodePreviewActive;
+        }
+
+        private static bool IsNodePreviewActive(PcgGraphComponent component)
+        {
+            if (component == null || component.GraphAsset == null)
+                return false;
+
+            var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
+            if (string.IsNullOrEmpty(assetPath))
+                return false;
+
+            var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
+            foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
+            {
+                if (window == null || !window.HasLoadedGraph)
+                    continue;
+                if (!window.MatchesGraphAsset(assetPath, assetGuid))
+                    continue;
+                if (!string.IsNullOrEmpty(window.PreviewNodeId))
+                    return true;
+            }
+
+            return false;
         }
 
         private static string BuildExecutionJson(PcgGraphComponent component)

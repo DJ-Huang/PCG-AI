@@ -27,6 +27,12 @@ namespace DJTechRuntime.PCG
         [SerializeField]
         private PcgHostOutputMode hostOutputMode = PcgHostOutputMode.Mesh;
 
+        [SerializeField]
+        private bool showStampOverlays = true;
+
+        [SerializeField]
+        private PcgStampLiveCookMode stampLiveCookMode = PcgStampLiveCookMode.OnRelease;
+
         [SerializeField, Min(0.05f)]
         private float editModeCookInterval = 0.15f;
         [SerializeField] private bool enableAsyncCookInEditor = true;
@@ -123,7 +129,15 @@ namespace DJTechRuntime.PCG
         public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
         public PcgHostOutputMode HostOutputMode => hostOutputMode;
+        public bool ShowStampOverlays => showStampOverlays;
+        public PcgStampLiveCookMode StampLiveCookMode => stampLiveCookMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
+
+        /// <summary>
+        /// Editor bridge: Graph Editor is cooking a per-node preview subgraph for this component.
+        /// Mesh/Points sinks under Terrain Host must not clear or rewrite TerrainData.
+        /// </summary>
+        public static System.Func<PcgGraphComponent, bool> EditorIsNodePreviewActive;
 
         public void SetHostOutputMode(PcgHostOutputMode mode, bool requestCook = true)
         {
@@ -699,7 +713,30 @@ namespace DJTechRuntime.PCG
 #endif
 
             if (hostOutputMode == PcgHostOutputMode.Terrain)
-                return ApplyTerrainHostResult(result, kind);
+            {
+                var isHeightField = kind == PcgResultKind.HeightField ||
+                    (result.HeightFieldBinary != null && result.HeightFieldBinary.Length > 0);
+                if (isHeightField)
+                    return ApplyTerrainHostResult(result, kind);
+
+#if UNITY_EDITOR
+                // Node Preview of Mesh/Points under Terrain Host: keep TerrainData,
+                // treat result as overlay/debug only (stamp volume preview path).
+                if (EditorIsNodePreviewActive?.Invoke(this) == true &&
+                    (kind == PcgResultKind.Mesh || kind == PcgResultKind.Points || kind == PcgResultKind.Splines))
+                {
+                    ApplyTerrainHostOverlayPreview(result, kind);
+                    return true;
+                }
+#endif
+                Debug.LogError(
+                    "[PCG] Host Output Mode = Terrain expects a HeightField Output " +
+                    "(wire HeightField → Output; do not Convert → Mesh). " +
+                    "Mesh node Preview under Terrain Host is overlay-only — use Scene stamp gizmo " +
+                    "or clear Node Preview to cook the full terrain graph.",
+                    this);
+                return false;
+            }
 
             switch (kind)
             {
@@ -819,6 +856,26 @@ namespace DJTechRuntime.PCG
             return true;
         }
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// Terrain Host + Node Preview of Mesh/Points: keep Terrain, optional polygon wire only.
+        /// Stamp volume interaction uses <c>PcgStampOverlaySceneHandles</c>, not Host Output.
+        /// </summary>
+        private void ApplyTerrainHostOverlayPreview(PcgGraphExecuteResult result, PcgResultKind kind)
+        {
+            if (kind != PcgResultKind.Mesh)
+                return;
+
+            if (result.GeometryBinary != null &&
+                result.GeometryBinary.Length > 0 &&
+                PcgResultParser.TryParseGeometryBinary(
+                    result.GeometryBinary, out var polygon, out _))
+            {
+                m_PolygonPreview = polygon;
+            }
+        }
+#endif
+
         private bool ApplyTerrainHostResult(PcgGraphExecuteResult result, PcgResultKind kind)
         {
             ClearGeneratedMesh();
@@ -876,9 +933,13 @@ namespace DJTechRuntime.PCG
             if (report.Applied)
             {
                 m_TerrainApplyGeneration++;
+                // Without Flush, Scene View often keeps the previous heightmesh until
+                // the camera moves (LOD / render cache). Always flush after SetHeights.
+                terrain.Flush();
 #if UNITY_EDITOR
                 if (terrain.terrainData != null)
                     UnityEditor.EditorUtility.SetDirty(terrain.terrainData);
+                UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
 #endif
             }
 

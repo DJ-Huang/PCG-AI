@@ -5,6 +5,15 @@
 `TerrainData`; a future Unreal adapter can implement the same field contract for
 Landscape without introducing Unity or Unreal APIs into `pcg-core`.
 
+## Stamp overlay (Unity Editor)
+
+Terrain Host keeps **HeightField → Output** as the primary result. Stamp volumes
+used by `HeightFieldMaskByObject` are drawn as Scene View wire overlays and edited
+with Transform handles (`PcgStampOverlaySceneHandles`). Overlay edits write
+`TransformMesh` node data; recook follows `Stamp Live Cook` (Manual / OnRelease /
+WhileDragging). Node Preview of Mesh under Terrain Host is overlay-only and does
+not clear or rewrite `TerrainData`.
+
 ## Data contract
 
 | Field | Meaning | P0 rule |

@@ -494,53 +494,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6da0b53a7b57f49b289b636b42609214, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  graphAsset: {fileID: -6750239444755058063, guid: f32ee897923e24aa9b04bb6ab56d6245,
+  graphAsset: {fileID: -6750239444755058063, guid: 43746cc74b02848d8a8469c55e69c22f,
     type: 3}
   seed: 42
   cookMode: 3
   hostOutputMode: 1
+  showStampOverlays: 1
+  stampLiveCookMode: 1
   editModeCookInterval: 0.15
   enableAsyncCookInEditor: 1
   m_ParameterOverrides:
-  - parameterId: macro_amplitude
-    name: Macro Amplitude
+  - parameterId: stamp_height
+    name: Stamp Height
     type: number
-    floatValue: 42
+    floatValue: 30
     intValue: 0
     boolValue: 0
     stringValue: 
-  - parameterId: detail_amplitude
-    name: Detail Amplitude
+  - parameterId: stamp_blur
+    name: Stamp Soft Edge
     type: number
-    floatValue: 5.5
-    intValue: 0
-    boolValue: 0
-    stringValue: 
-  - parameterId: pattern_height
-    name: Pattern Height
-    type: number
-    floatValue: 12
-    intValue: 0
-    boolValue: 0
-    stringValue: 
-  - parameterId: erosion_iterations
-    name: Erosion Iterations
-    type: integer
-    floatValue: 0
-    intValue: 20
-    boolValue: 0
-    stringValue: 
-  - parameterId: slump_iterations
-    name: Slump Iterations
-    type: integer
-    floatValue: 0
-    intValue: 16
-    boolValue: 0
-    stringValue: 
-  - parameterId: flow_rain
-    name: Flow Rain Amount
-    type: number
-    floatValue: 0.55
+    floatValue: 3
     intValue: 0
     boolValue: 0
     stringValue: 

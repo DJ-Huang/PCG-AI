@@ -31,6 +31,17 @@ namespace DJTechRuntime.PCG
         Terrain = 1,
     }
 
+    /// <summary>
+    /// When to recook the full HeightField graph after editing a stamp overlay gizmo.
+    /// Overlay matrix updates always happen immediately; cook follows this mode.
+    /// </summary>
+    public enum PcgStampLiveCookMode
+    {
+        Manual = 0,
+        OnRelease = 1,
+        WhileDragging = 2,
+    }
+
     [Serializable]
     public class PcgMeshBinding
     {

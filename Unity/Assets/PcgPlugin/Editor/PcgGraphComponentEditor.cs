@@ -22,6 +22,8 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_ScatterPointMeshProp;
         private SerializedProperty m_ScatterDisplayModeProp;
         private SerializedProperty m_EnableAsyncCookInEditorProp;
+        private SerializedProperty m_ShowStampOverlaysProp;
+        private SerializedProperty m_StampLiveCookModeProp;
         private bool m_SliderReleasedThisFrame;
 
         private void OnEnable()
@@ -39,6 +41,8 @@ namespace DJTechEditor.PCG
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
             m_ScatterDisplayModeProp = serializedObject.FindProperty("scatterDisplayMode");
             m_EnableAsyncCookInEditorProp = serializedObject.FindProperty("enableAsyncCookInEditor");
+            m_ShowStampOverlaysProp = serializedObject.FindProperty("showStampOverlays");
+            m_StampLiveCookModeProp = serializedObject.FindProperty("stampLiveCookMode");
 
             m_Target.RefreshDocument();
             serializedObject.Update();
@@ -84,6 +88,24 @@ namespace DJTechEditor.PCG
                 EditorGUILayout.PropertyField(
                     m_EnableAsyncCookInEditorProp,
                     new GUIContent("Async Cook In Editor", "Run cook in background thread; Esc cancels current cook."));
+            }
+            if (m_ShowStampOverlaysProp != null)
+            {
+                EditorGUILayout.PropertyField(
+                    m_ShowStampOverlaysProp,
+                    new GUIContent(
+                        "Show Stamp Overlays",
+                        "Draw MaskByObject stamp volumes in Scene View (wire boxes)."));
+            }
+            if (m_StampLiveCookModeProp != null &&
+                m_HostOutputModeProp != null &&
+                (PcgHostOutputMode)m_HostOutputModeProp.enumValueIndex == PcgHostOutputMode.Terrain)
+            {
+                EditorGUILayout.PropertyField(
+                    m_StampLiveCookModeProp,
+                    new GUIContent(
+                        "Stamp Live Cook",
+                        "When Scene stamp gizmos move: Manual = no cook; OnRelease = cook on mouse up; WhileDragging = debounced cook."));
             }
             if (EditorGUI.EndChangeCheck())
             {
