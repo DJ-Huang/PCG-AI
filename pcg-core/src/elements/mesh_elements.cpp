@@ -237,13 +237,10 @@ public:
         const bool cap_top = ctx.node->data.value("capTop", true);
         const bool cap_bottom = ctx.node->data.value("capBottom", true);
 
-        data::PcgMeshData mesh = create_cylinder_mesh(radius, height,
-                                                       radial_segments, height_segments,
-                                                       cap_top, cap_bottom);
-        if (mesh.vertices().empty())
+        data::PcgGeometry geometry = create_cylinder_geometry(
+            radius, height, radial_segments, height_segments, cap_top, cap_bottom);
+        if (geometry.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateCylinderMesh invalid parameters");
-
-        data::PcgGeometry geometry = data::geometry_from_mesh(mesh);
 
         if (auto input_geometry = ctx.inputs.find_geometry_shared("in")) {
             geometry = data::merge_geometries(geometry, *input_geometry, "in_");

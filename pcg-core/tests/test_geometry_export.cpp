@@ -66,6 +66,20 @@ const char* kFixtureB = R"({
   ]
 })";
 
+const char* kFixtureCylinder = R"({
+  "version": "1.0",
+  "nodes": [
+    {"id": "cylinder", "type": "CreateCylinderMesh", "position": {"x":0,"y":0},
+     "data": {"radius": 1.0, "height": 2.0, "radialSegments": 8,
+              "heightSegments": 2, "capTop": true, "capBottom": true}},
+    {"id": "out", "type": "Output", "position": {"x":200,"y":0},
+     "data": {}}
+  ],
+  "edges": [
+    {"id": "e1", "source": "cylinder", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+  ]
+})";
+
 struct ExecMeshResult {
     PcgResultCode code = PCG_ERR_EXECUTION;
     int kind = 0;
@@ -190,6 +204,31 @@ void test_n3_null_geometry_buffer()
     std::printf("PASS N3 null/0 geometry buffer\n");
 }
 
+void test_create_cylinder_exports_polygon_geometry()
+{
+    std::vector<uint8_t> geo_buf(8 * 1024 * 1024);
+    int geometry_bytes = -1;
+    const ExecMeshResult r = execute_v8(
+        kFixtureCylinder, geo_buf.data(), static_cast<int>(geo_buf.size()), &geometry_bytes);
+    assert_mesh_round_trip(r, 132);
+    expect_true(geometry_bytes > 0, "cylinder geometry_bytes > 0");
+
+    pcg::internal::data::PcgGeometry geometry;
+    expect_true(pcg::internal::data::read_geometry_binary(
+                    geo_buf.data(), geometry_bytes, geometry),
+                "read cylinder geometry_binary");
+    expect_eq_int(static_cast<int>(geometry.points().size()), 24, "cylinder points");
+    expect_eq_int(static_cast<int>(geometry.faces().size()), 18, "cylinder polygon faces");
+    for (size_t i = 0; i < 16; ++i)
+        expect_eq_int(static_cast<int>(geometry.faces()[i].size()), 4,
+                      "cylinder side face corner count");
+    expect_eq_int(static_cast<int>(geometry.faces()[16].size()), 8,
+                  "cylinder bottom cap corner count");
+    expect_eq_int(static_cast<int>(geometry.faces()[17].size()), 8,
+                  "cylinder top cap corner count");
+    std::printf("PASS CreateCylinderMesh exports polygon geometry\n");
+}
+
 void test_n4_tiny_geometry_buffer()
 {
     uint8_t tiny[16] = {};
@@ -230,6 +269,7 @@ int main()
 {
     test_n1_geometry_export();
     test_n2_create_box_exports_geometry();
+    test_create_cylinder_exports_polygon_geometry();
     test_n3_null_geometry_buffer();
     test_n4_tiny_geometry_buffer();
     test_n5_v7_regression();

@@ -61,6 +61,12 @@ data::PcgMeshData create_cylinder_mesh(double radius, double height,
                                        int radial_segments, int height_segments,
                                        bool cap_top, bool cap_bottom);
 
+/// Cylinder as quad side faces + optional n-gon caps (canonical Geometry;
+/// triangulate only at Sink).
+data::PcgGeometry create_cylinder_geometry(double radius, double height,
+                                           int radial_segments, int height_segments,
+                                           bool cap_top, bool cap_bottom);
+
 struct RevolveGeometryOptions {
     std::string axis = "y";
     int segments = 16;

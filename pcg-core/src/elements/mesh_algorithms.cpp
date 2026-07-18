@@ -353,6 +353,68 @@ data::PcgMeshData create_cylinder_mesh(double radius, double height,
     return mesh;
 }
 
+data::PcgGeometry create_cylinder_geometry(double radius, double height,
+                                           int radial_segments, int height_segments,
+                                           bool cap_top, bool cap_bottom)
+{
+    if (radius < 0.001 || height < 0.001 || radial_segments < 3 || height_segments < 1)
+        return {};
+
+    radial_segments = std::min(radial_segments, 128);
+    height_segments = std::min(height_segments, 64);
+
+    data::PcgGeometry geometry;
+    const double half_h = height * 0.5;
+    const double pi = 3.14159265358979323846;
+
+    auto& points = geometry.points_mut();
+    points.reserve(static_cast<size_t>(height_segments + 1) *
+                   static_cast<size_t>(radial_segments));
+    for (int h = 0; h <= height_segments; ++h) {
+        const double y = -half_h + height * static_cast<double>(h) / height_segments;
+        for (int r = 0; r < radial_segments; ++r) {
+            const double angle = 2.0 * pi * r / radial_segments;
+            points.push_back({radius * std::cos(angle), y, radius * std::sin(angle)});
+        }
+    }
+
+    auto& faces = geometry.faces_mut();
+    faces.reserve(static_cast<size_t>(height_segments * radial_segments) +
+                  static_cast<size_t>(cap_top) + static_cast<size_t>(cap_bottom));
+
+    // Preserve each requested height/radial segment as one polygon. The winding
+    // matches create_cylinder_mesh after the polygon is triangulated at Sink.
+    for (int h = 0; h < height_segments; ++h) {
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            const int i0 = h * radial_segments + r;
+            const int i1 = h * radial_segments + r_next;
+            const int i2 = (h + 1) * radial_segments + r_next;
+            const int i3 = (h + 1) * radial_segments + r;
+            faces.push_back({i0, i3, i2, i1});
+        }
+    }
+
+    if (cap_bottom) {
+        std::vector<int> cap;
+        cap.reserve(static_cast<size_t>(radial_segments));
+        for (int r = 0; r < radial_segments; ++r)
+            cap.push_back(r);
+        faces.push_back(std::move(cap));
+    }
+
+    if (cap_top) {
+        std::vector<int> cap;
+        cap.reserve(static_cast<size_t>(radial_segments));
+        const int top_ring = height_segments * radial_segments;
+        for (int r = radial_segments - 1; r >= 0; --r)
+            cap.push_back(top_ring + r);
+        faces.push_back(std::move(cap));
+    }
+
+    return geometry;
+}
+
 data::PcgGeometry revolve_geometry(const data::PcgSplineData& profile,
                                   const RevolveGeometryOptions& options)
 {

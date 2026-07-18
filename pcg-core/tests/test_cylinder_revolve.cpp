@@ -142,6 +142,39 @@ int main()
         expect(mesh.triangles().size() == 108, "cylinder multi seg: 108 indices (3*6*6)");
     }
 
+    // --- Cylinder geometry: polygon topology is preserved for Scene wire preview ---
+    {
+        auto geometry = create_cylinder_geometry(1.0, 2.0, 8, 1, true, true);
+        expect(geometry.points().size() == 16,
+               "cylinder geometry: two rings without triangle-fan center points");
+        expect(geometry.faces().size() == 10,
+               "cylinder geometry: 8 side quads + 2 cap n-gons");
+        for (int i = 0; i < 8; ++i)
+            expect(geometry.faces()[static_cast<size_t>(i)].size() == 4,
+                   "cylinder geometry: each side face is a quad");
+        expect(geometry.faces()[8].size() == 8 && geometry.faces()[9].size() == 8,
+               "cylinder geometry: caps are n-gons");
+
+        auto triangulated = triangulate_geometry_shared(geometry);
+        expect(triangulated.triangles().size() == 84,
+               "cylinder geometry: Sink triangulates quads and n-gons");
+        expect(all_outward_y(triangulated),
+               "cylinder geometry: triangulated normals point outward");
+    }
+
+    // --- Cylinder geometry: height segments remain explicit polygon rows ---
+    {
+        auto geometry = create_cylinder_geometry(1.0, 2.0, 6, 3, false, false);
+        expect(geometry.points().size() == 24,
+               "cylinder geometry multi seg: 4 rings * 6 points");
+        expect(geometry.faces().size() == 18,
+               "cylinder geometry multi seg: 3 rows * 6 side quads");
+        bool all_quads = true;
+        for (const auto& face : geometry.faces())
+            all_quads = all_quads && face.size() == 4;
+        expect(all_quads, "cylinder geometry multi seg: no triangle diagonals in topology");
+    }
+
     // --- Cylinder: invalid params ---
     {
         auto m1 = create_cylinder_mesh(0.0001, 2.0, 8, 1, true, true);
