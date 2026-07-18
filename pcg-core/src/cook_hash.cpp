@@ -141,6 +141,33 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     return h;
 }
 
+uint64_t hash_heightfield(const data::PcgHeightField& heightfield)
+{
+    uint64_t h = kFnvOffsetBasis;
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.resolution_x()));
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.resolution_z()));
+    const double size_x = heightfield.size_x();
+    const double size_z = heightfield.size_z();
+    h = hash_bytes(&size_x, sizeof(double), h);
+    h = hash_bytes(&size_z, sizeof(double), h);
+    const auto& center = heightfield.center();
+    h = hash_bytes(&center.x, sizeof(double), h);
+    h = hash_bytes(&center.y, sizeof(double), h);
+    h = hash_bytes(&center.z, sizeof(double), h);
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.sampling()));
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.orientation()));
+
+    for (const auto& [name, layer] : heightfield.layers()) {
+        h = hash_combine(h, hash_string(name));
+        h = hash_combine(h, static_cast<uint64_t>(layer.tuple_size));
+        h = hash_combine(h, static_cast<uint64_t>(layer.border_type));
+        h = hash_bytes(&layer.border_value, sizeof(float), h);
+        if (!layer.values.empty())
+            h = hash_bytes(layer.values.data(), layer.values.size() * sizeof(float), h);
+    }
+    return h;
+}
+
 uint64_t hash_points(const data::PcgPointData& points)
 {
     uint64_t h = kFnvOffsetBasis;
@@ -194,6 +221,8 @@ uint64_t hash_collection(const data::PcgDataCollection& collection)
             h = hash_combine(h, hash_mesh(*item.mesh));
         else if (item.geometry)
             h = hash_combine(h, hash_geometry(*item.geometry));
+        else if (item.heightfield)
+            h = hash_combine(h, hash_heightfield(*item.heightfield));
         else if (item.points) {
             h = hash_combine(h, hash_points(*item.points));
             h = hash_combine(h, hash_json(item.payload));

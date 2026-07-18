@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **62 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **76 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -9,6 +9,21 @@
 ## 目录
 
 - [Pin 数据类型](#pin-数据类型)
+- [Terrain 类别](#terrain-类别)
+  - [HeightField](#heightfield)
+  - [HeightFieldNoise](#heightfieldnoise)
+  - [HeightFieldMaskNoise](#heightfieldmasknoise)
+  - [HeightFieldMaskByFeature](#heightfieldmaskbyfeature)
+  - [HeightFieldClip](#heightfieldclip)
+  - [HeightFieldTerrace](#heightfieldterrace)
+  - [HeightFieldBlur](#heightfieldblur)
+  - [HeightFieldResample](#heightfieldresample)
+  - [HeightFieldLayer](#heightfieldlayer)
+  - [HeightFieldErode](#heightfielderode)
+  - [HeightFieldDistortByNoise](#heightfielddistortbynoise)
+  - [HeightFieldProject](#heightfieldproject)
+  - [HeightFieldScatter](#heightfieldscatter)
+  - [ConvertHeightField](#convertheightfield)
 - [Input 类别](#input-类别)
   - [GetTerrainData](#getterraindata)
   - [GetMeshData](#getmeshdata)
@@ -101,8 +116,189 @@
 | `SpatialMesh` | 网格数据（顶点+三角形） | `PcgMeshData` → `vertices[], triangles[]` |
 | `Any` | 任意类型透传 | — |
 | `Texture` | 纹理数据（2D 图像） | `PcgTextureData` → `width, height, channels, data[]` |
+| `HeightField` | 命名层 2D volume（`height`/`mask`/自定义层） | `PcgHeightField` → grid transform + `PcgHeightFieldLayer[]` |
 
 > **连接规则**：输出 Pin 类型必须与输入 Pin 类型匹配。`Any` 类型可接受任意输入。
+
+---
+
+## Terrain 类别
+
+### HeightField
+
+**功能**：创建 Houdini 风格的 typed 2D HeightField，同时生成标量 `height` 与 `mask` 命名层。Unity 路径默认使用 Corner sampling；Houdini 原生默认是 Center sampling。
+
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性名 | 默认值 | 说明 |
+|--------|--------|------|
+| `orientation` | `zx` | 栅格平面；`zx` 为 Unity 地面，位移沿 Y |
+| `sampling` | `corner` | `corner` 或 `center`；决定 sample index 与世界坐标的半格偏移 |
+| `divisionMode` | `bySize` | `bySize` 使用 `gridSpacing`；`byAxis` 使用最长轴 `gridSamples` |
+| `gridSpacing` | 1.0 | 相邻采样点的目标间距（米） |
+| `gridSamples` | 257 | By Axis 最长轴采样数 |
+| `sizeX`, `sizeZ` | 256 | HeightField 平面尺寸（米） |
+| `centerX/Y/Z` | 0 | 栅格中心；ZX 时 `centerY` 是基准高度 |
+| `initialHeight`, `initialMask` | 0 | 两个默认层的初值 |
+
+Corner sampling 下，`size=256`、`gridSpacing=1` 会生成 257×257 个样本，适合 Unity 的 `2^n+1` 高度图约束。所有命名层共享同一栅格变换；层结构从第一版即保留 tuple size，以支持后续 `flowdir` 向量层。
+
+### HeightFieldNoise
+
+**功能**：向指定 HeightField 层增加垂直分形噪声。第一个输入是被修改的 HeightField；可选第二输入是 mask HeightField，`maskLayer` 指定其中用于缩放效果的层。
+
+**输入 Pin**：`in`（`HeightField`）、`mask`（可选 `HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性名 | 默认值 | 说明 |
+|--------|--------|------|
+| `noiseLayer` | `height` | 被修改的标量层 |
+| `maskLayer` | `mask` | 第二输入中的遮罩层；0 不生效、1 完全生效 |
+| `noiseType` | `perlin` | L0 公开子集；与 `fractal` 分开 |
+| `fractal` | `terrain` | `none` / `standard` / `terrain` / `hybridTerrain` |
+| `centerNoise` | true | true 输出围绕 0，适合叠加地形 |
+| `amplitude` | 30 | 垂直位移幅度（米） |
+| `elementSize` | 64 | 主要地貌特征尺寸（米） |
+| `scaleX/Z`, `offsetX/Z` | 1 / 0 | 噪声空间缩放与平移 |
+| `maxOctaves` | 5 | 分形 octave 上限（1–12） |
+| `lacunarity`, `roughness` | 2.0 / 0.5 | 频率递增与幅度衰减 |
+| `seed` | 0 | PCG 确定性扩展；用于稳定空间噪声，不伪装成 SideFX 原生参数 |
+
+L0 对齐的是 SideFX 节点名、输入、命名层和参数语义，不承诺与 SideFX 私有噪声实现逐 voxel 相同。建议至少串联一次宏观 Noise 与一次低振幅细节 Noise。
+
+### HeightFieldMaskNoise
+
+**功能**：生成 0–1 为主的分形噪声并写入 `mask` 或任意标量层；可选第二输入继续遮罩本节点效果。
+
+**输入 Pin**：`in`、可选 `mask`（均为 `HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+核心属性为 `outputLayer`、`maskLayer`、`combine`、`blend`、`invert`，以及与 `HeightFieldNoise` 同构的 Noise Type / Fractal / Element Size / Scale / Offset / Octave 参数。`combine` 支持 Replace、Add、Subtract、Difference、Multiply、Maximum、Minimum、Blend。Mask 默认不居中，噪声先映射到 `[0,1]`。
+
+### HeightFieldMaskByFeature
+
+**功能**：从高度与坡度生成特征 mask；同时启用时取条件交集，未启用任何条件时按 SideFX 语义填充为 1。
+
+**输入 Pin**：`in`、可选 `mask`（`HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性 | 说明 |
+|------|------|
+| `maskByHeight`, `minHeight`, `maxHeight`, `heightFeather` | 高度范围与线性平滑边缘 |
+| `maskBySlope`, `minSlopeAngle`, `maxSlopeAngle`, `slopeFeather` | 由世界米制梯度计算 0–90° 坡度范围 |
+| `smoothRadius` | 输出 mask 的采样格半径平滑 |
+| `combine`, `blend`, `invert` | 与已有输出层的组合方式 |
+
+L1 暂不暴露 SideFX 的任意 Ramp、curvature、direction 和 occlusion，避免把固定函数误称为完整节点。
+
+### HeightFieldClip
+
+**功能**：把 `heightLayer` 限制在可选最小/最大高度；输出 `mesa`（被裁剪区域）与 `cliffs`（边界）层，也可把其中一层复制为 `mask`。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`（`HeightField`）
+
+核心属性：`minClipEnabled/minClip`、`maxClipEnabled/maxClip`、`edgeMaskRadius`、`generateMaskFrom`、`outputClippedLayer`、`outputEdgeLayer`。当前子集为硬裁剪；Soft Clip 留待后续参数映射。
+
+### HeightFieldTerrace
+
+**功能**：在指定高度范围内创建阶梯平原，输出 `mesa` 与 `cliffs` 命名层。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`（`HeightField`）
+
+核心属性：`minHeight/maxHeight`、`fade`（0 为完整台阶，1 为原地形）、`maxStepSize`（米）、`stepOffset`、`smoothEdges`。L1 实现固定步长与平滑阶沿；SideFX 的可变 Step Ramp、Fade Ramp 和 Undulations 属于后续扩展。
+
+### HeightFieldBlur
+
+**功能**：平滑 `height`、`mask` 或任意标量层。半径使用米；可选第二输入控制生效区域。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`（`HeightField`）
+
+`method` 支持可分离 Gaussian 与 Box；`iterations` 增强平滑，`radius` 是米制半径。卷积尊重层的 Constant / Repeat / Streak border policy。Expand、Shrink、Sharpen 留待后续。
+
+### HeightFieldResample
+
+**功能**：保持尺寸、中心、朝向、Sampling、所有命名层和 tuple size，改变 HeightField 分辨率。
+
+**输入 Pin**：`in`；**输出 Pin**：`out`（`HeightField`）
+
+`specifyExactResolution=false` 时使用 `resolutionScale`；启用时按 `divisionMode`、`gridSamples` 或 `gridSpacing` 求新栅格。所有 tuple 分量按世界坐标双线性采样。L1 公开 Bilinear 子集，其他 SideFX Filter/Filter Scale 尚未暴露。
+
+### HeightFieldLayer
+
+**功能**：SideFX 风格三输入合成：`base` + `layer` + 可选 `mask`。第二输入始终重采样到 base grid，输出继承 base 的栅格变换。
+
+**输入 Pin**：`base`、`layer`、可选 `mask`（`HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+`layerMode` 支持 Replace/Add/Subtract/Multiply/Maximum/Minimum/Blend；`layers` 是 `*` 或空格分隔层名。`maskStrength/invertMask` 控制合成区域，Base/Layer/Final Offset+Scale 与可选 Min/Max Clamp 用于完整的合成前后重映射。tuple size 不匹配会显式失败，不做静默降维。
+
+### HeightFieldErode
+
+**功能**：确定性的水力 + 热力侵蚀核心，保持 typed HeightField 并写出 Houdini 工作流常用的 `sediment`、`debris`、`flow` 与二维 `flowdir` 命名层。可选第二输入控制侵蚀区域。
+
+**输入 Pin**：`in`、可选 `mask`（`HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `iterations`, `seed` | 30 / 0 | 模拟迭代与确定性降雨扰动 |
+| `rainfallCoverage`, `flowForce` | 0.04 / 1.0 | 每轮加水量与下坡输运比例 |
+| `erodability`, `erosionRate` | 1.0 / 0.18 | 基岩可侵蚀性与水力切削速率 |
+| `sedimentCapacity`, `depositionRate`, `evaporationRate` | 1.4 / 0.12 / 0.12 | 携沙容量、沉积与蒸发 |
+| `weatheringForce`, `cutAngle`, `reposeAngle` | 0.08 / 35° / 28° | 热力风化、切削角与安息角 |
+| `addDebrisToHeight`, `addSedimentToHeight` | true / true | 是否把松散物/沉积反馈到最终高度 |
+| `debrisLayer`, `sedimentLayer`, `flowLayer`, `flowDirectionLayer` | 见属性名 | 输出层命名 |
+
+水力阶段在 8 邻域中按最大下坡输运水和携沙，根据容量差进行侵蚀/沉积；热力阶段把超过 Cut Angle 的物质搬运到低处，并按 Repose Angle 继续滑移。`flowdir` 是归一化的平面二维向量层。该节点对齐 SideFX 的两类模拟与输出层契约，但属于 CPU 确定性核心子集，不声称复刻 SideFX OpenCL 求解器、Freeze at Frame、侵蚀 bedrock/debris 各向异性、riverbed/riverbank 等全部高级参数。
+
+### HeightFieldDistortByNoise
+
+**功能**：通过噪声向量场反向追踪并搬移已有层，打破规则边缘；与 HeightField Noise 的“修改高度值”不同，本节点重采样输入内容。
+
+**输入 Pin**：`in`、可选 `mask`（`HeightField`）；**输出 Pin**：`out`（`HeightField`）
+
+`distortLayers` 是 `*` 或空格分隔层名；`noiseType` 支持 Simplex 语义的双通道梯度场与 Curl 场。`amplitude` 和 `elementSize` 均使用米，`substeps` 把总位移拆为多次 advection，较大振幅时可减少折叠。Scale、Offset、Roughness、Max Octaves 与 Seed 控制空间场。所有 tuple 分量一起搬移，且遵守各层 border policy。当前噪声核不承诺与 SideFX Simplex 逐 voxel 相同。
+
+### HeightFieldProject
+
+**功能**：把第二输入的多边形几何沿 HeightField 法线方向投影到指定高度层。这是 geometry → HeightField，不能与 points → terrain 的 `ProjectPoints` 混用。
+
+**输入 Pin**：`heightfield`（`HeightField`）、`geometry`（`SpatialMesh`）；**输出 Pin**：`out`（`HeightField`）
+
+`hitFarthest=true` 选择法线方向最高交点，通常与 `combineMethod=maximum` 组合抬升山体/建筑；关闭后选择最低交点，通常与 Minimum 组合压出谷地。Combine 支持 Replace/Add/Maximum/Minimum，`maxRayDistance` 限制相对原高度的投影距离。实现先保留 polygon 投影核心；SideFX 的 Mask Mode、supersampling/jitter 和 ray combiner 属于后续子集。
+
+### HeightFieldScatter
+
+**功能**：从 HeightField 表面生成确定性点云。`scatterAmountLayer` 必须指向存在且有正值的标量层；空层按官方语义输出零点。
+
+**输入 Pin**：`in`（`HeightField`）；**输出 Pin**：`out`（`SpatialPoint`）
+
+开启 `useExactPointCount` 时使用 `pointCount`；否则 `density` 表示每平方米点数，并按 mask 权重与坡面面积估算数量。`maxPoints` 是硬上限，`globalSeed` 保证复现，`candidatesPerPoint` 以 best-candidate 方式降低局部团簇。输出点贴合双线性高度并携带 `nx/ny/nz`、`u/v`、`height`、`density`。SideFX 的多轮 Relax/半径参数当前由轻量 best-candidate 子集替代。
+
+### ConvertHeightField
+
+**功能**：把 HeightField 的指定高度层转换为共享顶点的四边形 `PcgGeometry`。转换是 HeightField→Polygon 的边界；上游 HeightField 节点不会做 geometry→mesh 往返。
+
+**输入 Pin**：`in`（`HeightField`）
+**输出 Pin**：`out`（`SpatialMesh`，内部保持 `PcgGeometry` 到 Sink）
+
+| 属性名 | 默认值 | 说明 |
+|--------|--------|------|
+| `heightLayer` | `height` | 转换的标量高度层 |
+| `density` | 1.0 | 输出分辨率/输入分辨率比例 |
+
+输出自带平滑着色策略和归一化 UV0；Sink 才三角化。L0 只覆盖 Polygon surface，SideFX 的 Polygon Soup、VDB、Extrude Base、Bake Point Colors 留在后续阶段。
+
+典型质量链：
+
+```text
+HeightField → HeightFieldNoise (macro) → HeightFieldNoise (detail)
+            → HeightFieldMaskByFeature → HeightFieldTerrace → HeightFieldBlur
+            → HeightFieldDistortByNoise → HeightFieldErode
+            → ConvertHeightField → Output
+```
+
+官方语义参考：[HeightField](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield.html)、[Mask by Feature](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_maskbyfeature.html)、[Clip](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_clip)、[Terrace](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_terrace.html)、[Blur](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_blur.html)、[Resample](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_resample.html)、[Layer](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_layer.html)、[Distort by Noise](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_distort.html)、[Erode](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_erode.html)、[Project](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_project.html)、[Scatter](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_scatter-.html)、[Convert HeightField](https://www.sidefx.com/docs/houdini/nodes/sop/convertheightfield.html)、[Unity Terrain sampling](https://www.sidefx.com/docs/houdini/unity/terrain/basics.html)。
 
 ---
 
@@ -112,7 +308,7 @@
 
 **类别**：Input / Sampler
 
-**功能**：生成程序化地形高度图数据。使用基于噪声的算法在指定网格范围内生成地形高度值，供下游地形相关节点（`ProjectPoints`、`SampleSurface`）采样。
+**功能**：旧图兼容节点。保留原参数和噪声外观，但内部输出 typed `PcgHeightField`（`height` + 零 `mask`），供 `ProjectPoints`、`SampleSurface` 采样。新图优先使用 `HeightField` + `HeightFieldNoise`。
 
 **输入 Pin**：无
 
@@ -120,7 +316,7 @@
 
 | Pin ID | 标签 | 类型 |
 |--------|------|------|
-| `out` | Terrain | `Param` |
+| `out` | Terrain | `HeightField` |
 
 **属性**：
 
@@ -134,7 +330,7 @@
 **执行逻辑**：
 1. 在 `gridSize × gridSize` 网格上逐点计算 `simple_noise(wx, wz, seed) * amplitude`
 2. 世界坐标 `wx = (x - gridSize/2) * cellSize`，`wz` 同理
-3. 输出 `Param` 类型数据：`{"gridSize", "cellSize", "amplitude", "seed", "heights": [...]}`
+3. 把结果写入 `PcgHeightField.height`，同时创建零值 `mask` 层；不再把扁平 `heights[]` 当终态
 
 **用法示例**：
 
@@ -666,7 +862,7 @@
 | Pin ID | 标签 | 类型 | 说明 |
 |--------|------|------|------|
 | `in` | Points | `SpatialPoint` | 要投影的点云 |
-| `terrain` | Terrain | `Param` | 可选。来自 `GetTerrainData` 的地形数据 |
+| `terrain` | Terrain | `HeightField` | 可选。来自 `HeightFieldNoise` 或兼容节点 `GetTerrainData` |
 
 **输出 Pin**：
 
@@ -682,8 +878,8 @@
 | `baseY` | number | 0 | 不使用地形时的固定 Y 坐标 |
 
 **执行逻辑**：
-1. 检测是否有 terrain 输入，`useTerrain` 缺省取 `terrain != nullptr`
-2. 若使用地形：对每个点 `(x, z)` 从地形 heightmap 中采样高度（先转换为网格索引，越界时回退到 `simple_noise`）
+1. 检测是否有 typed HeightField terrain 输入，`useTerrain` 缺省取 `terrain != nullptr`
+2. 若使用 typed 地形：按 HeightField sampling 与 border policy 对命名 `height` 层做世界空间双线性采样；不会在越界时静默换成随机噪声
 3. 若不使用地形：Y = `baseY`
 4. X 和 Z 坐标不变，保留原始属性
 
@@ -698,7 +894,7 @@
 }
 ```
 
-> 典型连接：`GetTerrainData → ProjectPoints(terrain)`，`CreatePointGrid → ProjectPoints(in)`
+> 典型连接：`HeightFieldNoise → ProjectPoints(terrain)`，`CreatePointGrid → ProjectPoints(in)`；旧图仍可连接 `GetTerrainData`。
 
 ---
 
@@ -715,7 +911,7 @@
 | Pin ID | 标签 | 类型 | 说明 |
 |--------|------|------|------|
 | `in` | Points | `SpatialPoint` | 要采样的点云 |
-| `terrain` | Terrain | `Param` | **必需**。来自 `GetTerrainData` 的地形数据 |
+| `terrain` | Terrain | `HeightField` | **必需**。来自 `HeightFieldNoise` 或兼容节点 `GetTerrainData` |
 
 **输出 Pin**：
 
@@ -731,8 +927,8 @@
 | `blend` | number | 1.0 | 0 ~ 1 | 混合系数。0 = 保持原始 Y，1 = 完全使用地形 Y |
 
 **执行逻辑**：
-1. 读取地形数据中的 `seed`（缺省取 `graph_seed`）
-2. 对每个点采样地形高度 `terrain_y = sample_terrain_height(terrain, x, z, seed)`
+1. 读取 typed HeightField 的命名 `height` 层
+2. 按 sampling 与 border policy 做双线性采样得到 `terrain_y`
 3. 计算 `y = point.y × (1 - blend) + terrain_y × blend + offsetY`
 4. X 和 Z 不变，保留原始属性
 

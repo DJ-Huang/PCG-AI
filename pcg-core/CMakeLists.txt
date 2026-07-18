@@ -34,6 +34,7 @@ set(PCG_CORE_SOURCES
     src/data/pcg_spline_data.cpp
     src/data/pcg_mesh_data.cpp
     src/data/pcg_geometry.cpp
+    src/data/pcg_heightfield.cpp
     src/data/pcg_geometry_binary.cpp
     src/data/pcg_mesh_binary.cpp
     src/data/pcg_point_binary.cpp
@@ -69,6 +70,8 @@ set(PCG_CORE_SOURCES
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
     src/elements/primitive_elements.cpp
+    src/elements/heightfield_algorithms.cpp
+    src/elements/heightfield_elements.cpp
     src/elements/structural_algorithms.cpp
     src/elements/structural_elements.cpp
     src/elements/spline_algorithms.cpp
@@ -245,6 +248,12 @@ target_link_libraries(test_attribute_nodes PRIVATE PcgCoreStatic nlohmann_json::
 target_include_directories(test_attribute_nodes PRIVATE src)
 
 add_test(NAME test_attribute_nodes COMMAND test_attribute_nodes WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_heightfield tests/test_heightfield.cpp)
+target_link_libraries(test_heightfield PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_heightfield PRIVATE src)
+
+add_test(NAME test_heightfield COMMAND test_heightfield WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # ── Phase 4.7: Boolean Mesh ─────────────────────────────
 

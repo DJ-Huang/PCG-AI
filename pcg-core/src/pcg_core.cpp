@@ -164,11 +164,6 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
 
     if (result.kind == pcg::internal::GraphResultKind::Points && result.points) {
         const int point_count = static_cast<int>(result.points->points().size());
-        if (point_count <= 0) {
-            pcg::internal::write_error(err_buf, err_buf_size, "Point result is empty");
-            return PCG_ERR_EXECUTION;
-        }
-
         if (out_points_buf && out_points_buf_size > 0) {
             uint32_t flags = PCG_POINT_ATTR_NONE;
             if (!pcg::internal::data::write_point_binary(

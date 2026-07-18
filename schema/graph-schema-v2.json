@@ -23,7 +23,7 @@
   "$defs": {
     "pinType": {
       "type": "string",
-      "enum": ["Param", "SpatialPoint", "SpatialSpline", "SpatialSurface"]
+      "enum": ["Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface", "SpatialMesh", "Texture", "HeightField"]
     },
     "node": {
       "type": "object",

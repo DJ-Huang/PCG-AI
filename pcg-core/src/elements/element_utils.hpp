@@ -4,6 +4,7 @@
 #include "data/pcg_point_data.hpp"
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_geometry.hpp"
+#include "data/pcg_heightfield.hpp"
 #include "data/pcg_spline_data.hpp"
 #include "pcg_api.h"
 
@@ -27,6 +28,7 @@ data::PcgSplineData parse_spline_input(const nlohmann::json& json);
 data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
 data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* label);
 data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const char* label);
+data::PcgHeightField get_heightfield_input(PcgContext& ctx, const char* pin, const char* label);
 void emit_geometry(PcgContext& ctx, data::PcgGeometry data);
 void emit_geometry_shared(PcgContext& ctx,
                           const std::string& tag,
@@ -41,6 +43,10 @@ void emit_points_shared_with_meta(PcgContext& ctx,
                                   nlohmann::json sidecar);
 void emit_splines(PcgContext& ctx, data::PcgSplineData data);
 void emit_mesh(PcgContext& ctx, data::PcgMeshData data);
+void emit_heightfield(PcgContext& ctx, data::PcgHeightField data);
+void emit_heightfield_shared(PcgContext& ctx,
+                             const std::string& tag,
+                             std::shared_ptr<const data::PcgHeightField> heightfield);
 void emit_mesh_shared(PcgContext& ctx,
                       const std::string& tag,
                       std::shared_ptr<const data::PcgMeshData> mesh);

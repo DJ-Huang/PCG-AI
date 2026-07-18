@@ -383,6 +383,7 @@ namespace DJTechEditor.PCG.Graph
             { "SpatialPoint", new Color(0f, 0.8f, 1f) },       // cyan
             { "SpatialSpline", new Color(0.3f, 0.9f, 0.4f) },    // green
             { "SpatialMesh", new Color(1f, 0.6f, 0f) },          // orange
+            { "HeightField", new Color(0.45f, 0.78f, 0.28f) },   // terrain green
             { "Param", new Color(1f, 0.85f, 0f) },               // gold
             { "Texture", new Color(0.7f, 0.3f, 0.9f) },          // purple
             { "Any", new Color(0.65f, 0.65f, 0.65f) },           // gray

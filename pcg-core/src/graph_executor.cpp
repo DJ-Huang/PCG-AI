@@ -169,6 +169,11 @@ void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
             continue;
         }
 
+        if (auto heightfield = upstream.find_heightfield_shared(source_pin)) {
+            inputs.add_heightfield_shared(pin, heightfield);
+            continue;
+        }
+
         // Prefer Geometry over Mesh: mesh-first wrongly drops n-gon when both exist,
         // and mesh-only mid nodes (e.g. SubdivideMesh) must not hide upstream Geometry.
         if (auto geometry = upstream.find_geometry_shared(source_pin)) {
@@ -190,6 +195,10 @@ void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
 
         const nlohmann::json primary = upstream.primary_json();
         if (!primary.is_object() || primary.empty()) {
+            if (auto heightfield = upstream.primary_heightfield_shared()) {
+                inputs.add_heightfield_shared(pin, heightfield);
+                continue;
+            }
             if (auto geometry = upstream.primary_geometry_shared()) {
                 inputs.add_geometry_shared(pin, geometry);
                 continue;
@@ -233,6 +242,8 @@ nlohmann::json build_node_stats(
         } else if (const auto* mesh = collection.primary_mesh()) {
             point_count = static_cast<int>(mesh->vertices().size());
             triangle_count = static_cast<int>(mesh->triangles().size()) / 3;
+        } else if (const auto* heightfield = collection.primary_heightfield()) {
+            point_count = static_cast<int>(heightfield->sample_count());
         } else if (const auto pts = collection.find_points_shared("out")) {
             point_count = static_cast<int>(pts->points().size());
         } else {
@@ -272,6 +283,28 @@ nlohmann::json build_per_node_groups(const NodeOutputMap& outputs)
         }
     }
     return result;
+}
+
+nlohmann::json build_heightfield_summary(const data::PcgHeightField& heightfield)
+{
+    auto layer_names = nlohmann::json::array();
+    for (const auto& [name, layer] : heightfield.layers()) {
+        layer_names.push_back({
+            {"name", name},
+            {"tupleSize", layer.tuple_size},
+        });
+    }
+
+    return nlohmann::json{
+        {"kind", "heightfield"},
+        {"resolutionX", heightfield.resolution_x()},
+        {"resolutionZ", heightfield.resolution_z()},
+        {"sizeX", heightfield.size_x()},
+        {"sizeZ", heightfield.size_z()},
+        {"sampling", heightfield.sampling() == data::HeightFieldSampling::Corner
+            ? "corner" : "center"},
+        {"layers", std::move(layer_names)},
+    };
 }
 
 } // namespace
@@ -467,6 +500,15 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.points = out_item->points;
         out_result.point_sidecar = out_item->payload;
         out_result.json = nlohmann::json::object();
+        out_result.mesh = data::PcgMeshData{};
+        out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
+        return PCG_OK;
+    }
+
+    if (auto heightfield = sink_output.find_heightfield_shared("out")) {
+        out_result.kind = GraphResultKind::Json;
+        out_result.json = build_heightfield_summary(*heightfield);
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;

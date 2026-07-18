@@ -66,9 +66,6 @@ bool write_point_binary(const PcgPointData& points, void* buffer, int buffer_siz
         return false;
 
     const int point_count = static_cast<int>(points.points().size());
-    if (point_count <= 0)
-        return false;
-
     const uint32_t flags = detect_point_attr_flags(points);
     const int required = point_binary_size(points, flags);
     if (required <= 0 || buffer_size < required)

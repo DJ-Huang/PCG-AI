@@ -5,6 +5,7 @@
 #include "data/pcg_point_data.hpp"
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_geometry.hpp"
+#include "data/pcg_heightfield.hpp"
 #include "data/pcg_spline_data.hpp"
 
 #include <nlohmann/json.hpp>
@@ -23,6 +24,7 @@ struct PcgTaggedData {
     nlohmann::json payload;
     std::shared_ptr<const PcgMeshData> mesh;
     std::shared_ptr<const PcgGeometry> geometry;
+    std::shared_ptr<const PcgHeightField> heightfield;
     std::shared_ptr<const PcgPointData> points;
     std::optional<PcgSplineData> splines;
 };
@@ -45,6 +47,9 @@ public:
     void add_mesh_shared(const std::string& tag, std::shared_ptr<const PcgMeshData> mesh);
     void add_geometry(const std::string& tag, PcgGeometry data);
     void add_geometry_shared(const std::string& tag, std::shared_ptr<const PcgGeometry> geometry);
+    void add_heightfield(const std::string& tag, PcgHeightField data);
+    void add_heightfield_shared(const std::string& tag,
+                                std::shared_ptr<const PcgHeightField> heightfield);
 
     const PcgTaggedData* find(const std::string& tag) const;
     const nlohmann::json* find_json(const std::string& tag) const;
@@ -55,12 +60,16 @@ public:
     std::shared_ptr<const PcgMeshData> find_mesh_shared(const std::string& tag) const;
     const PcgGeometry* find_geometry(const std::string& tag) const;
     std::shared_ptr<const PcgGeometry> find_geometry_shared(const std::string& tag) const;
+    const PcgHeightField* find_heightfield(const std::string& tag) const;
+    std::shared_ptr<const PcgHeightField> find_heightfield_shared(const std::string& tag) const;
 
     nlohmann::json primary_json() const;
     const PcgMeshData* primary_mesh() const;
     std::shared_ptr<const PcgMeshData> primary_mesh_shared() const;
     const PcgGeometry* primary_geometry() const;
     std::shared_ptr<const PcgGeometry> primary_geometry_shared() const;
+    const PcgHeightField* primary_heightfield() const;
+    std::shared_ptr<const PcgHeightField> primary_heightfield_shared() const;
     PcgDataType primary_type() const;
 
     const std::vector<PcgTaggedData>& items() const { return items_; }

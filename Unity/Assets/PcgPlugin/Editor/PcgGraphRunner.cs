@@ -77,13 +77,31 @@ namespace DJTechEditor.PCG
                     break;
 
                 case PcgResultKind.Points:
-                    if (!PcgResultParser.TryParsePoints(result.Json, out var parsed, out var parseError))
+                    if (result.Kind == PcgExecuteKind.Points)
                     {
-                        Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
-                        return false;
+                        if (!PcgResultParser.TryParsePointBinary(
+                                result.PointBinary, out var binaryPoints, out var binaryError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
+                            return false;
+                        }
+                        var positions = new List<Vector3>(binaryPoints.Count);
+                        foreach (var point in binaryPoints)
+                            positions.Add(point.Position);
+                        preview.SetPoints(positions);
+                        Debug.Log($"[PCG] Point preview updated ({binaryPoints.Count} points).");
                     }
-                    preview.SetPoints(PcgResultParser.ToVector3List(parsed));
-                    Debug.Log($"[PCG] Point preview updated ({parsed.pointCount} points).");
+                    else
+                    {
+                        if (!PcgResultParser.TryParsePoints(
+                                result.Json, out var parsed, out var parseError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
+                            return false;
+                        }
+                        preview.SetPoints(PcgResultParser.ToVector3List(parsed));
+                        Debug.Log($"[PCG] Point preview updated ({parsed.pointCount} points).");
+                    }
                     break;
 
                 default:

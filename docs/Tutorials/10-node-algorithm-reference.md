@@ -595,6 +595,98 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
 
 ---
 
+## HeightField Terrain 节点
+
+### HeightField
+
+| 项 | 值 |
+|---|---|
+| 文件 | `heightfield_elements.cpp`, `pcg_heightfield.cpp` |
+| 算法 | typed 2D volume 创建与 index↔world 变换 |
+| 输入 | 无 |
+| 输出 | HeightField (pin "out") |
+
+同时创建命名 `height`、`mask` 标量层。Corner sampling 的样本覆盖 Size 两端；Center sampling 相对边界偏移半个 grid spacing。Unity 建议 Corner + `2^n+1` samples。
+
+### HeightFieldNoise
+
+| 项 | 值 |
+|---|---|
+| 文件 | `heightfield_elements.cpp`, `heightfield_algorithms.cpp` |
+| 算法 | 确定性 gradient noise + 分形叠加 |
+| 输入 | HeightField (pin "in"), optional HeightField (pin "mask") |
+| 输出 | HeightField (pin "out") |
+
+L0 `noiseType` 公开 Perlin 子集；`fractal` 独立支持 None/Standard/Terrain/Hybrid Terrain 语义。第二输入按世界坐标双线性采样 `maskLayer`。
+
+### HeightFieldMaskNoise / HeightFieldMaskByFeature
+
+| 项 | 值 |
+|---|---|
+| 文件 | `heightfield_elements.cpp`, `heightfield_algorithms.cpp` |
+| 算法 | 分形噪声 mask；高度/坡度特征交集 |
+| 输入 | HeightField (pin "in"), optional HeightField (pin "mask") |
+| 输出 | HeightField (pin "out") |
+
+Mask Noise 复用确定性 noise kernel，默认映射到 0–1，再按 Replace/Add/Subtract/Difference/Multiply/Min/Max/Blend 合入目标层。Feature 节点通过米制高度范围与中央差分坡度角生成权重；多个启用条件相乘，输出可做有限半径平滑。
+
+### HeightFieldClip / HeightFieldTerrace / HeightFieldBlur
+
+| 项 | 值 |
+|---|---|
+| 文件 | `heightfield_elements.cpp`, `heightfield_algorithms.cpp` |
+| 算法 | 高度裁剪、阶梯量化、可选 mask 的分离卷积 |
+| 输入 | HeightField (pin "in"), optional HeightField (pin "mask") |
+| 输出 | HeightField (pin "out") |
+
+Clip 和 Terrace 都保留 typed HeightField，并新增 `mesa`/`cliffs` 标量层。Terrace 的 `fade=0` 为完整台阶、`fade=1` 为原高度。Blur 的 Box 与 Gaussian 都使用可分离一维卷积，卷积读取层 border policy。
+
+### HeightFieldResample
+
+按比例或精确的 By Axis/By Size 参数创建新栅格；遍历所有命名层与 tuple 分量，按输出 sample 的世界位置双线性读取输入。尺寸、中心、朝向、Center/Corner sampling 与 border metadata 不变。
+
+### HeightFieldLayer
+
+三输入合成：`base`、`layer`、可选 `mask`。输出固定使用 base grid，第二/第三输入通过世界坐标采样，因此允许分辨率不同。支持指定层集合、Replace/Add/Subtract/Multiply/Min/Max/Blend、输入/输出 scale+offset 和 clamp；tuple 不匹配显式失败。
+
+### HeightFieldErode
+
+| 项 | 值 |
+|---|---|
+| 文件 | `heightfield_elements.cpp`, `heightfield_algorithms.cpp` |
+| 算法 | 确定性 8 邻域水力输运 + 热力风化 |
+| 输入 | HeightField (pin "in"), optional HeightField (pin "mask") |
+| 输出 | HeightField (pin "out") |
+
+每轮水力阶段先施加带 seed 的确定性降雨，再沿最大下坡搬运 water 与 carried sediment；局部携沙容量不足时侵蚀基岩，超过容量时沉积。热力阶段根据 Cut Angle 释放松散物，并按 Repose Angle 向低处滑移。最终除修改 `height` 外，还输出标量 `sediment`、`debris`、`flow` 和 tuple-size=2 的归一化 `flowdir` 层。
+
+实现目标是保持 Houdini HeightField 的命名层数据流和 Hydro/Thermal 参数分组，而非逐值复刻 SideFX 的 OpenCL 求解器。高级 bedrock/debris 各向异性、Freeze at Frame、riverbed/riverbank 等参数不在当前子集内。
+
+### HeightFieldDistortByNoise
+
+对 `distortLayers` 选择的全部 tuple 分量做多步反向 advection。Simplex 语义模式由两个独立梯度噪声通道形成位移；Curl 模式对标量噪声求有限差分并旋转 90°，得到近似无散向量场。每个 substep 从上一步 HeightField 做世界坐标双线性采样，mask 直接缩放位移距离，因此它搬移已有细节而不是增加新的高度。
+
+### HeightFieldProject
+
+将 polygon geometry 三角化后映射到 HeightField 的二维成像平面，对每个 sample 做重心覆盖测试并插值法线轴高度。Hit Farthest/Closest 分别选择最高/最低交点；Replace/Add/Maximum/Minimum 再与原高度合成。ZX、XY、YZ 三种 orientation 使用各自的平面轴和位移轴。
+
+### HeightFieldScatter
+
+先按 `scatterAmountLayer × 坡面面积` 建立 cell CDF，再以 seed 确定性采样；精确点数与每平方米密度共用 `maxPoints` 安全上限。每个点从多个候选中选择与近期点更远者以降低团簇，随后双线性读取高度、中央差分计算单位法线，并写出 UV、高度和 density 属性。空 scatter layer 不生成点。
+
+### ConvertHeightField
+
+| 项 | 值 |
+|---|---|
+| 文件 | `heightfield_elements.cpp`, `heightfield_algorithms.cpp` |
+| 算法 | HeightField → 共享顶点四边形 PcgGeometry |
+| 输入 | HeightField (pin "in") |
+| 输出 | SpatialMesh (内部为 Geometry) |
+
+输出平滑着色策略与 UV0；只在 Sink 三角化。`density` 控制输出相对分辨率。
+
+---
+
 ## 8. Transform 节点
 
 ### 8.1 TransformPoints
@@ -616,7 +708,7 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
 |---|---|
 | 文件 | `primitive_elements.cpp` |
 | 算法 | 地形投影 |
-| 输入 | Points (pin "in"), Param (pin "terrain") |
+| 输入 | Points (pin "in"), HeightField (pin "terrain") |
 | 输出 | Points (pin "out") |
 
 **算法**：将点的 Y 坐标设置为地形高度。`useTerrain` 启用地形采样，否则使用 `baseY`。
@@ -634,9 +726,9 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
 | 文件 | `primitive_elements.cpp` |
 | 算法 | 程序化地形生成 |
 | 输入 | 无 |
-| 输出 | Param (pin "out") |
+| 输出 | HeightField (pin "out") |
 
-**算法**：按 `gridSize`/`cellSize` 生成网格，`amplitude`/`seed` 控制高度噪声。输出为 JSON Param 供 ProjectPoints/SampleSurface 消费。
+**算法**：旧图兼容壳。按 `gridSize`/`cellSize` 生成网格，`amplitude`/`seed` 控制高度噪声，写入 typed `height` 层并创建零 `mask`。
 
 **参数**：`gridSize` (≥2), `cellSize` (≥0), `amplitude`, `seed`
 
@@ -646,7 +738,7 @@ domain 支持 point/edge/face。输出组名通过 `outputGroup` 参数指定，
 |---|---|
 | 文件 | `primitive_elements.cpp` |
 | 算法 | 地形表面采样 |
-| 输入 | Points (pin "in"), Param (pin "terrain") |
+| 输入 | Points (pin "in"), HeightField (pin "terrain") |
 | 输出 | Points (pin "out") |
 
 **算法**：将点投影到地形表面，`blend` 控制混合系数（0=原始高度，1=完全投影）。

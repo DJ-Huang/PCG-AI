@@ -12,6 +12,7 @@
 #include "elements/uv_elements.hpp"
 #include "elements/vehicle_modeling_elements.hpp"
 #include "elements/building_elements.hpp"
+#include "elements/heightfield_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -126,6 +127,11 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (auto heightfield = ctx.inputs.find_heightfield_shared("in")) {
+            ctx.outputs.add_heightfield_shared("out", heightfield);
+            return PCG_OK;
+        }
+
         if (auto geometry = ctx.inputs.find_geometry_shared("in")) {
             ctx.outputs.add_geometry_shared("out", geometry);
             return PCG_OK;
@@ -192,6 +198,7 @@ void register_builtin_elements()
     register_uv_elements(map);
     register_vehicle_modeling_elements(map);
     register_building_elements(map);
+    register_heightfield_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

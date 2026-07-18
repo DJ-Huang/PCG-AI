@@ -162,6 +162,15 @@ data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const cha
     return {};
 }
 
+data::PcgHeightField get_heightfield_input(PcgContext& ctx, const char* pin, const char* label)
+{
+    if (const data::PcgHeightField* heightfield = ctx.inputs.find_heightfield(pin))
+        return *heightfield;
+
+    fail_ctx(ctx, PCG_ERR_EXECUTION, label);
+    return {};
+}
+
 nlohmann::json point_data_to_json(const data::PcgPointData& data)
 {
     return data.to_json();
@@ -204,6 +213,18 @@ void emit_geometry_shared(PcgContext& ctx,
                           std::shared_ptr<const data::PcgGeometry> geometry)
 {
     ctx.outputs.add_geometry_shared(tag, std::move(geometry));
+}
+
+void emit_heightfield(PcgContext& ctx, data::PcgHeightField data)
+{
+    ctx.outputs.add_heightfield("out", std::move(data));
+}
+
+void emit_heightfield_shared(PcgContext& ctx,
+                             const std::string& tag,
+                             std::shared_ptr<const data::PcgHeightField> heightfield)
+{
+    ctx.outputs.add_heightfield_shared(tag, std::move(heightfield));
 }
 
 void emit_mesh_shared(PcgContext& ctx,
