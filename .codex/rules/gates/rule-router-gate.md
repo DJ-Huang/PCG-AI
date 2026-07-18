@@ -51,7 +51,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 | 域名 | 意图 | 应命中 rule_id（检索词示例） |
 |------|------|------------------------------|
 | Unity | 始终 | `core/role`, `core/anti-ai-trace` |
-| Unity | 写码 | `core/hmirp-rendering-agent`（**仅 HMIRP 项目**触发；其它 Unity 渲染项目及非 HMIRP 的 C# 不触发 §Stable，避免噪声） |
+| Unity | 写码 | `core/hmirp-rendering-agent` |
 | Unity | 架构/文档/模块说明 | `agents/ta-render-expert` |
 | Unity | review | `reviews/hmirp-review-rules`, `agents/shader-expert` |
 | Unity | 调试 | `agents/test-engineer` |
@@ -83,12 +83,28 @@ Vault 中有**跨域通用**的经验知识，不绑定特定技术栈：
 
 **禁止**以「这是通用项目，Vault 里不会有相关经验」为由跳过 vault_search。
 
-## 4. 回执（改代码/出审查结论前一行）
+## 4. Unity / Tuanjie Editor MCP 路由
+
+当任务位于 Unity / Tuanjie 工程，且需要**运行中 Editor 的真实状态或操作**时，优先使用已配置的 `tuanjie-mcp`；它不是静态代码检索的替代品。
+
+**应触发 MCP**：查看或处理 Console、编译状态、当前场景 / Hierarchy、GameObject、Selection、Play Mode、Editor 菜单与项目中的实际对象，或用户明确要求「在 Unity / 团结中查看、执行、操作、验证」。
+
+**不应触发 MCP**：只读源码、静态配置、文档或纯方案讨论，且任务不依赖 Editor 当前状态时。
+
+执行协议：
+
+1. 用户已明确给出项目路径或 PID 时，用该上下文选择实例；否则先调用 `unity_list_instances`。
+2. 仅一个可达实例时可自动选中；有多个可达实例且无法从任务上下文唯一确定时，先展示项目路径 / PID 并请用户选择，禁止盲目操作任意进程。
+3. 对选中的实例先调用 `unity_ping`，确认 `project_root` 与用户目标一致；随后按最小权限调用相应工具（例如 Console、Scene、GameObject、Editor 或 `unity_bridge_call`）。
+4. `unity_initialize_bridge` 会修改目标工程并启动批处理 Editor；仅当用户明确要求初始化 / 安装 Bridge，或已授权为该项目启用 MCP 时才调用。初始化后重新列举并验证实例。
+5. 任何会修改场景、对象、资源、包或 Editor 状态的调用，仍须遵守现有写入授权与验证规则；不能因为 MCP 可用而扩大操作范围。
+
+## 5. 回执（改代码/出审查结论前一行）
 
 `Router（dev, <fresh|reused|delta>）：<域名> | key: <意图+关键词+模块摘要> | rules: <rule_id 列表> | vault: <笔记 id/摘要或 no hit>`
 
 `reused` 只引用既有 `rule_id` / 笔记 id 和约束摘要，不重复粘贴 excerpt。`delta` 只报告新增、删除或发生冲突的命中。
 
-## 5. 委派子 Agent
+## 6. 委派子 Agent
 
-子 Agent 不继承 alwaysApply。主 Agent 先完成 §1–§4，再在 prompt 注入硬约束摘要（含 rule_search 命中要点）。
+子 Agent 不继承 alwaysApply。主 Agent 先完成 §1–§5，再在 prompt 注入硬约束摘要（含 rule_search 命中要点与 Unity MCP 实例上下文，如适用）。
