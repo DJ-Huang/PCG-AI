@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **76 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **86 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -14,15 +14,24 @@
   - [HeightFieldNoise](#heightfieldnoise)
   - [HeightFieldMaskNoise](#heightfieldmasknoise)
   - [HeightFieldMaskByFeature](#heightfieldmaskbyfeature)
+  - [HeightFieldMaskByObject](#heightfieldmaskbyobject)
+  - [HeightFieldPattern](#heightfieldpattern)
   - [HeightFieldClip](#heightfieldclip)
   - [HeightFieldTerrace](#heightfieldterrace)
   - [HeightFieldBlur](#heightfieldblur)
   - [HeightFieldResample](#heightfieldresample)
   - [HeightFieldLayer](#heightfieldlayer)
+  - [HeightFieldCopyLayer](#heightfieldcopylayer)
+  - [HeightFieldLayerClear](#heightfieldlayerclear)
+  - [HeightFieldLayerProperties](#heightfieldlayerproperties)
+  - [HeightFieldIsolateLayer](#heightfieldisolatelayer)
   - [HeightFieldErode](#heightfielderode)
+  - [HeightFieldFlowField](#heightfieldflowfield)
+  - [HeightFieldSlump](#heightfieldslump)
   - [HeightFieldDistortByNoise](#heightfielddistortbynoise)
   - [HeightFieldProject](#heightfieldproject)
   - [HeightFieldScatter](#heightfieldscatter)
+  - [HeightFieldFile](#heightfieldfile)
   - [ConvertHeightField](#convertheightfield)
 - [Input 类别](#input-类别)
   - [GetTerrainData](#getterraindata)
@@ -275,6 +284,56 @@ L1 暂不暴露 SideFX 的任意 Ramp、curvature、direction 和 occlusion，�
 
 开启 `useExactPointCount` 时使用 `pointCount`；否则 `density` 表示每平方米点数，并按 mask 权重与坡面面积估算数量。`maxPoints` 是硬上限，`globalSeed` 保证复现，`candidatesPerPoint` 以 best-candidate 方式降低局部团簇。输出点贴合双线性高度并携带 `nx/ny/nz`、`u/v`、`height`、`density`。SideFX 的多轮 Relax/半径参数当前由轻量 best-candidate 子集替代。
 
+### HeightFieldMaskByObject
+
+**功能**：把第二输入几何投影到 HeightField，生成/合成 `mask`（或指定输出层）。对齐 SideFX HeightField Mask by Geometry（`heightfield_maskbyobject`）的 Project 路径；Fog/SDF Volume 方法未实现。
+
+**输入 Pin**：`in`（`HeightField`）、`geometry`（`SpatialMesh`）；**输出 Pin**：`out`（`HeightField`）
+
+`maskingByGeometry` 控制 Above / Below / Either；`combine` 与既有 mask 合成；可选 `blurRadius` 羽化边缘。
+
+### HeightFieldPattern
+
+**功能**：在指定层写入程序化图案位移（Ramp / Exponential Ramp / Step / Stripes）。对齐 SideFX HeightField Pattern 的常用子集；Stars / Voronoi / Distortion 未纳入本版。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`
+
+`patternLayer` 默认 `height`；也常写到 `mask` 做梯度蒙版。`size` / `rotate` / `center*` / `phase` 控制图案摆放。
+
+### HeightFieldFlowField
+
+**功能**：降雨后沿地形下坡输运，累积 `flow` / `flowdir` / `water`；可选 `copyToMask` 与 `adjustHeight` 挖槽。对齐 SideFX HeightField Flow Field 的核心参数（Smooth/Granular、Rain、Spread/Smoothing Iterations）。
+
+**输入 Pin**：`in`；**输出 Pin**：`out`
+
+### HeightFieldSlump
+
+**功能**：按休止角把松散物质（默认 `debris`）滑移到更稳构型，可选写回流场。对齐 SideFX HeightField Slump 的 Smooth/Granular 核心；高级河床侵蚀参数未纳入。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`
+
+### HeightFieldCopyLayer
+
+**功能**：把源层复制到目标层（可只建层不拷数据）。对齐 SideFX HeightField Copy Layer。
+
+### HeightFieldLayerClear
+
+**功能**：把指定层填成常量。对齐 SideFX HeightField Layer Clear。
+
+### HeightFieldLayerProperties
+
+**功能**：设置层的 border 类型/常量。对齐 SideFX HeightField Layer Properties。
+
+### HeightFieldIsolateLayer
+
+**功能**：把指定层拷到 `mask`（和/或覆盖 `height`）以便预览。对齐 SideFX HeightField Isolate Layer。
+
+### HeightFieldFile
+
+**功能**：从磁盘载入栅格创建 HeightField。对齐 SideFX HeightField File 的 Size/Scale/Clamp/Sampling 契约；当前读取 **PGM** 与 **float32 raw**（`.raw`/`.r32`/`.f32`，需 `rawResolutionX/Z`），不依赖 COP。
+
+**输入 Pin**：无；**输出 Pin**：`out`
+
 ### ConvertHeightField
 
 **功能**：把 HeightField 的指定高度层转换为共享顶点的四边形 `PcgGeometry`。转换是 HeightField→Polygon 的边界；上游 HeightField 节点不会做 geometry→mesh 往返。
@@ -296,6 +355,14 @@ HeightField → HeightFieldNoise (macro) → HeightFieldNoise (detail)
             → HeightFieldMaskByFeature → HeightFieldTerrace → HeightFieldBlur
             → HeightFieldDistortByNoise → HeightFieldErode
             → ConvertHeightField → Output
+```
+
+可控山体 / 河流 / 植被蒙版链：
+
+```text
+HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObject
+            → HeightFieldFlowField (copyToMask + adjustHeight)
+            → HeightFieldSlump → HeightFieldScatter → CopyMeshToPoints
 ```
 
 官方语义参考：[HeightField](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield.html)、[Mask by Feature](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_maskbyfeature.html)、[Clip](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_clip)、[Terrace](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_terrace.html)、[Blur](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_blur.html)、[Resample](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_resample.html)、[Layer](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_layer.html)、[Distort by Noise](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_distort.html)、[Erode](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_erode.html)、[Project](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_project.html)、[Scatter](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_scatter-.html)、[Convert HeightField](https://www.sidefx.com/docs/houdini/nodes/sop/convertheightfield.html)、[Unity Terrain sampling](https://www.sidefx.com/docs/houdini/unity/terrain/basics.html)。

@@ -589,6 +589,359 @@ public:
     }
 };
 
+bool parse_mask_side(const std::string& value, HeightFieldMaskByObjectSide& out)
+{
+    if (value == "either") out = HeightFieldMaskByObjectSide::Either;
+    else if (value == "above") out = HeightFieldMaskByObjectSide::Above;
+    else if (value == "below") out = HeightFieldMaskByObjectSide::Below;
+    else return false;
+    return true;
+}
+
+bool parse_pattern_kind(const std::string& value, HeightFieldPatternKind& out)
+{
+    if (value == "ramp") out = HeightFieldPatternKind::Ramp;
+    else if (value == "exponentialRamp") out = HeightFieldPatternKind::ExponentialRamp;
+    else if (value == "step") out = HeightFieldPatternKind::Step;
+    else if (value == "stripes") out = HeightFieldPatternKind::Stripes;
+    else return false;
+    return true;
+}
+
+bool parse_ramp_mode(const std::string& value, HeightFieldRampMode& out)
+{
+    if (value == "linear") out = HeightFieldRampMode::Linear;
+    else if (value == "concentric") out = HeightFieldRampMode::Concentric;
+    else if (value == "radial") out = HeightFieldRampMode::Radial;
+    else return false;
+    return true;
+}
+
+bool parse_slump_mode(const std::string& value, HeightFieldSlumpMode& out)
+{
+    if (value == "smooth") out = HeightFieldSlumpMode::Smooth;
+    else if (value == "granular") out = HeightFieldSlumpMode::Granular;
+    else return false;
+    return true;
+}
+
+bool parse_border_type(const std::string& value, data::HeightFieldBorderType& out)
+{
+    if (value == "constant") out = data::HeightFieldBorderType::Constant;
+    else if (value == "repeat") out = data::HeightFieldBorderType::Repeat;
+    else if (value == "streak") out = data::HeightFieldBorderType::Streak;
+    else return false;
+    return true;
+}
+
+bool parse_blur_method(const std::string& value, HeightFieldBlurMethod& out)
+{
+    if (value == "gaussian") out = HeightFieldBlurMethod::Gaussian;
+    else if (value == "box") out = HeightFieldBlurMethod::Box;
+    else return false;
+    return true;
+}
+
+class HeightFieldMaskByObjectElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldMaskByObject"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldMaskByObject missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldMaskByObject missing heightfield input");
+        const data::PcgGeometry geometry = get_geometry_input(
+            ctx, "geometry", "HeightFieldMaskByObject missing geometry input");
+        if (geometry.points().empty() || geometry.faces().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldMaskByObject geometry has no polygon surface");
+        HeightFieldMaskByObjectOptions options;
+        options.height_layer = ctx.node->data.value("heightLayer", "height");
+        options.output_layer = ctx.node->data.value("outputLayer", "mask");
+        options.blend = ctx.node->data.value("blend", 1.0);
+        options.invert = ctx.node->data.value("invertMask", false);
+        options.max_ray_distance = ctx.node->data.value("maxRayDistance", 1000.0);
+        options.value = ctx.node->data.value("value", 1.0);
+        options.blur_radius_meters = ctx.node->data.value("blurRadius", 0.0);
+        if (!parse_combine(ctx.node->data.value("combine", "replace"), options.combine) ||
+            !parse_mask_side(ctx.node->data.value("maskingByGeometry", "above"), options.side) ||
+            !parse_blur_method(ctx.node->data.value("blurMethod", "gaussian"),
+                               options.blur_method)) {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldMaskByObject invalid parameters");
+        }
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_mask_by_object(output, geometry, options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldMaskByObject invalid parameters or excessive work");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldPatternElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldPattern"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldPattern missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldPattern missing heightfield input");
+        HeightFieldPatternOptions options;
+        options.pattern_layer = ctx.node->data.value("patternLayer", "height");
+        options.mask_layer = ctx.node->data.value("maskLayer", "mask");
+        options.blend = ctx.node->data.value("blend", 1.0);
+        options.height = ctx.node->data.value("height", 10.0);
+        options.base_height = ctx.node->data.value("baseHeight", 0.0);
+        options.post_blur_radius = ctx.node->data.value("postBlurRadius", 0.0);
+        options.rotate_degrees = ctx.node->data.value("rotate", 0.0);
+        options.size = ctx.node->data.value("size", 64.0);
+        options.scale_x = ctx.node->data.value("scaleX", 1.0);
+        options.scale_z = ctx.node->data.value("scaleZ", 1.0);
+        options.center_x = ctx.node->data.value("centerX", 0.0);
+        options.center_z = ctx.node->data.value("centerZ", 0.0);
+        options.phase = ctx.node->data.value("phase", 0.0);
+        options.ramp_repeat = ctx.node->data.value("rampRepeat", false);
+        options.ramp_mirror = ctx.node->data.value("rampMirror", false);
+        options.rise_over_run = ctx.node->data.value("riseOverRun", 0.5);
+        options.step_height = ctx.node->data.value("stepHeight", 2.0);
+        options.step_reference_height = ctx.node->data.value("stepReferenceHeight", 0.0);
+        options.stripe_width = ctx.node->data.value("stripeWidth", 0.5);
+        if (!parse_combine(ctx.node->data.value("combine", "add"), options.combine) ||
+            !parse_pattern_kind(ctx.node->data.value("pattern", "ramp"), options.pattern) ||
+            !parse_ramp_mode(ctx.node->data.value("rampMode", "linear"), options.ramp_mode)) {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldPattern invalid parameters");
+        }
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_pattern(output, ctx.inputs.find_heightfield("mask"), options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldPattern invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldFlowFieldElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldFlowField"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFlowField missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFlowField missing heightfield input");
+        HeightFieldFlowFieldOptions options;
+        options.height_layer = ctx.node->data.value("heightLayer", "height");
+        options.water_layer = ctx.node->data.value("waterLayer", "water");
+        options.flow_layer = ctx.node->data.value("flowLayer", "flow");
+        options.flow_direction_layer = ctx.node->data.value("flowDirLayer", "flowdir");
+        options.mask_layer = ctx.node->data.value("maskLayer", "mask");
+        options.rain_amount = ctx.node->data.value("rainAmount", 0.5);
+        options.rain_density = ctx.node->data.value("rainDensity", 1.0);
+        options.spread_iterations = ctx.node->data.value("spreadIterations", 40);
+        options.smoothing_iterations = ctx.node->data.value("smoothingIterations", 2);
+        options.copy_to_mask = ctx.node->data.value("copyToMask", true);
+        options.mask_scale = ctx.node->data.value("maskScale", 1.0);
+        options.adjust_height = ctx.node->data.value("adjustHeight", false);
+        options.adjust_height_scale = ctx.node->data.value("adjustHeightScale", 1.0);
+        options.seed = ctx.node->data.value("seed", ctx.graph_seed);
+        if (!parse_slump_mode(ctx.node->data.value("slumpMode", "smooth"), options.slump_mode))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFlowField invalid slumpMode");
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_flow_field(output, options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFlowField invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldSlumpElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldSlump"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldSlump missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldSlump missing heightfield input");
+        HeightFieldSlumpOptions options;
+        options.height_layer = ctx.node->data.value("heightLayer", "height");
+        options.mask_layer = ctx.node->data.value("maskLayer", "mask");
+        options.material_layer = ctx.node->data.value("materialLayer", "debris");
+        options.flow_layer = ctx.node->data.value("flowLayer", "flow");
+        options.flow_direction_layer = ctx.node->data.value("flowDirLayer", "flowdir");
+        options.spread_iterations = ctx.node->data.value("spreadIterations", 20);
+        options.spread_rate = ctx.node->data.value("spreadRate", 1.0);
+        options.repose_angle_degrees = ctx.node->data.value("reposeAngle", 30.0);
+        options.height_factor = ctx.node->data.value("heightFactor", 1.0);
+        options.quantization = ctx.node->data.value("quantization", 0.0);
+        options.calculate_flow_fields = ctx.node->data.value("calculateFlowFields", true);
+        options.flow_smoothing_iterations = ctx.node->data.value("flowSmoothingIterations", 0);
+        options.allow_material_outflow = ctx.node->data.value("allowMaterialOutflow", true);
+        options.add_to_bedrock = ctx.node->data.value("addToBedrock", true);
+        options.seed = ctx.node->data.value("seed", ctx.graph_seed);
+        if (!parse_slump_mode(ctx.node->data.value("slumpMode", "smooth"), options.slump_mode))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldSlump invalid slumpMode");
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_slump(output, ctx.inputs.find_heightfield("mask"), options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldSlump invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldCopyLayerElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldCopyLayer"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldCopyLayer missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldCopyLayer missing heightfield input");
+        HeightFieldCopyLayerOptions options;
+        options.source = ctx.node->data.value("source", "mask");
+        options.destination = ctx.node->data.value("destination", "mask_copy");
+        options.copy_source_data = ctx.node->data.value("copySourceData", true);
+        options.replace_existing = ctx.node->data.value("replaceExisting", true);
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_copy_layer(output, options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldCopyLayer invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldLayerClearElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldLayerClear"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldLayerClear missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldLayerClear missing heightfield input");
+        HeightFieldLayerClearOptions options;
+        options.layer = ctx.node->data.value("layer", "mask");
+        options.value = ctx.node->data.value("value", 0.0);
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_layer_clear(output, options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldLayerClear invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldLayerPropertiesElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldLayerProperties"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldLayerProperties missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldLayerProperties missing heightfield input");
+        HeightFieldLayerPropertiesOptions options;
+        options.layer = ctx.node->data.value("layer", "height");
+        options.set_border = ctx.node->data.value("setBorder", true);
+        options.border_value = ctx.node->data.value("borderValue", 0.0);
+        if (!parse_border_type(ctx.node->data.value("borderType", "streak"), options.border_type))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldLayerProperties invalid borderType");
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_layer_properties(output, options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldLayerProperties invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldIsolateLayerElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldIsolateLayer"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldIsolateLayer missing node");
+        const data::PcgHeightField* input = ctx.inputs.find_heightfield("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldIsolateLayer missing heightfield input");
+        HeightFieldIsolateLayerOptions options;
+        options.layer = ctx.node->data.value("layer", "mask");
+        options.overwrite_height = ctx.node->data.value("overwriteHeight", false);
+        options.overwrite_mask = ctx.node->data.value("overwriteMask", true);
+        data::PcgHeightField output = *input;
+        if (!apply_heightfield_isolate_layer(output, options))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "HeightFieldIsolateLayer invalid parameters");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
+class HeightFieldFileElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "HeightFieldFile"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFile missing node");
+        HeightFieldFileOptions options;
+        options.file_path = ctx.node->data.value("file", "");
+        options.layer_type = ctx.node->data.value("layerType", "height");
+        options.size = ctx.node->data.value("size", 256.0);
+        options.grid_spacing = ctx.node->data.value("gridSpacing", 1.0);
+        options.uniform_scale = ctx.node->data.value("uniformScale", 1.0);
+        options.height_scale = ctx.node->data.value("heightScale", 1.0);
+        options.clamp_minimum = ctx.node->data.value("clampMinimum", false);
+        options.minimum = ctx.node->data.value("minimum", 0.0);
+        options.clamp_maximum = ctx.node->data.value("clampMaximum", false);
+        options.maximum = ctx.node->data.value("maximum", 1.0);
+        options.raw_resolution_x = ctx.node->data.value("rawResolutionX", 0);
+        options.raw_resolution_z = ctx.node->data.value("rawResolutionZ", 0);
+        options.center.x = ctx.node->data.value("centerX", 0.0);
+        options.center.y = ctx.node->data.value("centerY", 0.0);
+        options.center.z = ctx.node->data.value("centerZ", 0.0);
+        const std::string size_method = ctx.node->data.value("sizeMethod", "sizeOfLargestAxis");
+        if (size_method == "gridSpacing")
+            options.size_method = HeightFieldFileSizeMethod::GridSpacing;
+        else if (size_method == "sizeOfLargestAxis")
+            options.size_method = HeightFieldFileSizeMethod::SizeOfLargestAxis;
+        else
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFile invalid sizeMethod");
+        if (!parse_sampling(ctx.node->data.value("sampling", "corner"), options.sampling) ||
+            !parse_orientation(ctx.node->data.value("orientation", "zx"), options.orientation)) {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFile invalid sampling/orientation");
+        }
+        data::PcgHeightField output = create_heightfield_from_file(options);
+        if (!output.valid())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "HeightFieldFile failed to load image/raw");
+        emit_heightfield(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_heightfield_elements(
@@ -598,16 +951,26 @@ void register_heightfield_elements(
     map.emplace("HeightFieldNoise", std::make_unique<HeightFieldNoiseElement>());
     map.emplace("HeightFieldMaskNoise", std::make_unique<HeightFieldMaskNoiseElement>());
     map.emplace("HeightFieldMaskByFeature", std::make_unique<HeightFieldMaskByFeatureElement>());
+    map.emplace("HeightFieldMaskByObject", std::make_unique<HeightFieldMaskByObjectElement>());
+    map.emplace("HeightFieldPattern", std::make_unique<HeightFieldPatternElement>());
     map.emplace("HeightFieldClip", std::make_unique<HeightFieldClipElement>());
     map.emplace("HeightFieldTerrace", std::make_unique<HeightFieldTerraceElement>());
     map.emplace("HeightFieldBlur", std::make_unique<HeightFieldBlurElement>());
     map.emplace("HeightFieldResample", std::make_unique<HeightFieldResampleElement>());
     map.emplace("HeightFieldLayer", std::make_unique<HeightFieldLayerElement>());
+    map.emplace("HeightFieldCopyLayer", std::make_unique<HeightFieldCopyLayerElement>());
+    map.emplace("HeightFieldLayerClear", std::make_unique<HeightFieldLayerClearElement>());
+    map.emplace("HeightFieldLayerProperties",
+                std::make_unique<HeightFieldLayerPropertiesElement>());
+    map.emplace("HeightFieldIsolateLayer", std::make_unique<HeightFieldIsolateLayerElement>());
     map.emplace("HeightFieldErode", std::make_unique<HeightFieldErodeElement>());
+    map.emplace("HeightFieldFlowField", std::make_unique<HeightFieldFlowFieldElement>());
+    map.emplace("HeightFieldSlump", std::make_unique<HeightFieldSlumpElement>());
     map.emplace("HeightFieldDistortByNoise",
                 std::make_unique<HeightFieldDistortByNoiseElement>());
     map.emplace("HeightFieldProject", std::make_unique<HeightFieldProjectElement>());
     map.emplace("HeightFieldScatter", std::make_unique<HeightFieldScatterElement>());
+    map.emplace("HeightFieldFile", std::make_unique<HeightFieldFileElement>());
     map.emplace("ConvertHeightField", std::make_unique<ConvertHeightFieldElement>());
 }
 

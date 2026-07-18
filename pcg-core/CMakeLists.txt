@@ -73,6 +73,7 @@ set(PCG_CORE_SOURCES
     src/elements/attribute_elements.cpp
     src/elements/primitive_elements.cpp
     src/elements/heightfield_algorithms.cpp
+    src/elements/heightfield_algorithms_l3.cpp
     src/elements/heightfield_elements.cpp
     src/elements/structural_algorithms.cpp
     src/elements/structural_elements.cpp

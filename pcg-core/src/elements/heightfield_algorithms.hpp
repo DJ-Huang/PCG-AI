@@ -235,6 +235,154 @@ struct HeightFieldScatterOptions {
     bool (*is_cancel_requested)() = nullptr;
 };
 
+enum class HeightFieldMaskByObjectSide {
+    Either,
+    Above,
+    Below,
+};
+
+struct HeightFieldMaskByObjectOptions {
+    std::string height_layer = "height";
+    std::string output_layer = "mask";
+    HeightFieldCombineMode combine = HeightFieldCombineMode::Replace;
+    double blend = 1.0;
+    bool invert = false;
+    HeightFieldMaskByObjectSide side = HeightFieldMaskByObjectSide::Above;
+    double max_ray_distance = 1000.0;
+    double value = 1.0;
+    HeightFieldBlurMethod blur_method = HeightFieldBlurMethod::Gaussian;
+    double blur_radius_meters = 0.0;
+};
+
+enum class HeightFieldPatternKind {
+    Ramp,
+    ExponentialRamp,
+    Step,
+    Stripes,
+};
+
+enum class HeightFieldRampMode {
+    Linear,
+    Concentric,
+    Radial,
+};
+
+struct HeightFieldPatternOptions {
+    std::string pattern_layer = "height";
+    std::string mask_layer = "mask";
+    HeightFieldCombineMode combine = HeightFieldCombineMode::Add;
+    double blend = 1.0;
+    double height = 10.0;
+    double base_height = 0.0;
+    double post_blur_radius = 0.0;
+    HeightFieldPatternKind pattern = HeightFieldPatternKind::Ramp;
+    double rotate_degrees = 0.0;
+    double size = 64.0;
+    double scale_x = 1.0;
+    double scale_z = 1.0;
+    double center_x = 0.0;
+    double center_z = 0.0;
+    double phase = 0.0;
+    HeightFieldRampMode ramp_mode = HeightFieldRampMode::Linear;
+    bool ramp_repeat = false;
+    bool ramp_mirror = false;
+    double rise_over_run = 0.5;
+    double step_height = 2.0;
+    double step_reference_height = 0.0;
+    double stripe_width = 0.5;
+};
+
+enum class HeightFieldSlumpMode {
+    Smooth,
+    Granular,
+};
+
+struct HeightFieldFlowFieldOptions {
+    std::string height_layer = "height";
+    std::string water_layer = "water";
+    std::string flow_layer = "flow";
+    std::string flow_direction_layer = "flowdir";
+    std::string mask_layer = "mask";
+    HeightFieldSlumpMode slump_mode = HeightFieldSlumpMode::Smooth;
+    double rain_amount = 0.5;
+    double rain_density = 1.0;
+    int spread_iterations = 40;
+    int smoothing_iterations = 2;
+    bool copy_to_mask = true;
+    double mask_scale = 1.0;
+    bool adjust_height = false;
+    double adjust_height_scale = 1.0;
+    int seed = 0;
+};
+
+struct HeightFieldSlumpOptions {
+    std::string height_layer = "height";
+    std::string mask_layer = "mask";
+    std::string material_layer = "debris";
+    std::string flow_layer = "flow";
+    std::string flow_direction_layer = "flowdir";
+    HeightFieldSlumpMode slump_mode = HeightFieldSlumpMode::Smooth;
+    int spread_iterations = 20;
+    double spread_rate = 1.0;
+    double repose_angle_degrees = 30.0;
+    double height_factor = 1.0;
+    double quantization = 0.0;
+    bool calculate_flow_fields = true;
+    int flow_smoothing_iterations = 0;
+    bool allow_material_outflow = true;
+    bool add_to_bedrock = true;
+    int seed = 0;
+};
+
+struct HeightFieldCopyLayerOptions {
+    std::string source = "mask";
+    std::string destination = "mask_copy";
+    bool copy_source_data = true;
+    bool replace_existing = true;
+};
+
+struct HeightFieldLayerClearOptions {
+    std::string layer = "mask";
+    float value = 0.0f;
+};
+
+struct HeightFieldLayerPropertiesOptions {
+    std::string layer = "height";
+    bool set_border = true;
+    data::HeightFieldBorderType border_type = data::HeightFieldBorderType::Streak;
+    float border_value = 0.0f;
+};
+
+struct HeightFieldIsolateLayerOptions {
+    std::string layer = "mask";
+    bool overwrite_height = false;
+    bool overwrite_mask = true;
+};
+
+enum class HeightFieldFileSizeMethod {
+    SizeOfLargestAxis,
+    GridSpacing,
+};
+
+struct HeightFieldFileOptions {
+    std::string file_path;
+    std::string layer_type = "height";
+    HeightFieldFileSizeMethod size_method = HeightFieldFileSizeMethod::SizeOfLargestAxis;
+    double size = 256.0;
+    double grid_spacing = 1.0;
+    double uniform_scale = 1.0;
+    double height_scale = 1.0;
+    bool clamp_minimum = false;
+    double minimum = 0.0;
+    bool clamp_maximum = false;
+    double maximum = 1.0;
+    data::PcgVec3 center{};
+    data::HeightFieldSampling sampling = data::HeightFieldSampling::Corner;
+    data::HeightFieldOrientation orientation = data::HeightFieldOrientation::ZX;
+    int raw_resolution_x = 0;
+    int raw_resolution_z = 0;
+};
+
 bool resolve_heightfield_resolution(const HeightFieldCreateOptions& options,
                                     int& out_resolution_x,
                                     int& out_resolution_z);
@@ -291,6 +439,37 @@ bool apply_heightfield_project(data::PcgHeightField& heightfield,
 data::PcgPointData scatter_heightfield(
     const data::PcgHeightField& heightfield,
     const HeightFieldScatterOptions& options);
+
+bool apply_heightfield_mask_by_object(data::PcgHeightField& heightfield,
+                                      const data::PcgGeometry& geometry,
+                                      const HeightFieldMaskByObjectOptions& options);
+
+bool apply_heightfield_pattern(data::PcgHeightField& heightfield,
+                               const data::PcgHeightField* mask,
+                               const HeightFieldPatternOptions& options);
+
+bool apply_heightfield_flow_field(data::PcgHeightField& heightfield,
+                                  const HeightFieldFlowFieldOptions& options);
+
+bool apply_heightfield_slump(data::PcgHeightField& heightfield,
+                             const data::PcgHeightField* mask,
+                             const HeightFieldSlumpOptions& options);
+
+bool apply_heightfield_copy_layer(data::PcgHeightField& heightfield,
+                                  const HeightFieldCopyLayerOptions& options);
+
+bool apply_heightfield_layer_clear(data::PcgHeightField& heightfield,
+                                   const HeightFieldLayerClearOptions& options);
+
+bool apply_heightfield_layer_properties(
+    data::PcgHeightField& heightfield,
+    const HeightFieldLayerPropertiesOptions& options);
+
+bool apply_heightfield_isolate_layer(data::PcgHeightField& heightfield,
+                                     const HeightFieldIsolateLayerOptions& options);
+
+data::PcgHeightField create_heightfield_from_file(
+    const HeightFieldFileOptions& options);
 
 data::PcgGeometry convert_heightfield_to_geometry(
     const data::PcgHeightField& heightfield,

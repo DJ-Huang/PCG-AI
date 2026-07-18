@@ -400,6 +400,109 @@ void test_l2_distort_project_and_scatter()
     assert(empty_flags == PCG_POINT_ATTR_NONE);
 }
 
+void test_l3_mask_pattern_flow_slump_layers_and_file()
+{
+    HeightFieldCreateOptions create;
+    create.size_x = 4.0;
+    create.size_z = 4.0;
+    create.grid_spacing = 1.0;
+    PcgHeightField masked = pcg::internal::elements::create_heightfield(create);
+    pcg::internal::data::PcgGeometry geometry;
+    geometry.points_mut() = {
+        {-1.0, 5.0, -1.0}, {1.0, 5.0, -1.0},
+        {1.0, 5.0, 1.0}, {-1.0, 5.0, 1.0},
+    };
+    geometry.faces_mut().push_back({0, 1, 2, 3});
+    pcg::internal::elements::HeightFieldMaskByObjectOptions mask_object;
+    mask_object.side = pcg::internal::elements::HeightFieldMaskByObjectSide::Above;
+    mask_object.max_ray_distance = 10.0;
+    assert(pcg::internal::elements::apply_heightfield_mask_by_object(
+        masked, geometry, mask_object));
+    assert(masked.find_layer("mask")->values[12] > 0.5f);
+    assert(masked.find_layer("mask")->values[0] == 0.0f);
+
+    PcgHeightField patterned = pcg::internal::elements::create_heightfield(create);
+    pcg::internal::elements::HeightFieldPatternOptions pattern;
+    pattern.pattern = pcg::internal::elements::HeightFieldPatternKind::Ramp;
+    pattern.combine = HeightFieldCombineMode::Replace;
+    pattern.height = 4.0;
+    pattern.size = 4.0;
+    assert(pcg::internal::elements::apply_heightfield_pattern(patterned, nullptr, pattern));
+    const auto* pattern_height = patterned.find_layer("height");
+    assert(pattern_height->values.front() != pattern_height->values.back());
+
+    PcgHeightField flow_field = make_ramp_field();
+    pcg::internal::elements::HeightFieldFlowFieldOptions flow;
+    flow.spread_iterations = 12;
+    flow.copy_to_mask = true;
+    flow.adjust_height = true;
+    flow.adjust_height_scale = 0.25;
+    flow.seed = 3;
+    assert(pcg::internal::elements::apply_heightfield_flow_field(flow_field, flow));
+    assert(flow_field.find_layer("flow"));
+    assert(flow_field.find_layer("flowdir")->tuple_size == 2);
+    assert(flow_field.find_layer("water"));
+    float max_mask = 0.0f;
+    for (float value : flow_field.find_layer("mask")->values)
+        max_mask = std::max(max_mask, value);
+    assert(max_mask > 0.0f);
+
+    PcgHeightField slumped = make_ramp_field();
+    slumped.create_layer("debris", 1, 1.0f);
+    pcg::internal::elements::HeightFieldSlumpOptions slump;
+    slump.spread_iterations = 8;
+    slump.repose_angle_degrees = 20.0;
+    slump.add_to_bedrock = true;
+    assert(pcg::internal::elements::apply_heightfield_slump(slumped, nullptr, slump));
+    assert(slumped.find_layer("flow"));
+    assert(slumped.find_layer("flowdir")->tuple_size == 2);
+
+    PcgHeightField layers = make_ramp_field();
+    std::fill(layers.find_layer_mut("mask")->values.begin(),
+              layers.find_layer_mut("mask")->values.end(), 0.75f);
+    pcg::internal::elements::HeightFieldCopyLayerOptions copy;
+    copy.source = "mask";
+    copy.destination = "veg";
+    assert(pcg::internal::elements::apply_heightfield_copy_layer(layers, copy));
+    assert(layers.find_layer("veg")->values == layers.find_layer("mask")->values);
+
+    pcg::internal::elements::HeightFieldLayerPropertiesOptions props;
+    props.layer = "veg";
+    props.border_type = pcg::internal::data::HeightFieldBorderType::Constant;
+    props.border_value = 0.25f;
+    assert(pcg::internal::elements::apply_heightfield_layer_properties(layers, props));
+    assert(layers.find_layer("veg")->border_type ==
+           pcg::internal::data::HeightFieldBorderType::Constant);
+
+    pcg::internal::elements::HeightFieldIsolateLayerOptions isolate;
+    isolate.layer = "veg";
+    isolate.overwrite_mask = true;
+    assert(pcg::internal::elements::apply_heightfield_isolate_layer(layers, isolate));
+    assert(layers.find_layer("mask")->values == layers.find_layer("veg")->values);
+
+    pcg::internal::elements::HeightFieldLayerClearOptions clear;
+    clear.layer = "veg";
+    clear.value = 0.0f;
+    assert(pcg::internal::elements::apply_heightfield_layer_clear(layers, clear));
+    for (float value : layers.find_layer("veg")->values)
+        assert(value == 0.0f);
+
+    const std::string pgm_path = "/tmp/pcg_heightfield_file_test.pgm";
+    {
+        std::ofstream out(pgm_path);
+        out << "P2\n2 2\n255\n0 64\n128 255\n";
+    }
+    pcg::internal::elements::HeightFieldFileOptions file;
+    file.file_path = pgm_path;
+    file.size = 4.0;
+    file.height_scale = 10.0;
+    PcgHeightField from_file = pcg::internal::elements::create_heightfield_from_file(file);
+    assert(from_file.valid());
+    assert(from_file.resolution_x() == 2);
+    assert(from_file.resolution_z() == 2);
+    assert(near(from_file.find_layer("height")->values[3], 10.0));
+}
+
 void test_convert_quality_contract()
 {
     HeightFieldCreateOptions create;
@@ -874,6 +977,7 @@ int main()
     test_l1_resample_and_layer();
     test_l2_erode_layers_and_determinism();
     test_l2_distort_project_and_scatter();
+    test_l3_mask_pattern_flow_slump_layers_and_file();
     test_convert_quality_contract();
     test_graph_pipeline();
     test_l1_graph_pipeline();
