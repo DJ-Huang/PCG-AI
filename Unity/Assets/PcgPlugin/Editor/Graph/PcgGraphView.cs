@@ -281,7 +281,29 @@ namespace DJTechEditor.PCG.Graph
             }
             else if (evt.keyCode == KeyCode.F)
             {
-                FrameAll();
+                var selected = selection.OfType<GraphElement>();
+                if (selected.Any())
+                {
+                    var bounds = Rect.MinMaxRect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue);
+                    foreach (var elem in selected)
+                    {
+                        var r = elem.GetPosition();
+                        bounds = Rect.MinMaxRect(
+                            Mathf.Min(bounds.xMin, r.xMin),
+                            Mathf.Min(bounds.yMin, r.yMin),
+                            Mathf.Max(bounds.xMax, r.xMax),
+                            Mathf.Max(bounds.yMax, r.yMax));
+                    }
+                    var viewportSize = layout.size;
+                    float scaleX = viewportSize.x / bounds.width;
+                    float scaleY = viewportSize.y / bounds.height;
+                    float scale = Mathf.Min(scaleX, scaleY) * 0.8f;
+                    scale = Mathf.Clamp(scale, 0.05f, 4f);
+                    var viewPos = viewportSize * 0.5f - bounds.center * scale;
+                    UpdateViewTransform(viewPos, Vector3.one * scale);
+                }
+                else
+                    FrameAll();
                 evt.StopPropagation();
             }
             else if (evt.keyCode == KeyCode.P)
