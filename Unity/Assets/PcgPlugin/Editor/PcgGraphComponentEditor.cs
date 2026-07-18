@@ -23,6 +23,9 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_ScatterDisplayModeProp;
         private SerializedProperty m_EnableAsyncCookInEditorProp;
         private SerializedProperty m_ShowStampOverlaysProp;
+        private SerializedProperty m_ShowMaskOverlayProp;
+        private SerializedProperty m_MaskOverlayLayerProp;
+        private SerializedProperty m_MaskOverlayOpacityProp;
         private SerializedProperty m_StampLiveCookModeProp;
         private bool m_SliderReleasedThisFrame;
 
@@ -42,6 +45,9 @@ namespace DJTechEditor.PCG
             m_ScatterDisplayModeProp = serializedObject.FindProperty("scatterDisplayMode");
             m_EnableAsyncCookInEditorProp = serializedObject.FindProperty("enableAsyncCookInEditor");
             m_ShowStampOverlaysProp = serializedObject.FindProperty("showStampOverlays");
+            m_ShowMaskOverlayProp = serializedObject.FindProperty("showMaskOverlay");
+            m_MaskOverlayLayerProp = serializedObject.FindProperty("maskOverlayLayer");
+            m_MaskOverlayOpacityProp = serializedObject.FindProperty("maskOverlayOpacity");
             m_StampLiveCookModeProp = serializedObject.FindProperty("stampLiveCookMode");
 
             m_Target.RefreshDocument();
@@ -97,9 +103,10 @@ namespace DJTechEditor.PCG
                         "Show Stamp Overlays",
                         "Draw MaskByObject stamp volumes in Scene View (wire boxes)."));
             }
-            if (m_StampLiveCookModeProp != null &&
-                m_HostOutputModeProp != null &&
-                (PcgHostOutputMode)m_HostOutputModeProp.enumValueIndex == PcgHostOutputMode.Terrain)
+
+            var isTerrainHost = m_HostOutputModeProp != null &&
+                (PcgHostOutputMode)m_HostOutputModeProp.enumValueIndex == PcgHostOutputMode.Terrain;
+            if (isTerrainHost && m_StampLiveCookModeProp != null)
             {
                 EditorGUILayout.PropertyField(
                     m_StampLiveCookModeProp,
@@ -107,6 +114,7 @@ namespace DJTechEditor.PCG
                         "Stamp Live Cook",
                         "When Scene stamp gizmos move: Manual = no cook; OnRelease = cook on mouse up; WhileDragging = debounced cook."));
             }
+
             if (EditorGUI.EndChangeCheck())
             {
                 serializedObject.ApplyModifiedProperties();
@@ -115,6 +123,46 @@ namespace DJTechEditor.PCG
                 if (m_Target.SupportsEditModePreview())
                     m_Target.RequestPreviewCook(immediate: true);
                 serializedObject.Update();
+            }
+
+            if (isTerrainHost)
+            {
+                EditorGUI.BeginChangeCheck();
+                if (m_ShowMaskOverlayProp != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        m_ShowMaskOverlayProp,
+                        new GUIContent(
+                            "Show Mask Overlay",
+                            "Houdini-style red tint of the cooked HeightField mask layer on Terrain. Only drawn while Enter PCG Mode is active."));
+                }
+
+                if (m_ShowMaskOverlayProp != null && m_ShowMaskOverlayProp.boolValue)
+                {
+                    if (m_MaskOverlayLayerProp != null)
+                    {
+                        EditorGUILayout.PropertyField(
+                            m_MaskOverlayLayerProp,
+                            new GUIContent(
+                                "Mask Overlay Layer",
+                                "Named scalar layer to tint (default mask). Use HeightFieldIsolateLayer to copy mesa/cliffs into mask."));
+                    }
+
+                    if (m_MaskOverlayOpacityProp != null)
+                    {
+                        EditorGUILayout.PropertyField(
+                            m_MaskOverlayOpacityProp,
+                            new GUIContent(
+                                "Mask Overlay Opacity",
+                                "Red tint strength (0–1)."));
+                    }
+                }
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    SceneView.RepaintAll();
+                }
             }
 
             DrawCookModeHelp();

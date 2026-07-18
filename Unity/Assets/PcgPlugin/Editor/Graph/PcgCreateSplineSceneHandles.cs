@@ -40,6 +40,12 @@ namespace DJTechEditor.PCG.Graph
         private static bool s_PcgModeActive;
         private static PcgGraphEditorWindow s_ActiveWindow;
         private static PcgGraphComponent s_ActiveComponent;
+
+        /// <summary>True while Scene View toolbar is in Enter PCG Mode.</summary>
+        internal static bool IsPcgModeActive => s_PcgModeActive;
+
+        /// <summary>Component locked for Scene View edits in PCG Mode; null when inactive.</summary>
+        internal static PcgGraphComponent ActivePcgModeComponent => s_ActiveComponent;
         private static GameObject s_LockedSelection;
         private static bool s_SelectionGuard;
         private static Tool s_PrevTool;
@@ -487,6 +493,8 @@ namespace DJTechEditor.PCG.Graph
             s_LastParsedJson = null;
             Tools.current = s_PrevTool;
             RestoreHiddenRenderers();
+            PcgHeightFieldMaskOverlaySceneHandles.DestroyCachedResources();
+            SceneView.RepaintAll();
         }
 
         private static void ApplyOthersDisplayMode()

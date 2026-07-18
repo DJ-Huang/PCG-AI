@@ -14,6 +14,35 @@ with Transform handles (`PcgStampOverlaySceneHandles`). Overlay edits write
 WhileDragging). Node Preview of Mesh under Terrain Host is overlay-only and does
 not clear or rewrite `TerrainData`.
 
+## Mask overlay (Unity Editor)
+
+Terrain Host mirrors Houdini’s HeightField mask preview: the Terrain shows
+`height`, and the cooked scalar layer (default `mask`) is drawn as a **red tint**
+in Scene View (`PcgHeightFieldMaskOverlaySceneHandles`) **only while Enter PCG
+Mode is active**. Outside PCG Mode the tint never appears (cached mesh is
+cleared on exit).
+
+| Inspector | Default | Meaning |
+|---|---|---|
+| Show Mask Overlay | on | Toggle the red tint (still requires Enter PCG Mode) |
+| Mask Overlay Layer | `mask` | Named scalar layer to visualize |
+| Mask Overlay Opacity | 0.55 | Tint strength |
+
+After cook, `PcgGraphComponent` retains the full `PcgHostTerrainSurface` (all named
+layers). Export still writes only `height` into `TerrainData`; mask and other
+layers stay in memory for this overlay.
+
+To preview non-`mask` layers (for example `mesa` / `cliffs` from Clip or Terrace),
+use `HeightFieldIsolateLayer` to copy that layer into `mask`, then cook — or set
+**Mask Overlay Layer** to the layer name when it is already present on the cooked
+surface.
+
+Adjusting `HeightFieldMaskByFeature` (or any mask-writing node) and cooking / Node
+Previewing that HeightField updates the red region in Scene View. Clearing Node
+Preview drops the retained HeightField immediately so a stale preview mask cannot
+linger; the next full-graph cook restores the final `mask` tint when
+**Show Mask Overlay** stays on. Stamp wire overlays and mask tint can be enabled
+together. Large grids are downsampled to at most 256² for the tint mesh.
 ## Data contract
 
 | Field | Meaning | P0 rule |

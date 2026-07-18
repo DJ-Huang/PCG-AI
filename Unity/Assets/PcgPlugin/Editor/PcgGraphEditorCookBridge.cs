@@ -24,7 +24,13 @@ namespace DJTechEditor.PCG
         public static void CancelPreviewCooksForWindow(PcgGraphEditorWindow window)
         {
             foreach (var component in ComponentsForWindow(window))
+            {
                 component.CancelAsyncCookForPreviewSwitch();
+                // Node Preview of a mask/HF node keeps LastCookedHeightField for the red
+                // Scene tint. Leaving preview must drop that surface immediately; the
+                // following full-graph cook restores the final HeightField if needed.
+                component.ClearHeightFieldOverlayForPreviewSwitch();
+            }
         }
 
         public static void NotifyGraphChanged(PcgGraphEditorWindow window, bool immediate = false)

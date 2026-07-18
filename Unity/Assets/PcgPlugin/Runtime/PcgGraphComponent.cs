@@ -31,6 +31,15 @@ namespace DJTechRuntime.PCG
         private bool showStampOverlays = true;
 
         [SerializeField]
+        private bool showMaskOverlay = true;
+
+        [SerializeField]
+        private string maskOverlayLayer = "mask";
+
+        [SerializeField, Range(0f, 1f)]
+        private float maskOverlayOpacity = 0.55f;
+
+        [SerializeField]
         private PcgStampLiveCookMode stampLiveCookMode = PcgStampLiveCookMode.OnRelease;
 
         [SerializeField, Min(0.05f)]
@@ -67,6 +76,9 @@ namespace DJTechRuntime.PCG
         private int m_TerrainApplyGeneration;
         [SerializeField] private string[] m_LastMaterialNames = Array.Empty<string>();
         private PcgPolygonPreviewData m_PolygonPreview;
+
+        [NonSerialized] private PcgHostTerrainSurface m_LastCookedHeightField;
+        [NonSerialized] private int m_LastCookedHeightFieldGeneration;
 
         /// <summary>Cached Sink n-gon topology for Scene View polygon wire (null when unavailable).</summary>
         public PcgPolygonPreviewData PolygonPreview => m_PolygonPreview;
@@ -130,8 +142,21 @@ namespace DJTechRuntime.PCG
         public PcgCookMode CookMode => cookMode;
         public PcgHostOutputMode HostOutputMode => hostOutputMode;
         public bool ShowStampOverlays => showStampOverlays;
+        public bool ShowMaskOverlay => showMaskOverlay;
+        public string MaskOverlayLayer =>
+            string.IsNullOrEmpty(maskOverlayLayer) ? "mask" : maskOverlayLayer;
+        public float MaskOverlayOpacity => Mathf.Clamp01(maskOverlayOpacity);
         public PcgStampLiveCookMode StampLiveCookMode => stampLiveCookMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
+
+        /// <summary>
+        /// Last Terrain-host HeightField surface (includes mask and other layers).
+        /// Cleared on ClearResults or when a non-HeightField result is applied in Mesh host mode.
+        /// </summary>
+        public PcgHostTerrainSurface LastCookedHeightField => m_LastCookedHeightField;
+
+        /// <summary>Increments whenever <see cref="LastCookedHeightField"/> is replaced or cleared.</summary>
+        public int LastCookedHeightFieldGeneration => m_LastCookedHeightFieldGeneration;
 
         /// <summary>
         /// Editor bridge: Graph Editor is cooking a per-node preview subgraph for this component.
@@ -722,6 +747,7 @@ namespace DJTechRuntime.PCG
 #if UNITY_EDITOR
                 // Node Preview of Mesh/Points under Terrain Host: keep TerrainData,
                 // treat result as overlay/debug only (stamp volume preview path).
+                // Keep LastCookedHeightField so mask overlay can still draw.
                 if (EditorIsNodePreviewActive?.Invoke(this) == true &&
                     (kind == PcgResultKind.Mesh || kind == PcgResultKind.Points || kind == PcgResultKind.Splines))
                 {
@@ -735,8 +761,12 @@ namespace DJTechRuntime.PCG
                     "Mesh node Preview under Terrain Host is overlay-only — use Scene stamp gizmo " +
                     "or clear Node Preview to cook the full terrain graph.",
                     this);
+                // Do not keep a stale Node Preview HeightField (mask tint would stick).
+                ClearLastCookedHeightField();
                 return false;
             }
+
+            ClearLastCookedHeightField();
 
             switch (kind)
             {
@@ -909,7 +939,29 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            SetLastCookedHeightField(terrainSurface);
             return ApplyTerrainSurface(terrainSurface);
+        }
+
+        private void SetLastCookedHeightField(PcgHostTerrainSurface surface)
+        {
+            m_LastCookedHeightField = surface;
+            m_LastCookedHeightFieldGeneration++;
+#if UNITY_EDITOR
+            UnityEditor.SceneView.RepaintAll();
+#endif
+        }
+
+        private void ClearLastCookedHeightField()
+        {
+            if (m_LastCookedHeightField == null && m_LastCookedHeightFieldGeneration == 0)
+                return;
+
+            m_LastCookedHeightField = null;
+            m_LastCookedHeightFieldGeneration++;
+#if UNITY_EDITOR
+            UnityEditor.SceneView.RepaintAll();
+#endif
         }
 
         private bool ApplyTerrainSurface(PcgHostTerrainSurface surface)
@@ -1011,6 +1063,15 @@ namespace DJTechRuntime.PCG
         public void CancelAsyncCookForPreviewSwitch()
         {
             RequestAsyncCookCancellation(null, log: false);
+        }
+
+        /// <summary>
+        /// Drop the retained HeightField used by Scene mask tint when leaving Node Preview
+        /// so the previous preview mask disappears immediately (full-graph recook restores it).
+        /// </summary>
+        public void ClearHeightFieldOverlayForPreviewSwitch()
+        {
+            ClearLastCookedHeightField();
         }
 
         private bool RequestAsyncCookCancellation(string reason, bool log = true)
@@ -1188,6 +1249,7 @@ namespace DJTechRuntime.PCG
         {
             InvalidateCookResult();
             ClearGeneratedMesh();
+            ClearLastCookedHeightField();
             m_PolygonPreview = null;
         }
 
