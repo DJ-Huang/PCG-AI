@@ -15,6 +15,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_CookModeProp;
         private SerializedProperty m_OverridesProp;
         private SerializedProperty m_MeshBindingsProp;
+        private SerializedProperty m_TerrainBindingsProp;
         private SerializedProperty m_MaterialBindingsProp;
         private SerializedProperty m_ScatterPointScaleProp;
         private SerializedProperty m_ScatterPointMeshProp;
@@ -30,6 +31,7 @@ namespace DJTechEditor.PCG
             m_CookModeProp = serializedObject.FindProperty("cookMode");
             m_OverridesProp = serializedObject.FindProperty("m_ParameterOverrides");
             m_MeshBindingsProp = serializedObject.FindProperty("m_MeshBindings");
+            m_TerrainBindingsProp = serializedObject.FindProperty("m_TerrainBindings");
             m_MaterialBindingsProp = serializedObject.FindProperty("m_MaterialBindings");
             m_ScatterPointScaleProp = serializedObject.FindProperty("scatterPointScale");
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
@@ -114,6 +116,7 @@ namespace DJTechEditor.PCG
 
             DrawScatterSettings();
             DrawMeshBindings();
+            DrawTerrainBindings();
             DrawMaterialBindings();
             DrawParameters();
 
@@ -234,6 +237,35 @@ namespace DJTechEditor.PCG
             }
 
             EditorGUILayout.PropertyField(m_MeshBindingsProp, includeChildren: true);
+        }
+
+        private void DrawTerrainBindings()
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Terrain Bindings", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Read From Host uploads a bound Unity Terrain to GetTerrainData by bindingKey. " +
+                "Write Cook Result applies the nearest typed HeightField upstream of the Sink. " +
+                "Both can stay enabled while Convert HeightField continues to render the Mesh preview.",
+                MessageType.Info);
+
+            if (GraphHasGetTerrainData() && m_TerrainBindingsProp.arraySize == 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "GetTerrainData can use a host Terrain: add a binding with " +
+                    "bindingKey = targetTerrain and enable Read From Host.",
+                    MessageType.Warning);
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(m_TerrainBindingsProp, includeChildren: true);
+            if (EditorGUI.EndChangeCheck())
+            {
+                serializedObject.ApplyModifiedProperties();
+                if (m_Target.SupportsEditModePreview())
+                    m_Target.RequestPreviewCook(immediate: true);
+                serializedObject.Update();
+            }
         }
 
         private void DrawMaterialBindings()
@@ -461,6 +493,21 @@ namespace DJTechEditor.PCG
             foreach (var node in doc.nodes)
             {
                 if (node?.type == "GetMeshData")
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool GraphHasGetTerrainData()
+        {
+            var doc = m_Target.Document;
+            if (doc?.nodes == null)
+                return false;
+
+            foreach (var node in doc.nodes)
+            {
+                if (node?.type == "GetTerrainData")
                     return true;
             }
 

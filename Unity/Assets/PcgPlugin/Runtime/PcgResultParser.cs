@@ -57,6 +57,7 @@ namespace DJTechRuntime.PCG
         Points,
         Splines,
         Mesh,
+        HeightField,
     }
 
     [Serializable]
@@ -94,6 +95,9 @@ namespace DJTechRuntime.PCG
                 return PcgResultKind.Splines;
             if (resultJson.Contains("\"points\""))
                 return PcgResultKind.Points;
+            if (resultJson.Contains("\"kind\":\"heightfield\"") ||
+                resultJson.Contains("\"kind\": \"heightfield\""))
+                return PcgResultKind.HeightField;
 
             return PcgResultKind.Unknown;
         }
@@ -107,6 +111,9 @@ namespace DJTechRuntime.PCG
                 return PcgResultKind.Mesh;
             if (result.Kind == PcgExecuteKind.Points)
                 return PcgResultKind.Points;
+            if (result.HeightFieldBinary != null && result.HeightFieldBinary.Length > 0 &&
+                result.Kind == PcgExecuteKind.Json)
+                return PcgResultKind.HeightField;
 
             return DetectKind(result.Json);
         }

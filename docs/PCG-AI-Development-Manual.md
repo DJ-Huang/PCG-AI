@@ -736,6 +736,10 @@ fixed (byte* ptr = data)
 | `PcgScatterGpuInstancer.cs` | GPU 实例化散点渲染 |
 | `PcgMeshBindingTable.cs` | bindingKey → Mesh 来源解析 |
 | `PcgSplineResolver.cs` | Spline slot 上传 |
+| `PcgHostTerrain.cs` | Host Terrain Surface DTO、Unity Terrain 双向绑定与重采样 |
+
+Terrain 宿主契约、同步策略与 Unreal 预留接口见
+[`host-terrain-surface.md`](host-terrain-surface.md)。
 
 ### 8.2 Editor 层 — Graph 编辑器
 

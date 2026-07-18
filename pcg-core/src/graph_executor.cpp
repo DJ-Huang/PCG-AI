@@ -6,6 +6,7 @@
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 #include "texture_runtime.hpp"
+#include "heightfield_runtime.hpp"
 
 #include <chrono>
 #include <queue>
@@ -317,6 +318,7 @@ PcgResultCode execute_graph(const Graph& graph,
                             const TextureRuntime* textures,
                             const MeshRuntime* meshes,
                             const SplineRuntime* splines,
+                            const HeightFieldRuntime* heightfields,
                             GraphCookCache* cache,
                             bool (*is_cancel_requested)(),
                             GraphPerfReport* perf)
@@ -392,7 +394,8 @@ PcgResultCode execute_graph(const Graph& graph,
 
         uint64_t input_hash = 0;
         if (cache)
-            input_hash = compute_node_input_hash(*node, seed, upstream_hashes, textures, meshes, splines);
+            input_hash = compute_node_input_hash(
+                *node, seed, upstream_hashes, textures, meshes, splines, heightfields);
 
         if (cache) {
             data::PcgDataCollection cached_outputs;
@@ -419,6 +422,7 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.textures = textures;
         ctx.meshes = meshes;
         ctx.splines = splines;
+        ctx.heightfields = heightfields;
         ctx.err_buf = err_buf;
         ctx.err_buf_size = err_buf_size;
         ctx.is_cancel_requested = is_cancel_requested;
@@ -482,6 +486,33 @@ PcgResultCode execute_graph(const Graph& graph,
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Sink node produced no output");
 
     const data::PcgDataCollection& sink_output = sink_it->second;
+
+    // Keep HeightField as a typed sidecar even when ConvertHeightField feeds the
+    // Mesh Sink. This lets host terrain adapters update native Terrain/Landscape
+    // while the existing mesh preview remains unchanged.
+    auto find_nearest_heightfield = [&]() -> std::shared_ptr<const data::PcgHeightField> {
+        std::queue<std::string> frontier;
+        std::unordered_set<std::string> visited{sink->id};
+        frontier.push(sink->id);
+        while (!frontier.empty()) {
+            const std::string current = frontier.front();
+            frontier.pop();
+            const auto current_output = outputs.find(current);
+            if (current_output != outputs.end()) {
+                if (auto heightfield = current_output->second.primary_heightfield_shared())
+                    return heightfield;
+            }
+            const auto incoming_it = incoming_by_node.find(current);
+            if (incoming_it == incoming_by_node.end())
+                continue;
+            for (const GraphEdge* edge : incoming_it->second) {
+                if (visited.insert(edge->source).second)
+                    frontier.push(edge->source);
+            }
+        }
+        return nullptr;
+    };
+    out_result.source_heightfield = find_nearest_heightfield();
     if (const data::PcgMeshData* spawn_mesh = sink_output.find_mesh("spawnMesh")) {
         out_result.spawn_mesh = *spawn_mesh;
     } else {
@@ -507,6 +538,7 @@ PcgResultCode execute_graph(const Graph& graph,
     }
 
     if (auto heightfield = sink_output.find_heightfield_shared("out")) {
+        out_result.source_heightfield = heightfield;
         out_result.kind = GraphResultKind::Json;
         out_result.json = build_heightfield_summary(*heightfield);
         out_result.mesh = data::PcgMeshData{};

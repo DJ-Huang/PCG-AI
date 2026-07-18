@@ -104,8 +104,20 @@ namespace DJTechEditor.PCG
                     }
                     break;
 
+                case PcgResultKind.HeightField:
+                    if (!PcgHeightFieldBinaryParser.TryParse(
+                            result.HeightFieldBinary, out var surface, out var heightFieldError))
+                    {
+                        Debug.LogError($"[PCG] Failed to parse HeightField result: {heightFieldError}");
+                        return false;
+                    }
+                    Debug.Log(
+                        $"[PCG] HeightField cooked ({surface.ResolutionX}x{surface.ResolutionZ}, " +
+                        $"layers={surface.Layers.Count}). Add a PcgGraphComponent Terrain Binding to apply it.");
+                    break;
+
                 default:
-                    Debug.LogError("[PCG] Unknown result JSON shape (expected points, splines, or mesh).");
+                    Debug.LogError("[PCG] Unknown result JSON shape (expected points, splines, mesh, or heightfield).");
                     return false;
             }
 

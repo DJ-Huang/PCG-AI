@@ -19,6 +19,7 @@ namespace pcg::internal {
 class MeshRuntime;
 class SplineRuntime;
 class TextureRuntime;
+class HeightFieldRuntime;
 
 /** FNV-1a 64-bit (Blender-style content addressing for cook cache). */
 constexpr uint64_t kFnvOffsetBasis = 14695981039346656037ull;
@@ -49,7 +50,8 @@ uint64_t compute_node_input_hash(const GraphNode& node,
                                  const std::vector<std::pair<std::string, uint64_t>>& upstream_hashes,
                                  const TextureRuntime* textures,
                                  const MeshRuntime* meshes,
-                                 const SplineRuntime* splines);
+                                 const SplineRuntime* splines,
+                                 const HeightFieldRuntime* heightfields);
 
 uint64_t compute_output_hash(const data::PcgDataCollection& outputs);
 

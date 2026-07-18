@@ -4,6 +4,7 @@
 #include "mesh_runtime.hpp"
 #include "spline_runtime.hpp"
 #include "texture_runtime.hpp"
+#include "heightfield_runtime.hpp"
 
 #include <algorithm>
 #include <vector>
@@ -266,7 +267,8 @@ uint64_t compute_node_input_hash(const GraphNode& node,
                                  const std::vector<std::pair<std::string, uint64_t>>& upstream_hashes,
                                  const TextureRuntime* textures,
                                  const MeshRuntime* meshes,
-                                 const SplineRuntime* splines)
+                                 const SplineRuntime* splines,
+                                 const HeightFieldRuntime* heightfields)
 {
     uint64_t h = hash_string(node.type);
     h = hash_combine(h, hash_json(node.data));
@@ -290,6 +292,11 @@ uint64_t compute_node_input_hash(const GraphNode& node,
     if (node.type == "ImageTexture" && textures) {
         if (const data::PcgTextureData* tex = textures->find(node.id))
             h = hash_combine(h, hash_texture(*tex));
+    }
+
+    if (node.type == "GetTerrainData" && heightfields) {
+        if (const data::PcgHeightField* heightfield = heightfields->find(node.id))
+            h = hash_combine(h, hash_heightfield(*heightfield));
     }
 
     return h;

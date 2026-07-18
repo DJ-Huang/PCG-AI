@@ -88,6 +88,17 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines)
         {
+            return Execute(json, seed, textures, meshes, splines, null);
+        }
+
+        public static PcgGraphExecuteResult Execute(
+            string json,
+            int seed,
+            IReadOnlyList<PcgTextureUpload> textures,
+            IReadOnlyList<PcgMeshUpload> meshes,
+            IReadOnlyList<PcgSplineUpload> splines,
+            IReadOnlyList<PcgHeightFieldUpload> heightfields)
+        {
             if (!PcgGraphExecutionPolicy.TryPrepareJson(json, out json, out var prepareError))
             {
                 Debug.LogError($"[PCG] Failed to prepare graph for execution: {prepareError}");
@@ -96,7 +107,8 @@ namespace DJTechRuntime.PCG
 
             // ExecuteGraph parses and validates the same document. A separate native
             // validation call doubled JSON parsing on every cook without adding safety.
-            var (execCode, result) = PcgNative.ExecuteGraph(json, seed, textures, meshes, splines);
+            var (execCode, result) = PcgNative.ExecuteGraph(
+                json, seed, textures, meshes, splines, heightfields);
             if (execCode != PcgResultCode.Ok)
             {
                 Debug.LogError($"[PCG] Execution failed ({execCode}): {result?.Error}");

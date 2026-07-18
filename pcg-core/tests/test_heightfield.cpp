@@ -1,5 +1,6 @@
 #include "cook_hash.hpp"
 #include "data/pcg_data_collection.hpp"
+#include "data/pcg_heightfield_binary.hpp"
 #include "data/pcg_mesh_binary.hpp"
 #include "data/pcg_point_binary.hpp"
 #include "elements/heightfield_algorithms.hpp"
@@ -87,6 +88,29 @@ void test_contract_and_sampling()
     assert(collection.find_heightfield("out"));
     assert(collection.primary_type() == pcg::internal::data::PcgDataType::HeightField);
     assert(pcg::internal::hash_heightfield(field) != 0);
+}
+
+void test_heightfield_binary_round_trip()
+{
+    PcgHeightField source = make_bilinear_fixture();
+    auto& flow = source.create_layer("flowdir", 2, 0.0f);
+    flow.values = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
+    const int required = pcg::internal::data::heightfield_binary_size(source);
+    assert(required > pcg::internal::data::kPcgHeightFieldBinaryHeaderSize);
+    std::vector<unsigned char> bytes(static_cast<std::size_t>(required));
+    assert(pcg::internal::data::write_heightfield_binary(
+        source, bytes.data(), static_cast<int>(bytes.size())));
+
+    PcgHeightField restored;
+    assert(pcg::internal::data::read_heightfield_binary(
+        bytes.data(), static_cast<int>(bytes.size()), restored));
+    assert(restored.valid());
+    assert(restored.resolution_x() == 2);
+    assert(restored.resolution_z() == 2);
+    assert(restored.find_layer("height")->values == source.find_layer("height")->values);
+    assert(restored.find_layer("mask")->values == source.find_layer("mask")->values);
+    assert(restored.find_layer("flowdir")->tuple_size == 2);
+    assert(restored.find_layer("flowdir")->values == flow.values);
 }
 
 void test_noise_mask_and_determinism()
@@ -712,11 +736,139 @@ void test_terrain_demo_graph()
     assert(*std::max_element(decoded.triangles().begin(), decoded.triangles().end()) > 65535);
 }
 
+void test_host_heightfield_v9_round_trip_and_cache_dirty()
+{
+    const char* graph = R"({
+      "version":"1.0",
+      "nodes":[
+        {"id":"host","type":"GetTerrainData","data":{"bindingKey":"targetTerrain"}},
+        {"id":"noise","type":"HeightFieldNoise","data":{"amplitude":0,"elementSize":2}},
+        {"id":"convert","type":"ConvertHeightField","data":{}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"id":"e1","source":"host","target":"noise"},
+        {"id":"e2","source":"noise","target":"convert"},
+        {"id":"e3","source":"convert","target":"out"}
+      ]
+    })";
+
+    std::vector<float> heights = {
+        0.0f, 1.0f, 2.0f,
+        3.0f, 4.0f, 5.0f,
+        6.0f, 7.0f, 8.0f,
+    };
+    std::vector<float> mask(heights.size(), 1.0f);
+    PcgHeightFieldSlot slot{};
+    slot.slot_id = "host";
+    slot.resolution_x = 3;
+    slot.resolution_z = 3;
+    slot.size_x = 2.0;
+    slot.size_z = 2.0;
+    slot.center_x = 1.0;
+    slot.center_y = 0.0;
+    slot.center_z = 1.0;
+    slot.sampling = 1;
+    slot.orientation = 0;
+    slot.height = heights.data();
+    slot.mask = mask.data();
+
+    auto execute = [&](PcgHeightField& decoded) {
+        std::vector<char> json(64 * 1024);
+        std::vector<unsigned char> mesh(1024 * 1024);
+        std::vector<unsigned char> points(1024);
+        std::vector<unsigned char> geometry(1024 * 1024);
+        std::vector<unsigned char> heightfield(1024 * 1024);
+        std::vector<char> perf(64 * 1024);
+        char error[1024] = {};
+        int kind = 0;
+        int point_count = 0;
+        uint32_t point_flags = 0;
+        int vertex_count = 0;
+        int index_count = 0;
+        int geometry_bytes = 0;
+        int heightfield_bytes = 0;
+        PcgCookStats stats{};
+        const PcgResultCode code = pcg_execute_graph_v9(
+            graph, 42,
+            nullptr, 0,
+            nullptr, 0,
+            nullptr, 0,
+            &slot, 1,
+            &kind,
+            json.data(), static_cast<int>(json.size()),
+            mesh.data(), static_cast<int>(mesh.size()),
+            points.data(), static_cast<int>(points.size()),
+            &point_count, &point_flags,
+            &vertex_count, &index_count,
+            &stats,
+            perf.data(), static_cast<int>(perf.size()),
+            geometry.data(), static_cast<int>(geometry.size()), &geometry_bytes,
+            heightfield.data(), static_cast<int>(heightfield.size()), &heightfield_bytes,
+            error, sizeof(error));
+        if (code != PCG_OK)
+            std::printf("host HeightField v9 error: %s\n", error);
+        assert(code == PCG_OK);
+        assert(kind == PCG_RESULT_KIND_MESH);
+        assert(vertex_count == 9);
+        assert(index_count == 24);
+        assert(heightfield_bytes > 0);
+        assert(pcg::internal::data::read_heightfield_binary(
+            heightfield.data(), heightfield_bytes, decoded));
+    };
+
+    {
+        std::vector<char> json(64 * 1024);
+        std::vector<unsigned char> mesh(1024 * 1024);
+        std::vector<unsigned char> points(1024);
+        std::vector<unsigned char> geometry(1024 * 1024);
+        unsigned char undersized_heightfield[1] = {};
+        std::vector<char> perf(64 * 1024);
+        char error[1024] = {};
+        int kind = 0;
+        int point_count = 0;
+        uint32_t point_flags = 0;
+        int vertex_count = 0;
+        int index_count = 0;
+        int geometry_bytes = 0;
+        int required_heightfield_bytes = 0;
+        PcgCookStats stats{};
+        assert(pcg_execute_graph_v9(
+            graph, 42,
+            nullptr, 0, nullptr, 0, nullptr, 0, &slot, 1,
+            &kind,
+            json.data(), static_cast<int>(json.size()),
+            mesh.data(), static_cast<int>(mesh.size()),
+            points.data(), static_cast<int>(points.size()),
+            &point_count, &point_flags, &vertex_count, &index_count, &stats,
+            perf.data(), static_cast<int>(perf.size()),
+            geometry.data(), static_cast<int>(geometry.size()), &geometry_bytes,
+            undersized_heightfield, sizeof(undersized_heightfield),
+            &required_heightfield_bytes,
+            error, sizeof(error)) == PCG_OK);
+        assert(required_heightfield_bytes >
+               static_cast<int>(sizeof(undersized_heightfield)));
+    }
+
+    pcg_cook_cache_clear();
+    PcgHeightField first;
+    execute(first);
+    assert(first.find_layer("height")->values == heights);
+
+    heights[4] = 19.0f;
+    slot.height = heights.data();
+    PcgHeightField second;
+    execute(second);
+    assert(second.find_layer("height")->values == heights);
+    assert(near(second.find_layer("height")->values[4], 19.0));
+}
+
 } // namespace
 
 int main()
 {
     test_contract_and_sampling();
+    test_heightfield_binary_round_trip();
     test_noise_mask_and_determinism();
     test_l1_masks_and_shaping();
     test_l1_resample_and_layer();
@@ -727,6 +879,7 @@ int main()
     test_l1_graph_pipeline();
     test_l2_project_and_scatter_graph_nodes();
     test_terrain_demo_graph();
+    test_host_heightfield_v9_round_trip_and_cache_dirty();
     std::printf("PASS: HeightField typed contract, sampling, noise, convert, graph, demo\n");
     return 0;
 }

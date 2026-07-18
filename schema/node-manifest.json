@@ -672,6 +672,7 @@
       "inputs": [],
       "outputs": [{ "id": "out", "label": "Terrain", "pinType": "HeightField" }],
       "properties": {
+        "bindingKey": { "type": "string", "default": "targetTerrain" },
         "gridSize": { "type": "integer", "default": 32, "minimum": 2 },
         "cellSize": { "type": "number", "default": 2.0, "minimum": 0 },
         "amplitude": { "type": "number", "default": 5.0 },

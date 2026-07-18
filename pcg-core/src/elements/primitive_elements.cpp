@@ -2,6 +2,7 @@
 #include "elements/heightfield_algorithms.hpp"
 #include "elements/pcg_element.hpp"
 #include "elements/primitive_elements.hpp"
+#include "heightfield_runtime.hpp"
 
 #include <cmath>
 #include <memory>
@@ -386,6 +387,13 @@ public:
     {
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "GetTerrainData missing node");
+
+        if (ctx.heightfields) {
+            if (const data::PcgHeightField* bound = ctx.heightfields->find(ctx.node->id)) {
+                emit_heightfield(ctx, *bound);
+                return PCG_OK;
+            }
+        }
 
         const int grid = clamp_count(ctx.node->data.value("gridSize", 32), 256);
         const double cell = ctx.node->data.value("cellSize", 2.0);

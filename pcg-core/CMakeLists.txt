@@ -35,6 +35,7 @@ set(PCG_CORE_SOURCES
     src/data/pcg_mesh_data.cpp
     src/data/pcg_geometry.cpp
     src/data/pcg_heightfield.cpp
+    src/data/pcg_heightfield_binary.cpp
     src/data/pcg_geometry_binary.cpp
     src/data/pcg_mesh_binary.cpp
     src/data/pcg_point_binary.cpp
@@ -42,6 +43,7 @@ set(PCG_CORE_SOURCES
     src/texture_runtime.cpp
     src/mesh_runtime.cpp
     src/spline_runtime.cpp
+    src/heightfield_runtime.cpp
     src/elements/mesh_algorithms.cpp
     src/elements/geometry_algorithms.cpp
     src/elements/geometry_elements.cpp

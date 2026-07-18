@@ -35,6 +35,9 @@ namespace DJTechRuntime.PCG
         private List<PcgMeshBinding> m_MeshBindings = new();
 
         [SerializeField]
+        private List<PcgTerrainBinding> m_TerrainBindings = new();
+
+        [SerializeField]
         private List<PcgMaterialBinding> m_MaterialBindings = new();
 
         [SerializeField]
@@ -52,6 +55,7 @@ namespace DJTechRuntime.PCG
         private string m_LastCookKey;
         private bool m_HasAppliedCookResult;
         private ulong m_LastMeshBinaryHash;
+        private int m_TerrainApplyGeneration;
         [SerializeField] private string[] m_LastMaterialNames = Array.Empty<string>();
         private PcgPolygonPreviewData m_PolygonPreview;
 
@@ -111,6 +115,7 @@ namespace DJTechRuntime.PCG
         public List<PcgParameterOverride> ParameterOverrides => m_ParameterOverrides;
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
         public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
+        public List<PcgTerrainBinding> TerrainBindings => m_TerrainBindings;
         public List<PcgMaterialBinding> MaterialBindings => m_MaterialBindings;
         public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
@@ -118,6 +123,7 @@ namespace DJTechRuntime.PCG
 
         /// <summary>Material slot names from the last successful mesh cook (empty until Run).</summary>
         public IReadOnlyList<string> LastMaterialNames => m_LastMaterialNames;
+        public int TerrainApplyGeneration => m_TerrainApplyGeneration;
 
         /// <summary>
         /// Re-apply <see cref="MaterialBindings"/> / fallback to the current MeshRenderer
@@ -570,10 +576,6 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
-            var cookKey = PcgGraphCookCache.BuildKey(json, seed);
-            if (TryReuseCachedCook(cookKey))
-                return true;
-
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {
@@ -590,14 +592,21 @@ namespace DJTechRuntime.PCG
 
             var splines = PcgSplineResolver.CollectFromGraphJson(
                 json, gameObject, m_SplineBindings, previewSplineBindings);
+            var heightfields = PcgTerrainResolver.CollectFromGraphJson(
+                json, gameObject, m_TerrainBindings);
+            var terrainFingerprint = PcgTerrainResolver.ComputeFingerprint(heightfields);
+            var cookKey = PcgGraphCookCache.BuildKey(json, seed, terrainFingerprint);
+            if (TryReuseCachedCook(cookKey))
+                return true;
 
             if (!forceSynchronous && ShouldUseAsyncCook())
             {
-                StartAsyncCook(json, textures, meshes, splines);
+                StartAsyncCook(json, textures, meshes, splines, heightfields);
                 return true;
             }
 
-            var result = PcgGraphLoader.Execute(json, seed, textures, meshes, splines);
+            var result = PcgGraphLoader.Execute(
+                json, seed, textures, meshes, splines, heightfields);
             if (result == null)
                 return false;
 
@@ -662,6 +671,18 @@ namespace DJTechRuntime.PCG
         {
             m_PolygonPreview = null;
             var kind = PcgResultParser.DetectKind(result);
+            PcgHostTerrainSurface terrainSurface = null;
+            if (HasTerrainOutputBindings())
+            {
+                if (!PcgHeightFieldBinaryParser.TryParse(
+                        result.HeightFieldBinary, out terrainSurface, out var terrainParseError))
+                {
+                    Debug.LogError(
+                        $"[PCG] Terrain output binding needs a typed HeightField result: {terrainParseError}",
+                        this);
+                    return false;
+                }
+            }
 
 #if UNITY_EDITOR
             LastCookResultJson = result.Json;
@@ -770,11 +791,74 @@ namespace DJTechRuntime.PCG
                     }
                     break;
 
+                case PcgResultKind.HeightField:
+                    // A pure HeightField result is consumed by Terrain Bindings. Keep
+                    // any existing Convert->Mesh preview untouched.
+                    break;
+
                 default:
                     Debug.LogError("[PCG] Unknown result JSON shape.");
                     return false;
             }
 
+            if (terrainSurface != null && !ApplyTerrainSurface(terrainSurface))
+                return false;
+
+            return true;
+        }
+
+        private bool HasTerrainOutputBindings()
+        {
+            if (m_TerrainBindings == null)
+                return false;
+            foreach (var binding in m_TerrainBindings)
+            {
+                if (binding != null && binding.writeCookResult)
+                    return true;
+            }
+            return false;
+        }
+
+        private bool ApplyTerrainSurface(PcgHostTerrainSurface surface)
+        {
+            var appliedAny = false;
+            foreach (var binding in m_TerrainBindings)
+            {
+                if (binding == null || !binding.writeCookResult)
+                    continue;
+
+                var terrain = PcgTerrainBindingTable.ResolveTerrain(binding, gameObject);
+                var adapter = new PcgUnityTerrainAdapter(terrain, transform);
+                if (!adapter.TryExportSurface(surface, out var report, out var error))
+                {
+                    Debug.LogError(
+                        $"[PCG] Terrain output '{binding.bindingKey}' failed: {error}", this);
+                    return false;
+                }
+
+                if (report.Applied)
+                {
+                    appliedAny = true;
+#if UNITY_EDITOR
+                    if (terrain != null && terrain.terrainData != null)
+                        UnityEditor.EditorUtility.SetDirty(terrain.terrainData);
+#endif
+                }
+
+                if (report.Resampled || report.ScaledFootprint || report.ClampedSamples > 0)
+                {
+                    Debug.Log(
+                        $"[PCG] Terrain '{binding.bindingKey}' applied " +
+                        $"({report.SourceResolutionX}x{report.SourceResolutionZ} -> " +
+                        $"{report.TargetResolution}x{report.TargetResolution}, " +
+                        $"resampled={report.Resampled}, scaledFootprint={report.ScaledFootprint}, " +
+                        $"clamped={report.ClampedSamples}).",
+                        this);
+                }
+            }
+
+            if (appliedAny)
+                m_TerrainApplyGeneration++;
             return true;
         }
 
@@ -793,7 +877,8 @@ namespace DJTechRuntime.PCG
             string json,
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes,
-            IReadOnlyList<PcgSplineUpload> splines)
+            IReadOnlyList<PcgSplineUpload> splines,
+            IReadOnlyList<PcgHeightFieldUpload> heightfields)
         {
             CancelAsyncCook(null, log: false);
             m_AsyncCookInProgress = true;
@@ -810,7 +895,8 @@ namespace DJTechRuntime.PCG
 
                 // ExecuteGraph performs parse + validation. Avoid a second P/Invoke and
                 // a second full JSON parse on every asynchronous preview cook.
-                var (execCode, execResult) = PcgNative.ExecuteGraph(json, localSeed, textures, meshes, splines);
+                var (execCode, execResult) = PcgNative.ExecuteGraph(
+                    json, localSeed, textures, meshes, splines, heightfields);
                 if (execCode != PcgResultCode.Ok)
                 {
                     return AsyncCookResult.Failed(
@@ -1146,10 +1232,16 @@ namespace DJTechRuntime.PCG
         private void EnsureMeshComponents()
         {
             if (m_MeshFilter == null)
-                m_MeshFilter = GetComponent<MeshFilter>() ?? gameObject.AddComponent<MeshFilter>();
+            {
+                m_MeshFilter = GetComponent<MeshFilter>();
+                if (m_MeshFilter == null)
+                    m_MeshFilter = gameObject.AddComponent<MeshFilter>();
+            }
             if (m_MeshRenderer == null)
             {
-                m_MeshRenderer = GetComponent<MeshRenderer>() ?? gameObject.AddComponent<MeshRenderer>();
+                m_MeshRenderer = GetComponent<MeshRenderer>();
+                if (m_MeshRenderer == null)
+                    m_MeshRenderer = gameObject.AddComponent<MeshRenderer>();
                 if (m_MeshRenderer.sharedMaterial == null)
                 {
                     var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
