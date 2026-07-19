@@ -25,7 +25,7 @@
 ### 改 Rule（`sync/rules/`）
 
 - [ ] 行为是否**所有平台一致**？是 → 只改正文；否 → 正文保持共享，差异放进 `gates/` 或 `adapters/`。
-- [ ] **路由正文**（Obsidian `Rules/`）改后 → `vault-rag reindex`；更新 Vault `Rules/meta/rules-vault-index`（若增删 rule_id）。
+- [ ] **路由正文**（Obsidian `Rules/`；PCG-AI 专用 `PCG AI Rule/`）改后 → `vault-rag reindex`；更新 Vault `Rules/meta/rules-vault-index`（若增删 rule_id）。
 - [ ] **Gate**（`gates/`）改后 → `setup.bat` 同步到目标工程。
 - [ ] 新增/删除 rule_id → 更新 gate §2、`rule-router-gate.md`、Vault `Rules/meta/rules-vault-index`；Skill 触发词变更时更新 `Rules/meta/skills-trigger-index`。
 - [ ] **禁止**在 `sync/rules/` 恢复 `core/`、`agents/`、`reviews/` 目录。

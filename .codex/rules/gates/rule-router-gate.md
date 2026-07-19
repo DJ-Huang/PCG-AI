@@ -27,7 +27,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 
 ## 2. rule_search（写产品代码前必须确认）
 
-路由规则**唯一真源**：Obsidian `Rules/`（`VAULT_ROOT/Rules`）。
+路由规则真源：通用规则在 Obsidian `Rules/`；PCG-AI 项目专用规则在 `PCG AI Rule/`。后者只有 `rule_search(domain=pcg)` 可见，`vault_search` 与其他 domain 必须排除。
 
 **禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.codex/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
 
@@ -57,7 +57,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 | Unity | 调试 | `agents/test-engineer` |
 | ComfyUI | 始终 | `core/comfyui`, `core/anti-ai-trace` |
 | ComfyUI | review | `reviews/comfyui-review-rules`, `agents/comfyui-expert` |
-| PCG | 始终 / 编图 | `pcg/index`, `pcg/assembly-bevel` |
+| PCG | 始终 | `pcg/project-engineering`, `pcg/index`, `pcg/graph-contract`, `pcg/assembly-bevel` |
 | PCG | 按模型类型 | `pcg/vehicle`, `pcg/bridge`, `pcg/spiral-staircase`, `pcg/scatter` |
 | 通用 | — | （无域专属规则，`no hit` 正常） |
 
@@ -67,7 +67,7 @@ description: 开发任务强制规则路由（域名 + rule_search + vault_searc
 
 ## 3. vault_search（经验知识，与规则分开 — 所有域名强制）
 
-`user-vault-rag.vault_search(query=任务技术关键词 + 任务类型, top_k=5)` — Pitfall / Tip / Concept / BugFix。规则正文必须用 §2 `rule_search`（仅 `Rules/`）。
+`user-vault-rag.vault_search(query=任务技术关键词 + 任务类型, top_k=5)` — Pitfall / Tip / Concept / BugFix。规则正文必须用 §2 `rule_search`；`vault_search` 排除 `Rules/` 与 `PCG AI Rule/`。
 
 首次检索与 §2 同批执行；后续与 §2 共用同一检索账本和 `fresh` / `reused` / `delta` 判定。返回结果按 `file_path` 去重，同一笔记默认只保留一个最相关 excerpt；需要细节时再用 `vault_get_chunk`。
 

@@ -26,7 +26,7 @@
 - 创建 MR 前必须先加载 `workflow/gitlab.md` 规则，按 MR 描述模板填写
 - Skill 必须遵循 7 段标准格式：Overview → When to Use → Process → Techniques → Rationalizations → Red Flags → Verification Checklist
 - 新建 Skill 参考 `sync/extensions/MySkills/skills/TEMPLATE-SKILL.md` 模板 + `sync/extensions/MySkills/skills/STANDARDS.md` 格式规范
-- **Rule gate / Skill** 只改 **`sync/`**（gates、workflow）。路由正文只改 Obsidian **`Rules/`** → `vault-rag reindex`。改 gate 后跑 **`setup.bat`**。
+- **Rule gate / Skill** 只改 **`sync/`**（gates、workflow）。通用路由正文改 Obsidian **`Rules/`**；PCG-AI 专用正文改 **`PCG AI Rule/`**（仅 `domain=pcg`）→ `vault-rag reindex`。改 gate 后跑 **`setup.bat`**。
 - 平台能力：Vault `Experience/PlatformCapabilities/`；审查 finding 见 `hmirp-review-rules` 五点五；记录平台能力 → obsidian-write + reindex
 - 涉及团结仓库（TJ URP）时，必须先用 `ask_user` 询问用户 TJ URP 仓库路径，禁止硬编码或假设路径
 - FRP 目录结构原则：如果 tj URP 有某功能，FRP 必须保持 tj URP 的目录结构，在此基础上做扩展。禁止将 tj 文件移到其他路径或删掉后重写；tj 缺失的文件（如 MotionVectorsCommon.hlsl、MotionVectorPass.hlsl）必须补回并保持原路径。FRP 扩展通过 partial class（`.FRP.cs`）或新增文件实现，不修改 tj 原文件。
@@ -36,7 +36,7 @@
 
 
 ## 目录与知识库
-- 路由正文 → Vault `Rules/`（`rule_search`）；经验 → `vault_search`；回写 → obsidian-write Skill
+- 路由正文 → Vault `Rules/`；PCG-AI 专用正文 → `PCG AI Rule/`（仅 `rule_search(domain=pcg)`）；经验 → `vault_search`；回写 → obsidian-write Skill
 - 完整 Skill 触发词 → Vault `Rules/meta/skills-trigger-index`（维护用）
 - 非开发任务（GitLab / 文档 / 解释）→ `Read` `.codex/rules/workflow/` 或对应 Skill
 

@@ -17,7 +17,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 | Rules gate（AlwaysApply） | `.codex/rules/gates/`（`setup.bat` 同步） |
 
-| Rules 路由正文 | Obsidian `VAULT_ROOT/Rules/`（`rule_search`，唯一真源） |
+| Rules 路由正文 | Obsidian `VAULT_ROOT/Rules/`；PCG-AI 专用正文在 `VAULT_ROOT/PCG AI Rule/`（仅 `domain=pcg`） |
 
 | Skills | `~/.codex/skills/`（user 目录全局联接） |
 
@@ -25,7 +25,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 
 
-改 gate / workflow → `{AISYNC_ROOT}/sync/rules/` 后 `setup.bat`。改路由正文 → Obsidian `Rules/` 后 `vault-rag reindex`。维护清单见 `workflow/sync-editing.md`。
+改 gate / workflow → `{AISYNC_ROOT}/sync/rules/` 后 `setup.bat`。改路由正文 → Obsidian `Rules/` 或 `PCG AI Rule/` 后 `vault-rag reindex`。维护清单见 `workflow/sync-editing.md`。
 
 
 
@@ -81,7 +81,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 | `activate_skill('name')` | `Read` `~/.codex/skills/name/SKILL.md` |
 
-| Vault 规则 | `user-vault-rag.rule_search`（仅 `Rules/`） |
+| Vault 规则 | `user-vault-rag.rule_search`（PCG 域额外纳入 `PCG AI Rule/`） |
 
 | Vault 经验 | `user-vault-rag.vault_search` |
 
@@ -125,7 +125,7 @@ description: 资产路径、加载契约、多平台工具映射与开发任务�
 
 | Rules gate | `.codex/rules/gates/` |
 
-| Rules 正文 | Obsidian `Rules/` via `rule_search` |
+| Rules 正文 | Obsidian `Rules/`；PCG 域专用 `PCG AI Rule/` via `rule_search` |
 
 
 

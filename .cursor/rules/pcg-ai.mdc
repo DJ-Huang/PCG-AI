@@ -1,23 +1,18 @@
 ---
-description: PCG-AI pcg-core、.pcg 图、Unity PcgPlugin 开发与联调（含 dylib + manifest 双步）
+description: PCG-AI pcg-core、.pcg 图、Unity PcgPlugin 开发与联调的 RAG 路由适配
 globs: pcg-core/**/*,schema/**/*,Unity/Assets/PcgPlugin/**/*,Unity/Assets/PCGDemo/**/*.pcg,examples/**/*.pcg,scripts/build-pcg-core.sh,scripts/sync-manifest.sh
 alwaysApply: false
 ---
 
-# PCG-AI（Cursor 适配）
+# PCG-AI（Cursor 薄适配）
 
-> 项目级规则：完整正文见 `.codely-cli/rules/pcg-ai.md`（Codely/Cursor/Trae 共用）。本文件为 Cursor 薄适配。
+本文件只识别 PCG-AI 路径，不复制项目规则正文。
 
-**P0 铁律**：节点输出必须 `emit_geometry()`，禁止 `emit_mesh()` 中间输出；禁止 geometry→mesh→geometry round-trip 绕过缺失属性；新增属性必须先扩展 PcgGeometry 字段。详见 `.codely-cli/rules/pcg-ai.md` §「P0 铁律」。
+开发、改节点或编图前：
 
-开发 / 改节点 / 编图前：
+1. `rule_search(query="PCG-AI + 任务意图 + 节点/模型关键词", domain="pcg", top_k=10)`。
+2. 至少读取 `pcg/project-engineering`、`pcg/index`、`pcg/graph-contract`、`pcg/assembly-bevel`；按模型补读 `pcg/vehicle`、`pcg/bridge` 等。
+3. `vault_search` 只查经验；当前 schema、源码和测试是实现事实真源。
+4. `.pcg` 图调用 `pcg-graph-authoring` Skill，并按 Skill 运行 validator。
 
-1. **Read `.codely-cli/rules/pcg-ai.md`**（项目级规则，不再走 `rule_search`）
-2. **`vault_search`**：PCG 踩坑与 Phase 记录
-3. 新节点或 C++ 行为变更后 **两步缺一不可**（仓库根）：
-   - `scripts/build-pcg-core.sh --copy-to-unity` — 原生 `pcg_validate_graph` / 执行
-   - `scripts/sync-manifest.sh` — GraphView / Inspector 与 `schema/node-manifest.json` 对齐
-   - **禁止**只跑 `cmake --build`：`pcg-core/build/` 与 `Unity/Assets/PcgPlugin/Plugins/macOS/` 是两份独立 dylib 副本，P/Invoke 加载后者，不同步则 Unity 渲染结果不变
-4. 编 `.pcg`：Read `.cursor/skills/pcg-graph-authoring/SKILL.md`；跑 `validate_pcg.py`
-
-漏任一步常见症状：Unity **`UnknownNode`**。改 dylib 后需重启 Unity Editor。
+专用规则根：`VAULT_ROOT/PCG AI Rule/`；除 `domain=pcg` 外不得检索。
