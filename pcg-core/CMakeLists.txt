@@ -8,6 +8,7 @@ project(pcg-core
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Match Unity IL2CPP Windows linker CRT (/MT) for static lib consumption.
 if(MSVC)
@@ -22,6 +23,38 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# ImportMesh uses the same pinned Assimp version as pcg-fbx-exporter, but only
+# builds the OBJ/FBX/glTF importers needed by the graph runtime.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(ASSIMP_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_FBX_IMPORTER ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_GLTF_IMPORTER ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+if(APPLE)
+    set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL "" FORCE)
+else()
+    set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
+endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cmake/PcgAssimp.cmake")
+pcg_declare_assimp()
+FetchContent_MakeAvailable(assimp)
+
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../schema/node-manifest.json")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../schema/node-manifest.json" PCG_NODE_MANIFEST_JSON)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/elements/node_manifest_embedded.hpp.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/node_manifest_embedded.hpp"
+    @ONLY
+)
+
 set(PCG_CORE_SOURCES
     src/pcg_core.cpp
     src/graph_parser.cpp
@@ -33,6 +66,7 @@ set(PCG_CORE_SOURCES
     src/data/pcg_param_data.cpp
     src/data/pcg_spline_data.cpp
     src/data/pcg_mesh_data.cpp
+    src/data/pcg_attribute_table.cpp
     src/data/pcg_geometry.cpp
     src/data/pcg_heightfield.cpp
     src/data/pcg_heightfield_binary.cpp
@@ -68,6 +102,7 @@ set(PCG_CORE_SOURCES
     src/elements/mesh_scatter_elements.cpp
     src/data/pcg_data_collection.cpp
     src/elements/element_registry.cpp
+    src/elements/node_contracts.cpp
     src/elements/element_utils.cpp
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
@@ -88,12 +123,16 @@ set(PCG_CORE_SOURCES
     src/elements/vehicle_modeling_elements.cpp
     src/elements/building_algorithms.cpp
     src/elements/building_elements.cpp
+    src/elements/assembly_algorithms.cpp
+    src/elements/assembly_elements.cpp
+    src/asset_path.cpp
 )
 
 # ── Shared library (DLL) — for Unity Editor development ──
 add_library(PcgCore SHARED ${PCG_CORE_SOURCES})
-target_include_directories(PcgCore PUBLIC include PRIVATE src third_party/CDT/CDT/include)
-target_link_libraries(PcgCore PRIVATE nlohmann_json::nlohmann_json)
+target_include_directories(PcgCore PUBLIC include PRIVATE src third_party/CDT/CDT/include
+    "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(PcgCore PRIVATE nlohmann_json::nlohmann_json assimp::assimp)
 target_compile_definitions(PcgCore PRIVATE PCG_EXPORTS)
 set_target_properties(PcgCore PROPERTIES
     OUTPUT_NAME "PcgCore"
@@ -107,8 +146,9 @@ endif()
 
 # ── Static library (LIB) — for IL2CPP Player static linking ──
 add_library(PcgCoreStatic STATIC ${PCG_CORE_SOURCES})
-target_include_directories(PcgCoreStatic PUBLIC include PRIVATE src third_party/CDT/CDT/include)
-target_link_libraries(PcgCoreStatic PRIVATE nlohmann_json::nlohmann_json)
+target_include_directories(PcgCoreStatic PUBLIC include PRIVATE src third_party/CDT/CDT/include
+    "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_link_libraries(PcgCoreStatic PRIVATE nlohmann_json::nlohmann_json assimp::assimp)
 target_compile_definitions(PcgCoreStatic PUBLIC PCG_STATIC)
 set_target_properties(PcgCoreStatic PROPERTIES
     OUTPUT_NAME "PcgCore"
@@ -321,6 +361,11 @@ target_link_libraries(test_boolean_bevel_chain PRIVATE PcgCoreStatic nlohmann_js
 target_include_directories(test_boolean_bevel_chain PRIVATE src)
 
 add_test(NAME test_boolean_bevel_chain COMMAND test_boolean_bevel_chain WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_assembly_nodes tests/test_assembly_nodes.cpp)
+target_link_libraries(test_assembly_nodes PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_assembly_nodes PRIVATE src)
+add_test(NAME test_assembly_nodes COMMAND test_assembly_nodes WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.

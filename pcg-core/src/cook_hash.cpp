@@ -2,6 +2,7 @@
 
 #include "geometry/group_table.hpp"
 #include "mesh_runtime.hpp"
+#include "asset_path.hpp"
 #include "spline_runtime.hpp"
 #include "texture_runtime.hpp"
 #include "heightfield_runtime.hpp"
@@ -115,14 +116,15 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     }
 
     for (geometry::GroupDomain domain :
-         {geometry::GroupDomain::Point, geometry::GroupDomain::Edge, geometry::GroupDomain::Face}) {
+         {geometry::GroupDomain::Point, geometry::GroupDomain::Edge,
+          geometry::GroupDomain::Face, geometry::GroupDomain::Vertex}) {
         for (const std::string& name : geometry.groups().group_names(domain)) {
             h = hash_combine(h, hash_string(name));
             const auto& members = geometry.groups().members(domain, name);
-            std::vector<int> sorted(members.begin(), members.end());
+            std::vector<geometry::GroupId> sorted(members.begin(), members.end());
             std::sort(sorted.begin(), sorted.end());
             if (!sorted.empty())
-                h = hash_bytes(sorted.data(), sorted.size() * sizeof(int), h);
+                h = hash_bytes(sorted.data(), sorted.size() * sizeof(geometry::GroupId), h);
         }
     }
 
@@ -130,6 +132,48 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     h = hash_combine(h, static_cast<uint64_t>(detail.shade_mode));
     double cusp = detail.cusp_angle_deg;
     h = hash_bytes(&cusp, sizeof(double), h);
+
+    if (geometry.has_colors() && !geometry.colors().empty())
+        h = hash_bytes(geometry.colors().data(),
+                       geometry.colors().size() * sizeof(data::PcgColor), h);
+    if (geometry.has_uvs() && !geometry.uvs().empty())
+        h = hash_bytes(geometry.uvs().data(),
+                       geometry.uvs().size() * sizeof(data::PcgVec2), h);
+    if (geometry.has_corner_uvs() && !geometry.corner_uvs().empty())
+        h = hash_bytes(geometry.corner_uvs().data(),
+                       geometry.corner_uvs().size() * sizeof(data::PcgVec2), h);
+
+    for (data::AttributeOwner owner :
+         {data::AttributeOwner::Point, data::AttributeOwner::Vertex,
+          data::AttributeOwner::Primitive, data::AttributeOwner::Detail}) {
+        for (const std::string& name : geometry.attributes().names(owner)) {
+            const data::AttributeArray* attribute = geometry.attributes().find(owner, name);
+            if (!attribute)
+                continue;
+            const auto& schema = attribute->schema();
+            h = hash_combine(h, hash_string(name));
+            h = hash_combine(h, static_cast<uint64_t>(schema.owner));
+            h = hash_combine(h, static_cast<uint64_t>(schema.type));
+            h = hash_combine(h, static_cast<uint64_t>(schema.tuple_size));
+            h = hash_combine(h, static_cast<uint64_t>(schema.transform_role));
+            if (!attribute->default_int().empty())
+                h = hash_bytes(attribute->default_int().data(),
+                               attribute->default_int().size() * sizeof(int64_t), h);
+            if (!attribute->default_float().empty())
+                h = hash_bytes(attribute->default_float().data(),
+                               attribute->default_float().size() * sizeof(double), h);
+            for (const std::string& value : attribute->default_string())
+                h = hash_combine(h, hash_string(value));
+            if (!attribute->int_values().empty())
+                h = hash_bytes(attribute->int_values().data(),
+                               attribute->int_values().size() * sizeof(int64_t), h);
+            if (!attribute->float_values().empty())
+                h = hash_bytes(attribute->float_values().data(),
+                               attribute->float_values().size() * sizeof(double), h);
+            for (const std::string& value : attribute->string_values())
+                h = hash_combine(h, hash_string(value));
+        }
+    }
 
     h = hash_combine(h, geometry.has_face_materials() ? 1u : 0u);
     if (geometry.has_face_materials()) {
@@ -282,6 +326,14 @@ uint64_t compute_node_input_hash(const GraphNode& node,
     if (node.type == "GetMeshData" && meshes) {
         if (const data::PcgMeshData* mesh = meshes->find(node.id))
             h = hash_combine(h, hash_mesh(*mesh));
+    }
+
+    if (node.type == "ImportMesh") {
+        if (meshes) {
+            if (const data::PcgMeshData* mesh = meshes->find(node.id))
+                h = hash_combine(h, hash_mesh(*mesh));
+        }
+        h = hash_combine(h, hash_asset_dependency(resolve_asset_path(node.data)));
     }
 
     if (node.type == "GetSplineData" && splines) {

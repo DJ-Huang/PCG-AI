@@ -112,6 +112,8 @@ namespace DJTechRuntime.PCG
         public string target;
         public string sourceHandle = "out";
         public string targetHandle = "in";
+        public string sourcePinType;
+        public string targetPinType;
     }
 
     [Serializable]

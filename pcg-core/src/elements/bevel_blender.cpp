@@ -536,8 +536,7 @@ bool bevel_cancel_requested(const BevelParams& bp)
 }
 
 int64_t edge_key(int a, int b) {
-    return a < b ? static_cast<int64_t>(a) * 1000000 + b
-                 : static_cast<int64_t>(b) * 1000000 + a;
+    return geometry::edge_group_id(a, b);
 }
 
 struct WeldedMesh {
@@ -4334,10 +4333,9 @@ data::PcgMeshData bevel_mesh_blender(
     // Find all vertices that are endpoints of hard edges
     std::set<int> bevel_verts;
     for (int64_t key : hard_edges) {
-        int v0 = static_cast<int>(key / 1000000);
-        int v1 = static_cast<int>(key % 1000000);
-        bevel_verts.insert(v0);
-        bevel_verts.insert(v1);
+        const auto endpoints = geometry::edge_group_points(key);
+        bevel_verts.insert(endpoints[0]);
+        bevel_verts.insert(endpoints[1]);
     }
 
     // For each beveled vertex, build EdgeHalf array

@@ -7,7 +7,8 @@
 namespace pcg::internal::data {
 
 constexpr uint32_t kPcgGeometryBinaryMagic = 0x47475043u; // 'PCGG' little-endian
-constexpr uint32_t kPcgGeometryBinaryVersion = 2u;
+constexpr uint32_t kPcgGeometryBinaryVersion = 3u;
+constexpr uint32_t kPcgGeometryBinaryPreviousVersion = 2u;
 constexpr int kPcgGeometryBinaryHeaderSize = 16;
 
 int geometry_binary_size(const PcgGeometry& geometry);

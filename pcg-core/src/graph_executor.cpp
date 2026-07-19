@@ -42,18 +42,18 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
     }
 
     auto groups = nlohmann::json::array();
-    static const char* kDomainNames[] = {"point", "edge", "face"};
+    static const char* kDomainNames[] = {"point", "edge", "face", "vertex"};
     const auto& points = geometry.points();
-    for (int d = 0; d < 3; ++d) {
+    for (int d = 0; d < 4; ++d) {
         const auto domain = static_cast<geometry::GroupDomain>(d);
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
             auto memberArray = nlohmann::json::array();
             auto edgeEndpoints = nlohmann::json::array();
-            for (int id : members) {
+            for (geometry::GroupId id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
                     // Expand face index into constituent mesh triangles
-                    if (id >= 0 && id < static_cast<int>(face_to_tri.size())) {
+                    if (id >= 0 && id < static_cast<geometry::GroupId>(face_to_tri.size())) {
                         const auto& face = geometry.faces()[static_cast<size_t>(id)];
                         const int first_tri = face_to_tri[static_cast<size_t>(id)];
                         const int tri_count = face.size() >= 3
@@ -65,9 +65,9 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                     memberArray.push_back(id);
                 }
                 if (d == static_cast<int>(geometry::GroupDomain::Edge)) {
-                    const int64_t key = static_cast<int64_t>(id);
-                    const int a = static_cast<int>(key / 1000000);
-                    const int b = static_cast<int>(key % 1000000);
+                    const auto endpoints = geometry::edge_group_points(id);
+                    const int a = endpoints[0];
+                    const int b = endpoints[1];
                     if (a >= 0 && a < static_cast<int>(points.size()) &&
                         b >= 0 && b < static_cast<int>(points.size())) {
                         const auto& pa = points[static_cast<size_t>(a)];

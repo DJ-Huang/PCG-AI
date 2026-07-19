@@ -616,7 +616,8 @@ namespace DJTechRuntime.PCG
         }
 
         public const uint GeometryBinaryMagic = 0x47475043u;
-        public const uint GeometryBinaryVersion = 2u;
+        public const uint GeometryBinaryVersion = 3u;
+        public const uint GeometryBinaryPreviousVersion = 2u;
         public const int GeometryBinaryHeaderSize = 16;
         private const uint GeometryChunkPoints = 1u;
         private const uint GeometryChunkFaceOffsets = 2u;
@@ -645,7 +646,7 @@ namespace DJTechRuntime.PCG
                 }
 
                 var version = ReadUInt32(data, ref offset);
-                if (version != GeometryBinaryVersion)
+                if (version != GeometryBinaryVersion && version != GeometryBinaryPreviousVersion)
                 {
                     error = $"Unsupported geometry binary version: {version}";
                     return false;

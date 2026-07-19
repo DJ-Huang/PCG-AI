@@ -17,7 +17,7 @@ namespace DJTechRuntime.PCG
     }
 
     /// <summary>
-    /// Serializes Graph JSON v1 aligned with schema/graph-schema.json and Web exportGraph.ts.
+    /// Serializes Graph JSON v1/v2 aligned with the C++ runtime wire contract.
     /// </summary>
     public static class PcgGraphSerializer
     {
@@ -33,7 +33,8 @@ namespace DJTechRuntime.PCG
             var nl = pretty ? "\n" : "";
             var sb = new StringBuilder(512);
             sb.Append('{').Append(nl);
-            sb.Append(indent).Append("\"version\": \"1.0\"").Append(',').Append(nl);
+            var version = doc.version == "2.0" ? "2.0" : "1.0";
+            sb.Append(indent).Append("\"version\": ").Append(JsonString(version)).Append(',').Append(nl);
             sb.Append(indent).Append("\"nodes\": [").Append(nl);
             for (var i = 0; i < doc.nodes.Count; i++)
             {
@@ -98,13 +99,16 @@ namespace DJTechRuntime.PCG
                     return false;
                 }
 
-                if (!root.TryGetValue("version", out var versionObj) || versionObj?.ToString() != "1.0")
+                var version = root.TryGetValue("version", out var versionObj)
+                    ? versionObj?.ToString()
+                    : null;
+                if (version != "1.0" && version != "2.0")
                 {
-                    error = "Unsupported or missing version (expected 1.0).";
+                    error = "Unsupported or missing version (expected 1.0 or 2.0).";
                     return false;
                 }
 
-                doc = new PcgGraphDocument { version = "1.0" };
+                doc = new PcgGraphDocument { version = version };
 
                 if (root.TryGetValue("nodes", out var nodesObj) && nodesObj is List<object> nodesList)
                 {
@@ -150,6 +154,8 @@ namespace DJTechRuntime.PCG
                             target = GetString(edgeDict, "target"),
                             sourceHandle = GetString(edgeDict, "sourceHandle", "out"),
                             targetHandle = GetString(edgeDict, "targetHandle", "in"),
+                            sourcePinType = GetString(edgeDict, "sourcePinType"),
+                            targetPinType = GetString(edgeDict, "targetPinType"),
                         });
                     }
                 }
@@ -241,6 +247,8 @@ namespace DJTechRuntime.PCG
                     target = GetString(edgeDict, "target"),
                     sourceHandle = GetString(edgeDict, "sourceHandle", "out"),
                     targetHandle = GetString(edgeDict, "targetHandle", "in"),
+                    sourcePinType = GetString(edgeDict, "sourcePinType"),
+                    targetPinType = GetString(edgeDict, "targetPinType"),
                 });
             }
         }
@@ -425,6 +433,10 @@ namespace DJTechRuntime.PCG
                 sb.Append(", \"sourceHandle\": ").Append(JsonString(edge.sourceHandle));
             if (!string.IsNullOrEmpty(edge.targetHandle))
                 sb.Append(", \"targetHandle\": ").Append(JsonString(edge.targetHandle));
+            if (!string.IsNullOrEmpty(edge.sourcePinType))
+                sb.Append(", \"sourcePinType\": ").Append(JsonString(edge.sourcePinType));
+            if (!string.IsNullOrEmpty(edge.targetPinType))
+                sb.Append(", \"targetPinType\": ").Append(JsonString(edge.targetPinType));
             sb.Append('}');
         }
 

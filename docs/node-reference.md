@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **86 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **89 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -9,6 +9,7 @@
 ## 目录
 
 - [Pin 数据类型](#pin-数据类型)
+- [Geometry 数据契约](#geometry-数据契约)
 - [Terrain 类别](#terrain-类别)
   - [HeightField](#heightfield)
   - [HeightFieldNoise](#heightfieldnoise)
@@ -63,6 +64,7 @@
   - [StaticMeshSpawner](#staticmeshspawner)
 - [Spline 类别](#spline-类别)
   - [CreateSpline](#createspline)
+  - [CreateBezierSpline](#createbezierspline)
   - [ResampleSpline](#resamplespline)
   - [SampleAlongSpline](#samplealongspline)
   - [SweepAlongSpline](#sweepalongspline)
@@ -83,6 +85,15 @@
   - [BevelMesh](#bevelmesh)
   - [MeshNoiseDeform](#meshnoisedeform)
   - [TransformMesh](#transformmesh)
+  - [LoftMesh](#loftmesh)
+  - [MirrorMesh](#mirrormesh)
+  - [FuseMesh](#fusemesh)
+  - [PolyExtrude](#polyextrude)
+  - [CopyMesh](#copymesh)
+  - [ShellMesh](#shellmesh)
+  - [ImportMesh](#importmesh)
+  - [MatchSize](#matchsize)
+  - [BendMesh](#bendmesh)
   - [MergeMesh](#mergemesh)
   - [BooleanMesh](#booleanmesh)
   - [CreateCylinderMesh](#createcylindermesh)
@@ -99,6 +110,7 @@
   - [Switch](#switch)
 - [Output 类别](#output-类别)
   - [Output](#output)
+  - [ExportFBX](#exportfbx)
 - [Material 类别](#material-类别)
   - [VertexColor](#vertexcolor)
   - [AssignMaterial](#assignmaterial)
@@ -122,12 +134,29 @@
 | `Param` | 参数对象（JSON 键值对） | `PcgParamData` / `nlohmann::json` |
 | `SpatialPoint` | 空间点云（含坐标和属性） | `PcgPointData` → `PcgPoint{x, y, z, attributes}` |
 | `SpatialSpline` | 样条/线段集合 | `PcgSplineData` → `PcgSpline{points[], closed}` |
-| `SpatialMesh` | 网格数据（顶点+三角形） | `PcgMeshData` → `vertices[], triangles[]` |
+| `SpatialMesh` | Houdini 风格多边形 Geometry；Sink 时才三角化 | `PcgGeometry` → points / vertices / primitives / detail attributes + groups；兼容旧 `PcgMeshData` 输入 |
 | `Any` | 任意类型透传 | — |
 | `Texture` | 纹理数据（2D 图像） | `PcgTextureData` → `width, height, channels, data[]` |
 | `HeightField` | 命名层 2D volume（`height`/`mask`/自定义层） | `PcgHeightField` → grid transform + `PcgHeightFieldLayer[]` |
 
 > **连接规则**：输出 Pin 类型必须与输入 Pin 类型匹配。`Any` 类型可接受任意输入。
+
+Node Manifest 是 Pin id、类型和 variadic 基数的唯一契约源。Core 在执行前验证 handle、类型、重复边及非 variadic 多重输入；Web 与 Unity 导入/导出均保留 Graph v1/v2 的 typed edge 元数据。Graph v2 的 parameters / subgraphs 同样跨端保留；Web 当前只对嵌套 subgraph 定义做无损导入与回写，不在本批增加子图内部编辑 UI。
+
+## Geometry 数据契约
+
+`SpatialMesh` 链路以 `PcgGeometry` 为 source of truth，节点中途不得通过 `PcgMeshData` 三角汤往返。数据域与 Houdini 对齐为：
+
+| Owner / Domain | 元素含义 | 稳定索引 |
+|----------------|----------|----------|
+| Point | 可被多个面角共享的位置 | point index |
+| Vertex | 某个 primitive 的 face-corner | 展平 corner index |
+| Primitive | polygon / face | face index |
+| Detail | 整份 geometry | 单元素 |
+
+通用属性由 schema（name、owner、type、tuple size、default、transform role）与等长数组组成。`Position` / `Vector` / `Normal` role 会在 Match Size、Bend 等变换节点中分别按点、向量、逆转置法线语义处理。Group 同样支持 point / vertex / primitive(face) / edge；edge member 使用两个 32-bit point index 打包成 64-bit `GroupId`，不再依赖点数阈值或十进制乘数。
+
+改变拓扑的节点必须提供 destination→source remap，再由统一传播层处理 attributes、UV、颜色、材质和 groups；无法映射的新元素使用属性默认值。Geometry Binary v3 会序列化上述通用属性及 64-bit group member；v2 reader 保持向后兼容，未知 chunk 可由旧宿主跳过。
 
 ---
 
@@ -1311,6 +1340,28 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 ---
 
+### CreateBezierSpline
+
+**类别**：Spline
+
+**功能**：以 Hermite 切线或 3n+1 cubic Bezier 控制点生成确定性样条，适合车身轮廓和精确装配路径。
+
+**输入 Pin**：无；**输出 Pin**：`out`（`SpatialSpline`）。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `mode` | `catmullRom` | 当前实现为 cubic Bezier / Hermite 子集 |
+| `closed` | false | 是否闭合首尾段 |
+| `subdivisions` | 12 | 每段采样数，范围 1–64 |
+| `controlPoints` | 两个 JSON 点 | anchor 列表；或不提供匹配 tangents 时使用 3n+1 cubic controls |
+| `tangents` | 两个 JSON 向量 | 数量与 anchors 相同时按 Hermite 求值 |
+| `editPlane` | `none` | Scene 编辑约束：`none` / `xy` / `xz` / `yz` |
+| `sceneOffsetX/Y/Z` | 0 | 编辑器场景偏移 |
+
+控制点少于两个，或既不满足“anchor+tangent 等长”也不满足 3n+1 cubic control 形式时明确失败。该节点输出曲线，不生成 Geometry。
+
+---
+
 ### ResampleSpline
 
 **类别**：Spline
@@ -2211,6 +2262,166 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 ---
 
+### LoftMesh
+
+**类别**：Mesh
+
+**功能**：对两个及以上 profile spline 做统一列数重采样并沿指定轴排序，生成 profile 之间的 polygon loft；输入 `profiles` 为 variadic `SpatialSpline`，输出 `out` 为 `SpatialMesh`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `columns` | 32 | 每条 profile 的采样列数，2–256 |
+| `sortAxis` | `x` | profile 排序轴：`x` / `y` / `z` |
+| `closedProfile` | true | profile 是否首尾闭合 |
+| `capStart` / `capEnd` | true | 生成起止端盖 |
+| `autoAlign` | true | 自动对齐相邻 profile 的起始列和方向 |
+| `shadeMode` | `auto` | `auto` / `smooth` / `flat` |
+| `cuspAngle` | 30 | Auto 法线折角阈值，0–180° |
+
+输出 face groups 为 `side`、条件性的 `cap_start` / `cap_end`，并维护 boundary edge group `unshared`。少于两条有效 profile 时失败。
+
+### MirrorMesh
+
+**类别**：Mesh
+
+**功能**：关于 `axis=value` 平面镜像 polygon geometry，并反转镜像面的 winding。输入/输出均为 `SpatialMesh`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `axis` | `z` | `x` / `y` / `z` |
+| `offset` | 0 | 镜像平面的轴坐标 |
+| `mergeOriginal` | true | 原件与镜像件是否合并输出 |
+| `weldSeam` | true | 合并时是否 Fuse 镜像缝 |
+| `weldTolerance` | 0.0001 | 缝合容差 |
+
+镜像拓扑通过 destination→source remap 传播 point/vertex/primitive/detail attributes、UV、颜色、材质和 groups；Position / Vector / Normal role 使用反射矩阵更新。
+
+### FuseMesh
+
+**类别**：Mesh
+
+**功能**：按空间量化容差焊接重合 points，重映射 faces 并可删除退化面/重复面。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `tolerance` | 0.0001 | point weld 容差，必须大于 0 |
+| `removeDegenerate` | true | 删除不足三个不同 point 的面及重复面 |
+
+焊接后的属性采用稳定 first-source 语义，所有 owner 的 cardinality 与 groups 会随 remap 更新；最后重建 `unshared` 边组。
+
+### PolyExtrude
+
+**类别**：Mesh
+
+**功能**：沿所选 polygon 的面法线挤出 top 和 side polygons，保持 polygon topology 到最终 Sink。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `faceGroup` | `""` | 可选 face group；空值选择全部面 |
+| `distance` | 0.02 | 法线方向挤出距离 |
+| `inset` | 0 | top 相对面中心的 inset 比例 |
+| `keepOriginal` | false | 是否保留被挤出的原面 |
+| `topGroup` | `extrude_top` | 新 top face group 名 |
+| `sideGroup` | `extrude_side` | 新 side face group 名 |
+
+生成元素从来源 face/corner/point 继承 attributes、UV 和材质；Position role 属性跟随新 point 位移。输出同时维护动态 top/side groups 与 `unshared`。
+
+### CopyMesh
+
+**类别**：Mesh
+
+**功能**：在一个节点内做固定数量的线性或环形 Geometry 复制；通用“按点复制”仍使用 `CopyMeshToPoints`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `mode` | `circular` | `circular` / `linear` |
+| `count` | 6 | 副本数量，1–256 |
+| `axis` | `x` | 环形旋转轴 |
+| `angle` | 360 | 全部副本覆盖的角度 |
+| `translateX/Y/Z` | 0 | linear 模式每个序号的平移增量 |
+| `centerX/Y/Z` | 0 | circular 模式旋转中心 |
+
+每个实例都保留 topology 和通用属性；Position / Vector / Normal role 使用对应实例 affine 变换。同名 groups 按 Houdini Copy 语义合并成员，不添加会破坏下游 selector 的副本前缀，随后重建边界组。
+
+### ShellMesh
+
+**类别**：Mesh
+
+**功能**：沿平均 point normal 生成 outer/inner 两层 polygon shell，并可在输入 boundary 上补 rim faces。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `thickness` | 0.02 | 壳厚，必须大于 0 |
+| `direction` | `centered` | `centered` / `outward` / `inward` |
+| `closeBoundaries` | true | 是否为开口边生成 rim |
+| `outerGroup` | `shell_outer` | 外层 face group |
+| `innerGroup` | `shell_inner` | 内层 face group |
+| `rimGroup` | `shell_rim` | 边界墙 face group |
+
+Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner 属性、UV 和材质，Position role 属性跟随壳体位移。输出维护三个动态 face groups 与 `unshared`。
+
+---
+
+### ImportMesh
+
+**功能**：从文件系统读取 OBJ / FBX / glTF 资产，转换为 `PcgGeometry` 并以 `emit_geometry()` 输出。场景节点变换、多 mesh、UV、顶点色、法线、材质名会被保留；每个导入实例同时生成 primitive `name` 属性和同名 face group。
+
+**输入 Pin**：无；若宿主按本节点 ID 上传 `PcgMeshSlot`，运行时 mesh 优先于文件路径。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `path` | `""` | 绝对路径，或相对工程根的资产路径 |
+| `projectRoot` | `""` | 可选；相对路径的明确解析根。空时相对宿主进程工作目录 |
+| `scale` | 1.0 | 导入后的统一单位缩放，必须大于零且有限 |
+| `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
+
+文件不存在、格式不支持、没有 polygon 或 Assimp 校验失败都会返回包含路径/Assimp 原因的明确错误。Cook cache 的输入指纹包含规范化路径、文件大小和修改时间，因此替换外部资产会使节点失效重算。
+
+### MatchSize
+
+**功能**：对 source 做纯 affine bbox 匹配，覆盖 Houdini Match Size 常用子集；不改变 points/faces 拓扑、groups、材质或非变换属性。
+
+**输入 Pin**：`source`（必需 `SpatialMesh`）、`reference`（可选 `SpatialMesh`）。连接 reference 时使用其 bbox；否则使用 `targetCenter*` / `targetSize*`。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `scaleToFit` | true | 是否把 source bbox 缩放到目标 bbox |
+| `uniformScale` | false | 使用统一缩放，避免改变比例 |
+| `uniformScaleMode` | `fit` | `fit` 取最小有效轴比例；`fill` 取最大比例 |
+| `sourceJustifyX/Y/Z` | `center` | source anchor：`min` / `center` / `max` |
+| `targetJustifyX/Y/Z` | `center` | target anchor：`min` / `center` / `max` |
+| `targetCenterX/Y/Z` | 0 | 无 reference 时的目标中心 |
+| `targetSizeX/Y/Z` | 1 | 无 reference 时的目标尺寸；必须非负 |
+
+输出 Detail owner 上会写入 float16 `pcg_match_xform`（row-major 4×4），供调试或后续装配读取。退化 source 轴保持 scale=1；其余有效轴仍参与 fit/fill。
+
+### BendMesh
+
+**功能**：围绕 capture frame 做直线 Bend，保持面连通与全部拓扑语义。首版不伪装成完整 Houdini Bend：不包含 Twist、Taper、双 capture 或 Lattice。
+
+**输入 Pin**：`source`（必需 `SpatialMesh`）、`rest`（可选 `SpatialMesh`）。Rest 必须与 source point/face 拓扑完全一致；其位置用于计算变形坐标，source-rest offset 会随局部 frame 旋转。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `captureOriginX/Y/Z` | 0 | 捕获起点 |
+| `captureDirectionX/Y/Z` | (0,1,0) | 捕获轴；会归一化 |
+| `upDirectionX/Y/Z` | (1,0,0) | 弯曲径向；不得与捕获轴平行 |
+| `captureLength` | 1 | 从 0 到完整角度的长度，必须大于 0 |
+| `angle` | 0 | 完整弯曲角度（度） |
+| `maskAttribute` | `bendmask` | 输出 point float mask；空字符串可关闭 |
+
+捕获区之前保持不动；区间内按恒定曲率弯曲；区间之后沿末端切线刚性延伸。带 `Position` / `Vector` / `Normal` transform role 的 float3+ 属性会使用各 owner 的位置同步变换。
+
+> 通用装配：`ImportMesh → MatchSize → CopyMeshToPoints`；需要下垂/弧形时在复制前接 `BendMesh`。沿线 chain 继续使用 `InstanceAlongSpline`，或 `ResampleSpline → CopyMeshToPoints`，不增加重复的专用节点。
+
+---
+
 ### MergeMesh
 
 **类别**：Mesh
@@ -2688,9 +2899,34 @@ CreateSpline(profile) ──┘
 
 > 可连接到任何类型的输出 pin（`Any` 类型接受任意输入）。
 
+### ExportFBX
+
+**类别**：Output（Editor Only）
+
+**功能**：显式把所连上游的 polygon Geometry 写成 FBX。它是类似 Houdini ROP 的手动副作用节点：普通 Editor 预览和 Player cook 会把它处理为被动 Output，绝不会自动写文件；只有 Unity Inspector 的 Export 操作会同步 cook 上游并调用原生 FBX exporter。
+
+**输入 Pin**：`in`（`SpatialMesh`）；**输出 Pin**：无。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `path` | `Exports/$GRAPH.fbx` | 工程相对或绝对路径；支持 `$GRAPH` / `$NODE`，缺少 `.fbx` 时自动追加 |
+| `scale` | 1.0 | 导出单位缩放，必须大于 0 |
+| `generateNormals` | true | 是否由 exporter 生成 smooth normals |
+
+执行前必须连接 Geometry。导出控制器会等待异步预览 cook、应用场景参数覆盖和 Mesh/Spline/Texture bindings，再只 cook Export 上游；失败会显示明确错误，不产生静默空文件。
+
 ---
 
 ## 常见节点组合
+
+节点、Manifest 或 native core 发生变化后，提交前执行：
+
+```bash
+scripts/build-pcg-core.sh --copy-to-unity --run-tests
+scripts/sync-manifest.sh
+```
+
+第一条构建 shared/static core、运行 fast 测试并复制/签名 macOS Unity 插件；第二条把 source-of-truth `schema/node-manifest.json` 同步到 Unity Editor 与 Resources 两个消费者。
 
 ### 建筑楼层 / 开间阵列
 

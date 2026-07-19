@@ -609,6 +609,28 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
         }
     }
 
+    // An authored Houdini-style point N attribute is authoritative over
+    // generated shading normals. Vertex N remains a future split-key concern;
+    // point N is lossless with the current render-vertex island mapping.
+    const auto* authored_normals =
+        geometry.attributes().find(AttributeOwner::Point, "N");
+    if (authored_normals && authored_normals->schema().type == AttributeType::Float &&
+        authored_normals->schema().tuple_size >= 3 &&
+        authored_normals->size() == points.size()) {
+        const auto& values = authored_normals->float_values();
+        const size_t width = static_cast<size_t>(authored_normals->schema().tuple_size);
+        for (const auto& [key, index] : render_vertex_map) {
+            const size_t source = static_cast<size_t>(key.point_index);
+            const double x = values[source * width];
+            const double y = values[source * width + 1];
+            const double z = values[source * width + 2];
+            const double magnitude = std::sqrt(x * x + y * y + z * z);
+            if (magnitude > 1.0e-12)
+                render_normals[static_cast<size_t>(index)] =
+                    {x / magnitude, y / magnitude, z / magnitude};
+        }
+    }
+
     // Set vertices and normals on the mesh
     for (const auto& v : render_positions)
         mesh.add_vertex({v.x, v.y, v.z});
@@ -662,6 +684,39 @@ PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
     opts.merge_coplanar_angle_deg = 0.0;
     const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh, opts);
     PcgGeometry geo = geometry::geometry_from_bmesh(bmesh);
+
+    // Preserve legacy render-mesh normals as Houdini-style point N. The
+    // compatibility bridge welds coincident positions, so first writer wins,
+    // matching the existing color/UV policy below.
+    if (mesh.has_normals()) {
+        const auto& mesh_verts = mesh.vertices();
+        const auto& mesh_normals = mesh.normals();
+        auto& normals = geo.attributes().create_float(
+            AttributeOwner::Point, "N", 3, {0.0, 1.0, 0.0},
+            AttributeTransformRole::Normal);
+        normals.float_values_mut().assign(geo.points().size() * 3, 0.0);
+        std::unordered_map<std::string, int> position_to_point;
+        const double eps = opts.weld_eps;
+        const auto quantize = [eps](double value) -> int64_t {
+            return static_cast<int64_t>(std::llround(value / eps));
+        };
+        for (size_t i = 0; i < mesh_verts.size() && i < mesh_normals.size(); ++i) {
+            const auto& vertex = mesh_verts[i];
+            const std::string key = std::to_string(quantize(vertex.x)) + ',' +
+                                    std::to_string(quantize(vertex.y)) + ',' +
+                                    std::to_string(quantize(vertex.z));
+            const auto [it, inserted] = position_to_point.emplace(
+                key, static_cast<int>(position_to_point.size()));
+            if (!inserted || it->second < 0 ||
+                static_cast<size_t>(it->second) >= geo.points().size())
+                continue;
+            const auto& normal = mesh_normals[i];
+            const size_t offset = static_cast<size_t>(it->second) * 3;
+            normals.float_values_mut()[offset] = normal.x;
+            normals.float_values_mut()[offset + 1] = normal.y;
+            normals.float_values_mut()[offset + 2] = normal.z;
+        }
+    }
 
     // Map mesh vertex colors back to geometry points. bmesh_from_mesh welds
     // positions, so multiple mesh vertices may map to one geometry point;
@@ -742,6 +797,195 @@ PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
     return geo;
 }
 
+void propagate_geometry_data(const PcgGeometry& source,
+                             PcgGeometry& destination,
+                             const GeometryElementRemap& remap)
+{
+    const size_t point_count = destination.points().size();
+    const size_t vertex_count = static_cast<size_t>(destination.corner_count());
+    const size_t primitive_count = destination.faces().size();
+    const auto normalized = [](const std::vector<int>& values, size_t count) {
+        std::vector<int> result = values;
+        result.resize(count, -1);
+        return result;
+    };
+
+    const std::vector<int> point_sources = normalized(remap.points, point_count);
+    const std::vector<int> vertex_sources = normalized(remap.vertices, vertex_count);
+    const std::vector<int> primitive_sources = normalized(remap.primitives, primitive_count);
+    AttributeRemap attribute_remap;
+    attribute_remap[static_cast<size_t>(AttributeOwner::Point)] = point_sources;
+    attribute_remap[static_cast<size_t>(AttributeOwner::Vertex)] = vertex_sources;
+    attribute_remap[static_cast<size_t>(AttributeOwner::Primitive)] = primitive_sources;
+    attribute_remap[static_cast<size_t>(AttributeOwner::Detail)] = {0};
+    destination.attributes() = AttributeTable::remap_from(source.attributes(), attribute_remap);
+    destination.detail() = source.detail();
+
+    if (source.has_colors() && source.colors().size() == source.points().size()) {
+        std::vector<PcgColor> colors(point_count, PcgColor{1.0, 1.0, 1.0, 1.0});
+        for (size_t i = 0; i < point_count; ++i) {
+            const int source_index = point_sources[i];
+            if (source_index >= 0 && static_cast<size_t>(source_index) < source.colors().size())
+                colors[i] = source.colors()[static_cast<size_t>(source_index)];
+        }
+        destination.set_colors(std::move(colors));
+    }
+
+    if (source.has_uvs() && source.uvs().size() == source.points().size()) {
+        std::vector<PcgVec2> uvs(point_count, PcgVec2{0.0, 0.0});
+        for (size_t i = 0; i < point_count; ++i) {
+            const int source_index = point_sources[i];
+            if (source_index >= 0 && static_cast<size_t>(source_index) < source.uvs().size())
+                uvs[i] = source.uvs()[static_cast<size_t>(source_index)];
+        }
+        destination.set_uvs(std::move(uvs));
+    }
+
+    if (source.has_corner_uvs() &&
+        source.corner_uvs().size() == static_cast<size_t>(source.corner_count())) {
+        std::vector<PcgVec2> uvs(vertex_count, PcgVec2{0.0, 0.0});
+        for (size_t i = 0; i < vertex_count; ++i) {
+            const int source_index = vertex_sources[i];
+            if (source_index >= 0 && static_cast<size_t>(source_index) < source.corner_uvs().size())
+                uvs[i] = source.corner_uvs()[static_cast<size_t>(source_index)];
+        }
+        destination.set_corner_uvs(std::move(uvs));
+    }
+
+    if (source.has_face_materials()) {
+        std::vector<std::string> materials(primitive_count,
+            source.has_material() ? source.material_name() : std::string{});
+        for (size_t i = 0; i < primitive_count; ++i) {
+            const int source_index = primitive_sources[i];
+            if (source_index >= 0 &&
+                static_cast<size_t>(source_index) < source.face_materials().size())
+                materials[i] = source.face_materials()[static_cast<size_t>(source_index)];
+        }
+        destination.set_face_materials(std::move(materials));
+    } else if (source.has_material()) {
+        destination.set_material_name(source.material_name());
+    }
+
+    for (const auto domain_and_sources :
+         {std::pair{geometry::GroupDomain::Point, &point_sources},
+          std::pair{geometry::GroupDomain::Face, &primitive_sources},
+          std::pair{geometry::GroupDomain::Vertex, &vertex_sources}}) {
+        const auto domain = domain_and_sources.first;
+        const auto& sources = *domain_and_sources.second;
+        for (const std::string& name : source.groups().group_names(domain)) {
+            for (size_t destination_index = 0; destination_index < sources.size();
+                 ++destination_index) {
+                const int source_index = sources[destination_index];
+                if (source_index >= 0 && source.groups().contains(domain, name, source_index))
+                    destination.groups().add(domain, name,
+                                             static_cast<geometry::GroupId>(destination_index));
+            }
+        }
+    }
+
+    for (const std::string& name :
+         source.groups().group_names(geometry::GroupDomain::Edge)) {
+        for (const auto& face : destination.faces()) {
+            for (size_t corner = 0; corner < face.size(); ++corner) {
+                const int destination_a = face[corner];
+                const int destination_b = face[(corner + 1) % face.size()];
+                if (destination_a < 0 || destination_b < 0 ||
+                    static_cast<size_t>(destination_a) >= point_sources.size() ||
+                    static_cast<size_t>(destination_b) >= point_sources.size())
+                    continue;
+                const int source_a = point_sources[static_cast<size_t>(destination_a)];
+                const int source_b = point_sources[static_cast<size_t>(destination_b)];
+                if (source_a < 0 || source_b < 0)
+                    continue;
+                if (source.groups().contains(geometry::GroupDomain::Edge, name,
+                                             geometry::edge_group_id(source_a, source_b))) {
+                    destination.groups().add(geometry::GroupDomain::Edge, name,
+                                             geometry::edge_group_id(destination_a,
+                                                                     destination_b));
+                }
+            }
+        }
+    }
+}
+
+PcgVec3 transform_vector(const GeometryAffineTransform& transform, const PcgVec3& value)
+{
+    const auto& m = transform.linear;
+    return {m[0] * value.x + m[1] * value.y + m[2] * value.z,
+            m[3] * value.x + m[4] * value.y + m[5] * value.z,
+            m[6] * value.x + m[7] * value.y + m[8] * value.z};
+}
+
+PcgVec3 transform_position(const GeometryAffineTransform& transform, const PcgVec3& value)
+{
+    const auto result = transform_vector(transform, value);
+    return {result.x + transform.translation.x,
+            result.y + transform.translation.y,
+            result.z + transform.translation.z};
+}
+
+PcgVec3 transform_normal(const GeometryAffineTransform& transform, const PcgVec3& value)
+{
+    const auto& m = transform.linear;
+    const double c00 = m[4] * m[8] - m[5] * m[7];
+    const double c01 = m[5] * m[6] - m[3] * m[8];
+    const double c02 = m[3] * m[7] - m[4] * m[6];
+    const double c10 = m[2] * m[7] - m[1] * m[8];
+    const double c11 = m[0] * m[8] - m[2] * m[6];
+    const double c12 = m[1] * m[6] - m[0] * m[7];
+    const double c20 = m[1] * m[5] - m[2] * m[4];
+    const double c21 = m[2] * m[3] - m[0] * m[5];
+    const double c22 = m[0] * m[4] - m[1] * m[3];
+    const double determinant = m[0] * c00 + m[1] * c01 + m[2] * c02;
+    PcgVec3 result;
+    if (std::abs(determinant) <= 1.0e-15) {
+        result = transform_vector(transform, value);
+    } else {
+        const double inverse_det = 1.0 / determinant;
+        result = {(c00 * value.x + c01 * value.y + c02 * value.z) * inverse_det,
+                  (c10 * value.x + c11 * value.y + c12 * value.z) * inverse_det,
+                  (c20 * value.x + c21 * value.y + c22 * value.z) * inverse_det};
+    }
+    const double magnitude = std::sqrt(result.x * result.x + result.y * result.y +
+                                       result.z * result.z);
+    if (magnitude <= 1.0e-15)
+        return {};
+    return {result.x / magnitude, result.y / magnitude, result.z / magnitude};
+}
+
+void transform_geometry_attributes(PcgGeometry& geometry,
+                                   const GeometryAffineTransform& transform)
+{
+    for (AttributeOwner owner : {AttributeOwner::Point, AttributeOwner::Vertex,
+                                 AttributeOwner::Primitive, AttributeOwner::Detail}) {
+        for (const auto& name : geometry.attributes().names(owner)) {
+            auto* attribute = geometry.attributes().find(owner, name);
+            if (!attribute || attribute->schema().type != AttributeType::Float ||
+                attribute->schema().tuple_size < 3)
+                continue;
+            const auto role = attribute->schema().transform_role;
+            if (role != AttributeTransformRole::Position &&
+                role != AttributeTransformRole::Vector &&
+                role != AttributeTransformRole::Normal)
+                continue;
+            auto& values = attribute->float_values_mut();
+            const size_t width = static_cast<size_t>(attribute->schema().tuple_size);
+            for (size_t index = 0; index < attribute->size(); ++index) {
+                const PcgVec3 value{values[index * width], values[index * width + 1],
+                                    values[index * width + 2]};
+                const PcgVec3 result = role == AttributeTransformRole::Position
+                    ? transform_position(transform, value)
+                    : role == AttributeTransformRole::Normal
+                        ? transform_normal(transform, value)
+                        : transform_vector(transform, value);
+                values[index * width] = result.x;
+                values[index * width + 1] = result.y;
+                values[index * width + 2] = result.z;
+            }
+        }
+    }
+}
+
 std::vector<int64_t> geometry_edge_keys(const PcgGeometry& geometry)
 {
     std::unordered_map<int64_t, int> face_count;
@@ -776,13 +1020,15 @@ void maintain_unshared_edge_group(PcgGeometry& geometry, const std::string& name
     geometry.groups().clear_group(geometry::GroupDomain::Edge, name);
     for (const auto& entry : use_count) {
         if (entry.second == 1)
-            geometry.groups().add(geometry::GroupDomain::Edge, name, static_cast<int>(entry.first));
+            geometry.groups().add(geometry::GroupDomain::Edge, name, entry.first);
     }
 }
 
 PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const std::string& b_prefix)
 {
     PcgGeometry merged = a;
+    const AttributeCounts a_counts = a.attribute_counts();
+    const AttributeCounts b_counts = b.attribute_counts();
     const int point_offset = static_cast<int>(merged.points().size());
     const int face_offset = static_cast<int>(merged.faces().size());
 
@@ -798,24 +1044,29 @@ PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const s
     }
 
     for (geometry::GroupDomain domain :
-         {geometry::GroupDomain::Point, geometry::GroupDomain::Face, geometry::GroupDomain::Edge}) {
+         {geometry::GroupDomain::Point, geometry::GroupDomain::Face,
+          geometry::GroupDomain::Edge, geometry::GroupDomain::Vertex}) {
         for (const std::string& name : b.groups().group_names(domain)) {
             const std::string out_name = b_prefix + name;
-            for (int id : b.groups().members(domain, name)) {
+            for (geometry::GroupId id : b.groups().members(domain, name)) {
                 if (domain == geometry::GroupDomain::Point)
                     merged.groups().add(domain, out_name, id + point_offset);
                 else if (domain == geometry::GroupDomain::Face)
                     merged.groups().add(domain, out_name, id + face_offset);
+                else if (domain == geometry::GroupDomain::Vertex)
+                    merged.groups().add(domain, out_name, id + a_counts[1]);
                 else {
-                    const int v0 = static_cast<int>(static_cast<int64_t>(id) / 1000000);
-                    const int v1 = static_cast<int>(static_cast<int64_t>(id) % 1000000);
+                    const auto endpoints = geometry::edge_group_points(id);
                     const int64_t remapped =
-                        geometry::edge_key(v0 + point_offset, v1 + point_offset);
-                    merged.groups().add(domain, out_name, static_cast<int>(remapped));
+                        geometry::edge_key(endpoints[0] + point_offset,
+                                           endpoints[1] + point_offset);
+                    merged.groups().add(domain, out_name, remapped);
                 }
             }
         }
     }
+
+    merged.attributes().append_from(b.attributes(), a_counts, b_counts);
 
     // Merge per-point colors
     if (a.has_colors() || b.has_colors()) {

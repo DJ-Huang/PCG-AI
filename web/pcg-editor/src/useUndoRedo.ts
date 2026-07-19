@@ -1,15 +1,16 @@
-// useUndoRedo.ts — Basic undo/redo via snapshot stack for nodes, edges, and parameters.
+// useUndoRedo.ts — Undo/redo snapshots for nodes, edges, parameters, and preserved subgraphs.
 // Cmd/Ctrl+Z → undo, Cmd/Ctrl+Shift+Z → redo.
 // Drag operations can be merged into a single undo step via beginDrag/endDrag.
 
 import { useCallback, useRef, useState } from 'react';
 import type { Node, Edge } from '@xyflow/react';
-import type { GraphParameter } from './graphSchema';
+import type { GraphParameter, GraphSubgraph } from './graphSchema';
 
 interface Snapshot {
   nodes: Node[];
   edges: Edge[];
   parameters: GraphParameter[];
+  subgraphs: GraphSubgraph[];
 }
 
 interface UndoRedoState {
@@ -23,9 +24,11 @@ export function useUndoRedo(
   nodes: Node[],
   edges: Edge[],
   parameters: GraphParameter[],
+  subgraphs: GraphSubgraph[],
   setNodes: (nodes: Node[]) => void,
   setEdges: (edges: Edge[]) => void,
   setParameters: (params: GraphParameter[]) => void,
+  setSubgraphs: (subgraphs: GraphSubgraph[]) => void,
 ) {
   const [state, setState] = useState<UndoRedoState>({ past: [], future: [] });
   const dragRef = useRef(false);
@@ -36,8 +39,15 @@ export function useUndoRedo(
       nodes: nodes.map((n) => ({ ...n, data: { ...n.data } })),
       edges: edges.map((e) => ({ ...e })),
       parameters: parameters.map((p) => ({ ...p })),
+      subgraphs: subgraphs.map((subgraph) => ({
+        ...subgraph,
+        inputs: subgraph.inputs.map((port) => ({ ...port })),
+        outputs: subgraph.outputs.map((port) => ({ ...port })),
+        nodes: subgraph.nodes.map((node) => ({ ...node, data: { ...node.data } })),
+        edges: subgraph.edges.map((edge) => ({ ...edge })),
+      })),
     };
-  }, [nodes, edges, parameters]);
+  }, [nodes, edges, parameters, subgraphs]);
 
   const commit = useCallback(
     (_actionName?: string) => {
@@ -61,6 +71,7 @@ export function useUndoRedo(
       setNodes(previous.nodes);
       setEdges(previous.edges);
       setParameters(previous.parameters);
+      setSubgraphs(previous.subgraphs);
       suppressRef.current = false;
 
       return {
@@ -68,7 +79,7 @@ export function useUndoRedo(
         future: [current, ...prev.future],
       };
     });
-  }, [takeSnapshot, setNodes, setEdges, setParameters]);
+  }, [takeSnapshot, setNodes, setEdges, setParameters, setSubgraphs]);
 
   const redo = useCallback(() => {
     setState((prev) => {
@@ -80,6 +91,7 @@ export function useUndoRedo(
       setNodes(next.nodes);
       setEdges(next.edges);
       setParameters(next.parameters);
+      setSubgraphs(next.subgraphs);
       suppressRef.current = false;
 
       return {
@@ -87,7 +99,7 @@ export function useUndoRedo(
         future: prev.future.slice(1),
       };
     });
-  }, [takeSnapshot, setNodes, setEdges, setParameters]);
+  }, [takeSnapshot, setNodes, setEdges, setParameters, setSubgraphs]);
 
   const beginDrag = useCallback(() => {
     dragRef.current = true;

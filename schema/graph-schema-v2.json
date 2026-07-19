@@ -18,6 +18,14 @@
     "edges": {
       "type": "array",
       "items": { "$ref": "#/$defs/edge" }
+    },
+    "parameters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "subgraphs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/subgraph" }
     }
   },
   "$defs": {
@@ -55,6 +63,46 @@
         "targetHandle": { "type": "string" },
         "sourcePinType": { "$ref": "#/$defs/pinType" },
         "targetPinType": { "$ref": "#/$defs/pinType" }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["id", "name", "type", "default", "exposed", "targetNode", "targetProperty"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["integer", "number", "boolean", "string"] },
+        "default": {},
+        "exposed": { "type": "boolean" },
+        "targetNode": { "type": "string" },
+        "targetProperty": { "type": "string" },
+        "hasRange": { "type": "boolean" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "subgraphPort": {
+      "type": "object",
+      "required": ["id", "name", "pinType"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "pinType": { "$ref": "#/$defs/pinType" }
+      }
+    },
+    "subgraph": {
+      "type": "object",
+      "required": ["id", "name", "inputs", "outputs", "nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
       }
     }
   }

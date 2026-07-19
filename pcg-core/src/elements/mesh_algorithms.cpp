@@ -1778,18 +1778,26 @@ data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
         return data::PcgVec3{x * c - y * s, x * s + y * c, z};
     };
 
-    for (auto& p : out.points_mut()) {
-        data::PcgVec3 v = rot_x(p.x, p.y, p.z);
-        v = rot_y(v.x, v.y, v.z);
-        v = rot_z(v.x, v.y, v.z);
-        v.x *= scale_x;
-        v.y *= scale_y;
-        v.z *= scale_z;
-        v.x += translate_x;
-        v.y += translate_y;
-        v.z += translate_z;
-        p = v;
-    }
+    const auto transformed_basis = [&](data::PcgVec3 value) {
+        value.x *= scale_x;
+        value.y *= scale_y;
+        value.z *= scale_z;
+        value = rot_x(value.x, value.y, value.z);
+        value = rot_y(value.x, value.y, value.z);
+        value = rot_z(value.x, value.y, value.z);
+        return value;
+    };
+    const auto x_axis = transformed_basis({1.0, 0.0, 0.0});
+    const auto y_axis = transformed_basis({0.0, 1.0, 0.0});
+    const auto z_axis = transformed_basis({0.0, 0.0, 1.0});
+    data::GeometryAffineTransform transform;
+    transform.linear = {x_axis.x, y_axis.x, z_axis.x,
+                        x_axis.y, y_axis.y, z_axis.y,
+                        x_axis.z, y_axis.z, z_axis.z};
+    transform.translation = {translate_x, translate_y, translate_z};
+    for (auto& point : out.points_mut())
+        point = data::transform_position(transform, point);
+    data::transform_geometry_attributes(out, transform);
 
     return out;
 }

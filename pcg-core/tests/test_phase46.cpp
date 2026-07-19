@@ -139,7 +139,7 @@ int main()
         {3, 0, 4, 7},
     };
     box.groups().add(GroupDomain::Face, "side", 2);
-    box.groups().add(GroupDomain::Edge, "test_edge", static_cast<int>(edge_key(0, 1)));
+    box.groups().add(GroupDomain::Edge, "test_edge", edge_key(0, 1));
 
     const PcgMeshData tri = triangulate_geometry(box);
     const PcgGeometry round_trip = geometry_from_mesh(tri);
@@ -152,7 +152,7 @@ int main()
     if (bmesh.edges.find(edge_key(0, 1)) == bmesh.edges.end()) fail("bmesh missing edge");
     if (bmesh.edges.at(edge_key(0, 1)).groups.count("test_edge") != 1) fail("bmesh edge group");
     const PcgGeometry from_bmesh = geometry_from_bmesh(bmesh);
-    if (!from_bmesh.groups().contains(GroupDomain::Edge, "test_edge", static_cast<int>(edge_key(0, 1))))
+    if (!from_bmesh.groups().contains(GroupDomain::Edge, "test_edge", edge_key(0, 1)))
         fail("geometry_from_bmesh group");
     std::printf("PASS: bmesh_from_geometry preserves edge groups\n");
 
@@ -178,10 +178,10 @@ int main()
     std::printf("PASS: Bevel excludeUnshared with geometry groups\n");
 
     PcgGeometry box_grouped = box;
-    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(0, 1)));
-    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(1, 2)));
-    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(2, 3)));
-    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", static_cast<int>(edge_key(3, 0)));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", edge_key(0, 1));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", edge_key(1, 2));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", edge_key(2, 3));
+    box_grouped.groups().add(GroupDomain::Edge, "bevel_edges", edge_key(3, 0));
 
     bevel::BevelEdgeSelection group_sel;
     group_sel.edge_group = "bevel_edges";
@@ -261,8 +261,8 @@ int main()
     if (!read_geometry_binary(geo_buf.data(), static_cast<int>(geo_buf.size()), binary_round_trip))
         fail("read geometry binary");
     if (!binary_round_trip.groups().contains(GroupDomain::Edge, "test_edge",
-                                             static_cast<int>(edge_key(0, 1))))
+                                             edge_key(0, 1)))
         fail("binary group");
-    std::printf("PASS: geometry_binary v2 round-trip\n");
+    std::printf("PASS: geometry_binary v3 round-trip\n");
     return 0;
 }

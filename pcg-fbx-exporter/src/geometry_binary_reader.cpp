@@ -7,7 +7,8 @@ namespace pcg::fbx {
 namespace {
 
 constexpr uint32_t kMagic = 0x47475043u;
-constexpr uint32_t kVersion = 2u;
+constexpr uint32_t kVersion = 3u;
+constexpr uint32_t kPreviousVersion = 2u;
 constexpr uint32_t kPoints = 1u;
 constexpr uint32_t kFaceOffsets = 2u;
 constexpr uint32_t kFaceIndices = 3u;
@@ -79,8 +80,8 @@ bool read_geometry_binary(const void* data, int size, Geometry& geometry, std::s
         error = "Geometry binary header is truncated.";
         return false;
     }
-    if (magic != kMagic || version != kVersion) {
-        error = "Unsupported geometry binary magic or version (expected PCGG v2).";
+    if (magic != kMagic || (version != kVersion && version != kPreviousVersion)) {
+        error = "Unsupported geometry binary magic or version (expected PCGG v2/v3).";
         return false;
     }
 

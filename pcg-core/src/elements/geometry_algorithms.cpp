@@ -55,8 +55,8 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
     if (!options.from_edge_groups.empty()) {
         for (const auto& grp : options.from_edge_groups) {
             const auto members = input.groups().members(geometry::GroupDomain::Edge, grp);
-            for (int id : members)
-                candidate_edges.insert(static_cast<int64_t>(id));
+            for (geometry::GroupId id : members)
+                candidate_edges.insert(id);
         }
     }
 
@@ -91,7 +91,7 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
                 continue;
         }
 
-        result.groups().add(domain, options.output_group, static_cast<int>(entry.first));
+        result.groups().add(domain, options.output_group, entry.first);
     }
 
     return result;
@@ -112,7 +112,7 @@ data::PcgGeometry group_combine(const data::PcgGeometry& input, const GroupCombi
         for (size_t i = 2; i < options.source_groups.size(); ++i) {
             const auto current = result.groups().members(domain, options.output_group);
             result.groups().clear_group(domain, options.output_group);
-            for (int id : current) {
+            for (geometry::GroupId id : current) {
                 if (input.groups().contains(domain, options.source_groups[i], id))
                     result.groups().add(domain, options.output_group, id);
             }

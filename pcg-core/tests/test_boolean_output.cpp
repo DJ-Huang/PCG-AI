@@ -408,8 +408,8 @@ void test_group_create_preserves_collinear_segment_edge()
     if (group_members.empty())
         fail("group_create: angle mode should select box edges (90° > 30°)");
 
-    for (int id : group_members) {
-        if (input_edges.count(static_cast<int64_t>(id)) == 0)
+    for (GroupId id : group_members) {
+        if (input_edges.count(id) == 0)
             fail("group_create: output edge key not in input geometry (dissolve changed edge keys)");
     }
 }

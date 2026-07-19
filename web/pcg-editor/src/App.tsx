@@ -22,7 +22,7 @@ import '@xyflow/react/dist/style.css';
 
 import ManifestNode from './nodes/ManifestNode';
 import { defaultData } from './graphSchema';
-import type { GraphParameter } from './graphSchema';
+import type { GraphParameter, GraphSubgraph } from './graphSchema';
 import { exportGraph, downloadGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
 import { importGraphFromFile, syncNodeCounterFromNodes } from './importGraph';
 import { isValidConnection } from './connectionValidation';
@@ -44,9 +44,12 @@ import './App.css';
 // Map every manifest node type to the generic ManifestNode component.
 // Using { default: ManifestNode } alone causes React Flow to pass type='default'
 // instead of the real type, so nodes render as "Unknown".
-const nodeTypes = Object.fromEntries(
-  getAllNodeTypes().map((def) => [def.type, ManifestNode]),
-);
+const nodeTypes = {
+  ...Object.fromEntries(getAllNodeTypes().map((def) => [def.type, ManifestNode])),
+  // Dynamic subgraph pins are preserved by import/export. Full nested graph
+  // authoring is intentionally outside this editor's current scope.
+  Subgraph: ManifestNode,
+};
 
 const initialNodes: Node[] = [
   {
@@ -73,6 +76,7 @@ function PcgEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [parameters, setParameters] = useState<GraphParameter[]>([]);
+  const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(true);
   const [showInspector, setShowInspector] = useState(true);
@@ -93,9 +97,11 @@ function PcgEditor() {
     nodes,
     edges,
     parameters,
+    subgraphs,
     setNodes,
     setEdges,
     setParameters,
+    setSubgraphs,
   );
 
   // ── Connection ──────────────────────────────────────
@@ -413,7 +419,7 @@ function PcgEditor() {
   // ── Import / Export ─────────────────────────────────
 
   const handleExport = () => {
-    const graph = exportGraph(nodes, edges, parameters);
+    const graph = exportGraph(nodes, edges, parameters, subgraphs);
     downloadGraph(graph);
     setStatus('Downloaded graph.pcg');
   };
@@ -423,7 +429,7 @@ function PcgEditor() {
       handleExport();
       return;
     }
-    const graph = exportGraph(nodes, edges, parameters);
+    const graph = exportGraph(nodes, edges, parameters, subgraphs);
     const result = await saveGraphToFile(graph, currentFilename);
     if (result.ok) {
       setStatus(`Saved to ${currentFilename}`);
@@ -433,7 +439,7 @@ function PcgEditor() {
   };
 
   const handleSendToUnity = async () => {
-    const graph = exportGraph(nodes, edges, parameters);
+    const graph = exportGraph(nodes, edges, parameters, subgraphs);
     const result = await exportToSchema(graph);
     if (result.ok) {
       setStatus('Saved to schema/editor-export.pcg — use PCG → Reload Watched Graph in Unity');
@@ -462,9 +468,10 @@ function PcgEditor() {
     setNodes(result.nodes);
     setEdges(result.edges);
     setParameters(result.parameters);
+    setSubgraphs(result.subgraphs);
     setSelectedNode(null);
     setCurrentFilename(file.name);
-    setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params)`);
+    setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params, ${result.subgraphs.length} subgraphs)`);
   };
 
   // ── New / Save As / Show in Project ────────────────
@@ -474,6 +481,7 @@ function PcgEditor() {
     setNodes([]);
     setEdges([]);
     setParameters([]);
+    setSubgraphs([]);
     setSelectedNode(null);
     setCurrentFilename('');
     nodeCounter = 100;
@@ -482,7 +490,7 @@ function PcgEditor() {
 
   const handleSaveAs = () => {
     const filename = currentFilename || 'graph.pcg';
-    const graph = exportGraph(nodes, edges, parameters);
+    const graph = exportGraph(nodes, edges, parameters, subgraphs);
     downloadGraph(graph, filename);
     setStatus(`Saved as ${filename}`);
   };
@@ -579,7 +587,7 @@ function PcgEditor() {
 
           {/* Status bar */}
           <div className="pcg-status-bar">
-            <span>{nodes.length} nodes · {edges.length} edges · {parameters.length} params</span>
+            <span>{nodes.length} nodes · {edges.length} edges · {parameters.length} params · {subgraphs.length} subgraphs</span>
             <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit</span>
             {(canUndo || canRedo) && (
               <span className="pcg-status-bar__undo">

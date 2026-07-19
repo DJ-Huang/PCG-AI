@@ -22,6 +22,8 @@ struct GraphEdge {
     std::string target;
     std::string source_handle = "out";
     std::string target_handle = "in";
+    std::string source_pin_type;
+    std::string target_pin_type;
 };
 
 struct GraphPort {

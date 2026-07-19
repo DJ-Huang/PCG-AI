@@ -83,6 +83,44 @@ int main()
     assert(std::strstr(out, "\"prefab\":\"Tree\"") != nullptr || std::strstr(out, "\"prefab\": \"Tree\"") != nullptr);
     std::printf("PASS: mini graph prefab preserved\n");
 
+    const char* typed_v2_graph = R"({
+      "version": "2.0",
+      "nodes": [
+        {"id":"a","type":"SpawnPoints","position":{"x":0,"y":0},"data":{}},
+        {"id":"b","type":"PlaceInScene","position":{"x":200,"y":0},"data":{}}
+      ],
+      "edges": [{"id":"e","source":"a","target":"b","sourceHandle":"out",
+        "targetHandle":"in","sourcePinType":"SpatialPoint","targetPinType":"SpatialPoint"}]
+    })";
+    expect_code(pcg_validate_graph(typed_v2_graph, err, sizeof(err)), PCG_OK,
+                "typed v2 graph validate");
+
+    const char* invalid_handle_graph = R"({
+      "version":"1.0",
+      "nodes":[{"id":"a","type":"SpawnPoints","data":{}},{"id":"b","type":"PlaceInScene","data":{}}],
+      "edges":[{"source":"a","target":"b","sourceHandle":"missing","targetHandle":"in"}]
+    })";
+    expect_code(pcg_validate_graph(invalid_handle_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
+                "invalid source handle");
+
+    const char* incompatible_pin_graph = R"({
+      "version":"1.0",
+      "nodes":[{"id":"a","type":"CreateBoxMesh","data":{}},{"id":"b","type":"PlaceInScene","data":{}}],
+      "edges":[{"source":"a","target":"b","sourceHandle":"out","targetHandle":"in"}]
+    })";
+    expect_code(pcg_validate_graph(incompatible_pin_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
+                "incompatible pin types");
+
+    const char* multiple_input_graph = R"({
+      "version":"1.0",
+      "nodes":[{"id":"a","type":"SpawnPoints","data":{}},{"id":"b","type":"SpawnPoints","data":{}},
+        {"id":"c","type":"PlaceInScene","data":{}}],
+      "edges":[{"source":"a","target":"c"},{"source":"b","target":"c"}]
+    })";
+    expect_code(pcg_validate_graph(multiple_input_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
+                "non-variadic input cardinality");
+    std::printf("PASS: runtime graph pin contracts\n");
+
     const std::string roundtrip_graph = read_file("fixtures/roundtrip.pcg");
     assert(!roundtrip_graph.empty());
     expect_code(pcg_validate_graph(roundtrip_graph.c_str(), err, sizeof(err)), PCG_OK, "roundtrip graph validate");

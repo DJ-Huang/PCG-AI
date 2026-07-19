@@ -32,8 +32,8 @@ int main()
       ],
       "subgraphs":[{
         "id":"move","name":"Move Geometry",
-        "inputs":[{"id":"geometry","name":"Geometry","pinType":"Mesh"}],
-        "outputs":[{"id":"geometry","name":"Geometry","pinType":"Mesh"}],
+        "inputs":[{"id":"geometry","name":"Geometry","pinType":"SpatialMesh"}],
+        "outputs":[{"id":"geometry","name":"Geometry","pinType":"SpatialMesh"}],
         "nodes":[
           {"id":"input","type":"SubgraphInput","position":{"x":0,"y":0},"data":{}},
           {"id":"transform","type":"TransformMesh","position":{"x":0,"y":160},"data":{"translateX":3,"translateY":0,"translateZ":0}},

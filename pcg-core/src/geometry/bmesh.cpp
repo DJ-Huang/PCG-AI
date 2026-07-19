@@ -489,9 +489,7 @@ void build_disk_cycles(BMesh& mesh) {
 }
 
 int64_t edge_key(int a, int b) {
-    if (a > b)
-        std::swap(a, b);
-    return static_cast<int64_t>(a) * 1000000 + b;
+    return edge_group_id(a, b);
 }
 
 Vec3 face_normal_from_loop(const BMesh& mesh, const std::vector<int>& loop) {
@@ -649,7 +647,7 @@ data::PcgGeometry geometry_from_bmesh(const BMesh& mesh) {
 
     for (const auto& entry : mesh.edges) {
         for (const std::string& group : entry.second.groups)
-            geometry.groups().add(GroupDomain::Edge, group, static_cast<int>(entry.first));
+            geometry.groups().add(GroupDomain::Edge, group, entry.first);
     }
 
     return geometry;

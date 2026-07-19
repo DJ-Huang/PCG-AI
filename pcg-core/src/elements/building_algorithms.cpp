@@ -257,26 +257,38 @@ data::PcgGeometry copy_geometry_to_points(const data::PcgGeometry& prototype,
 
         for (geometry::GroupDomain domain : {geometry::GroupDomain::Point,
                                              geometry::GroupDomain::Face,
-                                             geometry::GroupDomain::Edge}) {
+                                             geometry::GroupDomain::Edge,
+                                             geometry::GroupDomain::Vertex}) {
             for (const auto& name : prototype.groups().group_names(domain)) {
-                for (int id : prototype.groups().members(domain, name)) {
+                for (geometry::GroupId id : prototype.groups().members(domain, name)) {
                     if (domain == geometry::GroupDomain::Point) {
                         output.groups().add(domain, name, id + point_offset);
                     } else if (domain == geometry::GroupDomain::Face) {
                         output.groups().add(domain, name, id + face_offset);
+                    } else if (domain == geometry::GroupDomain::Vertex) {
+                        const int vertex_offset = static_cast<int>(output.corner_count()) -
+                                                  prototype.corner_count();
+                        output.groups().add(domain, name, id + vertex_offset);
                     } else {
-                        const int v0 = static_cast<int>(static_cast<int64_t>(id) / 1000000);
-                        const int v1 = static_cast<int>(static_cast<int64_t>(id) % 1000000);
-                        const int remapped_v0 = v0 + point_offset;
-                        const int remapped_v1 = v1 + point_offset;
-                        const int64_t edge = static_cast<int64_t>(std::min(remapped_v0, remapped_v1)) *
-                                                 1000000 +
-                                             std::max(remapped_v0, remapped_v1);
-                        output.groups().add(domain, name, static_cast<int>(edge));
+                        const auto endpoints = geometry::edge_group_points(id);
+                        const int remapped_v0 = endpoints[0] + point_offset;
+                        const int remapped_v1 = endpoints[1] + point_offset;
+                        const int64_t edge = geometry::edge_group_id(remapped_v0, remapped_v1);
+                        output.groups().add(domain, name, edge);
                     }
                 }
             }
         }
+    }
+
+    const data::AttributeCounts prototype_counts = prototype.attribute_counts();
+    data::AttributeCounts output_counts{};
+    output_counts[static_cast<size_t>(data::AttributeOwner::Detail)] = 1;
+    for (size_t copy = 0; copy < copy_count; ++copy) {
+        output.attributes().append_from(prototype.attributes(), output_counts, prototype_counts);
+        output_counts[static_cast<size_t>(data::AttributeOwner::Point)] += prototype_counts[0];
+        output_counts[static_cast<size_t>(data::AttributeOwner::Vertex)] += prototype_counts[1];
+        output_counts[static_cast<size_t>(data::AttributeOwner::Primitive)] += prototype_counts[2];
     }
 
     if (prototype.has_colors()) {

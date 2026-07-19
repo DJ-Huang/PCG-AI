@@ -1778,6 +1778,83 @@
       }
     },
     {
+      "type": "ImportMesh",
+      "displayName": "Import Mesh",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "path": { "type": "string", "displayName": "Asset Path", "default": "" },
+        "projectRoot": { "type": "string", "displayName": "Project Root (optional)", "default": "" },
+        "scale": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "axisConversion": {
+          "type": "enum", "displayName": "Axis Conversion", "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "zUpToYUp", "label": "Z Up to Y Up" },
+            { "value": "yUpToZUp", "label": "Y Up to Z Up" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "MatchSize",
+      "displayName": "Match Size",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "source", "label": "Source", "pinType": "SpatialMesh" },
+        { "id": "reference", "label": "Reference (optional)", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "scaleToFit": { "type": "boolean", "default": true },
+        "uniformScale": { "type": "boolean", "default": false },
+        "uniformScaleMode": {
+          "type": "enum", "default": "fit",
+          "options": [
+            { "value": "fit", "label": "Fit Inside" },
+            { "value": "fill", "label": "Fill Bounds" }
+          ]
+        },
+        "sourceJustifyX": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "sourceJustifyY": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "sourceJustifyZ": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetJustifyX": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetJustifyY": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetJustifyZ": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetCenterX": { "type": "number", "default": 0.0 },
+        "targetCenterY": { "type": "number", "default": 0.0 },
+        "targetCenterZ": { "type": "number", "default": 0.0 },
+        "targetSizeX": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "targetSizeY": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "targetSizeZ": { "type": "number", "default": 1.0, "minimum": 0.0 }
+      }
+    },
+    {
+      "type": "BendMesh",
+      "displayName": "Bend Mesh",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "source", "label": "Source", "pinType": "SpatialMesh" },
+        { "id": "rest", "label": "Rest (optional)", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "captureOriginX": { "type": "number", "default": 0.0 },
+        "captureOriginY": { "type": "number", "default": 0.0 },
+        "captureOriginZ": { "type": "number", "default": 0.0 },
+        "captureDirectionX": { "type": "number", "default": 0.0 },
+        "captureDirectionY": { "type": "number", "default": 1.0 },
+        "captureDirectionZ": { "type": "number", "default": 0.0 },
+        "upDirectionX": { "type": "number", "default": 1.0 },
+        "upDirectionY": { "type": "number", "default": 0.0 },
+        "upDirectionZ": { "type": "number", "default": 0.0 },
+        "captureLength": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "angle": { "type": "number", "default": 0.0 },
+        "maskAttribute": { "type": "string", "default": "bendmask" }
+      }
+    },
+    {
       "type": "CopyMeshToPoints",
       "displayName": "Copy Mesh To Points",
       "category": "Mesh",

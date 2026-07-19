@@ -1,12 +1,14 @@
 #include "graph_parser.hpp"
 
 #include "elements/pcg_element.hpp"
+#include "elements/node_contracts.hpp"
 #include "internal/error_util.hpp"
 
 #include <algorithm>
 #include <cstdio>
 #include <set>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -61,6 +63,8 @@ bool parse_edges(const nlohmann::json& array,
         edge.target = edge_json["target"].get<std::string>();
         edge.source_handle = edge_json.value("sourceHandle", "out");
         edge.target_handle = edge_json.value("targetHandle", "in");
+        edge.source_pin_type = edge_json.value("sourcePinType", "");
+        edge.target_pin_type = edge_json.value("targetPinType", "");
         edges.push_back(std::move(edge));
     }
     return true;
@@ -204,6 +208,8 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
                 flat.target = target.node;
                 flat.source_handle = source.handle;
                 flat.target_handle = target.handle;
+                flat.source_pin_type = edge.source_pin_type;
+                flat.target_pin_type = edge.target_pin_type;
                 out.edges.push_back(std::move(flat));
             }
         }
@@ -303,7 +309,7 @@ PcgResultCode validate_graph_structure(const Graph& graph,
                                        char* err_buf,
                                        int err_buf_size)
 {
-    if (graph.version != "1.0")
+    if (graph.version != "1.0" && graph.version != "2.0")
         return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON, "Unsupported graph version");
 
     if (graph.nodes.empty())
@@ -317,6 +323,9 @@ PcgResultCode validate_graph_structure(const Graph& graph,
             std::snprintf(msg, sizeof(msg), "Unknown node type: \"%s\"", node.type.c_str());
             return fail(err_buf, err_buf_size, PCG_ERR_UNKNOWN_NODE, msg);
         }
+        if (!elements::find_node_contract(node.type))
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Executable node is missing from node manifest");
 
         node_by_id[node.id] = &node;
     }
@@ -360,6 +369,38 @@ PcgResultCode validate_graph_structure(const Graph& graph,
 
     if (visited != graph.nodes.size())
         return fail(err_buf, err_buf_size, PCG_ERR_CYCLE_DETECTED, "Cycle detected in graph");
+
+    std::set<std::tuple<std::string, std::string, std::string, std::string>> edge_signatures;
+    std::unordered_map<std::string, int> target_pin_counts;
+    for (const auto& edge : graph.edges) {
+        const auto* source_contract = elements::find_node_contract(node_by_id.at(edge.source)->type);
+        const auto* target_contract = elements::find_node_contract(node_by_id.at(edge.target)->type);
+        if (!source_contract || !target_contract)
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Executable node is missing from node manifest");
+        const auto source_pin = source_contract->outputs.find(edge.source_handle);
+        if (source_pin == source_contract->outputs.end())
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Edge source handle is not declared by node manifest");
+        const auto target_pin = target_contract->inputs.find(edge.target_handle);
+        if (target_pin == target_contract->inputs.end())
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Edge target handle is not declared by node manifest");
+        if (!elements::pin_types_compatible(source_pin->second.type, target_pin->second.type))
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Edge pin types are incompatible");
+        if ((!edge.source_pin_type.empty() && edge.source_pin_type != source_pin->second.type) ||
+            (!edge.target_pin_type.empty() && edge.target_pin_type != target_pin->second.type))
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Edge pin type metadata does not match node manifest");
+        if (!edge_signatures.emplace(edge.source, edge.source_handle,
+                                     edge.target, edge.target_handle).second)
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON, "Duplicate edge");
+        const std::string key = edge.target + "\x1f" + edge.target_handle;
+        if (++target_pin_counts[key] > 1 && !target_pin->second.variadic)
+            return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
+                        "Multiple edges connected to a non-variadic input");
+    }
 
     return PCG_OK;
 }

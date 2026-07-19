@@ -67,10 +67,19 @@ namespace DJTechEditor.PCG.Graph
             if (!skipTypeCheck && !PcgNodeManifest.CanConnect(sourceType, targetType, sourceHandle, targetHandle))
                 return false;
 
+            var variadic = PcgNodeManifest.TryGet(targetType, out var targetDef) &&
+                targetDef.inputs.FirstOrDefault(pin => pin.id == targetHandle)?.variadic == true;
             var duplicateIn = existingEdges.Any(e =>
-                e.input?.node is PcgGraphNodeBase target &&
-                target.NodeId == targetId &&
-                (e.input.userData as string ?? e.input.portName) == targetHandle);
+            {
+                if (e.input?.node is not PcgGraphNodeBase target || target.NodeId != targetId ||
+                    (e.input.userData as string ?? e.input.portName) != targetHandle)
+                    return false;
+                if (!variadic)
+                    return true;
+                return e.output?.node is PcgGraphNodeBase source &&
+                    source.NodeId == sourceId &&
+                    (e.output.userData as string ?? e.output.portName) == sourceHandle;
+            });
 
             return !duplicateIn;
         }

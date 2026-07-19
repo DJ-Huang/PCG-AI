@@ -4,6 +4,7 @@
 // Triangulation is deferred to Sink / explicit Triangulate nodes.
 
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_attribute_table.hpp"
 #include "geometry/group_table.hpp"
 
 #include <array>
@@ -34,6 +35,21 @@ struct NormalComputeOptions {
     bool hard_group_boundaries = true;
 };
 
+struct GeometryElementRemap {
+    // Destination element index -> source element index. -1 means generated.
+    std::vector<int> points;
+    std::vector<int> vertices;
+    std::vector<int> primitives;
+};
+
+struct GeometryAffineTransform {
+    // Row-major 3x3 linear transform followed by translation.
+    std::array<double, 9> linear{1.0, 0.0, 0.0,
+                                 0.0, 1.0, 0.0,
+                                 0.0, 0.0, 1.0};
+    PcgVec3 translation{};
+};
+
 class PcgGeometry {
 public:
     std::vector<PcgVec3>& points_mut() { return points_; }
@@ -44,6 +60,17 @@ public:
     const geometry::GroupTable& groups() const { return groups_; }
     GeometryDetailMeta& detail() { return detail_; }
     const GeometryDetailMeta& detail() const { return detail_; }
+    AttributeTable& attributes() { return attributes_; }
+    const AttributeTable& attributes() const { return attributes_; }
+
+    AttributeCounts attribute_counts() const
+    {
+        return {points_.size(), static_cast<size_t>(corner_count()), faces_.size(), 1};
+    }
+    bool validate_attributes(std::string* error = nullptr) const
+    {
+        return attributes_.validate(attribute_counts(), error);
+    }
 
     bool has_colors() const { return has_colors_; }
     const std::vector<PcgColor>& colors() const { return colors_; }
@@ -76,6 +103,7 @@ private:
     std::vector<std::vector<int>> faces_;
     geometry::GroupTable groups_;
     GeometryDetailMeta detail_;
+    AttributeTable attributes_;
     std::vector<PcgColor> colors_;
     bool has_colors_ = false;
     std::vector<PcgVec2> uvs_;
@@ -105,6 +133,17 @@ PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalCompu
 
 /// Rebuild polygon topology from triangle soup (weld + coplanar merge via BMesh).
 PcgGeometry geometry_from_mesh(const PcgMeshData& mesh);
+
+/// Propagate attributes, fixed channels, materials, and groups through a topology edit.
+/// Destination topology must already be populated and remap sizes must match its domains.
+void propagate_geometry_data(const PcgGeometry& source,
+                             PcgGeometry& destination,
+                             const GeometryElementRemap& remap);
+PcgVec3 transform_position(const GeometryAffineTransform& transform, const PcgVec3& value);
+PcgVec3 transform_vector(const GeometryAffineTransform& transform, const PcgVec3& value);
+PcgVec3 transform_normal(const GeometryAffineTransform& transform, const PcgVec3& value);
+void transform_geometry_attributes(PcgGeometry& geometry,
+                                   const GeometryAffineTransform& transform);
 
 /// Enumerate manifold edges; boundary edges have face1 < 0.
 std::vector<int64_t> geometry_edge_keys(const PcgGeometry& geometry);

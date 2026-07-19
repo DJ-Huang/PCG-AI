@@ -174,6 +174,33 @@ data::PcgVec3 rotate_about_axis(const data::PcgVec3& point,
     return add(rotated, center);
 }
 
+void apply_position_attribute_deltas(const data::PcgGeometry& source,
+                                     data::PcgGeometry& destination,
+                                     const std::vector<int>& destination_to_source)
+{
+    if (destination_to_source.size() != destination.points().size())
+        return;
+    for (const auto& name : destination.attributes().names(data::AttributeOwner::Point)) {
+        auto* attribute = destination.attributes().find(data::AttributeOwner::Point, name);
+        if (!attribute || attribute->schema().type != data::AttributeType::Float ||
+            attribute->schema().tuple_size < 3 ||
+            attribute->schema().transform_role != data::AttributeTransformRole::Position)
+            continue;
+        auto& values = attribute->float_values_mut();
+        const size_t width = static_cast<size_t>(attribute->schema().tuple_size);
+        for (size_t point = 0; point < destination.points().size(); ++point) {
+            const int source_point = destination_to_source[point];
+            if (source_point < 0 || static_cast<size_t>(source_point) >= source.points().size())
+                continue;
+            const auto delta = sub(destination.points()[point],
+                                   source.points()[static_cast<size_t>(source_point)]);
+            values[point * width] += delta.x;
+            values[point * width + 1] += delta.y;
+            values[point * width + 2] += delta.z;
+        }
+    }
+}
+
 } // namespace
 
 data::PcgGeometry loft_splines(const std::vector<data::PcgSpline>& input_profiles,
@@ -253,6 +280,7 @@ data::PcgGeometry mirror_geometry(const data::PcgGeometry& input,
                                   const MirrorMeshOptions& options)
 {
     data::PcgGeometry mirrored;
+    data::GeometryElementRemap topology_remap;
     std::vector<int> remap(input.points().size(), -1);
     for (size_t i = 0; i < input.points().size(); ++i) {
         auto p = input.points()[i];
@@ -262,14 +290,34 @@ data::PcgGeometry mirror_geometry(const data::PcgGeometry& input,
         *coordinate = options.offset * 2.0 - *coordinate;
         remap[i] = static_cast<int>(mirrored.points().size());
         mirrored.points_mut().push_back(p);
+        topology_remap.points.push_back(static_cast<int>(i));
     }
-    for (const auto& face : input.faces()) {
+    int source_corner_offset = 0;
+    for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
+        const auto& face = input.faces()[face_index];
         std::vector<int> next;
-        for (auto it = face.rbegin(); it != face.rend(); ++it)
+        for (auto it = face.rbegin(); it != face.rend(); ++it) {
             next.push_back(remap[static_cast<size_t>(*it)]);
+            const int local = static_cast<int>(std::distance(it, face.rend())) - 1;
+            topology_remap.vertices.push_back(source_corner_offset + local);
+        }
         mirrored.faces_mut().push_back(std::move(next));
+        topology_remap.primitives.push_back(static_cast<int>(face_index));
+        source_corner_offset += static_cast<int>(face.size());
     }
-    mirrored.detail() = input.detail();
+    data::propagate_geometry_data(input, mirrored, topology_remap);
+    data::GeometryAffineTransform mirror_transform;
+    if (options.axis == "y" || options.axis == "Y") {
+        mirror_transform.linear[4] = -1.0;
+        mirror_transform.translation.y = options.offset * 2.0;
+    } else if (options.axis == "z" || options.axis == "Z") {
+        mirror_transform.linear[8] = -1.0;
+        mirror_transform.translation.z = options.offset * 2.0;
+    } else {
+        mirror_transform.linear[0] = -1.0;
+        mirror_transform.translation.x = options.offset * 2.0;
+    }
+    data::transform_geometry_attributes(mirrored, mirror_transform);
     data::PcgGeometry result = options.merge_original ? data::merge_geometries(input, mirrored, "mirror_")
                                                       : std::move(mirrored);
     if (options.merge_original && options.weld_seam)
@@ -282,7 +330,7 @@ data::PcgGeometry fuse_geometry(const data::PcgGeometry& input,
                                 const FuseMeshOptions& options)
 {
     data::PcgGeometry output;
-    output.detail() = input.detail();
+    data::GeometryElementRemap topology_remap;
     const double tolerance = std::max(0.00000001, options.tolerance);
     std::unordered_map<std::string, int> welded;
     std::vector<int> point_remap(input.points().size(), -1);
@@ -296,35 +344,47 @@ data::PcgGeometry fuse_geometry(const data::PcgGeometry& input,
             welded.emplace(key, index);
             point_remap[i] = index;
             output.points_mut().push_back(input.points()[i]);
+            topology_remap.points.push_back(static_cast<int>(i));
         }
     }
 
-    std::vector<int> face_remap(input.faces().size(), -1);
     std::unordered_set<std::string> unique_faces;
+    int source_corner_offset = 0;
     for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
         std::vector<int> face;
-        for (int old_index : input.faces()[face_index]) {
+        std::vector<int> vertex_sources;
+        for (size_t corner = 0; corner < input.faces()[face_index].size(); ++corner) {
+            const int old_index = input.faces()[face_index][corner];
             const int index = point_remap[static_cast<size_t>(old_index)];
-            if (face.empty() || face.back() != index) face.push_back(index);
+            if (face.empty() || face.back() != index) {
+                face.push_back(index);
+                vertex_sources.push_back(source_corner_offset + static_cast<int>(corner));
+            }
         }
-        if (face.size() > 1 && face.front() == face.back()) face.pop_back();
+        if (face.size() > 1 && face.front() == face.back()) {
+            face.pop_back();
+            vertex_sources.pop_back();
+        }
         std::unordered_set<int> distinct(face.begin(), face.end());
-        if (options.remove_degenerate && distinct.size() < 3) continue;
+        if (options.remove_degenerate && distinct.size() < 3) {
+            source_corner_offset += static_cast<int>(input.faces()[face_index].size());
+            continue;
+        }
         std::vector<int> canonical(face.begin(), face.end());
         std::sort(canonical.begin(), canonical.end());
         std::string key;
         for (int index : canonical) key += std::to_string(index) + ',';
-        if (!unique_faces.insert(key).second) continue;
-        face_remap[face_index] = static_cast<int>(output.faces().size());
-        output.faces_mut().push_back(std::move(face));
-    }
-
-    for (const auto& name : input.groups().group_names(geometry::GroupDomain::Face)) {
-        for (int old_face : input.groups().members(geometry::GroupDomain::Face, name)) {
-            if (old_face >= 0 && static_cast<size_t>(old_face) < face_remap.size() && face_remap[old_face] >= 0)
-                output.groups().add(geometry::GroupDomain::Face, name, face_remap[old_face]);
+        if (!unique_faces.insert(key).second) {
+            source_corner_offset += static_cast<int>(input.faces()[face_index].size());
+            continue;
         }
+        output.faces_mut().push_back(std::move(face));
+        topology_remap.primitives.push_back(static_cast<int>(face_index));
+        topology_remap.vertices.insert(topology_remap.vertices.end(),
+                                       vertex_sources.begin(), vertex_sources.end());
+        source_corner_offset += static_cast<int>(input.faces()[face_index].size());
     }
+    data::propagate_geometry_data(input, output, topology_remap);
     data::maintain_unshared_edge_group(output);
     return output;
 }
@@ -332,24 +392,39 @@ data::PcgGeometry fuse_geometry(const data::PcgGeometry& input,
 data::PcgGeometry poly_extrude_geometry(const data::PcgGeometry& input,
                                         const PolyExtrudeOptions& options)
 {
-    data::PcgGeometry output = input;
-    std::unordered_set<int> selected;
+    data::PcgGeometry output;
+    output.points_mut() = input.points();
+    data::GeometryElementRemap topology_remap;
+    topology_remap.points.reserve(input.points().size());
+    for (size_t i = 0; i < input.points().size(); ++i)
+        topology_remap.points.push_back(static_cast<int>(i));
+
+    std::unordered_set<geometry::GroupId> selected;
     if (options.face_group.empty()) {
-        for (size_t i = 0; i < input.faces().size(); ++i) selected.insert(static_cast<int>(i));
+        for (size_t i = 0; i < input.faces().size(); ++i)
+            selected.insert(static_cast<geometry::GroupId>(i));
     } else {
         selected = input.groups().eval(geometry::GroupDomain::Face, options.face_group);
     }
-    if (selected.empty()) return output;
+    if (selected.empty()) return input;
 
-    std::vector<std::vector<int>> faces;
+    std::vector<int> source_corner_offsets(input.faces().size(), 0);
+    int corner_cursor = 0;
     for (size_t i = 0; i < input.faces().size(); ++i) {
-        if (selected.count(static_cast<int>(i)) == 0 || options.keep_original)
-            faces.push_back(input.faces()[i]);
+        source_corner_offsets[i] = corner_cursor;
+        corner_cursor += static_cast<int>(input.faces()[i].size());
+        if (selected.count(static_cast<geometry::GroupId>(i)) == 0 || options.keep_original) {
+            output.faces_mut().push_back(input.faces()[i]);
+            topology_remap.primitives.push_back(static_cast<int>(i));
+            for (size_t corner = 0; corner < input.faces()[i].size(); ++corner)
+                topology_remap.vertices.push_back(source_corner_offsets[i] +
+                                                  static_cast<int>(corner));
+        }
     }
-    output.faces_mut() = std::move(faces);
-    output.groups() = {};
 
-    for (int selected_index : selected) {
+    std::vector<std::pair<size_t, size_t>> generated_face_ranges;
+    for (geometry::GroupId selected_id : selected) {
+        const int selected_index = static_cast<int>(selected_id);
         if (selected_index < 0 || static_cast<size_t>(selected_index) >= input.faces().size()) continue;
         const auto& base = input.faces()[static_cast<size_t>(selected_index)];
         if (base.size() < 3) continue;
@@ -367,16 +442,40 @@ data::PcgGeometry poly_extrude_geometry(const data::PcgGeometry& input,
             p = add(p, scale(normal, options.distance));
             top.push_back(static_cast<int>(output.points().size()));
             output.points_mut().push_back(p);
+            topology_remap.points.push_back(index);
         }
+        generated_face_ranges.push_back({output.faces().size(), base.size()});
         for (size_t edge = 0; edge < base.size(); ++edge) {
             const size_t next = (edge + 1) % base.size();
-            const int face_index = static_cast<int>(output.faces().size());
             output.faces_mut().push_back({base[edge], base[next], top[next], top[edge]});
-            output.groups().add(geometry::GroupDomain::Face, options.side_group, face_index);
+            topology_remap.primitives.push_back(selected_index);
+            const int corner_base = source_corner_offsets[static_cast<size_t>(selected_index)];
+            topology_remap.vertices.push_back(corner_base + static_cast<int>(edge));
+            topology_remap.vertices.push_back(corner_base + static_cast<int>(next));
+            topology_remap.vertices.push_back(corner_base + static_cast<int>(next));
+            topology_remap.vertices.push_back(corner_base + static_cast<int>(edge));
         }
-        const int top_index = static_cast<int>(output.faces().size());
         output.faces_mut().push_back(std::move(top));
-        output.groups().add(geometry::GroupDomain::Face, options.top_group, top_index);
+        topology_remap.primitives.push_back(selected_index);
+        for (size_t corner = 0; corner < base.size(); ++corner)
+            topology_remap.vertices.push_back(
+                source_corner_offsets[static_cast<size_t>(selected_index)] +
+                static_cast<int>(corner));
+    }
+
+    data::propagate_geometry_data(input, output, topology_remap);
+
+    // Generated top points inherit source point attributes, then position-role
+    // attributes follow the same displacement as the authoritative point.
+    apply_position_attribute_deltas(input, output, topology_remap.points);
+
+    for (const auto& [first_face, side_count] : generated_face_ranges) {
+        size_t generated_face = first_face;
+        for (size_t side = 0; side < side_count; ++side)
+            output.groups().add(geometry::GroupDomain::Face, options.side_group,
+                                static_cast<geometry::GroupId>(generated_face++));
+        output.groups().add(geometry::GroupDomain::Face, options.top_group,
+                            static_cast<geometry::GroupId>(generated_face++));
     }
     data::maintain_unshared_edge_group(output);
     return output;
@@ -391,16 +490,30 @@ data::PcgGeometry copy_geometry(const data::PcgGeometry& input,
     for (int copy = 0; copy < count; ++copy) {
         data::PcgGeometry instance = input;
         const double t = count <= 1 ? 0.0 : static_cast<double>(copy) / static_cast<double>(count);
-        for (auto& p : instance.points_mut()) {
-            if (options.mode == "linear") {
-                p.x += options.translate_x * copy;
-                p.y += options.translate_y * copy;
-                p.z += options.translate_z * copy;
-            } else {
-                p = rotate_about_axis(p, center, options.axis, options.angle * t * kPi / 180.0);
-            }
+        data::GeometryAffineTransform transform;
+        if (options.mode == "linear") {
+            transform.translation = {options.translate_x * copy,
+                                     options.translate_y * copy,
+                                     options.translate_z * copy};
+        } else {
+            const double angle = options.angle * t * kPi / 180.0;
+            const auto origin = rotate_about_axis({0.0, 0.0, 0.0}, center, options.axis, angle);
+            const auto x = rotate_about_axis({1.0, 0.0, 0.0}, center, options.axis, angle);
+            const auto y = rotate_about_axis({0.0, 1.0, 0.0}, center, options.axis, angle);
+            const auto z = rotate_about_axis({0.0, 0.0, 1.0}, center, options.axis, angle);
+            transform.linear = {
+                x.x - origin.x, y.x - origin.x, z.x - origin.x,
+                x.y - origin.y, y.y - origin.y, z.y - origin.y,
+                x.z - origin.z, y.z - origin.z, z.z - origin.z,
+            };
+            transform.translation = origin;
         }
-        output = data::merge_geometries(output, instance, "copy" + std::to_string(copy) + "_");
+        for (auto& point : instance.points_mut())
+            point = data::transform_position(transform, point);
+        data::transform_geometry_attributes(instance, transform);
+        // Copy SOP semantics union same-named groups across instances. Per-copy
+        // prefixes would silently break downstream group selectors.
+        output = data::merge_geometries(output, instance);
     }
     output.detail() = input.detail();
     data::maintain_unshared_edge_group(output);
@@ -411,6 +524,7 @@ data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
                                  const ShellMeshOptions& options)
 {
     data::PcgGeometry output;
+    data::GeometryElementRemap topology_remap;
     if (input.points().empty() || input.faces().empty() || options.thickness <= 0.0)
         return output;
 
@@ -440,28 +554,45 @@ data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
     }
 
     const int point_count = static_cast<int>(input.points().size());
-    for (size_t i = 0; i < input.points().size(); ++i)
+    for (size_t i = 0; i < input.points().size(); ++i) {
         output.points_mut().push_back(add(input.points()[i], scale(normals[i], outer_distance)));
-    for (size_t i = 0; i < input.points().size(); ++i)
+        topology_remap.points.push_back(static_cast<int>(i));
+    }
+    for (size_t i = 0; i < input.points().size(); ++i) {
         output.points_mut().push_back(add(input.points()[i], scale(normals[i], inner_distance)));
+        topology_remap.points.push_back(static_cast<int>(i));
+    }
 
-    for (const auto& face : input.faces()) {
+    std::vector<int> source_corner_offsets(input.faces().size(), 0);
+    int source_corner_cursor = 0;
+    for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
+        const auto& face = input.faces()[face_index];
+        source_corner_offsets[face_index] = source_corner_cursor;
         const int outer_face = static_cast<int>(output.faces().size());
         output.faces_mut().push_back(face);
         output.groups().add(geometry::GroupDomain::Face, options.outer_group, outer_face);
+        topology_remap.primitives.push_back(static_cast<int>(face_index));
+        for (size_t corner = 0; corner < face.size(); ++corner)
+            topology_remap.vertices.push_back(source_corner_cursor + static_cast<int>(corner));
 
         std::vector<int> inner;
         inner.reserve(face.size());
-        for (auto it = face.rbegin(); it != face.rend(); ++it)
+        for (auto it = face.rbegin(); it != face.rend(); ++it) {
             inner.push_back(*it + point_count);
+            const int local = static_cast<int>(std::distance(it, face.rend())) - 1;
+            topology_remap.vertices.push_back(source_corner_cursor + local);
+        }
         const int inner_face = static_cast<int>(output.faces().size());
         output.faces_mut().push_back(std::move(inner));
         output.groups().add(geometry::GroupDomain::Face, options.inner_group, inner_face);
+        topology_remap.primitives.push_back(static_cast<int>(face_index));
+        source_corner_cursor += static_cast<int>(face.size());
     }
 
     if (options.close_boundaries) {
         std::unordered_set<int64_t> emitted;
-        for (const auto& face : input.faces()) {
+        for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
+            const auto& face = input.faces()[face_index];
             for (size_t edge = 0; edge < face.size(); ++edge) {
                 const int a = face[edge];
                 const int b = face[(edge + 1) % face.size()];
@@ -470,10 +601,18 @@ data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
                 const int rim_face = static_cast<int>(output.faces().size());
                 output.faces_mut().push_back({a, b, b + point_count, a + point_count});
                 output.groups().add(geometry::GroupDomain::Face, options.rim_group, rim_face);
+                topology_remap.primitives.push_back(static_cast<int>(face_index));
+                const int source_corner = source_corner_offsets[face_index];
+                const int next = static_cast<int>((edge + 1) % face.size());
+                topology_remap.vertices.push_back(source_corner + static_cast<int>(edge));
+                topology_remap.vertices.push_back(source_corner + next);
+                topology_remap.vertices.push_back(source_corner + next);
+                topology_remap.vertices.push_back(source_corner + static_cast<int>(edge));
             }
         }
     }
-    output.detail() = input.detail();
+    data::propagate_geometry_data(input, output, topology_remap);
+    apply_position_attribute_deltas(input, output, topology_remap.points);
     data::maintain_unshared_edge_group(output);
     return output;
 }

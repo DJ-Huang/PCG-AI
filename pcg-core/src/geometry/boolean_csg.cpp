@@ -778,7 +778,7 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
         }
         if (is_seam) {
             int64_t ek = edge_key(ov0, ov1);
-            out.groups().add(geometry::GroupDomain::Edge, BooleanGroups::AB_SEAMS, static_cast<int>(ek));
+            out.groups().add(geometry::GroupDomain::Edge, BooleanGroups::AB_SEAMS, ek);
         }
     };
 
@@ -1041,9 +1041,9 @@ data::PcgGeometry extract_sampled_boundary(
                 out.groups().add(
                     geometry::GroupDomain::Edge,
                     BooleanGroups::AB_SEAMS,
-                    static_cast<int>(edge_key(
+                    edge_key(
                         edge == 0 ? ov0 : (edge == 1 ? ov1 : ov2),
-                        edge == 0 ? ov1 : (edge == 1 ? ov2 : ov0))));
+                        edge == 0 ? ov1 : (edge == 1 ? ov2 : ov0)));
             }
         }
     }

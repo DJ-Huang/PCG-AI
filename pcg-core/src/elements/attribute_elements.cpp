@@ -398,11 +398,6 @@ data::PcgSplineData blast_splines(const data::PcgSplineData& source,
     return output;
 }
 
-int encode_edge(int a, int b)
-{
-    return static_cast<int>(static_cast<int64_t>(std::min(a, b)) * 1000000 + std::max(a, b));
-}
-
 data::PcgGeometry rebuild_geometry(const data::PcgGeometry& source,
                                    const std::vector<bool>& initial_keep_points,
                                    const std::vector<bool>& keep_faces,
@@ -468,16 +463,19 @@ data::PcgGeometry rebuild_geometry(const data::PcgGeometry& source,
         }
     }
     for (const auto& name : source.groups().group_names(geometry::GroupDomain::Edge)) {
-        for (int old_edge : source.groups().members(geometry::GroupDomain::Edge, name)) {
-            const int old_a = old_edge / 1000000;
-            const int old_b = old_edge % 1000000;
+        for (geometry::GroupId old_edge :
+             source.groups().members(geometry::GroupDomain::Edge, name)) {
+            const auto endpoints = geometry::edge_group_points(old_edge);
+            const int old_a = endpoints[0];
+            const int old_b = endpoints[1];
             if (old_a < 0 || old_b < 0 || static_cast<size_t>(old_a) >= point_remap.size() ||
                 static_cast<size_t>(old_b) >= point_remap.size())
                 continue;
             const int a = point_remap[static_cast<size_t>(old_a)];
             const int b = point_remap[static_cast<size_t>(old_b)];
             if (a >= 0 && b >= 0)
-                output.groups().add(geometry::GroupDomain::Edge, name, encode_edge(a, b));
+                output.groups().add(geometry::GroupDomain::Edge, name,
+                                    geometry::edge_group_id(a, b));
         }
     }
 
@@ -533,7 +531,7 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
 
     if (primitives) {
         const auto group_members = group.empty()
-            ? std::unordered_set<int>{}
+            ? std::unordered_set<geometry::GroupId>{}
             : source.groups().eval(geometry::GroupDomain::Face, group);
         for (size_t face_index = 0; face_index < source.faces().size(); ++face_index) {
             double x = 0.0, y = 0.0, z = 0.0;
@@ -565,7 +563,7 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
         }
     } else {
         const auto group_members = group.empty()
-            ? std::unordered_set<int>{}
+            ? std::unordered_set<geometry::GroupId>{}
             : source.groups().eval(geometry::GroupDomain::Point, group);
         for (size_t point_index = 0; point_index < source.points().size(); ++point_index) {
             const auto& source_point = source.points()[point_index];

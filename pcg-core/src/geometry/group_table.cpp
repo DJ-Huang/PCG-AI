@@ -19,7 +19,20 @@ std::string trim(const std::string& s)
 
 } // namespace
 
-const std::unordered_set<int> GroupTable::kEmpty{};
+GroupId edge_group_id(int point_a, int point_b)
+{
+    const uint32_t a = static_cast<uint32_t>(std::min(point_a, point_b));
+    const uint32_t b = static_cast<uint32_t>(std::max(point_a, point_b));
+    return static_cast<GroupId>((static_cast<uint64_t>(a) << 32u) | b);
+}
+
+std::array<int, 2> edge_group_points(GroupId id)
+{
+    const uint64_t bits = static_cast<uint64_t>(id);
+    return {static_cast<int>(bits >> 32u), static_cast<int>(bits & 0xffffffffu)};
+}
+
+const std::unordered_set<GroupId> GroupTable::kEmpty{};
 
 GroupTable::GroupMap& GroupTable::map_for(GroupDomain domain)
 {
@@ -30,6 +43,8 @@ GroupTable::GroupMap& GroupTable::map_for(GroupDomain domain)
         return edge_groups_;
     case GroupDomain::Face:
         return face_groups_;
+    case GroupDomain::Vertex:
+        return vertex_groups_;
     }
     return edge_groups_;
 }
@@ -39,7 +54,7 @@ const GroupTable::GroupMap& GroupTable::map_for(GroupDomain domain) const
     return const_cast<GroupTable*>(this)->map_for(domain);
 }
 
-bool GroupTable::contains(GroupDomain domain, const std::string& name, int id) const
+bool GroupTable::contains(GroupDomain domain, const std::string& name, GroupId id) const
 {
     const auto& groups = map_for(domain);
     const auto it = groups.find(name);
@@ -48,12 +63,12 @@ bool GroupTable::contains(GroupDomain domain, const std::string& name, int id) c
     return it->second.count(id) > 0;
 }
 
-void GroupTable::add(GroupDomain domain, const std::string& name, int id)
+void GroupTable::add(GroupDomain domain, const std::string& name, GroupId id)
 {
     map_for(domain)[name].insert(id);
 }
 
-void GroupTable::remove(GroupDomain domain, const std::string& name, int id)
+void GroupTable::remove(GroupDomain domain, const std::string& name, GroupId id)
 {
     auto& groups = map_for(domain);
     const auto it = groups.find(name);
@@ -69,8 +84,8 @@ void GroupTable::clear_group(GroupDomain domain, const std::string& name)
     map_for(domain).erase(name);
 }
 
-const std::unordered_set<int>& GroupTable::members(GroupDomain domain,
-                                                  const std::string& name) const
+const std::unordered_set<GroupId>& GroupTable::members(GroupDomain domain,
+                                                       const std::string& name) const
 {
     const auto& groups = map_for(domain);
     const auto it = groups.find(name);
@@ -102,8 +117,8 @@ void GroupTable::intersect_into(GroupDomain domain,
 {
     const auto& a_members = members(domain, a);
     const auto& b_members = members(domain, b);
-    std::unordered_set<int> result;
-    for (int id : a_members) {
+    std::unordered_set<GroupId> result;
+    for (GroupId id : a_members) {
         if (b_members.count(id) > 0)
             result.insert(id);
     }
@@ -126,13 +141,13 @@ void GroupTable::subtract_into(GroupDomain domain, const std::string& dst, const
         return;
 
     auto& dst_members = dst_it->second;
-    for (int id : src_it->second)
+    for (GroupId id : src_it->second)
         dst_members.erase(id);
     if (dst_members.empty())
         groups.erase(dst_it);
 }
 
-std::unordered_set<int> GroupTable::eval(GroupDomain domain, const std::string& expr) const
+std::unordered_set<GroupId> GroupTable::eval(GroupDomain domain, const std::string& expr) const
 {
     const std::string trimmed = trim(expr);
     if (trimmed.empty())
@@ -144,8 +159,8 @@ std::unordered_set<int> GroupTable::eval(GroupDomain domain, const std::string& 
         const std::string right = trim(trimmed.substr(amp + 1));
         const auto left_set = eval(domain, left);
         const auto right_set = eval(domain, right);
-        std::unordered_set<int> result;
-        for (int id : left_set) {
+        std::unordered_set<GroupId> result;
+        for (GroupId id : left_set) {
             if (right_set.count(id) > 0)
                 result.insert(id);
         }
@@ -158,7 +173,7 @@ std::unordered_set<int> GroupTable::eval(GroupDomain domain, const std::string& 
         const std::string right = trim(trimmed.substr(minus + 1));
         auto result = eval(domain, left);
         const auto sub = eval(domain, right);
-        for (int id : sub)
+        for (GroupId id : sub)
             result.erase(id);
         return result;
     }
@@ -178,12 +193,13 @@ void GroupTable::merge_from(const GroupTable& other, const std::string& prefix)
     merge_domain(GroupDomain::Point);
     merge_domain(GroupDomain::Edge);
     merge_domain(GroupDomain::Face);
+    merge_domain(GroupDomain::Vertex);
 }
 
 bool GroupTable::operator==(const GroupTable& other) const
 {
     return point_groups_ == other.point_groups_ && edge_groups_ == other.edge_groups_ &&
-           face_groups_ == other.face_groups_;
+           face_groups_ == other.face_groups_ && vertex_groups_ == other.vertex_groups_;
 }
 
 } // namespace pcg::internal::geometry
