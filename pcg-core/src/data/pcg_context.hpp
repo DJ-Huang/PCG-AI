@@ -8,6 +8,7 @@ namespace pcg::internal {
 class TextureRuntime;
 class MeshRuntime;
 class SplineRuntime;
+class HeightFieldRuntime;
 
 /** Per-node execution context (UE PCGContext analogue). */
 struct PcgContext {
@@ -17,6 +18,7 @@ struct PcgContext {
     const TextureRuntime* textures = nullptr;
     const MeshRuntime* meshes = nullptr;
     const SplineRuntime* splines = nullptr;
+    const HeightFieldRuntime* heightfields = nullptr;
     data::PcgDataCollection inputs;
     data::PcgDataCollection outputs;
     char* err_buf = nullptr;

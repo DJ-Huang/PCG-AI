@@ -15,7 +15,10 @@ namespace DJTechEditor.PCG.Graph
 
         protected Port InputPort { get; set; }
         protected Port OutputPort { get; set; }
+        private VisualElement m_RightTitleRoot;
         private Label m_RightTitleLabel;
+        private Label m_TypeSubtitleLabel;
+        private bool m_ShowTypeSubtitle;
         private TextField m_TitleEditor;
         private VisualElement m_RadialMenu;
         private Button m_PreviewBtn;
@@ -66,7 +69,8 @@ namespace DJTechEditor.PCG.Graph
             {
                 if (evt.clickCount >= 2)
                 {
-                    BeginRename();
+                    if (!HandleDoubleClick())
+                        BeginRename();
                     evt.StopPropagation();
                 }
             });
@@ -110,13 +114,19 @@ namespace DJTechEditor.PCG.Graph
 
         public string GetDisplayTitle() => m_RightTitleLabel?.text ?? title;
 
+        protected virtual bool HandleDoubleClick() => false;
+
         public void SetUserTitle(string userTitle)
         {
             m_UserTitle = userTitle?.Trim() ?? "";
             UpdateDisplayedTitle();
         }
 
+        public void RequestRename() => BeginRename();
+
         protected virtual string GetDefaultTitle() => title;
+
+        protected virtual void ApplyRenamedTitle(string newTitle) => SetUserTitle(newTitle);
 
         private void ConfigureHoudiniPortLayout()
         {
@@ -376,6 +386,7 @@ namespace DJTechEditor.PCG.Graph
             { "SpatialPoint", new Color(0f, 0.8f, 1f) },       // cyan
             { "SpatialSpline", new Color(0.3f, 0.9f, 0.4f) },    // green
             { "SpatialMesh", new Color(1f, 0.6f, 0f) },          // orange
+            { "HeightField", new Color(0.45f, 0.78f, 0.28f) },   // terrain green
             { "Param", new Color(1f, 0.85f, 0f) },               // gold
             { "Texture", new Color(0.7f, 0.3f, 0.9f) },          // purple
             { "Any", new Color(0.65f, 0.65f, 0.65f) },           // gray
@@ -452,30 +463,61 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static float RightTitleTop => Mathf.Max(0f, (NodeHeight - 14f) * 0.5f);
+        private static float RightTitleTop(bool hasSubtitle) =>
+            Mathf.Max(0f, (NodeHeight - (hasSubtitle ? 26f : 14f)) * 0.5f);
 
         private void BuildRightTitleUI()
         {
+            m_RightTitleRoot = new VisualElement
+            {
+                name = "pcg-node-title-root",
+                style =
+                {
+                    position = Position.Absolute,
+                    flexDirection = FlexDirection.Column,
+                    alignItems = Align.FlexStart,
+                    minWidth = 120,
+                    maxWidth = 220,
+                    overflow = Overflow.Visible,
+                },
+            };
+            // Display-only overlay in contentViewContainer — must not intercept hits
+            // or it can block SelectionDragger on a neighbouring node body.
+            m_RightTitleRoot.pickingMode = PickingMode.Ignore;
+
             m_RightTitleLabel = new Label
             {
                 style =
                 {
-                    position = Position.Absolute,
-                    right = -132,
-                    top = RightTitleTop,
-                    minWidth = 120,
-                    maxWidth = 220,
                     unityTextAlign = TextAnchor.MiddleLeft,
                     color = new Color(0.9f, 0.9f, 0.9f),
                     unityFontStyleAndWeight = FontStyle.Bold,
                     whiteSpace = WhiteSpace.Normal,
                     overflow = Overflow.Visible,
+                    marginBottom = 0,
+                    paddingBottom = 0,
                 },
             };
-            // The title label is a display-only overlay in contentViewContainer.
-            // It must NOT intercept hits — otherwise it can overlap a neighbouring
-            // node's body and block SelectionDragger from starting a drag.
             m_RightTitleLabel.pickingMode = PickingMode.Ignore;
+
+            m_TypeSubtitleLabel = new Label
+            {
+                style =
+                {
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                    color = new Color(0.62f, 0.62f, 0.62f, 0.95f),
+                    unityFontStyleAndWeight = FontStyle.Normal,
+                    fontSize = 10,
+                    whiteSpace = WhiteSpace.Normal,
+                    overflow = Overflow.Visible,
+                    marginTop = -1,
+                    display = DisplayStyle.None,
+                },
+            };
+            m_TypeSubtitleLabel.pickingMode = PickingMode.Ignore;
+
+            m_RightTitleRoot.Add(m_RightTitleLabel);
+            m_RightTitleRoot.Add(m_TypeSubtitleLabel);
         }
 
         private void BeginRename()
@@ -485,8 +527,6 @@ namespace DJTechEditor.PCG.Graph
 
             m_TitleEditor = new TextField { value = GetDisplayTitle() };
             m_TitleEditor.style.position = Position.Absolute;
-            m_TitleEditor.style.right = -132;
-            m_TitleEditor.style.top = RightTitleTop - 2f;
             m_TitleEditor.style.width = 180;
             m_TitleEditor.style.height = 20;
             m_TitleEditor.RegisterCallback<BlurEvent>(_ => CommitRename());
@@ -519,13 +559,13 @@ namespace DJTechEditor.PCG.Graph
             var newTitle = m_TitleEditor.value?.Trim() ?? "";
             if (graphView != null)
             {
-                graphView.WithUndo("Rename Node", () => SetUserTitle(newTitle));
+                graphView.WithUndo("Rename Node", () => ApplyRenamedTitle(newTitle));
                 graphView.NotifyDocumentChanged();
                 graphView.Inspector?.OnSelectionChanged();
             }
             else
             {
-                SetUserTitle(newTitle);
+                ApplyRenamedTitle(newTitle);
             }
 
             EndRename();
@@ -540,13 +580,35 @@ namespace DJTechEditor.PCG.Graph
             m_TitleEditor = null;
         }
 
-        private void UpdateDisplayedTitle()
+        protected void UpdateDisplayedTitle()
         {
+            var typeHint = GetTypeHintText();
             var finalTitle = string.IsNullOrEmpty(m_UserTitle) ? GetDefaultTitle() : m_UserTitle;
             if (string.IsNullOrEmpty(finalTitle))
-                finalTitle = NodeType;
+                finalTitle = typeHint;
+
             if (m_RightTitleLabel != null)
                 m_RightTitleLabel.text = finalTitle;
+
+            var showTypeHint = !string.IsNullOrEmpty(m_UserTitle)
+                && !string.Equals(m_UserTitle, typeHint, StringComparison.Ordinal);
+            m_ShowTypeSubtitle = showTypeHint;
+            if (m_TypeSubtitleLabel != null)
+            {
+                m_TypeSubtitleLabel.text = typeHint;
+                m_TypeSubtitleLabel.style.display = showTypeHint ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+
+            UpdateOverlayPlacement();
+        }
+
+        /// <summary>Canonical display name for the node type (manifest displayName / subgraph title).</summary>
+        private string GetTypeHintText()
+        {
+            var defaultTitle = GetDefaultTitle();
+            if (!string.IsNullOrEmpty(defaultTitle))
+                return defaultTitle;
+            return NodeType ?? "";
         }
 
         private void BuildHoverRadialMenu()
@@ -715,8 +777,8 @@ namespace DJTechEditor.PCG.Graph
             if (overlayParent == null)
                 return;
 
-            if (m_RightTitleLabel != null && m_RightTitleLabel.parent != overlayParent)
-                overlayParent.Add(m_RightTitleLabel);
+            if (m_RightTitleRoot != null && m_RightTitleRoot.parent != overlayParent)
+                overlayParent.Add(m_RightTitleRoot);
             if (m_RadialMenu != null && m_RadialMenu.parent != overlayParent)
                 overlayParent.Add(m_RadialMenu);
             m_OverlayAttached = true;
@@ -730,7 +792,7 @@ namespace DJTechEditor.PCG.Graph
         /// </summary>
         internal void DetachOverlays()
         {
-            m_RightTitleLabel?.RemoveFromHierarchy();
+            m_RightTitleRoot?.RemoveFromHierarchy();
             m_RadialMenu?.RemoveFromHierarchy();
             m_TitleEditor?.RemoveFromHierarchy();
             m_TitleEditor = null;
@@ -742,17 +804,19 @@ namespace DJTechEditor.PCG.Graph
         {
             EnsureOverlayAttached();
             var rect = GetPosition();
+            var hasSubtitle = m_ShowTypeSubtitle;
+            var titleTop = RightTitleTop(hasSubtitle);
 
-            if (m_RightTitleLabel != null)
+            if (m_RightTitleRoot != null)
             {
-                m_RightTitleLabel.style.left = rect.x + rect.width + 14;
-                m_RightTitleLabel.style.top = rect.y + RightTitleTop;
+                m_RightTitleRoot.style.left = rect.x + rect.width + 14;
+                m_RightTitleRoot.style.top = rect.y + titleTop;
             }
 
             if (m_TitleEditor != null)
             {
                 m_TitleEditor.style.left = rect.x + rect.width + 14;
-                m_TitleEditor.style.top = rect.y + RightTitleTop - 2f;
+                m_TitleEditor.style.top = rect.y + titleTop - 2f;
             }
 
             if (m_RadialMenu != null)

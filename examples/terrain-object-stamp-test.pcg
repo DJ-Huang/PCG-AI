@@ -1,0 +1,173 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "terrain_flat",
+      "type": "HeightField",
+      "position": { "x": 200, "y": 0 },
+      "data": {
+        "__nodeTitle": "Flat Base",
+        "orientation": "zx",
+        "sampling": "corner",
+        "divisionMode": "bySize",
+        "gridSpacing": 2.0,
+        "sizeX": 256.0,
+        "sizeZ": 256.0,
+        "centerX": 0.0,
+        "centerY": 0.0,
+        "centerZ": 0.0,
+        "initialHeight": 0.0,
+        "initialMask": 0.0
+      }
+    },
+    {
+      "id": "stamp_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 520, "y": 0 },
+      "data": {
+        "__nodeTitle": "Stamp Box",
+        "width": 64.0,
+        "height": 80.0,
+        "depth": 64.0
+      }
+    },
+    {
+      "id": "stamp_place",
+      "type": "TransformMesh",
+      "position": { "x": 520, "y": 160 },
+      "data": {
+        "__nodeTitle": "Stamp Place",
+        "translateX": 0.0,
+        "translateY": 40.0,
+        "translateZ": 0.0,
+        "rotationX": 0.0,
+        "rotationY": 0.0,
+        "rotationZ": 0.0,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "scaleZ": 1.0
+      }
+    },
+    {
+      "id": "stamp_mask",
+      "type": "HeightFieldMaskByObject",
+      "position": { "x": 200, "y": 160 },
+      "data": {
+        "__nodeTitle": "Object Stamp Mask",
+        "heightLayer": "height",
+        "outputLayer": "mask",
+        "combine": "replace",
+        "blend": 1.0,
+        "maskingByGeometry": "above",
+        "invertMask": false,
+        "maxRayDistance": 200.0,
+        "value": 1.0,
+        "blurMethod": "gaussian",
+        "blurRadius": 3.0
+      }
+    },
+    {
+      "id": "stamp_raise",
+      "type": "HeightFieldNoise",
+      "position": { "x": 200, "y": 320 },
+      "data": {
+        "__nodeTitle": "Raise Under Stamp",
+        "noiseLayer": "height",
+        "maskLayer": "mask",
+        "noiseType": "perlin",
+        "fractal": "none",
+        "centerNoise": false,
+        "amplitude": 30.0,
+        "elementSize": 512.0,
+        "scaleX": 1.0,
+        "scaleZ": 1.0,
+        "offsetX": 0.0,
+        "offsetZ": 0.0,
+        "maxOctaves": 1,
+        "lacunarity": 2.0,
+        "roughness": 0.5,
+        "seed": 7
+      }
+    },
+    {
+      "id": "terrain_output",
+      "type": "Output",
+      "position": { "x": 200, "y": 480 },
+      "data": {
+        "__nodeTitle": "Output (TerrainData)",
+        "label": "Object Stamp Test"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_flat_mask",
+      "source": "terrain_flat",
+      "sourceHandle": "out",
+      "target": "stamp_mask",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_box_place",
+      "source": "stamp_box",
+      "sourceHandle": "out",
+      "target": "stamp_place",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_place_mask",
+      "source": "stamp_place",
+      "sourceHandle": "out",
+      "target": "stamp_mask",
+      "targetHandle": "geometry"
+    },
+    {
+      "id": "edge_mask_raise_in",
+      "source": "stamp_mask",
+      "sourceHandle": "out",
+      "target": "stamp_raise",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_mask_raise_mask",
+      "source": "stamp_mask",
+      "sourceHandle": "out",
+      "target": "stamp_raise",
+      "targetHandle": "mask"
+    },
+    {
+      "id": "edge_raise_out",
+      "source": "stamp_raise",
+      "sourceHandle": "out",
+      "target": "terrain_output",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "stamp_height",
+      "name": "Stamp Height",
+      "type": "number",
+      "default": 30.0,
+      "exposed": true,
+      "hasRange": true,
+      "min": 0.0,
+      "max": 60.0,
+      "targetNode": "stamp_raise",
+      "targetProperty": "amplitude"
+    },
+    {
+      "id": "stamp_blur",
+      "name": "Stamp Soft Edge",
+      "type": "number",
+      "default": 3.0,
+      "exposed": true,
+      "hasRange": true,
+      "min": 0.0,
+      "max": 16.0,
+      "targetNode": "stamp_mask",
+      "targetProperty": "blurRadius"
+    }
+  ],
+  "subgraphs": []
+}

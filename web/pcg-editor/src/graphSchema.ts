@@ -25,6 +25,23 @@ export interface GraphEdge {
   target: string;
   sourceHandle?: string;
   targetHandle?: string;
+  sourcePinType?: string;
+  targetPinType?: string;
+}
+
+export interface GraphSubgraphPort {
+  id: string;
+  name: string;
+  pinType: string;
+}
+
+export interface GraphSubgraph {
+  id: string;
+  name: string;
+  inputs: GraphSubgraphPort[];
+  outputs: GraphSubgraphPort[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 // ── Parameters ─────────────────────────────────────────
@@ -47,10 +64,11 @@ export interface GraphParameter {
 // ── Graph Document ─────────────────────────────────────
 
 export interface GraphJson {
-  version: '1.0';
+  version: '1.0' | '2.0';
   nodes: GraphNode[];
   edges: GraphEdge[];
   parameters?: GraphParameter[];
+  subgraphs?: GraphSubgraph[];
 }
 
 // ── Defaults ───────────────────────────────────────────

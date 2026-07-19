@@ -50,19 +50,21 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
 
     const geometry::BMesh bmesh = geometry::bmesh_from_geometry(input);
 
-    // If from_edge_group is set, only consider edges already in that group
+    // If from_edge_groups is set, only consider edges already in those groups
     std::unordered_set<int64_t> candidate_edges;
-    if (!options.from_edge_group.empty()) {
-        const auto members = input.groups().members(geometry::GroupDomain::Edge, options.from_edge_group);
-        for (int id : members)
-            candidate_edges.insert(static_cast<int64_t>(id));
+    if (!options.from_edge_groups.empty()) {
+        for (const auto& grp : options.from_edge_groups) {
+            const auto members = input.groups().members(geometry::GroupDomain::Edge, grp);
+            for (geometry::GroupId id : members)
+                candidate_edges.insert(id);
+        }
     }
 
     for (const auto& entry : bmesh.edges) {
         const geometry::BMeshEdge& edge = entry.second;
 
-        // Filter by from_edge_group if specified
-        if (!options.from_edge_group.empty() && candidate_edges.count(entry.first) == 0)
+        // Filter by from_edge_groups if specified
+        if (!options.from_edge_groups.empty() && candidate_edges.count(entry.first) == 0)
             continue;
 
         if (!options.include_unshared && edge.face1 < 0)
@@ -89,7 +91,7 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
                 continue;
         }
 
-        result.groups().add(domain, options.output_group, static_cast<int>(entry.first));
+        result.groups().add(domain, options.output_group, entry.first);
     }
 
     return result;
@@ -110,7 +112,7 @@ data::PcgGeometry group_combine(const data::PcgGeometry& input, const GroupCombi
         for (size_t i = 2; i < options.source_groups.size(); ++i) {
             const auto current = result.groups().members(domain, options.output_group);
             result.groups().clear_group(domain, options.output_group);
-            for (int id : current) {
+            for (geometry::GroupId id : current) {
                 if (input.groups().contains(domain, options.source_groups[i], id))
                     result.groups().add(domain, options.output_group, id);
             }
@@ -127,6 +129,61 @@ data::PcgGeometry group_combine(const data::PcgGeometry& input, const GroupCombi
 
     for (const std::string& src : options.source_groups)
         result.groups().union_into(domain, options.output_group, src);
+
+    return result;
+}
+
+data::PcgGeometry face_group_by_normal(const data::PcgGeometry& input,
+                                       const FaceGroupByNormalOptions& options)
+{
+    data::PcgGeometry result = input;
+    result.groups().clear_group(geometry::GroupDomain::Face, options.output_group);
+
+    const double direction_length = std::sqrt(options.direction_x * options.direction_x
+        + options.direction_y * options.direction_y + options.direction_z * options.direction_z);
+    if (direction_length <= 1e-12 || options.output_group.empty())
+        return result;
+
+    const double dx = options.direction_x / direction_length;
+    const double dy = options.direction_y / direction_length;
+    const double dz = options.direction_z / direction_length;
+    const double spread = std::clamp(options.spread_angle_deg, 0.0, 180.0);
+    const double threshold = std::cos(spread * kPi / 180.0);
+
+    for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
+        const auto& face = input.faces()[face_index];
+        if (face.size() < 3)
+            continue;
+
+        double nx = 0.0;
+        double ny = 0.0;
+        double nz = 0.0;
+        bool valid = true;
+        for (size_t i = 0; i < face.size(); ++i) {
+            const int current_index = face[i];
+            const int next_index = face[(i + 1) % face.size()];
+            if (current_index < 0 || next_index < 0
+                || static_cast<size_t>(current_index) >= input.points().size()
+                || static_cast<size_t>(next_index) >= input.points().size()) {
+                valid = false;
+                break;
+            }
+            const auto& current = input.points()[static_cast<size_t>(current_index)];
+            const auto& next = input.points()[static_cast<size_t>(next_index)];
+            nx += (current.y - next.y) * (current.z + next.z);
+            ny += (current.z - next.z) * (current.x + next.x);
+            nz += (current.x - next.x) * (current.y + next.y);
+        }
+
+        const double normal_length = std::sqrt(nx * nx + ny * ny + nz * nz);
+        if (!valid || normal_length <= 1e-12)
+            continue;
+
+        const double alignment = (nx * dx + ny * dy + nz * dz) / normal_length;
+        if (alignment >= threshold)
+            result.groups().add(geometry::GroupDomain::Face, options.output_group,
+                                static_cast<int>(face_index));
+    }
 
     return result;
 }

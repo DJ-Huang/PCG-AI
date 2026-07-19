@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pcg.example.com/graph-schema-v1.json",
   "title": "PCG Graph JSON v1",
-  "description": "Contract between Web editor, C++ core, and Unity plugin",
+  "description": "Manifest-driven compatibility contract between Web, C++ core, and Unity",
   "type": "object",
   "required": ["version", "nodes", "edges"],
   "additionalProperties": false,
@@ -24,9 +24,18 @@
       "type": "array",
       "description": "Graph-level parameters exposed to the runtime Inspector",
       "items": { "$ref": "#/$defs/parameter" }
+    },
+    "subgraphs": {
+      "type": "array",
+      "description": "Inline reusable graph definitions. Subgraph instance nodes reference these by data.subgraphId.",
+      "items": { "$ref": "#/$defs/subgraph" }
     }
   },
   "$defs": {
+    "pinType": {
+      "type": "string",
+      "enum": ["Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface", "SpatialMesh", "Texture", "HeightField"]
+    },
     "node": {
       "type": "object",
       "required": ["id", "type", "position", "data"],
@@ -38,8 +47,7 @@
         },
         "type": {
           "type": "string",
-          "enum": ["ParseConfig", "SpawnPoints", "PlaceInScene"],
-          "description": "Node type determines which Block executes"
+          "description": "Node type is resolved through schema/node-manifest.json; structural subgraph node types are parser built-ins"
         },
         "position": {
           "type": "object",
@@ -49,13 +57,7 @@
             "y": { "type": "number" }
           }
         },
-        "data": {
-          "oneOf": [
-            { "$ref": "#/$defs/ParseConfigData" },
-            { "$ref": "#/$defs/SpawnPointsData" },
-            { "$ref": "#/$defs/PlaceInSceneData" }
-          ]
-        }
+        "data": { "type": "object" }
       }
     },
     "edge": {
@@ -67,31 +69,9 @@
         "source": { "type": "string" },
         "target": { "type": "string" },
         "sourceHandle": { "type": "string" },
-        "targetHandle": { "type": "string" }
-      }
-    },
-    "ParseConfigData": {
-      "type": "object",
-      "title": "ParseConfig",
-      "properties": {
-        "seed": { "type": "integer", "default": 42 },
-        "density": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 }
-      }
-    },
-    "SpawnPointsData": {
-      "type": "object",
-      "title": "SpawnPoints",
-      "properties": {
-        "count": { "type": "integer", "default": 100, "minimum": 0 },
-        "radius": { "type": "number", "default": 10.0, "minimum": 0 }
-      }
-    },
-    "PlaceInSceneData": {
-      "type": "object",
-      "title": "PlaceInScene",
-      "properties": {
-        "prefab": { "type": "string", "default": "" },
-        "scale": { "type": "number", "default": 1.0 }
+        "targetHandle": { "type": "string" },
+        "sourcePinType": { "$ref": "#/$defs/pinType" },
+        "targetPinType": { "$ref": "#/$defs/pinType" }
       }
     },
     "parameter": {
@@ -105,7 +85,33 @@
         "default": { "description": "Default value (type depends on 'type' field)" },
         "exposed": { "type": "boolean", "default": true, "description": "Whether to show on runtime Inspector" },
         "targetNode": { "type": "string", "description": "Node ID whose property this parameter overrides" },
-        "targetProperty": { "type": "string", "description": "Property key in the target node's data" }
+        "targetProperty": { "type": "string", "description": "Property key in the target node's data" },
+        "hasRange": { "type": "boolean" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "subgraphPort": {
+      "type": "object",
+      "required": ["id", "name", "pinType"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "pinType": { "$ref": "#/$defs/pinType" }
+      }
+    },
+    "subgraph": {
+      "type": "object",
+      "required": ["id", "name", "inputs", "outputs", "nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
       }
     }
   }

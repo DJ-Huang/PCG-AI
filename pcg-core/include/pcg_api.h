@@ -31,7 +31,7 @@ extern "C" {
 
 #define PCG_API_VERSION_MAJOR 0
 #define PCG_API_VERSION_MINOR 1
-#define PCG_API_VERSION_PATCH 1
+#define PCG_API_VERSION_PATCH 2
 
 /**
  * Returns a static version string, e.g. "pcg-core 0.1.0".
@@ -46,7 +46,8 @@ typedef enum {
     PCG_ERR_INVALID_JSON   = 1,
     PCG_ERR_CYCLE_DETECTED = 2,
     PCG_ERR_UNKNOWN_NODE   = 3,
-    PCG_ERR_EXECUTION      = 4
+    PCG_ERR_EXECUTION      = 4,
+    PCG_ERR_INVALID_ARGUMENT = 5
 } PcgResultCode;
 
 typedef enum {
@@ -56,13 +57,18 @@ typedef enum {
     PCG_RESULT_KIND_POINTS = 3
 } PcgResultKind;
 
-/* Mesh binary header: magic 'PCGM', version, vertex_count, index_count, flags (20 bytes v2).
+/* Mesh binary header: magic 'PCGM', version, vertex_count, index_count, flags,
+ * material_section_bytes (24 bytes v3).
  * v1 (16 bytes, no flags) is supported for backward-compatible reading only.
  * v2 header is followed by float32 xyz positions, uint32 triangle indices,
- * and optionally float32 normals (when flags & 0x1). */
+ * then optional blocks in order: normals (flags & 0x1, float3*N),
+ * colors (flags & 0x2, float4*N), uvs (flags & 0x4, float2*N).
+ * Each optional block is independent; any combination may be present.
+ * v3 material payload: slot_count, repeated [name_bytes, UTF-8 bytes], then one
+ * uint32 material slot per triangle. v1/v2 remain readable. */
 #define PCG_MESH_BINARY_MAGIC 0x4D474350u
-#define PCG_MESH_BINARY_VERSION 2u
-#define PCG_MESH_BINARY_HEADER_SIZE 20
+#define PCG_MESH_BINARY_VERSION 3u
+#define PCG_MESH_BINARY_HEADER_SIZE 24
 
 /* Point binary header (v6 data-plane target):
  * [magic|version|point_count|flags] (16 bytes)
@@ -72,6 +78,11 @@ typedef enum {
 #define PCG_POINT_BINARY_MAGIC 0x50544750u /* 'PGTP' little-endian */
 #define PCG_POINT_BINARY_VERSION 1u
 #define PCG_POINT_BINARY_HEADER_SIZE 16
+
+/* HeightField binary transports grid metadata and all named layers. */
+#define PCG_HEIGHTFIELD_BINARY_MAGIC 0x48474350u /* 'PCGH' little-endian */
+#define PCG_HEIGHTFIELD_BINARY_VERSION 1u
+#define PCG_HEIGHTFIELD_BINARY_HEADER_SIZE 72
 
 typedef enum {
     PCG_POINT_ATTR_NONE = 0,
@@ -293,6 +304,160 @@ PCG_API PcgResultCode pcg_execute_graph_v7(const char* json,
                                            int out_perf_json_size,
                                            char* err_buf,
                                            int err_buf_size);
+
+/**
+ * Same as v7, plus optional best-effort geometry_binary export.
+ * out_geometry_buf is filled only when Sink produced native PcgGeometry and the
+ * buffer is large enough. On skip/failure *out_geometry_bytes_written stays 0
+ * and Mesh/Points cooks still return PCG_OK when otherwise successful.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v8(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           const PcgSplineSlot* splines,
+                                           int spline_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           void* out_points_buf,
+                                           int out_points_buf_size,
+                                           int* out_point_count,
+                                           uint32_t* out_point_attr_flags,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           PcgCookStats* out_stats,
+                                           char* out_perf_json,
+                                           int out_perf_json_size,
+                                           void* out_geometry_buf,
+                                           int out_geometry_buf_size,
+                                           int* out_geometry_bytes_written,
+                                           char* err_buf,
+                                           int err_buf_size);
+
+/**
+ * Runtime host terrain slice keyed by GetTerrainData node id.
+ * Height and mask are row-major [z * resolution_x + x]. Height values are
+ * world/unit displacements along the HeightField orientation normal.
+ */
+typedef struct {
+    const char* slot_id;
+    int resolution_x;
+    int resolution_z;
+    double size_x;
+    double size_z;
+    double center_x;
+    double center_y;
+    double center_z;
+    int sampling;    /* 0=center, 1=corner */
+    int orientation; /* 0=ZX, 1=XY, 2=YZ */
+    const float* height;
+    const float* mask;
+} PcgHeightFieldSlot;
+
+/**
+ * Same as v8, plus a typed HeightField sidecar. The original host upload struct
+ * has no source lengths, so current libraries reject v9 calls that provide
+ * heightfields; use v10 for host uploads. Calls without host uploads retain v9
+ * behavior. If the HeightField output buffer is too small,
+ * out_heightfield_bytes_written reports the required size for a retry.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v9(const char* json,
+                                           int seed,
+                                           const PcgTextureSlot* textures,
+                                           int texture_count,
+                                           const PcgMeshSlot* meshes,
+                                           int mesh_count,
+                                           const PcgSplineSlot* splines,
+                                           int spline_count,
+                                           const PcgHeightFieldSlot* heightfields,
+                                           int heightfield_count,
+                                           int* out_kind,
+                                           char* out_json,
+                                           int out_json_size,
+                                           void* out_mesh_buf,
+                                           int out_mesh_buf_size,
+                                           void* out_points_buf,
+                                           int out_points_buf_size,
+                                           int* out_point_count,
+                                           uint32_t* out_point_attr_flags,
+                                           int* out_vertex_count,
+                                           int* out_index_count,
+                                           PcgCookStats* out_stats,
+                                           char* out_perf_json,
+                                           int out_perf_json_size,
+                                           void* out_geometry_buf,
+                                           int out_geometry_buf_size,
+                                           int* out_geometry_bytes_written,
+                                           void* out_heightfield_buf,
+                                           int out_heightfield_buf_size,
+                                           int* out_heightfield_bytes_written,
+                                           char* err_buf,
+                                           int err_buf_size);
+
+/**
+ * Length-aware host terrain slice for v10. Counts are float element counts,
+ * not byte counts. height_count must equal resolution_x * resolution_z.
+ * mask_count must be zero when mask is null, otherwise it must equal the same
+ * sample count.
+ */
+typedef struct {
+    const char* slot_id;
+    int resolution_x;
+    int resolution_z;
+    double size_x;
+    double size_z;
+    double center_x;
+    double center_y;
+    double center_z;
+    int sampling;    /* 0=center, 1=corner */
+    int orientation; /* 0=ZX, 1=XY, 2=YZ */
+    int height_count;
+    int mask_count;
+    const float* height;
+    const float* mask;
+} PcgHeightFieldSlotV10;
+
+/**
+ * Same as v9, but host HeightField uploads carry explicit source lengths and
+ * are rejected before any buffer read when metadata or lengths are invalid.
+ */
+PCG_API PcgResultCode pcg_execute_graph_v10(const char* json,
+                                            int seed,
+                                            const PcgTextureSlot* textures,
+                                            int texture_count,
+                                            const PcgMeshSlot* meshes,
+                                            int mesh_count,
+                                            const PcgSplineSlot* splines,
+                                            int spline_count,
+                                            const PcgHeightFieldSlotV10* heightfields,
+                                            int heightfield_count,
+                                            int* out_kind,
+                                            char* out_json,
+                                            int out_json_size,
+                                            void* out_mesh_buf,
+                                            int out_mesh_buf_size,
+                                            void* out_points_buf,
+                                            int out_points_buf_size,
+                                            int* out_point_count,
+                                            uint32_t* out_point_attr_flags,
+                                            int* out_vertex_count,
+                                            int* out_index_count,
+                                            PcgCookStats* out_stats,
+                                            char* out_perf_json,
+                                            int out_perf_json_size,
+                                            void* out_geometry_buf,
+                                            int out_geometry_buf_size,
+                                            int* out_geometry_bytes_written,
+                                            void* out_heightfield_buf,
+                                            int out_heightfield_buf_size,
+                                            int* out_heightfield_bytes_written,
+                                            char* err_buf,
+                                            int err_buf_size);
 
 /** Clears the session-scoped per-node cook cache. */
 PCG_API void pcg_cook_cache_clear(void);

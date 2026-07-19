@@ -77,17 +77,47 @@ namespace DJTechEditor.PCG
                     break;
 
                 case PcgResultKind.Points:
-                    if (!PcgResultParser.TryParsePoints(result.Json, out var parsed, out var parseError))
+                    if (result.Kind == PcgExecuteKind.Points)
                     {
-                        Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
+                        if (!PcgResultParser.TryParsePointBinary(
+                                result.PointBinary, out var binaryPoints, out var binaryError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
+                            return false;
+                        }
+                        var positions = new List<Vector3>(binaryPoints.Count);
+                        foreach (var point in binaryPoints)
+                            positions.Add(point.Position);
+                        preview.SetPoints(positions);
+                        Debug.Log($"[PCG] Point preview updated ({binaryPoints.Count} points).");
+                    }
+                    else
+                    {
+                        if (!PcgResultParser.TryParsePoints(
+                                result.Json, out var parsed, out var parseError))
+                        {
+                            Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
+                            return false;
+                        }
+                        preview.SetPoints(PcgResultParser.ToVector3List(parsed));
+                        Debug.Log($"[PCG] Point preview updated ({parsed.pointCount} points).");
+                    }
+                    break;
+
+                case PcgResultKind.HeightField:
+                    if (!PcgHeightFieldBinaryParser.TryParse(
+                            result.HeightFieldBinary, out var surface, out var heightFieldError))
+                    {
+                        Debug.LogError($"[PCG] Failed to parse HeightField result: {heightFieldError}");
                         return false;
                     }
-                    preview.SetPoints(PcgResultParser.ToVector3List(parsed));
-                    Debug.Log($"[PCG] Point preview updated ({parsed.pointCount} points).");
+                    Debug.Log(
+                        $"[PCG] HeightField cooked ({surface.ResolutionX}x{surface.ResolutionZ}, " +
+                        $"layers={surface.Layers.Count}). Add a PcgGraphComponent Terrain Binding to apply it.");
                     break;
 
                 default:
-                    Debug.LogError("[PCG] Unknown result JSON shape (expected points, splines, or mesh).");
+                    Debug.LogError("[PCG] Unknown result JSON shape (expected points, splines, mesh, or heightfield).");
                     return false;
             }
 

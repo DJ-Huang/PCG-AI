@@ -5,9 +5,10 @@ import manifestJson from '../../../schema/node-manifest.json';
 
 // ── Types ──────────────────────────────────────────────
 
-export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialMesh' | 'Param' | 'Any';
+export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialSurface' | 'SpatialMesh' |
+  'Texture' | 'HeightField' | 'Param' | 'Any';
 export type PropertyType = 'integer' | 'number' | 'boolean' | 'string' | 'enum' | 'groupSelect' | 'groupMultiSelect';
-export type GroupDomain = 'edge' | 'face' | 'point';
+export type GroupDomain = 'edge' | 'face' | 'point' | 'vertex';
 
 export interface ManifestEnumOption {
   value: string;

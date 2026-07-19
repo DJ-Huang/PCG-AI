@@ -131,6 +131,46 @@ data::PcgSplineData create_spline_data(const CreateSplineOptions& options)
     return polyline_to_spline_data(polyline, options.closed);
 }
 
+data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& options)
+{
+    data::PcgSplineData out;
+
+    if (options.radius <= 0.0 || options.pitch == 0.0 ||
+        options.turns <= 0.0 || options.points_per_turn < 4)
+        return out;
+
+    int axis = -1;
+    if (options.axis == "x" || options.axis == "X") axis = 0;
+    else if (options.axis == "y" || options.axis == "Y") axis = 1;
+    else if (options.axis == "z" || options.axis == "Z") axis = 2;
+    else return out;
+
+    const double pi = 3.14159265358979323846;
+    const int sample_count = static_cast<int>(std::ceil(options.turns * options.points_per_turn)) + 1;
+
+    data::PcgSpline spline;
+    spline.closed = false;
+    spline.points.reserve(static_cast<size_t>(sample_count));
+
+    for (int i = 0; i < sample_count; ++i) {
+        const double t = std::min(static_cast<double>(i) / options.points_per_turn, options.turns);
+        const double height = t * options.pitch;
+        const double angle = t * 2.0 * pi;
+        const double c = options.radius * std::cos(angle);
+        const double s = options.radius * std::sin(angle);
+
+        data::PcgSplinePoint p{};
+        if (axis == 0)      { p = {height, c, s}; }
+        else if (axis == 1) { p = {c, height, s}; }
+        else                { p = {c, s, height}; }
+
+        spline.points.push_back(p);
+    }
+
+    out.add_spline(std::move(spline));
+    return out;
+}
+
 data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options)
 {
     data::PcgSplineData out;
@@ -428,12 +468,55 @@ data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformM
 
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b)
 {
-    data::PcgMeshData out = a;
-    const int offset = static_cast<int>(out.vertices().size());
+    if (a.vertices().empty())
+        return b;
+    if (b.vertices().empty())
+        return a;
+
+    data::PcgMeshData out;
+    const int a_verts = static_cast<int>(a.vertices().size());
+
+    for (const auto& v : a.vertices())
+        out.vertices_mut().push_back(v);
     for (const auto& v : b.vertices())
         out.vertices_mut().push_back(v);
+
+    for (int idx : a.triangles())
+        out.triangles_mut().push_back(idx);
     for (int idx : b.triangles())
-        out.triangles_mut().push_back(idx + offset);
+        out.triangles_mut().push_back(idx + a_verts);
+
+    if (a.has_normals() && b.has_normals()) {
+        std::vector<data::PcgVertex> normals;
+        normals.reserve(out.vertices().size());
+        for (const auto& n : a.normals())
+            normals.push_back(n);
+        for (const auto& n : b.normals())
+            normals.push_back(n);
+        out.set_normals(std::move(normals));
+    }
+
+    if (a.has_colors() && b.has_colors()) {
+        std::vector<data::PcgColor> colors;
+        colors.reserve(out.vertices().size());
+        for (const auto& c : a.colors())
+            colors.push_back(c);
+        for (const auto& c : b.colors())
+            colors.push_back(c);
+        out.set_colors(std::move(colors));
+    }
+
+    if (a.has_uvs() && b.has_uvs()) {
+        std::vector<data::PcgVec2> uvs;
+        uvs.reserve(out.vertices().size());
+        for (const auto& uv : a.uvs())
+            uvs.push_back(uv);
+        for (const auto& uv : b.uvs())
+            uvs.push_back(uv);
+        out.set_uvs(std::move(uvs));
+    }
+
+    out.metadata() = a.metadata();
     return out;
 }
 

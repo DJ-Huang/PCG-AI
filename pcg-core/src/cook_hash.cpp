@@ -2,8 +2,10 @@
 
 #include "geometry/group_table.hpp"
 #include "mesh_runtime.hpp"
+#include "asset_path.hpp"
 #include "spline_runtime.hpp"
 #include "texture_runtime.hpp"
+#include "heightfield_runtime.hpp"
 
 #include <algorithm>
 #include <vector>
@@ -53,6 +55,43 @@ uint64_t hash_mesh(const data::PcgMeshData& mesh)
     if (!tris.empty())
         h = hash_bytes(tris.data(), tris.size() * sizeof(int), h);
 
+    h = hash_combine(h, mesh.has_normals() ? 1u : 0u);
+    if (mesh.has_normals()) {
+        for (const auto& n : mesh.normals()) {
+            h = hash_bytes(&n.x, sizeof(double), h);
+            h = hash_bytes(&n.y, sizeof(double), h);
+            h = hash_bytes(&n.z, sizeof(double), h);
+        }
+    }
+
+    h = hash_combine(h, mesh.has_colors() ? 1u : 0u);
+    if (mesh.has_colors()) {
+        for (const auto& c : mesh.colors()) {
+            h = hash_bytes(&c.r, sizeof(double), h);
+            h = hash_bytes(&c.g, sizeof(double), h);
+            h = hash_bytes(&c.b, sizeof(double), h);
+            h = hash_bytes(&c.a, sizeof(double), h);
+        }
+    }
+
+    h = hash_combine(h, mesh.has_uvs() ? 1u : 0u);
+    if (mesh.has_uvs()) {
+        for (const auto& uv : mesh.uvs()) {
+            h = hash_bytes(&uv.u, sizeof(double), h);
+            h = hash_bytes(&uv.v, sizeof(double), h);
+        }
+    }
+
+    h = hash_combine(h, mesh.has_materials() ? 1u : 0u);
+    if (mesh.has_materials()) {
+        for (const std::string& name : mesh.material_slots())
+            h = hash_combine(h, hash_string(name));
+        if (!mesh.triangle_materials().empty()) {
+            h = hash_bytes(mesh.triangle_materials().data(),
+                           mesh.triangle_materials().size() * sizeof(uint32_t), h);
+        }
+    }
+
     h = hash_combine(h, hash_json(mesh.metadata().raw()));
     return h;
 }
@@ -77,14 +116,15 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     }
 
     for (geometry::GroupDomain domain :
-         {geometry::GroupDomain::Point, geometry::GroupDomain::Edge, geometry::GroupDomain::Face}) {
+         {geometry::GroupDomain::Point, geometry::GroupDomain::Edge,
+          geometry::GroupDomain::Face, geometry::GroupDomain::Vertex}) {
         for (const std::string& name : geometry.groups().group_names(domain)) {
             h = hash_combine(h, hash_string(name));
             const auto& members = geometry.groups().members(domain, name);
-            std::vector<int> sorted(members.begin(), members.end());
+            std::vector<geometry::GroupId> sorted(members.begin(), members.end());
             std::sort(sorted.begin(), sorted.end());
             if (!sorted.empty())
-                h = hash_bytes(sorted.data(), sorted.size() * sizeof(int), h);
+                h = hash_bytes(sorted.data(), sorted.size() * sizeof(geometry::GroupId), h);
         }
     }
 
@@ -93,6 +133,83 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     double cusp = detail.cusp_angle_deg;
     h = hash_bytes(&cusp, sizeof(double), h);
 
+    if (geometry.has_colors() && !geometry.colors().empty())
+        h = hash_bytes(geometry.colors().data(),
+                       geometry.colors().size() * sizeof(data::PcgColor), h);
+    if (geometry.has_uvs() && !geometry.uvs().empty())
+        h = hash_bytes(geometry.uvs().data(),
+                       geometry.uvs().size() * sizeof(data::PcgVec2), h);
+    if (geometry.has_corner_uvs() && !geometry.corner_uvs().empty())
+        h = hash_bytes(geometry.corner_uvs().data(),
+                       geometry.corner_uvs().size() * sizeof(data::PcgVec2), h);
+
+    for (data::AttributeOwner owner :
+         {data::AttributeOwner::Point, data::AttributeOwner::Vertex,
+          data::AttributeOwner::Primitive, data::AttributeOwner::Detail}) {
+        for (const std::string& name : geometry.attributes().names(owner)) {
+            const data::AttributeArray* attribute = geometry.attributes().find(owner, name);
+            if (!attribute)
+                continue;
+            const auto& schema = attribute->schema();
+            h = hash_combine(h, hash_string(name));
+            h = hash_combine(h, static_cast<uint64_t>(schema.owner));
+            h = hash_combine(h, static_cast<uint64_t>(schema.type));
+            h = hash_combine(h, static_cast<uint64_t>(schema.tuple_size));
+            h = hash_combine(h, static_cast<uint64_t>(schema.transform_role));
+            if (!attribute->default_int().empty())
+                h = hash_bytes(attribute->default_int().data(),
+                               attribute->default_int().size() * sizeof(int64_t), h);
+            if (!attribute->default_float().empty())
+                h = hash_bytes(attribute->default_float().data(),
+                               attribute->default_float().size() * sizeof(double), h);
+            for (const std::string& value : attribute->default_string())
+                h = hash_combine(h, hash_string(value));
+            if (!attribute->int_values().empty())
+                h = hash_bytes(attribute->int_values().data(),
+                               attribute->int_values().size() * sizeof(int64_t), h);
+            if (!attribute->float_values().empty())
+                h = hash_bytes(attribute->float_values().data(),
+                               attribute->float_values().size() * sizeof(double), h);
+            for (const std::string& value : attribute->string_values())
+                h = hash_combine(h, hash_string(value));
+        }
+    }
+
+    h = hash_combine(h, geometry.has_face_materials() ? 1u : 0u);
+    if (geometry.has_face_materials()) {
+        for (const std::string& name : geometry.face_materials())
+            h = hash_combine(h, hash_string(name));
+    } else if (geometry.has_material()) {
+        h = hash_combine(h, hash_string(geometry.material_name()));
+    }
+
+    return h;
+}
+
+uint64_t hash_heightfield(const data::PcgHeightField& heightfield)
+{
+    uint64_t h = kFnvOffsetBasis;
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.resolution_x()));
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.resolution_z()));
+    const double size_x = heightfield.size_x();
+    const double size_z = heightfield.size_z();
+    h = hash_bytes(&size_x, sizeof(double), h);
+    h = hash_bytes(&size_z, sizeof(double), h);
+    const auto& center = heightfield.center();
+    h = hash_bytes(&center.x, sizeof(double), h);
+    h = hash_bytes(&center.y, sizeof(double), h);
+    h = hash_bytes(&center.z, sizeof(double), h);
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.sampling()));
+    h = hash_combine(h, static_cast<uint64_t>(heightfield.orientation()));
+
+    for (const auto& [name, layer] : heightfield.layers()) {
+        h = hash_combine(h, hash_string(name));
+        h = hash_combine(h, static_cast<uint64_t>(layer.tuple_size));
+        h = hash_combine(h, static_cast<uint64_t>(layer.border_type));
+        h = hash_bytes(&layer.border_value, sizeof(float), h);
+        if (!layer.values.empty())
+            h = hash_bytes(layer.values.data(), layer.values.size() * sizeof(float), h);
+    }
     return h;
 }
 
@@ -149,6 +266,8 @@ uint64_t hash_collection(const data::PcgDataCollection& collection)
             h = hash_combine(h, hash_mesh(*item.mesh));
         else if (item.geometry)
             h = hash_combine(h, hash_geometry(*item.geometry));
+        else if (item.heightfield)
+            h = hash_combine(h, hash_heightfield(*item.heightfield));
         else if (item.points) {
             h = hash_combine(h, hash_points(*item.points));
             h = hash_combine(h, hash_json(item.payload));
@@ -192,7 +311,8 @@ uint64_t compute_node_input_hash(const GraphNode& node,
                                  const std::vector<std::pair<std::string, uint64_t>>& upstream_hashes,
                                  const TextureRuntime* textures,
                                  const MeshRuntime* meshes,
-                                 const SplineRuntime* splines)
+                                 const SplineRuntime* splines,
+                                 const HeightFieldRuntime* heightfields)
 {
     uint64_t h = hash_string(node.type);
     h = hash_combine(h, hash_json(node.data));
@@ -208,6 +328,14 @@ uint64_t compute_node_input_hash(const GraphNode& node,
             h = hash_combine(h, hash_mesh(*mesh));
     }
 
+    if (node.type == "ImportMesh") {
+        if (meshes) {
+            if (const data::PcgMeshData* mesh = meshes->find(node.id))
+                h = hash_combine(h, hash_mesh(*mesh));
+        }
+        h = hash_combine(h, hash_asset_dependency(resolve_asset_path(node.data)));
+    }
+
     if (node.type == "GetSplineData" && splines) {
         if (const data::PcgSplineData* spline = splines->find(node.id))
             h = hash_combine(h, hash_splines(*spline));
@@ -216,6 +344,11 @@ uint64_t compute_node_input_hash(const GraphNode& node,
     if (node.type == "ImageTexture" && textures) {
         if (const data::PcgTextureData* tex = textures->find(node.id))
             h = hash_combine(h, hash_texture(*tex));
+    }
+
+    if (node.type == "GetTerrainData" && heightfields) {
+        if (const data::PcgHeightField* heightfield = heightfields->find(node.id))
+            h = hash_combine(h, hash_heightfield(*heightfield));
     }
 
     return h;

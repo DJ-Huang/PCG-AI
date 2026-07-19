@@ -33,6 +33,22 @@ namespace DJTechRuntime.PCG
         public float maxValue = 1f;
     }
 
+    public static class PcgGraphParameterUtility
+    {
+        public static List<PcgGraphParameter> FindBindingsTargetingNodes(
+            IEnumerable<PcgGraphParameter> parameters,
+            ISet<string> nodeIds)
+        {
+            if (parameters == null || nodeIds == null || nodeIds.Count == 0)
+                return new List<PcgGraphParameter>();
+
+            return parameters.Where(parameter =>
+                parameter != null &&
+                !string.IsNullOrEmpty(parameter.targetNode) &&
+                nodeIds.Contains(parameter.targetNode)).ToList();
+        }
+    }
+
     [Serializable]
     public class PcgParameterOverride
     {
@@ -112,6 +128,27 @@ namespace DJTechRuntime.PCG
         public string target;
         public string sourceHandle = "out";
         public string targetHandle = "in";
+        public string sourcePinType;
+        public string targetPinType;
+    }
+
+    [Serializable]
+    public class PcgSubgraphPort
+    {
+        public string id;
+        public string name;
+        public string pinType = "Any";
+    }
+
+    [Serializable]
+    public class PcgSubgraphDefinition
+    {
+        public string id;
+        public string name;
+        public List<PcgSubgraphPort> inputs = new();
+        public List<PcgSubgraphPort> outputs = new();
+        public List<PcgGraphNodeRecord> nodes = new();
+        public List<PcgGraphEdgeRecord> edges = new();
     }
 
     [Serializable]
@@ -121,6 +158,7 @@ namespace DJTechRuntime.PCG
         public List<PcgGraphNodeRecord> nodes = new();
         public List<PcgGraphEdgeRecord> edges = new();
         public List<PcgGraphParameter> parameters = new();
+        public List<PcgSubgraphDefinition> subgraphs = new();
     }
 
     [Serializable]

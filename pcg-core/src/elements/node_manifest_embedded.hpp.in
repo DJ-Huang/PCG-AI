@@ -1,0 +1,7 @@
+#pragma once
+
+namespace pcg::internal::elements {
+
+inline constexpr char kNodeManifestJson[] = R"PCGMANIFEST(@PCG_NODE_MANIFEST_JSON@)PCGMANIFEST";
+
+} // namespace pcg::internal::elements

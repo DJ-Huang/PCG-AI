@@ -14,6 +14,7 @@ namespace DJTechRuntime.PCG
         [SerializeField] private string m_HighlightedGroupName;
         [SerializeField] private string m_HighlightedDomain;
         [SerializeField] private List<int> m_MemberIds = new();
+        [SerializeField] private Vector3[] m_EdgeEndpoints;
         [SerializeField] private Vector3[] m_Vertices;
         [SerializeField] private int[] m_Triangles;
 
@@ -45,10 +46,11 @@ namespace DJTechRuntime.PCG
             m_HighlightedGroupName = groupName;
             m_HighlightedDomain = domain;
             m_MemberIds.Clear();
+            m_EdgeEndpoints = null;
 
             if (!string.IsNullOrEmpty(m_LastResultJson))
             {
-                ParseGroupMembers(m_LastResultJson, groupName, domain, m_MemberIds);
+                ParseGroupMembers(m_LastResultJson, groupName, domain, m_MemberIds, out m_EdgeEndpoints);
             }
 
             CacheMeshData();
@@ -101,9 +103,10 @@ namespace DJTechRuntime.PCG
             m_Triangles = mesh.triangles;
         }
 
-        private void ParseGroupMembers(string json, string groupName, string domain, List<int> output)
+        private void ParseGroupMembers(string json, string groupName, string domain, List<int> output, out Vector3[] edgeEndpoints)
         {
             output.Clear();
+            edgeEndpoints = null;
             try
             {
                 var root = JsonUtility.FromJson<GroupsWrapper>(json);
@@ -117,6 +120,13 @@ namespace DJTechRuntime.PCG
                         continue;
                     foreach (var id in g.members)
                         output.Add(id);
+                    if (g.edgeEndpoints != null && g.edgeEndpoints.Length >= 6)
+                    {
+                        var pts = new Vector3[g.edgeEndpoints.Length / 3];
+                        for (int i = 0; i + 2 < g.edgeEndpoints.Length; i += 3)
+                            pts[i / 3] = new Vector3(g.edgeEndpoints[i], g.edgeEndpoints[i + 1], g.edgeEndpoints[i + 2]);
+                        edgeEndpoints = pts;
+                    }
                     return;
                 }
             }
@@ -143,16 +153,28 @@ namespace DJTechRuntime.PCG
             if (m_HighlightedDomain == "edge")
             {
                 Gizmos.color = new Color(0f, 1f, 0.8f, 0.9f);
-                foreach (var key in m_MemberIds)
+
+                if (m_EdgeEndpoints != null && m_EdgeEndpoints.Length >= 2)
                 {
-                    // Edge key encodes vertex pair: key = min(a,b) * 1000000 + max(a,b)
-                    int a = (int)((long)key / 1000000);
-                    int b = (int)((long)key % 1000000);
-                    if (a < 0 || b < 0 || a >= m_Vertices.Length || b >= m_Vertices.Length)
-                        continue;
-                    var p0 = transformLocalToWorld.MultiplyPoint(m_Vertices[a]);
-                    var p1 = transformLocalToWorld.MultiplyPoint(m_Vertices[b]);
-                    Gizmos.DrawLine(p0, p1);
+                    for (int i = 0; i + 1 < m_EdgeEndpoints.Length; i += 2)
+                    {
+                        var p0 = transformLocalToWorld.MultiplyPoint(m_EdgeEndpoints[i]);
+                        var p1 = transformLocalToWorld.MultiplyPoint(m_EdgeEndpoints[i + 1]);
+                        Gizmos.DrawLine(p0, p1);
+                    }
+                }
+                else
+                {
+                    foreach (var key in m_MemberIds)
+                    {
+                        int a = (int)((long)key / 1000000);
+                        int b = (int)((long)key % 1000000);
+                        if (a < 0 || b < 0 || a >= m_Vertices.Length || b >= m_Vertices.Length)
+                            continue;
+                        var p0 = transformLocalToWorld.MultiplyPoint(m_Vertices[a]);
+                        var p1 = transformLocalToWorld.MultiplyPoint(m_Vertices[b]);
+                        Gizmos.DrawLine(p0, p1);
+                    }
                 }
             }
             else if (m_HighlightedDomain == "face")
@@ -198,6 +220,7 @@ namespace DJTechRuntime.PCG
             public string domain;
             public int count;
             public int[] members;
+            public float[] edgeEndpoints;
         }
 
         [System.Serializable]

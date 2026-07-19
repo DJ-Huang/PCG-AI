@@ -1,0 +1,18 @@
+---
+description: PCG-AI pcg-core、.pcg 图、Unity PcgPlugin 开发与联调的 RAG 路由适配
+globs: pcg-core/**/*,schema/**/*,Unity/Assets/PcgPlugin/**/*,Unity/Assets/PCGDemo/**/*.pcg,examples/**/*.pcg,scripts/build-pcg-core.sh,scripts/sync-manifest.sh
+alwaysApply: false
+---
+
+# PCG-AI（Cursor 薄适配）
+
+本文件只识别 PCG-AI 路径，不复制项目规则正文。
+
+开发、改节点或编图前：
+
+1. `rule_search(query="PCG-AI + 任务意图 + 节点/模型关键词", domain="pcg", top_k=10)`。
+2. 至少读取 `pcg/project-engineering`、`pcg/index`、`pcg/graph-contract`、`pcg/assembly-bevel`；按模型补读 `pcg/vehicle`、`pcg/bridge` 等。
+3. `vault_search` 只查经验；当前 schema、源码和测试是实现事实真源。
+4. `.pcg` 图调用 `pcg-graph-authoring` Skill，并按 Skill 运行 validator。
+
+专用规则根：`VAULT_ROOT/PCG AI Rule/`；除 `domain=pcg` 外不得检索。

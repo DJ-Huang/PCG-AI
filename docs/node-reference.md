@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.4）中定义的全部 **42 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **89 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -9,6 +9,31 @@
 ## 目录
 
 - [Pin 数据类型](#pin-数据类型)
+- [Geometry 数据契约](#geometry-数据契约)
+- [Terrain 类别](#terrain-类别)
+  - [HeightField](#heightfield)
+  - [HeightFieldNoise](#heightfieldnoise)
+  - [HeightFieldMaskNoise](#heightfieldmasknoise)
+  - [HeightFieldMaskByFeature](#heightfieldmaskbyfeature)
+  - [HeightFieldMaskByObject](#heightfieldmaskbyobject)
+  - [HeightFieldPattern](#heightfieldpattern)
+  - [HeightFieldClip](#heightfieldclip)
+  - [HeightFieldTerrace](#heightfieldterrace)
+  - [HeightFieldBlur](#heightfieldblur)
+  - [HeightFieldResample](#heightfieldresample)
+  - [HeightFieldLayer](#heightfieldlayer)
+  - [HeightFieldCopyLayer](#heightfieldcopylayer)
+  - [HeightFieldLayerClear](#heightfieldlayerclear)
+  - [HeightFieldLayerProperties](#heightfieldlayerproperties)
+  - [HeightFieldIsolateLayer](#heightfieldisolatelayer)
+  - [HeightFieldErode](#heightfielderode)
+  - [HeightFieldFlowField](#heightfieldflowfield)
+  - [HeightFieldSlump](#heightfieldslump)
+  - [HeightFieldDistortByNoise](#heightfielddistortbynoise)
+  - [HeightFieldProject](#heightfieldproject)
+  - [HeightFieldScatter](#heightfieldscatter)
+  - [HeightFieldFile](#heightfieldfile)
+  - [ConvertHeightField](#convertheightfield)
 - [Input 类别](#input-类别)
   - [GetTerrainData](#getterraindata)
   - [GetMeshData](#getmeshdata)
@@ -22,6 +47,9 @@
 - [Filter 类别](#filter-类别)
   - [DensityFilter](#densityfilter)
   - [AttributeFilter](#attributefilter)
+  - [Blast](#blast)
+- [Attribute 类别](#attribute-类别)
+  - [AttributeWrangle](#attributewrangle)
 - [Transform 类别](#transform-类别)
   - [TransformPoints](#transformpoints)
   - [ProjectPoints](#projectpoints)
@@ -36,12 +64,14 @@
   - [StaticMeshSpawner](#staticmeshspawner)
 - [Spline 类别](#spline-类别)
   - [CreateSpline](#createspline)
+  - [CreateBezierSpline](#createbezierspline)
   - [ResampleSpline](#resamplespline)
   - [SampleAlongSpline](#samplealongspline)
   - [SweepAlongSpline](#sweepalongspline)
   - [ExtrudeAlongSpline](#extrudealongspline)
   - [CrossSectionProfile](#crosssectionprofile)
   - [InstanceAlongSpline](#instancealongspline)
+  - [CreateSpiralSpline](#createspiralspline)
 - [Structural 类别](#structural-类别)
   - [ConvexHull](#convexhull)
   - [ConnectNearest](#connectnearest)
@@ -55,16 +85,43 @@
   - [BevelMesh](#bevelmesh)
   - [MeshNoiseDeform](#meshnoisedeform)
   - [TransformMesh](#transformmesh)
+  - [LoftMesh](#loftmesh)
+  - [MirrorMesh](#mirrormesh)
+  - [FuseMesh](#fusemesh)
+  - [PolyExtrude](#polyextrude)
+  - [CopyMesh](#copymesh)
+  - [ShellMesh](#shellmesh)
+  - [ImportMesh](#importmesh)
+  - [MatchSize](#matchsize)
+  - [BendMesh](#bendmesh)
   - [MergeMesh](#mergemesh)
   - [BooleanMesh](#booleanmesh)
+  - [CreateCylinderMesh](#createcylindermesh)
+  - [RevolveMesh](#revolvemesh)
 - [Geometry 类别](#geometry-类别)
   - [GroupCreate](#groupcreate)
   - [GroupCombine](#groupcombine)
+  - [FaceGroupByNormal](#facegroupbynormal)
 - [Texture 类别](#texture-类别)
   - [ImageTexture](#imagetexture)
+- [建筑生成核心节点](#建筑生成核心节点)
+  - [CopyMeshToPoints](#copymeshtopoints)
+  - [AttributeRandomize](#attributerandomize)
+  - [Switch](#switch)
 - [Output 类别](#output-类别)
   - [Output](#output)
+  - [ExportFBX](#exportfbx)
+- [Material 类别](#material-类别)
+  - [VertexColor](#vertexcolor)
+  - [AssignMaterial](#assignmaterial)
+- [UV 类别](#uv-类别)
+  - [UVTexture](#uvtexture)
+  - [ProjectTexture](#projecttexture)
+  - [Output](#output)
 - [常见节点组合](#常见节点组合)
+- [示例 .pcg 文件](#示例-pcg-文件)
+  - [PCGDemo](#pcgdemo)
+  - [Test](#test)
 
 ---
 
@@ -77,11 +134,267 @@
 | `Param` | 参数对象（JSON 键值对） | `PcgParamData` / `nlohmann::json` |
 | `SpatialPoint` | 空间点云（含坐标和属性） | `PcgPointData` → `PcgPoint{x, y, z, attributes}` |
 | `SpatialSpline` | 样条/线段集合 | `PcgSplineData` → `PcgSpline{points[], closed}` |
-| `SpatialMesh` | 网格数据（顶点+三角形） | `PcgMeshData` → `vertices[], triangles[]` |
+| `SpatialMesh` | Houdini 风格多边形 Geometry；Sink 时才三角化 | `PcgGeometry` → points / vertices / primitives / detail attributes + groups；兼容旧 `PcgMeshData` 输入 |
 | `Any` | 任意类型透传 | — |
 | `Texture` | 纹理数据（2D 图像） | `PcgTextureData` → `width, height, channels, data[]` |
+| `HeightField` | 命名层 2D volume（`height`/`mask`/自定义层） | `PcgHeightField` → grid transform + `PcgHeightFieldLayer[]` |
 
 > **连接规则**：输出 Pin 类型必须与输入 Pin 类型匹配。`Any` 类型可接受任意输入。
+
+Node Manifest 是 Pin id、类型和 variadic 基数的唯一契约源。Core 在执行前验证 handle、类型、重复边及非 variadic 多重输入；Web 与 Unity 导入/导出均保留 Graph v1/v2 的 typed edge 元数据。Graph v2 的 parameters / subgraphs 同样跨端保留；Web 当前只对嵌套 subgraph 定义做无损导入与回写，不在本批增加子图内部编辑 UI。
+
+## Geometry 数据契约
+
+`SpatialMesh` 链路以 `PcgGeometry` 为 source of truth，节点中途不得通过 `PcgMeshData` 三角汤往返。数据域与 Houdini 对齐为：
+
+| Owner / Domain | 元素含义 | 稳定索引 |
+|----------------|----------|----------|
+| Point | 可被多个面角共享的位置 | point index |
+| Vertex | 某个 primitive 的 face-corner | 展平 corner index |
+| Primitive | polygon / face | face index |
+| Detail | 整份 geometry | 单元素 |
+
+通用属性由 schema（name、owner、type、tuple size、default、transform role）与等长数组组成。`Position` / `Vector` / `Normal` role 会在 Match Size、Bend 等变换节点中分别按点、向量、逆转置法线语义处理。Group 同样支持 point / vertex / primitive(face) / edge；edge member 使用两个 32-bit point index 打包成 64-bit `GroupId`，不再依赖点数阈值或十进制乘数。
+
+改变拓扑的节点必须提供 destination→source remap，再由统一传播层处理 attributes、UV、颜色、材质和 groups；无法映射的新元素使用属性默认值。Geometry Binary v3 会序列化上述通用属性及 64-bit group member；v2 reader 保持向后兼容，未知 chunk 可由旧宿主跳过。
+
+---
+
+## Terrain 类别
+
+### HeightField
+
+**功能**：创建 Houdini 风格的 typed 2D HeightField，同时生成标量 `height` 与 `mask` 命名层。Unity 路径默认使用 Corner sampling；Houdini 原生默认是 Center sampling。
+
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性名 | 默认值 | 说明 |
+|--------|--------|------|
+| `orientation` | `zx` | 栅格平面；`zx` 为 Unity 地面，位移沿 Y |
+| `sampling` | `corner` | `corner` 或 `center`；决定 sample index 与世界坐标的半格偏移 |
+| `divisionMode` | `bySize` | `bySize` 使用 `gridSpacing`；`byAxis` 使用最长轴 `gridSamples` |
+| `gridSpacing` | 1.0 | 相邻采样点的目标间距（米） |
+| `gridSamples` | 257 | By Axis 最长轴采样数 |
+| `sizeX`, `sizeZ` | 256 | HeightField 平面尺寸（米） |
+| `centerX/Y/Z` | 0 | 栅格中心；ZX 时 `centerY` 是基准高度 |
+| `initialHeight`, `initialMask` | 0 | 两个默认层的初值 |
+
+Corner sampling 下，`size=256`、`gridSpacing=1` 会生成 257×257 个样本，适合 Unity 的 `2^n+1` 高度图约束。所有命名层共享同一栅格变换；层结构从第一版即保留 tuple size，以支持后续 `flowdir` 向量层。
+
+### HeightFieldNoise
+
+**功能**：向指定 HeightField 层增加垂直分形噪声。第一个输入是被修改的 HeightField；可选第二输入是 mask HeightField，`maskLayer` 指定其中用于缩放效果的层。
+
+**输入 Pin**：`in`（`HeightField`）、`mask`（可选 `HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性名 | 默认值 | 说明 |
+|--------|--------|------|
+| `noiseLayer` | `height` | 被修改的标量层 |
+| `maskLayer` | `mask` | 第二输入中的遮罩层；0 不生效、1 完全生效 |
+| `noiseType` | `perlin` | L0 公开子集；与 `fractal` 分开 |
+| `fractal` | `terrain` | `none` / `standard` / `terrain` / `hybridTerrain` |
+| `centerNoise` | true | true 输出围绕 0，适合叠加地形 |
+| `amplitude` | 30 | 垂直位移幅度（米） |
+| `elementSize` | 64 | 主要地貌特征尺寸（米） |
+| `scaleX/Z`, `offsetX/Z` | 1 / 0 | 噪声空间缩放与平移 |
+| `maxOctaves` | 5 | 分形 octave 上限（1–12） |
+| `lacunarity`, `roughness` | 2.0 / 0.5 | 频率递增与幅度衰减 |
+| `seed` | 0 | PCG 确定性扩展；用于稳定空间噪声，不伪装成 SideFX 原生参数 |
+
+L0 对齐的是 SideFX 节点名、输入、命名层和参数语义，不承诺与 SideFX 私有噪声实现逐 voxel 相同。建议至少串联一次宏观 Noise 与一次低振幅细节 Noise。
+
+### HeightFieldMaskNoise
+
+**功能**：生成 0–1 为主的分形噪声并写入 `mask` 或任意标量层；可选第二输入继续遮罩本节点效果。
+
+**输入 Pin**：`in`、可选 `mask`（均为 `HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+核心属性为 `outputLayer`、`maskLayer`、`combine`、`blend`、`invert`，以及与 `HeightFieldNoise` 同构的 Noise Type / Fractal / Element Size / Scale / Offset / Octave 参数。`combine` 支持 Replace、Add、Subtract、Difference、Multiply、Maximum、Minimum、Blend。Mask 默认不居中，噪声先映射到 `[0,1]`。
+
+### HeightFieldMaskByFeature
+
+**功能**：从高度与坡度生成特征 mask；同时启用时取条件交集，未启用任何条件时按 SideFX 语义填充为 1。
+
+**输入 Pin**：`in`、可选 `mask`（`HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性 | 说明 |
+|------|------|
+| `maskByHeight`, `minHeight`, `maxHeight`, `heightFeather` | 高度范围与线性平滑边缘 |
+| `maskBySlope`, `minSlopeAngle`, `maxSlopeAngle`, `slopeFeather` | 由世界米制梯度计算 0–90° 坡度范围 |
+| `smoothRadius` | 输出 mask 的采样格半径平滑 |
+| `combine`, `blend`, `invert` | 与已有输出层的组合方式 |
+
+L1 暂不暴露 SideFX 的任意 Ramp、curvature、direction 和 occlusion，避免把固定函数误称为完整节点。
+
+### HeightFieldClip
+
+**功能**：把 `heightLayer` 限制在可选最小/最大高度；输出 `mesa`（被裁剪区域）与 `cliffs`（边界）层，也可把其中一层复制为 `mask`。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`（`HeightField`）
+
+核心属性：`minClipEnabled/minClip`、`maxClipEnabled/maxClip`、`edgeMaskRadius`、`generateMaskFrom`、`outputClippedLayer`、`outputEdgeLayer`。当前子集为硬裁剪；Soft Clip 留待后续参数映射。
+
+### HeightFieldTerrace
+
+**功能**：在指定高度范围内创建阶梯平原，输出 `mesa` 与 `cliffs` 命名层。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`（`HeightField`）
+
+核心属性：`minHeight/maxHeight`、`fade`（0 为完整台阶，1 为原地形）、`maxStepSize`（米）、`stepOffset`、`smoothEdges`。L1 实现固定步长与平滑阶沿；SideFX 的可变 Step Ramp、Fade Ramp 和 Undulations 属于后续扩展。
+
+### HeightFieldBlur
+
+**功能**：平滑 `height`、`mask` 或任意标量层。半径使用米；可选第二输入控制生效区域。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`（`HeightField`）
+
+`method` 支持可分离 Gaussian 与 Box；`iterations` 增强平滑，`radius` 是米制半径。卷积尊重层的 Constant / Repeat / Streak border policy。Expand、Shrink、Sharpen 留待后续。
+
+### HeightFieldResample
+
+**功能**：保持尺寸、中心、朝向、Sampling、所有命名层和 tuple size，改变 HeightField 分辨率。
+
+**输入 Pin**：`in`；**输出 Pin**：`out`（`HeightField`）
+
+`specifyExactResolution=false` 时使用 `resolutionScale`；启用时按 `divisionMode`、`gridSamples` 或 `gridSpacing` 求新栅格。所有 tuple 分量按世界坐标双线性采样。L1 公开 Bilinear 子集，其他 SideFX Filter/Filter Scale 尚未暴露。
+
+### HeightFieldLayer
+
+**功能**：SideFX 风格三输入合成：`base` + `layer` + 可选 `mask`。第二输入始终重采样到 base grid，输出继承 base 的栅格变换。
+
+**输入 Pin**：`base`、`layer`、可选 `mask`（`HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+`layerMode` 支持 Replace/Add/Subtract/Multiply/Maximum/Minimum/Blend；`layers` 是 `*` 或空格分隔层名。`maskStrength/invertMask` 控制合成区域，Base/Layer/Final Offset+Scale 与可选 Min/Max Clamp 用于完整的合成前后重映射。tuple size 不匹配会显式失败，不做静默降维。
+
+### HeightFieldErode
+
+**功能**：确定性的水力 + 热力侵蚀核心，保持 typed HeightField 并写出 Houdini 工作流常用的 `sediment`、`debris`、`flow` 与二维 `flowdir` 命名层。可选第二输入控制侵蚀区域。
+
+**输入 Pin**：`in`、可选 `mask`（`HeightField`）
+**输出 Pin**：`out`（`HeightField`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `iterations`, `seed` | 30 / 0 | 模拟迭代与确定性降雨扰动 |
+| `rainfallCoverage`, `flowForce` | 0.04 / 1.0 | 每轮加水量与下坡输运比例 |
+| `erodability`, `erosionRate` | 1.0 / 0.18 | 基岩可侵蚀性与水力切削速率 |
+| `sedimentCapacity`, `depositionRate`, `evaporationRate` | 1.4 / 0.12 / 0.12 | 携沙容量、沉积与蒸发 |
+| `weatheringForce`, `cutAngle`, `reposeAngle` | 0.08 / 35° / 28° | 热力风化、切削角与安息角 |
+| `addDebrisToHeight`, `addSedimentToHeight` | true / true | 是否把松散物/沉积反馈到最终高度 |
+| `debrisLayer`, `sedimentLayer`, `flowLayer`, `flowDirectionLayer` | 见属性名 | 输出层命名 |
+
+水力阶段在 8 邻域中按最大下坡输运水和携沙，根据容量差进行侵蚀/沉积；热力阶段把超过 Cut Angle 的物质搬运到低处，并按 Repose Angle 继续滑移。`flowdir` 是归一化的平面二维向量层。该节点对齐 SideFX 的两类模拟与输出层契约，但属于 CPU 确定性核心子集，不声称复刻 SideFX OpenCL 求解器、Freeze at Frame、侵蚀 bedrock/debris 各向异性、riverbed/riverbank 等全部高级参数。
+
+### HeightFieldDistortByNoise
+
+**功能**：通过噪声向量场反向追踪并搬移已有层，打破规则边缘；与 HeightField Noise 的“修改高度值”不同，本节点重采样输入内容。
+
+**输入 Pin**：`in`、可选 `mask`（`HeightField`）；**输出 Pin**：`out`（`HeightField`）
+
+`distortLayers` 是 `*` 或空格分隔层名；`noiseType` 支持 Simplex 语义的双通道梯度场与 Curl 场。`amplitude` 和 `elementSize` 均使用米，`substeps` 把总位移拆为多次 advection，较大振幅时可减少折叠。Scale、Offset、Roughness、Max Octaves 与 Seed 控制空间场。所有 tuple 分量一起搬移，且遵守各层 border policy。当前噪声核不承诺与 SideFX Simplex 逐 voxel 相同。
+
+### HeightFieldProject
+
+**功能**：把第二输入的多边形几何沿 HeightField 法线方向投影到指定高度层。这是 geometry → HeightField，不能与 points → terrain 的 `ProjectPoints` 混用。
+
+**输入 Pin**：`heightfield`（`HeightField`）、`geometry`（`SpatialMesh`）；**输出 Pin**：`out`（`HeightField`）
+
+`hitFarthest=true` 选择法线方向最高交点，通常与 `combineMethod=maximum` 组合抬升山体/建筑；关闭后选择最低交点，通常与 Minimum 组合压出谷地。Combine 支持 Replace/Add/Maximum/Minimum，`maxRayDistance` 限制相对原高度的投影距离。实现先保留 polygon 投影核心；SideFX 的 Mask Mode、supersampling/jitter 和 ray combiner 属于后续子集。
+
+### HeightFieldScatter
+
+**功能**：从 HeightField 表面生成确定性点云。`scatterAmountLayer` 必须指向存在且有正值的标量层；空层按官方语义输出零点。
+
+**输入 Pin**：`in`（`HeightField`）；**输出 Pin**：`out`（`SpatialPoint`）
+
+开启 `useExactPointCount` 时使用 `pointCount`；否则 `density` 表示每平方米点数，并按 mask 权重与坡面面积估算数量。`maxPoints` 是硬上限，`globalSeed` 保证复现，`candidatesPerPoint` 以 best-candidate 方式降低局部团簇。输出点贴合双线性高度并携带 `nx/ny/nz`、`u/v`、`height`、`density`。SideFX 的多轮 Relax/半径参数当前由轻量 best-candidate 子集替代。
+
+### HeightFieldMaskByObject
+
+**功能**：把第二输入几何投影到 HeightField，生成/合成 `mask`（或指定输出层）。对齐 SideFX HeightField Mask by Geometry（`heightfield_maskbyobject`）的 Project 路径；Fog/SDF Volume 方法未实现。
+
+**输入 Pin**：`in`（`HeightField`）、`geometry`（`SpatialMesh`）；**输出 Pin**：`out`（`HeightField`）
+
+`maskingByGeometry` 控制 Above / Below / Either；`combine` 与既有 mask 合成；可选 `blurRadius` 羽化边缘。
+
+### HeightFieldPattern
+
+**功能**：在指定层写入程序化图案位移（Ramp / Exponential Ramp / Step / Stripes）。对齐 SideFX HeightField Pattern 的常用子集；Stars / Voronoi / Distortion 未纳入本版。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`
+
+`patternLayer` 默认 `height`；也常写到 `mask` 做梯度蒙版。`size` / `rotate` / `center*` / `phase` 控制图案摆放。
+
+### HeightFieldFlowField
+
+**功能**：降雨后沿地形下坡输运，累积 `flow` / `flowdir` / `water`；可选 `copyToMask` 与 `adjustHeight` 挖槽。对齐 SideFX HeightField Flow Field 的核心参数（Smooth/Granular、Rain、Spread/Smoothing Iterations）。
+
+**输入 Pin**：`in`；**输出 Pin**：`out`
+
+### HeightFieldSlump
+
+**功能**：按休止角把松散物质（默认 `debris`）滑移到更稳构型，可选写回流场。对齐 SideFX HeightField Slump 的 Smooth/Granular 核心；高级河床侵蚀参数未纳入。
+
+**输入 Pin**：`in`、可选 `mask`；**输出 Pin**：`out`
+
+### HeightFieldCopyLayer
+
+**功能**：把源层复制到目标层（可只建层不拷数据）。对齐 SideFX HeightField Copy Layer。
+
+### HeightFieldLayerClear
+
+**功能**：把指定层填成常量。对齐 SideFX HeightField Layer Clear。
+
+### HeightFieldLayerProperties
+
+**功能**：设置层的 border 类型/常量。对齐 SideFX HeightField Layer Properties。
+
+### HeightFieldIsolateLayer
+
+**功能**：把指定层拷到 `mask`（和/或覆盖 `height`）以便预览。对齐 SideFX HeightField Isolate Layer。
+
+### HeightFieldFile
+
+**功能**：从磁盘载入栅格创建 HeightField。对齐 SideFX HeightField File 的 Size/Scale/Clamp/Sampling 契约；当前读取 **PGM** 与 **float32 raw**（`.raw`/`.r32`/`.f32`，需 `rawResolutionX/Z`），不依赖 COP。
+
+**输入 Pin**：无；**输出 Pin**：`out`
+
+### ConvertHeightField
+
+**功能**：把 HeightField 的指定高度层转换为共享顶点的四边形 `PcgGeometry`。转换是 HeightField→Polygon 的边界；上游 HeightField 节点不会做 geometry→mesh 往返。
+
+**输入 Pin**：`in`（`HeightField`）
+**输出 Pin**：`out`（`SpatialMesh`，内部保持 `PcgGeometry` 到 Sink）
+
+| 属性名 | 默认值 | 说明 |
+|--------|--------|------|
+| `heightLayer` | `height` | 转换的标量高度层 |
+| `density` | 1.0 | 输出分辨率/输入分辨率比例 |
+
+输出自带平滑着色策略和归一化 UV0；Sink 才三角化。L0 只覆盖 Polygon surface，SideFX 的 Polygon Soup、VDB、Extrude Base、Bake Point Colors 留在后续阶段。
+
+典型质量链：
+
+```text
+HeightField → HeightFieldNoise (macro) → HeightFieldNoise (detail)
+            → HeightFieldMaskByFeature → HeightFieldTerrace → HeightFieldBlur
+            → HeightFieldDistortByNoise → HeightFieldErode
+            → ConvertHeightField → Output
+```
+
+可控山体 / 河流 / 植被蒙版链：
+
+```text
+HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObject
+            → HeightFieldFlowField (copyToMask + adjustHeight)
+            → HeightFieldSlump → HeightFieldScatter → CopyMeshToPoints
+```
+
+官方语义参考：[HeightField](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield.html)、[Mask by Feature](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_maskbyfeature.html)、[Clip](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_clip)、[Terrace](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_terrace.html)、[Blur](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_blur.html)、[Resample](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_resample.html)、[Layer](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_layer.html)、[Distort by Noise](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_distort.html)、[Erode](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_erode.html)、[Project](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_project.html)、[Scatter](https://www.sidefx.com/docs/houdini/nodes/sop/heightfield_scatter-.html)、[Convert HeightField](https://www.sidefx.com/docs/houdini/nodes/sop/convertheightfield.html)、[Unity Terrain sampling](https://www.sidefx.com/docs/houdini/unity/terrain/basics.html)。
 
 ---
 
@@ -91,7 +404,7 @@
 
 **类别**：Input / Sampler
 
-**功能**：生成程序化地形高度图数据。使用基于噪声的算法在指定网格范围内生成地形高度值，供下游地形相关节点（`ProjectPoints`、`SampleSurface`）采样。
+**功能**：旧图兼容节点。保留原参数和噪声外观，但内部输出 typed `PcgHeightField`（`height` + 零 `mask`），供 `ProjectPoints`、`SampleSurface` 采样。新图优先使用 `HeightField` + `HeightFieldNoise`。
 
 **输入 Pin**：无
 
@@ -99,7 +412,7 @@
 
 | Pin ID | 标签 | 类型 |
 |--------|------|------|
-| `out` | Terrain | `Param` |
+| `out` | Terrain | `HeightField` |
 
 **属性**：
 
@@ -113,7 +426,7 @@
 **执行逻辑**：
 1. 在 `gridSize × gridSize` 网格上逐点计算 `simple_noise(wx, wz, seed) * amplitude`
 2. 世界坐标 `wx = (x - gridSize/2) * cellSize`，`wz` 同理
-3. 输出 `Param` 类型数据：`{"gridSize", "cellSize", "amplitude", "seed", "heights": [...]}`
+3. 把结果写入 `PcgHeightField.height`，同时创建零值 `mask` 层；不再把扁平 `heights[]` 当终态
 
 **用法示例**：
 
@@ -541,6 +854,49 @@
 
 ---
 
+### Blast
+
+**类别**：Filter
+
+**功能**：按 group 或标量表达式删除 Point、Spline point 或 Geometry point/primitive。Spline 中间删除会拆成多条 open spline，不跨缺口重连。
+
+**属性**：`entity` (`points`/`primitives`)、`group`、`expression`、`parameters`、`deleteNonSelected`、`removeUnusedPoints`。
+
+```json
+{
+  "id": "broken_u",
+  "type": "Blast",
+  "data": { "entity": "points", "expression": "@curveu >= 0.4 && @curveu <= 0.6" }
+}
+```
+
+完整表达式语法与数据类型行为见 [Attribute Wrangle 与 Blast](Tutorials/12-attribute-wrangle-and-blast.md)。
+
+---
+
+## Attribute 类别
+
+### AttributeWrangle
+
+**类别**：Attribute
+
+**功能**：以 Houdini 风格标量表达式逐点修改 `@P.x/y/z`；Point 输入还可读写任意数值 `@attribute`。支持只读 `@curveu`、元素编号、数学函数与 `chf("name")` 参数。
+
+```json
+{
+  "id": "gravity_sag",
+  "type": "AttributeWrangle",
+  "data": {
+    "expression": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);",
+    "parameters": "{\"sag\":3.0}"
+  }
+}
+```
+
+完整语法见 [Attribute Wrangle 与 Blast](Tutorials/12-attribute-wrangle-and-blast.md)。
+
+---
+
 ## Transform 类别
 
 ### TransformPoints
@@ -602,7 +958,7 @@
 | Pin ID | 标签 | 类型 | 说明 |
 |--------|------|------|------|
 | `in` | Points | `SpatialPoint` | 要投影的点云 |
-| `terrain` | Terrain | `Param` | 可选。来自 `GetTerrainData` 的地形数据 |
+| `terrain` | Terrain | `HeightField` | 可选。来自 `HeightFieldNoise` 或兼容节点 `GetTerrainData` |
 
 **输出 Pin**：
 
@@ -618,8 +974,8 @@
 | `baseY` | number | 0 | 不使用地形时的固定 Y 坐标 |
 
 **执行逻辑**：
-1. 检测是否有 terrain 输入，`useTerrain` 缺省取 `terrain != nullptr`
-2. 若使用地形：对每个点 `(x, z)` 从地形 heightmap 中采样高度（先转换为网格索引，越界时回退到 `simple_noise`）
+1. 检测是否有 typed HeightField terrain 输入，`useTerrain` 缺省取 `terrain != nullptr`
+2. 若使用 typed 地形：按 HeightField sampling 与 border policy 对命名 `height` 层做世界空间双线性采样；不会在越界时静默换成随机噪声
 3. 若不使用地形：Y = `baseY`
 4. X 和 Z 坐标不变，保留原始属性
 
@@ -634,7 +990,7 @@
 }
 ```
 
-> 典型连接：`GetTerrainData → ProjectPoints(terrain)`，`CreatePointGrid → ProjectPoints(in)`
+> 典型连接：`HeightFieldNoise → ProjectPoints(terrain)`，`CreatePointGrid → ProjectPoints(in)`；旧图仍可连接 `GetTerrainData`。
 
 ---
 
@@ -651,7 +1007,7 @@
 | Pin ID | 标签 | 类型 | 说明 |
 |--------|------|------|------|
 | `in` | Points | `SpatialPoint` | 要采样的点云 |
-| `terrain` | Terrain | `Param` | **必需**。来自 `GetTerrainData` 的地形数据 |
+| `terrain` | Terrain | `HeightField` | **必需**。来自 `HeightFieldNoise` 或兼容节点 `GetTerrainData` |
 
 **输出 Pin**：
 
@@ -667,8 +1023,8 @@
 | `blend` | number | 1.0 | 0 ~ 1 | 混合系数。0 = 保持原始 Y，1 = 完全使用地形 Y |
 
 **执行逻辑**：
-1. 读取地形数据中的 `seed`（缺省取 `graph_seed`）
-2. 对每个点采样地形高度 `terrain_y = sample_terrain_height(terrain, x, z, seed)`
+1. 读取 typed HeightField 的命名 `height` 层
+2. 按 sampling 与 border policy 做双线性采样得到 `terrain_y`
 3. 计算 `y = point.y × (1 - blend) + terrain_y × blend + offsetY`
 4. X 和 Z 不变，保留原始属性
 
@@ -951,7 +1307,7 @@
 | `endY` | number | 0 | — | 直线模式终点 Y |
 | `endZ` | number | 0 | — | 直线模式终点 Z |
 | `controlPoints` | string | `[{"x":0,"y":0,"z":0},...]` | — | JSON 格式的控制点列表 |
-| `editPlane` | enum | `"none"` | `none` / `xy` / `xz` / `yz` | 编辑平面约束 |
+| `editPlane` | enum | `"none"` | `none` / `xy` / `xz` / `yz` | 编辑平面约束（Scene 拖动时被锁定轴保持该点原分量，不归零） |
 | `sceneOffsetX` | number | 0 | — | 场景偏移 X |
 | `sceneOffsetY` | number | 0 | — | 场景偏移 Y |
 | `sceneOffsetZ` | number | 0 | — | 场景偏移 Z |
@@ -981,6 +1337,28 @@
 ```
 
 > 典型连接：`CreateSpline(backbone) → SweepAlongSpline`，`CreateSpline(profile) → SweepAlongSpline`。
+
+---
+
+### CreateBezierSpline
+
+**类别**：Spline
+
+**功能**：以 Hermite 切线或 3n+1 cubic Bezier 控制点生成确定性样条，适合车身轮廓和精确装配路径。
+
+**输入 Pin**：无；**输出 Pin**：`out`（`SpatialSpline`）。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `mode` | `catmullRom` | 当前实现为 cubic Bezier / Hermite 子集 |
+| `closed` | false | 是否闭合首尾段 |
+| `subdivisions` | 12 | 每段采样数，范围 1–64 |
+| `controlPoints` | 两个 JSON 点 | anchor 列表；或不提供匹配 tangents 时使用 3n+1 cubic controls |
+| `tangents` | 两个 JSON 向量 | 数量与 anchors 相同时按 Hermite 求值 |
+| `editPlane` | `none` | Scene 编辑约束：`none` / `xy` / `xz` / `yz` |
+| `sceneOffsetX/Y/Z` | 0 | 编辑器场景偏移 |
+
+控制点少于两个，或既不满足“anchor+tangent 等长”也不满足 3n+1 cubic control 形式时明确失败。该节点输出曲线，不生成 Geometry。
 
 ---
 
@@ -1321,6 +1699,24 @@
 ```
 
 > 典型连接：`CreateSpline → InstanceAlongSpline(spline) + GetMeshData → InstanceAlongSpline(mesh)`，沿路径放置路灯柱/桥墩。
+
+### CreateSpiralSpline
+
+生成螺旋线样条（pitch-driven 模型）。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| radius | number | 1.0 | > 0 | 螺旋半径 |
+| pitch | number | 0.5 | ≠ 0 | 每完整一圈沿轴前进的距离 |
+| turns | number | 3.0 | > 0 | 圈数（支持小数如 2.5） |
+| pointsPerTurn | integer | 24 | ≥ 4 | 每圈采样点数 |
+| axis | enum | y | x/y/z | 螺旋轴 |
+
+**输出**：`out: SpatialSpline`（polyline，closed=false）。
+
+**执行逻辑**：`sample_count = ceil(turns * pointsPerTurn) + 1`。对每个采样点：`t = min(i / pointsPerTurn, turns)`，高度 = `t * pitch`，角度 = `t * 2π`。
+
+> 典型连接：`CreateSpiralSpline → SweepAlongSpline → Output`
 
 ---
 
@@ -1693,7 +2089,7 @@
 
 **类别**：Mesh
 
-**功能**：对网格执行倒角/斜切操作，支持两种方法和两种偏移类型。
+**功能**：对网格执行倒角/斜切操作。当前已支持能力按 Blender 4.5 Bevel 子集对齐参数命名与 Inspector 分区；边选择保留 Houdini PolyBevel 风格 Group。
 
 **输入 Pin**：
 
@@ -1707,35 +2103,37 @@
 |--------|------|------|
 | `out` | Mesh | `SpatialMesh` |
 
-**属性**：
+**属性**（Inspector：Group → 主区 → Profile / Geometry / Advanced 折叠）：
 
 | 属性名 | 类型 | 默认值 | 范围 | 说明 |
 |--------|------|--------|------|------|
-| `method` | enum | `"edge"` | `edge` / `vertexPush` | 倒角方法。`edge` = 边倒角（Blender 风格），`vertexPush` = 顶点收缩 |
-| `offsetType` | enum | `"offset"` | `offset` / `width` | 偏移类型。`offset` = 偏移距离，`width` = 倒角宽度 |
-| `amount` | number | 0.1 | ≥ 0, ≤ 1.0 | 倒角量 |
-| `segments` | integer | 2 | 1 ~ 8 | 倒角分段数。越大越圆滑 |
-| `clampOverlap` | boolean | true | — | 是否钳制重叠（防止倒角量过大导致几何翻转） |
-| `angleLimit` | number | 30.0 | 0 ~ 180 | 角度限制。仅对相邻面夹角 ≥ 此值的边进行倒角 |
-| `profile` | number | 0.5 | 0 ~ 1 | 倒角轮廓形状。0.5 = 圆弧，0 = 凹陷，1 = 凸起 |
-| `miterOuter` | enum | `"sharp"` | `sharp` / `patch` / `arc` | 外拐角处理方式 |
-| `miterInner` | enum | `"sharp"` | `sharp` / `patch` / `arc` | 内拐角处理方式 |
-| `vmeshMethod` | enum | `"adj"` | `adj` / `cutoff` | 顶点网格方法。`adj` = Catmull-Clark 邻接，`cutoff` = 截断 |
-| `edgeGroup` | groupSelect | `""` | 上游可用边组 | 限制倒角范围到指定边组。留空 = 所有边 |
-| `excludeUnshared` | boolean | true | — | 是否排除边界边（只有一侧面的边） |
-| `excludeGroups` | groupMultiSelect | `"cap_start,cap_end"` | 上游可用组 | 排除指定组中的边不参与倒角 |
+| `edgeGroup` | groupSelect | `""` | 上游可用边组 | Houdini 风格 Group。空 = 全部候选边；命名组只允许组内边；未知组不倒角 |
+| `offsetType` | enum | `"offset"` | `offset` / `width` | Width Type。`offset` = 偏移距离，`width` = 倒角宽度 |
+| `amount` | number | 0.1 | ≥ 0, ≤ 1.0 | Amount |
+| `segments` | integer | 2 | 1 ~ 8 | Segments |
+| `limitMethod` | enum | `"angle"` | `none` / `angle` | Limit Method。`angle` 再按 `angleLimit` 过滤；`none` 不过滤角度 |
+| `angleLimit` | number | 30.0 | 0 ~ 180 | Angle。仅当 `limitMethod=angle` 时显示/生效 |
+| `profile` | number | 0.5 | 0 ~ 1 | Profile Shape。0.5 = 圆弧 |
+| `miterOuter` | enum | `"sharp"` | `sharp` / `patch` / `arc` | Miter Outer |
+| `miterInner` | enum | `"sharp"` | `sharp` / `patch` / `arc` | Miter Inner |
+| `vmeshMethod` | enum | `"adj"` | `adj` / `cutoff` | Intersections。`adj` ≈ Grid Fill，`cutoff` = Cutoff |
+| `clampOverlap` | boolean | true | — | Clamp Overlap |
+| `method` | enum | `"edge"` | `edge` / `vertexPush` | Advanced/Legacy。`vertexPush` 沿顶点法线推点，**不是** Blender Vertices Bevel |
+| `excludeUnshared` | boolean | true | — | 排除边界边（单侧面） |
+| `excludeGroups` | groupMultiSelect | `"cap_start,cap_end"` | 上游可用组 | 排除指定组 |
+
+**选择流水线**：`edgeGroup` 候选 → `excludeUnshared` / `excludeGroups` → `limitMethod`（Angle / None）。
+
+**旧图兼容**：节点 data 中缺少 `limitMethod` 时：空 Group → Angle；非空 Group → None（保持历史“组内跳过角度过滤”行为）。新节点默认写入 `limitMethod=angle`。
+
+**当前不支持（勿当成已对齐）**：Blender Custom Profile、Depth/Percent/Absolute、Loop Slide、Harden Normals、Mark Seam/Sharp、Material Index、Face Strength；Houdini Viewport Reselect / edge-loop 点选。
 
 **执行逻辑**：
 1. 读取输入网格（空则报错）
-2. 若 `edgeGroup` 非空，仅对指定边组中的边进行倒角；否则考虑所有边
-3. `excludeGroups` 中的边组被排除；`excludeUnshared` 控制是否排除边界边
-4. `angleLimit` 过滤：仅对相邻面夹角 ≥ 此值的边倒角
-5. 根据 `method` 选择边倒角或顶点收缩算法
-6. 根据 `offsetType` 解释 `amount`：`offset` = 顶点沿法线偏移距离，`width` = 倒角后两条新边之间的距离
-7. `segments` 控制每条倒角边的分段数；`profile` 控制倒角轮廓形状
-8. `miterOuter` / `miterInner` 控制拐角处的连接方式
-9. `clampOverlap` 启用时自动缩放 amount 防止自交
-10. 输出倒角后的网格
+2. 按上表选择流水线选出要倒角的边
+3. `method=edge` 走 Blender 风格边倒角；`vertexPush` 走 Legacy 顶点推移
+4. `offsetType` 解释 `amount`；`segments` / `profile` / miter / clamp 控制形状
+5. 输出倒角后的网格
 
 **用法示例**：
 
@@ -1745,13 +2143,13 @@
   "type": "BevelMesh",
   "position": { "x": 600, "y": 0 },
   "data": {
-    "method": "edge",
     "offsetType": "offset",
     "amount": 0.2,
     "segments": 3,
-    "clampOverlap": true,
+    "limitMethod": "angle",
     "angleLimit": 30,
-    "profile": 0.5
+    "profile": 0.5,
+    "clampOverlap": true
   }
 }
 ```
@@ -1864,6 +2262,166 @@
 
 ---
 
+### LoftMesh
+
+**类别**：Mesh
+
+**功能**：对两个及以上 profile spline 做统一列数重采样并沿指定轴排序，生成 profile 之间的 polygon loft；输入 `profiles` 为 variadic `SpatialSpline`，输出 `out` 为 `SpatialMesh`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `columns` | 32 | 每条 profile 的采样列数，2–256 |
+| `sortAxis` | `x` | profile 排序轴：`x` / `y` / `z` |
+| `closedProfile` | true | profile 是否首尾闭合 |
+| `capStart` / `capEnd` | true | 生成起止端盖 |
+| `autoAlign` | true | 自动对齐相邻 profile 的起始列和方向 |
+| `shadeMode` | `auto` | `auto` / `smooth` / `flat` |
+| `cuspAngle` | 30 | Auto 法线折角阈值，0–180° |
+
+输出 face groups 为 `side`、条件性的 `cap_start` / `cap_end`，并维护 boundary edge group `unshared`。少于两条有效 profile 时失败。
+
+### MirrorMesh
+
+**类别**：Mesh
+
+**功能**：关于 `axis=value` 平面镜像 polygon geometry，并反转镜像面的 winding。输入/输出均为 `SpatialMesh`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `axis` | `z` | `x` / `y` / `z` |
+| `offset` | 0 | 镜像平面的轴坐标 |
+| `mergeOriginal` | true | 原件与镜像件是否合并输出 |
+| `weldSeam` | true | 合并时是否 Fuse 镜像缝 |
+| `weldTolerance` | 0.0001 | 缝合容差 |
+
+镜像拓扑通过 destination→source remap 传播 point/vertex/primitive/detail attributes、UV、颜色、材质和 groups；Position / Vector / Normal role 使用反射矩阵更新。
+
+### FuseMesh
+
+**类别**：Mesh
+
+**功能**：按空间量化容差焊接重合 points，重映射 faces 并可删除退化面/重复面。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `tolerance` | 0.0001 | point weld 容差，必须大于 0 |
+| `removeDegenerate` | true | 删除不足三个不同 point 的面及重复面 |
+
+焊接后的属性采用稳定 first-source 语义，所有 owner 的 cardinality 与 groups 会随 remap 更新；最后重建 `unshared` 边组。
+
+### PolyExtrude
+
+**类别**：Mesh
+
+**功能**：沿所选 polygon 的面法线挤出 top 和 side polygons，保持 polygon topology 到最终 Sink。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `faceGroup` | `""` | 可选 face group；空值选择全部面 |
+| `distance` | 0.02 | 法线方向挤出距离 |
+| `inset` | 0 | top 相对面中心的 inset 比例 |
+| `keepOriginal` | false | 是否保留被挤出的原面 |
+| `topGroup` | `extrude_top` | 新 top face group 名 |
+| `sideGroup` | `extrude_side` | 新 side face group 名 |
+
+生成元素从来源 face/corner/point 继承 attributes、UV 和材质；Position role 属性跟随新 point 位移。输出同时维护动态 top/side groups 与 `unshared`。
+
+### CopyMesh
+
+**类别**：Mesh
+
+**功能**：在一个节点内做固定数量的线性或环形 Geometry 复制；通用“按点复制”仍使用 `CopyMeshToPoints`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `mode` | `circular` | `circular` / `linear` |
+| `count` | 6 | 副本数量，1–256 |
+| `axis` | `x` | 环形旋转轴 |
+| `angle` | 360 | 全部副本覆盖的角度 |
+| `translateX/Y/Z` | 0 | linear 模式每个序号的平移增量 |
+| `centerX/Y/Z` | 0 | circular 模式旋转中心 |
+
+每个实例都保留 topology 和通用属性；Position / Vector / Normal role 使用对应实例 affine 变换。同名 groups 按 Houdini Copy 语义合并成员，不添加会破坏下游 selector 的副本前缀，随后重建边界组。
+
+### ShellMesh
+
+**类别**：Mesh
+
+**功能**：沿平均 point normal 生成 outer/inner 两层 polygon shell，并可在输入 boundary 上补 rim faces。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `thickness` | 0.02 | 壳厚，必须大于 0 |
+| `direction` | `centered` | `centered` / `outward` / `inward` |
+| `closeBoundaries` | true | 是否为开口边生成 rim |
+| `outerGroup` | `shell_outer` | 外层 face group |
+| `innerGroup` | `shell_inner` | 内层 face group |
+| `rimGroup` | `shell_rim` | 边界墙 face group |
+
+Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner 属性、UV 和材质，Position role 属性跟随壳体位移。输出维护三个动态 face groups 与 `unshared`。
+
+---
+
+### ImportMesh
+
+**功能**：从文件系统读取 OBJ / FBX / glTF 资产，转换为 `PcgGeometry` 并以 `emit_geometry()` 输出。场景节点变换、多 mesh、UV、顶点色、法线、材质名会被保留；每个导入实例同时生成 primitive `name` 属性和同名 face group。
+
+**输入 Pin**：无；若宿主按本节点 ID 上传 `PcgMeshSlot`，运行时 mesh 优先于文件路径。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `path` | `""` | 绝对路径，或相对工程根的资产路径 |
+| `projectRoot` | `""` | 可选；相对路径的明确解析根。空时相对宿主进程工作目录 |
+| `scale` | 1.0 | 导入后的统一单位缩放，必须大于零且有限 |
+| `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
+
+文件不存在、格式不支持、没有 polygon 或 Assimp 校验失败都会返回包含路径/Assimp 原因的明确错误。Cook cache 的输入指纹包含规范化路径、文件大小和修改时间，因此替换外部资产会使节点失效重算。
+
+### MatchSize
+
+**功能**：对 source 做纯 affine bbox 匹配，覆盖 Houdini Match Size 常用子集；不改变 points/faces 拓扑、groups、材质或非变换属性。
+
+**输入 Pin**：`source`（必需 `SpatialMesh`）、`reference`（可选 `SpatialMesh`）。连接 reference 时使用其 bbox；否则使用 `targetCenter*` / `targetSize*`。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `scaleToFit` | true | 是否把 source bbox 缩放到目标 bbox |
+| `uniformScale` | false | 使用统一缩放，避免改变比例 |
+| `uniformScaleMode` | `fit` | `fit` 取最小有效轴比例；`fill` 取最大比例 |
+| `sourceJustifyX/Y/Z` | `center` | source anchor：`min` / `center` / `max` |
+| `targetJustifyX/Y/Z` | `center` | target anchor：`min` / `center` / `max` |
+| `targetCenterX/Y/Z` | 0 | 无 reference 时的目标中心 |
+| `targetSizeX/Y/Z` | 1 | 无 reference 时的目标尺寸；必须非负 |
+
+输出 Detail owner 上会写入 float16 `pcg_match_xform`（row-major 4×4），供调试或后续装配读取。退化 source 轴保持 scale=1；其余有效轴仍参与 fit/fill。
+
+### BendMesh
+
+**功能**：围绕 capture frame 做直线 Bend，保持面连通与全部拓扑语义。首版不伪装成完整 Houdini Bend：不包含 Twist、Taper、双 capture 或 Lattice。
+
+**输入 Pin**：`source`（必需 `SpatialMesh`）、`rest`（可选 `SpatialMesh`）。Rest 必须与 source point/face 拓扑完全一致；其位置用于计算变形坐标，source-rest offset 会随局部 frame 旋转。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `captureOriginX/Y/Z` | 0 | 捕获起点 |
+| `captureDirectionX/Y/Z` | (0,1,0) | 捕获轴；会归一化 |
+| `upDirectionX/Y/Z` | (1,0,0) | 弯曲径向；不得与捕获轴平行 |
+| `captureLength` | 1 | 从 0 到完整角度的长度，必须大于 0 |
+| `angle` | 0 | 完整弯曲角度（度） |
+| `maskAttribute` | `bendmask` | 输出 point float mask；空字符串可关闭 |
+
+捕获区之前保持不动；区间内按恒定曲率弯曲；区间之后沿末端切线刚性延伸。带 `Position` / `Vector` / `Normal` transform role 的 float3+ 属性会使用各 owner 的位置同步变换。
+
+> 通用装配：`ImportMesh → MatchSize → CopyMeshToPoints`；需要下垂/弧形时在复制前接 `BendMesh`。沿线 chain 继续使用 `InstanceAlongSpline`，或 `ResampleSpline → CopyMeshToPoints`，不增加重复的专用节点。
+
+---
+
 ### MergeMesh
 
 **类别**：Mesh
@@ -1942,7 +2500,7 @@
 | `treatAAs` | enum | `"solid"` | A 的几何类型：`solid`（实体）/ `surface`（表面） |
 | `treatBAs` | enum | `"solid"` | B 的几何类型：`solid`（实体）/ `surface`（表面） |
 | `useSelf` | boolean | false | 是否对 A 自身执行自布尔运算 |
-| `detriangulate` | enum | `"all"` | 去三角化：`all`（所有多边形）/ `unchanged`（仅未改变）/ `none`（不处理） |
+| `detriangulate` | enum | `"all"` | 去三角化：`all`（按输入面来源重建）/ `unchanged`（仅重建未被切割的输入面）/ `none`（保留三角） |
 | `weldEpsilon` | number | 0.0001 | 焊接容差（≥ 1e-8） |
 | `triangleBudget` | integer | 500000 | 三角形数量上限（≥ 1000） |
 
@@ -1955,7 +2513,7 @@
    - `subtract`：保留 A 外部的面，去除 A 内部的面
    - `shatter`：将 A 沿 B 的切割面碎裂为多个独立片
 4. 根据 `treatAAs`/`treatBAs` 调整整/表面模式下的内部/外部判定
-5. `detriangulate` 控制是否将共面三角形合并为多边形
+5. `detriangulate` 按 Houdini Boolean 语义重建输入面：`all` 只合并来自同一输入 polygon 的相邻三角；`unchanged` 进一步排除被交线切割的输入面；A-B seam 边不会被跨越
 6. 标记输出组（a_inside_b / a_outside_b / b_inside_a / b_outside_a / ab_seams）
 7. 若三角形数超过 `triangleBudget`，报错终止
 8. 输出布尔运算结果网格
@@ -2179,6 +2737,20 @@ CreateSpline(profile) ──┘
 
 > 典型用途：将多个 GroupCreate 的输出合并为一个组，或用 subtract 排除某些边（如从 `profile_corner` 中减去 `cap_start` 的边）。
 
+### FaceGroupByNormal
+
+**类别**：Geometry
+
+**功能**：按面法线与目标方向的夹角建立 face group，适合选择顶面、底面或朝向特定方向的面，再交给 `AssignMaterial` 做局部材质覆盖。
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| `outputGroup` | string | `material_faces` | 输出 face group 名称 |
+| `directionX/Y/Z` | number | `0/1/0` | 目标方向，会自动归一化 |
+| `spreadAngle` | number | `30` | 法线允许偏离目标方向的最大角度（0–180°） |
+
+典型连接：`Geometry → FaceGroupByNormal(outputGroup="top") → AssignMaterial(group="") → AssignMaterial(group="top") → Output`。
+
 ---
 
 ## Texture 类别
@@ -2225,6 +2797,68 @@ CreateSpline(profile) ──┘
 
 ---
 
+## 建筑生成核心节点
+
+### CopyMeshToPoints
+
+**类别**：Mesh
+
+**功能**：将一份原型 Geometry 复制到输入点云的每个点，并合并为一份 Geometry。对应 Houdini `copytopoints`，中间过程保持 polygon、group、UV、color 与逐面材质，不做 geometry→mesh→geometry 往返。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `prototype` | Prototype | `SpatialMesh` | 要复制的原型 Geometry/Mesh |
+| `points` | Points | `SpatialPoint` | 放置点及点属性 |
+
+**输出 Pin**：`out`（`SpatialMesh`，内部保持 `PcgGeometry`）
+
+**点属性约定**：
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `P` | 点的 `x/y/z` | 实例平移 |
+| `pscale` | number | Houdini 风格统一缩放 |
+| `scale` | number / `[x,y,z]` / `{x,y,z}` | 统一或逐轴缩放，与 `pscale` 相乘 |
+| `scaleX/Y/Z` | number | 额外逐轴缩放 |
+| `rotationX/Y/Z`（或 `rx/ry/rz`） | number | XYZ 欧拉角，单位为度 |
+| `orient` | `[x,y,z,w]` / `{x,y,z,w}` | 四元数；存在时优先于 frame 属性 |
+| `nx/ny/nz` + `tx/ty/tz` | number | 与 `SampleAlongSpline` 一致的 normal/tangent frame |
+
+原型以自身局部原点为放置基准，不自动居中。每个副本先 scale，再应用欧拉旋转与 `orient`/frame，最后平移到点坐标。
+
+---
+
+### AttributeRandomize
+
+**类别**：Transform
+
+**功能**：以 `graph_seed + seed` 为确定性随机源，随机偏移点位置，并写入供 `CopyMeshToPoints` 消费的旋转与统一缩放属性。
+
+**输入/输出 Pin**：`in` → `out`，均为 `SpatialPoint`。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `seed` | 0 | 节点随机种子，与 graph seed 组合 |
+| `translateX/Y/Z` | 0 | 各轴对称随机幅度 `[-value,+value]`，直接修改点坐标 |
+| `rotateX/Y/Z` | 0 | 各轴对称欧拉角幅度，写入 `rotationX/Y/Z` |
+| `scaleMin/scaleMax` | 1 / 1 | 统一缩放范围，写入 `scale`；上下限反置时自动交换 |
+
+相同 graph seed、节点 seed 和输入点序列必定得到相同结果。
+
+---
+
+### Switch
+
+**类别**：Flow
+
+**功能**：按整数 `index` 在固定四路 `in0`–`in3` 中选择一路 Geometry/Mesh 透传到 `out`。输入/输出 Pin 均为 `SpatialMesh`，内部会保持选中分支的 `PcgGeometry` 或 `PcgMeshData` 载荷。
+
+`index` 会 clamp 到 `[0,3]`；clamp 后对应输入未连接时执行失败。当前执行器按拓扑顺序计算所有上游分支，Switch 只负责选择结果，不提供惰性分支求值。
+
+---
+
 ## Output 类别
 
 ### Output
@@ -2265,9 +2899,45 @@ CreateSpline(profile) ──┘
 
 > 可连接到任何类型的输出 pin（`Any` 类型接受任意输入）。
 
+### ExportFBX
+
+**类别**：Output（Editor Only）
+
+**功能**：显式把所连上游的 polygon Geometry 写成 FBX。它是类似 Houdini ROP 的手动副作用节点：普通 Editor 预览和 Player cook 会把它处理为被动 Output，绝不会自动写文件；只有 Unity Inspector 的 Export 操作会同步 cook 上游并调用原生 FBX exporter。
+
+**输入 Pin**：`in`（`SpatialMesh`）；**输出 Pin**：无。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `path` | `Exports/$GRAPH.fbx` | 工程相对或绝对路径；支持 `$GRAPH` / `$NODE`，缺少 `.fbx` 时自动追加 |
+| `scale` | 1.0 | 导出单位缩放，必须大于 0 |
+| `generateNormals` | true | 是否由 exporter 生成 smooth normals |
+
+执行前必须连接 Geometry。导出控制器会等待异步预览 cook、应用场景参数覆盖和 Mesh/Spline/Texture bindings，再只 cook Export 上游；失败会显示明确错误，不产生静默空文件。
+
 ---
 
 ## 常见节点组合
+
+节点、Manifest 或 native core 发生变化后，提交前执行：
+
+```bash
+scripts/build-pcg-core.sh --copy-to-unity --run-tests
+scripts/sync-manifest.sh
+```
+
+第一条构建 shared/static core、运行 fast 测试并复制/签名 macOS Unity 插件；第二条把 source-of-truth `schema/node-manifest.json` 同步到 Unity Editor 与 Resources 两个消费者。
+
+### 建筑楼层 / 开间阵列
+
+最小建筑连线由点网格驱动，不需要手摆多份 Box：
+
+```text
+CreatePointGrid → AttributeRandomize → CopyMeshToPoints(points) → Output
+CreateBoxMesh ───────────────────────→ CopyMeshToPoints(prototype)
+```
+
+规整立面可将 `AttributeRandomize` 幅度保持为 0；错位塔可设置水平平移、Y 轴旋转与 scale 范围。可选部件使用 `Switch` 在多路 Geometry 中选通，再进入后续 Merge。
 
 ### 1. 基础点生成流水线
 
@@ -2412,6 +3082,128 @@ CreateSpline ──(profile)──┘
 
 ---
 
+---
+
+### CreateCylinderMesh
+
+生成 Y 轴圆柱 mesh。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| radius | number | 1.0 | ≥ 0.001 | 半径 |
+| height | number | 2.0 | ≥ 0.001 | 高度 |
+| radialSegments | integer | 16 | 3–128 | 圆周分段 |
+| heightSegments | integer | 1 | 1–64 | 高度分段 |
+| capTop | boolean | true | | 顶盖 |
+| capBottom | boolean | true | | 底盖 |
+
+**输入**：可选 `in: SpatialMesh`（与 CreateBoxMesh 相同的 optional merge 行为）。
+
+**执行逻辑**：生成 `(heightSegments+1) * radialSegments` 个侧面顶点，每个 cap 复用 rim 并加一个 center 顶点。不生成 normals/colors/uvs。
+
+> 典型连接：`CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output`
+
+### RevolveMesh
+
+将剖面曲线绕轴旋转生成回转体。
+
+| 输入 Pin | 类型 | 说明 |
+|----------|------|------|
+| profile | SpatialSpline | 剖面曲线 |
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| axis | enum | y | x/y/z | 旋转轴 |
+| segments | integer | 16 | 3–256 | 旋转分段 |
+| closeProfile | boolean | false | | 连接首尾（启用时忽略 cap） |
+| capStart | boolean | false | | 起始端盖 |
+| capEnd | boolean | false | | 结束端盖 |
+
+**执行逻辑**：内部使用 `PcgGeometry` 传输（可直接连接 BevelMesh）。对每个 profile point：到旋转轴距离 ≤ 1e-8 时仅创建一个轴上点；否则创建 segments 个环上点。相邻 profile point 之间：ring-ring → quad，axis-ring → triangle，axis-axis → 不生成面。
+
+> 典型连接：`CreateSpline → RevolveMesh → BevelMesh → Output`
+
+---
+
+## Material 类别
+
+### VertexColor
+
+为 mesh 的每个顶点写入统一的 RGBA 颜色。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| r | number | 1.0 | [0, 1] | 红色通道 |
+| g | number | 1.0 | [0, 1] | 绿色通道 |
+| b | number | 1.0 | [0, 1] | 蓝色通道 |
+| a | number | 1.0 | [0, 1] | Alpha 通道（不会丢失） |
+
+**执行逻辑**：读取输入 mesh，为所有顶点设置相同的颜色值，输出 mesh。
+
+**范围限制**：本期仅支持 solid RGBA（统一颜色）。不支持按 face group 着色。应放在最后一个拓扑修改节点之后。
+
+### AssignMaterial
+
+向全部面或指定 face group 赋予材质名，并在 Unity 输出中生成对应 SubMesh。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| group | groupMultiSelect (face) | "" | 逗号分隔的 face group；空值表示全部面 |
+| materialName | string | "" | 材质名称（空字符串允许） |
+
+**执行逻辑**：Geometry 输入时写入逐面材质属性；多个节点链式使用时，下游节点只覆盖命中 Group 的面，最后赋值获胜。Sink 将逐面属性展开为逐三角形材质槽，Mesh Binary v3 传给 Unity 并创建 SubMesh。Mesh-only 输入仅支持空 Group 的全局赋值。
+
+**Unity 绑定**：在 `PcgGraphComponent > Material Bindings` 中将 `materialName` 映射到 Unity `Material`。未映射和空名称使用 `Mesh Material` fallback。完整流程见 [多材质工作流](multi-material-workflow.md)。
+
+---
+
+## UV 类别
+
+### UVTexture
+
+为 mesh 生成 UV 坐标，支持 planar / cylindrical / spherical 投射。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| projection | enum | planar | 投射方式：planar / cylindrical / spherical（`box` 已关闭，P4 再实现真盒体投影） |
+| axis | enum | y | 投射轴：x / y / z |
+| scaleU | number | 1.0 | U 方向缩放 |
+| scaleV | number | 1.0 | V 方向缩放 |
+| offsetU | number | 0.0 | U 方向偏移 |
+| offsetV | number | 0.0 | V 方向偏移 |
+
+**执行逻辑**：
+- Planar：将 mesh AABB 归一化到 [0,1]，取垂直于 axis 的两个坐标作为 UV。
+- Cylindrical：U = atan2 角度 / 2π + 0.5，V = 轴向坐标归一化。
+- Spherical：U = 经度，V = 纬度（基于顶点到中心的方向向量）。
+- Geometry 路径写入 **point UV**，并展开为 **corner（vertex）UV**；Sink 优先 corner → Mesh UV0。
+- 未知 / 遗留 `box` 投影返回执行错误（禁止静默写常数 UV）。
+
+**范围限制**：应放在最后一个拓扑修改节点之后。不支持 UV Flatten/Pack、lightmap unwrap；`uv2` 仅 P5。
+
+### ProjectTexture
+
+根据 ImageTexture descriptor 的 repeat 参数生成 UV。
+
+| 输入 Pin | 类型 | 说明 |
+|----------|------|------|
+| in | SpatialMesh | 输入 mesh |
+| texture | Texture | ImageTexture 输出（必须连接） |
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| direction | enum | z | 投射方向：x / y / z |
+| scaleU | number | 1.0 | U 方向缩放 |
+| scaleV | number | 1.0 | V 方向缩放 |
+| offsetU | number | 0.0 | U 方向偏移 |
+| offsetV | number | 0.0 | V 方向偏移 |
+
+**执行逻辑**：读取 texture pin 的 ImageTexture descriptor 中的 `repeatX/repeatY`，与节点 `scaleU/scaleV` 相乘，按 direction 垂直平面做 AABB-normalized planar UV。不读取 texture pixels，不依赖 TextureRuntime。
+
+**范围限制**：未连接 texture pin 时返回 `PCG_ERR_EXECUTION`。不进行像素投射或贴花混合。
+
+---
+
 ### 6. 属性分类放置
 
 生成点 → 打标签 → 按标签过滤 → 分别放置不同 prefab。
@@ -2425,3 +3217,39 @@ CopyAttributes(tag, values=tree/rock)
 ```
 
 > 注：`CopyAttributes` 对所有点写入相同的属性值。要实现不同标签分类，可串联多个 `CopyAttributes` + `AttributeFilter` 分支，或在 Web 编辑器中手动编辑不同分支的属性。
+
+---
+
+## 示例 .pcg 文件
+
+项目提供两组示例图，可直接在 PCG Graph Editor 中打开运行。
+
+### PCGDemo
+
+位于 `examples/` 和 `Unity/Assets/PcgPlugin/Examples/PCGDemo/`，展示完整场景级用法：
+
+| 文件 | 说明 |
+|------|------|
+| `demo.pcg` | 综合演示（Box → Bevel + 基础 mesh 流水线） |
+| `bridge-demo.pcg` | 桥梁场景（Sweep + Bevel） |
+| `boolean-test.pcg` | Boolean CSG 四种操作演示 |
+| `car.pcg` / `lowpoly-car.pcg` / `lowpoly-car-2.pcg` | 程序化车辆生成 |
+| `lowpoly-sedan.pcg` | 低多边形轿车 |
+| `excavator.pcg` | 挖掘机场景 |
+| `spiral-staircase.pcg` | 螺旋楼梯（InstanceAlongSpline + Sweep） |
+| `stone-arch-bridge.pcg` | 石拱桥（BooleanMesh + BevelMesh） |
+| `village-demo.pcg` | 村落场景（点生成 + 地形 + 实例放置） |
+
+### Test
+
+位于 `examples/Test/` 和 `Unity/Assets/PcgPlugin/Examples/Test/`，覆盖 Phase 5 新增 7 节点的最小验证图：
+
+| 文件 | 测试链路 | 验证内容 |
+|------|---------|---------|
+| `test-cylinder.pcg` | `CreateCylinderMesh → Output` | 圆柱生成、顶点/索引数、cap winding |
+| `test-revolve-bevel.pcg` | `CreateSpline → RevolveMesh → BevelMesh → Output` | 回转体生成、BevelMesh 几何链保持 |
+| `test-spiral-sweep.pcg` | `CreateSpiralSpline → SweepAlongSpline → Output` | 螺旋线采样、Sweep 扫掠 |
+| `test-color-uv-material.pcg` | `CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output` | RGBA colors（含 alpha）、UV0、material metadata 跨 native boundary 传递 |
+| `test-project-texture.pcg` | `ImageTexture → ProjectTexture + CreateCylinderMesh → Output` | texture descriptor repeat 读取、planar UV 投射 |
+
+> **验证步骤**：在 Unity Editor 中打开 PCG Graph Editor → File → Open .pcg → Cook → 检查 Scene View mesh、Console 无报错。`test-color-uv-material.pcg` 可通过 mesh.colors / mesh.uv 长度验证属性传递。

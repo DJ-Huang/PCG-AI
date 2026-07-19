@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,24 @@ namespace DJTechRuntime.PCG
         [FormerlySerializedAs("executionMode")]
         [SerializeField] private PcgCookMode cookMode = PcgCookMode.OnParameterChange;
 
+        [SerializeField]
+        private PcgHostOutputMode hostOutputMode = PcgHostOutputMode.Mesh;
+
+        [SerializeField]
+        private bool showStampOverlays = true;
+
+        [SerializeField]
+        private bool showMaskOverlay = true;
+
+        [SerializeField]
+        private string maskOverlayLayer = "mask";
+
+        [SerializeField, Range(0f, 1f)]
+        private float maskOverlayOpacity = 0.55f;
+
+        [SerializeField]
+        private PcgStampLiveCookMode stampLiveCookMode = PcgStampLiveCookMode.OnRelease;
+
         [SerializeField, Min(0.05f)]
         private float editModeCookInterval = 0.15f;
         [SerializeField] private bool enableAsyncCookInEditor = true;
@@ -34,10 +53,17 @@ namespace DJTechRuntime.PCG
         private List<PcgMeshBinding> m_MeshBindings = new();
 
         [SerializeField]
+        private List<PcgTerrainBinding> m_TerrainBindings = new();
+
+        [SerializeField]
+        private List<PcgMaterialBinding> m_MaterialBindings = new();
+
+        [SerializeField]
         private List<PcgSplineBinding> m_SplineBindings = new();
 
         private float m_NextEditModeCookTime;
         private bool m_PreviewCookPending;
+        private bool m_PreviewCookPriority;
         private bool m_CookInProgress;
         private bool m_AsyncCookInProgress;
         private CancellationTokenSource m_AsyncCookCts;
@@ -47,6 +73,15 @@ namespace DJTechRuntime.PCG
         private string m_LastCookKey;
         private bool m_HasAppliedCookResult;
         private ulong m_LastMeshBinaryHash;
+        private int m_TerrainApplyGeneration;
+        [SerializeField] private string[] m_LastMaterialNames = Array.Empty<string>();
+        private PcgPolygonPreviewData m_PolygonPreview;
+
+        [NonSerialized] private PcgHostTerrainSurface m_LastCookedHeightField;
+        [NonSerialized] private int m_LastCookedHeightFieldGeneration;
+
+        /// <summary>Cached Sink n-gon topology for Scene View polygon wire (null when unavailable).</summary>
+        public PcgPolygonPreviewData PolygonPreview => m_PolygonPreview;
 
 #if UNITY_EDITOR
         private static readonly HashSet<PcgGraphComponent> s_EditModePreviewCooks = new();
@@ -60,14 +95,18 @@ namespace DJTechRuntime.PCG
 
         public static void FlushDeferredEnablePreviewCooks()
         {
-            foreach (var component in s_EditModePreviewCooks.ToArray())
+            foreach (var component in s_EditModePreviewCooks)
             {
                 if (component == null || !component.m_DeferredEnablePreviewCook)
                     continue;
 
                 component.m_DeferredEnablePreviewCook = false;
-                if (component.SupportsEditModePreview())
-                    component.RequestPreviewCook(immediate: true);
+                // Scene/domain load is not a graph mutation. Recooking every component
+                // here makes an idle Editor contend with a queue of cold native graphs.
+                // The first explicit Run, node Preview, parameter edit, or graph edit
+                // marks the component dirty and schedules the cook on demand.
+                component.m_PreviewCookPending = false;
+                component.m_PreviewCookPriority = false;
             }
         }
 
@@ -97,9 +136,68 @@ namespace DJTechRuntime.PCG
         public List<PcgParameterOverride> ParameterOverrides => m_ParameterOverrides;
         public List<PcgGraphParameter> GraphParameters => m_GraphParameters;
         public List<PcgMeshBinding> MeshBindings => m_MeshBindings;
+        public List<PcgTerrainBinding> TerrainBindings => m_TerrainBindings;
+        public List<PcgMaterialBinding> MaterialBindings => m_MaterialBindings;
         public List<PcgSplineBinding> SplineBindings => m_SplineBindings;
         public PcgCookMode CookMode => cookMode;
+        public PcgHostOutputMode HostOutputMode => hostOutputMode;
+        public bool ShowStampOverlays => showStampOverlays;
+        public bool ShowMaskOverlay => showMaskOverlay;
+        public string MaskOverlayLayer =>
+            string.IsNullOrEmpty(maskOverlayLayer) ? "mask" : maskOverlayLayer;
+        public float MaskOverlayOpacity => Mathf.Clamp01(maskOverlayOpacity);
+        public PcgStampLiveCookMode StampLiveCookMode => stampLiveCookMode;
         public PcgScatterDisplayMode ScatterDisplayMode => scatterDisplayMode;
+
+        /// <summary>
+        /// Last Terrain-host HeightField surface (includes mask and other layers).
+        /// Cleared on ClearResults or when a non-HeightField result is applied in Mesh host mode.
+        /// </summary>
+        public PcgHostTerrainSurface LastCookedHeightField => m_LastCookedHeightField;
+
+        /// <summary>Increments whenever <see cref="LastCookedHeightField"/> is replaced or cleared.</summary>
+        public int LastCookedHeightFieldGeneration => m_LastCookedHeightFieldGeneration;
+
+        /// <summary>
+        /// Editor bridge: Graph Editor is cooking a per-node preview subgraph for this component.
+        /// Mesh/Points sinks under Terrain Host must not clear or rewrite TerrainData.
+        /// </summary>
+        public static System.Func<PcgGraphComponent, bool> EditorIsNodePreviewActive;
+
+        public void SetHostOutputMode(PcgHostOutputMode mode, bool requestCook = true)
+        {
+            var changed = hostOutputMode != mode;
+            hostOutputMode = mode;
+            if (mode == PcgHostOutputMode.Terrain)
+                ClearGeneratedMesh();
+
+            if (!changed)
+                return;
+
+            InvalidateCookResult();
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
+            if (requestCook && SupportsEditModePreview())
+                RequestPreviewCook(immediate: true);
+        }
+
+        /// <summary>Material slot names from the last successful mesh cook (empty until Run).</summary>
+        public IReadOnlyList<string> LastMaterialNames => m_LastMaterialNames;
+        public int TerrainApplyGeneration => m_TerrainApplyGeneration;
+
+        /// <summary>
+        /// Re-apply <see cref="MaterialBindings"/> / fallback to the current MeshRenderer
+        /// without re-cooking. No-op until a mesh cook has produced material slots.
+        /// </summary>
+        public void RefreshAppliedMaterials()
+        {
+            EnsureMeshComponents();
+            if (m_MeshRenderer == null)
+                return;
+
+            ApplyMaterialBindings(m_LastMaterialNames);
+        }
 
         public void SetScatterDisplayMode(PcgScatterDisplayMode mode, bool requestCook = true)
         {
@@ -137,7 +235,7 @@ namespace DJTechRuntime.PCG
         public static System.Action EditorAfterPreviewCookApplied;
 
         /// <summary>Last cook result JSON (contains groups + node_stats). Read by Graph Editor info panel.</summary>
-        public string LastCookResultJson;
+        [NonSerialized] public string LastCookResultJson;
 #endif
 
 #if UNITY_EDITOR
@@ -204,20 +302,61 @@ namespace DJTechRuntime.PCG
         /// <summary>Called by <c>PcgEditModeCookScheduler</c> in the Editor assembly.</summary>
         public static void TickAllEditModePreviewCooks()
         {
-            foreach (var component in s_EditModePreviewCooks.ToArray())
+            // Finish completed workers first so their results are applied before the
+            // next queued graph starts. This path runs on every Editor update, so keep
+            // it allocation-free.
+            PcgGraphComponent active = null;
+            foreach (var component in s_EditModePreviewCooks)
             {
-                if (component != null)
+                if (component == null)
+                    continue;
+
+                component.PumpAsyncCookCompletion();
+                if (component.m_AsyncCookInProgress)
+                    active = component;
+            }
+
+            // The native cache/cancellation state is process-global and not safe for
+            // concurrent cooks. Let the current worker finish before starting another.
+            if (active != null)
+                return;
+
+            PcgGraphComponent next = null;
+            foreach (var component in s_EditModePreviewCooks)
+            {
+                if (component == null || !component.CanStartEditModePreviewCook())
+                    continue;
+
+                if (next == null ||
+                    (component.m_PreviewCookPriority && !next.m_PreviewCookPriority) ||
+                    (component.m_PreviewCookPriority == next.m_PreviewCookPriority &&
+                     component.m_NextEditModeCookTime < next.m_NextEditModeCookTime))
                 {
-                    component.PumpAsyncCookCompletion();
-                    component.TickEditModePreviewCook();
+                    next = component;
                 }
             }
+
+            next?.TickEditModePreviewCook();
+        }
+
+        public static bool HasPendingEditModePreviewCooks()
+        {
+            foreach (var component in s_EditModePreviewCooks)
+            {
+                if (component != null &&
+                    (component.m_AsyncCookInProgress || component.m_PreviewCookPending))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static bool CancelAllEditModeAsyncCooks()
         {
             var cancelledAny = false;
-            foreach (var component in s_EditModePreviewCooks.ToArray())
+            foreach (var component in s_EditModePreviewCooks)
             {
                 if (component != null)
                     cancelledAny |= component.CancelAsyncCook("Esc");
@@ -230,6 +369,16 @@ namespace DJTechRuntime.PCG
         {
             if (Application.isPlaying || !SupportsEditModePreview())
                 return;
+
+            // A superseded background cook may still be unwinding inside one
+            // native node. Never wait for it on the Editor thread; Pump will
+            // discard it by generation and the pending cook starts afterwards.
+            if (m_AsyncCookInProgress)
+            {
+                if (m_PreviewCookPending)
+                    m_NextEditModeCookTime = Time.realtimeSinceStartup + 0.05f;
+                return;
+            }
 
             if (EffectiveCookMode != PcgCookMode.OnParameterChange ||
                 !m_PreviewCookPending ||
@@ -244,18 +393,28 @@ namespace DJTechRuntime.PCG
             if (Run(skipDocumentRefresh: true))
             {
                 m_PreviewCookPending = false;
+                m_PreviewCookPriority = false;
                 if (!m_AsyncCookInProgress)
                     EditorAfterPreviewCookApplied?.Invoke();
             }
             else if (!IsCookBusy())
             {
                 m_PreviewCookPending = false;
+                m_PreviewCookPriority = false;
             }
             else
             {
                 m_NextEditModeCookTime = Time.realtimeSinceStartup + 0.05f;
             }
         }
+
+        private bool CanStartEditModePreviewCook() =>
+            !Application.isPlaying &&
+            SupportsEditModePreview() &&
+            !m_AsyncCookInProgress &&
+            EffectiveCookMode == PcgCookMode.OnParameterChange &&
+            m_PreviewCookPending &&
+            Time.realtimeSinceStartup >= m_NextEditModeCookTime;
 #endif
 
         public bool SupportsEditModePreview()
@@ -282,22 +441,51 @@ namespace DJTechRuntime.PCG
             if (!SupportsEditModePreview())
                 return;
 
+            if (m_AsyncCookInProgress)
+            {
+                RequestAsyncCookCancellation(null, log: false);
+                m_PreviewCookPending = true;
+                m_PreviewCookPriority |= immediate;
+                m_NextEditModeCookTime = immediate
+                    ? Time.realtimeSinceStartup
+                    : Time.realtimeSinceStartup + editModeCookInterval;
+                return;
+            }
+
             if (immediate)
             {
+#if UNITY_EDITOR
+                if (ShouldUseAsyncCook())
+                {
+                    // Queue instead of starting directly: all Editor components share
+                    // one native cache and cancellation token. The scheduler starts this
+                    // priority request on the next update without racing another cook.
+                    m_PreviewCookPending = true;
+                    m_PreviewCookPriority = true;
+                    m_NextEditModeCookTime = Time.realtimeSinceStartup;
+                    return;
+                }
+#endif
                 m_PreviewCookPending = false;
+                m_PreviewCookPriority = false;
                 if (m_Document == null)
                     RefreshDocument();
+                // "Immediate" means start now. When async Editor cooking is enabled,
+                // Mesh + PolygonPreview are still applied atomically on completion,
+                // without freezing the main thread on a complex preview graph.
                 if (Run(skipDocumentRefresh: true))
                 {
                     m_NextEditModeCookTime = Time.realtimeSinceStartup + editModeCookInterval;
 #if UNITY_EDITOR
-                    EditorAfterPreviewCookApplied?.Invoke();
+                    if (!m_AsyncCookInProgress)
+                        EditorAfterPreviewCookApplied?.Invoke();
 #endif
                 }
                 return;
             }
 
             m_PreviewCookPending = true;
+            m_PreviewCookPriority = false;
             m_NextEditModeCookTime = Time.realtimeSinceStartup + editModeCookInterval;
         }
 
@@ -395,14 +583,17 @@ namespace DJTechRuntime.PCG
 
         public bool Run() => Run(skipDocumentRefresh: false);
 
-        public bool Run(bool skipDocumentRefresh)
+        public bool Run(bool skipDocumentRefresh) =>
+            Run(skipDocumentRefresh, forceSynchronous: false);
+
+        public bool Run(bool skipDocumentRefresh, bool forceSynchronous)
         {
             if (m_CookInProgress)
                 return false;
 
             if (m_AsyncCookInProgress)
             {
-                if (ShouldUseAsyncCook())
+                if (ShouldUseAsyncCook() || forceSynchronous)
                     CancelAsyncCook(null, log: false);
                 else
                     return false;
@@ -420,7 +611,7 @@ namespace DJTechRuntime.PCG
             m_CookInProgress = true;
             try
             {
-                return RunInternal();
+                return RunInternal(forceSynchronous);
             }
             finally
             {
@@ -428,7 +619,7 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private bool RunInternal()
+        private bool RunInternal(bool forceSynchronous = false)
         {
             string json = null;
 #if UNITY_EDITOR
@@ -440,9 +631,11 @@ namespace DJTechRuntime.PCG
                     return false;
             }
 
-            var cookKey = PcgGraphCookCache.BuildKey(json, seed);
-            if (TryReuseCachedCook(cookKey))
-                return true;
+            if (!PcgGraphExecutionPolicy.TryPrepareJson(json, out json, out var prepareError))
+            {
+                Debug.LogError($"[PCG] Failed to prepare graph for execution: {prepareError}", this);
+                return false;
+            }
 
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
@@ -460,14 +653,21 @@ namespace DJTechRuntime.PCG
 
             var splines = PcgSplineResolver.CollectFromGraphJson(
                 json, gameObject, m_SplineBindings, previewSplineBindings);
+            var heightfields = PcgTerrainResolver.CollectFromGraphJson(
+                json, gameObject, m_TerrainBindings);
+            var terrainFingerprint = PcgTerrainResolver.ComputeFingerprint(heightfields);
+            var cookKey = PcgGraphCookCache.BuildKey(json, seed, terrainFingerprint);
+            if (TryReuseCachedCook(cookKey))
+                return true;
 
-            if (ShouldUseAsyncCook())
+            if (!forceSynchronous && ShouldUseAsyncCook())
             {
-                StartAsyncCook(json, textures, meshes, splines);
+                StartAsyncCook(json, textures, meshes, splines, heightfields);
                 return true;
             }
 
-            var result = PcgGraphLoader.Execute(json, seed, textures, meshes, splines);
+            var result = PcgGraphLoader.Execute(
+                json, seed, textures, meshes, splines, heightfields);
             if (result == null)
                 return false;
 
@@ -508,6 +708,7 @@ namespace DJTechRuntime.PCG
             m_LastCookKey = null;
             m_HasAppliedCookResult = false;
             m_LastMeshBinaryHash = 0;
+            m_LastMaterialNames = Array.Empty<string>();
         }
 
         private bool TryBuildExecutionJson(out string json)
@@ -529,11 +730,43 @@ namespace DJTechRuntime.PCG
 
         private bool ApplyExecutionResult(PcgGraphExecuteResult result)
         {
+            m_PolygonPreview = null;
             var kind = PcgResultParser.DetectKind(result);
 
 #if UNITY_EDITOR
             LastCookResultJson = result.Json;
 #endif
+
+            if (hostOutputMode == PcgHostOutputMode.Terrain)
+            {
+                var isHeightField = kind == PcgResultKind.HeightField ||
+                    (result.HeightFieldBinary != null && result.HeightFieldBinary.Length > 0);
+                if (isHeightField)
+                    return ApplyTerrainHostResult(result, kind);
+
+#if UNITY_EDITOR
+                // Node Preview of Mesh/Points under Terrain Host: keep TerrainData,
+                // treat result as overlay/debug only (stamp volume preview path).
+                // Keep LastCookedHeightField so mask overlay can still draw.
+                if (EditorIsNodePreviewActive?.Invoke(this) == true &&
+                    (kind == PcgResultKind.Mesh || kind == PcgResultKind.Points || kind == PcgResultKind.Splines))
+                {
+                    ApplyTerrainHostOverlayPreview(result, kind);
+                    return true;
+                }
+#endif
+                Debug.LogError(
+                    "[PCG] Host Output Mode = Terrain expects a HeightField Output " +
+                    "(wire HeightField → Output; do not Convert → Mesh). " +
+                    "Mesh node Preview under Terrain Host is overlay-only — use Scene stamp gizmo " +
+                    "or clear Node Preview to cook the full terrain graph.",
+                    this);
+                // Do not keep a stale Node Preview HeightField (mask tint would stick).
+                ClearLastCookedHeightField();
+                return false;
+            }
+
+            ClearLastCookedHeightField();
 
             switch (kind)
             {
@@ -551,18 +784,51 @@ namespace DJTechRuntime.PCG
                     var binHash = ComputeBinaryHash(result.MeshBinary);
                     if (binHash != 0 && binHash == m_LastMeshBinaryHash && m_GeneratedMesh != null)
                     {
-                        ApplyMesh(m_GeneratedMesh);
+                        ApplyMesh(m_GeneratedMesh, m_LastMaterialNames);
                     }
                     else
                     {
-                        if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out var meshError))
+                        if (!PcgResultParser.TryParseMeshBinary(
+                                result.MeshBinary, out var mesh, out var materialNames, out var meshError))
                         {
                             Debug.LogError($"[PCG] Failed to parse mesh result: {meshError}");
                             return false;
                         }
-                        ApplyMesh(mesh);
+                        ApplyMesh(mesh, materialNames);
+                        m_LastMaterialNames = materialNames;
                         m_LastMeshBinaryHash = binHash;
                     }
+
+                    if (result.GeometryBinary != null && result.GeometryBinary.Length > 0)
+                    {
+                        if (PcgResultParser.TryParseGeometryBinary(
+                                result.GeometryBinary, out var polygon, out var geometryError))
+                        {
+                            m_PolygonPreview = polygon;
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[PCG] Failed to parse geometry binary for polygon wire: {geometryError}");
+                        }
+                    }
+#if UNITY_EDITOR
+                    else
+                    {
+                        var exportHint = "";
+                        if (!string.IsNullOrEmpty(result.Json) &&
+                            result.Json.Contains("\"geometry_export\""))
+                        {
+                            exportHint = " json.geometry_export present.";
+                        }
+
+                        Debug.LogWarning(
+                            "[PCG] Mesh cook has no geometry_binary — Scene polygon wire empty. " +
+                            $"verts={result.VertexCount} idx={result.IndexCount}.{exportHint} " +
+                            "Normal for SubdivideMesh / other mesh-only nodes with no upstream Geometry. " +
+                            "CreateBoxMesh / Sweep / Bevel / GroupCreate should export geometry — if not, bug. " +
+                            "Check '[PCG] Run uses node preview' for the previewed node.");
+                    }
+#endif
                     break;
                 }
 
@@ -605,9 +871,139 @@ namespace DJTechRuntime.PCG
                     }
                     break;
 
+                case PcgResultKind.HeightField:
+                    Debug.LogError(
+                        "[PCG] HeightField Output requires Host Output = Terrain " +
+                        "with PcgGraphComponent on the Terrain GameObject.",
+                        this);
+                    return false;
+
                 default:
                     Debug.LogError("[PCG] Unknown result JSON shape.");
                     return false;
+            }
+
+            return true;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Terrain Host + Node Preview of Mesh/Points: keep Terrain, optional polygon wire only.
+        /// Stamp volume interaction uses <c>PcgStampOverlaySceneHandles</c>, not Host Output.
+        /// </summary>
+        private void ApplyTerrainHostOverlayPreview(PcgGraphExecuteResult result, PcgResultKind kind)
+        {
+            if (kind != PcgResultKind.Mesh)
+                return;
+
+            if (result.GeometryBinary != null &&
+                result.GeometryBinary.Length > 0 &&
+                PcgResultParser.TryParseGeometryBinary(
+                    result.GeometryBinary, out var polygon, out _))
+            {
+                m_PolygonPreview = polygon;
+            }
+        }
+#endif
+
+        private bool ApplyTerrainHostResult(PcgGraphExecuteResult result, PcgResultKind kind)
+        {
+            ClearGeneratedMesh();
+            m_LastMeshBinaryHash = 0;
+            m_LastMaterialNames = Array.Empty<string>();
+
+            if (PcgTerrainBindingTable.ResolveSelfTerrain(gameObject) == null)
+            {
+                Debug.LogError(
+                    "[PCG] Host Output Mode = Terrain requires PcgGraphComponent on a GameObject with Terrain.",
+                    this);
+                return false;
+            }
+
+            if (kind != PcgResultKind.HeightField &&
+                (result.HeightFieldBinary == null || result.HeightFieldBinary.Length == 0))
+            {
+                Debug.LogError(
+                    "[PCG] Host Output Mode = Terrain expects a HeightField Output " +
+                    "(wire HeightField → Output; do not Convert → Mesh).",
+                    this);
+                return false;
+            }
+
+            if (!PcgHeightFieldBinaryParser.TryParse(
+                    result.HeightFieldBinary, out var terrainSurface, out var terrainParseError))
+            {
+                Debug.LogError(
+                    $"[PCG] Terrain host mode needs a typed HeightField result: {terrainParseError}",
+                    this);
+                return false;
+            }
+
+            SetLastCookedHeightField(terrainSurface);
+            return ApplyTerrainSurface(terrainSurface);
+        }
+
+        private void SetLastCookedHeightField(PcgHostTerrainSurface surface)
+        {
+            m_LastCookedHeightField = surface;
+            m_LastCookedHeightFieldGeneration++;
+#if UNITY_EDITOR
+            UnityEditor.SceneView.RepaintAll();
+#endif
+        }
+
+        private void ClearLastCookedHeightField()
+        {
+            if (m_LastCookedHeightField == null && m_LastCookedHeightFieldGeneration == 0)
+                return;
+
+            m_LastCookedHeightField = null;
+            m_LastCookedHeightFieldGeneration++;
+#if UNITY_EDITOR
+            UnityEditor.SceneView.RepaintAll();
+#endif
+        }
+
+        private bool ApplyTerrainSurface(PcgHostTerrainSurface surface)
+        {
+            var terrain = PcgTerrainBindingTable.ResolveSelfTerrain(gameObject);
+            if (terrain == null)
+            {
+                Debug.LogError(
+                    "[PCG] No Terrain on this GameObject. Attach PcgGraphComponent to the Terrain.",
+                    this);
+                return false;
+            }
+
+            var adapter = new PcgUnityTerrainAdapter(terrain, transform);
+            if (!adapter.TryExportSurface(surface, out var report, out var error))
+            {
+                Debug.LogError($"[PCG] Terrain output failed: {error}", this);
+                return false;
+            }
+
+            if (report.Applied)
+            {
+                m_TerrainApplyGeneration++;
+                // Without Flush, Scene View often keeps the previous heightmesh until
+                // the camera moves (LOD / render cache). Always flush after SetHeights.
+                terrain.Flush();
+#if UNITY_EDITOR
+                if (terrain.terrainData != null)
+                    UnityEditor.EditorUtility.SetDirty(terrain.terrainData);
+                UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
+#endif
+            }
+
+            if (report.Resampled || report.ScaledFootprint || report.ClampedSamples > 0)
+            {
+                Debug.Log(
+                    $"[PCG] Terrain applied " +
+                    $"({report.SourceResolutionX}x{report.SourceResolutionZ} -> " +
+                    $"{report.TargetResolution}x{report.TargetResolution}, " +
+                    $"resampled={report.Resampled}, scaledFootprint={report.ScaledFootprint}, " +
+                    $"clamped={report.ClampedSamples}).",
+                    this);
             }
 
             return true;
@@ -628,7 +1024,8 @@ namespace DJTechRuntime.PCG
             string json,
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes,
-            IReadOnlyList<PcgSplineUpload> splines)
+            IReadOnlyList<PcgSplineUpload> splines,
+            IReadOnlyList<PcgHeightFieldUpload> heightfields)
         {
             CancelAsyncCook(null, log: false);
             m_AsyncCookInProgress = true;
@@ -643,18 +1040,10 @@ namespace DJTechRuntime.PCG
                 if (token.IsCancellationRequested)
                     return AsyncCookResult.FromCancelled(generation);
 
-                var (validateCode, validateError) = PcgNative.ValidateGraph(json);
-                if (validateCode != PcgResultCode.Ok)
-                {
-                    return AsyncCookResult.Failed(
-                        generation,
-                        $"Validation failed ({validateCode}): {validateError}");
-                }
-
-                if (token.IsCancellationRequested)
-                    return AsyncCookResult.FromCancelled(generation);
-
-                var (execCode, execResult) = PcgNative.ExecuteGraph(json, localSeed, textures, meshes, splines);
+                // ExecuteGraph performs parse + validation. Avoid a second P/Invoke and
+                // a second full JSON parse on every asynchronous preview cook.
+                var (execCode, execResult) = PcgNative.ExecuteGraph(
+                    json, localSeed, textures, meshes, splines, heightfields);
                 if (execCode != PcgResultCode.Ok)
                 {
                     return AsyncCookResult.Failed(
@@ -666,18 +1055,92 @@ namespace DJTechRuntime.PCG
             }, token);
         }
 
-        private bool CancelAsyncCook(string reason, bool log = true)
+        /// <summary>
+        /// Marks an in-flight preview cook as obsolete and asks native execution to
+        /// cancel. The worker is deliberately not joined here: preview switching must
+        /// stay responsive even while a long-running native node is unwinding.
+        /// </summary>
+        public void CancelAsyncCookForPreviewSwitch()
         {
-            if (!m_AsyncCookInProgress)
+            RequestAsyncCookCancellation(null, log: false);
+        }
+
+        /// <summary>
+        /// Drop the retained HeightField used by Scene mask tint when leaving Node Preview
+        /// so the previous preview mask disappears immediately (full-graph recook restores it).
+        /// </summary>
+        public void ClearHeightFieldOverlayForPreviewSwitch()
+        {
+            ClearLastCookedHeightField();
+        }
+
+        private bool RequestAsyncCookCancellation(string reason, bool log = true)
+        {
+            if (!m_AsyncCookInProgress || m_AsyncCookTask == null)
                 return false;
+
+            if (m_LastAsyncCookStatus == "cancelling")
+                return true;
 
             PcgNative.RequestCancel();
             m_AsyncCookCts?.Cancel();
+            // A completed result from the superseded request must never apply.
+            m_AsyncCookGeneration++;
+            m_LastAsyncCookStatus = "cancelling";
+
+#if UNITY_EDITOR
+            if (log && !string.IsNullOrEmpty(reason))
+                Debug.Log($"[PCG] Async cook cancellation requested ({reason}).");
+#endif
+            return true;
+        }
+
+        private bool CancelAsyncCook(string reason, bool log = true)
+        {
+            var task = m_AsyncCookTask;
+            if (!m_AsyncCookInProgress && task == null)
+                return false;
+
+            // Ask the in-flight Task.Run cook to stop, then WAIT for native ExecuteGraph
+            // to finish. Dropping the Task reference without Wait races the next cook against
+            // g_cook_cache / static cancel flag — Mesh may still apply, GeometryBinary often becomes 0
+            // (cyan polygon wire empty on node Preview).
+            PcgNative.RequestCancel();
+            m_AsyncCookCts?.Cancel();
+
             m_AsyncCookInProgress = false;
             m_AsyncCookTask = null;
-            m_AsyncCookCts?.Dispose();
+            // Invalidate generation so a late Pump cannot apply a raced result.
+            m_AsyncCookGeneration++;
+            var cts = m_AsyncCookCts;
             m_AsyncCookCts = null;
             m_LastAsyncCookStatus = "cancelled";
+
+            if (task != null)
+            {
+                try
+                {
+                    if (!task.Wait(TimeSpan.FromSeconds(30)))
+                    {
+#if UNITY_EDITOR
+                        Debug.LogWarning("[PCG] Timed out waiting for cancelled async cook to finish.");
+#endif
+                    }
+                }
+                catch (AggregateException)
+                {
+                    // Expected when RequestCancel / CTS cancels the worker.
+                }
+                catch (Exception ex)
+                {
+#if UNITY_EDITOR
+                    Debug.LogWarning($"[PCG] Wait for cancelled cook failed: {ex.Message}");
+#endif
+                }
+            }
+
+            cts?.Dispose();
+            PcgNative.ClearCancel();
 
 #if UNITY_EDITOR
             if (log && !string.IsNullOrEmpty(reason))
@@ -709,7 +1172,10 @@ namespace DJTechRuntime.PCG
 
             var asyncResult = completedTask.Result;
             if (asyncResult == null || asyncResult.IsCancelled || asyncResult.Generation != m_AsyncCookGeneration)
+            {
+                m_LastAsyncCookStatus = "cancelled";
                 return;
+            }
 
             if (!string.IsNullOrEmpty(asyncResult.Error))
             {
@@ -783,6 +1249,8 @@ namespace DJTechRuntime.PCG
         {
             InvalidateCookResult();
             ClearGeneratedMesh();
+            ClearLastCookedHeightField();
+            m_PolygonPreview = null;
         }
 
         // --- Result rendering ---
@@ -864,7 +1332,7 @@ namespace DJTechRuntime.PCG
             ClearScatterDisplay();
         }
 
-        private void ApplyMesh(Mesh mesh)
+        private void ApplyMesh(Mesh mesh, IReadOnlyList<string> materialNames = null)
         {
             ClearGpuInstancingOnly();
 
@@ -881,16 +1349,56 @@ namespace DJTechRuntime.PCG
             EnsureMeshComponents();
             m_MeshFilter.sharedMesh = mesh;
             if (m_MeshRenderer != null)
+            {
                 m_MeshRenderer.enabled = mesh != null;
+                ApplyMaterialBindings(materialNames);
+            }
+        }
+
+        private void ApplyMaterialBindings(IReadOnlyList<string> materialNames)
+        {
+            if (m_MeshRenderer == null)
+                return;
+
+            var fallback = meshMaterial != null ? meshMaterial : m_MeshRenderer.sharedMaterial;
+            if (materialNames == null || materialNames.Count == 0)
+            {
+                m_MeshRenderer.sharedMaterials = new[] { fallback };
+                return;
+            }
+
+            var resolved = new Material[materialNames.Count];
+            for (var slot = 0; slot < materialNames.Count; slot++)
+            {
+                resolved[slot] = fallback;
+                var name = materialNames[slot];
+                if (string.IsNullOrEmpty(name))
+                    continue;
+                foreach (var binding in m_MaterialBindings)
+                {
+                    if (binding != null && binding.material != null && binding.materialName == name)
+                    {
+                        resolved[slot] = binding.material;
+                        break;
+                    }
+                }
+            }
+            m_MeshRenderer.sharedMaterials = resolved;
         }
 
         private void EnsureMeshComponents()
         {
             if (m_MeshFilter == null)
-                m_MeshFilter = GetComponent<MeshFilter>() ?? gameObject.AddComponent<MeshFilter>();
+            {
+                m_MeshFilter = GetComponent<MeshFilter>();
+                if (m_MeshFilter == null)
+                    m_MeshFilter = gameObject.AddComponent<MeshFilter>();
+            }
             if (m_MeshRenderer == null)
             {
-                m_MeshRenderer = GetComponent<MeshRenderer>() ?? gameObject.AddComponent<MeshRenderer>();
+                m_MeshRenderer = GetComponent<MeshRenderer>();
+                if (m_MeshRenderer == null)
+                    m_MeshRenderer = gameObject.AddComponent<MeshRenderer>();
                 if (m_MeshRenderer.sharedMaterial == null)
                 {
                     var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");

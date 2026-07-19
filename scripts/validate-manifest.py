@@ -5,6 +5,8 @@ Extracts type names from:
   - pcg-core/src/elements/*.cpp  (map.emplace("TypeName", ...))
   - schema/node-manifest.json   (nodes[].type)
 
+Also validates optional Inspector section/layout metadata when present.
+
 Reports any mismatches and exits with code 1 if out of sync.
 """
 
@@ -36,7 +38,7 @@ def extract_cpp_types():
 
 
 def extract_manifest_types():
-    """Extract node type names from node-manifest.json."""
+    """Extract native types; Editor-only ROP nodes intentionally have no C++ element."""
     if not MANIFEST_PATH.is_file():
         print(f"ERROR: node-manifest.json not found: {MANIFEST_PATH}")
         sys.exit(1)
@@ -44,12 +46,95 @@ def extract_manifest_types():
     with open(MANIFEST_PATH, encoding="utf-8") as f:
         manifest = json.load(f)
 
-    return {node["type"] for node in manifest.get("nodes", [])}
+    return {
+        node["type"]
+        for node in manifest.get("nodes", [])
+        if not node.get("editorOnly", False)
+    }
+
+
+def load_manifest():
+    with open(MANIFEST_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def validate_inspector_layout(manifest):
+    """Validate optional inspectorSections / property layout metadata."""
+    errors = []
+    for node in manifest.get("nodes", []):
+        node_type = node.get("type", "<unknown>")
+        sections = node.get("inspectorSections")
+        props = node.get("properties") or {}
+        if not sections:
+            for key, prop in props.items():
+                if not isinstance(prop, dict):
+                    continue
+                if "section" in prop:
+                    errors.append(
+                        f"{node_type}.{key}: has section but node has no inspectorSections"
+                    )
+            continue
+
+        section_ids = []
+        for section in sections:
+            if not isinstance(section, dict):
+                errors.append(f"{node_type}: inspectorSections entry must be object")
+                continue
+            sid = section.get("id")
+            if not sid:
+                errors.append(f"{node_type}: inspectorSections entry missing id")
+                continue
+            if sid in section_ids:
+                errors.append(f"{node_type}: duplicate section id '{sid}'")
+            section_ids.append(sid)
+
+        known = set(section_ids)
+        orders_by_section = {}
+
+        for key, prop in props.items():
+            if not isinstance(prop, dict):
+                errors.append(f"{node_type}.{key}: property must be object")
+                continue
+
+            section = prop.get("section")
+            if section is not None and section != "":
+                if section not in known:
+                    errors.append(f"{node_type}.{key}: unknown section '{section}'")
+                if "order" in prop:
+                    orders_by_section.setdefault(section, []).append((key, prop["order"]))
+
+            visible = prop.get("visibleWhen")
+            if visible is not None:
+                if not isinstance(visible, dict):
+                    errors.append(f"{node_type}.{key}: visibleWhen must be object")
+                else:
+                    driver = visible.get("property")
+                    if not driver:
+                        errors.append(f"{node_type}.{key}: visibleWhen missing property")
+                    elif driver not in props:
+                        errors.append(
+                            f"{node_type}.{key}: visibleWhen property '{driver}' not found"
+                        )
+                    if "equals" not in visible:
+                        errors.append(f"{node_type}.{key}: visibleWhen missing equals")
+
+        for section, items in orders_by_section.items():
+            seen = {}
+            for key, order in items:
+                if order in seen:
+                    errors.append(
+                        f"{node_type}: duplicate order {order} in section '{section}' "
+                        f"({seen[order]} and {key})"
+                    )
+                seen[order] = key
+
+    return errors
 
 
 def main():
     cpp_types = extract_cpp_types()
     manifest_types = extract_manifest_types()
+    manifest = load_manifest()
 
     cpp_only = cpp_types - manifest_types
     manifest_only = manifest_types - cpp_types
@@ -58,22 +143,35 @@ def main():
     print(f"Manifest nodes:   {len(manifest_types)}")
     print()
 
+    failed = False
+
     if cpp_only:
+        failed = True
         print("ERROR: Registered in C++ but missing from manifest:")
         for t in sorted(cpp_only):
             print(f"  - {t}")
 
     if manifest_only:
+        failed = True
         print("ERROR: In manifest but not registered in C++:")
         for t in sorted(manifest_only):
             print(f"  - {t}")
 
-    if not cpp_only and not manifest_only:
+    layout_errors = validate_inspector_layout(manifest)
+    if layout_errors:
+        failed = True
+        print("ERROR: Inspector layout metadata:")
+        for err in layout_errors:
+            print(f"  - {err}")
+    else:
+        print("OK: Inspector layout metadata")
+
+    if not failed:
         print(f"OK: C++ and manifest are in sync ({len(cpp_types)} nodes)")
         return 0
 
     print()
-    print("FAILED: Manifest is out of sync with C++ registrations.")
+    print("FAILED: Manifest validation failed.")
     return 1
 
 

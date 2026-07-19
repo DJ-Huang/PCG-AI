@@ -1,6 +1,8 @@
 #include "elements/element_utils.hpp"
+#include "elements/heightfield_algorithms.hpp"
 #include "elements/pcg_element.hpp"
 #include "elements/primitive_elements.hpp"
+#include "heightfield_runtime.hpp"
 
 #include <cmath>
 #include <memory>
@@ -321,7 +323,7 @@ public:
     }
 };
 
-double sample_terrain_height(const nlohmann::json* terrain, double x, double z, int seed)
+double sample_legacy_terrain_height(const nlohmann::json* terrain, double x, double z, int seed)
 {
     if (terrain && terrain->contains("heights") && (*terrain)["heights"].is_array()) {
         const auto& heights = (*terrain)["heights"];
@@ -353,15 +355,22 @@ public:
         data::PcgPointData source = get_points_input(ctx, "in", "ProjectPoints missing points input");
         if (source.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ProjectPoints missing points input");
+        const data::PcgHeightField* heightfield = ctx.inputs.find_heightfield("terrain");
         const nlohmann::json* terrain = ctx.inputs.find_json("terrain");
-        const bool use_terrain = ctx.node->data.value("useTerrain", terrain != nullptr);
+        const bool use_terrain = ctx.node->data.value(
+            "useTerrain", heightfield != nullptr || terrain != nullptr);
         const double base_y = ctx.node->data.value("baseY", 0.0);
 
         data::PcgPointData projected;
         for (const auto& point : source.points()) {
-            const double y = use_terrain
-                ? sample_terrain_height(terrain, point.x, point.z, ctx.graph_seed)
-                : base_y;
+            double y = base_y;
+            if (use_terrain && heightfield) {
+                if (!heightfield->sample_scalar_world("height", point.x, point.y, point.z, y))
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                    "ProjectPoints failed to sample height layer");
+            } else if (use_terrain) {
+                y = sample_legacy_terrain_height(terrain, point.x, point.z, ctx.graph_seed);
+            }
             projected.add_point(data::PcgPoint{point.x, y, point.z, point.attributes});
         }
 
@@ -379,27 +388,43 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "GetTerrainData missing node");
 
+        if (ctx.heightfields) {
+            if (const data::PcgHeightField* bound = ctx.heightfields->find(ctx.node->id)) {
+                emit_heightfield(ctx, *bound);
+                return PCG_OK;
+            }
+        }
+
         const int grid = clamp_count(ctx.node->data.value("gridSize", 32), 256);
         const double cell = ctx.node->data.value("cellSize", 2.0);
         const double amplitude = ctx.node->data.value("amplitude", 5.0);
         const int seed = ctx.node->data.value("seed", ctx.graph_seed);
+        if (grid < 2 || !std::isfinite(cell) || cell <= 0.0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GetTerrainData grid and cellSize must be > 0");
 
-        nlohmann::json heights = nlohmann::json::array();
+        data::PcgHeightField heightfield(
+            grid,
+            grid,
+            static_cast<double>(grid - 1) * cell,
+            static_cast<double>(grid - 1) * cell,
+            data::PcgVec3{-0.5 * cell, 0.0, -0.5 * cell},
+            data::HeightFieldSampling::Corner,
+            data::HeightFieldOrientation::ZX);
+        auto& height_layer = heightfield.create_layer("height", 1, 0.0f);
+        heightfield.create_layer("mask", 1, 0.0f);
         for (int z = 0; z < grid; ++z) {
             for (int x = 0; x < grid; ++x) {
                 const double wx = (x - grid * 0.5) * cell;
                 const double wz = (z - grid * 0.5) * cell;
-                heights.push_back(simple_noise(wx, wz, seed) * amplitude);
+                const std::size_t index = static_cast<std::size_t>(z) *
+                                          static_cast<std::size_t>(grid) +
+                                          static_cast<std::size_t>(x);
+                height_layer.values[index] =
+                    static_cast<float>(simple_noise(wx, wz, seed) * amplitude);
             }
         }
 
-        ctx.outputs.add_param("out", data::PcgParamData(nlohmann::json{
-            {"gridSize", grid},
-            {"cellSize", cell},
-            {"amplitude", amplitude},
-            {"seed", seed},
-            {"heights", std::move(heights)},
-        }));
+        emit_heightfield(ctx, std::move(heightfield));
         return PCG_OK;
     }
 };
@@ -417,11 +442,14 @@ public:
         if (source.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "SampleSurface missing points input");
 
-        const nlohmann::json* terrain = require_input_json(ctx, "terrain", "SampleSurface missing terrain input");
-        if (!terrain)
+        const data::PcgHeightField* heightfield = ctx.inputs.find_heightfield("terrain");
+        const nlohmann::json* terrain = ctx.inputs.find_json("terrain");
+        if (!heightfield && !terrain) {
+            fail_ctx(ctx, PCG_ERR_EXECUTION, "SampleSurface missing terrain input");
             return PCG_ERR_EXECUTION;
+        }
 
-        const int seed = terrain->value("seed", ctx.graph_seed);
+        const int seed = terrain ? terrain->value("seed", ctx.graph_seed) : ctx.graph_seed;
         const double offset_y = ctx.node->data.value("offsetY", 0.0);
         double blend = ctx.node->data.value("blend", 1.0);
         if (blend < 0.0) blend = 0.0;
@@ -429,7 +457,16 @@ public:
 
         data::PcgPointData sampled;
         for (const auto& point : source.points()) {
-            const double terrain_y = sample_terrain_height(terrain, point.x, point.z, seed);
+            double terrain_y = 0.0;
+            if (heightfield) {
+                if (!heightfield->sample_scalar_world(
+                        "height", point.x, point.y, point.z, terrain_y)) {
+                    return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                    "SampleSurface failed to sample height layer");
+                }
+            } else {
+                terrain_y = sample_legacy_terrain_height(terrain, point.x, point.z, seed);
+            }
             sampled.add_point(data::PcgPoint{
                 point.x,
                 point.y * (1.0 - blend) + terrain_y * blend + offset_y,

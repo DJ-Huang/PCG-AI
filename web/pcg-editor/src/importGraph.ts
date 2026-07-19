@@ -1,17 +1,41 @@
-// importGraph.ts — Parse Graph JSON v1 (with parameters) into React Flow nodes/edges.
+// importGraph.ts — Parse Graph JSON v1/v2 into React Flow state without dropping subgraphs.
 // Node types validated against node-manifest.json (no hardcoded type set).
 
 import type { Node, Edge } from '@xyflow/react';
-import type { GraphNode, GraphEdge, NodeData, GraphParameter } from './graphSchema';
+import type {
+  GraphNode,
+  GraphEdge,
+  NodeData,
+  GraphParameter,
+  GraphSubgraph,
+  GraphSubgraphPort,
+} from './graphSchema';
 import { defaultData } from './graphSchema';
 import { getNodeTypeDefs } from './nodeManifest';
 
+const PIN_TYPES = new Set([
+  'Any', 'Param', 'SpatialPoint', 'SpatialSpline', 'SpatialSurface',
+  'SpatialMesh', 'Texture', 'HeightField',
+]);
+
+function canonicalPinType(value: unknown): string | undefined {
+  if (value === 'Mesh') return 'SpatialMesh'; // Legacy subgraph alias.
+  return typeof value === 'string' && PIN_TYPES.has(value) ? value : undefined;
+}
+
 export type ImportResult =
-  | { ok: true; nodes: Node[]; edges: Edge[]; parameters: GraphParameter[]; filename?: string }
+  | {
+      ok: true;
+      nodes: Node[];
+      edges: Edge[];
+      parameters: GraphParameter[];
+      subgraphs: GraphSubgraph[];
+      filename?: string;
+    }
   | { ok: false; error: string };
 
 /**
- * Parses Graph JSON v1 text into React Flow nodes/edges + parameters.
+ * Parses Graph JSON v1/v2 into React Flow nodes/edges plus document-level data.
  */
 export function parseGraphJson(text: string): ImportResult {
   let parsed: unknown;
@@ -26,8 +50,8 @@ export function parseGraphJson(text: string): ImportResult {
   }
 
   const root = parsed as Record<string, unknown>;
-  if (root.version !== '1.0') {
-    return { ok: false, error: 'Unsupported or missing version (expected 1.0).' };
+  if (root.version !== '1.0' && root.version !== '2.0') {
+    return { ok: false, error: 'Unsupported or missing version (expected 1.0 or 2.0).' };
   }
 
   if (!Array.isArray(root.nodes)) {
@@ -82,7 +106,26 @@ export function parseGraphJson(text: string): ImportResult {
     }
   }
 
-  return { ok: true, nodes, edges, parameters };
+  // Subgraph definitions are preserved even though this editor does not yet
+  // expose an authoring UI for their nested contents.
+  const subgraphs: GraphSubgraph[] = [];
+  const subgraphIds = new Set<string>();
+  if (Array.isArray(root.subgraphs)) {
+    for (let i = 0; i < root.subgraphs.length; i++) {
+      const subgraphResult = toGraphSubgraph(root.subgraphs[i], i);
+      if (!subgraphResult.ok) return subgraphResult;
+      if (subgraphIds.has(subgraphResult.subgraph.id)) {
+        return {
+          ok: false,
+          error: `Duplicate subgraph id "${subgraphResult.subgraph.id}".`,
+        };
+      }
+      subgraphIds.add(subgraphResult.subgraph.id);
+      subgraphs.push(subgraphResult.subgraph);
+    }
+  }
+
+  return { ok: true, nodes, edges, parameters, subgraphs };
 }
 
 export function importGraphFromFile(file: File): Promise<ImportResult> {
@@ -113,6 +156,7 @@ export function syncNodeCounterFromNodes(nodes: Node[]): number {
 type NodeParse = { ok: true; node: GraphNode } | { ok: false; error: string };
 type EdgeParse = { ok: true; edge: GraphEdge } | { ok: false; error: string };
 type ParamParse = { ok: true; param: GraphParameter } | { ok: false; error: string };
+type SubgraphParse = { ok: true; subgraph: GraphSubgraph } | { ok: false; error: string };
 
 function toGraphNode(item: unknown, index: number): NodeParse {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
@@ -130,8 +174,11 @@ function toGraphNode(item: unknown, index: number): NodeParse {
     return { ok: false, error: `Node "${id}" is missing "type".` };
   }
 
-  // Validate against manifest (no hardcoded type set)
-  if (!getNodeTypeDefs(type)) {
+  // Subgraph interface nodes are structural parser primitives and therefore
+  // intentionally absent from the executable-node manifest.
+  const isStructuralSubgraphNode =
+    type === 'Subgraph' || type === 'SubgraphInput' || type === 'SubgraphOutput';
+  if (!getNodeTypeDefs(type) && !isStructuralSubgraphNode) {
     return { ok: false, error: `Node "${id}" has unknown type "${type}".` };
   }
 
@@ -185,6 +232,14 @@ function toGraphEdge(item: unknown, index: number): EdgeParse {
   if (!id) return { ok: false, error: `Edge at index ${index} is missing "id".` };
   if (!source) return { ok: false, error: `Edge "${id}" is missing "source".` };
   if (!target) return { ok: false, error: `Edge "${id}" is missing "target".` };
+  const sourcePinType = canonicalPinType(raw.sourcePinType);
+  const targetPinType = canonicalPinType(raw.targetPinType);
+  if (raw.sourcePinType !== undefined && !sourcePinType) {
+    return { ok: false, error: `Edge "${id}" has invalid "sourcePinType".` };
+  }
+  if (raw.targetPinType !== undefined && !targetPinType) {
+    return { ok: false, error: `Edge "${id}" has invalid "targetPinType".` };
+  }
 
   return {
     ok: true,
@@ -192,8 +247,10 @@ function toGraphEdge(item: unknown, index: number): EdgeParse {
       id,
       source,
       target,
-      sourceHandle: typeof raw.sourceHandle === 'string' ? raw.sourceHandle : undefined,
-      targetHandle: typeof raw.targetHandle === 'string' ? raw.targetHandle : undefined,
+      sourceHandle: typeof raw.sourceHandle === 'string' ? raw.sourceHandle : 'out',
+      targetHandle: typeof raw.targetHandle === 'string' ? raw.targetHandle : 'in',
+      sourcePinType,
+      targetPinType,
     },
   };
 }
@@ -234,6 +291,80 @@ function toGraphParameter(item: unknown, index: number): ParamParse {
   };
 }
 
+function toGraphSubgraph(item: unknown, index: number): SubgraphParse {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return { ok: false, error: `Subgraph at index ${index} is not an object.` };
+  }
+  const raw = item as Record<string, unknown>;
+  const id = typeof raw.id === 'string' ? raw.id : '';
+  const name = typeof raw.name === 'string' ? raw.name : '';
+  if (!id) return { ok: false, error: `Subgraph at index ${index} is missing "id".` };
+  if (!name) return { ok: false, error: `Subgraph "${id}" is missing "name".` };
+  if (!Array.isArray(raw.inputs) || !Array.isArray(raw.outputs) ||
+      !Array.isArray(raw.nodes) || !Array.isArray(raw.edges)) {
+    return { ok: false, error: `Subgraph "${id}" has invalid ports, nodes, or edges.` };
+  }
+
+  const parsePorts = (
+    values: unknown[],
+    direction: 'input' | 'output',
+  ): { ok: true; ports: GraphSubgraphPort[] } | { ok: false; error: string } => {
+    const ports: GraphSubgraphPort[] = [];
+    const ids = new Set<string>();
+    for (let portIndex = 0; portIndex < values.length; portIndex++) {
+      const value = values[portIndex];
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return { ok: false, error: `Subgraph "${id}" ${direction} port ${portIndex} is invalid.` };
+      }
+      const port = value as Record<string, unknown>;
+      const portId = typeof port.id === 'string' ? port.id : '';
+      const portName = typeof port.name === 'string' ? port.name : '';
+      const pinType = canonicalPinType(port.pinType) ?? '';
+      if (!portId || !portName || !pinType || ids.has(portId)) {
+        return { ok: false, error: `Subgraph "${id}" has an invalid or duplicate ${direction} port.` };
+      }
+      ids.add(portId);
+      ports.push({ id: portId, name: portName, pinType });
+    }
+    return { ok: true, ports };
+  };
+
+  const inputs = parsePorts(raw.inputs, 'input');
+  if (!inputs.ok) return inputs;
+  const outputs = parsePorts(raw.outputs, 'output');
+  if (!outputs.ok) return outputs;
+
+  const nodes: GraphNode[] = [];
+  const nodeIds = new Set<string>();
+  for (let nodeIndex = 0; nodeIndex < raw.nodes.length; nodeIndex++) {
+    const node = toGraphNode(raw.nodes[nodeIndex], nodeIndex);
+    if (!node.ok) return { ok: false, error: `Subgraph "${id}": ${node.error}` };
+    if (nodeIds.has(node.node.id)) {
+      return { ok: false, error: `Subgraph "${id}" has duplicate node id "${node.node.id}".` };
+    }
+    nodeIds.add(node.node.id);
+    nodes.push(node.node);
+  }
+
+  const edges: GraphEdge[] = [];
+  const edgeIds = new Set<string>();
+  for (let edgeIndex = 0; edgeIndex < raw.edges.length; edgeIndex++) {
+    const edge = toGraphEdge(raw.edges[edgeIndex], edgeIndex);
+    if (!edge.ok) return { ok: false, error: `Subgraph "${id}": ${edge.error}` };
+    if (edgeIds.has(edge.edge.id) || !nodeIds.has(edge.edge.source) ||
+        !nodeIds.has(edge.edge.target)) {
+      return { ok: false, error: `Subgraph "${id}" has a duplicate or dangling edge.` };
+    }
+    edgeIds.add(edge.edge.id);
+    edges.push(edge.edge);
+  }
+
+  return {
+    ok: true,
+    subgraph: { id, name, inputs: inputs.ports, outputs: outputs.ports, nodes, edges },
+  };
+}
+
 function toFlowNode(graphNode: GraphNode): Node {
   return {
     id: graphNode.id,
@@ -250,5 +381,9 @@ function toFlowEdge(graphEdge: GraphEdge): Edge {
     target: graphEdge.target,
     sourceHandle: graphEdge.sourceHandle ?? 'out',
     targetHandle: graphEdge.targetHandle ?? 'in',
+    data: {
+      sourcePinType: graphEdge.sourcePinType,
+      targetPinType: graphEdge.targetPinType,
+    },
   };
 }

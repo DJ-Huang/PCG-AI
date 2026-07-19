@@ -1,0 +1,109 @@
+---
+description: 开发任务强制规则路由（域名 + rule_search + vault_search）
+---
+# Rule router gate
+
+**手册**：`~/.codely-cli/extensions/MySkills/skills/rule-router/SKILL.md`
+
+## 何时执行
+
+用户任务含 **写/改/实现/调试/review/审查/重构/优化** 等开发意图，或显式 `/rule-router`。
+
+**跳过**：纯 Q&A、仅文档、仅 Git、纯 `vault_search` / `rule_search`、纯 GitLab（改读 `workflow/gitlab.md`）、HMIRP 手册（`create-hmirp-doc` Skill）、用户明确禁止改仓库。
+
+## 1. 域名（四选一）
+
+| 域名 | 强信号关键词 |
+|------|----------------|
+| **Unity 渲染** | hmirp, unity, shader, hlsl, 渲染管线, render feature, pass, 材质, 光照, 后处理, stable, Runtime.Stable, FRP, sync-tj, 合并 URP |
+| **ComfyUI** | comfyui, custom node, ta-toolkit, node_base, tensor |
+| **PCG** | pcg, .pcg, PcgGeometry, BevelMesh, SweepAlongSpline, pcg-graph, pcg-core, MergeMesh, RevolveMesh, 编图 |
+| **通用** | （未命中上述域名强信号的开发任务，自动归入） |
+
+弱信号 → 让用户选域（Cursor 用 `AskQuestion`，Trae/Codely 在对话中追问）。未命中任何强信号 → 自动 **通用**，不跳过后续步骤。
+
+> PCG 与 Unity 同时出现时（如「Unity 里跑 .pcg」）：优先 **PCG**（编图/节点/几何连线）；仅改 Unity Editor UI 且无 graph 语义时用 Unity 渲染。
+
+## 2. rule_search（写产品代码前必须确认）
+
+路由规则真源：通用规则在 Obsidian `Rules/`；PCG-AI 项目专用规则在 `PCG AI Rule/`。后者只有 `rule_search(domain=pcg)` 可见，`vault_search` 与其他 domain 必须排除。
+
+**禁止**用 `vault_search` 代替规则检索；**禁止** `Read` `.codely-cli/rules/core/`、`agents/`、`reviews/`（本地不应存在这些目录）。
+
+首次修改产品路径（见 `gates/codely-pre-code-gate`）**之前**：
+
+1. `user-vault-rag.rule_search(query=任务技术关键词 + 意图, domain=unity|comfyui|pcg, top_k=5)`（**通用**域名传 `domain=null`）
+2. 命中后按需 `vault_get_chunk(chunk_id=…)` 读完整规则正文；同一 `rule_id` 的多个 chunk 只保留与任务最相关的要点
+3. 建立本会话**检索账本**：`domain + intent + 技术关键词 + 影响模块/路径`，并记录命中 `rule_id`、关键约束和已读 `chunk_id`
+4. **通用**域名 `rule_search` 可能 `no hit` — 此时回执写 `no hit (general domain)`，**但 vault_search 仍必须执行**
+
+后续写码前必须检查检索账本，不得跳过检查；按范围选择状态：
+
+| 状态 | 条件 | 行为 |
+|------|------|------|
+| `fresh` | 本会话尚无账本；域名或意图变化；已知 Rules/Vault 重建索引或规则更新；旧结果不足或互相冲突 | 完整执行 `rule_search` + `vault_search`，覆盖账本 |
+| `reused` | 同一会话、同一域名与意图，当前技术关键词和影响模块均被账本覆盖，且未发现索引/规则变化 | 不调用 RAG；直接复用已记录约束 |
+| `delta` | 域名与意图不变，但新增技术关键词、模块、API、平台或风险假设 | 只用新增关键词补查 `rule_search` + `vault_search`，按 `rule_id` / `file_path` / `chunk_id` 去重后合并账本 |
+
+新会话不得假设持有旧会话账本。此前的 `no hit` 在检索键完全相同时可 `reused`；新增关键词时必须 `delta`。涉及新平台能力、Shader Pass、GPU 资源/API 假设时至少执行 `delta`。
+
+| 域名 | 意图 | 应命中 rule_id（检索词示例） |
+|------|------|------------------------------|
+| Unity | 始终 | `core/role`, `core/anti-ai-trace` |
+| Unity | 写码 | `core/hmirp-rendering-agent` |
+| Unity | 架构/文档/模块说明 | `agents/ta-render-expert` |
+| Unity | review | `reviews/hmirp-review-rules`, `agents/shader-expert` |
+| Unity | 调试 | `agents/test-engineer` |
+| ComfyUI | 始终 | `core/comfyui`, `core/anti-ai-trace` |
+| ComfyUI | review | `reviews/comfyui-review-rules`, `agents/comfyui-expert` |
+| PCG | 始终 | `pcg/project-engineering`, `pcg/index`, `pcg/graph-contract`, `pcg/assembly-bevel` |
+| PCG | 按模型类型 | `pcg/vehicle`, `pcg/bridge`, `pcg/spiral-staircase`, `pcg/scatter` |
+| 通用 | — | （无域专属规则，`no hit` 正常） |
+
+**AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.codely-cli/rules/gates/`，由 `setup.bat` 同步，不迁入 Vault。
+
+**完整 rule_id 清单**（维护者）：Obsidian `Rules/meta/rules-vault-index`（`rag_index: false`，直接 Read 或维护时查阅）。
+
+## 3. vault_search（经验知识，与规则分开 — 所有域名强制）
+
+`user-vault-rag.vault_search(query=任务技术关键词 + 任务类型, top_k=5)` — Pitfall / Tip / Concept / BugFix。规则正文必须用 §2 `rule_search`；`vault_search` 排除 `Rules/` 与 `PCG AI Rule/`。
+
+首次检索与 §2 同批执行；后续与 §2 共用同一检索账本和 `fresh` / `reused` / `delta` 判定。返回结果按 `file_path` 去重，同一笔记默认只保留一个最相关 excerpt；需要细节时再用 `vault_get_chunk`。
+
+### 为什么通用域名也必须搜
+
+Vault 中有**跨域通用**的经验知识，不绑定特定技术栈：
+
+- **Concept**（如 `cpt-agent-complex-bug-playbook`）— 复杂 bug 修复方法论，适用任何项目
+- **Pitfall**（如 `pit-debug-layer-misattribution`）— 层归因错误，通用调试陷阱
+- **Tip**（如 `tip-diagnose-before-fix`）— 先诊断再修复，通用工程纪律
+
+**搜索策略**：query 应包含任务类型关键词（debug / refactor / implement / review）+ 技术关键词，不要只搜技术名。
+
+**禁止**以「这是通用项目，Vault 里不会有相关经验」为由跳过 vault_search。
+
+## 4. Unity / Tuanjie Editor MCP 路由
+
+当任务位于 Unity / Tuanjie 工程，且需要**运行中 Editor 的真实状态或操作**时，优先使用已配置的 `tuanjie-mcp`；它不是静态代码检索的替代品。
+
+**应触发 MCP**：查看或处理 Console、编译状态、当前场景 / Hierarchy、GameObject、Selection、Play Mode、Editor 菜单与项目中的实际对象，或用户明确要求「在 Unity / 团结中查看、执行、操作、验证」。
+
+**不应触发 MCP**：只读源码、静态配置、文档或纯方案讨论，且任务不依赖 Editor 当前状态时。
+
+执行协议：
+
+1. 用户已明确给出项目路径或 PID 时，用该上下文选择实例；否则先调用 `unity_list_instances`。
+2. 仅一个可达实例时可自动选中；有多个可达实例且无法从任务上下文唯一确定时，先展示项目路径 / PID 并请用户选择，禁止盲目操作任意进程。
+3. 对选中的实例先调用 `unity_ping`，确认 `project_root` 与用户目标一致；随后按最小权限调用相应工具（例如 Console、Scene、GameObject、Editor 或 `unity_bridge_call`）。
+4. `unity_initialize_bridge` 会修改目标工程并启动批处理 Editor；仅当用户明确要求初始化 / 安装 Bridge，或已授权为该项目启用 MCP 时才调用。初始化后重新列举并验证实例。
+5. 任何会修改场景、对象、资源、包或 Editor 状态的调用，仍须遵守现有写入授权与验证规则；不能因为 MCP 可用而扩大操作范围。
+
+## 5. 回执（改代码/出审查结论前一行）
+
+`Router（dev, <fresh|reused|delta>）：<域名> | key: <意图+关键词+模块摘要> | rules: <rule_id 列表> | vault: <笔记 id/摘要或 no hit>`
+
+`reused` 只引用既有 `rule_id` / 笔记 id 和约束摘要，不重复粘贴 excerpt。`delta` 只报告新增、删除或发生冲突的命中。
+
+## 6. 委派子 Agent
+
+子 Agent 不继承 alwaysApply。主 Agent 先完成 §1–§5，再在 prompt 注入硬约束摘要（含 rule_search 命中要点与 Unity MCP 实例上下文，如适用）。

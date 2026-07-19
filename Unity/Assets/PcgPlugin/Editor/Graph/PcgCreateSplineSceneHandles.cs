@@ -9,7 +9,7 @@ using UnityEngine;
 namespace DJTechEditor.PCG.Graph
 {
     /// <summary>
-    /// Houdini-style Scene View editing for <see cref="PcgManifestNodeView"/> CreateSpline nodes
+    /// Houdini-style Scene View editing for spline authoring nodes
     /// selected in an open Graph Editor window.
     /// </summary>
     [InitializeOnLoad]
@@ -39,9 +39,52 @@ namespace DJTechEditor.PCG.Graph
 
         private static bool s_PcgModeActive;
         private static PcgGraphEditorWindow s_ActiveWindow;
+        private static PcgGraphComponent s_ActiveComponent;
+
+        /// <summary>True while Scene View toolbar is in Enter PCG Mode.</summary>
+        internal static bool IsPcgModeActive => s_PcgModeActive;
+
+        /// <summary>Component locked for Scene View edits in PCG Mode; null when inactive.</summary>
+        internal static PcgGraphComponent ActivePcgModeComponent => s_ActiveComponent;
         private static GameObject s_LockedSelection;
         private static bool s_SelectionGuard;
         private static Tool s_PrevTool;
+
+        // SceneView invokes duringSceneGui several times per frame. Resolve the selected
+        // component/window only when selection changes instead of hitting AssetDatabase
+        // and Resources.FindObjectsOfTypeAll on every layout/repaint event.
+        private static GameObject s_CachedSelection;
+        private static PcgGraphComponent s_CachedSelectionComponent;
+        private static PcgGraphAsset s_CachedSelectionGraphAsset;
+        private static string s_CachedSelectionAssetPath;
+        private static PcgGraphEditorWindow s_CachedSelectionWindow;
+        private static bool s_SelectionCacheDirty = true;
+
+        // Wire overlay edge cache — rebuilt only when preview data changes
+        private static PcgPolygonPreviewData s_WirePreviewCache;
+        private static int[] s_WireEdgePairs; // flat: [a0, b0, a1, b1, ...]
+
+        // Blender-style screen-space thick wire: expand edges → camera-facing quads, 1× DrawMeshNow.
+        // Width is pixels (EditorPrefs); not N× DrawAAPolyLine (that was the V58 stall).
+        private const string WireWidthPrefsKey = "Pcg.PolygonWire.WidthPx";
+        private const float WireWidthPxDefault = 3f;
+        private static readonly Color s_WireColor = new(0f, 0.75f, 0.85f, 0.85f);
+        private static Mesh s_WireMesh;
+        private static Material s_WireMaterial;
+        private static Vector3[] s_WireVerts;
+        private static Color[] s_WireColors;
+        private static int[] s_WireTris;
+        private static int s_WireBuiltEdgeCount;
+        private static int s_WireUploadedEdgeCount;
+        private static PcgPolygonPreviewData s_WireMeshPreviewCache;
+        private static Matrix4x4 s_WireLastLocalToWorld;
+        private static Vector3 s_WireLastCameraPosition;
+        private static Quaternion s_WireLastCameraRotation;
+        private static bool s_WireLastOrthographic;
+        private static float s_WireLastProjectionSize;
+        private static int s_WireLastPixelHeight;
+        private static float s_WireLastWidthPx;
+        private static bool s_WireMeshStateValid;
 
         private enum OthersDisplayMode
         {
@@ -74,6 +117,8 @@ namespace DJTechEditor.PCG.Graph
 
         // --- Group viewer state ---
         private static string s_SelectedGroupName;
+        private static string s_SelectedGroupSource;
+        private static string s_SelectedGroupNodeId;
         private static readonly List<GroupInfo> s_AvailableGroups = new();
         private static string s_LastParsedJson;
 
@@ -215,6 +260,8 @@ namespace DJTechEditor.PCG.Graph
 
         private static void OnSelectionChanged()
         {
+            s_SelectionCacheDirty = true;
+
             if (!s_PcgModeActive || s_LockedSelection == null || s_SelectionGuard)
                 return;
 
@@ -231,27 +278,51 @@ namespace DJTechEditor.PCG.Graph
             if (Application.isPlaying)
                 return;
 
-            var graphWindow = FindGraphWindow();
+            // Show the toolbar/entry when the selected object has a PcgGraphComponent,
+            // regardless of whether a Graph Editor window is open.
+            RefreshSelectionCacheIfNeeded();
+            var component = s_CachedSelectionComponent;
 
-            if (graphWindow == null)
+            if (component == null || component.GraphAsset == null)
             {
                 if (s_PcgModeActive)
                     ExitPcgMode();
                 return;
             }
 
+            var graphWindow = s_PcgModeActive && s_ActiveComponent == component
+                ? s_ActiveWindow
+                : s_CachedSelectionWindow;
+
             if (!s_PcgModeActive)
             {
-                DrawPcgModeEntryOverlay(sceneView, graphWindow);
+                DrawPcgModeEntryOverlay(sceneView, graphWindow, component);
+                return;
+            }
+
+            // In PCG mode, keep using the active window. If selection changed to
+            // a different component, exit so the user can re-enter with the new one.
+            if (s_ActiveComponent != null && s_ActiveComponent != component)
+            {
+                ExitPcgMode();
+                DrawPcgModeEntryOverlay(sceneView, graphWindow, component);
+                return;
+            }
+
+            if (graphWindow == null)
+            {
+                ExitPcgMode();
+                DrawPcgModeEntryOverlay(sceneView, null, component);
                 return;
             }
 
             DrawPcgModeToolbar(sceneView, graphWindow);
+            DrawPolygonWireOverlay(sceneView, graphWindow);
 
             var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
             foreach (var node in graphWindow.GraphView.selection.OfType<PcgManifestNodeView>())
             {
-                if (node.NodeType == "CreateSpline")
+                if (IsEditableSplineNode(node.NodeType))
                     splineNodes.Add((graphWindow, graphWindow.GraphView, node));
             }
 
@@ -259,7 +330,7 @@ namespace DJTechEditor.PCG.Graph
             if (splineNodes.Count > 0 && ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
             {
                 HandleSplineShortcuts(sceneView, splineNodes);
-                DrawSplineOverlay(splineNodes[0].node);
+                DrawSplineOverlay(sceneView, splineNodes[0].node);
 
                 foreach (var (window, graphView, node) in splineNodes)
                     DrawNodeSpline(sceneView, window, graphView, node);
@@ -269,17 +340,17 @@ namespace DJTechEditor.PCG.Graph
                 var groupNode = graphWindow.GraphView.selection.OfType<PcgManifestNodeView>().FirstOrDefault();
                 if (groupNode != null)
                 {
-                    DrawGroupViewerOverlay(graphWindow, groupNode);
+                    DrawGroupViewerOverlay(sceneView, graphWindow, groupNode);
                     DrawNodeGroupHighlight(sceneView, graphWindow);
                 }
                 else
                 {
-                    DrawPcgModeStatusOverlay(graphWindow);
+                    DrawPcgModeStatusOverlay(sceneView, graphWindow);
                 }
             }
             else
             {
-                DrawPcgModeStatusOverlay(graphWindow);
+                DrawPcgModeStatusOverlay(sceneView, graphWindow);
             }
 
             TryEndSplineDrag();
@@ -299,28 +370,78 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static PcgGraphEditorWindow FindGraphWindow()
+        private static void RefreshSelectionCacheIfNeeded()
         {
-            if (s_PcgModeActive && s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph)
+            var selected = Selection.activeGameObject;
+            if (!s_SelectionCacheDirty && s_CachedSelection == selected)
+            {
+                // Reading the serialized reference is cheap and catches an Inspector
+                // graph reassignment without polling GetComponent/AssetDatabase.
+                var currentGraphAsset = s_CachedSelectionComponent != null
+                    ? s_CachedSelectionComponent.GraphAsset
+                    : null;
+                if (s_CachedSelectionGraphAsset == currentGraphAsset)
+                    return;
+            }
+
+            var component = selected != null ? selected.GetComponent<PcgGraphComponent>() : null;
+            var graphAsset = component != null ? component.GraphAsset : null;
+            s_CachedSelection = selected;
+            s_CachedSelectionComponent = component;
+            s_CachedSelectionGraphAsset = graphAsset;
+            s_CachedSelectionAssetPath = graphAsset != null
+                ? AssetDatabase.GetAssetPath(graphAsset)
+                : null;
+            // A null window is intentionally cached too. The entry button performs a
+            // fresh lookup when clicked, so an idle SceneView never polls globally.
+            s_CachedSelectionWindow = FindGraphWindowForComponent(component);
+            s_SelectionCacheDirty = false;
+        }
+
+        private static PcgGraphEditorWindow FindGraphWindowForComponent(PcgGraphComponent component)
+        {
+            if (component == null || component.GraphAsset == null)
+                return null;
+
+            // Fast path: in PCG mode the active window/component pair is already known;
+            // skip per-frame AssetDatabase.GetAssetPath / AssetPathToGUID lookups.
+            if (s_PcgModeActive && s_ActiveComponent == component &&
+                s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph)
+                return s_ActiveWindow;
+
+            var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
+            var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
+
+            // If already in PCG mode, keep using the active window if it matches.
+            if (s_PcgModeActive && s_ActiveWindow != null && s_ActiveWindow.HasLoadedGraph &&
+                s_ActiveWindow.MatchesGraphAsset(assetPath, assetGuid))
                 return s_ActiveWindow;
 
             foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
             {
-                if (window != null && window.HasLoadedGraph && window.GraphView != null)
+                if (window != null && window.HasLoadedGraph && window.GraphView != null &&
+                    window.MatchesGraphAsset(assetPath, assetGuid))
                     return window;
             }
             return null;
         }
 
-        private static void EnterPcgMode(PcgGraphEditorWindow window)
+        private static void EnterPcgMode(PcgGraphEditorWindow window, PcgGraphComponent component)
         {
             s_PcgModeActive = true;
             s_ActiveWindow = window;
-            window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+            s_ActiveComponent = component;
+            s_CachedSelectionWindow = window;
+            // Re-derive context from current selection instead of resetting to
+            // Object/None. If a node (e.g. GroupCreate) was already selected,
+            // the toolbar activates the correct domain on entry.
+            if (window != null && window.GraphView != null)
+                window.GraphView.RefreshSceneEditContext();
 
             s_OthersDisplay = OthersDisplayMode.HideOthers;
 
-            var anchor = FindPreviewAnchor(window);
+            // Use the selected component's transform as the preview anchor directly.
+            var anchor = component != null ? component.transform : FindPreviewAnchor(window);
             if (anchor != null)
             {
                 s_LockedSelection = anchor.gameObject;
@@ -332,6 +453,19 @@ namespace DJTechEditor.PCG.Graph
             s_PrevTool = Tools.current;
             Tools.current = Tool.None;
             ApplyOthersDisplayMode();
+
+            // Frame the Scene View on the selected object.
+            if (s_LockedSelection != null)
+            {
+                var renderers = s_LockedSelection.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0)
+                {
+                    var bounds = renderers[0].bounds;
+                    for (var i = 1; i < renderers.Length; i++)
+                        bounds.Encapsulate(renderers[i].bounds);
+                    SceneView.lastActiveSceneView?.Frame(bounds, false);
+                }
+            }
         }
 
         private static void ExitPcgMode()
@@ -343,13 +477,24 @@ namespace DJTechEditor.PCG.Graph
             }
             s_PcgModeActive = false;
             s_ActiveWindow = null;
+            s_ActiveComponent = null;
             s_LockedSelection = null;
+            s_WirePreviewCache = null;
+            s_WireEdgePairs = null;
+            s_WireBuiltEdgeCount = 0;
+            s_WireUploadedEdgeCount = 0;
+            s_WireMeshPreviewCache = null;
+            s_WireMeshStateValid = false;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
+            s_SelectedGroupSource = null;
+            s_SelectedGroupNodeId = null;
             s_AvailableGroups.Clear();
             s_LastParsedJson = null;
             Tools.current = s_PrevTool;
             RestoreHiddenRenderers();
+            PcgHeightFieldMaskOverlaySceneHandles.DestroyCachedResources();
+            SceneView.RepaintAll();
         }
 
         private static void ApplyOthersDisplayMode()
@@ -499,7 +644,7 @@ namespace DJTechEditor.PCG.Graph
                 foreach (var selIdx in selectedIndices)
                 {
                     var newLocal = WorldToLocal(worldPoints[selIdx] + delta, anchor) - sceneOffset;
-                    newLocal = ConstrainToEditPlane(newLocal, editPlane);
+                    newLocal = ConstrainToEditPlane(newLocal, points[selIdx], editPlane);
                     points[selIdx] = newLocal;
                 }
                 WritePointsToNode(node, points, usesExplicit);
@@ -541,6 +686,9 @@ namespace DJTechEditor.PCG.Graph
             sceneView.Repaint();
             HandleUtility.Repaint();
         }
+
+        private static bool IsEditableSplineNode(string nodeType) =>
+            nodeType == "CreateSpline" || nodeType == "CreateBezierSpline";
 
         private static bool DrawTangentHandles(
             SceneView sceneView,
@@ -600,7 +748,7 @@ namespace DJTechEditor.PCG.Graph
                     // raw direction scaled by the drag distance ratio.
                     var dragWorldDir = newOut - wp;
                     var newTangentLocal = WorldDirToLocalDir(dragWorldDir, anchor);
-                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, editPlane);
+                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, tangents[i], editPlane);
                     tangents[i] = newTangentLocal;
 
                     var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
@@ -624,7 +772,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     var dragWorldDir = wp - newIn;
                     var newTangentLocal = WorldDirToLocalDir(dragWorldDir, anchor);
-                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, editPlane);
+                    newTangentLocal = ConstrainToEditPlane(newTangentLocal, tangents[i], editPlane);
                     tangents[i] = newTangentLocal;
 
                     var displayLen = HandleUtility.GetHandleSize(wp) * 0.4f;
@@ -720,15 +868,15 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawPcgModeEntryOverlay(SceneView sceneView, PcgGraphEditorWindow window)
+        private static void DrawPcgModeEntryOverlay(SceneView sceneView, PcgGraphEditorWindow window, PcgGraphComponent component)
         {
             Handles.BeginGUI();
             try
             {
-                const float width = 200f;
+                const float width = 320f;
                 const float height = 64f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin,
                     width,
                     height);
@@ -736,13 +884,41 @@ namespace DJTechEditor.PCG.Graph
 
                 GUILayout.BeginArea(area);
                 GUILayout.Space(6f);
-                var assetName = window.CurrentAssetPath;
+                var assetName = window != null ? window.CurrentAssetPath : null;
+                if (string.IsNullOrEmpty(assetName) && s_CachedSelectionComponent == component)
+                    assetName = s_CachedSelectionAssetPath;
                 if (string.IsNullOrEmpty(assetName))
                     assetName = "untitled";
                 GUILayout.Label($"PCG: {assetName}", EditorStyles.boldLabel);
                 if (GUILayout.Button("Enter PCG Mode", GUILayout.Height(24f)))
                 {
-                    EnterPcgMode(window);
+                    // If no graph window is open, open one as a tab next to
+                    // the Scene View — same as Shader Graph.
+                    if (window == null && component != null && component.GraphAsset != null)
+                    {
+                        var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
+                        var guid = AssetDatabase.AssetPathToGUID(assetPath);
+
+                        // Focus existing window with the same graph if one is open.
+                        foreach (var w in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
+                        {
+                            if (w.selectedGuid == guid)
+                            {
+                                window = w;
+                                break;
+                            }
+                        }
+
+                        if (window == null)
+                        {
+                            window = EditorWindow.GetWindow<PcgGraphEditorWindow>(typeof(SceneView));
+                            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/PcgPlugin/Editor/Icons/pcg-icon-16.png");
+                            window.titleContent = new GUIContent("PCG Graph", icon);
+                            window.Initialize(guid);
+                        }
+                    }
+                    if (window != null)
+                        EnterPcgMode(window, component);
                     sceneView.Repaint();
                 }
                 GUILayout.EndArea();
@@ -757,78 +933,102 @@ namespace DJTechEditor.PCG.Graph
         {
             var ctx = window.GraphView.SceneEditContext;
 
+            // Count visible buttons to compute dynamic toolbar width
+            const float btnWidth = 24f;
+            const float btnHeight = 20f;
+            const float spacing = 4f;
+            const float popupWidth = 70f;
+            const float exitWidth = 24f;
+            const float toolbarHeight = 26f;
+
+            int buttonCount = 1; // Object always visible
+            bool showSpline = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
+            bool showVertex = ctx.SupportsDomain(SceneEditDomain.Vertex);
+            bool showEdge = ctx.SupportsDomain(SceneEditDomain.Edge);
+            bool showFace = ctx.SupportsDomain(SceneEditDomain.Face);
+            if (showSpline) buttonCount++;
+            if (showVertex) buttonCount++;
+            if (showEdge) buttonCount++;
+            if (showFace) buttonCount++;
+            // + popup + exit
+            float toolbarWidth = buttonCount * (btnWidth + 2f) + spacing + popupWidth + spacing + exitWidth + 6f;
+
             Handles.BeginGUI();
             try
             {
-                const float toolbarHeight = 26f;
-                var toolbarArea = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
-                    SceneOverlayMargin,
-                    260f,
-                    toolbarHeight);
-                GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
+            var toolbarArea = new Rect(
+                (sceneView.position.width - toolbarWidth) / 2f,
+                SceneOverlayMargin,
+                toolbarWidth,
+                toolbarHeight);
+            GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
 
-                GUILayout.BeginArea(toolbarArea);
-                GUILayout.BeginHorizontal();
+            GUILayout.BeginArea(toolbarArea);
+            GUILayout.BeginHorizontal();
 
-                // Object mode — cube icon
-                if (IconToolbarButton(IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
-                    window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+            // Object mode — cube icon
+            if (IconToolbarButton(IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
+                window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
 
-                // Spline CP — curve icon
-                bool splineEnabled = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
-                GUI.enabled = splineEnabled;
+            // Spline CP — curve icon (only when supported)
+            if (showSpline)
+            {
                 if (IconToolbarButton(IconSplineActive, IconSplineNormal, "Spline Control Points",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint))
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.SplineControlPoint);
-                GUI.enabled = true;
+            }
 
-                // Vertex / Edge / Face — group viewer modes
-                bool vertexEnabled = ctx.SupportsDomain(SceneEditDomain.Vertex);
-                GUI.enabled = vertexEnabled;
+            // Vertex / Edge / Face — group viewer modes (only when supported)
+            if (showVertex)
+            {
                 if (IconToolbarButton(IconVertexActive, IconVertexNormal, "Vertex Group View",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Vertex))
                 {
                     s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Vertex);
                 }
+            }
 
-                bool edgeEnabled = ctx.SupportsDomain(SceneEditDomain.Edge);
-                GUI.enabled = edgeEnabled;
+            if (showEdge)
+            {
                 if (IconToolbarButton(IconEdgeActive, IconEdgeNormal, "Edge Group View",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Edge))
                 {
                     s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Edge);
                 }
+            }
 
-                bool faceEnabled = ctx.SupportsDomain(SceneEditDomain.Face);
-                GUI.enabled = faceEnabled;
+            if (showFace)
+            {
                 if (IconToolbarButton(IconFaceActive, IconFaceNormal, "Face Group View",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.Face))
                 {
                     s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.Face);
                 }
-                GUI.enabled = true;
+            }
 
-                GUILayout.Space(4);
+            GUILayout.Space(spacing);
 
                 // Display mode popup — short label
                 var oldDisplay = s_OthersDisplay;
                 s_OthersDisplay = (OthersDisplayMode)EditorGUILayout.EnumPopup(
                     s_OthersDisplay, EditorStyles.toolbarPopup,
-                    GUILayout.Width(70));
+                    GUILayout.Width(popupWidth));
                 if (s_OthersDisplay != oldDisplay)
                     ApplyOthersDisplayMode();
 
-                GUILayout.Space(4);
+                GUILayout.Space(spacing);
 
                 // Exit — X icon
                 var exitColor = GUI.color;
                 GUI.color = new Color(1f, 0.7f, 0.5f);
                 if (GUILayout.Button(new GUIContent(IconExit, "Exit PCG Mode"), EditorStyles.toolbarButton,
-                        GUILayout.Width(24f)))
+                        GUILayout.Width(exitWidth)))
                 {
                     ExitPcgMode();
                     sceneView.Repaint();
@@ -856,7 +1056,7 @@ namespace DJTechEditor.PCG.Graph
             return clicked;
         }
 
-        private static void DrawPcgModeStatusOverlay(PcgGraphEditorWindow window)
+        private static void DrawPcgModeStatusOverlay(SceneView sceneView, PcgGraphEditorWindow window)
         {
             var ctx = window.GraphView.SceneEditContext;
             var sel = window.GraphView.selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
@@ -868,7 +1068,7 @@ namespace DJTechEditor.PCG.Graph
                 const float width = 300f;
                 const float height = 52f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
                     width,
                     height);
@@ -887,7 +1087,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawSplineOverlay(PcgManifestNodeView node)
+        private static void DrawSplineOverlay(SceneView sceneView, PcgManifestNodeView node)
         {
             var nodeData = node.CollectData();
             var pointCount = PcgSplineControlPoints.GetEffectivePoints(nodeData).Count;
@@ -900,7 +1100,7 @@ namespace DJTechEditor.PCG.Graph
                 const float width = 300f;
                 const float height = 118f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
                     width,
                     height);
@@ -908,7 +1108,7 @@ namespace DJTechEditor.PCG.Graph
 
                 GUILayout.BeginArea(area);
                 GUILayout.Space(6f);
-                GUILayout.Label($"Create Spline — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
+                GUILayout.Label($"{node.GetDisplayTitle()}", EditorStyles.boldLabel);
                 GUILayout.Label(
                     $"Points: {pointCount}   Selected: {selectedCount}",
                     EditorStyles.miniLabel);
@@ -1085,7 +1285,11 @@ namespace DJTechEditor.PCG.Graph
                 return false;
 
             var insertIndex = segmentIndex + 1;
-            var localPoint = ConstrainToEditPlane(WorldToLocal(hitWorld, anchor) - sceneOffset, editPlane);
+            var localPoint = WorldToLocal(hitWorld, anchor) - sceneOffset;
+            var segEndIndex = (segmentIndex + 1) % points.Count;
+            var segT = SegmentBlendT(worldPoints[segmentIndex], worldPoints[segEndIndex], hitWorld);
+            var onSegment = Vector3.Lerp(points[segmentIndex], points[segEndIndex], segT);
+            localPoint = ConstrainToEditPlane(localPoint, onSegment, editPlane);
 
             graphView.WithUndo("Insert Spline Control Point", () =>
             {
@@ -1125,7 +1329,7 @@ namespace DJTechEditor.PCG.Graph
 
             var left = points[Mathf.Clamp(insertIndex - 1, 0, points.Count - 1)];
             var right = points[Mathf.Clamp(insertIndex, 0, points.Count - 1)];
-            var midpoint = ConstrainToEditPlane((left + right) * 0.5f, ReadEditPlane(nodeData));
+            var midpoint = (left + right) * 0.5f;
 
             graphView.WithUndo("Insert Spline Control Point", () =>
             {
@@ -1396,6 +1600,10 @@ namespace DJTechEditor.PCG.Graph
 
         private static Transform FindPreviewAnchor(PcgGraphEditorWindow window)
         {
+            // When in PCG mode with a known active component, use it directly.
+            if (s_ActiveComponent != null)
+                return s_ActiveComponent.transform;
+
             var assetPath = window.CurrentAssetPath;
             var assetGuid = window.selectedGuid;
             foreach (var component in Object.FindObjectsOfType<PcgGraphComponent>())
@@ -1436,14 +1644,21 @@ namespace DJTechEditor.PCG.Graph
         private static string ReadEditPlane(PcgNodeData data) =>
             data?.GetRaw("editPlane")?.ToString() ?? "none";
 
-        private static Vector3 ConstrainToEditPlane(Vector3 local, string editPlane) =>
+        private static Vector3 ConstrainToEditPlane(Vector3 local, Vector3 original, string editPlane) =>
             editPlane switch
             {
-                "xy" => new Vector3(local.x, local.y, 0f),
-                "xz" => new Vector3(local.x, 0f, local.z),
-                "yz" => new Vector3(0f, local.y, local.z),
+                "xy" => new Vector3(local.x, local.y, original.z),
+                "xz" => new Vector3(local.x, original.y, local.z),
+                "yz" => new Vector3(original.x, local.y, local.z),
                 _ => local,
             };
+
+        private static float SegmentBlendT(Vector3 a, Vector3 b, Vector3 p)
+        {
+            var ab = b - a;
+            var lenSq = ab.sqrMagnitude;
+            return lenSq < 1e-8f ? 0f : Mathf.Clamp01(Vector3.Dot(p - a, ab) / lenSq);
+        }
 
         private static bool ReadBool(PcgNodeData data, string key, bool defaultValue)
         {
@@ -1501,6 +1716,7 @@ namespace DJTechEditor.PCG.Graph
             public string domain;
             public int count;
             public long[] members;
+            public float[] edgeEndpoints;
         }
 
         [System.Serializable]
@@ -1515,6 +1731,7 @@ namespace DJTechEditor.PCG.Graph
             public string domain;
             public int count;
             public long[] members;
+            public float[] edgeEndpoints;
         }
 
         private static bool IsGroupDomain(SceneEditDomain domain) =>
@@ -1529,6 +1746,31 @@ namespace DJTechEditor.PCG.Graph
             SceneEditDomain.Face => "face",
             _ => "unknown",
         };
+
+        /// <summary>
+        /// Popup defaults to index 0 visually, but selection state stays null until the user
+        /// changes the popup. Sync state so Scene View highlighting matches the displayed group.
+        /// </summary>
+        private static void EnsureDefaultGroupSelection(
+            List<PcgNodeInspector.AvailableGroup> outputGroups,
+            List<PcgNodeInspector.AvailableGroup> inputGroups)
+        {
+            if (!string.IsNullOrEmpty(s_SelectedGroupName))
+                return;
+
+            if (outputGroups.Count > 0)
+            {
+                s_SelectedGroupName = outputGroups[0].name;
+                s_SelectedGroupSource = "output";
+                return;
+            }
+
+            if (inputGroups.Count > 0)
+            {
+                s_SelectedGroupName = inputGroups[0].name;
+                s_SelectedGroupSource = "input";
+            }
+        }
 
         private static void ParseGroupsFromJson(string json, List<GroupInfo> output)
         {
@@ -1548,6 +1790,7 @@ namespace DJTechEditor.PCG.Graph
                         domain = g.domain,
                         count = g.count,
                         members = g.members,
+                        edgeEndpoints = g.edgeEndpoints,
                     });
                 }
             }
@@ -1557,84 +1800,165 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawGroupViewerOverlay(PcgGraphEditorWindow window, PcgManifestNodeView node)
+        private static void DrawGroupViewerOverlay(SceneView sceneView, PcgGraphEditorWindow window, PcgManifestNodeView node)
         {
             var ctx = window.GraphView.SceneEditContext;
             var domainStr = DomainToString(ctx.Domain);
 
+            // Collect output groups from manifest
+            var outputGroups = new List<PcgNodeInspector.AvailableGroup>();
+            PcgNodeInspector.CollectNodeGroups(node, outputGroups, new HashSet<string>());
+            var outputFiltered = outputGroups.Where(g => g.domain == domainStr).ToList();
+
+            // Collect input groups from upstream
+            var inputGroups = new List<PcgNodeInspector.AvailableGroup>();
+            var inspector = window.GraphView.Inspector;
+            if (inspector != null)
+            {
+                var upstream = inspector.ResolveUpstreamGroups(node.NodeId);
+                inputGroups = upstream.Where(g => g.domain == domainStr).ToList();
+            }
+
+            // Parse per-node group stats from the cook result JSON.
+            // This gives us group member data for the selected node (not just the final output).
             var anchor = FindPreviewAnchor(window);
-            if (anchor == null)
+            var gv = anchor?.GetComponent<PcgGroupVisualizer>();
+            var graphView = window.GraphView;
+            List<NodeGroupEntry> nodeGroups = null;
+            if (graphView != null && graphView.TryGetNodeGroups(node.NodeId, out var perNodeGroups))
+                nodeGroups = perNodeGroups;
+
+            // Also parse upstream node groups for input groups
+            List<NodeGroupEntry> inputNodeGroups = null;
+            if (inspector != null && inputGroups.Count > 0)
             {
-                DrawGroupViewerMessage("No preview anchor found.\nAdd a PcgGraphComponent to the scene.");
-                return;
+                // Find the source node for the first input group and get its groups
+                var firstInput = inputGroups[0];
+                if (graphView != null && graphView.TryGetNodeGroups(firstInput.sourceNodeId, out var upstreamGroups))
+                    inputNodeGroups = upstreamGroups;
             }
 
-            var gv = anchor.GetComponent<PcgGroupVisualizer>();
-            var json = gv != null ? gv.ResultJson : null;
-            if (string.IsNullOrEmpty(json))
+            // Helper: find group stats by name from per-node data
+            NodeGroupEntry FindGroupStats(string name, bool fromOutput)
             {
-                DrawGroupViewerMessage($"No group data available.\nCook the graph to see {domainStr} groups.");
-                return;
+                var list = fromOutput ? nodeGroups : inputNodeGroups;
+                if (list == null) return null;
+                return list.FirstOrDefault(g => g.name == name && g.domain == domainStr);
             }
 
-            // Re-parse only if JSON changed
-            if (json != s_LastParsedJson)
-            {
-                ParseGroupsFromJson(json, s_AvailableGroups);
-                s_LastParsedJson = json;
-            }
+            var allGroups = outputFiltered.Concat(inputGroups).ToList();
 
-            var filtered = s_AvailableGroups.Where(g => g.domain == domainStr).ToList();
+            if (s_SelectedGroupNodeId != node.NodeId)
+            {
+                s_SelectedGroupNodeId = node.NodeId;
+                s_SelectedGroupName = null;
+                s_SelectedGroupSource = null;
+            }
 
             // Clear stale selection
             if (!string.IsNullOrEmpty(s_SelectedGroupName) &&
-                !filtered.Any(g => g.name == s_SelectedGroupName))
+                !allGroups.Any(g => g.name == s_SelectedGroupName))
             {
                 s_SelectedGroupName = null;
+                s_SelectedGroupSource = null;
                 gv?.ClearHighlight();
             }
+
+            EnsureDefaultGroupSelection(outputFiltered, inputGroups);
+
+            // Compute dynamic height
+            bool hasOutput = outputFiltered.Count > 0;
+            bool hasInput = inputGroups.Count > 0;
+            bool hasGroups = hasOutput || hasInput;
+            float height = hasGroups ? 58f : 40f;
+
+            // Check if selected group has member data for highlighting
+            bool canHighlight = !string.IsNullOrEmpty(s_SelectedGroupName) &&
+                FindGroupStats(s_SelectedGroupName, s_SelectedGroupSource == "output") != null;
+            if (!canHighlight && hasGroups && !string.IsNullOrEmpty(s_SelectedGroupName))
+                height += 16f;
 
             Handles.BeginGUI();
             try
             {
-                const float width = 300f;
-                const float height = 80f;
-
+                const float width = 380f;
                 var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
+                    (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
                     width,
                     height);
                 GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
 
                 GUILayout.BeginArea(area);
-                GUILayout.Space(6f);
+                GUILayout.Space(4f);
                 GUILayout.Label($"{node.NodeType} — {node.GetDisplayTitle()}", EditorStyles.boldLabel);
 
-                if (filtered.Count == 0)
+                if (hasGroups)
                 {
-                    GUILayout.Label($"No {domainStr} groups in cooked result.", EditorStyles.miniLabel);
+                    GUILayout.BeginHorizontal();
+
+                    if (hasOutput)
+                    {
+                        GUILayout.BeginVertical();
+                        GUILayout.Label("Output:", EditorStyles.miniLabel);
+                        var labels = outputFiltered.Select(g =>
+                        {
+                            var stats = FindGroupStats(g.name, true);
+                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
+                        }).ToArray();
+                        var currentIdx = s_SelectedGroupSource == "output"
+                            ? outputFiltered.FindIndex(g => g.name == s_SelectedGroupName)
+                            : -1;
+                        if (currentIdx < 0)
+                            currentIdx = 0;
+                        EditorGUI.BeginChangeCheck();
+                        var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
+                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < outputFiltered.Count)
+                        {
+                            var group = outputFiltered[newIdx];
+                            s_SelectedGroupName = group.name;
+                            s_SelectedGroupSource = "output";
+                            SceneView.RepaintAll();
+                        }
+                        GUILayout.EndVertical();
+                    }
+
+                    if (hasInput)
+                    {
+                        GUILayout.BeginVertical();
+                        GUILayout.Label("Input:", EditorStyles.miniLabel);
+                        var labels = inputGroups.Select(g =>
+                        {
+                            var stats = FindGroupStats(g.name, false);
+                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
+                        }).ToArray();
+                        var currentIdx = s_SelectedGroupSource == "input"
+                            ? inputGroups.FindIndex(g => g.name == s_SelectedGroupName)
+                            : -1;
+                        if (currentIdx < 0)
+                            currentIdx = 0;
+                        EditorGUI.BeginChangeCheck();
+                        var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
+                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < inputGroups.Count)
+                        {
+                            var group = inputGroups[newIdx];
+                            s_SelectedGroupName = group.name;
+                            s_SelectedGroupSource = "input";
+                            SceneView.RepaintAll();
+                        }
+                        GUILayout.EndVertical();
+                    }
+
+                    GUILayout.EndHorizontal();
+
+                    if (!canHighlight && !string.IsNullOrEmpty(s_SelectedGroupName))
+                    {
+                        GUILayout.Label("Group has no member data in cook result.", EditorStyles.miniLabel);
+                    }
                 }
                 else
                 {
-                    var labels = filtered.Select(g => $"{g.name} ({g.count})").ToArray();
-                    var currentIdx = filtered.FindIndex(g => g.name == s_SelectedGroupName);
-                    var newIdx = EditorGUILayout.Popup(currentIdx < 0 ? 0 : currentIdx, labels, EditorStyles.popup);
-                    if (newIdx != currentIdx)
-                    {
-                        if (newIdx >= 0 && newIdx < filtered.Count)
-                        {
-                            var group = filtered[newIdx];
-                            s_SelectedGroupName = group.name;
-                            gv?.HighlightGroup(group.name, group.domain);
-                        }
-                        else
-                        {
-                            s_SelectedGroupName = null;
-                            gv?.ClearHighlight();
-                        }
-                        SceneView.RepaintAll();
-                    }
+                    GUILayout.Label($"No {domainStr} groups available.", EditorStyles.miniLabel);
                 }
 
                 GUILayout.EndArea();
@@ -1645,33 +1969,336 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void DrawGroupViewerMessage(string message)
+        private static void DrawPolygonWireOverlay(SceneView sceneView, PcgGraphEditorWindow window)
         {
-            Handles.BeginGUI();
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            var cam = sceneView != null ? sceneView.camera : null;
+            if (cam == null)
+                return;
+
+            var anchor = FindPreviewAnchor(window);
+            if (anchor == null)
+                return;
+
+            var component = anchor.GetComponent<PcgGraphComponent>();
+            if (component == null)
+                return;
+
+            // Only n-gon geometry_binary. Never draw MeshFilter triangles here — that shows
+            // fan diagonals and looks like "preview forced triangulation".
+            var preview = component.PolygonPreview;
+            if (preview == null || preview.FaceCount <= 0 ||
+                preview.Points == null || preview.FaceOffsets == null || preview.FaceIndices == null)
+                return;
+
+            // Rebuild unique edge list only when preview data changes (new cook),
+            // not every frame. Eliminates per-frame HashSet allocation + dedup loop.
+            if (!ReferenceEquals(preview, s_WirePreviewCache))
+            {
+                s_WirePreviewCache = preview;
+                s_WireEdgePairs = BuildUniqueEdgePairs(preview);
+            }
+
+            if (s_WireEdgePairs == null || s_WireEdgePairs.Length < 2)
+                return;
+
+            if (!EnsureWireDrawResources())
+            {
+                // Shader missing: fall back to 1px batched DrawLines (still 1 draw call).
+                DrawPolygonWireOverlayThinFallback(anchor, preview.Points);
+                return;
+            }
+
+            var edgeCount = s_WireEdgePairs.Length / 2;
+            var vertCount = edgeCount * 4;
+            var indexCount = edgeCount * 6;
+            EnsureWireBuffers(edgeCount, vertCount, indexCount);
+
+            var widthPx = EditorPrefs.GetFloat(WireWidthPrefsKey, WireWidthPxDefault);
+            if (widthPx < 0.5f)
+                widthPx = 0.5f;
+
+            var localToWorld = anchor.localToWorldMatrix;
+            if (NeedsWireMeshRebuild(preview, localToWorld, cam, widthPx))
+            {
+                ExpandEdgesToCameraFacingQuads(
+                    preview.Points,
+                    localToWorld,
+                    cam,
+                    widthPx,
+                    edgeCount);
+
+                if (s_WireUploadedEdgeCount != edgeCount)
+                {
+                    s_WireMesh.Clear(false);
+                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                    s_WireMesh.SetColors(s_WireColors, 0, vertCount);
+                    s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+                    s_WireUploadedEdgeCount = edgeCount;
+                }
+                else
+                {
+                    // Camera-facing vertices change while indices/colors do not.
+                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                }
+
+                RememberWireMeshState(preview, localToWorld, cam, widthPx);
+            }
+
+            s_WireMaterial.SetPass(0);
+            Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
+        }
+
+        private static bool NeedsWireMeshRebuild(
+            PcgPolygonPreviewData preview,
+            Matrix4x4 localToWorld,
+            Camera cam,
+            float widthPx)
+        {
+            if (!s_WireMeshStateValid || !ReferenceEquals(preview, s_WireMeshPreviewCache))
+                return true;
+
+            var projectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
+            return localToWorld != s_WireLastLocalToWorld ||
+                   cam.transform.position != s_WireLastCameraPosition ||
+                   cam.transform.rotation != s_WireLastCameraRotation ||
+                   cam.orthographic != s_WireLastOrthographic ||
+                   !Mathf.Approximately(projectionSize, s_WireLastProjectionSize) ||
+                   cam.pixelHeight != s_WireLastPixelHeight ||
+                   !Mathf.Approximately(widthPx, s_WireLastWidthPx);
+        }
+
+        private static void RememberWireMeshState(
+            PcgPolygonPreviewData preview,
+            Matrix4x4 localToWorld,
+            Camera cam,
+            float widthPx)
+        {
+            s_WireMeshPreviewCache = preview;
+            s_WireLastLocalToWorld = localToWorld;
+            s_WireLastCameraPosition = cam.transform.position;
+            s_WireLastCameraRotation = cam.transform.rotation;
+            s_WireLastOrthographic = cam.orthographic;
+            s_WireLastProjectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
+            s_WireLastPixelHeight = cam.pixelHeight;
+            s_WireLastWidthPx = widthPx;
+            s_WireMeshStateValid = true;
+        }
+
+        private static void DrawPolygonWireOverlayThinFallback(Transform anchor, Vector3[] points)
+        {
+            var linePoints = new Vector3[s_WireEdgePairs.Length];
+            var l2w = anchor.localToWorldMatrix;
+            for (var i = 0; i < s_WireEdgePairs.Length; i++)
+                linePoints[i] = l2w.MultiplyPoint(points[s_WireEdgePairs[i]]);
+
+            var prevColor = Handles.color;
+            var prevZTest = Handles.zTest;
             try
             {
-                const float width = 300f;
-                const float height = 70f;
-                var area = new Rect(
-                    SceneViewToolsPanelWidth + SceneOverlayMargin,
-                    SceneOverlayMargin + 30f,
-                    width,
-                    height);
-                GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
-
-                GUILayout.BeginArea(area);
-                GUILayout.Space(6f);
-                GUILayout.Label(message, EditorStyles.wordWrappedLabel);
-                GUILayout.EndArea();
+                Handles.color = s_WireColor;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+                Handles.DrawLines(linePoints);
             }
             finally
             {
-                Handles.EndGUI();
+                Handles.color = prevColor;
+                Handles.zTest = prevZTest;
             }
+        }
+
+        private static bool EnsureWireDrawResources()
+        {
+            if (s_WireMesh == null)
+            {
+                s_WireMesh = new Mesh { name = "PcgPolygonWireOverlay", hideFlags = HideFlags.HideAndDontSave };
+                s_WireMesh.MarkDynamic();
+                s_WireUploadedEdgeCount = 0;
+                s_WireMeshStateValid = false;
+            }
+
+            if (s_WireMaterial == null)
+            {
+                var shader = Shader.Find("Hidden/Internal-Colored");
+                if (shader == null)
+                    return false;
+
+                s_WireMaterial = new Material(shader)
+                {
+                    name = "PcgPolygonWireOverlay",
+                    hideFlags = HideFlags.HideAndDontSave,
+                };
+                s_WireMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                s_WireMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                s_WireMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+                s_WireMaterial.SetInt("_ZWrite", 0);
+                // LessEqual: respect depth so back edges are occluded by the Lit mesh.
+                s_WireMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual);
+            }
+
+            return true;
+        }
+
+        private static void EnsureWireBuffers(int edgeCount, int vertCount, int indexCount)
+        {
+            if (s_WireVerts == null || s_WireVerts.Length < vertCount)
+            {
+                s_WireVerts = new Vector3[vertCount];
+                s_WireColors = new Color[vertCount];
+                s_WireBuiltEdgeCount = 0;
+            }
+
+            if (s_WireTris == null || s_WireTris.Length < indexCount)
+            {
+                s_WireTris = new int[indexCount];
+                s_WireBuiltEdgeCount = 0;
+            }
+
+            // Indices and colors are deterministic from edgeCount — fill once per size.
+            if (s_WireBuiltEdgeCount == edgeCount)
+                return;
+
+            for (var e = 0; e < edgeCount; e++)
+            {
+                var vi = e * 4;
+                s_WireColors[vi] = s_WireColor;
+                s_WireColors[vi + 1] = s_WireColor;
+                s_WireColors[vi + 2] = s_WireColor;
+                s_WireColors[vi + 3] = s_WireColor;
+
+                var ti = e * 6;
+                s_WireTris[ti] = vi;
+                s_WireTris[ti + 1] = vi + 1;
+                s_WireTris[ti + 2] = vi + 2;
+                s_WireTris[ti + 3] = vi + 1;
+                s_WireTris[ti + 4] = vi + 3;
+                s_WireTris[ti + 5] = vi + 2;
+            }
+
+            s_WireBuiltEdgeCount = edgeCount;
+        }
+
+        /// <summary>
+        /// Expand each unique edge into a camera-facing screen-space quad (Blender polyline style).
+        /// Half-width = widthPx * world-units-per-pixel at the edge midpoint.
+        /// </summary>
+        private static void ExpandEdgesToCameraFacingQuads(
+            Vector3[] points,
+            Matrix4x4 l2w,
+            Camera cam,
+            float widthPx,
+            int edgeCount)
+        {
+            var camPos = cam.transform.position;
+            var camFwd = cam.transform.forward;
+            var camUp = cam.transform.up;
+            var camRight = cam.transform.right;
+            var pixelHeight = Mathf.Max(1f, cam.pixelHeight);
+            var ortho = cam.orthographic;
+            var orthoWorldPerPixel = ortho ? (2f * cam.orthographicSize / pixelHeight) : 0f;
+            var tanHalfFov = ortho
+                ? 0f
+                : Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+
+            for (var e = 0; e < edgeCount; e++)
+            {
+                var a = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2]]);
+                var b = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2 + 1]]);
+                var mid = (a + b) * 0.5f;
+                var dir = b - a;
+                var lenSq = dir.sqrMagnitude;
+                if (lenSq < 1e-12f)
+                {
+                    var vi0 = e * 4;
+                    s_WireVerts[vi0] = a;
+                    s_WireVerts[vi0 + 1] = a;
+                    s_WireVerts[vi0 + 2] = a;
+                    s_WireVerts[vi0 + 3] = a;
+                    continue;
+                }
+
+                dir *= 1f / Mathf.Sqrt(lenSq);
+
+                var toCam = camPos - mid;
+                var perp = Vector3.Cross(dir, toCam);
+                if (perp.sqrMagnitude < 1e-10f)
+                {
+                    perp = Vector3.Cross(dir, camUp);
+                    if (perp.sqrMagnitude < 1e-10f)
+                        perp = Vector3.Cross(dir, camRight);
+                }
+
+                perp.Normalize();
+
+                float worldPerPixel;
+                if (ortho)
+                {
+                    worldPerPixel = orthoWorldPerPixel;
+                }
+                else
+                {
+                    var dist = Vector3.Dot(mid - camPos, camFwd);
+                    if (dist < 0.01f)
+                        dist = 0.01f;
+                    worldPerPixel = dist * tanHalfFov * 2f / pixelHeight;
+                }
+
+                var half = perp * (widthPx * 0.5f * worldPerPixel);
+                var vi = e * 4;
+                s_WireVerts[vi] = a + half;
+                s_WireVerts[vi + 1] = a - half;
+                s_WireVerts[vi + 2] = b + half;
+                s_WireVerts[vi + 3] = b - half;
+            }
+        }
+
+        /// <summary>
+        /// Extracts unique undirected edges from polygon preview data as flat
+        /// index pairs: [a0, b0, a1, b1, ...]. Called only when preview changes.
+        /// </summary>
+        private static int[] BuildUniqueEdgePairs(PcgPolygonPreviewData preview)
+        {
+            var offsets = preview.FaceOffsets;
+            var indices = preview.FaceIndices;
+            var pointCount = preview.Points.Length;
+            var drawn = new HashSet<ulong>();
+            var pairs = new List<int>(offsets.Length * 4);
+
+            for (var fi = 0; fi < preview.FaceCount; fi++)
+            {
+                var start = offsets[fi];
+                var end = fi + 1 < preview.FaceCount ? offsets[fi + 1] : indices.Length;
+                if (end - start < 3 || start < 0 || end > indices.Length)
+                    continue;
+
+                for (var i = start; i < end; i++)
+                {
+                    var a = indices[i];
+                    var b = indices[i + 1 < end ? i + 1 : start];
+                    if (a == b || a < 0 || b < 0 || a >= pointCount || b >= pointCount)
+                        continue;
+
+                    var lo = a < b ? a : b;
+                    var hi = a < b ? b : a;
+                    var key = ((ulong)(uint)lo << 32) | (uint)hi;
+                    if (!drawn.Add(key))
+                        continue;
+
+                    pairs.Add(lo);
+                    pairs.Add(hi);
+                }
+            }
+
+            return pairs.Count > 0 ? pairs.ToArray() : null;
         }
 
         private static void DrawNodeGroupHighlight(SceneView sceneView, PcgGraphEditorWindow window)
         {
+            if (Event.current.type != EventType.Repaint)
+                return;
+
             if (string.IsNullOrEmpty(s_SelectedGroupName))
                 return;
 
@@ -1680,37 +2307,70 @@ namespace DJTechEditor.PCG.Graph
             if (anchor == null)
                 return;
 
-            var mf = anchor.GetComponent<MeshFilter>();
-            if (mf == null || mf.sharedMesh == null)
+            var l2w = anchor.localToWorldMatrix;
+            var domainStr = DomainToString(ctx.Domain);
+
+            // Find the selected node and its per-node group stats
+            var graphView = window.GraphView;
+            var selectedNode = graphView.selection.OfType<PcgManifestNodeView>().FirstOrDefault();
+            if (selectedNode == null)
                 return;
 
-            var mesh = mf.sharedMesh;
-            var vertices = mesh.vertices;
-            var triangles = mesh.triangles;
-            var l2w = anchor.localToWorldMatrix;
+            List<NodeGroupEntry> nodeGroups = null;
+            var sourceNodeId = selectedNode.NodeId;
 
-            var domainStr = DomainToString(ctx.Domain);
-            var group = s_AvailableGroups.FirstOrDefault(
-                g => g.name == s_SelectedGroupName && g.domain == domainStr);
-            if (group.members == null || group.members.Length == 0)
+            // If source is "input", look up the upstream source node's groups
+            if (s_SelectedGroupSource == "input")
+            {
+                var inspector = graphView.Inspector;
+                if (inspector != null)
+                {
+                    var upstream = inspector.ResolveUpstreamGroups(selectedNode.NodeId);
+                    var matchIdx = upstream.FindIndex(g => g.name == s_SelectedGroupName && g.domain == domainStr);
+                    if (matchIdx >= 0)
+                        sourceNodeId = upstream[matchIdx].sourceNodeId;
+                }
+            }
+
+            if (!graphView.TryGetNodeGroups(sourceNodeId, out nodeGroups))
+                return;
+
+            var group = nodeGroups.FirstOrDefault(g => g.name == s_SelectedGroupName && g.domain == domainStr);
+            if (group == null)
+                return;
+
+            // Edge groups can render via edgeEndpoints without members
+            bool hasEdgeEndpoints = group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6;
+            if (!hasEdgeEndpoints && (group.members == null || group.members.Length == 0))
                 return;
 
             if (ctx.Domain == SceneEditDomain.Edge)
             {
+                var prevZTest = Handles.zTest;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
                 Handles.color = new Color(0f, 1f, 0.8f, 0.9f);
-                foreach (var key in group.members)
+                if (group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6)
                 {
-                    int a = (int)(key / 1000000);
-                    int b = (int)(key % 1000000);
-                    if (a < 0 || b < 0 || a >= vertices.Length || b >= vertices.Length)
-                        continue;
-                    var p0 = l2w.MultiplyPoint(vertices[a]);
-                    var p1 = l2w.MultiplyPoint(vertices[b]);
-                    Handles.DrawAAPolyLine(4f, p0, p1);
+                    for (int i = 0; i + 5 < group.edgeEndpoints.Length; i += 6)
+                    {
+                        var p0 = l2w.MultiplyPoint(new Vector3(
+                            group.edgeEndpoints[i], group.edgeEndpoints[i + 1], group.edgeEndpoints[i + 2]));
+                        var p1 = l2w.MultiplyPoint(new Vector3(
+                            group.edgeEndpoints[i + 3], group.edgeEndpoints[i + 4], group.edgeEndpoints[i + 5]));
+                        Handles.DrawAAPolyLine(4f, p0, p1);
+                    }
                 }
+                Handles.zTest = prevZTest;
             }
             else if (ctx.Domain == SceneEditDomain.Face)
             {
+                var mf = anchor.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null)
+                    return;
+                var mesh = mf.sharedMesh;
+                var vertices = mesh.vertices;
+                var triangles = mesh.triangles;
+
                 // Filled translucent triangles
                 Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
                 foreach (var faceIdx in group.members)
@@ -1751,7 +2411,16 @@ namespace DJTechEditor.PCG.Graph
                 Handles.color = new Color(1f, 0.3f, 0.3f, 0.9f);
                 foreach (var ptIdx in group.members)
                 {
-                    if (ptIdx < 0 || ptIdx >= vertices.Length)
+                    if (ptIdx < 0)
+                        continue;
+                    // For vertex groups, we need mesh vertices — but per-node stats
+                    // use geometry point indices, not mesh vertex indices.
+                    // Only attempt if we have a mesh on the anchor.
+                    var mf = anchor.GetComponent<MeshFilter>();
+                    if (mf == null || mf.sharedMesh == null)
+                        break;
+                    var vertices = mf.sharedMesh.vertices;
+                    if (ptIdx >= vertices.Length)
                         continue;
                     var p = l2w.MultiplyPoint(vertices[(int)ptIdx]);
                     Handles.SphereHandleCap(0, p, Quaternion.identity, 0.02f, EventType.Repaint);

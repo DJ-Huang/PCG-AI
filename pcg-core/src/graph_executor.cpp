@@ -6,10 +6,12 @@
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 #include "texture_runtime.hpp"
+#include "heightfield_runtime.hpp"
 
 #include <chrono>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -40,16 +42,18 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
     }
 
     auto groups = nlohmann::json::array();
-    static const char* kDomainNames[] = {"point", "edge", "face"};
-    for (int d = 0; d < 3; ++d) {
+    static const char* kDomainNames[] = {"point", "edge", "face", "vertex"};
+    const auto& points = geometry.points();
+    for (int d = 0; d < 4; ++d) {
         const auto domain = static_cast<geometry::GroupDomain>(d);
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
             auto memberArray = nlohmann::json::array();
-            for (int id : members) {
+            auto edgeEndpoints = nlohmann::json::array();
+            for (geometry::GroupId id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
                     // Expand face index into constituent mesh triangles
-                    if (id >= 0 && id < static_cast<int>(face_to_tri.size())) {
+                    if (id >= 0 && id < static_cast<geometry::GroupId>(face_to_tri.size())) {
                         const auto& face = geometry.faces()[static_cast<size_t>(id)];
                         const int first_tri = face_to_tri[static_cast<size_t>(id)];
                         const int tri_count = face.size() >= 3
@@ -60,13 +64,32 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                 } else {
                     memberArray.push_back(id);
                 }
+                if (d == static_cast<int>(geometry::GroupDomain::Edge)) {
+                    const auto endpoints = geometry::edge_group_points(id);
+                    const int a = endpoints[0];
+                    const int b = endpoints[1];
+                    if (a >= 0 && a < static_cast<int>(points.size()) &&
+                        b >= 0 && b < static_cast<int>(points.size())) {
+                        const auto& pa = points[static_cast<size_t>(a)];
+                        const auto& pb = points[static_cast<size_t>(b)];
+                        edgeEndpoints.push_back(pa.x);
+                        edgeEndpoints.push_back(pa.y);
+                        edgeEndpoints.push_back(pa.z);
+                        edgeEndpoints.push_back(pb.x);
+                        edgeEndpoints.push_back(pb.y);
+                        edgeEndpoints.push_back(pb.z);
+                    }
+                }
             }
-            groups.push_back({
+            auto entry = nlohmann::json::object({
                 {"name", name},
                 {"domain", kDomainNames[d]},
                 {"count", static_cast<int>(memberArray.size())},
                 {"members", std::move(memberArray)},
             });
+            if (d == static_cast<int>(geometry::GroupDomain::Edge))
+                entry["edgeEndpoints"] = std::move(edgeEndpoints);
+            groups.push_back(std::move(entry));
         }
     }
     auto obj = nlohmann::json::object();
@@ -117,26 +140,22 @@ std::vector<std::string> topological_order(const Graph& graph,
     return order;
 }
 
-void gather_inputs(const Graph& graph,
-                   const std::string& node_id,
+void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
                    const NodeOutputMap& outputs,
                    data::PcgDataCollection& inputs,
                    char* err_buf,
                    int err_buf_size,
                    PcgResultCode& code)
 {
-    for (const auto& edge : graph.edges) {
-        if (edge.target != node_id)
-            continue;
-
-        const auto it = outputs.find(edge.source);
+    for (const GraphEdge* edge : incoming_edges) {
+        const auto it = outputs.find(edge->source);
         if (it == outputs.end()) {
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
             return;
         }
 
-        const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
-        const std::string source_pin = edge.source_handle.empty() ? "out" : edge.source_handle;
+        const std::string pin = edge->target_handle.empty() ? "in" : edge->target_handle;
+        const std::string source_pin = edge->source_handle.empty() ? "out" : edge->source_handle;
         const data::PcgDataCollection& upstream = it->second;
 
         if (auto points = upstream.find_points_shared(source_pin)) {
@@ -151,13 +170,20 @@ void gather_inputs(const Graph& graph,
             continue;
         }
 
-        if (auto mesh = upstream.find_mesh_shared(source_pin)) {
-            inputs.add_mesh_shared(pin, mesh);
+        if (auto heightfield = upstream.find_heightfield_shared(source_pin)) {
+            inputs.add_heightfield_shared(pin, heightfield);
             continue;
         }
 
+        // Prefer Geometry over Mesh: mesh-first wrongly drops n-gon when both exist,
+        // and mesh-only mid nodes (e.g. SubdivideMesh) must not hide upstream Geometry.
         if (auto geometry = upstream.find_geometry_shared(source_pin)) {
             inputs.add_geometry_shared(pin, geometry);
+            continue;
+        }
+
+        if (auto mesh = upstream.find_mesh_shared(source_pin)) {
+            inputs.add_mesh_shared(pin, mesh);
             continue;
         }
 
@@ -170,12 +196,16 @@ void gather_inputs(const Graph& graph,
 
         const nlohmann::json primary = upstream.primary_json();
         if (!primary.is_object() || primary.empty()) {
-            if (auto mesh = upstream.primary_mesh_shared()) {
-                inputs.add_mesh_shared(pin, mesh);
+            if (auto heightfield = upstream.primary_heightfield_shared()) {
+                inputs.add_heightfield_shared(pin, heightfield);
                 continue;
             }
             if (auto geometry = upstream.primary_geometry_shared()) {
                 inputs.add_geometry_shared(pin, geometry);
+                continue;
+            }
+            if (auto mesh = upstream.primary_mesh_shared()) {
+                inputs.add_mesh_shared(pin, mesh);
                 continue;
             }
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Missing upstream output");
@@ -213,6 +243,8 @@ nlohmann::json build_node_stats(
         } else if (const auto* mesh = collection.primary_mesh()) {
             point_count = static_cast<int>(mesh->vertices().size());
             triangle_count = static_cast<int>(mesh->triangles().size()) / 3;
+        } else if (const auto* heightfield = collection.primary_heightfield()) {
+            point_count = static_cast<int>(heightfield->sample_count());
         } else if (const auto pts = collection.find_points_shared("out")) {
             point_count = static_cast<int>(pts->points().size());
         } else {
@@ -235,6 +267,47 @@ nlohmann::json build_node_stats(
     return stats;
 }
 
+/// Builds a flat array of per-node group stats: [{"node_id", "name", "domain", "count", "members", "edgeEndpoints"}, ...]
+/// Flattened (not nested) so Unity's JsonUtility can deserialize it.
+nlohmann::json build_per_node_groups(const NodeOutputMap& outputs)
+{
+    auto result = nlohmann::json::array();
+    for (const auto& [node_id, collection] : outputs) {
+        if (const auto* geom = collection.primary_geometry()) {
+            auto groups_json = build_group_stats(*geom);
+            if (groups_json.contains("groups") && groups_json["groups"].is_array()) {
+                for (auto& g : groups_json["groups"]) {
+                    g["node_id"] = node_id;
+                    result.push_back(g);
+                }
+            }
+        }
+    }
+    return result;
+}
+
+nlohmann::json build_heightfield_summary(const data::PcgHeightField& heightfield)
+{
+    auto layer_names = nlohmann::json::array();
+    for (const auto& [name, layer] : heightfield.layers()) {
+        layer_names.push_back({
+            {"name", name},
+            {"tupleSize", layer.tuple_size},
+        });
+    }
+
+    return nlohmann::json{
+        {"kind", "heightfield"},
+        {"resolutionX", heightfield.resolution_x()},
+        {"resolutionZ", heightfield.resolution_z()},
+        {"sizeX", heightfield.size_x()},
+        {"sizeZ", heightfield.size_z()},
+        {"sampling", heightfield.sampling() == data::HeightFieldSampling::Corner
+            ? "corner" : "center"},
+        {"layers", std::move(layer_names)},
+    };
+}
+
 } // namespace
 
 PcgResultCode execute_graph(const Graph& graph,
@@ -245,6 +318,7 @@ PcgResultCode execute_graph(const Graph& graph,
                             const TextureRuntime* textures,
                             const MeshRuntime* meshes,
                             const SplineRuntime* splines,
+                            const HeightFieldRuntime* heightfields,
                             GraphCookCache* cache,
                             bool (*is_cancel_requested)(),
                             GraphPerfReport* perf)
@@ -260,15 +334,30 @@ PcgResultCode execute_graph(const Graph& graph,
 
     if (cache) {
         const uint64_t structure_hash = compute_graph_structure_hash(graph);
-        if (cache->structure_hash() != 0 && cache->structure_hash() != structure_hash)
-            cache->clear();
+        // Do not clear node entries when only the graph topology changes. Node
+        // input hashes below include incoming connection identity, parameters,
+        // seed, runtime bindings, and upstream output hashes. This makes entries
+        // safe to reuse across Editor preview subgraphs, where changing the sink
+        // would otherwise discard an expensive full-graph cook.
         cache->set_structure_hash(structure_hash);
         cache->reset_stats();
     }
 
     std::unordered_map<std::string, const GraphNode*> node_by_id;
+    node_by_id.reserve(graph.nodes.size());
     for (const auto& node : graph.nodes)
         node_by_id[node.id] = &node;
+
+    std::unordered_map<std::string, std::vector<const GraphEdge*>> incoming_by_node;
+    incoming_by_node.reserve(graph.nodes.size());
+    std::unordered_set<std::string> nodes_with_outgoing;
+    nodes_with_outgoing.reserve(graph.nodes.size());
+    for (const auto& edge : graph.edges) {
+        incoming_by_node[edge.target].push_back(&edge);
+        nodes_with_outgoing.insert(edge.source);
+    }
+
+    static const std::vector<const GraphEdge*> kNoIncomingEdges;
 
     std::unordered_map<std::string, uint64_t> output_hashes;
     NodeOutputMap outputs;
@@ -277,18 +366,27 @@ PcgResultCode execute_graph(const Graph& graph,
             return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
         const GraphNode* node = node_by_id[node_id];
+        const auto incoming_it = incoming_by_node.find(node_id);
+        const auto& incoming_edges = incoming_it != incoming_by_node.end()
+            ? incoming_it->second
+            : kNoIncomingEdges;
 
         std::vector<std::pair<std::string, uint64_t>> upstream_hashes;
-        for (const auto& edge : graph.edges) {
-            if (edge.target != node_id)
-                continue;
-
-            const auto it = output_hashes.find(edge.source);
+        upstream_hashes.reserve(incoming_edges.size());
+        for (const GraphEdge* edge : incoming_edges) {
+            const auto it = output_hashes.find(edge->source);
             if (it == output_hashes.end())
                 continue;
 
-            const std::string pin = edge.target_handle.empty() ? "in" : edge.target_handle;
-            upstream_hashes.emplace_back(pin + "\0" + edge.source, it->second);
+            const std::string pin = edge->target_handle.empty() ? "in" : edge->target_handle;
+            std::string connection_key;
+            connection_key.reserve(pin.size() + edge->source.size() + edge->source_handle.size() + 2);
+            connection_key.append(pin);
+            connection_key.push_back('\0');
+            connection_key.append(edge->source);
+            connection_key.push_back('\0');
+            connection_key.append(edge->source_handle);
+            upstream_hashes.emplace_back(std::move(connection_key), it->second);
         }
 
         std::sort(upstream_hashes.begin(), upstream_hashes.end(),
@@ -296,7 +394,8 @@ PcgResultCode execute_graph(const Graph& graph,
 
         uint64_t input_hash = 0;
         if (cache)
-            input_hash = compute_node_input_hash(*node, seed, upstream_hashes, textures, meshes, splines);
+            input_hash = compute_node_input_hash(
+                *node, seed, upstream_hashes, textures, meshes, splines, heightfields);
 
         if (cache) {
             data::PcgDataCollection cached_outputs;
@@ -323,12 +422,13 @@ PcgResultCode execute_graph(const Graph& graph,
         ctx.textures = textures;
         ctx.meshes = meshes;
         ctx.splines = splines;
+        ctx.heightfields = heightfields;
         ctx.err_buf = err_buf;
         ctx.err_buf_size = err_buf_size;
         ctx.is_cancel_requested = is_cancel_requested;
 
         PcgResultCode input_code = PCG_OK;
-        gather_inputs(graph, node_id, outputs, ctx.inputs, err_buf, err_buf_size, input_code);
+        gather_inputs(incoming_edges, outputs, ctx.inputs, err_buf, err_buf_size, input_code);
         if (input_code != PCG_OK)
             return input_code;
 
@@ -340,7 +440,14 @@ PcgResultCode execute_graph(const Graph& graph,
             return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
         outputs[node_id] = std::move(ctx.outputs);
-        const uint64_t out_hash = compute_output_hash(outputs[node_id]);
+        // Elements are deterministic for their node data, graph seed, runtime
+        // bindings, and upstream fingerprints. Reuse that dependency fingerprint
+        // instead of walking every produced vertex/face/attribute a second time.
+        // Legacy uncached entry points retain the deep output hash because they do
+        // not compute an input fingerprint.
+        const uint64_t out_hash = cache
+            ? input_hash
+            : compute_output_hash(outputs[node_id]);
         output_hashes[node_id] = out_hash;
 
         if (cache)
@@ -354,17 +461,12 @@ PcgResultCode execute_graph(const Graph& graph,
     }
 
     auto node_stats = build_node_stats(outputs, node_by_id);
+    auto per_node_groups = build_per_node_groups(outputs);
 
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
     for (const auto& node : graph.nodes) {
-        bool has_outgoing = false;
-        for (const auto& edge : graph.edges) {
-            if (edge.source == node.id) {
-                has_outgoing = true;
-                break;
-            }
-        }
+        const bool has_outgoing = nodes_with_outgoing.count(node.id) != 0;
         if (!has_outgoing) {
             if (node.type == "Output" && !sink)
                 sink = &node;
@@ -384,6 +486,33 @@ PcgResultCode execute_graph(const Graph& graph,
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Sink node produced no output");
 
     const data::PcgDataCollection& sink_output = sink_it->second;
+
+    // Keep HeightField as a typed sidecar even when ConvertHeightField feeds the
+    // Mesh Sink. This lets host terrain adapters update native Terrain/Landscape
+    // while the existing mesh preview remains unchanged.
+    auto find_nearest_heightfield = [&]() -> std::shared_ptr<const data::PcgHeightField> {
+        std::queue<std::string> frontier;
+        std::unordered_set<std::string> visited{sink->id};
+        frontier.push(sink->id);
+        while (!frontier.empty()) {
+            const std::string current = frontier.front();
+            frontier.pop();
+            const auto current_output = outputs.find(current);
+            if (current_output != outputs.end()) {
+                if (auto heightfield = current_output->second.primary_heightfield_shared())
+                    return heightfield;
+            }
+            const auto incoming_it = incoming_by_node.find(current);
+            if (incoming_it == incoming_by_node.end())
+                continue;
+            for (const GraphEdge* edge : incoming_it->second) {
+                if (visited.insert(edge->source).second)
+                    frontier.push(edge->source);
+            }
+        }
+        return nullptr;
+    };
+    out_result.source_heightfield = find_nearest_heightfield();
     if (const data::PcgMeshData* spawn_mesh = sink_output.find_mesh("spawnMesh")) {
         out_result.spawn_mesh = *spawn_mesh;
     } else {
@@ -404,6 +533,17 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = nlohmann::json::object();
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
+        return PCG_OK;
+    }
+
+    if (auto heightfield = sink_output.find_heightfield_shared("out")) {
+        out_result.source_heightfield = heightfield;
+        out_result.kind = GraphResultKind::Json;
+        out_result.json = build_heightfield_summary(*heightfield);
+        out_result.mesh = data::PcgMeshData{};
+        out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
@@ -413,34 +553,79 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = primary;
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
         return PCG_OK;
     }
 
-    if (const data::PcgGeometry* geometry = sink_output.find_geometry("out")) {
+    if (auto geometry = sink_output.find_geometry_shared("out")) {
         out_result.kind = GraphResultKind::Mesh;
+        out_result.source_geometry = geometry;
         const auto& d = geometry->detail();
         out_result.mesh = data::compute_split_normals(*geometry,
             data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
+        out_result.json["geometry_export"] = "sink_geometry";
+        if (!out_result.mesh.metadata().raw().empty())
+            out_result.json["mesh_metadata"] = out_result.mesh.metadata().raw();
         return PCG_OK;
     }
 
-    if (const data::PcgGeometry* geometry = sink_output.primary_geometry()) {
+    if (auto geometry = sink_output.primary_geometry_shared()) {
         out_result.kind = GraphResultKind::Mesh;
+        out_result.source_geometry = geometry;
         const auto& d = geometry->detail();
         out_result.mesh = data::compute_split_normals(*geometry,
             data::NormalComputeOptions{d.shade_mode, d.cusp_angle_deg, true});
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
+        out_result.json["geometry_export"] = "sink_geometry";
+        if (!out_result.mesh.metadata().raw().empty())
+            out_result.json["mesh_metadata"] = out_result.mesh.metadata().raw();
         return PCG_OK;
     }
+
+    auto try_salvage_upstream_geometry = [&]() {
+        // BFS from sink along reverse edges; prefer nearest Geometry for Scene wire.
+        std::queue<std::string> frontier;
+        std::unordered_set<std::string> visited{sink->id};
+        frontier.push(sink->id);
+        while (!frontier.empty()) {
+            const std::string current = frontier.front();
+            frontier.pop();
+            const auto incoming_it = incoming_by_node.find(current);
+            if (incoming_it == incoming_by_node.end())
+                continue;
+            for (const GraphEdge* edge : incoming_it->second) {
+                if (visited.count(edge->source))
+                    continue;
+                visited.insert(edge->source);
+                const auto up = outputs.find(edge->source);
+                if (up == outputs.end())
+                    continue;
+                if (auto geometry = up->second.primary_geometry_shared()) {
+                    out_result.source_geometry = geometry;
+                    out_result.json["geometry_export"] = "salvaged_upstream";
+                    out_result.json["geometry_export_from"] = edge->source;
+                    return;
+                }
+                frontier.push(edge->source);
+            }
+        }
+        out_result.json["geometry_export"] = "mesh_only";
+    };
 
     if (const data::PcgMeshData* mesh = sink_output.find_mesh("out")) {
         out_result.kind = GraphResultKind::Mesh;
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
+        if (!mesh->metadata().raw().empty())
+            out_result.json["mesh_metadata"] = mesh->metadata().raw();
+        try_salvage_upstream_geometry();
         return PCG_OK;
     }
 
@@ -449,6 +634,10 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.mesh = *mesh;
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
+        out_result.json["node_groups"] = per_node_groups;
+        if (!mesh->metadata().raw().empty())
+            out_result.json["mesh_metadata"] = mesh->metadata().raw();
+        try_salvage_upstream_geometry();
         return PCG_OK;
     }
 
@@ -456,6 +645,7 @@ PcgResultCode execute_graph(const Graph& graph,
     out_result.json = sink_output.primary_json();
     out_result.mesh = data::PcgMeshData{};
     out_result.json["node_stats"] = node_stats;
+    out_result.json["node_groups"] = per_node_groups;
     return PCG_OK;
 }
 

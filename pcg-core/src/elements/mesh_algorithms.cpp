@@ -1,6 +1,7 @@
 #include "elements/mesh_algorithms.hpp"
 #include "elements/bevel_blender.hpp"
 #include "elements/element_utils.hpp"
+#include "geometry/bmesh.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -260,8 +261,444 @@ data::PcgMeshData create_box_mesh(double width, double height, double depth)
     return mesh;
 }
 
-data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
+data::PcgGeometry create_box_geometry(double width, double height, double depth)
 {
+    const double hx = std::max(width, 0.0) * 0.5;
+    const double hy = std::max(height, 0.0) * 0.5;
+    const double hz = std::max(depth, 0.0) * 0.5;
+
+    data::PcgGeometry geo;
+    // Shared corners. Face loops are CCW when viewed from outside so fan
+    // triangulation (i0,i,i+1) yields outward normals — same as add_quad after
+    // its index swap. Do NOT copy add_quad's pre-swap CW vertex order here.
+    geo.points_mut() = {
+        {-hx, -hy, -hz}, // 0
+        { hx, -hy, -hz}, // 1
+        { hx,  hy, -hz}, // 2
+        {-hx,  hy, -hz}, // 3
+        {-hx, -hy,  hz}, // 4
+        { hx, -hy,  hz}, // 5
+        { hx,  hy,  hz}, // 6
+        {-hx,  hy,  hz}, // 7
+    };
+    // +X, -X, +Y, -Y, +Z, -Z
+    geo.faces_mut() = {
+        {1, 2, 6, 5},
+        {4, 7, 3, 0},
+        {3, 7, 6, 2},
+        {4, 0, 1, 5},
+        {4, 5, 6, 7},
+        {1, 0, 3, 2},
+    };
+    return geo;
+}
+
+data::PcgMeshData create_cylinder_mesh(double radius, double height,
+                                       int radial_segments, int height_segments,
+                                       bool cap_top, bool cap_bottom)
+{
+    if (radius < 0.001 || height < 0.001 || radial_segments < 3 || height_segments < 1)
+        return {};
+
+    radial_segments = std::min(radial_segments, 128);
+    height_segments = std::min(height_segments, 64);
+
+    data::PcgMeshData mesh;
+    const double half_h = height * 0.5;
+    const double pi = 3.14159265358979323846;
+
+    // Side vertices: (heightSegments + 1) rings * radialSegments
+    for (int h = 0; h <= height_segments; ++h) {
+        const double y = -half_h + height * static_cast<double>(h) / height_segments;
+        for (int r = 0; r < radial_segments; ++r) {
+            const double angle = 2.0 * pi * r / radial_segments;
+            mesh.add_vertex({radius * std::cos(angle), y, radius * std::sin(angle)});
+        }
+    }
+
+    // Side faces — outward winding matching add_quad convention
+    for (int h = 0; h < height_segments; ++h) {
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            const int i0 = h * radial_segments + r;
+            const int i1 = h * radial_segments + r_next;
+            const int i2 = (h + 1) * radial_segments + r_next;
+            const int i3 = (h + 1) * radial_segments + r;
+            mesh.add_triangle(i0, i2, i1);
+            mesh.add_triangle(i0, i3, i2);
+        }
+    }
+
+    const int bottom_ring = 0;
+    const int top_ring = height_segments * radial_segments;
+
+    if (cap_bottom) {
+        const int center_idx = static_cast<int>(mesh.vertices().size());
+        mesh.add_vertex({0.0, -half_h, 0.0});
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            mesh.add_triangle(center_idx, bottom_ring + r, bottom_ring + r_next);
+        }
+    }
+
+    if (cap_top) {
+        const int center_idx = static_cast<int>(mesh.vertices().size());
+        mesh.add_vertex({0.0, half_h, 0.0});
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            mesh.add_triangle(center_idx, top_ring + r_next, top_ring + r);
+        }
+    }
+
+    return mesh;
+}
+
+data::PcgGeometry create_cylinder_geometry(double radius, double height,
+                                           int radial_segments, int height_segments,
+                                           bool cap_top, bool cap_bottom)
+{
+    if (radius < 0.001 || height < 0.001 || radial_segments < 3 || height_segments < 1)
+        return {};
+
+    radial_segments = std::min(radial_segments, 128);
+    height_segments = std::min(height_segments, 64);
+
+    data::PcgGeometry geometry;
+    const double half_h = height * 0.5;
+    const double pi = 3.14159265358979323846;
+
+    auto& points = geometry.points_mut();
+    points.reserve(static_cast<size_t>(height_segments + 1) *
+                   static_cast<size_t>(radial_segments));
+    for (int h = 0; h <= height_segments; ++h) {
+        const double y = -half_h + height * static_cast<double>(h) / height_segments;
+        for (int r = 0; r < radial_segments; ++r) {
+            const double angle = 2.0 * pi * r / radial_segments;
+            points.push_back({radius * std::cos(angle), y, radius * std::sin(angle)});
+        }
+    }
+
+    auto& faces = geometry.faces_mut();
+    faces.reserve(static_cast<size_t>(height_segments * radial_segments) +
+                  static_cast<size_t>(cap_top) + static_cast<size_t>(cap_bottom));
+
+    // Preserve each requested height/radial segment as one polygon. The winding
+    // matches create_cylinder_mesh after the polygon is triangulated at Sink.
+    for (int h = 0; h < height_segments; ++h) {
+        for (int r = 0; r < radial_segments; ++r) {
+            const int r_next = (r + 1) % radial_segments;
+            const int i0 = h * radial_segments + r;
+            const int i1 = h * radial_segments + r_next;
+            const int i2 = (h + 1) * radial_segments + r_next;
+            const int i3 = (h + 1) * radial_segments + r;
+            faces.push_back({i0, i3, i2, i1});
+        }
+    }
+
+    if (cap_bottom) {
+        std::vector<int> cap;
+        cap.reserve(static_cast<size_t>(radial_segments));
+        for (int r = 0; r < radial_segments; ++r)
+            cap.push_back(r);
+        faces.push_back(std::move(cap));
+    }
+
+    if (cap_top) {
+        std::vector<int> cap;
+        cap.reserve(static_cast<size_t>(radial_segments));
+        const int top_ring = height_segments * radial_segments;
+        for (int r = radial_segments - 1; r >= 0; --r)
+            cap.push_back(top_ring + r);
+        faces.push_back(std::move(cap));
+    }
+
+    return geometry;
+}
+
+data::PcgGeometry revolve_geometry(const data::PcgSplineData& profile,
+                                  const RevolveGeometryOptions& options)
+{
+    if (profile.splines().empty())
+        return {};
+
+    const auto& spline = profile.splines()[0];
+    if (spline.points.empty())
+        return {};
+
+    int axis = -1;
+    if (options.axis == "x" || options.axis == "X") axis = 0;
+    else if (options.axis == "y" || options.axis == "Y") axis = 1;
+    else if (options.axis == "z" || options.axis == "Z") axis = 2;
+    else return {};
+
+    if (options.segments < 3)
+        return {};
+
+    const int seg = options.segments;
+    const double pi = 3.14159265358979323846;
+    const double eps = 1e-8;
+
+    // Extract profile points as Vec3
+    std::vector<Vec3> prof;
+    prof.reserve(spline.points.size());
+    for (const auto& p : spline.points)
+        prof.push_back({p.x, p.y, p.z});
+
+    // Helper: distance to rotation axis
+    auto axis_dist = [axis](const Vec3& p) -> double {
+        if (axis == 0) return std::sqrt(p.y * p.y + p.z * p.z);
+        if (axis == 1) return std::sqrt(p.x * p.x + p.z * p.z);
+        return std::sqrt(p.x * p.x + p.y * p.y);
+    };
+
+    // Helper: create ring point at angle theta
+    auto ring_point = [axis](const Vec3& p, double theta) -> data::PcgVec3 {
+        const double c = std::cos(theta);
+        const double s = std::sin(theta);
+        if (axis == 0) return {p.x, p.y * c - p.z * s, p.y * s + p.z * c};
+        if (axis == 1) return {p.x * c - p.z * s, p.y, p.x * s + p.z * c};
+        return {p.x * c - p.y * s, p.x * s + p.y * c, p.z};
+    };
+
+    // Helper: axis projection of a point
+    auto axis_point = [axis](const Vec3& p) -> data::PcgVec3 {
+        if (axis == 0) return {p.x, 0.0, 0.0};
+        if (axis == 1) return {0.0, p.y, 0.0};
+        return {0.0, 0.0, p.z};
+    };
+
+    data::PcgGeometry geo;
+
+    // Generate vertices
+    // For each profile point: if on axis, create 1 point; otherwise create seg points
+    std::vector<std::vector<int>> vert_idx(prof.size());
+    for (size_t i = 0; i < prof.size(); ++i) {
+        if (axis_dist(prof[i]) <= eps) {
+            vert_idx[i].resize(1);
+            vert_idx[i][0] = static_cast<int>(geo.points().size());
+            geo.points_mut().push_back(axis_point(prof[i]));
+        } else {
+            vert_idx[i].resize(seg);
+            for (int j = 0; j < seg; ++j) {
+                const double theta = 2.0 * pi * j / seg;
+                vert_idx[i][j] = static_cast<int>(geo.points().size());
+                geo.points_mut().push_back(ring_point(prof[i], theta));
+            }
+        }
+    }
+
+    // Generate faces
+    auto add_quad_face = [&geo](int a, int b, int c, int d) {
+        geo.faces_mut().push_back({a, b, c, d});
+    };
+    auto add_tri_face = [&geo](int a, int b, int c) {
+        geo.faces_mut().push_back({a, b, c});
+    };
+
+    int n = static_cast<int>(prof.size());
+    if (options.close_profile) {
+        // Connect last to first
+        for (int i = 0; i < n; ++i) {
+            int i2 = (i + 1) % n;
+            const auto& vi = vert_idx[i];
+            const auto& vj = vert_idx[i2];
+            bool ai = (vi.size() == 1);
+            bool aj = (vj.size() == 1);
+            if (ai && aj) continue;
+            if (ai) {
+                // axis-ring → triangle
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[0], vj[j], vj[jn]);
+                }
+            } else if (aj) {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[j], vj[0], vi[jn]);
+                }
+            } else {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_quad_face(vi[j], vj[j], vj[jn], vi[jn]);
+                }
+            }
+        }
+    } else {
+        for (int i = 0; i < n - 1; ++i) {
+            const auto& vi = vert_idx[i];
+            const auto& vj = vert_idx[i + 1];
+            bool ai = (vi.size() == 1);
+            bool aj = (vj.size() == 1);
+            if (ai && aj) continue;
+            if (ai) {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[0], vj[j], vj[jn]);
+                }
+            } else if (aj) {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_tri_face(vi[j], vj[0], vi[jn]);
+                }
+            } else {
+                for (int j = 0; j < seg; ++j) {
+                    int jn = (j + 1) % seg;
+                    add_quad_face(vi[j], vj[j], vj[jn], vi[jn]);
+                }
+            }
+        }
+
+        // Caps for open profile
+        if (options.cap_start && vert_idx[0].size() > 1) {
+            // Project first profile point to axis
+            int cap_center = static_cast<int>(geo.points().size());
+            geo.points_mut().push_back(axis_point(prof[0]));
+            for (int j = 0; j < seg; ++j) {
+                int jn = (j + 1) % seg;
+                if (axis == 1)
+                    add_tri_face(cap_center, vert_idx[0][j], vert_idx[0][jn]);
+                else
+                    add_tri_face(cap_center, vert_idx[0][jn], vert_idx[0][j]);
+            }
+        }
+        if (options.cap_end && vert_idx[n - 1].size() > 1) {
+            int cap_center = static_cast<int>(geo.points().size());
+            geo.points_mut().push_back(axis_point(prof[n - 1]));
+            for (int j = 0; j < seg; ++j) {
+                int jn = (j + 1) % seg;
+                if (axis == 1)
+                    add_tri_face(cap_center, vert_idx[n - 1][jn], vert_idx[n - 1][j]);
+                else
+                    add_tri_face(cap_center, vert_idx[n - 1][j], vert_idx[n - 1][jn]);
+            }
+        }
+    }
+
+    return geo;
+}
+
+// ── Welded mesh structure shared by all subdivision methods ─────────────────
+struct WeldedMesh {
+    std::vector<Vec3> positions;
+    std::vector<int> triangles;       // flat (a,b,c) * nt
+    std::vector<int> weld_remap;      // original vertex → welded index
+    int nv = 0;
+    int nt = 0;
+};
+
+WeldedMesh weld_mesh_for_subd(const data::PcgMeshData& mesh) {
+    WeldedMesh w;
+    const auto& verts = mesh.vertices();
+    const auto& tris = mesh.triangles();
+
+    std::unordered_map<std::string, int> pos_to_idx;
+    w.weld_remap.resize(verts.size(), -1);
+
+    for (size_t i = 0; i < verts.size(); ++i) {
+        const std::string key = position_key(to_vec3(verts[i]));
+        auto it = pos_to_idx.find(key);
+        if (it == pos_to_idx.end()) {
+            const int idx = static_cast<int>(w.positions.size());
+            w.positions.push_back(to_vec3(verts[i]));
+            pos_to_idx[key] = idx;
+            w.weld_remap[i] = idx;
+        } else {
+            w.weld_remap[i] = it->second;
+        }
+    }
+    w.nv = static_cast<int>(w.positions.size());
+
+    for (size_t i = 0; i + 2 < tris.size(); i += 3) {
+        const int a = w.weld_remap[tris[i]];
+        const int b = w.weld_remap[tris[i + 1]];
+        const int c = w.weld_remap[tris[i + 2]];
+        if (a == b || b == c || a == c) continue;
+        w.triangles.push_back(a);
+        w.triangles.push_back(b);
+        w.triangles.push_back(c);
+    }
+    w.nt = static_cast<int>(w.triangles.size() / 3);
+    return w;
+}
+
+auto ek64 = [](int a, int b) -> int64_t {
+    return static_cast<int64_t>(std::min(a, b)) * 1000000LL + std::max(a, b);
+};
+
+void propagate_attributes(const data::PcgMeshData& src, data::PcgMeshData& dst,
+                           const WeldedMesh& w,
+                           const std::vector<int>& extra_src_a,
+                           const std::vector<int>& extra_src_b,
+                           int pad_count = 0) {
+    const int nv = w.nv;
+    const int nextra = static_cast<int>(extra_src_a.size());
+    const bool has_colors = src.has_colors();
+    const bool has_uvs = src.has_uvs();
+    const bool has_normals = src.has_normals();
+    if (!has_colors && !has_uvs && !has_normals) return;
+
+    std::vector<int> w2o(nv, -1);
+    for (size_t i = 0; i < src.vertices().size(); ++i) {
+        const int wi = w.weld_remap[i];
+        if (w2o[wi] < 0) w2o[wi] = static_cast<int>(i);
+    }
+
+    const int total = nv + nextra + pad_count;
+
+    if (has_colors) {
+        std::vector<data::PcgColor> oc(static_cast<size_t>(total));
+        for (int vi = 0; vi < nv; ++vi) {
+            const int oi = w2o[vi];
+            oc[static_cast<size_t>(vi)] = oi >= 0 ? src.colors()[static_cast<size_t>(oi)] : data::PcgColor{};
+        }
+        for (int i = 0; i < nextra; ++i) {
+            const int oa = w2o[extra_src_a[static_cast<size_t>(i)]];
+            const int ob = w2o[extra_src_b[static_cast<size_t>(i)]];
+            const auto& ca = oa >= 0 ? src.colors()[static_cast<size_t>(oa)] : data::PcgColor{};
+            const auto& cb = ob >= 0 ? src.colors()[static_cast<size_t>(ob)] : data::PcgColor{};
+            oc[static_cast<size_t>(nv + i)] = {(ca.r + cb.r) * 0.5, (ca.g + cb.g) * 0.5,
+                                                (ca.b + cb.b) * 0.5, (ca.a + cb.a) * 0.5};
+        }
+        dst.set_colors(std::move(oc));
+    }
+
+    if (has_uvs) {
+        std::vector<data::PcgVec2> ou(static_cast<size_t>(total));
+        for (int vi = 0; vi < nv; ++vi) {
+            const int oi = w2o[vi];
+            ou[static_cast<size_t>(vi)] = oi >= 0 ? src.uvs()[static_cast<size_t>(oi)] : data::PcgVec2{};
+        }
+        for (int i = 0; i < nextra; ++i) {
+            const int oa = w2o[extra_src_a[static_cast<size_t>(i)]];
+            const int ob = w2o[extra_src_b[static_cast<size_t>(i)]];
+            const auto& ua = oa >= 0 ? src.uvs()[static_cast<size_t>(oa)] : data::PcgVec2{};
+            const auto& ub = ob >= 0 ? src.uvs()[static_cast<size_t>(ob)] : data::PcgVec2{};
+            ou[static_cast<size_t>(nv + i)] = {(ua.u + ub.u) * 0.5, (ua.v + ub.v) * 0.5};
+        }
+        dst.set_uvs(std::move(ou));
+    }
+
+    if (has_normals) {
+        std::vector<data::PcgVertex> on(static_cast<size_t>(total));
+        for (int vi = 0; vi < nv; ++vi) {
+            const int oi = w2o[vi];
+            on[static_cast<size_t>(vi)] = oi >= 0 ? src.normals()[static_cast<size_t>(oi)] : data::PcgVertex{};
+        }
+        for (int i = 0; i < nextra; ++i) {
+            const int oa = w2o[extra_src_a[static_cast<size_t>(i)]];
+            const int ob = w2o[extra_src_b[static_cast<size_t>(i)]];
+            const auto& na = oa >= 0 ? src.normals()[static_cast<size_t>(oa)] : data::PcgVertex{};
+            const auto& nb = ob >= 0 ? src.normals()[static_cast<size_t>(ob)] : data::PcgVertex{};
+            on[static_cast<size_t>(nv + i)] = {(na.x + nb.x) * 0.5, (na.y + nb.y) * 0.5, (na.z + nb.z) * 0.5};
+        }
+        dst.set_normals(std::move(on));
+    }
+}
+
+// ── Simple (linear) subdivision: flat 1-to-4, no vertex movement ──────────────
+// Operates directly on original vertex indices — no welding, no attribute
+// propagation. Matches the original pre-multi-method subdivide_mesh behavior.
+data::PcgMeshData subdivide_simple(const data::PcgMeshData& mesh, int levels) {
     data::PcgMeshData current = mesh;
     levels = std::clamp(levels, 0, 4);
 
@@ -271,6 +708,7 @@ data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
             next.add_vertex(v);
 
         std::unordered_map<int, int> edge_midpoints;
+        std::vector<std::pair<int, int>> mid_parents;
         const auto& verts = current.vertices();
         const auto& tris = current.triangles();
 
@@ -285,6 +723,7 @@ data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
             const int index = static_cast<int>(next.vertices().size());
             next.add_vertex(to_vertex(scale(add(va, vb), 0.5)));
             edge_midpoints[key] = index;
+            mid_parents.push_back({a, b});
             return index;
         };
 
@@ -302,10 +741,935 @@ data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels)
             next.add_triangle(ab, bc, ca);
         }
 
+        // Propagate per-vertex attributes: originals keep indices, midpoints average parents.
+        const int orig_count = static_cast<int>(current.vertices().size());
+        if (current.has_colors()) {
+            const auto& sc = current.colors();
+            std::vector<data::PcgColor> oc(next.vertices().size(), data::PcgColor{1,1,1,1});
+            for (int i = 0; i < orig_count && i < static_cast<int>(sc.size()); ++i)
+                oc[static_cast<size_t>(i)] = sc[static_cast<size_t>(i)];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ca = sc[static_cast<size_t>(mid_parents[i].first)];
+                const auto& cb = sc[static_cast<size_t>(mid_parents[i].second)];
+                oc[static_cast<size_t>(orig_count + i)] =
+                    {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+            }
+            next.set_colors(std::move(oc));
+        }
+        if (current.has_uvs()) {
+            const auto& su = current.uvs();
+            std::vector<data::PcgVec2> ou(next.vertices().size());
+            for (int i = 0; i < orig_count && i < static_cast<int>(su.size()); ++i)
+                ou[static_cast<size_t>(i)] = su[static_cast<size_t>(i)];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ua = su[static_cast<size_t>(mid_parents[i].first)];
+                const auto& ub = su[static_cast<size_t>(mid_parents[i].second)];
+                ou[static_cast<size_t>(orig_count + i)] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+            }
+            next.set_uvs(std::move(ou));
+        }
+        if (current.has_normals()) {
+            const auto& sn = current.normals();
+            std::vector<data::PcgVertex> on(next.vertices().size());
+            for (int i = 0; i < orig_count && i < static_cast<int>(sn.size()); ++i)
+                on[static_cast<size_t>(i)] = sn[static_cast<size_t>(i)];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& na = sn[static_cast<size_t>(mid_parents[i].first)];
+                const auto& nb = sn[static_cast<size_t>(mid_parents[i].second)];
+                on[static_cast<size_t>(orig_count + i)] =
+                    {(na.x+nb.x)*0.5, (na.y+nb.y)*0.5, (na.z+nb.z)*0.5};
+            }
+            next.set_normals(std::move(on));
+        }
+
+        current = std::move(next);
+    }
+    return current;
+}
+
+// ── Loop subdivision (triangle meshes) ───────────────────────────────────────
+data::PcgMeshData subdivide_loop(const data::PcgMeshData& mesh, int levels) {
+    data::PcgMeshData current = mesh;
+    levels = std::clamp(levels, 0, 4);
+    constexpr double kPi = 3.14159265358979323846;
+
+    for (int level = 0; level < levels; ++level) {
+        const WeldedMesh w = weld_mesh_for_subd(current);
+        if (w.nt == 0) break;
+
+        // Build edge → opposite vertices and vertex → neighbor set
+        std::unordered_map<int64_t, std::vector<int>> edge_opp;
+        std::vector<std::unordered_set<int>> vneigh(static_cast<size_t>(w.nv));
+
+        for (int ti = 0; ti < w.nt; ++ti) {
+            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
+            edge_opp[ek64(a, b)].push_back(c);
+            edge_opp[ek64(b, c)].push_back(a);
+            edge_opp[ek64(c, a)].push_back(b);
+            vneigh[a].insert(b); vneigh[b].insert(a);
+            vneigh[b].insert(c); vneigh[c].insert(b);
+            vneigh[c].insert(a); vneigh[a].insert(c);
+        }
+
+        auto is_bnd = [&](int a, int b) {
+            const auto it = edge_opp.find(ek64(a, b));
+            return it == edge_opp.end() || it->second.size() < 2;
+        };
+
+        // Odd vertices
+        std::unordered_map<int64_t, int> odd_map;
+        std::vector<Vec3> odd_pos;
+        std::vector<int> odd_a, odd_b;
+
+        auto get_odd = [&](int a, int b) -> int {
+            const int64_t key = ek64(a, b);
+            auto it = odd_map.find(key);
+            if (it != odd_map.end()) return it->second;
+            const auto& opps = edge_opp[key];
+            Vec3 p;
+            if (opps.size() >= 2)
+                p = add(scale(add(w.positions[a], w.positions[b]), 3.0 / 8.0),
+                        scale(add(w.positions[opps[0]], w.positions[opps[1]]), 1.0 / 8.0));
+            else
+                p = scale(add(w.positions[a], w.positions[b]), 0.5);
+            const int idx = static_cast<int>(odd_pos.size());
+            odd_pos.push_back(p);
+            odd_a.push_back(a);
+            odd_b.push_back(b);
+            odd_map[key] = idx;
+            return idx;
+        };
+
+        for (int ti = 0; ti < w.nt; ++ti) {
+            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
+            get_odd(a, b); get_odd(b, c); get_odd(c, a);
+        }
+
+        // Even vertices
+        std::vector<Vec3> even_pos(static_cast<size_t>(w.nv));
+        for (int vi = 0; vi < w.nv; ++vi) {
+            const Vec3& p = w.positions[vi];
+            const int n = static_cast<int>(vneigh[static_cast<size_t>(vi)].size());
+            if (n == 0) { even_pos[static_cast<size_t>(vi)] = p; continue; }
+
+            std::vector<int> bn;
+            for (int nb : vneigh[static_cast<size_t>(vi)])
+                if (is_bnd(vi, nb)) bn.push_back(nb);
+
+            if (bn.size() >= 2) {
+                even_pos[static_cast<size_t>(vi)] = add(scale(p, 0.75),
+                    scale(add(w.positions[bn[0]], w.positions[bn[1]]), 0.125));
+            } else {
+                double beta;
+                if (n == 3) beta = 3.0 / 16.0;
+                else {
+                    const double c = std::cos(2.0 * kPi / n);
+                    beta = (1.0 / n) * (5.0 / 8.0 - std::pow(3.0 / 8.0 + 0.25 * c, 2));
+                }
+                Vec3 sum = {0, 0, 0};
+                for (int nb : vneigh[static_cast<size_t>(vi)])
+                    sum = add(sum, w.positions[nb]);
+                even_pos[static_cast<size_t>(vi)] = add(scale(p, 1.0 - n * beta), scale(sum, beta));
+            }
+        }
+
+        // Build output
+        data::PcgMeshData next;
+        for (int vi = 0; vi < w.nv; ++vi)
+            next.add_vertex(to_vertex(even_pos[static_cast<size_t>(vi)]));
+        for (const auto& p : odd_pos)
+            next.add_vertex(to_vertex(p));
+
+        const int odd_base = w.nv;
+        for (int ti = 0; ti < w.nt; ++ti) {
+            const int a = w.triangles[ti * 3], b = w.triangles[ti * 3 + 1], c = w.triangles[ti * 3 + 2];
+            const int ab = odd_base + odd_map[ek64(a, b)];
+            const int bc = odd_base + odd_map[ek64(b, c)];
+            const int ca = odd_base + odd_map[ek64(c, a)];
+            next.add_triangle(a, ab, ca);
+            next.add_triangle(ab, b, bc);
+            next.add_triangle(ca, bc, c);
+            next.add_triangle(ab, bc, ca);
+        }
+        propagate_attributes(current, next, w, odd_a, odd_b);
+        current = std::move(next);
+    }
+    return current;
+}
+
+// ── Catmull-Clark subdivision (polygon faces, not triangle soup) ─────────────
+// Triangle-CC leaves ~41° fake creases inside former quads after L1, which
+// angle-based bevel then treats as hard edges (CC_L1 bad_edges). Run CC on
+// coplanar-merged n-gons so a box stays 6 quads → 24 quads with only silhouette
+// creases above sharpAngle.
+data::PcgMeshData subdivide_catmull_clark(const data::PcgMeshData& mesh, int levels) {
+    data::PcgMeshData current = mesh;
+    levels = std::clamp(levels, 0, 4);
+
+    for (int level = 0; level < levels; ++level) {
+        geometry::BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 2.0;
+        opts.sharp_angle_deg = 180.0; // not used for topology
+        const geometry::BMesh bm = geometry::bmesh_from_mesh(current, opts);
+        if (bm.faces.empty() || bm.verts.empty())
+            break;
+
+        const int nv = static_cast<int>(bm.verts.size());
+        const int nf = static_cast<int>(bm.faces.size());
+
+        auto to_local = [](const geometry::Vec3& v) -> Vec3 { return {v.x, v.y, v.z}; };
+
+        std::vector<Vec3> positions(static_cast<size_t>(nv));
+        for (int i = 0; i < nv; ++i)
+            positions[static_cast<size_t>(i)] = to_local(bm.verts[static_cast<size_t>(i)]);
+
+        // Incident faces / neighbors from polygon loops
+        std::vector<std::vector<int>> vert_faces(static_cast<size_t>(nv));
+        std::vector<std::unordered_set<int>> vneigh(static_cast<size_t>(nv));
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(loop.size());
+            for (int i = 0; i < n; ++i) {
+                const int a = loop[static_cast<size_t>(i)];
+                const int b = loop[static_cast<size_t>((i + 1) % n)];
+                vert_faces[static_cast<size_t>(a)].push_back(fi);
+                vneigh[static_cast<size_t>(a)].insert(b);
+                vneigh[static_cast<size_t>(b)].insert(a);
+            }
+        }
+
+        auto is_bnd_edge = [&](int a, int b) {
+            const auto it = bm.edges.find(geometry::edge_key(a, b));
+            return it == bm.edges.end() || it->second.face1 < 0;
+        };
+
+        // 1. Face points
+        std::vector<Vec3> face_pts(static_cast<size_t>(nf));
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            Vec3 sum{0, 0, 0};
+            for (int vi : loop)
+                sum = add(sum, positions[static_cast<size_t>(vi)]);
+            face_pts[static_cast<size_t>(fi)] =
+                scale(sum, 1.0 / static_cast<double>(loop.size()));
+        }
+
+        // 2. Edge points
+        std::unordered_map<int64_t, int> edge_pt_idx;
+        std::vector<Vec3> edge_pt_pos;
+        edge_pt_pos.reserve(bm.edges.size());
+
+        auto get_edge_pt = [&](int a, int b) -> int {
+            const int64_t key = geometry::edge_key(a, b);
+            const auto it = edge_pt_idx.find(key);
+            if (it != edge_pt_idx.end())
+                return it->second;
+
+            const Vec3 mid = scale(add(positions[static_cast<size_t>(a)],
+                                       positions[static_cast<size_t>(b)]), 0.5);
+            Vec3 ep = mid;
+            const auto eit = bm.edges.find(key);
+            if (eit != bm.edges.end() && eit->second.face0 >= 0 && eit->second.face1 >= 0) {
+                const Vec3 favg = scale(
+                    add(face_pts[static_cast<size_t>(eit->second.face0)],
+                        face_pts[static_cast<size_t>(eit->second.face1)]),
+                    0.5);
+                ep = scale(add(mid, favg), 0.5);
+            }
+
+            const int idx = static_cast<int>(edge_pt_pos.size());
+            edge_pt_pos.push_back(ep);
+            edge_pt_idx[key] = idx;
+            return idx;
+        };
+
+        for (const auto& entry : bm.edges)
+            get_edge_pt(entry.second.v0, entry.second.v1);
+
+        // 3. Vertex points
+        std::vector<Vec3> vert_pt(static_cast<size_t>(nv));
+        for (int vi = 0; vi < nv; ++vi) {
+            const Vec3& p = positions[static_cast<size_t>(vi)];
+            const auto& vf = vert_faces[static_cast<size_t>(vi)];
+            if (vf.empty()) {
+                vert_pt[static_cast<size_t>(vi)] = p;
+                continue;
+            }
+
+            std::vector<int> bn;
+            for (int nb : vneigh[static_cast<size_t>(vi)])
+                if (is_bnd_edge(vi, nb))
+                    bn.push_back(nb);
+
+            if (bn.size() >= 2) {
+                vert_pt[static_cast<size_t>(vi)] = add(
+                    scale(p, 0.75),
+                    scale(add(positions[static_cast<size_t>(bn[0])],
+                              positions[static_cast<size_t>(bn[1])]),
+                          0.125));
+            } else {
+                const int nval = static_cast<int>(vneigh[static_cast<size_t>(vi)].size());
+                if (nval == 0) {
+                    vert_pt[static_cast<size_t>(vi)] = p;
+                    continue;
+                }
+                Vec3 fsum{0, 0, 0};
+                for (int fi : vf)
+                    fsum = add(fsum, face_pts[static_cast<size_t>(fi)]);
+                // Average unique incident face points (vf may list a face once per loop visit)
+                const Vec3 Q = scale(fsum, 1.0 / static_cast<double>(vf.size()));
+
+                Vec3 rsum{0, 0, 0};
+                for (int nb : vneigh[static_cast<size_t>(vi)])
+                    rsum = add(rsum, scale(add(p, positions[static_cast<size_t>(nb)]), 0.5));
+                const Vec3 R = scale(rsum, 1.0 / nval);
+
+                const double m1 = static_cast<double>(nval - 3) / nval;
+                const double m2 = 1.0 / nval;
+                const double m3 = 2.0 / nval;
+                vert_pt[static_cast<size_t>(vi)] =
+                    add(add(scale(p, m1), scale(Q, m2)), scale(R, m3));
+            }
+        }
+
+        // 4. Emit: [0,nv) verts, [nv,nv+ne) edges, [nv+ne, ...) face points
+        data::PcgMeshData next;
+        for (int vi = 0; vi < nv; ++vi)
+            next.add_vertex(to_vertex(vert_pt[static_cast<size_t>(vi)]));
+        for (const auto& p : edge_pt_pos)
+            next.add_vertex(to_vertex(p));
+        const int ep_base = nv;
+        const int fp_base = nv + static_cast<int>(edge_pt_pos.size());
+        for (const auto& p : face_pts)
+            next.add_vertex(to_vertex(p));
+
+        // 5. Each n-gon → n quads (2 tris), CCW: (v, e_next, fp, e_prev)
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(loop.size());
+            if (n < 3)
+                continue;
+            const int fp = fp_base + fi;
+            for (int i = 0; i < n; ++i) {
+                const int v = loop[static_cast<size_t>(i)];
+                const int v_next = loop[static_cast<size_t>((i + 1) % n)];
+                const int v_prev = loop[static_cast<size_t>((i + n - 1) % n)];
+                const int e_next = ep_base + get_edge_pt(v, v_next);
+                const int e_prev = ep_base + get_edge_pt(v_prev, v);
+                next.add_triangle(v, e_next, fp);
+                next.add_triangle(v, fp, e_prev);
+            }
+        }
+
+        // Propagate per-vertex attributes through CC subdivision.
+        if (current.has_colors() || current.has_uvs() || current.has_normals()) {
+            // Map bmesh vert → first original mesh vertex (by position).
+            std::unordered_map<std::string, int> pos_to_orig;
+            for (size_t i = 0; i < current.vertices().size(); ++i) {
+                const std::string key = position_key(to_vec3(current.vertices()[i]));
+                pos_to_orig.try_emplace(key, static_cast<int>(i));
+            }
+            auto orig_idx = [&](int bm_vi) -> int {
+                const std::string key = position_key(to_local(bm.verts[static_cast<size_t>(bm_vi)]));
+                auto it = pos_to_orig.find(key);
+                return it != pos_to_orig.end() ? it->second : -1;
+            };
+
+            if (current.has_colors()) {
+                const auto& sc = current.colors();
+                std::vector<data::PcgColor> oc(next.vertices().size(), data::PcgColor{1,1,1,1});
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = orig_idx(vi);
+                    if (oi >= 0 && oi < static_cast<int>(sc.size()))
+                        oc[static_cast<size_t>(vi)] = sc[static_cast<size_t>(oi)];
+                }
+                for (const auto& entry : bm.edges) {
+                    const auto it = edge_pt_idx.find(entry.first);
+                    if (it == edge_pt_idx.end()) continue;
+                    const int ei = it->second;
+                    const int oa = orig_idx(entry.second.v0), ob = orig_idx(entry.second.v1);
+                    const auto& ca = oa >= 0 && oa < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(oa)] : data::PcgColor{};
+                    const auto& cb = ob >= 0 && ob < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(ob)] : data::PcgColor{};
+                    oc[static_cast<size_t>(nv + ei)] =
+                        {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+                }
+                for (int fi = 0; fi < nf; ++fi) {
+                    const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                    data::PcgColor avg{0,0,0,0}; int count = 0;
+                    for (int vi : loop) {
+                        const int oi = orig_idx(vi);
+                        if (oi >= 0 && oi < static_cast<int>(sc.size())) {
+                            avg.r += sc[static_cast<size_t>(oi)].r; avg.g += sc[static_cast<size_t>(oi)].g;
+                            avg.b += sc[static_cast<size_t>(oi)].b; avg.a += sc[static_cast<size_t>(oi)].a; ++count;
+                        }
+                    }
+                    if (count > 0) { avg.r /= count; avg.g /= count; avg.b /= count; avg.a /= count; }
+                    oc[static_cast<size_t>(fp_base + fi)] = avg;
+                }
+                next.set_colors(std::move(oc));
+            }
+            if (current.has_uvs()) {
+                const auto& su = current.uvs();
+                std::vector<data::PcgVec2> ou(next.vertices().size());
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = orig_idx(vi);
+                    if (oi >= 0 && oi < static_cast<int>(su.size()))
+                        ou[static_cast<size_t>(vi)] = su[static_cast<size_t>(oi)];
+                }
+                for (const auto& entry : bm.edges) {
+                    const auto it = edge_pt_idx.find(entry.first);
+                    if (it == edge_pt_idx.end()) continue;
+                    const int ei = it->second;
+                    const int oa = orig_idx(entry.second.v0), ob = orig_idx(entry.second.v1);
+                    const auto& ua = oa >= 0 && oa < static_cast<int>(su.size()) ? su[static_cast<size_t>(oa)] : data::PcgVec2{};
+                    const auto& ub = ob >= 0 && ob < static_cast<int>(su.size()) ? su[static_cast<size_t>(ob)] : data::PcgVec2{};
+                    ou[static_cast<size_t>(nv + ei)] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+                }
+                for (int fi = 0; fi < nf; ++fi) {
+                    const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                    data::PcgVec2 avg{0,0}; int count = 0;
+                    for (int vi : loop) {
+                        const int oi = orig_idx(vi);
+                        if (oi >= 0 && oi < static_cast<int>(su.size())) {
+                            avg.u += su[static_cast<size_t>(oi)].u; avg.v += su[static_cast<size_t>(oi)].v; ++count;
+                        }
+                    }
+                    if (count > 0) { avg.u /= count; avg.v /= count; }
+                    ou[static_cast<size_t>(fp_base + fi)] = avg;
+                }
+                next.set_uvs(std::move(ou));
+            }
+            if (current.has_normals()) {
+                const auto& sn = current.normals();
+                std::vector<data::PcgVertex> on(next.vertices().size());
+                for (int vi = 0; vi < nv; ++vi) {
+                    const int oi = orig_idx(vi);
+                    if (oi >= 0 && oi < static_cast<int>(sn.size()))
+                        on[static_cast<size_t>(vi)] = sn[static_cast<size_t>(oi)];
+                }
+                for (const auto& entry : bm.edges) {
+                    const auto it = edge_pt_idx.find(entry.first);
+                    if (it == edge_pt_idx.end()) continue;
+                    const int ei = it->second;
+                    const int oa = orig_idx(entry.second.v0), ob = orig_idx(entry.second.v1);
+                    const auto& na = oa >= 0 && oa < static_cast<int>(sn.size()) ? sn[static_cast<size_t>(oa)] : data::PcgVertex{};
+                    const auto& nb = ob >= 0 && ob < static_cast<int>(sn.size()) ? sn[static_cast<size_t>(ob)] : data::PcgVertex{};
+                    on[static_cast<size_t>(nv + ei)] =
+                        {(na.x+nb.x)*0.5, (na.y+nb.y)*0.5, (na.z+nb.z)*0.5};
+                }
+                for (int fi = 0; fi < nf; ++fi) {
+                    const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                    data::PcgVertex avg{0,0,0}; int count = 0;
+                    for (int vi : loop) {
+                        const int oi = orig_idx(vi);
+                        if (oi >= 0 && oi < static_cast<int>(sn.size())) {
+                            avg.x += sn[static_cast<size_t>(oi)].x; avg.y += sn[static_cast<size_t>(oi)].y;
+                            avg.z += sn[static_cast<size_t>(oi)].z; ++count;
+                        }
+                    }
+                    if (count > 0) { avg.x /= count; avg.y /= count; avg.z /= count; }
+                    on[static_cast<size_t>(fp_base + fi)] = avg;
+                }
+                next.set_normals(std::move(on));
+            }
+        }
+
+        current = std::move(next);
+    }
+    return current;
+}
+
+// ── Dispatch ────────────────────────────────────────────────────────────────
+data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels, SubdivideMethod method)
+{
+    switch (method) {
+    case SubdivideMethod::Simple:       return subdivide_simple(mesh, levels);
+    case SubdivideMethod::Loop:         return subdivide_loop(mesh, levels);
+    case SubdivideMethod::CatmullClark:
+    default:                             return subdivide_catmull_clark(mesh, levels);
+    }
+}
+
+// ── Simple subdivision on n-gon geometry (Blender Simple parity) ────────────
+// Works directly on polygon faces: adds edge midpoints (shared) and a face
+// center vertex per face, then connects (vi, mid_i, center, mid_{i-1}) into
+// quads. This preserves n-gon topology instead of fan-triangulating first.
+data::PcgGeometry subdivide_simple_geometry(const data::PcgGeometry& geometry, int levels)
+{
+    data::PcgGeometry current = geometry;
+    levels = std::clamp(levels, 0, 4);
+
+    for (int level = 0; level < levels; ++level) {
+        data::PcgGeometry next;
+        const auto& pts = current.points();
+        const auto& faces = current.faces();
+
+        // Copy original vertices
+        for (const auto& p : pts)
+            next.points_mut().push_back(p);
+
+        // Shared edge midpoints
+        std::unordered_map<int64_t, int> edge_mids;
+        std::vector<std::pair<int, int>> mid_parents;
+        std::vector<int> mid_indices;
+        std::vector<std::pair<int, std::vector<int>>> face_centers; // {center_idx, face_verts}
+        auto get_edge_mid = [&](int a, int b) -> int {
+            const int64_t key = geometry::edge_key(a, b);
+            const auto it = edge_mids.find(key);
+            if (it != edge_mids.end())
+                return it->second;
+            const auto& pa = pts[static_cast<size_t>(a)];
+            const auto& pb = pts[static_cast<size_t>(b)];
+            const int idx = static_cast<int>(next.points().size());
+            next.points_mut().push_back({
+                (pa.x + pb.x) * 0.5,
+                (pa.y + pb.y) * 0.5,
+                (pa.z + pb.z) * 0.5,
+            });
+            edge_mids[key] = idx;
+            mid_parents.push_back({a, b});
+            mid_indices.push_back(idx);
+            return idx;
+        };
+
+        for (const auto& face : faces) {
+            const int n = static_cast<int>(face.size());
+            if (n < 3) continue;
+
+            // Face center (centroid)
+            data::PcgVec3 center{0, 0, 0};
+            for (int vi : face) {
+                center.x += pts[static_cast<size_t>(vi)].x;
+                center.y += pts[static_cast<size_t>(vi)].y;
+                center.z += pts[static_cast<size_t>(vi)].z;
+            }
+            center.x /= n; center.y /= n; center.z /= n;
+            const int center_idx = static_cast<int>(next.points().size());
+            next.points_mut().push_back(center);
+
+            // Edge midpoints for this face
+            std::vector<int> mids(static_cast<size_t>(n));
+            for (int i = 0; i < n; ++i)
+                mids[static_cast<size_t>(i)] = get_edge_mid(
+                    face[static_cast<size_t>(i)],
+                    face[static_cast<size_t>((i + 1) % n)]);
+
+            // Sub-faces: (vi, mid_i, center, mid_{i-1})
+            for (int i = 0; i < n; ++i) {
+                const int vi = face[static_cast<size_t>(i)];
+                const int mid_next = mids[static_cast<size_t>(i)];
+                const int mid_prev = mids[static_cast<size_t>((i + n - 1) % n)];
+                next.faces_mut().push_back({vi, mid_next, center_idx, mid_prev});
+            }
+
+            face_centers.push_back({center_idx, face});
+        }
+
+        // Propagate per-vertex attributes: originals keep indices,
+        // edge midpoints (at actual indices) average parents,
+        // face centers average face vertex attributes.
+        if (current.has_colors()) {
+            const auto& sc = current.colors();
+            std::vector<data::PcgColor> oc(next.points().size(), data::PcgColor{1,1,1,1});
+            for (size_t i = 0; i < current.points().size() && i < sc.size(); ++i)
+                oc[i] = sc[i];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ca = sc[static_cast<size_t>(mid_parents[i].first)];
+                const auto& cb = sc[static_cast<size_t>(mid_parents[i].second)];
+                oc[static_cast<size_t>(mid_indices[i])] =
+                    {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+            }
+            for (const auto& fc : face_centers) {
+                data::PcgColor avg{0,0,0,0}; int count = 0;
+                for (int vi : fc.second) {
+                    if (vi >= 0 && vi < static_cast<int>(sc.size())) {
+                        avg.r += sc[static_cast<size_t>(vi)].r; avg.g += sc[static_cast<size_t>(vi)].g;
+                        avg.b += sc[static_cast<size_t>(vi)].b; avg.a += sc[static_cast<size_t>(vi)].a; ++count;
+                    }
+                }
+                if (count > 0) { avg.r /= count; avg.g /= count; avg.b /= count; avg.a /= count; }
+                oc[static_cast<size_t>(fc.first)] = avg;
+            }
+            next.set_colors(std::move(oc));
+        }
+        if (current.has_uvs()) {
+            const auto& su = current.uvs();
+            std::vector<data::PcgVec2> ou(next.points().size());
+            for (size_t i = 0; i < current.points().size() && i < su.size(); ++i)
+                ou[i] = su[i];
+            for (size_t i = 0; i < mid_parents.size(); ++i) {
+                const auto& ua = su[static_cast<size_t>(mid_parents[i].first)];
+                const auto& ub = su[static_cast<size_t>(mid_parents[i].second)];
+                ou[static_cast<size_t>(mid_indices[i])] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+            }
+            for (const auto& fc : face_centers) {
+                data::PcgVec2 avg{0,0}; int count = 0;
+                for (int vi : fc.second) {
+                    if (vi >= 0 && vi < static_cast<int>(su.size())) {
+                        avg.u += su[static_cast<size_t>(vi)].u; avg.v += su[static_cast<size_t>(vi)].v; ++count;
+                    }
+                }
+                if (count > 0) { avg.u /= count; avg.v /= count; }
+                ou[static_cast<size_t>(fc.first)] = avg;
+            }
+            next.set_uvs(std::move(ou));
+        }
+
+        current = std::move(next);
+    }
+    return current;
+}
+
+// ── Catmull-Clark subdivision on n-gon geometry (Blender parity) ────────────
+// Operates directly on polygon faces — no fan triangulation, no diagonal edges.
+// Matches Blender's Subdivision Surface modifier: each n-gon face produces n
+// quads with only silhouette creases.
+data::PcgGeometry subdivide_catmull_clark_geometry(const data::PcgGeometry& geometry, int levels)
+{
+    data::PcgGeometry current = geometry;
+    levels = std::clamp(levels, 0, 4);
+
+    for (int level = 0; level < levels; ++level) {
+        geometry::BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 0.0;  // faces are already canonical n-gons
+        opts.sharp_angle_deg = 180.0;         // not used for topology
+        const geometry::BMesh bm = geometry::bmesh_from_geometry(current, opts);
+        if (bm.faces.empty() || bm.verts.empty())
+            break;
+
+        const int nv = static_cast<int>(bm.verts.size());
+        const int nf = static_cast<int>(bm.faces.size());
+
+        auto to_local = [](const geometry::Vec3& v) -> Vec3 { return {v.x, v.y, v.z}; };
+
+        std::vector<Vec3> positions(static_cast<size_t>(nv));
+        for (int i = 0; i < nv; ++i)
+            positions[static_cast<size_t>(i)] = to_local(bm.verts[static_cast<size_t>(i)]);
+
+        std::vector<std::vector<int>> vert_faces(static_cast<size_t>(nv));
+        std::vector<std::unordered_set<int>> vneigh(static_cast<size_t>(nv));
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(loop.size());
+            for (int i = 0; i < n; ++i) {
+                const int a = loop[static_cast<size_t>(i)];
+                const int b = loop[static_cast<size_t>((i + 1) % n)];
+                vert_faces[static_cast<size_t>(a)].push_back(fi);
+                vneigh[static_cast<size_t>(a)].insert(b);
+                vneigh[static_cast<size_t>(b)].insert(a);
+            }
+        }
+
+        auto is_bnd_edge = [&](int a, int b) {
+            const auto it = bm.edges.find(geometry::edge_key(a, b));
+            return it == bm.edges.end() || it->second.face1 < 0;
+        };
+
+        // 1. Face points (centroids)
+        std::vector<Vec3> face_pts(static_cast<size_t>(nf));
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            Vec3 sum{0, 0, 0};
+            for (int vi : loop)
+                sum = add(sum, positions[static_cast<size_t>(vi)]);
+            face_pts[static_cast<size_t>(fi)] =
+                scale(sum, 1.0 / static_cast<double>(loop.size()));
+        }
+
+        // 2. Edge points
+        std::unordered_map<int64_t, int> edge_pt_idx;
+        std::vector<Vec3> edge_pt_pos;
+        edge_pt_pos.reserve(bm.edges.size());
+
+        auto get_edge_pt = [&](int a, int b) -> int {
+            const int64_t key = geometry::edge_key(a, b);
+            const auto it = edge_pt_idx.find(key);
+            if (it != edge_pt_idx.end())
+                return it->second;
+
+            const Vec3 mid = scale(add(positions[static_cast<size_t>(a)],
+                                       positions[static_cast<size_t>(b)]), 0.5);
+            Vec3 ep = mid;
+            const auto eit = bm.edges.find(key);
+            if (eit != bm.edges.end() && eit->second.face0 >= 0 && eit->second.face1 >= 0) {
+                const Vec3 favg = scale(
+                    add(face_pts[static_cast<size_t>(eit->second.face0)],
+                        face_pts[static_cast<size_t>(eit->second.face1)]),
+                    0.5);
+                ep = scale(add(mid, favg), 0.5);
+            }
+
+            const int idx = static_cast<int>(edge_pt_pos.size());
+            edge_pt_pos.push_back(ep);
+            edge_pt_idx[key] = idx;
+            return idx;
+        };
+
+        for (const auto& entry : bm.edges)
+            get_edge_pt(entry.second.v0, entry.second.v1);
+
+        // 3. Vertex points
+        std::vector<Vec3> vert_pt(static_cast<size_t>(nv));
+        for (int vi = 0; vi < nv; ++vi) {
+            const Vec3& p = positions[static_cast<size_t>(vi)];
+            const auto& vf = vert_faces[static_cast<size_t>(vi)];
+            if (vf.empty()) {
+                vert_pt[static_cast<size_t>(vi)] = p;
+                continue;
+            }
+
+            std::vector<int> bn;
+            for (int nb : vneigh[static_cast<size_t>(vi)])
+                if (is_bnd_edge(vi, nb))
+                    bn.push_back(nb);
+
+            if (bn.size() >= 2) {
+                vert_pt[static_cast<size_t>(vi)] = add(
+                    scale(p, 0.75),
+                    scale(add(positions[static_cast<size_t>(bn[0])],
+                              positions[static_cast<size_t>(bn[1])]),
+                          0.125));
+            } else {
+                const int nval = static_cast<int>(vneigh[static_cast<size_t>(vi)].size());
+                if (nval == 0) {
+                    vert_pt[static_cast<size_t>(vi)] = p;
+                    continue;
+                }
+                Vec3 fsum{0, 0, 0};
+                for (int fi : vf)
+                    fsum = add(fsum, face_pts[static_cast<size_t>(fi)]);
+                const Vec3 Q = scale(fsum, 1.0 / static_cast<double>(vf.size()));
+
+                Vec3 rsum{0, 0, 0};
+                for (int nb : vneigh[static_cast<size_t>(vi)])
+                    rsum = add(rsum, scale(add(p, positions[static_cast<size_t>(nb)]), 0.5));
+                const Vec3 R = scale(rsum, 1.0 / nval);
+
+                const double m1 = static_cast<double>(nval - 3) / nval;
+                const double m2 = 1.0 / nval;
+                const double m3 = 2.0 / nval;
+                vert_pt[static_cast<size_t>(vi)] =
+                    add(add(scale(p, m1), scale(Q, m2)), scale(R, m3));
+            }
+        }
+
+        // 4. Build output PcgGeometry with quad faces
+        data::PcgGeometry next;
+        for (int vi = 0; vi < nv; ++vi)
+            next.points_mut().push_back({vert_pt[static_cast<size_t>(vi)].x,
+                                         vert_pt[static_cast<size_t>(vi)].y,
+                                         vert_pt[static_cast<size_t>(vi)].z});
+        for (const auto& p : edge_pt_pos)
+            next.points_mut().push_back({p.x, p.y, p.z});
+        const int ep_base = nv;
+        const int fp_base = nv + static_cast<int>(edge_pt_pos.size());
+        for (const auto& p : face_pts)
+            next.points_mut().push_back({p.x, p.y, p.z});
+
+        // 5. Each n-gon → n quads: (v_i, e_i, fp, e_{i-1})
+        for (int fi = 0; fi < nf; ++fi) {
+            const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+            const int n = static_cast<int>(loop.size());
+            if (n < 3)
+                continue;
+            const int fp = fp_base + fi;
+            for (int i = 0; i < n; ++i) {
+                const int v = loop[static_cast<size_t>(i)];
+                const int v_next = loop[static_cast<size_t>((i + 1) % n)];
+                const int v_prev = loop[static_cast<size_t>((i + n - 1) % n)];
+                const int e_next = ep_base + get_edge_pt(v, v_next);
+                const int e_prev = ep_base + get_edge_pt(v_prev, v);
+                next.faces_mut().push_back({v, e_next, fp, e_prev});
+            }
+        }
+
+        // Propagate per-vertex attributes (bmesh vert i = geometry point i, no weld).
+        if (current.has_colors()) {
+            const auto& sc = current.colors();
+            std::vector<data::PcgColor> oc(next.points().size(), data::PcgColor{1,1,1,1});
+            for (int vi = 0; vi < nv && vi < static_cast<int>(sc.size()); ++vi)
+                oc[static_cast<size_t>(vi)] = sc[static_cast<size_t>(vi)];
+            for (const auto& entry : bm.edges) {
+                const auto it = edge_pt_idx.find(entry.first);
+                if (it == edge_pt_idx.end()) continue;
+                const int ei = it->second;
+                const int a = entry.second.v0, b = entry.second.v1;
+                const auto& ca = a < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(a)] : data::PcgColor{};
+                const auto& cb = b < static_cast<int>(sc.size()) ? sc[static_cast<size_t>(b)] : data::PcgColor{};
+                oc[static_cast<size_t>(nv + ei)] =
+                    {(ca.r+cb.r)*0.5, (ca.g+cb.g)*0.5, (ca.b+cb.b)*0.5, (ca.a+cb.a)*0.5};
+            }
+            for (int fi = 0; fi < nf; ++fi) {
+                const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                data::PcgColor avg{0,0,0,0}; int count = 0;
+                for (int vi : loop) {
+                    if (vi < static_cast<int>(sc.size())) {
+                        avg.r += sc[static_cast<size_t>(vi)].r; avg.g += sc[static_cast<size_t>(vi)].g;
+                        avg.b += sc[static_cast<size_t>(vi)].b; avg.a += sc[static_cast<size_t>(vi)].a; ++count;
+                    }
+                }
+                if (count > 0) { avg.r /= count; avg.g /= count; avg.b /= count; avg.a /= count; }
+                oc[static_cast<size_t>(fp_base + fi)] = avg;
+            }
+            next.set_colors(std::move(oc));
+        }
+        if (current.has_uvs()) {
+            const auto& su = current.uvs();
+            std::vector<data::PcgVec2> ou(next.points().size());
+            for (int vi = 0; vi < nv && vi < static_cast<int>(su.size()); ++vi)
+                ou[static_cast<size_t>(vi)] = su[static_cast<size_t>(vi)];
+            for (const auto& entry : bm.edges) {
+                const auto it = edge_pt_idx.find(entry.first);
+                if (it == edge_pt_idx.end()) continue;
+                const int ei = it->second;
+                const int a = entry.second.v0, b = entry.second.v1;
+                const auto& ua = a < static_cast<int>(su.size()) ? su[static_cast<size_t>(a)] : data::PcgVec2{};
+                const auto& ub = b < static_cast<int>(su.size()) ? su[static_cast<size_t>(b)] : data::PcgVec2{};
+                ou[static_cast<size_t>(nv + ei)] = {(ua.u+ub.u)*0.5, (ua.v+ub.v)*0.5};
+            }
+            for (int fi = 0; fi < nf; ++fi) {
+                const auto& loop = bm.faces[static_cast<size_t>(fi)].verts;
+                data::PcgVec2 avg{0,0}; int count = 0;
+                for (int vi : loop) {
+                    if (vi < static_cast<int>(su.size())) {
+                        avg.u += su[static_cast<size_t>(vi)].u; avg.v += su[static_cast<size_t>(vi)].v; ++count;
+                    }
+                }
+                if (count > 0) { avg.u /= count; avg.v /= count; }
+                ou[static_cast<size_t>(fp_base + fi)] = avg;
+            }
+            next.set_uvs(std::move(ou));
+        }
+
+        next.detail() = current.detail();
         current = std::move(next);
     }
 
+    // Blender's Subdivision Surface modifier outputs vertices evaluated on the
+    // Catmull-Clark limit surface, not the final control cage. Keep the L-level
+    // topology and apply OpenSubdiv's Catmark smooth limit mask to its vertices.
+    // The face term is the opposite vertex of each incident refined quad; using
+    // the face centroid here changes the stencil and over-shrinks the surface.
+    if (levels > 0 && !current.points().empty()) {
+        geometry::BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 0.0;
+        opts.sharp_angle_deg = 180.0;
+        const geometry::BMesh bm = geometry::bmesh_from_geometry(current, opts);
+        const int nv = static_cast<int>(bm.verts.size());
+        const int nf = static_cast<int>(bm.faces.size());
+        if (nv == static_cast<int>(current.points().size())) {
+            std::vector<Vec3> positions(static_cast<size_t>(nv));
+            for (int i = 0; i < nv; ++i) {
+                const auto& p = bm.verts[static_cast<size_t>(i)];
+                positions[static_cast<size_t>(i)] = {p.x, p.y, p.z};
+            }
+
+            std::vector<std::vector<int>> vertex_faces(static_cast<size_t>(nv));
+            std::vector<std::unordered_set<int>> vertex_neighbors(static_cast<size_t>(nv));
+            std::vector<std::vector<int>> boundary_neighbors(static_cast<size_t>(nv));
+
+            for (int fi = 0; fi < nf; ++fi) {
+                const auto& face = bm.faces[static_cast<size_t>(fi)].verts;
+                for (int vi : face) {
+                    vertex_faces[static_cast<size_t>(vi)].push_back(fi);
+                }
+            }
+
+            for (const auto& entry : bm.edges) {
+                const auto& edge = entry.second;
+                vertex_neighbors[static_cast<size_t>(edge.v0)].insert(edge.v1);
+                vertex_neighbors[static_cast<size_t>(edge.v1)].insert(edge.v0);
+                if (edge.face1 < 0) {
+                    boundary_neighbors[static_cast<size_t>(edge.v0)].push_back(edge.v1);
+                    boundary_neighbors[static_cast<size_t>(edge.v1)].push_back(edge.v0);
+                }
+            }
+
+            auto& output_points = current.points_mut();
+            for (int vi = 0; vi < nv; ++vi) {
+                const Vec3& p = positions[static_cast<size_t>(vi)];
+                const auto& boundary = boundary_neighbors[static_cast<size_t>(vi)];
+                Vec3 limit = p;
+                if (boundary.size() >= 2) {
+                    limit = scale(
+                        add(scale(p, 4.0),
+                            add(positions[static_cast<size_t>(boundary[0])],
+                                positions[static_cast<size_t>(boundary[1])])),
+                        1.0 / 6.0);
+                } else {
+                    const auto& neighbors = vertex_neighbors[static_cast<size_t>(vi)];
+                    const int n = static_cast<int>(neighbors.size());
+                    if (n == 2) {
+                        // OpenSubdiv treats a smooth valence-two vertex as a corner.
+                        limit = p;
+                    } else if (n > 0 &&
+                               vertex_faces[static_cast<size_t>(vi)].size() ==
+                                   static_cast<size_t>(n)) {
+                        Vec3 edge_sum{0, 0, 0};
+                        for (int neighbor : neighbors)
+                            edge_sum = add(edge_sum, positions[static_cast<size_t>(neighbor)]);
+
+                        Vec3 face_sum{0, 0, 0};
+                        bool valid_refined_quads = true;
+                        for (int fi : vertex_faces[static_cast<size_t>(vi)]) {
+                            const auto& face = bm.faces[static_cast<size_t>(fi)].verts;
+                            if (face.size() != 4) {
+                                valid_refined_quads = false;
+                                break;
+                            }
+                            const auto it = std::find(face.begin(), face.end(), vi);
+                            if (it == face.end()) {
+                                valid_refined_quads = false;
+                                break;
+                            }
+                            const size_t corner = static_cast<size_t>(it - face.begin());
+                            const int opposite = face[(corner + 2) % 4];
+                            face_sum = add(face_sum, positions[static_cast<size_t>(opposite)]);
+                        }
+
+                        if (valid_refined_quads) {
+                            const double face_weight =
+                                1.0 / static_cast<double>(n * (n + 5));
+                            const double edge_weight = 4.0 * face_weight;
+                            const double vertex_weight =
+                                1.0 - static_cast<double>(n) * (edge_weight + face_weight);
+                            limit = add(add(scale(p, vertex_weight),
+                                            scale(edge_sum, edge_weight)),
+                                        scale(face_sum, face_weight));
+                        }
+                    }
+                }
+                output_points[static_cast<size_t>(vi)] = {limit.x, limit.y, limit.z};
+            }
+        }
+    }
     return current;
+}
+
+data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int levels, SubdivideMethod method)
+{
+    if (geometry.points().empty() || geometry.faces().empty())
+        return geometry;
+
+    if (method == SubdivideMethod::Simple) {
+        data::PcgGeometry out = subdivide_simple_geometry(geometry, levels);
+        out.detail() = geometry.detail();
+        return out;
+    }
+
+    if (method == SubdivideMethod::CatmullClark) {
+        data::PcgGeometry out = subdivide_catmull_clark_geometry(geometry, levels);
+        out.detail() = geometry.detail();
+        return out;
+    }
+
+    // Loop: triangle-based, needs mesh conversion
+    data::PcgMeshData mesh = data::triangulate_geometry_shared(geometry);
+
+    const data::PcgMeshData result = subdivide_mesh(mesh, levels, method);
+    data::PcgGeometry out = data::geometry_from_mesh(result);
+    out.detail() = geometry.detail();
+    return out;
 }
 
 data::PcgMeshData bevel_mesh(const data::PcgMeshData& mesh, double amount, int segments,
@@ -345,18 +1709,8 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
 {
     // Shared-vertex triangulation: geometry.points() are already welded, so use
     // them directly to ensure BMesh (from geometry) and WeldedMesh (from mesh)
-    // share the same vertex indices. Per-face duplication (triangulate_geometry)
-    // reorders vertices on re-weld, breaking the index alignment.
-    data::PcgMeshData mesh;
-    for (const auto& p : geometry.points())
-        mesh.add_vertex({p.x, p.y, p.z});
-    for (const auto& face : geometry.faces()) {
-        if (face.size() < 3)
-            continue;
-        const int i0 = face[0];
-        for (size_t i = 1; i + 1 < face.size(); ++i)
-            mesh.add_triangle(i0, face[i], face[i + 1]);
-    }
+    // share the same vertex indices.
+    data::PcgMeshData mesh = data::triangulate_geometry_shared(geometry);
 
     if (method == BevelMethod::VertexPush) {
         // VertexPush only moves vertices; preserve geometry topology + groups.
@@ -397,6 +1751,7 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
         return fallback;
     }
 
+    // No-op / cancel / amount<=eps: return original geometry (preserves groups/loops).
     return geometry;
 }
 
@@ -423,18 +1778,26 @@ data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
         return data::PcgVec3{x * c - y * s, x * s + y * c, z};
     };
 
-    for (auto& p : out.points_mut()) {
-        data::PcgVec3 v = rot_x(p.x, p.y, p.z);
-        v = rot_y(v.x, v.y, v.z);
-        v = rot_z(v.x, v.y, v.z);
-        v.x *= scale_x;
-        v.y *= scale_y;
-        v.z *= scale_z;
-        v.x += translate_x;
-        v.y += translate_y;
-        v.z += translate_z;
-        p = v;
-    }
+    const auto transformed_basis = [&](data::PcgVec3 value) {
+        value.x *= scale_x;
+        value.y *= scale_y;
+        value.z *= scale_z;
+        value = rot_x(value.x, value.y, value.z);
+        value = rot_y(value.x, value.y, value.z);
+        value = rot_z(value.x, value.y, value.z);
+        return value;
+    };
+    const auto x_axis = transformed_basis({1.0, 0.0, 0.0});
+    const auto y_axis = transformed_basis({0.0, 1.0, 0.0});
+    const auto z_axis = transformed_basis({0.0, 0.0, 1.0});
+    data::GeometryAffineTransform transform;
+    transform.linear = {x_axis.x, y_axis.x, z_axis.x,
+                        x_axis.y, y_axis.y, z_axis.y,
+                        x_axis.z, y_axis.z, z_axis.z};
+    transform.translation = {translate_x, translate_y, translate_z};
+    for (auto& point : out.points_mut())
+        point = data::transform_position(transform, point);
+    data::transform_geometry_attributes(out, transform);
 
     return out;
 }

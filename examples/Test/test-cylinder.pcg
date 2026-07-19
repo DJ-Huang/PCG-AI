@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "cyl",
+      "type": "CreateCylinderMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "radius": 1.0,
+        "height": 2.0,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 200 },
+      "data": { "label": "Cylinder" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "cyl", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

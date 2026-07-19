@@ -11,13 +11,14 @@ namespace DJTechRuntime.PCG
         private static readonly Dictionary<string, PcgGraphExecuteResult> s_Cache = new();
         private const int MaxEntries = 32;
 
-        public static string BuildKey(string json, int seed)
+        public static string BuildKey(string json, int seed, ulong externalInputFingerprint = 0)
         {
             if (string.IsNullOrEmpty(json))
                 return string.Empty;
 
             using var sha = SHA256.Create();
-            var bytes = Encoding.UTF8.GetBytes(json + "|" + seed);
+            var bytes = Encoding.UTF8.GetBytes(
+                json + "|" + seed + "|" + externalInputFingerprint.ToString("X16"));
             var hash = sha.ComputeHash(bytes);
             var sb = new StringBuilder(hash.Length * 2);
             foreach (var b in hash)
@@ -65,6 +66,10 @@ namespace DJTechRuntime.PCG
                 CookNodesExecuted = source.CookNodesExecuted,
                 CookNodesSkipped = source.CookNodesSkipped,
                 MeshBinary = source.MeshBinary != null ? (byte[])source.MeshBinary.Clone() : null,
+                GeometryBinary = source.GeometryBinary != null ? (byte[])source.GeometryBinary.Clone() : null,
+                HeightFieldBinary = source.HeightFieldBinary != null
+                    ? (byte[])source.HeightFieldBinary.Clone()
+                    : null,
                 PointBinary = source.PointBinary != null ? (byte[])source.PointBinary.Clone() : null,
                 Perf = ClonePerf(source.Perf),
             };

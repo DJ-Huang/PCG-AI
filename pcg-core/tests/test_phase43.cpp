@@ -335,13 +335,13 @@ int main()
 
     if (!expect_outward_normals(
             pcg::internal::elements::subdivide_mesh(
-                pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1))) {
+                pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1,
+                pcg::internal::elements::SubdivideMethod::Simple))) {
         std::printf("FAIL: subdivided mesh triangle normals point inward\n");
         return 1;
     }
 
-    const auto subdivided = pcg::internal::elements::subdivide_mesh(
-        pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0), 1);
+    const auto subdivided = pcg::internal::elements::create_box_mesh(2.0, 2.0, 2.0);
 
     const auto edge_beveled = pcg::internal::elements::bevel_mesh(
         subdivided, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
@@ -356,8 +356,7 @@ int main()
     }
 
     const auto demo_beveled = pcg::internal::elements::bevel_mesh(
-        pcg::internal::elements::subdivide_mesh(
-            pcg::internal::elements::create_box_mesh(3.0, 1.5, 2.0), 1),
+        pcg::internal::elements::create_box_mesh(3.0, 1.5, 2.0),
         0.08, 3, pcg::internal::elements::BevelMethod::Edge,
         pcg::internal::elements::BevelOffsetType::Offset, true);
     if (!expect_outward_normals(demo_beveled)) {
@@ -620,7 +619,8 @@ int main()
             cone.add_triangle(center, v1, v0);
         }
 
-        const auto cone_subdiv = pcg::internal::elements::subdivide_mesh(cone, 1);
+        const auto cone_subdiv = pcg::internal::elements::subdivide_mesh(cone, 1,
+            pcg::internal::elements::SubdivideMethod::Simple);
         const auto cone_beveled = pcg::internal::elements::bevel_mesh(
             cone_subdiv, 0.08, 3, pcg::internal::elements::BevelMethod::Edge,
             pcg::internal::elements::BevelOffsetType::Offset, true);
@@ -651,6 +651,115 @@ int main()
             }
         }
         std::printf("PASS: cone subdiv+bevel (disk cycle regression)\n");
+    }
+
+    // ── Simple subdivision on n-gon geometry (Blender parity) ──────────────
+    // Box: 8 verts, 6 quad faces, 12 edges.
+    // Simple L1: +12 edge midpoints +6 face centers = 26 verts, 6×4=24 quad faces.
+    {
+        const auto box_geo = pcg::internal::elements::create_box_geometry(2.0, 2.0, 2.0);
+        const auto subdiv = pcg::internal::elements::subdivide_geometry(
+            box_geo, 1, pcg::internal::elements::SubdivideMethod::Simple);
+
+        // 8 original + 12 edge midpoints + 6 face centers
+        if (subdiv.points().size() != 26) {
+            std::printf("FAIL: Simple subdiv L1 box expected 26 points, got %zu\n",
+                        subdiv.points().size());
+            return 1;
+        }
+        // 6 faces × 4 sub-quads = 24 faces
+        if (subdiv.faces().size() != 24) {
+            std::printf("FAIL: Simple subdiv L1 box expected 24 faces, got %zu\n",
+                        subdiv.faces().size());
+            return 1;
+        }
+        // All sub-faces should be quads
+        for (size_t i = 0; i < subdiv.faces().size(); ++i) {
+            if (subdiv.faces()[i].size() != 4) {
+                std::printf("FAIL: Simple subdiv L1 face %zu expected 4 corners, got %zu\n",
+                            i, subdiv.faces()[i].size());
+                return 1;
+            }
+        }
+        // Triangulated output should have outward normals
+        const auto tri = pcg::internal::data::triangulate_geometry_shared(subdiv);
+        if (!expect_outward_normals(tri)) {
+            std::printf("FAIL: Simple subdiv L1 geometry normals point inward\n");
+            return 1;
+        }
+        std::printf("PASS: Simple subdiv L1 on n-gon geometry (26 pts, 24 quads, outward normals)\n");
+
+        // L2: each quad face → 4 sub-quads; 24×4=96 faces
+        const auto subdiv2 = pcg::internal::elements::subdivide_geometry(
+            box_geo, 2, pcg::internal::elements::SubdivideMethod::Simple);
+        if (subdiv2.faces().size() != 96) {
+            std::printf("FAIL: Simple subdiv L2 box expected 96 faces, got %zu\n",
+                        subdiv2.faces().size());
+            return 1;
+        }
+        std::printf("PASS: Simple subdiv L2 on n-gon geometry (96 quads)\n");
+    }
+
+    // Catmull-Clark L1 must evaluate the same limit-surface samples as Blender's
+    // applied Subdivision Surface modifier. These values come from Blender 4.4.3
+    // with a 4.2 x 0.8 x 1.8 box and Level 1 Catmull-Clark subdivision.
+    {
+        const auto box_geo = pcg::internal::elements::create_box_geometry(4.2, 0.8, 1.8);
+        const auto subdiv = pcg::internal::elements::subdivide_geometry(
+            box_geo, 1, pcg::internal::elements::SubdivideMethod::CatmullClark);
+
+        if (subdiv.points().size() != 26 || subdiv.faces().size() != 24) {
+            std::printf("FAIL: Catmull-Clark L1 expected 26 points / 24 faces, got %zu / %zu\n",
+                        subdiv.points().size(), subdiv.faces().size());
+            return 1;
+        }
+
+        pcg::internal::data::PcgVec3 min = subdiv.points().front();
+        pcg::internal::data::PcgVec3 max = min;
+        for (const auto& p : subdiv.points()) {
+            min.x = std::min(min.x, p.x); min.y = std::min(min.y, p.y); min.z = std::min(min.z, p.z);
+            max.x = std::max(max.x, p.x); max.y = std::max(max.y, p.y); max.z = std::max(max.z, p.z);
+        }
+        const auto near = [](double actual, double expected) {
+            return std::abs(actual - expected) <= 2e-5;
+        };
+        if (!near(min.x, -1.7629632) || !near(max.x, 1.7629632) ||
+            !near(min.y, -0.3358025) || !near(max.y, 0.3358025) ||
+            !near(min.z, -0.7555556) || !near(max.z, 0.7555556)) {
+            std::printf("FAIL: Catmull-Clark L1 Blender AABB mismatch: "
+                        "min=(%.7f,%.7f,%.7f) max=(%.7f,%.7f,%.7f)\n",
+                        min.x, min.y, min.z, max.x, max.y, max.z);
+            return 1;
+        }
+
+        pcg::internal::geometry::BMeshBuildOptions opts;
+        opts.merge_coplanar_angle_deg = 0.0;
+        opts.sharp_angle_deg = 30.0;
+        const auto bm = pcg::internal::geometry::bmesh_from_geometry(subdiv, opts);
+        int selected_edges = 0;
+        std::unordered_map<int, int> selected_degree;
+        for (const auto& entry : bm.edges) {
+            if (!entry.second.sharp)
+                continue;
+            ++selected_edges;
+            ++selected_degree[entry.second.v0];
+            ++selected_degree[entry.second.v1];
+        }
+        std::array<int, 5> degree_hist{};
+        for (const auto& entry : selected_degree) {
+            if (entry.second >= 0 && entry.second < static_cast<int>(degree_hist.size()))
+                ++degree_hist[static_cast<size_t>(entry.second)];
+        }
+        if (selected_edges != 28 || selected_degree.size() != 24 ||
+            degree_hist[1] != 4 || degree_hist[2] != 14 ||
+            degree_hist[3] != 0 || degree_hist[4] != 6) {
+            std::printf("FAIL: Catmull-Clark L1 Blender edge selection mismatch: "
+                        "edges=%d verts=%zu degree={1:%d,2:%d,3:%d,4:%d}\n",
+                        selected_edges, selected_degree.size(), degree_hist[1], degree_hist[2],
+                        degree_hist[3], degree_hist[4]);
+            return 1;
+        }
+        std::printf("PASS: Catmull-Clark L1 matches Blender limit samples and 30-degree selection\n");
     }
 
     std::printf("PASS: phase43 mesh pipeline\n");

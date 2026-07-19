@@ -88,24 +88,32 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines)
         {
-            var validateSw = System.Diagnostics.Stopwatch.StartNew();
-            var (validateCode, error) = PcgNative.ValidateGraph(json);
-            validateSw.Stop();
-            if (validateCode != PcgResultCode.Ok)
+            return Execute(json, seed, textures, meshes, splines, null);
+        }
+
+        public static PcgGraphExecuteResult Execute(
+            string json,
+            int seed,
+            IReadOnlyList<PcgTextureUpload> textures,
+            IReadOnlyList<PcgMeshUpload> meshes,
+            IReadOnlyList<PcgSplineUpload> splines,
+            IReadOnlyList<PcgHeightFieldUpload> heightfields)
+        {
+            if (!PcgGraphExecutionPolicy.TryPrepareJson(json, out json, out var prepareError))
             {
-                Debug.LogError($"[PCG] Validation failed ({validateCode}): {error}");
+                Debug.LogError($"[PCG] Failed to prepare graph for execution: {prepareError}");
                 return null;
             }
 
-            var (execCode, result) = PcgNative.ExecuteGraph(json, seed, textures, meshes, splines);
+            // ExecuteGraph parses and validates the same document. A separate native
+            // validation call doubled JSON parsing on every cook without adding safety.
+            var (execCode, result) = PcgNative.ExecuteGraph(
+                json, seed, textures, meshes, splines, heightfields);
             if (execCode != PcgResultCode.Ok)
             {
                 Debug.LogError($"[PCG] Execution failed ({execCode}): {result?.Error}");
                 return null;
             }
-
-            if (result.Perf != null)
-                result.Perf.ValidateMs = validateSw.Elapsed.TotalMilliseconds;
 
             if (result.CookNodesSkipped > 0)
             {

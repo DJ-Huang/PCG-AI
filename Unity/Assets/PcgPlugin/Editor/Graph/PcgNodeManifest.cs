@@ -42,6 +42,22 @@ namespace DJTechEditor.PCG.Graph
         public float maximum = 1f;
         public string groupDomain;
         public bool isGroupOutput;
+        public string displayName;
+        public string section;
+        public int order;
+        public bool hasOrder;
+        public string visibleWhenProperty;
+        public string visibleWhenEquals;
+        public bool multiline;
+        public int lines = 1;
+    }
+
+    public class ManifestSectionDef
+    {
+        public string id;
+        public string label;
+        public bool foldout = true;
+        public bool defaultExpanded = true;
     }
 
     public class ManifestNodeDef
@@ -53,6 +69,7 @@ namespace DJTechEditor.PCG.Graph
         public List<ManifestPinDef> outputs = new();
         public Dictionary<string, ManifestPropertyDef> properties = new();
         public List<ManifestOutputGroupDef> outputGroups = new();
+        public List<ManifestSectionDef> inspectorSections = new();
     }
 
     /// <summary>Loads schema/node-manifest.json for manifest-driven GraphView nodes.</summary>
@@ -219,7 +236,9 @@ namespace DJTechEditor.PCG.Graph
             try
             {
                 var root = PcgMiniJson.Deserialize(json) as Dictionary<string, object>;
-                if (root?.TryGetValue("nodes", out var nodesObj) != true || nodesObj is not List<object> nodesList)
+                if (root == null ||
+                    !root.TryGetValue("nodes", out var nodesObj) ||
+                    nodesObj is not List<object> nodesList)
                 {
                     _loaded = true;
                     return;
@@ -300,6 +319,25 @@ namespace DJTechEditor.PCG.Graph
                         propDef.isGroupOutput = propObj.TryGetValue("isGroupOutput", out var groupOutVal)
                             && Convert.ToBoolean(groupOutVal, CultureInfo.InvariantCulture);
 
+                        // Optional Inspector layout metadata (opt-in; missing → legacy UI path)
+                        propDef.displayName = GetString(propObj, "displayName");
+                        propDef.section = GetString(propObj, "section");
+                        propDef.multiline = propObj.TryGetValue("multiline", out var multilineVal)
+                            && Convert.ToBoolean(multilineVal, CultureInfo.InvariantCulture);
+                        if (propObj.TryGetValue("lines", out var linesVal) && linesVal != null)
+                            propDef.lines = Math.Max(1, Convert.ToInt32(linesVal, CultureInfo.InvariantCulture));
+                        if (propObj.TryGetValue("order", out var orderVal) && orderVal != null)
+                        {
+                            propDef.hasOrder = true;
+                            propDef.order = Convert.ToInt32(orderVal, CultureInfo.InvariantCulture);
+                        }
+                        if (propObj.TryGetValue("visibleWhen", out var visibleObj) &&
+                            visibleObj is Dictionary<string, object> visibleDict)
+                        {
+                            propDef.visibleWhenProperty = GetString(visibleDict, "property");
+                            propDef.visibleWhenEquals = GetString(visibleDict, "equals");
+                        }
+
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)
                         {
@@ -316,6 +354,27 @@ namespace DJTechEditor.PCG.Graph
                         }
                         def.properties[key] = propDef;
                     }
+                }
+            }
+
+            if (nodeDict.TryGetValue("inspectorSections", out var sectionsObj) &&
+                sectionsObj is List<object> sectionsList)
+            {
+                foreach (var sectionObj in sectionsList)
+                {
+                    if (sectionObj is not Dictionary<string, object> sectionDict)
+                        continue;
+                    var section = new ManifestSectionDef
+                    {
+                        id = GetString(sectionDict, "id"),
+                        label = GetString(sectionDict, "label", GetString(sectionDict, "id")),
+                        foldout = !sectionDict.TryGetValue("foldout", out var foldoutVal)
+                                  || Convert.ToBoolean(foldoutVal, CultureInfo.InvariantCulture),
+                        defaultExpanded = !sectionDict.TryGetValue("defaultExpanded", out var expandedVal)
+                                          || Convert.ToBoolean(expandedVal, CultureInfo.InvariantCulture),
+                    };
+                    if (!string.IsNullOrEmpty(section.id))
+                        def.inspectorSections.Add(section);
                 }
             }
 

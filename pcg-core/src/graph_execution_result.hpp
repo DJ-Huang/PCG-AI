@@ -1,5 +1,7 @@
 #pragma once
 
+#include "data/pcg_geometry.hpp"
+#include "data/pcg_heightfield.hpp"
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_point_data.hpp"
 
@@ -22,6 +24,10 @@ struct GraphExecutionResult {
     std::shared_ptr<const data::PcgPointData> points;
     nlohmann::json point_sidecar;
     data::PcgMeshData spawn_mesh;
+    /// Pre-triangulation Sink geometry for optional geometry_binary export (best-effort).
+    std::shared_ptr<const data::PcgGeometry> source_geometry;
+    /// Nearest typed HeightField upstream of the Sink for host terrain adapters.
+    std::shared_ptr<const data::PcgHeightField> source_heightfield;
 };
 
 } // namespace pcg::internal

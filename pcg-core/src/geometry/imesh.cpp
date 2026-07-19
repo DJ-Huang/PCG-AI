@@ -93,7 +93,8 @@ IMesh IMesh::from_geometry(const data::PcgGeometry& geo,
         return idx;
     };
 
-    // Fan-triangulate each n-gon face
+    // Triangulate each polygon face. Concave faces require constrained
+    // triangulation so a reconstructed Boolean opening cannot be filled by a fan.
     const auto& points = geo.points();
     const auto& faces = geo.faces();
     for (int fi = 0; fi < static_cast<int>(faces.size()); ++fi) {
@@ -112,12 +113,13 @@ IMesh IMesh::from_geometry(const data::PcgGeometry& geo,
 
         if (face_verts.size() < 3) continue;
 
-        // Fan triangulate from vertex 0
-        for (size_t i = 1; i + 1 < face_verts.size(); ++i) {
+        const auto triangles =
+            data::triangulate_face_corners(points, face);
+        for (const auto& corners : triangles) {
             IMeshTri tri;
-            tri.v0 = face_verts[0];
-            tri.v1 = face_verts[i];
-            tri.v2 = face_verts[i + 1];
+            tri.v0 = face_verts[static_cast<size_t>(corners[0])];
+            tri.v1 = face_verts[static_cast<size_t>(corners[1])];
+            tri.v2 = face_verts[static_cast<size_t>(corners[2])];
             tri.source = operand_index;
             tri.orig_face = fi;
             tri.parent_tri = -1;

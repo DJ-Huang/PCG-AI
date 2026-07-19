@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -23,10 +24,18 @@ namespace DJTechRuntime.PCG
         public const uint MeshBinaryMagic = 0x4D474350u;
         public const int MeshBinaryHeaderSize = 16;
         public const int MeshBinaryV2HeaderSize = 20;
+        public const int MeshBinaryV3HeaderSize = 24;
         public const uint MeshBinaryVersion2 = 2u;
+        public const uint MeshBinaryVersion3 = 3u;
         public const uint MeshBinaryFlagHasNormals = 0x1u;
+        public const uint MeshBinaryFlagHasColors  = 0x2u;
+        public const uint MeshBinaryFlagHasUVs     = 0x4u;
+        public const uint MeshBinaryFlagHasMaterials = 0x8u;
         public const uint PointBinaryMagic = 0x50544750u;
         public const int PointBinaryHeaderSize = 16;
+        public const uint HeightFieldBinaryMagic = 0x48474350u;
+        public const uint HeightFieldBinaryVersion = 1u;
+        public const int HeightFieldBinaryHeaderSize = 72;
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern IntPtr pcg_get_version();
@@ -80,7 +89,41 @@ namespace DJTechRuntime.PCG
         public const int OutJsonBufSize = 8 * 1024 * 1024;
         public const int OutMeshBufSize = 8 * 1024 * 1024;
         public const int OutPointsBufSize = 8 * 1024 * 1024;
+        public const int OutGeometryBufSize = 8 * 1024 * 1024;
+        public const int OutHeightFieldBufSize = 8 * 1024 * 1024;
         public const int OutPerfBufSize = 64 * 1024;
+
+        private sealed class RentedOutputBuffers : IDisposable
+        {
+            public readonly byte[] Json = ArrayPool<byte>.Shared.Rent(OutJsonBufSize);
+            public readonly byte[] Mesh = ArrayPool<byte>.Shared.Rent(OutMeshBufSize);
+            public readonly byte[] Points = ArrayPool<byte>.Shared.Rent(OutPointsBufSize);
+            public readonly byte[] Geometry = ArrayPool<byte>.Shared.Rent(OutGeometryBufSize);
+            public readonly byte[] HeightField = ArrayPool<byte>.Shared.Rent(OutHeightFieldBufSize);
+            public readonly byte[] Perf = ArrayPool<byte>.Shared.Rent(OutPerfBufSize);
+
+            public RentedOutputBuffers()
+            {
+                // Pool contents are undefined. Native writers null-terminate successful
+                // payloads, while these sentinels keep early-error perf reads empty.
+                Json[0] = 0;
+                Mesh[0] = 0;
+                Points[0] = 0;
+                Geometry[0] = 0;
+                HeightField[0] = 0;
+                Perf[0] = 0;
+            }
+
+            public void Dispose()
+            {
+                ArrayPool<byte>.Shared.Return(Json);
+                ArrayPool<byte>.Shared.Return(Mesh);
+                ArrayPool<byte>.Shared.Return(Points);
+                ArrayPool<byte>.Shared.Return(Geometry);
+                ArrayPool<byte>.Shared.Return(HeightField);
+                ArrayPool<byte>.Shared.Return(Perf);
+            }
+        }
 
         public static string GetVersion()
         {
@@ -208,6 +251,144 @@ namespace DJTechRuntime.PCG
             StringBuilder errBuf,
             int errBufSize);
 
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v8(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            NativeSplineSlot[] splines,
+            int spline_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            byte[] outPointsBuf,
+            int outPointsBufSize,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
+            byte[] outGeometryBuf,
+            int outGeometryBufSize,
+            out int outGeometryBytesWritten,
+            StringBuilder errBuf,
+            int errBufSize);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct NativeHeightFieldSlot
+        {
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string slot_id;
+            public int resolution_x;
+            public int resolution_z;
+            public double size_x;
+            public double size_z;
+            public double center_x;
+            public double center_y;
+            public double center_z;
+            public int sampling;
+            public int orientation;
+            public IntPtr height;
+            public IntPtr mask;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct NativeHeightFieldSlotV10
+        {
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string slot_id;
+            public int resolution_x;
+            public int resolution_z;
+            public double size_x;
+            public double size_z;
+            public double center_x;
+            public double center_y;
+            public double center_z;
+            public int sampling;
+            public int orientation;
+            public int height_count;
+            public int mask_count;
+            public IntPtr height;
+            public IntPtr mask;
+        }
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v9(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            NativeSplineSlot[] splines,
+            int spline_count,
+            NativeHeightFieldSlot[] heightfields,
+            int heightfield_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            byte[] outPointsBuf,
+            int outPointsBufSize,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
+            byte[] outGeometryBuf,
+            int outGeometryBufSize,
+            out int outGeometryBytesWritten,
+            byte[] outHeightFieldBuf,
+            int outHeightFieldBufSize,
+            out int outHeightFieldBytesWritten,
+            StringBuilder errBuf,
+            int errBufSize);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v10(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            NativeSplineSlot[] splines,
+            int spline_count,
+            NativeHeightFieldSlotV10[] heightfields,
+            int heightfield_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            byte[] outPointsBuf,
+            int outPointsBufSize,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
+            byte[] outGeometryBuf,
+            int outGeometryBufSize,
+            out int outGeometryBytesWritten,
+            byte[] outHeightFieldBuf,
+            int outHeightFieldBufSize,
+            out int outHeightFieldBytesWritten,
+            StringBuilder errBuf,
+            int errBufSize);
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         private static extern void pcg_cook_cache_clear();
 
@@ -253,6 +434,122 @@ namespace DJTechRuntime.PCG
             public IntPtr indices;
         }
 
+        private static bool TryValidateHeightFieldUploads(
+            IReadOnlyList<PcgHeightFieldUpload> heightfields,
+            out string error)
+        {
+            error = null;
+            if (heightfields == null)
+                return true;
+
+            for (var i = 0; i < heightfields.Count; i++)
+            {
+                var upload = heightfields[i];
+                if (upload == null)
+                {
+                    error = $"HeightField upload {i} is null.";
+                    return false;
+                }
+                if (upload.ResolutionX < 2 || upload.ResolutionZ < 2)
+                {
+                    error = $"HeightField upload {i} has an invalid resolution.";
+                    return false;
+                }
+
+                int sampleCount;
+                try
+                {
+                    sampleCount = checked(upload.ResolutionX * upload.ResolutionZ);
+                }
+                catch (OverflowException)
+                {
+                    error = $"HeightField upload {i} resolution exceeds the supported sample count.";
+                    return false;
+                }
+
+                if (upload.Heights == null || upload.Heights.Length != sampleCount)
+                {
+                    error = $"HeightField upload {i} requires exactly {sampleCount} height samples.";
+                    return false;
+                }
+                if (upload.Mask != null && upload.Mask.Length != sampleCount)
+                {
+                    error = $"HeightField upload {i} requires exactly {sampleCount} mask samples when a mask is provided.";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static int ExecuteGraphNative(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            NativeMeshSlot[] meshes,
+            NativeSplineSlot[] splines,
+            NativeHeightFieldSlot[] heightfieldsV9,
+            NativeHeightFieldSlotV10[] heightfieldsV10,
+            out int outKind,
+            byte[] outJson,
+            byte[] outMeshBuf,
+            byte[] outPointsBuf,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            byte[] outGeometryBuf,
+            out int outGeometryBytesWritten,
+            byte[] outHeightFieldBuf,
+            int outHeightFieldBufSize,
+            out int outHeightFieldBytesWritten,
+            StringBuilder errBuf)
+        {
+            try
+            {
+                return pcg_execute_graph_v10(
+                    json, seed,
+                    textures, textures?.Length ?? 0,
+                    meshes, meshes?.Length ?? 0,
+                    splines, splines?.Length ?? 0,
+                    heightfieldsV10, heightfieldsV10?.Length ?? 0,
+                    out outKind,
+                    outJson, OutJsonBufSize,
+                    outMeshBuf, OutMeshBufSize,
+                    outPointsBuf, OutPointsBufSize,
+                    out outPointCount, out outPointAttrFlags,
+                    out outVertexCount, out outIndexCount,
+                    out outStats,
+                    outPerfJson, OutPerfBufSize,
+                    outGeometryBuf, OutGeometryBufSize, out outGeometryBytesWritten,
+                    outHeightFieldBuf, outHeightFieldBufSize, out outHeightFieldBytesWritten,
+                    errBuf, ErrBufSize);
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // Managed length validation makes the legacy v9 fallback safe for
+                // platforms whose bundled native plugin has not been upgraded yet.
+                return pcg_execute_graph_v9(
+                    json, seed,
+                    textures, textures?.Length ?? 0,
+                    meshes, meshes?.Length ?? 0,
+                    splines, splines?.Length ?? 0,
+                    heightfieldsV9, heightfieldsV9?.Length ?? 0,
+                    out outKind,
+                    outJson, OutJsonBufSize,
+                    outMeshBuf, OutMeshBufSize,
+                    outPointsBuf, OutPointsBufSize,
+                    out outPointCount, out outPointAttrFlags,
+                    out outVertexCount, out outIndexCount,
+                    out outStats,
+                    outPerfJson, OutPerfBufSize,
+                    outGeometryBuf, OutGeometryBufSize, out outGeometryBytesWritten,
+                    outHeightFieldBuf, outHeightFieldBufSize, out outHeightFieldBytesWritten,
+                    errBuf, ErrBufSize);
+            }
+        }
+
         public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
             string json, int seed, IReadOnlyList<PcgTextureUpload> textures)
         {
@@ -272,20 +569,44 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines)
         {
+            return ExecuteGraph(json, seed, textures, meshes, splines, null);
+        }
+
+        public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
+            string json,
+            int seed,
+            IReadOnlyList<PcgTextureUpload> textures,
+            IReadOnlyList<PcgMeshUpload> meshes,
+            IReadOnlyList<PcgSplineUpload> splines,
+            IReadOnlyList<PcgHeightFieldUpload> heightfields)
+        {
+            if (!TryValidateHeightFieldUploads(heightfields, out var heightFieldError))
+            {
+                return (PcgResultCode.InvalidArgument, new PcgGraphExecuteResult
+                {
+                    Error = heightFieldError,
+                });
+            }
+
             ClearCancel();
             var errBuf = new StringBuilder(ErrBufSize);
-            var jsonBuf = new byte[OutJsonBufSize];
-            var meshBuf = new byte[OutMeshBufSize];
-            var pointsBuf = new byte[OutPointsBufSize];
-            var perfBuf = new byte[OutPerfBufSize];
+            using var outputBuffers = new RentedOutputBuffers();
+            var jsonBuf = outputBuffers.Json;
+            var meshBuf = outputBuffers.Mesh;
+            var pointsBuf = outputBuffers.Points;
+            var geometryBuf = outputBuffers.Geometry;
+            var heightfieldBuf = outputBuffers.HeightField;
+            var perfBuf = outputBuffers.Perf;
 
             var hasTextures = textures != null && textures.Count > 0;
             var hasMeshes = meshes != null && meshes.Count > 0;
             var hasSplines = splines != null && splines.Count > 0;
+            var hasHeightFields = heightfields != null && heightfields.Count > 0;
 
             var textureHandles = new List<GCHandle>();
             var meshHandles = new List<GCHandle>();
             var splineHandles = new List<GCHandle>();
+            var heightfieldHandles = new List<GCHandle>();
             var nativeSw = System.Diagnostics.Stopwatch.StartNew();
 
             PcgResultCode rc;
@@ -294,6 +615,8 @@ namespace DJTechRuntime.PCG
             uint pointAttrFlags;
             int vertexCount;
             int indexCount;
+            int geometryBytesWritten;
+            int heightfieldBytesWritten;
             NativeCookStats cookStats;
 
             try
@@ -363,31 +686,114 @@ namespace DJTechRuntime.PCG
                     }
                 }
 
-                rc = (PcgResultCode)pcg_execute_graph_v7(
-                    json,
-                    seed,
-                    nativeTextures,
-                    nativeTextures?.Length ?? 0,
-                    nativeMeshes,
-                    nativeMeshes?.Length ?? 0,
-                    nativeSplines,
-                    nativeSplines?.Length ?? 0,
+                NativeHeightFieldSlot[] nativeHeightFields = null;
+                NativeHeightFieldSlotV10[] nativeHeightFieldsV10 = null;
+                if (hasHeightFields)
+                {
+                    nativeHeightFields = new NativeHeightFieldSlot[heightfields.Count];
+                    nativeHeightFieldsV10 = new NativeHeightFieldSlotV10[heightfields.Count];
+                    for (var i = 0; i < heightfields.Count; i++)
+                    {
+                        var upload = heightfields[i];
+                        var heightPin = GCHandle.Alloc(upload.Heights, GCHandleType.Pinned);
+                        heightfieldHandles.Add(heightPin);
+                        var maskPointer = IntPtr.Zero;
+                        if (upload.Mask != null && upload.Mask.Length > 0)
+                        {
+                            var maskPin = GCHandle.Alloc(upload.Mask, GCHandleType.Pinned);
+                            heightfieldHandles.Add(maskPin);
+                            maskPointer = maskPin.AddrOfPinnedObject();
+                        }
+                        nativeHeightFields[i] = new NativeHeightFieldSlot
+                        {
+                            slot_id = upload.SlotId,
+                            resolution_x = upload.ResolutionX,
+                            resolution_z = upload.ResolutionZ,
+                            size_x = upload.SizeX,
+                            size_z = upload.SizeZ,
+                            center_x = upload.CenterX,
+                            center_y = upload.CenterY,
+                            center_z = upload.CenterZ,
+                            sampling = upload.Sampling,
+                            orientation = upload.Orientation,
+                            height = heightPin.AddrOfPinnedObject(),
+                            mask = maskPointer,
+                        };
+                        nativeHeightFieldsV10[i] = new NativeHeightFieldSlotV10
+                        {
+                            slot_id = upload.SlotId,
+                            resolution_x = upload.ResolutionX,
+                            resolution_z = upload.ResolutionZ,
+                            size_x = upload.SizeX,
+                            size_z = upload.SizeZ,
+                            center_x = upload.CenterX,
+                            center_y = upload.CenterY,
+                            center_z = upload.CenterZ,
+                            sampling = upload.Sampling,
+                            orientation = upload.Orientation,
+                            height_count = upload.Heights.Length,
+                            mask_count = upload.Mask?.Length ?? 0,
+                            height = heightPin.AddrOfPinnedObject(),
+                            mask = maskPointer,
+                        };
+                    }
+                }
+
+                rc = (PcgResultCode)ExecuteGraphNative(
+                    json, seed,
+                    nativeTextures, nativeMeshes, nativeSplines,
+                    nativeHeightFields, nativeHeightFieldsV10,
                     out kind,
                     jsonBuf,
-                    jsonBuf.Length,
                     meshBuf,
-                    meshBuf.Length,
                     pointsBuf,
-                    pointsBuf.Length,
                     out pointCount,
                     out pointAttrFlags,
                     out vertexCount,
                     out indexCount,
                     out cookStats,
                     perfBuf,
-                    perfBuf.Length,
-                    errBuf,
-                    ErrBufSize);
+                    geometryBuf,
+                    out geometryBytesWritten,
+                    heightfieldBuf,
+                    heightfieldBuf.Length,
+                    out heightfieldBytesWritten,
+                    errBuf);
+
+                if (rc == PcgResultCode.Ok &&
+                    heightfieldBytesWritten > heightfieldBuf.Length)
+                {
+                    var primaryCookStats = cookStats;
+                    var primaryPerf = new byte[OutPerfBufSize];
+                    Buffer.BlockCopy(perfBuf, 0, primaryPerf, 0, primaryPerf.Length);
+                    heightfieldBuf = new byte[heightfieldBytesWritten];
+
+                    rc = (PcgResultCode)ExecuteGraphNative(
+                        json, seed,
+                        nativeTextures, nativeMeshes, nativeSplines,
+                        nativeHeightFields, nativeHeightFieldsV10,
+                        out kind,
+                        jsonBuf,
+                        meshBuf,
+                        pointsBuf,
+                        out pointCount,
+                        out pointAttrFlags,
+                        out vertexCount,
+                        out indexCount,
+                        out cookStats,
+                        perfBuf,
+                        geometryBuf,
+                        out geometryBytesWritten,
+                        heightfieldBuf,
+                        heightfieldBuf.Length,
+                        out heightfieldBytesWritten,
+                        errBuf);
+
+                    // The retry is transport recovery; report the primary cook's
+                    // executed/skipped nodes and per-node timings to callers.
+                    cookStats = primaryCookStats;
+                    Buffer.BlockCopy(primaryPerf, 0, perfBuf, 0, primaryPerf.Length);
+                }
             }
             finally
             {
@@ -396,6 +802,8 @@ namespace DJTechRuntime.PCG
                 foreach (var handle in meshHandles)
                     handle.Free();
                 foreach (var handle in splineHandles)
+                    handle.Free();
+                foreach (var handle in heightfieldHandles)
                     handle.Free();
             }
 
@@ -413,12 +821,25 @@ namespace DJTechRuntime.PCG
                 });
             }
 
+#if UNITY_EDITOR
+            if (geometryBytesWritten <= 0 && kind == (int)PcgExecuteKind.Mesh && vertexCount > 0)
+            {
+                Debug.Log(
+                    $"[PcgNative] Mesh cook geometry_bytes=0 (verts={vertexCount}, idx={indexCount}, " +
+                    $"previewSink={(json != null && json.Contains("__pcg_preview_sink__"))}).");
+            }
+#endif
+
             return BuildSuccessResult(
                 rc,
                 (PcgExecuteKind)kind,
                 jsonBuf,
                 meshBuf,
                 pointsBuf,
+                geometryBuf,
+                geometryBytesWritten,
+                heightfieldBuf,
+                heightfieldBytesWritten,
                 pointCount,
                 pointAttrFlags,
                 vertexCount,
@@ -442,12 +863,51 @@ namespace DJTechRuntime.PCG
             };
         }
 
+        /// <summary>
+        /// Computes the actual byte size of a mesh binary payload by reading
+        /// the version/flags header. Used by both Mesh and Points(spawnMesh) paths.
+        /// </summary>
+        private static int ComputeMeshBinaryPayloadSize(byte[] meshBuf, int vertexCount, int indexCount)
+        {
+            int headerSize = MeshBinaryHeaderSize;
+            int normalSize = 0;
+            int colorSize = 0;
+            int uvSize = 0;
+            int materialSize = 0;
+
+            if (meshBuf.Length >= MeshBinaryV2HeaderSize)
+            {
+                var version = BitConverter.ToUInt32(meshBuf, 4);
+                if (version == MeshBinaryVersion2 || version == MeshBinaryVersion3)
+                {
+                    headerSize = version == MeshBinaryVersion3
+                        ? MeshBinaryV3HeaderSize
+                        : MeshBinaryV2HeaderSize;
+                    var flags = BitConverter.ToUInt32(meshBuf, 16);
+                    if ((flags & MeshBinaryFlagHasNormals) != 0)
+                        normalSize = vertexCount * 12;
+                    if ((flags & MeshBinaryFlagHasColors) != 0)
+                        colorSize = vertexCount * 16;
+                    if ((flags & MeshBinaryFlagHasUVs) != 0)
+                        uvSize = vertexCount * 8;
+                    if (version == MeshBinaryVersion3)
+                        materialSize = BitConverter.ToInt32(meshBuf, 20);
+                }
+            }
+
+            return headerSize + vertexCount * 12 + indexCount * 4 + normalSize + colorSize + uvSize + materialSize;
+        }
+
         private static (PcgResultCode code, PcgGraphExecuteResult result) BuildSuccessResult(
             PcgResultCode rc,
             PcgExecuteKind executeKind,
             byte[] jsonBuf,
             byte[] meshBuf,
             byte[] pointsBuf,
+            byte[] geometryBuf,
+            int geometryBytesWritten,
+            byte[] heightfieldBuf,
+            int heightfieldBytesWritten,
             int pointCount,
             uint pointAttrFlags,
             int vertexCount,
@@ -457,30 +917,39 @@ namespace DJTechRuntime.PCG
         {
             var copySw = System.Diagnostics.Stopwatch.StartNew();
             PcgGraphExecuteResult result;
+            byte[] geometryBinary = null;
+            if (geometryBytesWritten > 0)
+            {
+                if (geometryBuf != null && geometryBytesWritten <= geometryBuf.Length)
+                {
+                    geometryBinary = new byte[geometryBytesWritten];
+                    Buffer.BlockCopy(geometryBuf, 0, geometryBinary, 0, geometryBytesWritten);
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"[PcgNative] Ignoring invalid geometryBytesWritten={geometryBytesWritten} (bufferLength={geometryBuf?.Length ?? 0})");
+                }
+            }
+            byte[] heightfieldBinary = null;
+            if (heightfieldBytesWritten > 0 && heightfieldBuf != null &&
+                heightfieldBytesWritten <= heightfieldBuf.Length)
+            {
+                heightfieldBinary = new byte[heightfieldBytesWritten];
+                Buffer.BlockCopy(heightfieldBuf, 0, heightfieldBinary, 0, heightfieldBytesWritten);
+            }
 
             if (executeKind == PcgExecuteKind.Mesh)
             {
-                // Determine actual payload size from the binary's version/flags header.
-                int headerSize = MeshBinaryHeaderSize;
-                int normalSize = 0;
-                if (meshBuf.Length >= MeshBinaryV2HeaderSize)
-                {
-                    var version = BitConverter.ToUInt32(meshBuf, 4);
-                    if (version == MeshBinaryVersion2)
-                    {
-                        headerSize = MeshBinaryV2HeaderSize;
-                        var flags = BitConverter.ToUInt32(meshBuf, 16);
-                        if ((flags & MeshBinaryFlagHasNormals) != 0)
-                            normalSize = vertexCount * 12;
-                    }
-                }
-                var required = headerSize + vertexCount * 12 + indexCount * 4 + normalSize;
+                var required = ComputeMeshBinaryPayloadSize(meshBuf, vertexCount, indexCount);
                 var meshBinary = new byte[required];
                 Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, required);
                 result = new PcgGraphExecuteResult
                 {
                     Kind = executeKind,
                     MeshBinary = meshBinary,
+                    GeometryBinary = geometryBinary,
+                    HeightFieldBinary = heightfieldBinary,
                     Json = ReadNullTerminatedUtf8(jsonBuf),
                     VertexCount = vertexCount,
                     IndexCount = indexCount,
@@ -508,20 +977,7 @@ namespace DJTechRuntime.PCG
                 byte[] meshBinary = null;
                 if (vertexCount > 0 && indexCount > 0)
                 {
-                    int meshHdr = MeshBinaryHeaderSize;
-                    int meshNorm = 0;
-                    if (meshBuf.Length >= MeshBinaryV2HeaderSize)
-                    {
-                        var mv = BitConverter.ToUInt32(meshBuf, 4);
-                        if (mv == MeshBinaryVersion2)
-                        {
-                            meshHdr = MeshBinaryV2HeaderSize;
-                            var mf = BitConverter.ToUInt32(meshBuf, 16);
-                            if ((mf & MeshBinaryFlagHasNormals) != 0)
-                                meshNorm = vertexCount * 12;
-                        }
-                    }
-                    var meshRequired = meshHdr + vertexCount * 12 + indexCount * 4 + meshNorm;
+                    var meshRequired = ComputeMeshBinaryPayloadSize(meshBuf, vertexCount, indexCount);
                     meshBinary = new byte[meshRequired];
                     Buffer.BlockCopy(meshBuf, 0, meshBinary, 0, meshRequired);
                 }
@@ -533,6 +989,8 @@ namespace DJTechRuntime.PCG
                     PointCount = pointCount,
                     PointAttrFlags = pointAttrFlags,
                     MeshBinary = meshBinary,
+                    GeometryBinary = geometryBinary,
+                    HeightFieldBinary = heightfieldBinary,
                     VertexCount = vertexCount,
                     IndexCount = indexCount,
                     Json = ReadNullTerminatedUtf8(jsonBuf),
@@ -548,6 +1006,8 @@ namespace DJTechRuntime.PCG
                 {
                     Kind = executeKind,
                     Json = Encoding.UTF8.GetString(jsonBuf, 0, length),
+                    GeometryBinary = geometryBinary,
+                    HeightFieldBinary = heightfieldBinary,
                     CookNodesExecuted = cookStats.nodes_executed,
                     CookNodesSkipped = cookStats.nodes_skipped,
                 };
@@ -577,6 +1037,7 @@ namespace DJTechRuntime.PCG
         CycleDetected = 2,
         UnknownNode = 3,
         Execution = 4,
+        InvalidArgument = 5,
     }
 
     public enum PcgExecuteKind
@@ -603,6 +1064,8 @@ namespace DJTechRuntime.PCG
         public PcgExecuteKind Kind = PcgExecuteKind.None;
         public string Json;
         public byte[] MeshBinary;
+        public byte[] GeometryBinary;
+        public byte[] HeightFieldBinary;
         public byte[] PointBinary;
         public int PointCount;
         public uint PointAttrFlags;

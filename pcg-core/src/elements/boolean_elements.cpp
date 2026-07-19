@@ -73,8 +73,7 @@ public:
         if (result.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BooleanMesh produced empty result");
 
-        // Triangulate and emit as mesh (consistent with BevelMeshElement)
-        emit_mesh(ctx, data::triangulate_geometry(result));
+        emit_geometry(ctx, std::move(result));
         return PCG_OK;
     }
 };

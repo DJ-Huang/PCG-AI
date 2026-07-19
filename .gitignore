@@ -1,13 +1,5 @@
 # >>> Codely setup.bat (synced rules — do not commit) >>>
 # Source: Codely main repo sync/ + CODELY.md — re-run setup.bat to refresh
-.codely-cli/
-.codely-cli/rules/
-.codely/
-.cursor/rules/
-.trae/rules/
-.trae/user_rules/
-AGENTS.md
-CODELY.md
 Unity/.vs/
 Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgGraphNodeBase.cs
 Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgManifestNodeView.cs
@@ -46,9 +38,20 @@ pcg-core/.deps/
 pcg-core/build-debug/
 pcg-core/build-manual/
 pcg-core/build/
+pcg-fbx-exporter/build*/
 schema/graph-schema.json
 web/pcg-editor/dist/
 web/pcg-editor/node_modules/
+tools/artstation-capture/node_modules/
+tools/artstation-capture/out/
+tools/artstation-capture/.browser-profile/
+artstation-capture-out/
+webpage-capture-out/
 # <<< Codely setup.bat >>>
-.codely-cli/
 *.DS_Store
+.codely/clipboard/
+.codely-cli/auto-saves/
+.codely-cli/tool-outputs/
+.opencode/node_modules/
+.codely-cli/settings.json
+Plan/

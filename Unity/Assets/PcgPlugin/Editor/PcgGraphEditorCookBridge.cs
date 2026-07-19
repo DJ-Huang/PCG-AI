@@ -21,10 +21,29 @@ namespace DJTechEditor.PCG
             EditorApplication.QueuePlayerLoopUpdate();
         }
 
+        public static void CancelPreviewCooksForWindow(PcgGraphEditorWindow window)
+        {
+            foreach (var component in ComponentsForWindow(window))
+            {
+                component.CancelAsyncCookForPreviewSwitch();
+                // Node Preview of a mask/HF node keeps LastCookedHeightField for the red
+                // Scene tint. Leaving preview must drop that surface immediately; the
+                // following full-graph cook restores the final HeightField if needed.
+                component.ClearHeightFieldOverlayForPreviewSwitch();
+            }
+        }
+
         public static void NotifyGraphChanged(PcgGraphEditorWindow window, bool immediate = false)
         {
+            foreach (var component in ComponentsForWindow(window))
+                component.RequestPreviewCook(immediate);
+        }
+
+        private static System.Collections.Generic.IEnumerable<PcgGraphComponent> ComponentsForWindow(
+            PcgGraphEditorWindow window)
+        {
             if (window == null || !window.HasLoadedGraph)
-                return;
+                yield break;
 
             var assetPath = window.CurrentAssetPath;
             var assetGuid = window.selectedGuid;
@@ -43,7 +62,7 @@ namespace DJTechEditor.PCG
                 if (!component.SupportsEditModePreview())
                     continue;
 
-                component.RequestPreviewCook(immediate);
+                yield return component;
             }
         }
 

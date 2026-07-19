@@ -47,7 +47,7 @@ struct IMesh {
     double quantize_scale = 1e6; ///< Scale used for quantization (set by from_geometry)
 
     /// Build IMesh from canonical geometry.
-    /// Fan-triangulates n-gons, welds vertices, applies transform, quantizes.
+    /// Triangulates polygons, welds vertices, applies transform, and quantizes.
     static IMesh from_geometry(const data::PcgGeometry& geo,
                                int operand_index,
                                const Mat4& xform,

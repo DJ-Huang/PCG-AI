@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "profile",
+      "type": "CreateSpline",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "mode": "line",
+        "closed": false,
+        "subdivisions": 1,
+        "startX": 1.0,
+        "startY": -1.0,
+        "startZ": 0.0,
+        "endX": 1.0,
+        "endY": 1.0,
+        "endZ": 0.0,
+        "editPlane": "none"
+      }
+    },
+    {
+      "id": "revolve",
+      "type": "RevolveMesh",
+      "position": { "x": 0, "y": 200 },
+      "data": {
+        "axis": "y",
+        "segments": 16,
+        "closeProfile": false,
+        "capStart": true,
+        "capEnd": true
+      }
+    },
+    {
+      "id": "bevel",
+      "type": "BevelMesh",
+      "position": { "x": 0, "y": 400 },
+      "data": {
+        "method": "edge",
+        "amount": 0.1,
+        "segments": 2
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 600 },
+      "data": { "label": "Revolve Bevel" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "profile", "target": "revolve", "sourceHandle": "out", "targetHandle": "profile" },
+    { "id": "e2", "source": "revolve", "target": "bevel", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3", "source": "bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

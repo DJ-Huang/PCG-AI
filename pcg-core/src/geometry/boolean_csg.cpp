@@ -1,6 +1,7 @@
 // Blender-aligned boolean CSG implementation.
 
 #include "geometry/boolean_csg.hpp"
+#include "geometry/bvh.hpp"
 #include "geometry/robust_predicates.hpp"
 #include "geometry/group_table.hpp"
 
@@ -15,6 +16,12 @@
 namespace pcg::internal::geometry {
 
 namespace {
+
+int64_t face_origin_key(int source, int original_face)
+{
+    return (static_cast<int64_t>(source) << 32) |
+           static_cast<uint32_t>(original_face);
+}
 
 Vec3 tri_normal(const IMesh& mesh, int t)
 {
@@ -262,14 +269,14 @@ int resolve_cell(const CellsInfo& cinfo, int c)
     return c;
 }
 
-struct AABB {
+struct PatchAABB {
     Vec3 min{1e30, 1e30, 1e30};
     Vec3 max{-1e30, -1e30, -1e30};
     void expand(const Vec3& p) {
         min.x = std::min(min.x, p.x); min.y = std::min(min.y, p.y); min.z = std::min(min.z, p.z);
         max.x = std::max(max.x, p.x); max.y = std::max(max.y, p.y); max.z = std::max(max.z, p.z);
     }
-    bool contains(const AABB& o) const {
+    bool contains(const PatchAABB& o) const {
         return min.x <= o.min.x && min.y <= o.min.y && min.z <= o.min.z &&
                max.x >= o.max.x && max.y >= o.max.y && max.z >= o.max.z;
     }
@@ -278,9 +285,9 @@ struct AABB {
     }
 };
 
-AABB patch_aabb(const IMesh& mesh, const PatchesInfo& pinfo, int p)
+PatchAABB patch_aabb(const IMesh& mesh, const PatchesInfo& pinfo, int p)
 {
-    AABB bb;
+    PatchAABB bb;
     for (int t : pinfo.patch(p).tris) {
         const IMeshTri& tri = mesh.tris[static_cast<size_t>(t)];
         bb.expand(mesh.verts[tri.v0].co);
@@ -358,7 +365,7 @@ std::vector<std::vector<int>> find_patch_components(const CellsInfo& cinfo, cons
 }
 
 int ambient_cell_for_component(const IMesh& mesh, const PatchesInfo& pinfo,
-                               const std::vector<int>& patch_ids, const AABB& bb,
+                               const std::vector<int>& patch_ids, const PatchAABB& bb,
                                bool nested)
 {
     if (patch_ids.empty()) return kNoIndex;
@@ -419,11 +426,11 @@ void finish_patch_cell_graph(const IMesh& mesh, CellsInfo& cinfo, PatchesInfo& p
     if (components.size() <= 1) return;
 
     std::vector<int> ambient_cell(components.size(), kNoIndex);
-    std::vector<AABB> comp_bb(components.size());
+    std::vector<PatchAABB> comp_bb(components.size());
     std::vector<bool> nested_comp(components.size(), false);
     for (size_t ci = 0; ci < components.size(); ++ci) {
         for (int p : components[ci]) {
-            AABB pb = patch_aabb(mesh, pinfo, p);
+            PatchAABB pb = patch_aabb(mesh, pinfo, p);
             comp_bb[ci].expand(pb.min);
             comp_bb[ci].expand(pb.max);
         }
@@ -480,7 +487,7 @@ void finish_patch_cell_graph(const IMesh& mesh, CellsInfo& cinfo, PatchesInfo& p
                 for (int raw : {patch.cell_above, patch.cell_below}) {
                     int c = resolve_cell(cinfo, raw);
                     if (c < 0 || c == ambient_cell[static_cast<size_t>(best_outer)]) continue;
-                    AABB pb = patch_aabb(mesh, pinfo, p);
+                    PatchAABB pb = patch_aabb(mesh, pinfo, p);
                     Vec3 pc = pb.center();
                     double d2 = (pc.x - center.x) * (pc.x - center.x) +
                                   (pc.y - center.y) * (pc.y - center.y) +
@@ -732,7 +739,8 @@ void propagate_windings(const IMesh& mesh, CellsInfo& cinfo, PatchesInfo& pinfo,
 }
 
 data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo& pinfo,
-                                           const CellsInfo& cinfo, BooleanOp op)
+                                           const CellsInfo& cinfo, BooleanOp op,
+                                           std::vector<BooleanFaceOrigin>* face_origins)
 {
     data::PcgGeometry out;
     std::unordered_map<int, int> vert_map;
@@ -747,12 +755,15 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
         return ni;
     };
 
-    auto emit_tri = [&](int v0, int v1, int v2, int source, int w_a, int w_b, bool is_seam) {
+    auto emit_tri = [&](int v0, int v1, int v2, int source, int original_face,
+                        int w_a, int w_b, bool is_seam) {
         int ov0 = get_vert(v0);
         int ov1 = get_vert(v1);
         int ov2 = get_vert(v2);
         out.faces_mut().push_back({ov0, ov1, ov2});
         const int face_idx = static_cast<int>(out.faces().size()) - 1;
+        if (face_origins)
+            face_origins->push_back({source, original_face, false});
 
         if (source == 0) {
             if (w_b > 0)
@@ -767,14 +778,15 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
         }
         if (is_seam) {
             int64_t ek = edge_key(ov0, ov1);
-            out.groups().add(geometry::GroupDomain::Edge, BooleanGroups::AB_SEAMS, static_cast<int>(ek));
+            out.groups().add(geometry::GroupDomain::Edge, BooleanGroups::AB_SEAMS, ek);
         }
     };
 
     if (op == BooleanOp::Shatter) {
         for (int t = 0; t < static_cast<int>(mesh.tris.size()); ++t) {
             const IMeshTri& tri = mesh.tris[t];
-            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, 0, 0, tri.split_by_seam);
+            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, tri.orig_face,
+                     0, 0, tri.split_by_seam);
         }
         return out;
     }
@@ -824,9 +836,11 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
         }
 
         if (flip) {
-            emit_tri(tri.v0, tri.v2, tri.v1, tri.source, w_a, w_b, is_seam);
+            emit_tri(tri.v0, tri.v2, tri.v1, tri.source, tri.orig_face,
+                     w_a, w_b, is_seam);
         } else {
-            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, w_a, w_b, is_seam);
+            emit_tri(tri.v0, tri.v1, tri.v2, tri.source, tri.orig_face,
+                     w_a, w_b, is_seam);
         }
     }
 
@@ -835,45 +849,71 @@ data::PcgGeometry extract_boolean_geometry(const IMesh& mesh, const PatchesInfo&
 
 namespace {
 
-double source_winding_number(const IMesh& mesh, int source, const Vec3& point)
+bool ray_hits_triangle(const IMesh& mesh, int tri_index, const Vec3& origin,
+                       const Vec3& direction, double& out_t)
 {
-    constexpr double kFourPi = 12.56637061435917295385;
-    double solid_angle = 0.0;
-    for (const IMeshTri& tri : mesh.tris) {
-        if (tri.source != source) continue;
-        const Vec3 pa{
-            mesh.verts[tri.v0].co.x - point.x,
-            mesh.verts[tri.v0].co.y - point.y,
-            mesh.verts[tri.v0].co.z - point.z};
-        const Vec3 pb{
-            mesh.verts[tri.v1].co.x - point.x,
-            mesh.verts[tri.v1].co.y - point.y,
-            mesh.verts[tri.v1].co.z - point.z};
-        const Vec3 pc{
-            mesh.verts[tri.v2].co.x - point.x,
-            mesh.verts[tri.v2].co.y - point.y,
-            mesh.verts[tri.v2].co.z - point.z};
-        const double la = std::sqrt(pa.x * pa.x + pa.y * pa.y + pa.z * pa.z);
-        const double lb = std::sqrt(pb.x * pb.x + pb.y * pb.y + pb.z * pb.z);
-        const double lc = std::sqrt(pc.x * pc.x + pc.y * pc.y + pc.z * pc.z);
-        const Vec3 cross{
-            pb.y * pc.z - pb.z * pc.y,
-            pb.z * pc.x - pb.x * pc.z,
-            pb.x * pc.y - pb.y * pc.x};
-        const double numerator = pa.x * cross.x + pa.y * cross.y + pa.z * cross.z;
-        const double denominator =
-            la * lb * lc +
-            (pa.x * pb.x + pa.y * pb.y + pa.z * pb.z) * lc +
-            (pb.x * pc.x + pb.y * pc.y + pb.z * pc.z) * la +
-            (pc.x * pa.x + pc.y * pa.y + pc.z * pa.z) * lb;
-        solid_angle += 2.0 * std::atan2(numerator, denominator);
-    }
-    return solid_angle / kFourPi;
+    const IMeshTri& tri = mesh.tris[static_cast<size_t>(tri_index)];
+    const Vec3& a = mesh.verts[tri.v0].co;
+    const Vec3& b = mesh.verts[tri.v1].co;
+    const Vec3& c = mesh.verts[tri.v2].co;
+    const Vec3 edge_ab{b.x - a.x, b.y - a.y, b.z - a.z};
+    const Vec3 edge_ac{c.x - a.x, c.y - a.y, c.z - a.z};
+    const Vec3 pvec{
+        direction.y * edge_ac.z - direction.z * edge_ac.y,
+        direction.z * edge_ac.x - direction.x * edge_ac.z,
+        direction.x * edge_ac.y - direction.y * edge_ac.x};
+    const double determinant =
+        edge_ab.x * pvec.x + edge_ab.y * pvec.y + edge_ab.z * pvec.z;
+    if (std::fabs(determinant) <= 1e-14) return false;
+    const double inv_determinant = 1.0 / determinant;
+    const Vec3 tvec{origin.x - a.x, origin.y - a.y, origin.z - a.z};
+    const double u =
+        (tvec.x * pvec.x + tvec.y * pvec.y + tvec.z * pvec.z) * inv_determinant;
+    if (u < -1e-12 || u > 1.0 + 1e-12) return false;
+    const Vec3 qvec{
+        tvec.y * edge_ab.z - tvec.z * edge_ab.y,
+        tvec.z * edge_ab.x - tvec.x * edge_ab.z,
+        tvec.x * edge_ab.y - tvec.y * edge_ab.x};
+    const double v =
+        (direction.x * qvec.x + direction.y * qvec.y + direction.z * qvec.z) *
+        inv_determinant;
+    if (v < -1e-12 || u + v > 1.0 + 1e-12) return false;
+    out_t =
+        (edge_ac.x * qvec.x + edge_ac.y * qvec.y + edge_ac.z * qvec.z) *
+        inv_determinant;
+    return out_t > 1e-12;
 }
 
-bool point_inside_source(const IMesh& mesh, int source, const Vec3& point)
+bool point_inside_source(const IMesh& mesh, const BVH& bvh, const Vec3& point)
 {
-    return std::fabs(source_winding_number(mesh, source, point)) > 0.5;
+    static const Vec3 kDirections[] = {
+        {1.0, 0.3713906763541037, 0.6947465906068658},
+        {0.5270462766947299, 1.0, 0.3183098861837907},
+        {0.4142135623730950, 0.6180339887498948, 1.0},
+    };
+    int inside_votes = 0;
+    for (const Vec3& direction : kDirections) {
+        std::vector<double> hits;
+        const auto candidates = bvh.query_ray(point, direction);
+        hits.reserve(candidates.size());
+        for (int tri_index : candidates) {
+            double t = 0.0;
+            if (ray_hits_triangle(mesh, tri_index, point, direction, t))
+                hits.push_back(t);
+        }
+        std::sort(hits.begin(), hits.end());
+        int unique_hits = 0;
+        double previous = -std::numeric_limits<double>::infinity();
+        for (double t : hits) {
+            const double tolerance = 1e-10 * std::max(1.0, std::fabs(t));
+            if (unique_hits == 0 || std::fabs(t - previous) > tolerance) {
+                ++unique_hits;
+                previous = t;
+            }
+        }
+        if ((unique_hits & 1) != 0) ++inside_votes;
+    }
+    return inside_votes >= 2;
 }
 
 bool output_contains(BooleanOp op, bool in_a, bool in_b)
@@ -887,7 +927,9 @@ bool output_contains(BooleanOp op, bool in_a, bool in_b)
     return false;
 }
 
-data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
+data::PcgGeometry extract_sampled_boundary(
+    const IMesh& mesh, BooleanOp op,
+    std::vector<BooleanFaceOrigin>* face_origins)
 {
     data::PcgGeometry out;
     std::unordered_map<int, int> vert_map;
@@ -896,6 +938,21 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
     for (const IntersectEdgeRecord& seam : mesh.seam_edges) {
         seam_edges.insert(seam.edge_key);
     }
+
+    std::vector<BVHTriangle> source_triangles[2];
+    for (int tri_index = 0; tri_index < static_cast<int>(mesh.tris.size()); ++tri_index) {
+        const IMeshTri& tri = mesh.tris[static_cast<size_t>(tri_index)];
+        if (tri.source < 0 || tri.source > 1) continue;
+        BVHTriangle item;
+        item.tri_index = tri_index;
+        item.bounds.expand(mesh.verts[tri.v0].co);
+        item.bounds.expand(mesh.verts[tri.v1].co);
+        item.bounds.expand(mesh.verts[tri.v2].co);
+        source_triangles[tri.source].push_back(std::move(item));
+    }
+    BVH source_bvh[2];
+    source_bvh[0].build(source_triangles[0]);
+    source_bvh[1].build(source_triangles[1]);
 
     double max_abs = 1.0;
     for (const IMeshVert& v : mesh.verts) {
@@ -941,10 +998,10 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
             centroid.y - normal.y * offset,
             centroid.z - normal.z * offset};
 
-        const bool above_a = point_inside_source(mesh, 0, above);
-        const bool above_b = point_inside_source(mesh, 1, above);
-        const bool below_a = point_inside_source(mesh, 0, below);
-        const bool below_b = point_inside_source(mesh, 1, below);
+        const bool above_a = point_inside_source(mesh, source_bvh[0], above);
+        const bool above_b = point_inside_source(mesh, source_bvh[1], above);
+        const bool below_a = point_inside_source(mesh, source_bvh[0], below);
+        const bool below_b = point_inside_source(mesh, source_bvh[1], below);
         const bool output_above = output_contains(op, above_a, above_b);
         const bool output_below = output_contains(op, below_a, below_b);
         if (output_above == output_below) continue;
@@ -963,6 +1020,8 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
         const int ov2 = get_vert(source_vertices[2]);
         out.faces_mut().push_back({ov0, ov1, ov2});
         const int face_index = static_cast<int>(out.faces().size()) - 1;
+        if (face_origins)
+            face_origins->push_back({tri.source, tri.orig_face, false});
 
         if (tri.source == 0) {
             out.groups().add(
@@ -982,9 +1041,9 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
                 out.groups().add(
                     geometry::GroupDomain::Edge,
                     BooleanGroups::AB_SEAMS,
-                    static_cast<int>(edge_key(
+                    edge_key(
                         edge == 0 ? ov0 : (edge == 1 ? ov1 : ov2),
-                        edge == 0 ? ov1 : (edge == 1 ? ov2 : ov0))));
+                        edge == 0 ? ov1 : (edge == 1 ? ov2 : ov0)));
             }
         }
     }
@@ -993,10 +1052,30 @@ data::PcgGeometry extract_sampled_boundary(const IMesh& mesh, BooleanOp op)
 
 } // anonymous namespace
 
-data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op)
+data::PcgGeometry classify_and_extract(
+    const IMesh& combined, BooleanOp op,
+    std::vector<BooleanFaceOrigin>* face_origins)
 {
+    if (face_origins)
+        face_origins->clear();
+
+    auto finalize_origins = [&]() {
+        if (!face_origins) return;
+        std::unordered_set<int64_t> changed_origins;
+        for (const IMeshTri& tri : combined.tris) {
+            if (tri.split_by_seam && tri.source >= 0 && tri.orig_face >= 0)
+                changed_origins.insert(face_origin_key(tri.source, tri.orig_face));
+        }
+        for (BooleanFaceOrigin& origin : *face_origins) {
+            origin.changed = origin.source < 0 || origin.original_face < 0 ||
+                changed_origins.count(face_origin_key(origin.source, origin.original_face)) != 0;
+        }
+    };
+
     if (op != BooleanOp::Shatter) {
-        return extract_sampled_boundary(combined, op);
+        data::PcgGeometry out = extract_sampled_boundary(combined, op, face_origins);
+        finalize_origins();
+        return out;
     }
 
     MeshTriTopology topo(combined);
@@ -1011,10 +1090,10 @@ data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op)
     std::vector<int> shape_ambient(static_cast<size_t>(nshapes), kNoIndex);
     {
         auto components = find_patch_components(cinfo, pinfo);
-        std::vector<AABB> comp_bb(components.size());
+        std::vector<PatchAABB> comp_bb(components.size());
         for (size_t ci = 0; ci < components.size(); ++ci) {
             for (int p : components[ci]) {
-                AABB pb = patch_aabb(combined, pinfo, p);
+                PatchAABB pb = patch_aabb(combined, pinfo, p);
                 comp_bb[ci].expand(pb.min);
                 comp_bb[ci].expand(pb.max);
             }
@@ -1054,7 +1133,10 @@ data::PcgGeometry classify_and_extract(const IMesh& combined, BooleanOp op)
 
     propagate_windings(combined, cinfo, pinfo, ambient, op, nshapes, shape_fn, shape_ambient);
 
-    return extract_boolean_geometry(combined, pinfo, cinfo, op);
+    data::PcgGeometry out =
+        extract_boolean_geometry(combined, pinfo, cinfo, op, face_origins);
+    finalize_origins();
+    return out;
 }
 
 } // namespace pcg::internal::geometry

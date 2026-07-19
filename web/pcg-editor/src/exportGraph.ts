@@ -1,17 +1,30 @@
-// exportGraph.ts — Convert React Flow nodes/edges/parameters to Graph JSON v1.
+// exportGraph.ts — Convert React Flow state to Graph JSON v1/v2.
 
 import type { Node, Edge } from '@xyflow/react';
-import type { GraphJson, GraphNode, GraphEdge, NodeData, GraphParameter } from './graphSchema';
+import type {
+  GraphJson,
+  GraphNode,
+  GraphEdge,
+  NodeData,
+  GraphParameter,
+  GraphSubgraph,
+} from './graphSchema';
 
 /**
- * Converts React Flow internal nodes/edges to Graph JSON v1 (with parameters).
+ * Converts React Flow state to Graph JSON, selecting v2 when subgraphs are present.
  */
-export function exportGraph(nodes: Node[], edges: Edge[], parameters: GraphParameter[] = []): GraphJson {
+export function exportGraph(
+  nodes: Node[],
+  edges: Edge[],
+  parameters: GraphParameter[] = [],
+  subgraphs: GraphSubgraph[] = [],
+): GraphJson {
   return {
-    version: '1.0',
+    version: subgraphs.length > 0 ? '2.0' : '1.0',
     nodes: nodes.map(toGraphNode),
     edges: edges.map(toGraphEdge),
     parameters,
+    subgraphs,
   };
 }
 
@@ -25,12 +38,15 @@ function toGraphNode(node: Node): GraphNode {
 }
 
 function toGraphEdge(edge: Edge): GraphEdge {
+  const typedData = edge.data as { sourcePinType?: unknown; targetPinType?: unknown } | undefined;
   return {
     id: edge.id,
     source: edge.source,
     target: edge.target,
     sourceHandle: edge.sourceHandle ?? undefined,
     targetHandle: edge.targetHandle ?? undefined,
+    sourcePinType: typeof typedData?.sourcePinType === 'string' ? typedData.sourcePinType : undefined,
+    targetPinType: typeof typedData?.targetPinType === 'string' ? typedData.targetPinType : undefined,
   };
 }
 

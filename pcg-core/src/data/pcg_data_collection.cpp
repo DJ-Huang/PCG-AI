@@ -131,6 +131,29 @@ void PcgDataCollection::add_geometry_shared(const std::string& tag,
     items_.push_back(std::move(item));
 }
 
+void PcgDataCollection::add_heightfield(const std::string& tag, PcgHeightField data)
+{
+    PcgTaggedData item;
+    item.tag = tag;
+    item.type = PcgDataType::HeightField;
+    item.heightfield = std::make_shared<PcgHeightField>(std::move(data));
+    items_.push_back(std::move(item));
+}
+
+void PcgDataCollection::add_heightfield_shared(
+    const std::string& tag,
+    std::shared_ptr<const PcgHeightField> heightfield)
+{
+    if (!heightfield)
+        return;
+
+    PcgTaggedData item;
+    item.tag = tag;
+    item.type = PcgDataType::HeightField;
+    item.heightfield = std::move(heightfield);
+    items_.push_back(std::move(item));
+}
+
 const PcgTaggedData* PcgDataCollection::find(const std::string& tag) const
 {
     for (const auto& item : items_) {
@@ -144,6 +167,7 @@ const nlohmann::json* PcgDataCollection::find_json(const std::string& tag) const
 {
     const PcgTaggedData* item = find(tag);
     if (!item || item->type == PcgDataType::Mesh || item->type == PcgDataType::Geometry ||
+        item->type == PcgDataType::HeightField ||
         item->points || item->splines)
         return nullptr;
     return &item->payload;
@@ -202,6 +226,21 @@ std::shared_ptr<const PcgGeometry> PcgDataCollection::find_geometry_shared(
     return item->geometry;
 }
 
+const PcgHeightField* PcgDataCollection::find_heightfield(const std::string& tag) const
+{
+    const auto shared = find_heightfield_shared(tag);
+    return shared ? shared.get() : nullptr;
+}
+
+std::shared_ptr<const PcgHeightField> PcgDataCollection::find_heightfield_shared(
+    const std::string& tag) const
+{
+    const PcgTaggedData* item = find(tag);
+    if (!item || item->type != PcgDataType::HeightField || !item->heightfield)
+        return nullptr;
+    return item->heightfield;
+}
+
 nlohmann::json PcgDataCollection::build_point_sink_json(const PcgTaggedData& item)
 {
     nlohmann::json out = item.points->to_json();
@@ -222,7 +261,9 @@ nlohmann::json PcgDataCollection::primary_json() const
             return build_point_sink_json(*preferred);
         if (preferred->splines)
             return preferred->splines->to_json();
-        if (preferred->type != PcgDataType::Mesh)
+        if (preferred->type != PcgDataType::Mesh &&
+            preferred->type != PcgDataType::Geometry &&
+            preferred->type != PcgDataType::HeightField)
             return preferred->payload;
     }
 
@@ -231,7 +272,9 @@ nlohmann::json PcgDataCollection::primary_json() const
             return build_point_sink_json(item);
         if (item.splines)
             return item.splines->to_json();
-        if (item.type != PcgDataType::Mesh)
+        if (item.type != PcgDataType::Mesh &&
+            item.type != PcgDataType::Geometry &&
+            item.type != PcgDataType::HeightField)
             return item.payload;
     }
 
@@ -279,6 +322,25 @@ std::shared_ptr<const PcgGeometry> PcgDataCollection::primary_geometry_shared() 
             return item.geometry;
     }
 
+    return nullptr;
+}
+
+const PcgHeightField* PcgDataCollection::primary_heightfield() const
+{
+    const auto shared = primary_heightfield_shared();
+    return shared ? shared.get() : nullptr;
+}
+
+std::shared_ptr<const PcgHeightField> PcgDataCollection::primary_heightfield_shared() const
+{
+    const PcgTaggedData* preferred = find("out");
+    if (preferred && preferred->type == PcgDataType::HeightField && preferred->heightfield)
+        return preferred->heightfield;
+
+    for (const auto& item : items_) {
+        if (item.type == PcgDataType::HeightField && item.heightfield)
+            return item.heightfield;
+    }
     return nullptr;
 }
 

@@ -2,6 +2,9 @@
 // classification, island union-find, and render mesh + normal generation.
 #include "data/pcg_geometry.hpp"
 #include "data/pcg_mesh_binary.hpp"
+#include "data/pcg_geometry_binary.hpp"
+#include "elements/material_algorithms.hpp"
+#include "cook_hash.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -316,6 +319,281 @@ int main()
         PcgMeshData m100 = compute_split_normals(cube2, {ShadeMode::Auto, 100.0, true});
         expect(m30.vertices().size() != m100.vertices().size(),
                "hash: different cusp → different vertex count");
+    }
+
+    // --- Test 17: Colors-only binary round-trip ---
+    {
+        PcgGeometry tri = make_triangle();
+        PcgMeshData mesh = triangulate_geometry_shared(tri);
+        std::vector<PcgColor> colors{
+            {1.0, 0.0, 0.0, 1.0},
+            {0.0, 1.0, 0.0, 0.5},
+            {0.0, 0.0, 1.0, 0.0},
+        };
+        mesh.set_colors(colors);
+        expect(mesh.has_colors(), "colors-only: has colors");
+        expect(!mesh.has_normals(), "colors-only: no normals");
+        expect(!mesh.has_uvs(), "colors-only: no uvs");
+
+        int size = mesh_binary_size(mesh);
+        std::vector<uint8_t> buf(static_cast<size_t>(size));
+        bool ok = write_mesh_binary(mesh, buf.data(), size);
+        expect(ok, "colors-only: write");
+
+        PcgMeshData restored;
+        ok = read_mesh_binary(buf.data(), size, restored);
+        expect(ok, "colors-only: read");
+        expect(restored.has_colors(), "colors-only: restored has colors");
+        expect(!restored.has_normals(), "colors-only: restored no normals");
+        expect(!restored.has_uvs(), "colors-only: restored no uvs");
+        if (restored.has_colors() && restored.colors().size() == 3) {
+            expect(std::abs(restored.colors()[0].r - 1.0) < 1e-5, "colors-only: r0");
+            expect(std::abs(restored.colors()[1].a - 0.5) < 1e-5, "colors-only: a1");
+            expect(std::abs(restored.colors()[2].b - 1.0) < 1e-5, "colors-only: b2");
+        }
+    }
+
+    // --- Test 18: UVs-only binary round-trip ---
+    {
+        PcgGeometry tri = make_triangle();
+        PcgMeshData mesh = triangulate_geometry_shared(tri);
+        std::vector<PcgVec2> uvs{
+            {0.0, 0.0},
+            {1.0, 0.0},
+            {0.5, 1.0},
+        };
+        mesh.set_uvs(uvs);
+        expect(mesh.has_uvs(), "uvs-only: has uvs");
+        expect(!mesh.has_normals(), "uvs-only: no normals");
+        expect(!mesh.has_colors(), "uvs-only: no colors");
+
+        int size = mesh_binary_size(mesh);
+        std::vector<uint8_t> buf(static_cast<size_t>(size));
+        bool ok = write_mesh_binary(mesh, buf.data(), size);
+        expect(ok, "uvs-only: write");
+
+        PcgMeshData restored;
+        ok = read_mesh_binary(buf.data(), size, restored);
+        expect(ok, "uvs-only: read");
+        expect(restored.has_uvs(), "uvs-only: restored has uvs");
+        expect(!restored.has_normals(), "uvs-only: restored no normals");
+        expect(!restored.has_colors(), "uvs-only: restored no colors");
+        if (restored.has_uvs() && restored.uvs().size() == 3) {
+            expect(std::abs(restored.uvs()[1].u - 1.0) < 1e-5, "uvs-only: u1");
+            expect(std::abs(restored.uvs()[2].v - 1.0) < 1e-5, "uvs-only: v2");
+        }
+    }
+
+    // --- Test 19: Combined normals + colors + uvs binary round-trip ---
+    {
+        PcgGeometry cube = make_cube();
+        PcgMeshData mesh = compute_split_normals(cube, {ShadeMode::Auto, 30.0, true});
+        int vc = static_cast<int>(mesh.vertices().size());
+        std::vector<PcgColor> colors(vc, {0.5, 0.25, 0.75, 0.8});
+        std::vector<PcgVec2> uvs(vc, {0.1, 0.2});
+        mesh.set_colors(colors);
+        mesh.set_uvs(uvs);
+        expect(mesh.has_normals() && mesh.has_colors() && mesh.has_uvs(),
+               "combined: all flags set");
+
+        int size = mesh_binary_size(mesh);
+        std::vector<uint8_t> buf(static_cast<size_t>(size));
+        bool ok = write_mesh_binary(mesh, buf.data(), size);
+        expect(ok, "combined: write");
+
+        PcgMeshData restored;
+        ok = read_mesh_binary(buf.data(), size, restored);
+        expect(ok, "combined: read");
+        expect(restored.has_normals(), "combined: restored has normals");
+        expect(restored.has_colors(), "combined: restored has colors");
+        expect(restored.has_uvs(), "combined: restored has uvs");
+        expect(restored.vertices().size() == mesh.vertices().size(),
+               "combined: vertex count matches");
+        expect(restored.colors().size() == mesh.colors().size(),
+               "combined: color count matches");
+        expect(restored.uvs().size() == mesh.uvs().size(),
+               "combined: uv count matches");
+    }
+
+    // --- Test 20: Wrong-size colors/uv setter does not set flag ---
+    {
+        PcgGeometry tri = make_triangle();
+        PcgMeshData mesh = triangulate_geometry_shared(tri);
+        // 2 colors for 3 vertices → should be rejected
+        std::vector<PcgColor> bad_colors{{1, 0, 0, 1}, {0, 1, 0, 1}};
+        mesh.set_colors(bad_colors);
+        expect(!mesh.has_colors(), "wrong-size colors: flag not set");
+
+        // 5 uvs for 3 vertices → should be rejected
+        std::vector<PcgVec2> bad_uvs(5);
+        mesh.set_uvs(bad_uvs);
+        expect(!mesh.has_uvs(), "wrong-size uvs: flag not set");
+    }
+
+    // --- Test 21: Truncated colors binary rejected ---
+    {
+        PcgGeometry tri = make_triangle();
+        PcgMeshData mesh = triangulate_geometry_shared(tri);
+        mesh.set_colors(std::vector<PcgColor>{
+            {1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}});
+
+        int size = mesh_binary_size(mesh);
+        // Truncate by 1 byte
+        std::vector<uint8_t> buf(static_cast<size_t>(size - 1));
+        bool ok = write_mesh_binary(mesh, buf.data(), size - 1);
+        expect(!ok, "truncated colors: write rejected (buffer too small)");
+
+        // Write full then truncate read buffer
+        buf.resize(static_cast<size_t>(size));
+        write_mesh_binary(mesh, buf.data(), size);
+        PcgMeshData restored;
+        ok = read_mesh_binary(buf.data(), size - 1, restored);
+        expect(!ok, "truncated colors: read rejected");
+    }
+
+    // --- Test 22: Hash changes with colors ---
+    {
+        PcgGeometry tri = make_triangle();
+        PcgMeshData base = triangulate_geometry_shared(tri);
+        PcgMeshData with_colors = triangulate_geometry_shared(tri);
+        with_colors.set_colors(std::vector<PcgColor>{
+            {1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}});
+
+        uint64_t h1 = pcg::internal::hash_mesh(base);
+        uint64_t h2 = pcg::internal::hash_mesh(with_colors);
+        expect(h1 != h2, "hash: colors change hash");
+    }
+
+    // --- Test 23: Hash changes with uvs ---
+    {
+        PcgGeometry tri = make_triangle();
+        PcgMeshData base = triangulate_geometry_shared(tri);
+        PcgMeshData with_uvs = triangulate_geometry_shared(tri);
+        with_uvs.set_uvs(std::vector<PcgVec2>{
+            {0, 0}, {1, 0}, {0.5, 1}});
+
+        uint64_t h1 = pcg::internal::hash_mesh(base);
+        uint64_t h2 = pcg::internal::hash_mesh(with_uvs);
+        expect(h1 != h2, "hash: uvs change hash");
+    }
+
+    // --- Test 24: Worst-case sizing API sufficient ---
+    {
+        PcgGeometry cube = make_cube();
+        PcgMeshData mesh = compute_split_normals(cube, {ShadeMode::Auto, 30.0, true});
+        int vc = static_cast<int>(mesh.vertices().size());
+        int ic = static_cast<int>(mesh.triangles().size());
+        mesh.set_colors(std::vector<PcgColor>(vc, {1, 1, 1, 1}));
+        mesh.set_uvs(std::vector<PcgVec2>(vc, {0, 0}));
+
+        int actual = mesh_binary_size(mesh);
+        // Worst-case API should be >= actual for any combination of flags
+        // pcg_mesh_binary_size_for_counts is a C API; test via mesh_binary_size
+        // which returns exact size. The worst-case is header + pos + idx + all optional blocks.
+        int worst_case = kPcgMeshBinaryV2HeaderSize +
+                         vc * 3 * static_cast<int>(sizeof(float)) +
+                         ic * static_cast<int>(sizeof(uint32_t)) +
+                         vc * 3 * static_cast<int>(sizeof(float)) +  // normals
+                         vc * 4 * static_cast<int>(sizeof(float)) +  // colors
+                         vc * 2 * static_cast<int>(sizeof(float));   // uvs
+        expect(worst_case >= actual, "sizing: worst-case >= actual (all flags)");
+        expect(worst_case == actual, "sizing: worst-case == actual (all flags set)");
+    }
+
+    // --- Test 25: Houdini-style face group material assignment survives Sink + binary ---
+    {
+        PcgGeometry cube = make_cube();
+        cube.groups().add(GroupDomain::Face, "windows", 1);
+        cube.groups().add(GroupDomain::Face, "windows", 3);
+        pcg::internal::elements::assign_material(cube, "body", {});
+        pcg::internal::elements::assign_material(cube, "glass", {"windows"});
+
+        expect(cube.has_face_materials(), "materials: geometry has per-face channel");
+        expect(cube.face_materials()[0] == "body", "materials: unmatched face keeps body");
+        expect(cube.face_materials()[1] == "glass", "materials: group face gets glass");
+
+        PcgMeshData mesh = compute_split_normals(cube, {ShadeMode::Auto, 30.0, true});
+        expect(mesh.has_materials(), "materials: sink mesh has material table");
+        expect(mesh.material_slots().size() == 2, "materials: sink mesh has two slots");
+        int glass_triangles = 0;
+        for (uint32_t slot : mesh.triangle_materials()) {
+            if (mesh.material_slots()[slot] == "glass")
+                ++glass_triangles;
+        }
+        expect(glass_triangles == 4, "materials: two quad faces expand to four glass triangles");
+
+        std::vector<uint8_t> mesh_bytes(static_cast<size_t>(mesh_binary_size(mesh)));
+        expect(write_mesh_binary(mesh, mesh_bytes.data(), static_cast<int>(mesh_bytes.size())),
+               "materials: mesh binary v3 writes");
+        PcgMeshData restored_mesh;
+        expect(read_mesh_binary(mesh_bytes.data(), static_cast<int>(mesh_bytes.size()), restored_mesh),
+               "materials: mesh binary v3 reads");
+        expect(restored_mesh.material_slots() == mesh.material_slots(),
+               "materials: mesh slots round-trip");
+        expect(restored_mesh.triangle_materials() == mesh.triangle_materials(),
+               "materials: triangle slots round-trip");
+
+        std::vector<uint8_t> geometry_bytes(static_cast<size_t>(geometry_binary_size(cube)));
+        expect(write_geometry_binary(cube, geometry_bytes.data(), static_cast<int>(geometry_bytes.size())),
+               "materials: geometry binary writes face materials");
+        PcgGeometry restored_geometry;
+        expect(read_geometry_binary(geometry_bytes.data(), static_cast<int>(geometry_bytes.size()),
+                                    restored_geometry),
+               "materials: geometry binary reads face materials");
+        expect(restored_geometry.face_materials() == cube.face_materials(),
+               "materials: geometry face materials round-trip");
+    }
+
+    // --- Test 26: Corner UV domain — Sink prefers vertex UV; binary round-trips ---
+    {
+        PcgGeometry cube = make_cube();
+        std::vector<PcgVec2> point_uvs(cube.points().size(), PcgVec2{0.25, 0.25});
+        cube.set_uvs(point_uvs);
+
+        std::vector<PcgVec2> corner_uvs;
+        corner_uvs.reserve(static_cast<size_t>(cube.corner_count()));
+        for (size_t fi = 0; fi < cube.faces().size(); ++fi) {
+            for (size_t ci = 0; ci < cube.faces()[fi].size(); ++ci)
+                corner_uvs.push_back(PcgVec2{static_cast<double>(fi) * 0.1,
+                                             static_cast<double>(ci) * 0.1});
+        }
+        cube.set_corner_uvs(corner_uvs);
+        expect(cube.has_corner_uvs(), "corner-uv: flag set");
+        expect(static_cast<int>(cube.corner_uvs().size()) == cube.corner_count(),
+               "corner-uv: size matches corner count");
+
+        PcgMeshData mesh = compute_split_normals(cube, {ShadeMode::Flat, 30.0, true});
+        expect(mesh.has_uvs(), "corner-uv: sink mesh has uvs");
+        expect(mesh.uvs().size() == mesh.vertices().size(),
+               "corner-uv: sink uv count matches vertices");
+        // Flat cube: 24 render verts; first face corners should carry face0 UV pattern
+        bool found_corner_uv = false;
+        for (const auto& uv : mesh.uvs()) {
+            if (std::abs(uv.u) < 1e-9 && std::abs(uv.v) < 1e-9)
+                found_corner_uv = true;
+        }
+        expect(found_corner_uv, "corner-uv: sink uses corner values (not only point 0.25)");
+
+        std::vector<uint8_t> geometry_bytes(static_cast<size_t>(geometry_binary_size(cube)));
+        expect(write_geometry_binary(cube, geometry_bytes.data(),
+                                     static_cast<int>(geometry_bytes.size())),
+               "corner-uv: geometry binary writes");
+        PcgGeometry restored;
+        expect(read_geometry_binary(geometry_bytes.data(),
+                                    static_cast<int>(geometry_bytes.size()), restored),
+               "corner-uv: geometry binary reads");
+        expect(restored.has_corner_uvs(), "corner-uv: restored has corner uvs");
+        expect(restored.corner_uvs().size() == cube.corner_uvs().size(),
+               "corner-uv: corner count round-trips");
+        if (restored.corner_uvs().size() == cube.corner_uvs().size()) {
+            bool match = true;
+            for (size_t i = 0; i < cube.corner_uvs().size(); ++i) {
+                if (std::abs(restored.corner_uvs()[i].u - cube.corner_uvs()[i].u) > 1e-5 ||
+                    std::abs(restored.corner_uvs()[i].v - cube.corner_uvs()[i].v) > 1e-5)
+                    match = false;
+            }
+            expect(match, "corner-uv: corner values round-trip");
+        }
     }
 
     if (g_fail > 0) {

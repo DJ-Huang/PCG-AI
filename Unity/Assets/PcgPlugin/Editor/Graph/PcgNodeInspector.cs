@@ -25,6 +25,8 @@ namespace DJTechEditor.PCG.Graph
         private ScrollView m_Body;
         private PcgGraphNodeBase m_CurrentNode;
         private bool m_IsRebuilding;
+        // Foldout state keyed by "nodeId|sectionId" — survives Inspector rebuild within session.
+        private static readonly Dictionary<string, bool> s_SectionExpanded = new();
 
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
         {
@@ -149,14 +151,15 @@ namespace DJTechEditor.PCG.Graph
                     },
                 });
 
-                if (node is PcgManifestNodeView createSplineNode && createSplineNode.NodeType == "CreateSpline")
+                if (node is PcgManifestNodeView createSplineNode &&
+                    (createSplineNode.NodeType == "CreateSpline" || createSplineNode.NodeType == "CreateBezierSpline"))
                 {
                     if (ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
                     {
                         var data = createSplineNode.CollectData();
                         var editPlane = data?.GetRaw("editPlane")?.ToString() ?? "none";
                         var hint = editPlane != "none"
-                            ? $"Scene View: click point to select, drag tangent handles (green), I/Del insert/delete, Ctrl+click segment (locked to {editPlane.ToUpperInvariant()})."
+                            ? $"Scene View: click point to select, drag tangent handles (green), I/Del insert/delete, Ctrl+click segment (edit plane {editPlane.ToUpperInvariant()}, locked axis keeps its value)."
                             : "Scene View: click point to select, drag tangent handles (green), I insert, Del delete, Ctrl+click segment to insert.";
                         m_Body.Add(new Label(hint)
                         {
@@ -230,7 +233,11 @@ namespace DJTechEditor.PCG.Graph
                 }
 
                 if (node is PcgManifestNodeView manifestNode)
+                {
                     ShowManifestProperties(manifestNode);
+                    if (manifestNode.NodeType == "ExportFBX")
+                        m_Body.Add(CreateFbxExportActions(manifestNode));
+                }
             }
             finally
             {
@@ -248,7 +255,13 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            // Split properties into group-related and regular
+            if (def.inspectorSections != null && def.inspectorSections.Count > 0)
+            {
+                ShowSectionedManifestProperties(node, def);
+                return;
+            }
+
+            // Legacy path: Groups then Parameters; no layout metadata required.
             var groupProps = new List<(string key, ManifestPropertyDef prop)>();
             var regularProps = new List<(string key, ManifestPropertyDef prop)>();
             foreach (var (key, prop) in def.properties)
@@ -259,7 +272,6 @@ namespace DJTechEditor.PCG.Graph
                     regularProps.Add((key, prop));
             }
 
-            // Groups section
             if (groupProps.Count > 0)
             {
                 AddSectionHeader("Groups");
@@ -287,11 +299,99 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
 
-            // Parameters section
             if (groupProps.Count > 0 && regularProps.Count > 0)
                 AddSectionHeader("Parameters");
             foreach (var (key, prop) in regularProps)
                 m_Body.Add(CreatePropertyRow(node, key, prop));
+        }
+
+        private void ShowSectionedManifestProperties(PcgManifestNodeView node, ManifestNodeDef def)
+        {
+            var props = def.properties
+                .Select(kv => (key: kv.Key, prop: kv.Value))
+                .OrderBy(p => p.prop.hasOrder ? p.prop.order : int.MaxValue)
+                .ThenBy(p => p.key)
+                .ToList();
+
+            // Sticky top: properties without a section (e.g. Houdini-style Group).
+            var topProps = props.Where(p => string.IsNullOrEmpty(p.prop.section)).ToList();
+            foreach (var (key, prop) in topProps)
+            {
+                if (!IsPropertyVisible(node, prop))
+                    continue;
+                m_Body.Add(CreatePropertyRow(node, key, prop, rebuildOnChange: IsVisibilityDriver(def, key)));
+            }
+
+            if (topProps.Any(p => p.prop.type is "groupSelect" or "groupMultiSelect"))
+            {
+                var available = ResolveUpstreamGroups(node.NodeId);
+                if (available.Count > 0)
+                {
+                    m_Body.Add(new Label($"{available.Count} group{(available.Count != 1 ? "s" : "")} available from upstream")
+                    {
+                        style = { color = new Color(0.4f, 0.66f, 0.4f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4 },
+                    });
+                }
+            }
+
+            foreach (var section in def.inspectorSections)
+            {
+                var sectionProps = props
+                    .Where(p => p.prop.section == section.id && IsPropertyVisible(node, p.prop))
+                    .ToList();
+                if (sectionProps.Count == 0)
+                    continue;
+
+                VisualElement container = m_Body;
+                if (section.foldout)
+                {
+                    var foldoutKey = $"{node.NodeId}|{section.id}";
+                    if (!s_SectionExpanded.TryGetValue(foldoutKey, out var expanded))
+                        expanded = section.defaultExpanded;
+
+                    var foldout = new Foldout
+                    {
+                        text = string.IsNullOrEmpty(section.label) ? section.id : section.label,
+                        value = expanded,
+                    };
+                    foldout.style.marginTop = 4;
+                    foldout.RegisterValueChangedCallback(evt => s_SectionExpanded[foldoutKey] = evt.newValue);
+                    m_Body.Add(foldout);
+                    container = foldout;
+                }
+
+                foreach (var (key, prop) in sectionProps)
+                    container.Add(CreatePropertyRow(node, key, prop, rebuildOnChange: IsVisibilityDriver(def, key)));
+            }
+        }
+
+        private static bool IsVisibilityDriver(ManifestNodeDef def, string key) =>
+            def.properties.Values.Any(p =>
+                !string.IsNullOrEmpty(p.visibleWhenProperty) && p.visibleWhenProperty == key);
+
+        private static bool IsPropertyVisible(PcgManifestNodeView node, ManifestPropertyDef prop)
+        {
+            if (string.IsNullOrEmpty(prop.visibleWhenProperty))
+                return true;
+
+            var current = node.CollectData().GetRaw(prop.visibleWhenProperty)?.ToString();
+            if (string.IsNullOrEmpty(current) &&
+                PcgNodeManifest.TryGet(node.NodeType, out var def) &&
+                def.properties.TryGetValue(prop.visibleWhenProperty, out var driver))
+            {
+                current = driver.defaultValue?.ToString() ?? "";
+            }
+
+            return string.Equals(current ?? "", prop.visibleWhenEquals ?? "", StringComparison.Ordinal);
+        }
+
+        private void ScheduleInspectorRebuild(PcgManifestNodeView node)
+        {
+            schedule.Execute(() =>
+            {
+                if (m_CurrentNode == node)
+                    ShowNode(node);
+            }).ExecuteLater(1);
         }
 
         private void AddSectionHeader(string title)
@@ -313,7 +413,12 @@ namespace DJTechEditor.PCG.Graph
             });
         }
 
-        private VisualElement CreatePropertyRow(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
+        /// <summary>
+        /// Two-row layout matching other nodes: header (label + promote + bind), then full-width value.
+        /// Sectioned Inspectors also use this path so sliders/enums are not crushed beside decorate controls.
+        /// </summary>
+        private VisualElement CreatePropertyRow(
+            PcgManifestNodeView node, string key, ManifestPropertyDef prop, bool rebuildOnChange = false)
         {
             var container = new VisualElement
             {
@@ -323,6 +428,16 @@ namespace DJTechEditor.PCG.Graph
                     flexShrink = 0,
                 },
             };
+
+            Action<object> setValueOverride = null;
+            if (rebuildOnChange)
+            {
+                setValueOverride = v =>
+                {
+                    node.SetPropertyValue(key, v);
+                    ScheduleInspectorRebuild(node);
+                };
+            }
 
             // Row 1: label + promote button + bind dropdown
             var headerRow = new VisualElement
@@ -334,7 +449,7 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
 
-            var label = new Label(key)
+            var label = new Label(string.IsNullOrEmpty(prop.displayName) ? key : prop.displayName)
             {
                 style =
                 {
@@ -384,20 +499,32 @@ namespace DJTechEditor.PCG.Graph
                 if (container.childCount > 1)
                     container.RemoveAt(container.childCount - 1);
                 var binding = m_Blackboard.FindBinding(node.NodeId, key);
-                container.Add(CreateValueField(key, prop, node, binding));
+                container.Add(CreateValueField(key, prop, node, binding, setValueOverride));
             });
             headerRow.Add(bindPopup);
             container.Add(headerRow);
 
-            // Row 2: value or bound label
-            var binding = m_Blackboard.FindBinding(node.NodeId, key);
-            container.Add(CreateValueField(key, prop, node, binding));
+            // Row 2: value or bound label (full width — not crushed beside + / bind)
+            var currentBindingForValue = m_Blackboard.FindBinding(node.NodeId, key);
+            container.Add(CreateValueField(key, prop, node, currentBindingForValue, setValueOverride));
             return container;
         }
 
-        private VisualElement CreateValueField(string key, ManifestPropertyDef prop, PcgManifestNodeView node, PcgGraphParameter binding)
+        private VisualElement CreateValueField(
+            string key,
+            ManifestPropertyDef prop,
+            PcgManifestNodeView node,
+            PcgGraphParameter binding,
+            Action<object> setValueOverride = null)
         {
             var wrapper = new VisualElement { style = { marginTop = 2 } };
+            Action<object> apply = v =>
+            {
+                if (setValueOverride != null)
+                    setValueOverride(v);
+                else
+                    node.SetPropertyValue(key, v);
+            };
 
             if (binding != null)
             {
@@ -457,9 +584,9 @@ namespace DJTechEditor.PCG.Graph
                     newValue =>
                     {
                         if (isInteger)
-                            node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
+                            apply(Mathf.RoundToInt(newValue));
                         else
-                            node.SetPropertyValue(key, newValue);
+                            apply(newValue);
                         NotifyGraphChanged();
                     },
                     onDragBegin: () => m_GraphView.BeginDrag("Change Property"),
@@ -473,9 +600,9 @@ namespace DJTechEditor.PCG.Graph
                         m_GraphView.WithUndo("Change Property", () =>
                         {
                             if (isInteger)
-                                node.SetPropertyValue(key, Mathf.RoundToInt(newValue));
+                                apply(Mathf.RoundToInt(newValue));
                             else
-                                node.SetPropertyValue(key, newValue);
+                                apply(newValue);
                         });
                         NotifyGraphChanged();
                     }));
@@ -484,14 +611,14 @@ namespace DJTechEditor.PCG.Graph
 
             VisualElement field = prop.type switch
             {
-                "integer" => MakeIntField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "number" => MakeFloatField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "boolean" => MakeToggleField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "enum" => MakeEnumField(key, prop, currentVal, v => node.SetPropertyValue(key, v)),
-                "texture2d" => MakeTextureField(key, currentVal, v => node.SetPropertyValue(key, v)),
-                "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => node.SetPropertyValue(key, v)),
-                "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => node.SetPropertyValue(key, v)),
-                _ => MakeTextField(key, currentVal, v => node.SetPropertyValue(key, v)),
+                "integer" => MakeIntField(key, currentVal, v => apply(v)),
+                "number" => MakeFloatField(key, currentVal, v => apply(v)),
+                "boolean" => MakeToggleField(key, currentVal, v => apply(v)),
+                "enum" => MakeEnumField(key, prop, currentVal, v => apply(v)),
+                "texture2d" => MakeTextureField(key, currentVal, v => apply(v)),
+                "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => apply(v)),
+                "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => apply(v)),
+                _ => MakeTextField(key, prop, currentVal, v => apply(v)),
             };
             wrapper.Add(field);
             return wrapper;
@@ -637,6 +764,63 @@ namespace DJTechEditor.PCG.Graph
 
         private void NotifyGraphChanged() => m_GraphView?.NotifyDocumentChanged();
 
+        private VisualElement CreateFbxExportActions(PcgManifestNodeView node)
+        {
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 8,
+                    paddingTop = 8,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.3f, 0.3f, 0.3f),
+                },
+            };
+
+            var browse = new Button(() =>
+            {
+                var current = node.CollectData().GetRaw("path")?.ToString();
+                var selected = PcgFbxExportController.BrowseForPath(current);
+                if (string.IsNullOrEmpty(selected))
+                    return;
+                m_GraphView.WithUndo("Choose FBX Export Path", () =>
+                    node.SetPropertyValue("path", selected));
+                NotifyGraphChanged();
+                ShowNode(node);
+            })
+            {
+                text = "Browse…",
+                tooltip = "Choose an FBX file. Project-relative paths remain portable.",
+            };
+            container.Add(browse);
+
+            var export = new Button(() =>
+            {
+                if (m_GraphView.HostWindow is PcgGraphEditorWindow window)
+                    PcgFbxExportController.Export(window, node);
+            })
+            {
+                text = "Export Now",
+                tooltip = "Cook this node's upstream geometry and write the FBX once.",
+            };
+            export.style.height = 28;
+            export.style.marginTop = 5;
+            export.style.unityFontStyleAndWeight = FontStyle.Bold;
+            container.Add(export);
+
+            container.Add(new Label("Editor-only ROP: preview and automatic cooks never write this file.")
+            {
+                style =
+                {
+                    color = new Color(0.55f, 0.7f, 0.55f),
+                    fontSize = 9,
+                    marginTop = 4,
+                    whiteSpace = WhiteSpace.Normal,
+                },
+            });
+            return container;
+        }
+
         private (List<string> options, List<string> paramIds, int currentIdx) BuildBindOptions(
             string nodeId, string propertyKey, string propType)
         {
@@ -683,7 +867,10 @@ namespace DJTechEditor.PCG.Graph
         {
             var field = new IntegerField { value = Convert.ToInt32(val ?? 0, CultureInfo.InvariantCulture) };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -691,7 +878,10 @@ namespace DJTechEditor.PCG.Graph
         {
             var field = new FloatField { value = Convert.ToSingle(val ?? 0f, CultureInfo.InvariantCulture) };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -705,7 +895,10 @@ namespace DJTechEditor.PCG.Graph
             };
             var field = new Toggle { value = b };
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -739,6 +932,7 @@ namespace DJTechEditor.PCG.Graph
                     if (idx >= 0 && idx < values.Count)
                         onSet(values[idx]);
                 });
+                NotifyGraphChanged();
             });
             return popup;
         }
@@ -770,11 +964,24 @@ namespace DJTechEditor.PCG.Graph
             return field;
         }
 
-        private TextField MakeTextField(string key, object val, Action<string> onSet)
+        private TextField MakeTextField(
+            string key, ManifestPropertyDef prop, object val, Action<string> onSet)
         {
-            var field = new TextField { value = val?.ToString() ?? "" };
+            var field = new TextField
+            {
+                value = val?.ToString() ?? "",
+                multiline = prop.multiline,
+            };
+            if (prop.multiline)
+            {
+                field.style.minHeight = Math.Max(2, prop.lines) * 18;
+                field.style.whiteSpace = WhiteSpace.Normal;
+            }
             field.RegisterValueChangedCallback(evt =>
-                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue)));
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
             return field;
         }
 
@@ -833,7 +1040,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void CollectNodeGroups(
+        public static void CollectNodeGroups(
             PcgGraphNodeBase node,
             List<AvailableGroup> result,
             HashSet<string> seen)
@@ -926,52 +1133,63 @@ namespace DJTechEditor.PCG.Graph
 
             var currentVal = val?.ToString() ?? "";
 
-            // TextField for manual entry (always visible)
+            // Houdini-style: text field + expand button
+            var row = new VisualElement
+            {
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
+
             var textField = new TextField { value = currentVal };
-            textField.style.marginBottom = 2;
+            textField.style.flexGrow = 1;
+            textField.style.flexShrink = 1;
             textField.RegisterValueChangedCallback(evt =>
                 m_GraphView.WithUndo("Change Group", () => onSet(evt.newValue)));
-            container.Add(textField);
+            row.Add(textField);
 
-            // Quick-pick chips for available groups
+            var expandBtn = new Button { text = "\u25be", tooltip = "Browse available groups" };
+            expandBtn.style.width = 22;
+            expandBtn.style.flexShrink = 0;
+            expandBtn.style.marginLeft = 2;
+
             if (available.Count > 0)
             {
-                var chipsRow = new VisualElement
+                expandBtn.clicked += () =>
                 {
-                    style = { flexDirection = FlexDirection.Row, flexWrap = Wrap.Wrap },
-                };
+                    var menu = new GenericMenu();
+                    var bySource = available
+                        .GroupBy(g => g.sourceNodeType ?? "Unknown")
+                        .OrderBy(g => g.Key);
 
-                foreach (var g in available)
-                {
-                    var chip = new Button
+                    foreach (var sourceGroup in bySource)
                     {
-                        text = g.name,
-                        tooltip = $"{g.label ?? g.name} ({g.domain}) from {g.sourceNodeType}",
-                    };
-                    chip.style.fontSize = 9;
-                    chip.style.paddingLeft = 6;
-                    chip.style.paddingRight = 6;
-                    chip.style.paddingTop = 1;
-                    chip.style.paddingBottom = 1;
-                    chip.style.marginRight = 2;
-                    chip.style.marginBottom = 2;
-                    chip.style.unityFontStyleAndWeight = currentVal == g.name ? FontStyle.Bold : FontStyle.Normal;
-
-                    var capturedName = g.name;
-                    chip.clicked += () =>
-                    {
-                        m_GraphView.WithUndo("Pick Group", () =>
+                        foreach (var g in sourceGroup)
                         {
-                            onSet(capturedName);
-                            textField.value = capturedName;
-                            NotifyGraphChanged();
-                        });
-                    };
-                    chipsRow.Add(chip);
-                }
+                            var capturedName = g.name;
+                            var path = $"{sourceGroup.Key}/{g.name} ({g.domain})";
+                            var isCurrent = textField.value == capturedName;
+                            menu.AddItem(new GUIContent(path), isCurrent, () =>
+                            {
+                                m_GraphView.WithUndo("Pick Group", () =>
+                                {
+                                    onSet(capturedName);
+                                    textField.value = capturedName;
+                                    NotifyGraphChanged();
+                                });
+                            });
+                        }
+                    }
 
-                container.Add(chipsRow);
+                    var r = expandBtn.worldBound;
+                    menu.DropDown(new Rect(r.x, r.y + r.height, 0, 0));
+                };
             }
+            else
+            {
+                expandBtn.SetEnabled(false);
+            }
+
+            row.Add(expandBtn);
+            container.Add(row);
 
             return container;
         }
@@ -989,75 +1207,76 @@ namespace DJTechEditor.PCG.Graph
                 available = available.Where(g => g.domain == prop.groupDomain).ToList();
 
             var currentStr = val?.ToString() ?? "";
-            var selected = currentStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrEmpty(s))
-                .ToList();
 
-            // Checkboxes for available groups
-            if (available.Count > 0)
+            // Houdini-style: text field + expand button
+            var row = new VisualElement
             {
-                var availableNames = new HashSet<string>(available.Select(g => g.name));
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
 
-                foreach (var g in available)
-                {
-                    var groupName = g.name;
-                    var toggle = new Toggle
-                    {
-                        value = selected.Contains(groupName),
-                        text = $"{groupName} ({g.domain})",
-                        tooltip = g.label ?? groupName,
-                    };
-                    toggle.style.fontSize = 10;
-                    toggle.style.marginBottom = 1;
-
-                    toggle.RegisterValueChangedCallback(evt =>
-                    {
-                        m_GraphView.WithUndo("Toggle Group", () =>
-                        {
-                            if (evt.newValue && !selected.Contains(groupName))
-                                selected.Add(groupName);
-                            else if (!evt.newValue)
-                                selected.Remove(groupName);
-
-                            onSet(string.Join(",", selected));
-                            NotifyGraphChanged();
-                        });
-                    });
-                    container.Add(toggle);
-                }
-
-                // Show custom entries that aren't in available groups
-                foreach (var custom in selected.Where(s => !availableNames.Contains(s)))
-                {
-                    var toggle = new Toggle
-                    {
-                        value = true,
-                        text = $"{custom} (custom)",
-                    };
-                    toggle.style.fontSize = 10;
-                    toggle.style.marginBottom = 1;
-
-                    var capturedCustom = custom;
-                    toggle.RegisterValueChangedCallback(evt =>
-                    {
-                        m_GraphView.WithUndo("Toggle Group", () =>
-                        {
-                            selected.Remove(capturedCustom);
-                            onSet(string.Join(",", selected));
-                            NotifyGraphChanged();
-                        });
-                    });
-                    container.Add(toggle);
-                }
-            }
-
-            // TextField for manual comma-separated entry
             var textField = new TextField { value = currentStr };
-            textField.style.marginTop = 2;
+            textField.style.flexGrow = 1;
+            textField.style.flexShrink = 1;
             textField.RegisterValueChangedCallback(evt =>
                 m_GraphView.WithUndo("Change Groups", () => onSet(evt.newValue)));
-            container.Add(textField);
+            row.Add(textField);
+
+            var expandBtn = new Button { text = "\u25be", tooltip = "Browse available groups" };
+            expandBtn.style.width = 22;
+            expandBtn.style.flexShrink = 0;
+            expandBtn.style.marginLeft = 2;
+
+            if (available.Count > 0)
+            {
+                expandBtn.clicked += () =>
+                {
+                    var menu = new GenericMenu();
+                    var currentSelected = new HashSet<string>(
+                        textField.value
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(s => s.Trim())
+                            .Where(s => !string.IsNullOrEmpty(s)));
+
+                    var bySource = available
+                        .GroupBy(g => g.sourceNodeType ?? "Unknown")
+                        .OrderBy(g => g.Key);
+
+                    foreach (var sourceGroup in bySource)
+                    {
+                        foreach (var g in sourceGroup)
+                        {
+                            var capturedName = g.name;
+                            var path = $"{sourceGroup.Key}/{g.name} ({g.domain})";
+                            var isSelected = currentSelected.Contains(capturedName);
+                            menu.AddItem(new GUIContent(path), isSelected, () =>
+                            {
+                                m_GraphView.WithUndo("Toggle Group", () =>
+                                {
+                                    if (currentSelected.Contains(capturedName))
+                                        currentSelected.Remove(capturedName);
+                                    else
+                                        currentSelected.Add(capturedName);
+
+                                    var newVal = string.Join(",", currentSelected);
+                                    onSet(newVal);
+                                    textField.value = newVal;
+                                    NotifyGraphChanged();
+                                });
+                            });
+                        }
+                    }
+
+                    var r = expandBtn.worldBound;
+                    menu.DropDown(new Rect(r.x, r.y + r.height, 0, 0));
+                };
+            }
+            else
+            {
+                expandBtn.SetEnabled(false);
+            }
+
+            row.Add(expandBtn);
+            container.Add(row);
 
             return container;
         }

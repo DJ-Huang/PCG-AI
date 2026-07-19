@@ -140,7 +140,9 @@ data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* l
         return *mesh;
 
     if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry(pin))
-        return data::triangulate_geometry(*geometry);
+        return data::compute_split_normals(*geometry,
+            data::NormalComputeOptions{geometry->detail().shade_mode,
+                                        geometry->detail().cusp_angle_deg, true});
 
     const nlohmann::json* input = require_input_json(ctx, pin, label);
     if (!input)
@@ -157,6 +159,15 @@ data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const cha
     if (!mesh.vertices().empty())
         return data::geometry_from_mesh(mesh);
 
+    return {};
+}
+
+data::PcgHeightField get_heightfield_input(PcgContext& ctx, const char* pin, const char* label)
+{
+    if (const data::PcgHeightField* heightfield = ctx.inputs.find_heightfield(pin))
+        return *heightfield;
+
+    fail_ctx(ctx, PCG_ERR_EXECUTION, label);
     return {};
 }
 
@@ -202,6 +213,18 @@ void emit_geometry_shared(PcgContext& ctx,
                           std::shared_ptr<const data::PcgGeometry> geometry)
 {
     ctx.outputs.add_geometry_shared(tag, std::move(geometry));
+}
+
+void emit_heightfield(PcgContext& ctx, data::PcgHeightField data)
+{
+    ctx.outputs.add_heightfield("out", std::move(data));
+}
+
+void emit_heightfield_shared(PcgContext& ctx,
+                             const std::string& tag,
+                             std::shared_ptr<const data::PcgHeightField> heightfield)
+{
+    ctx.outputs.add_heightfield_shared(tag, std::move(heightfield));
 }
 
 void emit_mesh_shared(PcgContext& ctx,

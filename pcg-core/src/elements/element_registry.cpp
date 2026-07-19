@@ -1,4 +1,5 @@
 #include "elements/pcg_element.hpp"
+#include "elements/attribute_elements.hpp"
 #include "elements/primitive_elements.hpp"
 #include "elements/mesh_elements.hpp"
 #include "elements/geometry_elements.hpp"
@@ -7,6 +8,12 @@
 #include "elements/spline_elements.hpp"
 #include "elements/spline_mesh_elements.hpp"
 #include "elements/structural_elements.hpp"
+#include "elements/material_elements.hpp"
+#include "elements/uv_elements.hpp"
+#include "elements/vehicle_modeling_elements.hpp"
+#include "elements/building_elements.hpp"
+#include "elements/heightfield_elements.hpp"
+#include "elements/assembly_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -121,6 +128,11 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
+        if (auto heightfield = ctx.inputs.find_heightfield_shared("in")) {
+            ctx.outputs.add_heightfield_shared("out", heightfield);
+            return PCG_OK;
+        }
+
         if (auto geometry = ctx.inputs.find_geometry_shared("in")) {
             ctx.outputs.add_geometry_shared("out", geometry);
             return PCG_OK;
@@ -174,6 +186,7 @@ void register_builtin_elements()
     map.emplace("SpawnPoints", std::make_unique<SpawnPointsElement>());
     map.emplace("PlaceInScene", std::make_unique<PlaceInSceneElement>());
     map.emplace("Output", std::make_unique<OutputElement>());
+    register_attribute_elements(map);
     register_phase41_elements(map);
     register_phase42_elements(map);
     register_mesh_elements(map);
@@ -182,6 +195,12 @@ void register_builtin_elements()
     register_mesh_scatter_elements(map);
     register_spline_elements(map);
     register_spline_mesh_elements(map);
+    register_material_elements(map);
+    register_uv_elements(map);
+    register_vehicle_modeling_elements(map);
+    register_building_elements(map);
+    register_heightfield_elements(map);
+    register_assembly_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

@@ -1,0 +1,222 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "arch_path",
+      "type": "CreateSpline",
+      "position": { "x": 420, "y": 0 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 12, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":10,\"y\":2.5,\"z\":0},{\"x\":20,\"y\":3.5,\"z\":0},{\"x\":30,\"y\":2.5,\"z\":0},{\"x\":40,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "deck_profile",
+      "type": "CreateSpline",
+      "position": { "x": 420, "y": 480 },
+      "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": -3.5, "startY": -0.2, "startZ": 0, "endX": -3.5, "endY": 0.2, "endZ": 0, "controlPoints": "[{\"x\":-3.5,\"y\":-0.2,\"z\":0},{\"x\":3.5,\"y\":-0.2,\"z\":0},{\"x\":3.5,\"y\":0.2,\"z\":0},{\"x\":-3.5,\"y\":0.2,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "arch_deck",
+      "type": "SweepAlongSpline",
+      "position": { "x": 420, "y": 640 },
+      "data": {"surfaceShape": "crossSection", "profileWidth": 7, "profileHeight": 0.4, "radius": 1, "columns": 24, "sampleSpacing": 0.5, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
+    },
+    {
+      "id": "left_abut_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": -20, "y": 640 },
+      "data": {"width": 2, "height": 7, "depth": 7, "__nodeTitle": ""}
+    },
+    {
+      "id": "left_abut",
+      "type": "TransformMesh",
+      "position": { "x": -20, "y": 800 },
+      "data": {"translateX": -1, "translateY": -3.5, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
+    },
+    {
+      "id": "right_abut_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 420, "y": 800 },
+      "data": {"width": 2, "height": 7, "depth": 7, "__nodeTitle": ""}
+    },
+    {
+      "id": "right_abut",
+      "type": "TransformMesh",
+      "position": { "x": 420, "y": 960 },
+      "data": {"translateX": 41, "translateY": -3.5, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": ""}
+    },
+    {
+      "id": "left_rail_path",
+      "type": "CreateSpline",
+      "position": { "x": -20, "y": 960 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 8, "startX": 0, "startY": 1, "startZ": 3.25, "endX": 40, "endY": 1, "endZ": 3.25, "controlPoints": "[{\"x\":0,\"y\":1,\"z\":3.25},{\"x\":10,\"y\":3.5,\"z\":3.25},{\"x\":20,\"y\":4.5,\"z\":3.25},{\"x\":30,\"y\":3.5,\"z\":3.25},{\"x\":40,\"y\":1,\"z\":3.25}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "post_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 620, "y": 960 },
+      "data": {"width": 0.25, "height": 1.2, "depth": 0.25, "__nodeTitle": ""}
+    },
+    {
+      "id": "left_railing",
+      "type": "InstanceAlongSpline",
+      "position": { "x": -20, "y": 1120 },
+      "data": {"spacing": 2, "offset": 0.5, "includeEnd": true, "alignToTangent": false, "scale": 1, "__nodeTitle": ""}
+    },
+    {
+      "id": "right_rail_path",
+      "type": "CreateSpline",
+      "position": { "x": 420, "y": 1120 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 8, "startX": 0, "startY": 1, "startZ": -3.25, "endX": 40, "endY": 1, "endZ": -3.25, "controlPoints": "[{\"x\":0,\"y\":1,\"z\":-3.25},{\"x\":10,\"y\":3.5,\"z\":-3.25},{\"x\":20,\"y\":4.5,\"z\":-3.25},{\"x\":30,\"y\":3.5,\"z\":-3.25},{\"x\":40,\"y\":1,\"z\":-3.25}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "right_railing",
+      "type": "InstanceAlongSpline",
+      "position": { "x": 420, "y": 1280 },
+      "data": {"spacing": 2, "offset": 0.5, "includeEnd": true, "alignToTangent": false, "scale": 1, "__nodeTitle": ""}
+    },
+    {
+      "id": "deck_material",
+      "type": "AssignMaterial",
+      "position": { "x": -460, "y": 1440 },
+      "data": {"group": "", "materialName": "bridge_deck", "__nodeTitle": ""}
+    },
+    {
+      "id": "arch_material",
+      "type": "AssignMaterial",
+      "position": { "x": -240, "y": 1440 },
+      "data": {"group": "", "materialName": "stone_arch", "__nodeTitle": ""}
+    },
+    {
+      "id": "left_abut_material",
+      "type": "AssignMaterial",
+      "position": { "x": -20, "y": 1440 },
+      "data": {"group": "", "materialName": "left_abutment", "__nodeTitle": ""}
+    },
+    {
+      "id": "right_abut_material",
+      "type": "AssignMaterial",
+      "position": { "x": 200, "y": 1440 },
+      "data": {"group": "", "materialName": "right_abutment", "__nodeTitle": ""}
+    },
+    {
+      "id": "left_railing_material",
+      "type": "AssignMaterial",
+      "position": { "x": 420, "y": 1440 },
+      "data": {"group": "", "materialName": "left_railing", "__nodeTitle": ""}
+    },
+    {
+      "id": "right_railing_material",
+      "type": "AssignMaterial",
+      "position": { "x": 640, "y": 1440 },
+      "data": {"group": "", "materialName": "right_railing", "__nodeTitle": ""}
+    },
+    {
+      "id": "merge",
+      "type": "MergeMesh",
+      "position": { "x": 200, "y": 1600 },
+      "data": {"__nodeTitle": ""}
+    },
+    {
+      "id": "noise",
+      "type": "MeshNoiseDeform",
+      "position": { "x": 200, "y": 1760 },
+      "data": {"intensity": 0.015, "scale": 3, "midLevel": 0.5, "textureCoords": "local", "noiseType": "perlin", "__nodeTitle": ""}
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": { "x": 200, "y": 1920 },
+      "data": {"label": "Stone Arch Bridge", "__nodeTitle": ""}
+    },
+    {
+      "id": "ring_profile",
+      "type": "CreateSpline",
+      "position": { "x": -20, "y": 0 },
+      "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": -3, "startY": -0.5, "startZ": 0, "endX": -3, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-3,\"y\":-0.5,\"z\":0},{\"x\":3,\"y\":-0.5,\"z\":0},{\"x\":3,\"y\":0,\"z\":0},{\"x\":-3,\"y\":0,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "n103",
+      "type": "Subgraph",
+      "position": { "x": 200, "y": 320 },
+      "data": {"subgraphId": "subgraph_1", "__nodeTitle": ""}
+    }
+  ],
+  "edges": [
+    {"id": "e3", "source": "arch_path", "target": "arch_deck", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e4", "source": "deck_profile", "target": "arch_deck", "sourceHandle": "out", "targetHandle": "profile"},
+    {"id": "e7", "source": "left_abut_box", "target": "left_abut", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e8", "source": "right_abut_box", "target": "right_abut", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e9", "source": "left_rail_path", "target": "left_railing", "sourceHandle": "out", "targetHandle": "spline"},
+    {"id": "e10", "source": "post_box", "target": "left_railing", "sourceHandle": "out", "targetHandle": "mesh"},
+    {"id": "e11", "source": "right_rail_path", "target": "right_railing", "sourceHandle": "out", "targetHandle": "spline"},
+    {"id": "e12", "source": "post_box", "target": "right_railing", "sourceHandle": "out", "targetHandle": "mesh"},
+    {"id": "e13", "source": "arch_deck", "target": "deck_material", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e15", "source": "left_abut", "target": "left_abut_material", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e16", "source": "right_abut", "target": "right_abut_material", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e17", "source": "left_railing", "target": "left_railing_material", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e18", "source": "right_railing", "target": "right_railing_material", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e19", "source": "merge", "target": "noise", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e20", "source": "noise", "target": "output", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e21", "source": "deck_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e22", "source": "arch_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e23", "source": "left_abut_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e24", "source": "right_abut_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e25", "source": "left_railing_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e26", "source": "right_railing_material", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1", "source": "arch_path", "target": "n103", "sourceHandle": "out", "targetHandle": "in_1"},
+    {"id": "e2", "source": "ring_profile", "target": "n103", "sourceHandle": "out", "targetHandle": "in_2"},
+    {"id": "e14", "source": "n103", "target": "arch_material", "sourceHandle": "out_1", "targetHandle": "in"}
+  ],
+  "parameters": [
+    {"id": "p1", "name": "bevelAmount", "type": "number", "default": 0.15, "exposed": true, "targetNode": "arch_bevel", "targetProperty": "amount", "hasRange": true, "min": 0.02, "max": 0.5},
+    {"id": "p2", "name": "noiseIntensity", "type": "number", "default": 0.015, "exposed": true, "targetNode": "noise", "targetProperty": "intensity", "hasRange": true, "min": 0, "max": 0.1},
+    {"id": "p3", "name": "railingSpacing", "type": "number", "default": 2, "exposed": true, "targetNode": "left_railing", "targetProperty": "spacing", "hasRange": true, "min": 1, "max": 5},
+    {"id": "p4", "name": "railingSpacingR", "type": "number", "default": 2, "exposed": true, "targetNode": "right_railing", "targetProperty": "spacing", "hasRange": true, "min": 1, "max": 5}
+  ],
+  "subgraphs": [
+    {
+      "id": "subgraph_1",
+      "name": "Bridge",
+      "inputs": [ {"id": "in_1", "name": "backbone", "pinType": "SpatialSpline"}, {"id": "in_2", "name": "profile", "pinType": "SpatialSpline"} ],
+      "outputs": [ {"id": "out_1", "name": "out", "pinType": "SpatialMesh"} ],
+      "nodes": [
+        {
+          "id": "arch_ring",
+          "type": "SweepAlongSpline",
+          "position": { "x": 200, "y": 160 },
+          "data": {"surfaceShape": "crossSection", "profileWidth": 6, "profileHeight": 0.5, "radius": 1, "columns": 24, "sampleSpacing": 0.5, "capStart": false, "capEnd": false, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": ""}
+        },
+        {
+          "id": "arch_group",
+          "type": "GroupCreate",
+          "position": { "x": 200, "y": 320 },
+          "data": {"outputGroup": "bevel_edges", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "__nodeTitle": ""}
+        },
+        {
+          "id": "arch_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 480 },
+          "data": {"edgeGroup": "bevel_edges", "offsetType": "offset", "amount": 0.15, "segments": 4, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "cap_start,cap_end", "__nodeTitle": ""}
+        },
+        {
+          "id": "n101",
+          "type": "SubgraphInput",
+          "position": { "x": 200, "y": 33 },
+          "data": {"__nodeTitle": ""}
+        },
+        {
+          "id": "n102",
+          "type": "SubgraphOutput",
+          "position": { "x": 200, "y": 640 },
+          "data": {"__nodeTitle": ""}
+        }
+      ],
+      "edges": [
+        {"id": "e5", "source": "arch_ring", "target": "arch_group", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e6", "source": "arch_group", "target": "arch_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e101", "source": "n101", "target": "arch_ring", "sourceHandle": "in_1", "targetHandle": "backbone"},
+        {"id": "e102", "source": "n101", "target": "arch_ring", "sourceHandle": "in_2", "targetHandle": "profile"},
+        {"id": "e103", "source": "arch_bevel", "target": "n102", "sourceHandle": "out", "targetHandle": "out_1"}
+      ]
+    }
+  ]
+}

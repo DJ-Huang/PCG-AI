@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "spiral",
+      "type": "CreateSpiralSpline",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "radius": 1.0,
+        "pitch": 0.5,
+        "turns": 2.0,
+        "pointsPerTurn": 12,
+        "axis": "y"
+      }
+    },
+    {
+      "id": "sweep",
+      "type": "SweepAlongSpline",
+      "position": { "x": 0, "y": 200 },
+      "data": {
+        "surfaceShape": "circle",
+        "radius": 0.2,
+        "columns": 8,
+        "sampleSpacing": 0.5,
+        "capStart": true,
+        "capEnd": true,
+        "profilePlane": "xy"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 400 },
+      "data": { "label": "Spiral Sweep" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "spiral", "target": "sweep", "sourceHandle": "out", "targetHandle": "backbone" },
+    { "id": "e2", "source": "sweep", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

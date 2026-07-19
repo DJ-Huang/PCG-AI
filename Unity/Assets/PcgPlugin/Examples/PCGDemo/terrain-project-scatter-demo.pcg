@@ -1,0 +1,144 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "terrain_base",
+      "type": "HeightField",
+      "position": { "x": 200, "y": 0 },
+      "data": {
+        "__nodeTitle": "Scatter Terrain",
+        "orientation": "zx",
+        "sampling": "corner",
+        "divisionMode": "bySize",
+        "gridSpacing": 2.0,
+        "sizeX": 128.0,
+        "sizeZ": 128.0,
+        "initialHeight": 0.0,
+        "initialMask": 1.0
+      }
+    },
+    {
+      "id": "terrain_noise",
+      "type": "HeightFieldNoise",
+      "position": { "x": 200, "y": 180 },
+      "data": {
+        "__nodeTitle": "Rolling Base",
+        "noiseLayer": "height",
+        "fractal": "terrain",
+        "amplitude": 14.0,
+        "elementSize": 52.0,
+        "maxOctaves": 5,
+        "roughness": 0.5,
+        "seed": 83
+      }
+    },
+    {
+      "id": "project_geometry",
+      "type": "CreateBoxMesh",
+      "position": { "x": 520, "y": 180 },
+      "data": {
+        "__nodeTitle": "Projected Landmark",
+        "width": 24.0,
+        "height": 28.0,
+        "depth": 24.0
+      }
+    },
+    {
+      "id": "terrain_project",
+      "type": "HeightFieldProject",
+      "position": { "x": 200, "y": 380 },
+      "data": {
+        "__nodeTitle": "Geometry into HeightField",
+        "heightLayer": "height",
+        "hitFarthest": true,
+        "combineMethod": "maximum",
+        "maxRayDistance": 100.0
+      }
+    },
+    {
+      "id": "terrain_scatter",
+      "type": "HeightFieldScatter",
+      "position": { "x": 200, "y": 580 },
+      "data": {
+        "__nodeTitle": "Surface Scatter",
+        "heightLayer": "height",
+        "scatterAmountLayer": "mask",
+        "useExactPointCount": true,
+        "pointCount": 256,
+        "candidatesPerPoint": 6,
+        "globalSeed": 191,
+        "maxPoints": 10000
+      }
+    },
+    {
+      "id": "scatter_output",
+      "type": "Output",
+      "position": { "x": 200, "y": 760 },
+      "data": {
+        "__nodeTitle": "Scatter Points",
+        "label": "Terrain Scatter"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_base_noise",
+      "source": "terrain_base",
+      "sourceHandle": "out",
+      "target": "terrain_noise",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_noise_project",
+      "source": "terrain_noise",
+      "sourceHandle": "out",
+      "target": "terrain_project",
+      "targetHandle": "heightfield"
+    },
+    {
+      "id": "edge_geometry_project",
+      "source": "project_geometry",
+      "sourceHandle": "out",
+      "target": "terrain_project",
+      "targetHandle": "geometry"
+    },
+    {
+      "id": "edge_project_scatter",
+      "source": "terrain_project",
+      "sourceHandle": "out",
+      "target": "terrain_scatter",
+      "targetHandle": "in"
+    },
+    {
+      "id": "edge_scatter_output",
+      "source": "terrain_scatter",
+      "sourceHandle": "out",
+      "target": "scatter_output",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "scatter_count",
+      "name": "Scatter Count",
+      "type": "integer",
+      "default": 256,
+      "exposed": true,
+      "hasRange": true,
+      "min": 0,
+      "max": 10000,
+      "targetNode": "terrain_scatter",
+      "targetProperty": "pointCount"
+    },
+    {
+      "id": "scatter_seed",
+      "name": "Scatter Seed",
+      "type": "integer",
+      "default": 191,
+      "exposed": true,
+      "targetNode": "terrain_scatter",
+      "targetProperty": "globalSeed"
+    }
+  ]
+}
+

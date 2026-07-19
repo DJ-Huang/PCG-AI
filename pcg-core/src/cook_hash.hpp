@@ -5,6 +5,7 @@
 #include "data/pcg_spline_data.hpp"
 #include "data/pcg_mesh_data.hpp"
 #include "data/pcg_geometry.hpp"
+#include "data/pcg_heightfield.hpp"
 #include "data/pcg_texture_data.hpp"
 #include "internal/graph_types.hpp"
 
@@ -18,6 +19,7 @@ namespace pcg::internal {
 class MeshRuntime;
 class SplineRuntime;
 class TextureRuntime;
+class HeightFieldRuntime;
 
 /** FNV-1a 64-bit (Blender-style content addressing for cook cache). */
 constexpr uint64_t kFnvOffsetBasis = 14695981039346656037ull;
@@ -33,6 +35,7 @@ uint64_t hash_string(const std::string& value);
 uint64_t hash_json(const nlohmann::json& value);
 uint64_t hash_mesh(const data::PcgMeshData& mesh);
 uint64_t hash_geometry(const data::PcgGeometry& geometry);
+uint64_t hash_heightfield(const data::PcgHeightField& heightfield);
 uint64_t hash_points(const data::PcgPointData& points);
 uint64_t hash_splines(const data::PcgSplineData& splines);
 uint64_t hash_texture(const data::PcgTextureData& texture);
@@ -47,7 +50,8 @@ uint64_t compute_node_input_hash(const GraphNode& node,
                                  const std::vector<std::pair<std::string, uint64_t>>& upstream_hashes,
                                  const TextureRuntime* textures,
                                  const MeshRuntime* meshes,
-                                 const SplineRuntime* splines);
+                                 const SplineRuntime* splines,
+                                 const HeightFieldRuntime* heightfields);
 
 uint64_t compute_output_hash(const data::PcgDataCollection& outputs);
 

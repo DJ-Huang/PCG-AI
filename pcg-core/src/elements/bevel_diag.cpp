@@ -38,6 +38,9 @@ bool bevel_diag_enabled()
 
 BevelTopoStats analyze_bevel_output(const BevelParams::OutputMesh& out, const CapExtents& cap, double tol)
 {
+    // Ensure derived triangle cache is up-to-date.
+    const_cast<BevelParams::OutputMesh&>(out).rebuild_triangles_from_faces();
+
     BevelTopoStats stats;
     stats.verts = static_cast<int>(out.vertices.size());
     stats.tris = static_cast<int>(out.triangles.size() / 3);
@@ -124,6 +127,8 @@ void log_bevel_stage(const char* stage, const BevelParams::OutputMesh& out, cons
 {
     if (!bevel_diag_enabled())
         return;
+    // Ensure derived triangle cache is up-to-date for topology analysis.
+    const_cast<BevelParams::OutputMesh&>(out).rebuild_triangles_from_faces();
     const BevelTopoStats stats = analyze_bevel_output(out, cap, 0.05);
     std::fprintf(stderr,
                  "[PCG_BEVEL_DIAG] stage=%s verts=%d tris=%d boundary=%d nonmanifold=%d "

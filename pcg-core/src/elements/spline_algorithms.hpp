@@ -105,6 +105,17 @@ struct InstanceAlongSplineOptions {
 };
 
 data::PcgSplineData create_spline_data(const CreateSplineOptions& options);
+
+struct CreateSpiralSplineOptions {
+    double radius = 1.0;
+    double pitch = 0.5;
+    double turns = 3.0;
+    int points_per_turn = 24;
+    std::string axis = "y";
+};
+
+data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& options);
+
 data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options);
 data::PcgPointData sample_along_spline(const data::PcgSplineData& splines, const SampleAlongSplineOptions& options);
 data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,

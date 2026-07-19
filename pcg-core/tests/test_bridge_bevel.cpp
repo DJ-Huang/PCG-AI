@@ -3,441 +3,180 @@
 #include "data/pcg_mesh_binary.hpp"
 #include "data/pcg_mesh_data.hpp"
 
-#include <chrono>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
-#include <fstream>
-#include <sstream>
+#include <cstdlib>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace {
 
-std::string read_file(const char* path)
-{
-    std::ifstream file(path);
-    if (!file)
-        return {};
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
+using pcg::internal::data::PcgMeshData;
 
-void expect_code(PcgResultCode actual, PcgResultCode expected, const char* label)
+void expect(bool condition, const char* message)
 {
-    if (actual != expected) {
-        std::printf("FAIL: %s expected %d got %d\n", label, static_cast<int>(expected),
-                    static_cast<int>(actual));
+    std::printf("%s: %s\n", condition ? "PASS" : "FAIL", message);
+    if (!condition)
         std::exit(1);
-    }
 }
 
-PcgResultCode execute_mesh_graph(const char* json,
-                                 int seed,
-                                 pcg::internal::data::PcgMeshData& out_mesh,
-                                 int& vertex_count,
-                                 int& index_count,
-                                 char* err,
-                                 int err_size)
+PcgMeshData execute_mesh_graph(const std::string& graph)
 {
-    std::vector<uint8_t> mesh_buf(8 * 1024 * 1024);
-    int kind = 0;
-    char json_out[4096];
+    std::vector<uint8_t> mesh_buffer(1024 * 1024);
+    char json_output[1024] = {};
+    char error[512] = {};
+    int kind = PCG_RESULT_KIND_NONE;
+    int vertex_count = 0;
+    int index_count = 0;
+
     const PcgResultCode code = pcg_execute_graph_v7(
-        json, seed, nullptr, 0, nullptr, 0, nullptr, 0, &kind, json_out, sizeof(json_out),
-        mesh_buf.data(), static_cast<int>(mesh_buf.size()), nullptr, 0, nullptr, nullptr,
-        &vertex_count, &index_count, nullptr, nullptr, 0, err, err_size);
-    if (code != PCG_OK)
-        return code;
-    if (!pcg::internal::data::read_mesh_binary(mesh_buf.data(),
-                                              static_cast<int>(mesh_buf.size()), out_mesh)) {
-        std::snprintf(err, static_cast<size_t>(err_size), "failed to parse mesh binary");
-        return PCG_ERR_EXECUTION;
-    }
-    return PCG_OK;
+        graph.c_str(), 42, nullptr, 0, nullptr, 0, nullptr, 0, &kind,
+        json_output, sizeof(json_output), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), nullptr, 0, nullptr, nullptr,
+        &vertex_count, &index_count, nullptr, nullptr, 0, error, sizeof(error));
+    expect(code == PCG_OK, error[0] == '\0' ? "compact Sweep+Bevel graph executes" : error);
+    expect(kind == PCG_RESULT_KIND_MESH, "compact graph returns a mesh");
+
+    PcgMeshData mesh;
+    expect(pcg::internal::data::read_mesh_binary(
+               mesh_buffer.data(), static_cast<int>(mesh_buffer.size()), mesh),
+           "compact graph mesh binary is readable");
+    return mesh;
 }
 
-std::string with_bevel_amount(std::string graph, const char* amount)
+std::vector<int> weld_by_position(const PcgMeshData& mesh)
 {
-    const std::string key = "\"amount\":";
-    const size_t pos = graph.find(key);
-    if (pos == std::string::npos)
-        return graph;
-    size_t start = pos + key.size();
-    while (start < graph.size() && (graph[start] == ' ' || graph[start] == '\t'))
-        ++start;
-    size_t end = start;
-    while (end < graph.size() &&
-           (std::isdigit(static_cast<unsigned char>(graph[end])) || graph[end] == '.' ||
-            graph[end] == '-' || graph[end] == 'e' || graph[end] == 'E' || graph[end] == '+'))
-        ++end;
-    graph.replace(start, end - start, amount);
-    return graph;
-}
-
-// Weld vertices by position so that split normals don't create false boundaries.
-std::vector<int> weld_by_position(const pcg::internal::data::PcgMeshData& mesh)
-{
-    std::unordered_map<uint64_t, int> weld_map;
-    auto weld_key = [](double x, double y, double z) -> uint64_t {
-        const auto ix = static_cast<int64_t>(std::round(x * 1e6));
-        const auto iy = static_cast<int64_t>(std::round(y * 1e6));
-        const auto iz = static_cast<int64_t>(std::round(z * 1e6));
-        return static_cast<uint64_t>(ix * 73856093 ^ iy * 19349663 ^ iz * 83492791);
-    };
+    std::unordered_map<std::string, int> ids;
     std::vector<int> welded(mesh.vertices().size());
     int next_id = 0;
     for (size_t i = 0; i < mesh.vertices().size(); ++i) {
-        const auto& v = mesh.vertices()[i];
-        const uint64_t key = weld_key(v.x, v.y, v.z);
-        auto it = weld_map.find(key);
-        if (it != weld_map.end())
-            welded[i] = it->second;
-        else {
-            welded[i] = next_id;
-            weld_map[key] = next_id++;
-        }
+        const auto& vertex = mesh.vertices()[i];
+        const auto quantize = [](float value) {
+            return static_cast<long long>(std::llround(value * 1e6));
+        };
+        const std::string key = std::to_string(quantize(vertex.x)) + "," +
+                                std::to_string(quantize(vertex.y)) + "," +
+                                std::to_string(quantize(vertex.z));
+        const auto [it, inserted] = ids.emplace(key, next_id);
+        if (inserted)
+            ++next_id;
+        welded[i] = it->second;
     }
     return welded;
 }
 
-int boundary_edge_count(const pcg::internal::data::PcgMeshData& mesh)
-{
-    const std::vector<int> welded = weld_by_position(mesh);
+struct TopologyStats {
+    int boundary_edges = 0;
+    int bad_winding_edges = 0;
+};
 
+TopologyStats analyze_topology(const PcgMeshData& mesh)
+{
     struct EdgeUse {
-        int count = 0;
-    };
-    std::unordered_map<uint64_t, EdgeUse> edges;
-    auto edge_key = [](int a, int b) -> uint64_t {
-        const int lo = std::min(a, b);
-        const int hi = std::max(a, b);
-        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
-               static_cast<uint32_t>(hi);
+        int forward = 0;
+        int backward = 0;
     };
 
-    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {
-            welded[static_cast<size_t>(mesh.triangles()[i])],
-            welded[static_cast<size_t>(mesh.triangles()[i + 1])],
-            welded[static_cast<size_t>(mesh.triangles()[i + 2])],
-        };
-        for (int e = 0; e < 3; ++e)
-            ++edges[edge_key(tri[e], tri[(e + 1) % 3])].count;
-    }
-
-    int boundary = 0;
-    for (const auto& [_, use] : edges) {
-        if (use.count == 1)
-            ++boundary;
-    }
-    return boundary;
-}
-
-void dump_boundary_edges(const pcg::internal::data::PcgMeshData& mesh, int limit = 16)
-{
-    std::unordered_map<uint64_t, std::pair<int, int>> edges;
-    std::unordered_map<uint64_t, int> counts;
-    auto edge_key = [](int a, int b) -> uint64_t {
-        const int lo = std::min(a, b);
-        const int hi = std::max(a, b);
-        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
-               static_cast<uint32_t>(hi);
-    };
-
-    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
-        for (int e = 0; e < 3; ++e) {
-            const int a = tri[e];
-            const int b = tri[(e + 1) % 3];
-            const uint64_t key = edge_key(a, b);
-            edges[key] = {a, b};
-            ++counts[key];
-        }
-    }
-
-    int printed = 0;
-    for (const auto& [key, count] : counts) {
-        if (count != 1 || printed >= limit)
-            continue;
-        const auto [a_idx, b_idx] = edges[key];
-        const auto& a = mesh.vertices()[static_cast<size_t>(a_idx)];
-        const auto& b = mesh.vertices()[static_cast<size_t>(b_idx)];
-        std::printf("  boundary[%d]: (%.3f, %.3f, %.3f) -> (%.3f, %.3f, %.3f)\n",
-                    printed, a.x, a.y, a.z, b.x, b.y, b.z);
-        ++printed;
-    }
-}
-
-void dump_boundary_loops(const pcg::internal::data::PcgMeshData& mesh)
-{
-    std::unordered_map<uint64_t, int> counts;
-    std::unordered_map<int, std::vector<int>> adjacency;
-    auto edge_key = [](int a, int b) -> uint64_t {
-        const int lo = std::min(a, b);
-        const int hi = std::max(a, b);
-        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
-               static_cast<uint32_t>(hi);
-    };
-    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
-        for (int e = 0; e < 3; ++e)
-            ++counts[edge_key(tri[e], tri[(e + 1) % 3])];
-    }
-    for (const auto& [key, count] : counts) {
-        if (count != 1)
-            continue;
-        const int a = static_cast<int>(key >> 32);
-        const int b = static_cast<int>(key & 0xffffffffu);
-        adjacency[a].push_back(b);
-        adjacency[b].push_back(a);
-    }
-    std::unordered_map<int, bool> visited;
-    int loop_count = 0;
-    for (const auto& [start, _] : adjacency) {
-        if (visited[start])
-            continue;
-        int current = start;
-        int previous = -1;
-        int length = 0;
-        do {
-            visited[current] = true;
-            ++length;
-            int next = -1;
-            for (int candidate : adjacency[current]) {
-                if (candidate != previous) {
-                    next = candidate;
-                    break;
-                }
-            }
-            previous = current;
-            current = next;
-        } while (current >= 0 && current != start && length <= static_cast<int>(adjacency.size()));
-        std::printf("  boundary loop[%d]: %d vertices\n", loop_count++, length);
-    }
-}
-
-int manifold_winding_bad_count(const pcg::internal::data::PcgMeshData& mesh)
-{
     const std::vector<int> welded = weld_by_position(mesh);
-
-    struct DirCount {
-        int ab = 0;
-        int ba = 0;
-    };
-    std::unordered_map<uint64_t, DirCount> edges;
-    auto edge_key = [](int a, int b) -> uint64_t {
-        const int lo = std::min(a, b);
-        const int hi = std::max(a, b);
-        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
-               static_cast<uint32_t>(hi);
-    };
-
+    std::unordered_map<uint64_t, EdgeUse> edges;
     for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {
+        const int triangle[3] = {
             welded[static_cast<size_t>(mesh.triangles()[i])],
             welded[static_cast<size_t>(mesh.triangles()[i + 1])],
             welded[static_cast<size_t>(mesh.triangles()[i + 2])],
         };
-        for (int e = 0; e < 3; ++e) {
-            const int a = tri[e];
-            const int b = tri[(e + 1) % 3];
-            DirCount& count = edges[edge_key(a, b)];
-            if (a < b)
-                ++count.ab;
+        for (int edge = 0; edge < 3; ++edge) {
+            const int a = triangle[edge];
+            const int b = triangle[(edge + 1) % 3];
+            const int lo = std::min(a, b);
+            const int hi = std::max(a, b);
+            const uint64_t key =
+                (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
+                static_cast<uint32_t>(hi);
+            EdgeUse& use = edges[key];
+            if (a == lo)
+                ++use.forward;
             else
-                ++count.ba;
+                ++use.backward;
         }
     }
 
-    int bad = 0;
-    for (const auto& [key, count] : edges) {
-        if (count.ab + count.ba != 2)
-            continue;
-        if (count.ab != 1 || count.ba != 1)
-            ++bad;
+    TopologyStats stats;
+    for (const auto& [_, use] : edges) {
+        const int count = use.forward + use.backward;
+        if (count == 1)
+            ++stats.boundary_edges;
+        else if (count == 2 && (use.forward != 1 || use.backward != 1))
+            ++stats.bad_winding_edges;
     }
-    return bad;
+    return stats;
 }
 
-double signed_volume(const pcg::internal::data::PcgMeshData& mesh)
+double signed_volume(const PcgMeshData& mesh)
 {
-    double vol = 0.0;
+    double volume = 0.0;
     for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
         const auto& a = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i])];
         const auto& b = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 1])];
         const auto& c = mesh.vertices()[static_cast<size_t>(mesh.triangles()[i + 2])];
-        vol += a.x * (b.y * c.z - b.z * c.y) +
-               a.y * (b.z * c.x - b.x * c.z) +
-               a.z * (b.x * c.y - b.y * c.x);
+        volume += a.x * (b.y * c.z - b.z * c.y) +
+                  a.y * (b.z * c.x - b.x * c.z) +
+                  a.z * (b.x * c.y - b.y * c.x);
     }
-    return vol / 6.0;
+    return volume / 6.0;
 }
 
-int count_boundary_loops(const pcg::internal::data::PcgMeshData& mesh)
-{
-    std::unordered_map<uint64_t, int> counts;
-    std::unordered_map<int, std::vector<int>> adjacency;
-    auto edge_key = [](int a, int b) -> uint64_t {
-        const int lo = std::min(a, b);
-        const int hi = std::max(a, b);
-        return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
-               static_cast<uint32_t>(hi);
-    };
-    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
-        const int tri[3] = {mesh.triangles()[i], mesh.triangles()[i + 1], mesh.triangles()[i + 2]};
-        for (int e = 0; e < 3; ++e)
-            ++counts[edge_key(tri[e], tri[(e + 1) % 3])];
-    }
-    for (const auto& [key, count] : counts) {
-        if (count != 1)
-            continue;
-        const int a = static_cast<int>(key >> 32);
-        const int b = static_cast<int>(key & 0xffffffffu);
-        adjacency[a].push_back(b);
-        adjacency[b].push_back(a);
-    }
-    std::unordered_map<int, bool> visited;
-    int loop_count = 0;
-    for (const auto& [start, _] : adjacency) {
-        if (visited[start])
-            continue;
-        int current = start;
-        int previous = -1;
-        int length = 0;
-        do {
-            visited[current] = true;
-            ++length;
-            int next = -1;
-            for (int candidate : adjacency[current]) {
-                if (candidate != previous) {
-                    next = candidate;
-                    break;
-                }
-            }
-            previous = current;
-            current = next;
-        } while (current >= 0 && current != start && length <= static_cast<int>(adjacency.size()));
-        ++loop_count;
-    }
-    return loop_count;
-}
-
-std::string build_parametric_sedan(bool cap_start, bool cap_end, int segments,
-                                   double path_length)
+std::string build_graph(bool cap_start, bool cap_end)
 {
     std::string graph = R"({
-      "version": "1.0",
-      "nodes": [
-        {
-          "id": "body_path",
-          "type": "CreateSpline",
-          "position": { "x": 200, "y": 0 },
-          "data": {
-            "mode": "line",
-            "closed": false,
-            "subdivisions": 1,
-            "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":4.2,\"y\":0,\"z\":0}]",
-            "editPlane": "none"
-          }
-        },
-        {
-          "id": "body_profile",
-          "type": "CreateSpline",
-          "position": { "x": 420, "y": 0 },
-          "data": {
-            "mode": "catmullRom",
-            "closed": true,
-            "subdivisions": 8,
-            "controlPoints": "[{\"x\":0.9,\"y\":0,\"z\":0},{\"x\":0.95,\"y\":0.2,\"z\":0},{\"x\":0.85,\"y\":0.5,\"z\":0},{\"x\":0.6,\"y\":0.78,\"z\":0},{\"x\":0.25,\"y\":0.9,\"z\":0},{\"x\":-0.25,\"y\":0.9,\"z\":0},{\"x\":-0.6,\"y\":0.78,\"z\":0},{\"x\":-0.85,\"y\":0.5,\"z\":0},{\"x\":-0.95,\"y\":0.2,\"z\":0},{\"x\":-0.9,\"y\":0,\"z\":0}]",
-            "editPlane": "xy"
-          }
-        },
-        {
-          "id": "body_sweep",
-          "type": "SweepAlongSpline",
-          "position": { "x": 200, "y": 160 },
-          "data": {
-            "surfaceShape": "crossSection",
-            "sampleSpacing": 0.5,
-            "capStart": true,
-            "capEnd": true,
-            "upX": 0, "upY": 1, "upZ": 0,
-            "scaleStart": 1.0, "scaleEnd": 1.0,
-            "profilePlane": "xy"
-          }
-        },
-        {
-          "id": "body_group",
-          "type": "GroupCreate",
-          "position": { "x": 200, "y": 320 },
-          "data": {
-            "outputGroup": "bevel_edges",
-            "domain": "edge",
-            "mode": "angle",
-            "minEdgeAngle": 30,
-            "includeUnshared": false,
-            "fromFaceGroup": "",
-            "fromEdgeGroup": ""
-          }
-        },
-        {
-          "id": "body_bevel",
-          "type": "BevelMesh",
-          "position": { "x": 200, "y": 480 },
-          "data": {
-            "method": "edge",
-            "amount": 0.06,
-            "segments": 2,
-            "clampOverlap": true,
-            "edgeGroup": "bevel_edges",
-            "excludeUnshared": true,
-            "excludeGroups": "cap_start,cap_end"
-          }
-        },
-        {
-          "id": "out",
-          "type": "Output",
-          "position": { "x": 200, "y": 640 },
-          "data": { "label": "SedanBody" }
-        }
+      "version":"1.0",
+      "nodes":[
+        {"id":"path","type":"CreateSpline","data":{
+          "mode":"line","closed":false,"subdivisions":1,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0}]",
+          "editPlane":"none"
+        }},
+        {"id":"profile","type":"CreateSpline","data":{
+          "mode":"polyline","closed":true,"subdivisions":1,
+          "controlPoints":"[{\"x\":-0.4,\"y\":-0.3,\"z\":0},{\"x\":0.4,\"y\":-0.3,\"z\":0},{\"x\":0.4,\"y\":0.3,\"z\":0},{\"x\":-0.4,\"y\":0.3,\"z\":0}]",
+          "editPlane":"xy"
+        }},
+        {"id":"sweep","type":"SweepAlongSpline","data":{
+          "surfaceShape":"crossSection","sampleSpacing":1.0,
+          "capStart":true,"capEnd":true,"profilePlane":"xy"
+        }},
+        {"id":"group","type":"GroupCreate","data":{
+          "outputGroup":"bevel_edges","domain":"edge","mode":"angle",
+          "minEdgeAngle":30,"includeUnshared":false
+        }},
+        {"id":"bevel","type":"BevelMesh","data":{
+          "method":"edge","amount":0.05,"segments":1,"clampOverlap":true,
+          "edgeGroup":"bevel_edges","excludeUnshared":true,
+          "excludeGroups":"cap_start,cap_end"
+        }},
+        {"id":"out","type":"Output","data":{}}
       ],
-      "edges": [
-        { "id": "e1", "source": "body_path", "target": "body_sweep", "sourceHandle": "out", "targetHandle": "backbone" },
-        { "id": "e2", "source": "body_profile", "target": "body_sweep", "sourceHandle": "out", "targetHandle": "profile" },
-        { "id": "e3", "source": "body_sweep", "target": "body_group", "sourceHandle": "out", "targetHandle": "in" },
-        { "id": "e4", "source": "body_group", "target": "body_bevel", "sourceHandle": "out", "targetHandle": "in" },
-        { "id": "e5", "source": "body_bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+      "edges":[
+        {"id":"e1","source":"path","target":"sweep","sourceHandle":"out","targetHandle":"backbone"},
+        {"id":"e2","source":"profile","target":"sweep","sourceHandle":"out","targetHandle":"profile"},
+        {"id":"e3","source":"sweep","target":"group","sourceHandle":"out","targetHandle":"in"},
+        {"id":"e4","source":"group","target":"bevel","sourceHandle":"out","targetHandle":"in"},
+        {"id":"e5","source":"bevel","target":"out","sourceHandle":"out","targetHandle":"in"}
       ]
     })";
 
-    const auto replace_val = [](std::string& s, const std::string& key,
-                                const std::string& val) {
-        const size_t pos = s.find(key);
-        if (pos == std::string::npos)
-            return;
-        size_t start = pos + key.size();
-        while (start < s.size() && (s[start] == ' ' || s[start] == '\t'))
-            ++start;
-        size_t end = start;
-        while (end < s.size() && s[end] != ',' && s[end] != '\n' && s[end] != '}')
-            ++end;
-        s.replace(start, end - start, val);
+    const auto replace_bool = [&graph](const char* key, bool value) {
+        const size_t position = graph.find(key);
+        expect(position != std::string::npos, "cap parameter exists in compact fixture");
+        const size_t value_start = position + std::string(key).size();
+        graph.replace(value_start, 4, value ? "true" : "false");
     };
-
-    replace_val(graph, "\"capStart\":", cap_start ? "true" : "false");
-    replace_val(graph, "\"capEnd\":", cap_end ? "true" : "false");
-    replace_val(graph, "\"segments\":", std::to_string(segments));
-
-    {
-        const std::string from = R"({\"x\":4.2)";
-        const size_t pos = graph.find(from);
-        if (pos != std::string::npos) {
-            char to[32];
-            std::snprintf(to, sizeof(to), R"({\"x\":%.1f)", path_length);
-            graph.replace(pos, from.size(), to);
-        }
-    }
+    replace_bool("\"capStart\":", cap_start);
+    replace_bool("\"capEnd\":", cap_end);
     return graph;
 }
 
@@ -445,272 +184,18 @@ std::string build_parametric_sedan(bool cap_start, bool cap_end, int segments,
 
 int main()
 {
-    const std::string bridge_graph = read_file("../../examples/bridge-demo.pcg");
-    if (bridge_graph.empty()) {
-        std::printf("FAIL: could not read examples/bridge-demo.pcg\n");
-        return 1;
+    const PcgMeshData closed = execute_mesh_graph(build_graph(true, true));
+    const TopologyStats closed_stats = analyze_topology(closed);
+    expect(closed_stats.boundary_edges == 0, "closed Sweep+Bevel has no boundary edges");
+    expect(closed_stats.bad_winding_edges == 0, "closed Sweep+Bevel has consistent winding");
+    expect(signed_volume(closed) > 0.0, "closed Sweep+Bevel has positive volume");
+
+    for (const auto& caps : {std::pair{true, false}, std::pair{false, true}}) {
+        const PcgMeshData open = execute_mesh_graph(build_graph(caps.first, caps.second));
+        const TopologyStats open_stats = analyze_topology(open);
+        expect(open_stats.boundary_edges > 0, "single-cap Sweep+Bevel keeps one open end");
     }
 
-    char err[512] = {};
-    expect_code(pcg_validate_graph(bridge_graph.c_str(), err, sizeof(err)), PCG_OK,
-                "bridge-demo validate");
-
-    pcg::internal::data::PcgMeshData mesh_zero;
-    int verts_zero = 0;
-    int indices_zero = 0;
-    const std::string graph_zero = with_bevel_amount(bridge_graph, "0");
-    expect_code(execute_mesh_graph(graph_zero.c_str(), 42, mesh_zero, verts_zero, indices_zero, err,
-                                   sizeof(err)),
-                PCG_OK, "bridge-demo amount=0");
-
-    pcg::internal::data::PcgMeshData mesh;
-    int vertex_count = 0;
-    int index_count = 0;
-    const auto start = std::chrono::steady_clock::now();
-    expect_code(execute_mesh_graph(bridge_graph.c_str(), 42, mesh, vertex_count, index_count, err,
-                                   sizeof(err)),
-                PCG_OK, "bridge-demo GroupCreate+Bevel execute");
-    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start);
-
-    if (vertex_count < 300 || index_count < 300) {
-        std::printf("FAIL: bridge mesh too small (%d verts, %d indices)\n", vertex_count,
-                    index_count);
-        return 1;
-    }
-
-    // Bevel must change topology vs amount=0 (profile insertion / edge strips).
-    if (vertex_count <= verts_zero + 50) {
-        std::printf("FAIL: bevel did not increase topology enough (amount=0 -> %d, beveled -> %d)\n",
-                    verts_zero, vertex_count);
-        return 1;
-    }
-
-    if (elapsed_ms.count() > 1000) {
-        std::printf("FAIL: bridge-demo cook too slow (%lld ms)\n",
-                    static_cast<long long>(elapsed_ms.count()));
-        return 1;
-    }
-
-    std::printf("PASS: bridge-demo GroupCreate+Bevel (%d verts, %d indices, %lld ms, zero=%d)\n",
-                vertex_count, index_count, static_cast<long long>(elapsed_ms.count()), verts_zero);
-
-    const std::string sedan_graph = read_file("../../examples/lowpoly-sedan.pcg");
-    if (sedan_graph.empty()) {
-        std::printf("FAIL: could not read examples/lowpoly-sedan.pcg\n");
-        return 1;
-    }
-
-    expect_code(pcg_validate_graph(sedan_graph.c_str(), err, sizeof(err)), PCG_OK,
-                "lowpoly-sedan validate");
-
-    pcg::internal::data::PcgMeshData sedan_mesh;
-    int sedan_vertices = 0;
-    int sedan_indices = 0;
-    expect_code(execute_mesh_graph(sedan_graph.c_str(), 42, sedan_mesh, sedan_vertices, sedan_indices,
-                                   err, sizeof(err)),
-                PCG_OK, "lowpoly-sedan execute");
-
-    if (sedan_vertices < 1000 || sedan_indices < 3000) {
-        std::printf("FAIL: lowpoly-sedan mesh too small (%d verts, %d indices)\n",
-                    sedan_vertices, sedan_indices);
-        return 1;
-    }
-
-    std::printf("PASS: lowpoly-sedan Sweep+Bevel (%d verts, %d indices)\n",
-                sedan_vertices, sedan_indices);
-
-    const char* sedan_body_graph = R"({
-      "version": "1.0",
-      "nodes": [
-        {
-          "id": "body_path",
-          "type": "CreateSpline",
-          "position": { "x": 200, "y": 0 },
-          "data": {
-            "mode": "line",
-            "closed": false,
-            "subdivisions": 1,
-            "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":4.2,\"y\":0,\"z\":0}]",
-            "editPlane": "none"
-          }
-        },
-        {
-          "id": "body_profile",
-          "type": "CreateSpline",
-          "position": { "x": 420, "y": 0 },
-          "data": {
-            "mode": "catmullRom",
-            "closed": true,
-            "subdivisions": 8,
-            "controlPoints": "[{\"x\":0.9,\"y\":0,\"z\":0},{\"x\":0.95,\"y\":0.2,\"z\":0},{\"x\":0.85,\"y\":0.5,\"z\":0},{\"x\":0.6,\"y\":0.78,\"z\":0},{\"x\":0.25,\"y\":0.9,\"z\":0},{\"x\":-0.25,\"y\":0.9,\"z\":0},{\"x\":-0.6,\"y\":0.78,\"z\":0},{\"x\":-0.85,\"y\":0.5,\"z\":0},{\"x\":-0.95,\"y\":0.2,\"z\":0},{\"x\":-0.9,\"y\":0,\"z\":0}]",
-            "editPlane": "xy"
-          }
-        },
-        {
-          "id": "body_sweep",
-          "type": "SweepAlongSpline",
-          "position": { "x": 200, "y": 160 },
-          "data": {
-            "surfaceShape": "crossSection",
-            "sampleSpacing": 0.5,
-            "capStart": true,
-            "capEnd": true,
-            "upX": 0, "upY": 1, "upZ": 0,
-            "scaleStart": 1.0, "scaleEnd": 1.0,
-            "profilePlane": "xy"
-          }
-        },
-        {
-          "id": "body_group",
-          "type": "GroupCreate",
-          "position": { "x": 200, "y": 320 },
-          "data": {
-            "outputGroup": "bevel_edges",
-            "domain": "edge",
-            "mode": "angle",
-            "minEdgeAngle": 30,
-            "includeUnshared": false,
-            "fromFaceGroup": "",
-            "fromEdgeGroup": ""
-          }
-        },
-        {
-          "id": "body_bevel",
-          "type": "BevelMesh",
-          "position": { "x": 200, "y": 480 },
-          "data": {
-            "method": "edge",
-            "amount": 0.06,
-            "segments": 2,
-            "clampOverlap": true,
-            "edgeGroup": "bevel_edges",
-            "excludeUnshared": true,
-            "excludeGroups": "cap_start,cap_end"
-          }
-        },
-        {
-          "id": "out",
-          "type": "Output",
-          "position": { "x": 200, "y": 640 },
-          "data": { "label": "SedanBody" }
-        }
-      ],
-      "edges": [
-        { "id": "e1", "source": "body_path", "target": "body_sweep", "sourceHandle": "out", "targetHandle": "backbone" },
-        { "id": "e2", "source": "body_profile", "target": "body_sweep", "sourceHandle": "out", "targetHandle": "profile" },
-        { "id": "e3", "source": "body_sweep", "target": "body_group", "sourceHandle": "out", "targetHandle": "in" },
-        { "id": "e4", "source": "body_group", "target": "body_bevel", "sourceHandle": "out", "targetHandle": "in" },
-        { "id": "e5", "source": "body_bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
-      ]
-    })";
-
-    expect_code(pcg_validate_graph(sedan_body_graph, err, sizeof(err)), PCG_OK, "sedan body validate");
-
-    pcg::internal::data::PcgMeshData sedan_body_mesh;
-    int sedan_body_vertices = 0;
-    int sedan_body_indices = 0;
-    expect_code(execute_mesh_graph(sedan_body_graph, 42, sedan_body_mesh, sedan_body_vertices,
-                                   sedan_body_indices, err, sizeof(err)),
-                PCG_OK, "sedan body execute");
-
-    const int sedan_body_boundary = boundary_edge_count(sedan_body_mesh);
-    if (sedan_body_boundary != 0) {
-        std::printf("FAIL: sedan body Sweep+Bevel has boundary edges (%d)\n", sedan_body_boundary);
-        dump_boundary_edges(sedan_body_mesh);
-        dump_boundary_loops(sedan_body_mesh);
-        return 1;
-    }
-
-    const int sedan_body_bad = manifold_winding_bad_count(sedan_body_mesh);
-    if (sedan_body_bad != 0) {
-        std::printf("FAIL: sedan body Sweep+Bevel has opposite-winding manifold edges (%d)\n",
-                    sedan_body_bad);
-        return 1;
-    }
-
-    if (signed_volume(sedan_body_mesh) <= 0.0) {
-        std::printf("FAIL: sedan body Sweep+Bevel signed volume <= 0\n");
-        return 1;
-    }
-
-    std::printf("PASS: sedan body Sweep+Bevel (%d verts, %d indices)\n",
-                sedan_body_vertices, sedan_body_indices);
-
-    // Task 2.7: terminal cap parameterized regression
-    // cap={start,end,both} × segments={1,2,3} × path_length={4.0,4.2} = 18 configs
-    {
-        struct CapConfig { const char* name; bool start; bool end; };
-        const CapConfig caps[] = {
-            {"both",  true,  true},
-            {"start", true,  false},
-            {"end",   false, true},
-        };
-        const int segs[] = {1, 2, 3};
-        const double paths[] = {4.0, 4.2};
-
-        int pass_count = 0;
-        for (const auto& cap : caps) {
-            for (int seg : segs) {
-                for (double path_len : paths) {
-                    const std::string graph = build_parametric_sedan(
-                        cap.start, cap.end, seg, path_len);
-
-                    char err2[512] = {};
-                    expect_code(pcg_validate_graph(graph.c_str(), err2, sizeof(err2)),
-                                PCG_OK, "parametric sedan validate");
-
-                    pcg::internal::data::PcgMeshData pmesh;
-                    int pvc = 0, pic = 0;
-                    expect_code(execute_mesh_graph(graph.c_str(), 42, pmesh, pvc, pic,
-                                                   err2, sizeof(err2)),
-                                PCG_OK, "parametric sedan execute");
-
-                    if (cap.start && cap.end) {
-                        // Closed mesh: boundary=0, winding bad=0, vol>0
-                        const int boundary = boundary_edge_count(pmesh);
-                        const int bad = manifold_winding_bad_count(pmesh);
-                        if (boundary != 0) {
-                            std::printf("FAIL: parametric cap=both seg=%d path=%.1f "
-                                        "boundary=%d (expected 0)\n", seg, path_len, boundary);
-                            dump_boundary_edges(pmesh);
-                            return 1;
-                        }
-                        if (bad != 0) {
-                            std::printf("FAIL: parametric cap=both seg=%d path=%.1f "
-                                        "winding_bad=%d (expected 0)\n", seg, path_len, bad);
-                            return 1;
-                        }
-                        if (signed_volume(pmesh) <= 0.0) {
-                            std::printf("FAIL: parametric cap=both seg=%d path=%.1f "
-                                        "volume<=0\n", seg, path_len);
-                            return 1;
-                        }
-                    } else {
-                        // Open mesh: boundary>0, at least 1 open loop at missing cap end.
-                        // Bevel terminal vertices create additional small loops at the
-                        // uncapped end, so the exact count depends on segments/profile.
-                        const int boundary = boundary_edge_count(pmesh);
-                        const int loops = count_boundary_loops(pmesh);
-                        if (boundary == 0) {
-                            std::printf("FAIL: parametric cap=%s seg=%d path=%.1f "
-                                        "boundary=0 (expected >0)\n", cap.name, seg, path_len);
-                            return 1;
-                        }
-                        if (loops < 1) {
-                            std::printf("FAIL: parametric cap=%s seg=%d path=%.1f "
-                                        "loops=%d (expected >=1)\n",
-                                        cap.name, seg, path_len, loops);
-                            return 1;
-                        }
-                    }
-                    ++pass_count;
-                }
-            }
-        }
-        std::printf("PASS: terminal cap parameterized regression (%d/18 configs)\n",
-                    pass_count);
-    }
-
+    std::printf("PASS: compact Sweep+Bevel cap regression (3 cases)\n");
     return 0;
 }

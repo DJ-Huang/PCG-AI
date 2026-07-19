@@ -1,0 +1,1637 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "plinth",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -1600,
+        "y": 0
+      },
+      "data": {
+        "width": 8.4,
+        "height": 0.4,
+        "depth": 6.4,
+        "__nodeTitle": "Plinth Box"
+      }
+    },
+    {
+      "id": "plinth_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -1600,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0.2,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Plinth Lift"
+      }
+    },
+    {
+      "id": "plinth_div",
+      "type": "SubdivideMesh",
+      "position": {
+        "x": -1600,
+        "y": 320
+      },
+      "data": {
+        "levels": 1,
+        "method": "simple",
+        "__nodeTitle": "Plinth Div"
+      }
+    },
+    {
+      "id": "plinth_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -1600,
+        "y": 480
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.04,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Plinth Bevel"
+      }
+    },
+    {
+      "id": "post_raw",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -640,
+        "y": 0
+      },
+      "data": {
+        "width": 1.0,
+        "height": 1.0,
+        "depth": 1.0,
+        "__nodeTitle": "Post Raw"
+      }
+    },
+    {
+      "id": "post_match",
+      "type": "MatchSize",
+      "position": {
+        "x": -640,
+        "y": 160
+      },
+      "data": {
+        "scaleToFit": true,
+        "uniformScale": false,
+        "uniformScaleMode": "fit",
+        "sourceJustifyX": "center",
+        "sourceJustifyY": "center",
+        "sourceJustifyZ": "center",
+        "targetJustifyX": "center",
+        "targetJustifyY": "center",
+        "targetJustifyZ": "center",
+        "targetCenterX": 0,
+        "targetCenterY": 0,
+        "targetCenterZ": 0,
+        "targetSizeX": 0.28,
+        "targetSizeY": 2.7,
+        "targetSizeZ": 0.28,
+        "__nodeTitle": "Post MatchSize"
+      }
+    },
+    {
+      "id": "post_lift",
+      "type": "TransformMesh",
+      "position": {
+        "x": -640,
+        "y": 320
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 1.35,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Post Lift"
+      }
+    },
+    {
+      "id": "post_grid",
+      "type": "CreatePointGrid",
+      "position": {
+        "x": -320,
+        "y": 0
+      },
+      "data": {
+        "pointCountX": 3,
+        "pointCountY": 3,
+        "spacing": 3.5,
+        "__nodeTitle": "Post Grid"
+      }
+    },
+    {
+      "id": "post_jitter",
+      "type": "AttributeRandomize",
+      "position": {
+        "x": -320,
+        "y": 160
+      },
+      "data": {
+        "seed": 17,
+        "translateX": 0.03,
+        "translateY": 0.0,
+        "translateZ": 0.03,
+        "rotateX": 0,
+        "rotateY": 3,
+        "rotateZ": 0,
+        "scaleMin": 0.98,
+        "scaleMax": 1.02,
+        "__nodeTitle": "Post Jitter"
+      }
+    },
+    {
+      "id": "posts_copy",
+      "type": "CopyMeshToPoints",
+      "position": {
+        "x": -480,
+        "y": 480
+      },
+      "data": {
+        "__nodeTitle": "Posts Copy"
+      }
+    },
+    {
+      "id": "posts_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -480,
+        "y": 640
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.015,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Posts Bevel"
+      }
+    },
+    {
+      "id": "beam_xf",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "width": 8.0,
+        "height": 0.22,
+        "depth": 0.24,
+        "__nodeTitle": "Beam Front"
+      }
+    },
+    {
+      "id": "beam_xf_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 2.55,
+        "translateZ": 2.88,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Beam Front Place"
+      }
+    },
+    {
+      "id": "beam_xf_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.02,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Beam Front Bevel"
+      }
+    },
+    {
+      "id": "beam_xb",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 320,
+        "y": 0
+      },
+      "data": {
+        "width": 8.0,
+        "height": 0.22,
+        "depth": 0.24,
+        "__nodeTitle": "Beam Back"
+      }
+    },
+    {
+      "id": "beam_xb_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 320,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 2.55,
+        "translateZ": -2.88,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Beam Back Place"
+      }
+    },
+    {
+      "id": "beam_xb_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 320,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.02,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Beam Back Bevel"
+      }
+    },
+    {
+      "id": "beam_zl",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 640,
+        "y": 0
+      },
+      "data": {
+        "width": 0.24,
+        "height": 0.22,
+        "depth": 6.0,
+        "__nodeTitle": "Beam Left"
+      }
+    },
+    {
+      "id": "beam_zl_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 640,
+        "y": 160
+      },
+      "data": {
+        "translateX": -3.88,
+        "translateY": 2.55,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Beam Left Place"
+      }
+    },
+    {
+      "id": "beam_zl_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 640,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.02,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Beam Left Bevel"
+      }
+    },
+    {
+      "id": "beam_zr",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "width": 0.24,
+        "height": 0.22,
+        "depth": 6.0,
+        "__nodeTitle": "Beam Right"
+      }
+    },
+    {
+      "id": "beam_zr_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 960,
+        "y": 160
+      },
+      "data": {
+        "translateX": 3.88,
+        "translateY": 2.55,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Beam Right Place"
+      }
+    },
+    {
+      "id": "beam_zr_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 960,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.02,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Beam Right Bevel"
+      }
+    },
+    {
+      "id": "beams_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 320,
+        "y": 480
+      },
+      "data": {
+        "__nodeTitle": "Merge Beams"
+      }
+    },
+    {
+      "id": "wall_f",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1600,
+        "y": 0
+      },
+      "data": {
+        "width": 8.0,
+        "height": 2.55,
+        "depth": 0.12,
+        "__nodeTitle": "Wall Front"
+      }
+    },
+    {
+      "id": "wall_f_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1600,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 1.355,
+        "translateZ": 2.94,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Wall Front Place"
+      }
+    },
+    {
+      "id": "wall_f_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1600,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Wall Front Bevel"
+      }
+    },
+    {
+      "id": "wall_bk",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1920,
+        "y": 0
+      },
+      "data": {
+        "width": 8.0,
+        "height": 2.55,
+        "depth": 0.12,
+        "__nodeTitle": "Wall Back"
+      }
+    },
+    {
+      "id": "wall_bk_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1920,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 1.355,
+        "translateZ": -2.94,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Wall Back Place"
+      }
+    },
+    {
+      "id": "wall_bk_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1920,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Wall Back Bevel"
+      }
+    },
+    {
+      "id": "wall_l",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2240,
+        "y": 0
+      },
+      "data": {
+        "width": 0.12,
+        "height": 2.55,
+        "depth": 5.76,
+        "__nodeTitle": "Wall Left"
+      }
+    },
+    {
+      "id": "wall_l_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2240,
+        "y": 160
+      },
+      "data": {
+        "translateX": -3.94,
+        "translateY": 1.355,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Wall Left Place"
+      }
+    },
+    {
+      "id": "wall_l_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 2240,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Wall Left Bevel"
+      }
+    },
+    {
+      "id": "wall_r",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2560,
+        "y": 0
+      },
+      "data": {
+        "width": 0.12,
+        "height": 2.55,
+        "depth": 5.76,
+        "__nodeTitle": "Wall Right"
+      }
+    },
+    {
+      "id": "wall_r_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2560,
+        "y": 160
+      },
+      "data": {
+        "translateX": 3.94,
+        "translateY": 1.355,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Wall Right Place"
+      }
+    },
+    {
+      "id": "wall_r_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 2560,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Wall Right Bevel"
+      }
+    },
+    {
+      "id": "win_fl",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1600,
+        "y": 480
+      },
+      "data": {
+        "width": 1.2,
+        "height": 1.1,
+        "depth": 0.08,
+        "__nodeTitle": "Win Front L"
+      }
+    },
+    {
+      "id": "win_fl_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1600,
+        "y": 640
+      },
+      "data": {
+        "translateX": -1.6,
+        "translateY": 1.4,
+        "translateZ": 3.02,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Win Front L Place"
+      }
+    },
+    {
+      "id": "win_fr",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1920,
+        "y": 480
+      },
+      "data": {
+        "width": 1.2,
+        "height": 1.1,
+        "depth": 0.08,
+        "__nodeTitle": "Win Front R"
+      }
+    },
+    {
+      "id": "win_fr_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1920,
+        "y": 640
+      },
+      "data": {
+        "translateX": 1.6,
+        "translateY": 1.4,
+        "translateZ": 3.02,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Win Front R Place"
+      }
+    },
+    {
+      "id": "win_bk",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2240,
+        "y": 480
+      },
+      "data": {
+        "width": 1.2,
+        "height": 1.1,
+        "depth": 0.08,
+        "__nodeTitle": "Win Back"
+      }
+    },
+    {
+      "id": "win_bk_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2240,
+        "y": 640
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 1.4,
+        "translateZ": -3.02,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Win Back Place"
+      }
+    },
+    {
+      "id": "win_l",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2560,
+        "y": 480
+      },
+      "data": {
+        "width": 0.08,
+        "height": 1.1,
+        "depth": 1.2,
+        "__nodeTitle": "Win Left"
+      }
+    },
+    {
+      "id": "win_l_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2560,
+        "y": 640
+      },
+      "data": {
+        "translateX": -4.02,
+        "translateY": 1.4,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Win Left Place"
+      }
+    },
+    {
+      "id": "win_r",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2880,
+        "y": 480
+      },
+      "data": {
+        "width": 0.08,
+        "height": 1.1,
+        "depth": 1.2,
+        "__nodeTitle": "Win Right"
+      }
+    },
+    {
+      "id": "win_r_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2880,
+        "y": 640
+      },
+      "data": {
+        "translateX": 4.02,
+        "translateY": 1.4,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Win Right Place"
+      }
+    },
+    {
+      "id": "walls_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1920,
+        "y": 800
+      },
+      "data": {
+        "__nodeTitle": "Merge Walls"
+      }
+    },
+    {
+      "id": "floor_slab",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -1280,
+        "y": 0
+      },
+      "data": {
+        "width": 7.9,
+        "height": 0.18,
+        "depth": 5.9,
+        "__nodeTitle": "Floor Slab"
+      }
+    },
+    {
+      "id": "floor_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -1280,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0.09,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Floor Place"
+      }
+    },
+    {
+      "id": "floor_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -1280,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.02,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "__nodeTitle": "Floor Bevel"
+      }
+    },
+    {
+      "id": "story_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 200,
+        "y": 960
+      },
+      "data": {
+        "__nodeTitle": "Merge Story"
+      }
+    },
+    {
+      "id": "floors_path",
+      "type": "CreateSpline",
+      "position": {
+        "x": 200,
+        "y": 1120
+      },
+      "data": {
+        "mode": "line",
+        "closed": false,
+        "subdivisions": 8,
+        "startX": 0,
+        "startY": 0.4,
+        "startZ": 0,
+        "endX": 0,
+        "endY": 5.8,
+        "endZ": 0,
+        "controlPoints": "[{\"x\":0,\"y\":0.4,\"z\":0},{\"x\":0,\"y\":5.8,\"z\":0}]",
+        "editPlane": "none",
+        "sceneOffsetX": 0,
+        "sceneOffsetY": 0,
+        "sceneOffsetZ": 0,
+        "__nodeTitle": "Floors Path"
+      }
+    },
+    {
+      "id": "floors_sample",
+      "type": "SampleAlongSpline",
+      "position": {
+        "x": 200,
+        "y": 1280
+      },
+      "data": {
+        "spacing": 2.7,
+        "offset": 0.0,
+        "includeEnd": true,
+        "alignToTangent": false,
+        "seed": 0,
+        "__nodeTitle": "Floor Samples"
+      }
+    },
+    {
+      "id": "floors",
+      "type": "CopyMeshToPoints",
+      "position": {
+        "x": 200,
+        "y": 1440
+      },
+      "data": {
+        "__nodeTitle": "Stack Stories"
+      }
+    },
+    {
+      "id": "roof_panel_a",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 3200,
+        "y": 0
+      },
+      "data": {
+        "width": 8.6,
+        "height": 0.12,
+        "depth": 3.816084380618437,
+        "__nodeTitle": "Roof Panel A"
+      }
+    },
+    {
+      "id": "roof_panel_a_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3200,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 1.0,
+        "translateZ": -1.625,
+        "rotationX": -31.607502246248906,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Roof Panel A Place"
+      }
+    },
+    {
+      "id": "roof_panel_b",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 3520,
+        "y": 0
+      },
+      "data": {
+        "width": 8.6,
+        "height": 0.12,
+        "depth": 3.816084380618437,
+        "__nodeTitle": "Roof Panel B"
+      }
+    },
+    {
+      "id": "roof_panel_b_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3520,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 1.0,
+        "translateZ": 1.625,
+        "rotationX": 31.607502246248906,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Roof Panel B Place"
+      }
+    },
+    {
+      "id": "gable_l",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 3840,
+        "y": 0
+      },
+      "data": {
+        "width": 0.12,
+        "height": 2.0,
+        "depth": 6.5,
+        "__nodeTitle": "Gable Left"
+      }
+    },
+    {
+      "id": "gable_l_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3840,
+        "y": 160
+      },
+      "data": {
+        "translateX": -4.0,
+        "translateY": 1.0,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Gable Left Place"
+      }
+    },
+    {
+      "id": "gable_r",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 4160,
+        "y": 0
+      },
+      "data": {
+        "width": 0.12,
+        "height": 2.0,
+        "depth": 6.5,
+        "__nodeTitle": "Gable Right"
+      }
+    },
+    {
+      "id": "gable_r_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4160,
+        "y": 160
+      },
+      "data": {
+        "translateX": 4.0,
+        "translateY": 1.0,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Gable Right Place"
+      }
+    },
+    {
+      "id": "ridge",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 4480,
+        "y": 0
+      },
+      "data": {
+        "width": 8.5,
+        "height": 0.16,
+        "depth": 0.26,
+        "__nodeTitle": "Ridge Beam"
+      }
+    },
+    {
+      "id": "ridge_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4480,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 2.02,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Ridge Place"
+      }
+    },
+    {
+      "id": "roof_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 3520,
+        "y": 320
+      },
+      "data": {
+        "__nodeTitle": "Merge Roof"
+      }
+    },
+    {
+      "id": "roof_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3520,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 8.35,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Roof Place"
+      }
+    },
+    {
+      "id": "house_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 200,
+        "y": 1600
+      },
+      "data": {
+        "__nodeTitle": "House Assembly"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 200,
+        "y": 1760
+      },
+      "data": {
+        "label": "Output",
+        "__nodeTitle": "Output"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_f1",
+      "source": "plinth",
+      "target": "plinth_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_f2",
+      "source": "plinth_xf",
+      "target": "plinth_div",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_f3",
+      "source": "plinth_div",
+      "target": "plinth_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_p1",
+      "source": "post_raw",
+      "target": "post_match",
+      "sourceHandle": "out",
+      "targetHandle": "source"
+    },
+    {
+      "id": "e_p2",
+      "source": "post_match",
+      "target": "post_lift",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_p3",
+      "source": "post_grid",
+      "target": "post_jitter",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_p4",
+      "source": "post_lift",
+      "target": "posts_copy",
+      "sourceHandle": "out",
+      "targetHandle": "prototype"
+    },
+    {
+      "id": "e_p5",
+      "source": "post_jitter",
+      "target": "posts_copy",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    },
+    {
+      "id": "e_p6",
+      "source": "posts_copy",
+      "target": "posts_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bf1",
+      "source": "beam_xf",
+      "target": "beam_xf_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bf2",
+      "source": "beam_xf_p",
+      "target": "beam_xf_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bb1",
+      "source": "beam_xb",
+      "target": "beam_xb_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bb2",
+      "source": "beam_xb_p",
+      "target": "beam_xb_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bl1",
+      "source": "beam_zl",
+      "target": "beam_zl_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bl2",
+      "source": "beam_zl_p",
+      "target": "beam_zl_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_br1",
+      "source": "beam_zr",
+      "target": "beam_zr_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_br2",
+      "source": "beam_zr_p",
+      "target": "beam_zr_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bm1",
+      "source": "beam_xf_b",
+      "target": "beams_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bm2",
+      "source": "beam_xb_b",
+      "target": "beams_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bm3",
+      "source": "beam_zl_b",
+      "target": "beams_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bm4",
+      "source": "beam_zr_b",
+      "target": "beams_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wf1",
+      "source": "wall_f",
+      "target": "wall_f_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wf2",
+      "source": "wall_f_p",
+      "target": "wall_f_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wb1",
+      "source": "wall_bk",
+      "target": "wall_bk_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wb2",
+      "source": "wall_bk_p",
+      "target": "wall_bk_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wl1",
+      "source": "wall_l",
+      "target": "wall_l_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wl2",
+      "source": "wall_l_p",
+      "target": "wall_l_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wr1",
+      "source": "wall_r",
+      "target": "wall_r_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wr2",
+      "source": "wall_r_p",
+      "target": "wall_r_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wfl1",
+      "source": "win_fl",
+      "target": "win_fl_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wfr1",
+      "source": "win_fr",
+      "target": "win_fr_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wbk1",
+      "source": "win_bk",
+      "target": "win_bk_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wln1",
+      "source": "win_l",
+      "target": "win_l_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wrn1",
+      "source": "win_r",
+      "target": "win_r_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm1",
+      "source": "wall_f_b",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm2",
+      "source": "wall_bk_b",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm3",
+      "source": "wall_l_b",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm4",
+      "source": "wall_r_b",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm5",
+      "source": "win_fl_p",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm6",
+      "source": "win_fr_p",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm7",
+      "source": "win_bk_p",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm8",
+      "source": "win_l_p",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_wm9",
+      "source": "win_r_p",
+      "target": "walls_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_fl1",
+      "source": "floor_slab",
+      "target": "floor_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_fl2",
+      "source": "floor_xf",
+      "target": "floor_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_s1",
+      "source": "posts_bevel",
+      "target": "story_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_s2",
+      "source": "beams_merge",
+      "target": "story_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_s3",
+      "source": "walls_merge",
+      "target": "story_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_s4",
+      "source": "floor_bevel",
+      "target": "story_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_s5",
+      "source": "floors_path",
+      "target": "floors_sample",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_s6",
+      "source": "story_merge",
+      "target": "floors",
+      "sourceHandle": "out",
+      "targetHandle": "prototype"
+    },
+    {
+      "id": "e_s7",
+      "source": "floors_sample",
+      "target": "floors",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    },
+    {
+      "id": "e_h1",
+      "source": "plinth_bevel",
+      "target": "house_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_h2",
+      "source": "floors",
+      "target": "house_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_h4",
+      "source": "house_merge",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_ra1",
+      "source": "roof_panel_a",
+      "target": "roof_panel_a_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rb1",
+      "source": "roof_panel_b",
+      "target": "roof_panel_b_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_gl1",
+      "source": "gable_l",
+      "target": "gable_l_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_gr1",
+      "source": "gable_r",
+      "target": "gable_r_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rr1",
+      "source": "ridge",
+      "target": "ridge_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rm1",
+      "source": "roof_panel_a_xf",
+      "target": "roof_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rm2",
+      "source": "roof_panel_b_xf",
+      "target": "roof_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rm3",
+      "source": "gable_l_xf",
+      "target": "roof_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rm4",
+      "source": "gable_r_xf",
+      "target": "roof_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rm5",
+      "source": "ridge_xf",
+      "target": "roof_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rp1",
+      "source": "roof_merge",
+      "target": "roof_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rh1",
+      "source": "roof_place",
+      "target": "house_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "p1",
+      "name": "StoryHeight",
+      "type": "number",
+      "default": 2.7,
+      "exposed": true,
+      "targetNode": "floors_sample",
+      "targetProperty": "spacing",
+      "hasRange": true,
+      "min": 1.5,
+      "max": 4.0
+    },
+    {
+      "id": "p3",
+      "name": "PostJitterSeed",
+      "type": "integer",
+      "default": 17,
+      "exposed": true,
+      "targetNode": "post_jitter",
+      "targetProperty": "seed",
+      "hasRange": false
+    },
+    {
+      "id": "p4",
+      "name": "WallBevel",
+      "type": "number",
+      "default": 0.05,
+      "exposed": true,
+      "targetNode": "wall_f_b",
+      "targetProperty": "amount",
+      "hasRange": true,
+      "min": 0.01,
+      "max": 0.15
+    }
+  ],
+  "subgraphs": []
+}

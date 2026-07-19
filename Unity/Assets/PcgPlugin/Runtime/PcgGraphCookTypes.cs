@@ -20,6 +20,28 @@ namespace DJTechRuntime.PCG
         GpuInstancing = 1,
     }
 
+    /// <summary>
+    /// Primary host output for a <see cref="PcgGraphComponent"/>.
+    /// Mesh mode applies cook results to MeshFilter/MeshRenderer.
+    /// Terrain mode writes typed HeightField results to bound TerrainData only.
+    /// </summary>
+    public enum PcgHostOutputMode
+    {
+        Mesh = 0,
+        Terrain = 1,
+    }
+
+    /// <summary>
+    /// When to recook the full HeightField graph after editing a stamp overlay gizmo.
+    /// Overlay matrix updates always happen immediately; cook follows this mode.
+    /// </summary>
+    public enum PcgStampLiveCookMode
+    {
+        Manual = 0,
+        OnRelease = 1,
+        WhileDragging = 2,
+    }
+
     [Serializable]
     public class PcgMeshBinding
     {
@@ -27,6 +49,13 @@ namespace DJTechRuntime.PCG
         public PcgMeshBindingSource source = PcgMeshBindingSource.SceneObject;
         public GameObject sceneObject;
         public Mesh meshAsset;
+    }
+
+    [Serializable]
+    public class PcgMaterialBinding
+    {
+        public string materialName;
+        public Material material;
     }
 
     public enum PcgMeshBindingSource

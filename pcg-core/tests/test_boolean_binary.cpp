@@ -35,7 +35,27 @@ void test_geometry_binary_roundtrip()
     // Add some groups
     geo.groups().add(GroupDomain::Face, "a_outside_b", 0);
     geo.groups().add(GroupDomain::Face, "b_inside_a", 1);
-    geo.groups().add(GroupDomain::Edge, "ab_seams", 12345);
+    const GroupId high_edge = edge_group_id(12345, 67890);
+    geo.groups().add(GroupDomain::Edge, "ab_seams", high_edge);
+    geo.groups().add(GroupDomain::Vertex, "corners", 4);
+
+    auto& point_id = geo.attributes().create_int(AttributeOwner::Point, "id", 1, {-1});
+    point_id.int_values_mut() = {10, 11, 12, 13};
+    auto& vertex_weight = geo.attributes().create_float(
+        AttributeOwner::Vertex, "weight", 2, {0.25, 0.75},
+        AttributeTransformRole::Vector);
+    vertex_weight.float_values_mut() = {
+        0.0, 0.1, 1.0, 1.1, 2.0, 2.1,
+        3.0, 3.1, 4.0, 4.1, 5.0, 5.1,
+    };
+    auto& primitive_name = geo.attributes().create_string(
+        AttributeOwner::Primitive, "part", 1, {"unset"});
+    primitive_name.string_values_mut() = {"left", "right"};
+    auto& detail_scale = geo.attributes().create_float(
+        AttributeOwner::Detail, "source_scale", 3, {1.0, 1.0, 1.0});
+    detail_scale.float_values_mut() = {2.0, 3.0, 4.0};
+    if (!geo.validate_attributes())
+        fail("geometry_binary: source attribute table is invalid");
 
     // Serialize
     int bsize = geometry_binary_size(geo);
@@ -76,6 +96,12 @@ void test_geometry_binary_roundtrip()
     auto restored_edge_groups = restored.groups().group_names(GroupDomain::Edge);
     if (original_edge_groups.size() != restored_edge_groups.size())
         fail("geometry_binary: edge group count mismatch");
+    if (!restored.groups().contains(GroupDomain::Edge, "ab_seams", high_edge))
+        fail("geometry_binary: 64-bit edge id was truncated");
+    if (!restored.groups().contains(GroupDomain::Vertex, "corners", 4))
+        fail("geometry_binary: vertex group was lost");
+    if (!(restored.attributes() == geo.attributes()))
+        fail("geometry_binary: generic attributes changed after round-trip");
 }
 
 void test_boolean_result_roundtrip()

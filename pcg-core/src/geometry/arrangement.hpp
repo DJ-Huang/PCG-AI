@@ -27,9 +27,18 @@ enum class MeshTreatment {
 
 /// Detriangulation mode (Houdini-aligned).
 enum class DetriangulateMode {
-    All,       // Merge all coplanar triangles
-    Unchanged, // Only merge non-seam-split triangles
+    All,       // Rebuild neighboring triangles from the same input polygon
+    Unchanged, // Rebuild only input polygons untouched by the Boolean
     None,      // Keep all triangles
+};
+
+/// Source polygon carried by one triangle in the extracted Boolean geometry.
+/// `source` is 0 for A and 1 for B. `changed` is true when any triangle from
+/// the source polygon was split by an intersection constraint.
+struct BooleanFaceOrigin {
+    int source = -1;
+    int original_face = -1;
+    bool changed = true;
 };
 
 /// Error types for boolean operations.
@@ -45,6 +54,7 @@ enum class BooleanErrorType {
 /// Result of a boolean operation.
 struct BooleanResult {
     data::PcgGeometry geometry;
+    std::vector<BooleanFaceOrigin> face_origins;
     BooleanErrorType error = BooleanErrorType::Ok;
     std::string message;
     std::vector<int> bad_operand_indices;

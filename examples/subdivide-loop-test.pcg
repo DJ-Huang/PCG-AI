@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "width": 2.0,
+        "height": 2.0,
+        "depth": 2.0
+      }
+    },
+    {
+      "id": "color",
+      "type": "VertexColor",
+      "position": { "x": 0, "y": 160 },
+      "data": {
+        "r": 0.4,
+        "g": 0.5,
+        "b": 0.8,
+        "a": 1.0
+      }
+    },
+    {
+      "id": "subdiv",
+      "type": "SubdivideMesh",
+      "position": { "x": 0, "y": 320 },
+      "data": {
+        "levels": 2,
+        "method": "catmullClark"
+      }
+    },
+    {
+      "id": "bevel",
+      "type": "BevelMesh",
+      "position": { "x": 0, "y": 480 },
+      "data": {
+        "method": "edge",
+        "amount": 0.08,
+        "segments": 3,
+        "angleLimit": 25,
+        "profile": 0.7
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 0, "y": 640 },
+      "data": {
+        "label": "Subdivide Method Test"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "box", "target": "color", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2", "source": "color", "target": "subdiv", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e3", "source": "subdiv", "target": "bevel", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e4", "source": "bevel", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

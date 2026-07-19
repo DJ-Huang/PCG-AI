@@ -180,7 +180,7 @@ Vec3 get_profile_point(const Profile& pro, int i, int nseg, int bp_seg);
 float find_profile_fullness(int seg, float super_r, float profile_param);
 
 /// Fill ProfileSpacing with evenly-spaced superellipse chord coordinates.
-void set_profile_spacing(int seg, float super_r, ProfileSpacing& pro_spacing);
+void set_profile_spacing(int seg, float super_r, float profile, ProfileSpacing& pro_spacing);
 
 // ── Core Bevel Structures ──────────────────────────────────────────────────
 
@@ -294,13 +294,20 @@ struct BevelParams {
     std::vector<BevVert> bevverts;
 
     // Output mesh builder
+    struct OutputFace {
+        std::vector<int> verts;
+        int origin = -1;
+    };
+
     struct OutputMesh {
         std::vector<Vec3> vertices;
-        std::vector<int> triangles;
-        /// BMesh face index per output triangle (-1 for new geometry). Parallel to triangles (1 entry per tri).
-        std::vector<int> face_origins;
+        std::vector<OutputFace> faces;  // PRIMARY source of truth
         int current_face_origin = -1;
         std::unordered_map<std::string, int> vertex_cache;
+
+        // Derived cache — rebuilt by rebuild_triangles_from_faces().
+        std::vector<int> triangles;
+        std::vector<int> face_origins;
 
         int get_vertex(const Vec3& v) {
             auto quantize = [](double val) -> int64_t {
@@ -318,68 +325,47 @@ struct BevelParams {
             return idx;
         }
 
-        void add_triangle(int a, int b, int c) {
-            triangles.push_back(a);
-            triangles.push_back(b);
-            triangles.push_back(c);
-            face_origins.push_back(current_face_origin);
-        }
-
-        /// Emit a quad with Blender loop order (no mesh-center reorientation).
-        void add_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3) {
-            const int i0 = get_vertex(v0);
-            const int i1 = get_vertex(v1);
-            const int i2 = get_vertex(v2);
-            const int i3 = get_vertex(v3);
-            add_triangle(i0, i1, i2);
-            add_triangle(i0, i2, i3);
-        }
-
-        void add_polygon(const std::vector<Vec3>& poly) {
-            if (poly.size() < 3)
-                return;
-            const int i0 = get_vertex(poly[0]);
-            for (size_t i = 1; i + 1 < poly.size(); ++i)
-                add_triangle(i0, get_vertex(poly[i]), get_vertex(poly[i + 1]));
-        }
-
-        void add_oriented_triangle(const Vec3& a, const Vec3& b, const Vec3& c,
-                                    const Vec3& desired_normal) {
-            Vec3 n = cross(sub(b, a), sub(c, a));
-            int ia = get_vertex(a);
-            int ib = get_vertex(b);
-            int ic = get_vertex(c);
-            if (dot(n, desired_normal) < 0.0)
-                add_triangle(ia, ic, ib);
-            else
-                add_triangle(ia, ib, ic);
-        }
-
-        /// Fan-triangulate a polygon with ONE orientation decision (Blender keeps a
-        /// single loop winding; per-triangle flips on non-planar n-gons break manifold edges).
-        void add_oriented_polygon(const std::vector<Vec3>& poly, const Vec3& desired_normal) {
-            if (poly.size() < 3)
-                return;
-            // Sum all fan-triangle normals for a numerically stable polygon normal.
-            Vec3 n{};
-            for (size_t i = 1; i + 1 < poly.size(); ++i)
-                n = add(n, cross(sub(poly[i], poly[0]), sub(poly[i + 1], poly[0])));
-            const bool flip = dot(n, desired_normal) < 0.0;
-            const int i0 = get_vertex(poly[0]);
-            for (size_t i = 1; i + 1 < poly.size(); ++i) {
-                const int ia = get_vertex(poly[i]);
-                const int ib = get_vertex(poly[i + 1]);
-                if (flip)
-                    add_triangle(i0, ib, ia);
-                else
-                    add_triangle(i0, ia, ib);
+        /// Emit a face from vertex indices. Folds consecutive duplicates
+        /// and first==last; <3 distinct verts → skipped.
+        void emit_face(const std::vector<int>& indices) {
+            if (indices.size() < 3) return;
+            std::vector<int> clean;
+            clean.reserve(indices.size());
+            for (size_t i = 0; i < indices.size(); ++i) {
+                if (!clean.empty() && indices[i] == clean.back()) continue;
+                clean.push_back(indices[i]);
             }
+            if (clean.size() > 1 && clean.front() == clean.back())
+                clean.pop_back();
+            if (clean.size() < 3) return;
+            std::unordered_set<int> distinct(clean.begin(), clean.end());
+            if (distinct.size() < 3) return;
+            faces.push_back({std::move(clean), current_face_origin});
         }
 
-        void add_oriented_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3,
-                               const Vec3& desired_normal) {
-            // One orientation for the whole quad (Blender creates a single n-gon / consistent loop).
-            // Independent per-triangle flips break the shared diagonal on non-planar quads.
+        void emit_face(std::initializer_list<int> indices) {
+            emit_face(std::vector<int>(indices));
+        }
+
+        /// Emit an oriented face from positions + desired normal.
+        void emit_oriented_face(const std::vector<Vec3>& points, const Vec3& desired_normal) {
+            if (points.size() < 3) return;
+            Vec3 n{};
+            for (size_t i = 1; i + 1 < points.size(); ++i)
+                n = add(n, cross(sub(points[i], points[0]), sub(points[i + 1], points[0])));
+            const bool flip = dot(n, desired_normal) < 0.0;
+            std::vector<int> indices;
+            indices.reserve(points.size());
+            for (const auto& p : points)
+                indices.push_back(get_vertex(p));
+            if (flip)
+                std::reverse(indices.begin(), indices.end());
+            emit_face(indices);
+        }
+
+        /// Emit an oriented quad (single n-gon face, not two triangles).
+        void emit_oriented_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3,
+                                const Vec3& desired_normal) {
             Vec3 n = cross(sub(v1, v0), sub(v2, v0));
             if (length_squared(n) < 1e-20)
                 n = cross(sub(v2, v0), sub(v3, v0));
@@ -388,46 +374,96 @@ struct BevelParams {
             const int i1 = get_vertex(v1);
             const int i2 = get_vertex(v2);
             const int i3 = get_vertex(v3);
-            if (flip) {
-                add_triangle(i0, i2, i1);
-                add_triangle(i0, i3, i2);
-            } else {
-                add_triangle(i0, i1, i2);
-                add_triangle(i0, i2, i3);
+            if (flip)
+                emit_face({i0, i3, i2, i1});
+            else
+                emit_face({i0, i1, i2, i3});
+        }
+
+        /// Emit an oriented triangle (single tri face).
+        void emit_oriented_triangle(const Vec3& a, const Vec3& b, const Vec3& c,
+                                    const Vec3& desired_normal) {
+            Vec3 n = cross(sub(b, a), sub(c, a));
+            int ia = get_vertex(a);
+            int ib = get_vertex(b);
+            int ic = get_vertex(c);
+            if (dot(n, desired_normal) < 0.0)
+                emit_face({ia, ic, ib});
+            else
+                emit_face({ia, ib, ic});
+        }
+
+        // Legacy compat wrappers — all route through emit_face.
+        void add_triangle(int a, int b, int c) { emit_face({a, b, c}); }
+
+        void add_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3) {
+            emit_face({get_vertex(v0), get_vertex(v1), get_vertex(v2), get_vertex(v3)});
+        }
+
+        void add_polygon(const std::vector<Vec3>& poly) {
+            if (poly.size() < 3) return;
+            std::vector<int> indices;
+            indices.reserve(poly.size());
+            for (const auto& p : poly)
+                indices.push_back(get_vertex(p));
+            emit_face(indices);
+        }
+
+        void add_oriented_triangle(const Vec3& a, const Vec3& b, const Vec3& c,
+                                    const Vec3& desired_normal) {
+            emit_oriented_triangle(a, b, c, desired_normal);
+        }
+
+        void add_oriented_polygon(const std::vector<Vec3>& poly, const Vec3& desired_normal) {
+            emit_oriented_face(poly, desired_normal);
+        }
+
+        void add_oriented_quad(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& v3,
+                               const Vec3& desired_normal) {
+            emit_oriented_quad(v0, v1, v2, v3, desired_normal);
+        }
+
+        /// Rebuild derived triangle buffer from faces (fan triangulation).
+        void rebuild_triangles_from_faces() {
+            triangles.clear();
+            face_origins.clear();
+            for (const auto& face : faces) {
+                if (face.verts.size() < 3) continue;
+                const int i0 = face.verts[0];
+                for (size_t i = 1; i + 1 < face.verts.size(); ++i) {
+                    triangles.push_back(i0);
+                    triangles.push_back(face.verts[i]);
+                    triangles.push_back(face.verts[i + 1]);
+                    face_origins.push_back(face.origin);
+                }
             }
         }
 
-        /// Fix opposite-winding manifold edges by flipping triangles so that
-        /// every manifold edge has opposite winding directions on its two faces.
-        /// Uses BFS propagation from a seed triangle, flipping to match neighbors.
+        /// Fix opposite-winding manifold edges by BFS on polygon faces.
         void fix_winding() {
-            const size_t ntri = triangles.size() / 3;
-            if (ntri == 0) return;
+            if (faces.empty()) return;
 
-            auto edge_key = [](int a, int b) -> uint64_t {
+            auto edge_key_fn = [](int a, int b) -> uint64_t {
                 const int lo = std::min(a, b);
                 const int hi = std::max(a, b);
                 return (static_cast<uint64_t>(static_cast<uint32_t>(lo)) << 32) |
                        static_cast<uint32_t>(hi);
             };
 
-            // Build edge -> list of (tri_idx, direction) where direction=true means a<b
             std::unordered_map<uint64_t, std::vector<std::pair<int, bool>>> edge_owners;
-            for (size_t i = 0; i + 2 < triangles.size(); i += 3) {
-                const int t[3] = {triangles[i], triangles[i + 1], triangles[i + 2]};
-                for (int e = 0; e < 3; ++e) {
-                    const int a = t[e];
-                    const int b = t[(e + 1) % 3];
-                    edge_owners[edge_key(a, b)].push_back({static_cast<int>(i / 3), a < b});
+            for (int fi = 0; fi < static_cast<int>(faces.size()); ++fi) {
+                const auto& verts = faces[fi].verts;
+                for (size_t e = 0; e < verts.size(); ++e) {
+                    const int a = verts[e];
+                    const int b = verts[(e + 1) % verts.size()];
+                    edge_owners[edge_key_fn(a, b)].push_back({fi, a < b});
                 }
             }
 
-            // BFS: flip triangles so that adjacent triangles on shared edges
-            // have opposite directions.
-            std::vector<bool> visited(ntri, false);
-            std::vector<bool> need_flip(ntri, false);
+            std::vector<bool> visited(faces.size(), false);
+            std::vector<bool> need_flip(faces.size(), false);
 
-            for (size_t seed = 0; seed < ntri; ++seed) {
+            for (size_t seed = 0; seed < faces.size(); ++seed) {
                 if (visited[seed]) continue;
                 visited[seed] = true;
                 need_flip[seed] = false;
@@ -435,22 +471,17 @@ struct BevelParams {
                 size_t head = 0;
                 while (head < queue.size()) {
                     int cur = queue[head++];
-                    const int base = cur * 3;
-                    const int t[3] = {triangles[base], triangles[base + 1], triangles[base + 2]};
-                    for (int e = 0; e < 3; ++e) {
-                        const int a = t[e];
-                        const int b = t[(e + 1) % 3];
-                        const uint64_t key = edge_key(a, b);
+                    const auto& verts = faces[cur].verts;
+                    for (size_t e = 0; e < verts.size(); ++e) {
+                        const int a = verts[e];
+                        const int b = verts[(e + 1) % verts.size()];
+                        const uint64_t key = edge_key_fn(a, b);
                         auto it = edge_owners.find(key);
                         if (it == edge_owners.end()) continue;
                         for (const auto& [neighbor, neighbor_dir] : it->second) {
                             if (neighbor == cur || visited[neighbor]) continue;
                             visited[neighbor] = true;
-                            // Current triangle has direction (a < b) on this edge.
-                            // For consistent winding, neighbor must have opposite direction.
                             const bool cur_dir = (a < b);
-                            // If neighbor_dir == cur_dir, neighbor needs flip to make them opposite.
-                            // But if current was already flipped, invert the logic.
                             const bool cur_effective_dir = cur_dir ^ need_flip[cur];
                             need_flip[neighbor] = (neighbor_dir == cur_effective_dir);
                             queue.push_back(neighbor);
@@ -459,29 +490,28 @@ struct BevelParams {
                 }
             }
 
-            // Apply flips
-            for (size_t i = 0; i < ntri; ++i) {
-                if (need_flip[i]) {
-                    const int base = static_cast<int>(i) * 3;
-                    std::swap(triangles[base + 1], triangles[base + 2]);
-                }
+            for (size_t i = 0; i < faces.size(); ++i) {
+                if (need_flip[i])
+                    std::reverse(faces[i].verts.begin(), faces[i].verts.end());
             }
 
             // Check signed volume to ensure overall outward orientation.
-            // If negative, flip all triangles.
             double vol = 0.0;
-            for (size_t i = 0; i + 2 < triangles.size(); i += 3) {
-                const auto& a = vertices[static_cast<size_t>(triangles[i])];
-                const auto& b = vertices[static_cast<size_t>(triangles[i + 1])];
-                const auto& c = vertices[static_cast<size_t>(triangles[i + 2])];
-                vol += a.x * (b.y * c.z - b.z * c.y) +
-                       a.y * (b.z * c.x - b.x * c.z) +
-                       a.z * (b.x * c.y - b.y * c.x);
+            for (const auto& face : faces) {
+                if (face.verts.size() < 3) continue;
+                const auto& a = vertices[face.verts[0]];
+                for (size_t i = 1; i + 1 < face.verts.size(); ++i) {
+                    const auto& b = vertices[face.verts[i]];
+                    const auto& c = vertices[face.verts[i + 1]];
+                    vol += a.x * (b.y * c.z - b.z * c.y) +
+                           a.y * (b.z * c.x - b.x * c.z) +
+                           a.z * (b.x * c.y - b.y * c.x);
+                }
             }
             vol /= 6.0;
             if (vol < 0.0) {
-                for (size_t i = 0; i + 2 < triangles.size(); i += 3)
-                    std::swap(triangles[i + 1], triangles[i + 2]);
+                for (auto& face : faces)
+                    std::reverse(face.verts.begin(), face.verts.end());
             }
         }
     } output;
@@ -500,11 +530,20 @@ bool on_cap_plane_x(const Vec3& p, const CapExtents& cap, double tol);
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+/// Limit Method — Blender Bevel subset (None / Angle). Weight / Vertex Group out of scope.
+enum class BevelLimitMethod {
+    None,
+    Angle,
+};
+
 /// Main bevel function — completely aligned with Blender's BM_mesh_bevel pipeline.
 struct BevelEdgeSelection {
     std::string edge_group;
     bool exclude_unshared = true;
     std::vector<std::string> exclude_groups;
+    /// When false, empty group → Angle and non-empty group → None (legacy graph behavior).
+    bool limit_method_explicit = false;
+    BevelLimitMethod limit_method = BevelLimitMethod::Angle;
 };
 
 data::PcgMeshData bevel_mesh_blender(

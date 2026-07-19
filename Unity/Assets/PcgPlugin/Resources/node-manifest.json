@@ -1,6 +1,6 @@
 {
-  "version": "1.4",
-  "description": "Node definitions for PCG Graph editors (Phase 4.3 mesh + Phase 4.5 spline bridge). Pin types align with UE EPCGDataType.",
+  "version": "1.5",
+  "description": "Node definitions for PCG Graph editors (mesh, spline, and Houdini-style attribute/filter nodes). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
       "type": "SpawnPoints",
@@ -115,6 +115,79 @@
       }
     },
     {
+      "type": "AttributeWrangle",
+      "displayName": "Attribute Wrangle",
+      "category": "Attribute",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "Any" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "Any" }],
+      "properties": {
+        "runOver": {
+          "type": "enum",
+          "displayName": "Run Over",
+          "default": "points",
+          "options": [{ "value": "points", "label": "Points" }]
+        },
+        "expression": {
+          "type": "string",
+          "displayName": "VEXpression",
+          "default": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);",
+          "multiline": true,
+          "lines": 8
+        },
+        "parameters": {
+          "type": "string",
+          "displayName": "Parameters (JSON)",
+          "default": "{\"sag\": 3.0}",
+          "multiline": true,
+          "lines": 3
+        }
+      }
+    },
+    {
+      "type": "Blast",
+      "displayName": "Blast",
+      "category": "Filter",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "Any" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "Any" }],
+      "properties": {
+        "entity": {
+          "type": "enum",
+          "displayName": "Entity",
+          "default": "points",
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" }
+          ]
+        },
+        "group": { "type": "string", "displayName": "Group", "default": "" },
+        "expression": {
+          "type": "string",
+          "displayName": "Selection Expression",
+          "default": "@curveu >= 0.4 && @curveu <= 0.6",
+          "multiline": true,
+          "lines": 4
+        },
+        "parameters": {
+          "type": "string",
+          "displayName": "Parameters (JSON)",
+          "default": "{}",
+          "multiline": true,
+          "lines": 3
+        },
+        "deleteNonSelected": {
+          "type": "boolean",
+          "displayName": "Delete Non Selected",
+          "default": false
+        },
+        "removeUnusedPoints": {
+          "type": "boolean",
+          "displayName": "Remove Unused Points",
+          "default": true,
+          "visibleWhen": { "property": "entity", "equals": "primitives" }
+        }
+      }
+    },
+    {
       "type": "TransformPoints",
       "displayName": "Transform Points",
       "category": "Transform",
@@ -129,12 +202,30 @@
       }
     },
     {
+      "type": "AttributeRandomize",
+      "displayName": "Attribute Randomize",
+      "category": "Transform",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "seed": { "type": "integer", "default": 0 },
+        "translateX": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "translateY": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "translateZ": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "rotateX": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "rotateY": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "rotateZ": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "scaleMin": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "scaleMax": { "type": "number", "default": 1.0, "minimum": 0.000001 }
+      }
+    },
+    {
       "type": "ProjectPoints",
       "displayName": "Project Points",
       "category": "Transform",
       "inputs": [
         { "id": "in", "label": "Points", "pinType": "SpatialPoint" },
-        { "id": "terrain", "label": "Terrain", "pinType": "Param" }
+        { "id": "terrain", "label": "Terrain", "pinType": "HeightField" }
       ],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
       "properties": {
@@ -143,12 +234,732 @@
       }
     },
     {
+      "type": "HeightField",
+      "displayName": "HeightField",
+      "category": "Terrain",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "orientation": {
+          "type": "enum", "default": "zx",
+          "options": [
+            { "value": "zx", "label": "ZX (Ground)" },
+            { "value": "xy", "label": "XY" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        },
+        "sampling": {
+          "type": "enum", "default": "corner",
+          "options": [
+            { "value": "corner", "label": "Corner (Unity)" },
+            { "value": "center", "label": "Center (Houdini Default)" }
+          ]
+        },
+        "divisionMode": {
+          "type": "enum", "default": "bySize",
+          "options": [
+            { "value": "bySize", "label": "By Size" },
+            { "value": "byAxis", "label": "By Axis" }
+          ]
+        },
+        "gridSpacing": {
+          "type": "number", "default": 1.0, "minimum": 0.000001,
+          "visibleWhen": { "property": "divisionMode", "equals": "bySize" }
+        },
+        "gridSamples": {
+          "type": "integer", "default": 257, "minimum": 2, "maximum": 2049,
+          "visibleWhen": { "property": "divisionMode", "equals": "byAxis" }
+        },
+        "sizeX": { "type": "number", "default": 256.0, "minimum": 0.000001 },
+        "sizeZ": { "type": "number", "default": 256.0, "minimum": 0.000001 },
+        "centerX": { "type": "number", "default": 0.0 },
+        "centerY": { "type": "number", "default": 0.0 },
+        "centerZ": { "type": "number", "default": 0.0 },
+        "initialHeight": { "type": "number", "default": 0.0 },
+        "initialMask": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "HeightFieldNoise",
+      "displayName": "HeightField Noise",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "noiseLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "noiseType": {
+          "type": "enum", "default": "perlin",
+          "options": [{ "value": "perlin", "label": "Perlin" }]
+        },
+        "fractal": {
+          "type": "enum", "default": "terrain",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "standard", "label": "Standard" },
+            { "value": "terrain", "label": "Terrain" },
+            { "value": "hybridTerrain", "label": "Hybrid Terrain" }
+          ]
+        },
+        "centerNoise": { "type": "boolean", "default": true },
+        "amplitude": { "type": "number", "default": 30.0 },
+        "elementSize": { "type": "number", "default": 64.0, "minimum": 0.000001 },
+        "scaleX": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "scaleZ": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "offsetX": { "type": "number", "default": 0.0 },
+        "offsetZ": { "type": "number", "default": 0.0 },
+        "maxOctaves": { "type": "integer", "default": 5, "minimum": 1, "maximum": 12 },
+        "lacunarity": { "type": "number", "default": 2.0 },
+        "roughness": { "type": "number", "default": 0.5, "minimum": 0.0, "maximum": 1.0 },
+        "seed": { "type": "integer", "default": 0 }
+      }
+    },
+    {
+      "type": "HeightFieldMaskNoise",
+      "displayName": "HeightField Mask Noise",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "outputLayer": { "type": "string", "default": "mask" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "combine": {
+          "type": "enum", "default": "replace",
+          "options": [
+            { "value": "replace", "label": "Replace" },
+            { "value": "add", "label": "Add" },
+            { "value": "subtract", "label": "Subtract" },
+            { "value": "difference", "label": "Difference" },
+            { "value": "multiply", "label": "Multiply" },
+            { "value": "maximum", "label": "Maximum" },
+            { "value": "minimum", "label": "Minimum" },
+            { "value": "blend", "label": "Blend" }
+          ]
+        },
+        "blend": {
+          "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0,
+          "visibleWhen": { "property": "combine", "equals": "blend" }
+        },
+        "invert": { "type": "boolean", "default": false },
+        "noiseType": {
+          "type": "enum", "default": "perlin",
+          "options": [{ "value": "perlin", "label": "Perlin" }]
+        },
+        "fractal": {
+          "type": "enum", "default": "standard",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "standard", "label": "Standard" },
+            { "value": "terrain", "label": "Terrain" },
+            { "value": "hybridTerrain", "label": "Hybrid Terrain" }
+          ]
+        },
+        "centerNoise": { "type": "boolean", "default": false },
+        "amplitude": { "type": "number", "default": 1.0 },
+        "elementSize": { "type": "number", "default": 64.0, "minimum": 0.000001 },
+        "scaleX": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "scaleZ": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "offsetX": { "type": "number", "default": 0.0 },
+        "offsetZ": { "type": "number", "default": 0.0 },
+        "maxOctaves": { "type": "integer", "default": 5, "minimum": 1, "maximum": 12 },
+        "lacunarity": { "type": "number", "default": 2.0 },
+        "roughness": { "type": "number", "default": 0.5, "minimum": 0.0, "maximum": 1.0 },
+        "seed": { "type": "integer", "default": 0 }
+      }
+    },
+    {
+      "type": "HeightFieldMaskByFeature",
+      "displayName": "HeightField Mask by Feature",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "outputLayer": { "type": "string", "default": "mask" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "combine": {
+          "type": "enum", "default": "replace",
+          "options": [
+            { "value": "replace", "label": "Replace" },
+            { "value": "add", "label": "Add" },
+            { "value": "subtract", "label": "Subtract" },
+            { "value": "difference", "label": "Difference" },
+            { "value": "multiply", "label": "Multiply" },
+            { "value": "maximum", "label": "Maximum" },
+            { "value": "minimum", "label": "Minimum" },
+            { "value": "blend", "label": "Blend" }
+          ]
+        },
+        "blend": {
+          "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0,
+          "visibleWhen": { "property": "combine", "equals": "blend" }
+        },
+        "invert": { "type": "boolean", "default": false },
+        "maskByHeight": { "type": "boolean", "default": true },
+        "minHeight": { "type": "number", "default": 0.0 },
+        "maxHeight": { "type": "number", "default": 100.0 },
+        "heightFeather": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "maskBySlope": { "type": "boolean", "default": false },
+        "minSlopeAngle": { "type": "number", "default": 0.0, "minimum": 0.0, "maximum": 90.0 },
+        "maxSlopeAngle": { "type": "number", "default": 90.0, "minimum": 0.0, "maximum": 90.0 },
+        "slopeFeather": { "type": "number", "default": 0.0, "minimum": 0.0, "maximum": 90.0 },
+        "smoothRadius": { "type": "integer", "default": 0, "minimum": 0, "maximum": 64 }
+      }
+    },
+    {
+      "type": "HeightFieldClip",
+      "displayName": "HeightField Clip",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "minClipEnabled": { "type": "boolean", "default": false },
+        "minClip": { "type": "number", "default": 0.0 },
+        "maxClipEnabled": { "type": "boolean", "default": true },
+        "maxClip": { "type": "number", "default": 25.0 },
+        "edgeMaskRadius": { "type": "integer", "default": 1, "minimum": 1, "maximum": 64 },
+        "generateMaskFrom": {
+          "type": "enum", "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "clipped", "label": "Clipped Layer" },
+            { "value": "edge", "label": "Edge Layer" }
+          ]
+        },
+        "outputClippedLayer": { "type": "string", "default": "mesa" },
+        "outputEdgeLayer": { "type": "string", "default": "cliffs" }
+      }
+    },
+    {
+      "type": "HeightFieldTerrace",
+      "displayName": "HeightField Terrace",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "minHeight": { "type": "number", "default": -1000000.0 },
+        "maxHeight": { "type": "number", "default": 1000000.0 },
+        "fade": { "type": "number", "default": 0.15, "minimum": 0.0, "maximum": 1.0 },
+        "maxStepSize": { "type": "number", "default": 6.0, "minimum": 0.000001 },
+        "stepOffset": { "type": "number", "default": 0.0 },
+        "smoothEdges": { "type": "number", "default": 0.2, "minimum": 0.0, "maximum": 0.49 },
+        "outputMesaLayer": { "type": "string", "default": "mesa" },
+        "outputCliffLayer": { "type": "string", "default": "cliffs" }
+      }
+    },
+    {
+      "type": "HeightFieldBlur",
+      "displayName": "HeightField Blur",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "blurLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "method": {
+          "type": "enum", "default": "gaussian",
+          "options": [
+            { "value": "gaussian", "label": "Gaussian" },
+            { "value": "box", "label": "Box" }
+          ]
+        },
+        "iterations": { "type": "integer", "default": 1, "minimum": 1, "maximum": 16 },
+        "radius": { "type": "number", "default": 2.0, "minimum": 0.0, "maximum": 256.0 },
+        "maskAware": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "HeightFieldResample",
+      "displayName": "HeightField Resample",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "specifyExactResolution": { "type": "boolean", "default": false },
+        "resolutionScale": { "type": "number", "default": 2.0, "minimum": 0.01 },
+        "divisionMode": {
+          "type": "enum", "default": "byAxis",
+          "options": [
+            { "value": "byAxis", "label": "By Axis" },
+            { "value": "bySize", "label": "By Size" }
+          ]
+        },
+        "gridSamples": { "type": "integer", "default": 257, "minimum": 2, "maximum": 2049 },
+        "gridSpacing": { "type": "number", "default": 1.0, "minimum": 0.000001 }
+      }
+    },
+    {
+      "type": "HeightFieldLayer",
+      "displayName": "HeightField Layer",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "base", "label": "Base", "pinType": "HeightField" },
+        { "id": "layer", "label": "Layer", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "layerMode": {
+          "type": "enum", "default": "replace",
+          "options": [
+            { "value": "replace", "label": "Replace" },
+            { "value": "add", "label": "Add" },
+            { "value": "subtract", "label": "Subtract" },
+            { "value": "multiply", "label": "Multiply" },
+            { "value": "maximum", "label": "Maximum" },
+            { "value": "minimum", "label": "Minimum" },
+            { "value": "blend", "label": "Blend" }
+          ]
+        },
+        "blend": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "layers": { "type": "string", "default": "*" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "maskStrength": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "invertMask": { "type": "boolean", "default": false },
+        "baseOffset": { "type": "number", "default": 0.0 },
+        "baseScale": { "type": "number", "default": 1.0 },
+        "layerOffset": { "type": "number", "default": 0.0 },
+        "layerScale": { "type": "number", "default": 1.0 },
+        "finalOffset": { "type": "number", "default": 0.0 },
+        "finalScale": { "type": "number", "default": 1.0 },
+        "clampMinimum": { "type": "boolean", "default": false },
+        "minimum": { "type": "number", "default": 0.0 },
+        "clampMaximum": { "type": "boolean", "default": false },
+        "maximum": { "type": "number", "default": 1.0 }
+      }
+    },
+    {
+      "type": "HeightFieldErode",
+      "displayName": "HeightField Erode",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "Terrain to Erode", "pinType": "HeightField" },
+        { "id": "mask", "label": "Masks", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "Eroded HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "debrisLayer": { "type": "string", "default": "debris" },
+        "sedimentLayer": { "type": "string", "default": "sediment" },
+        "flowLayer": { "type": "string", "default": "flow" },
+        "flowDirectionLayer": { "type": "string", "default": "flowdir" },
+        "iterations": { "type": "integer", "default": 30, "minimum": 1, "maximum": 500 },
+        "seed": { "type": "integer", "default": 0 },
+        "erodability": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 2.0 },
+        "flowForce": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 2.0 },
+        "rainfallCoverage": { "type": "number", "default": 0.04, "minimum": 0.0, "maximum": 1.0 },
+        "erosionRate": { "type": "number", "default": 0.18, "minimum": 0.0, "maximum": 1.0 },
+        "depositionRate": { "type": "number", "default": 0.12, "minimum": 0.0, "maximum": 1.0 },
+        "sedimentCapacity": { "type": "number", "default": 1.4, "minimum": 0.0 },
+        "evaporationRate": { "type": "number", "default": 0.12, "minimum": 0.0, "maximum": 1.0 },
+        "weatheringForce": { "type": "number", "default": 0.08, "minimum": 0.0, "maximum": 1.0 },
+        "cutAngle": { "type": "number", "default": 35.0, "minimum": 0.0, "maximum": 89.0 },
+        "reposeAngle": { "type": "number", "default": 28.0, "minimum": 0.0, "maximum": 89.0 },
+        "addDebrisToHeight": { "type": "boolean", "default": true },
+        "addSedimentToHeight": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "HeightFieldDistortByNoise",
+      "displayName": "HeightField Distort by Noise",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "Distorted HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "distortLayers": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "noiseType": {
+          "type": "enum", "default": "simplex",
+          "options": [
+            { "value": "simplex", "label": "Simplex" },
+            { "value": "curl", "label": "Curl" }
+          ]
+        },
+        "amplitude": { "type": "number", "default": 8.0 },
+        "elementSize": { "type": "number", "default": 64.0, "minimum": 0.000001 },
+        "scaleX": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "scaleZ": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "offsetX": { "type": "number", "default": 0.0 },
+        "offsetZ": { "type": "number", "default": 0.0 },
+        "roughness": { "type": "number", "default": 0.5, "minimum": 0.0, "maximum": 1.0 },
+        "maxOctaves": { "type": "integer", "default": 4, "minimum": 1, "maximum": 12 },
+        "substeps": { "type": "integer", "default": 2, "minimum": 1, "maximum": 64 },
+        "seed": { "type": "integer", "default": 0 }
+      }
+    },
+    {
+      "type": "HeightFieldProject",
+      "displayName": "HeightField Project",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "heightfield", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "geometry", "label": "Geometry", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Projected HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "hitFarthest": { "type": "boolean", "default": true },
+        "combineMethod": {
+          "type": "enum", "default": "maximum",
+          "options": [
+            { "value": "replace", "label": "Replace" },
+            { "value": "add", "label": "Add" },
+            { "value": "maximum", "label": "Maximum" },
+            { "value": "minimum", "label": "Minimum" }
+          ]
+        },
+        "maxRayDistance": { "type": "number", "default": 1000.0, "minimum": 0.000001 }
+      }
+    },
+    {
+      "type": "HeightFieldScatter",
+      "displayName": "HeightField Scatter",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "scatterAmountLayer": { "type": "string", "default": "mask" },
+        "useExactPointCount": { "type": "boolean", "default": true },
+        "pointCount": { "type": "integer", "default": 1000, "minimum": 0, "maximum": 1000000 },
+        "density": { "type": "number", "default": 0.01, "minimum": 0.0 },
+        "candidatesPerPoint": { "type": "integer", "default": 4, "minimum": 1, "maximum": 32 },
+        "globalSeed": { "type": "integer", "default": 0 },
+        "maxPoints": { "type": "integer", "default": 100000, "minimum": 0, "maximum": 1000000 }
+      }
+    },
+    {
+      "type": "HeightFieldMaskByObject",
+      "displayName": "HeightField Mask by Object",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "geometry", "label": "Geometry", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "outputLayer": { "type": "string", "default": "mask" },
+        "combine": {
+          "type": "enum", "default": "replace",
+          "options": [
+            { "value": "replace", "label": "Replace" },
+            { "value": "add", "label": "Add" },
+            { "value": "subtract", "label": "Subtract" },
+            { "value": "difference", "label": "Difference" },
+            { "value": "multiply", "label": "Multiply" },
+            { "value": "maximum", "label": "Maximum" },
+            { "value": "minimum", "label": "Minimum" },
+            { "value": "blend", "label": "Blend" }
+          ]
+        },
+        "blend": {
+          "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0,
+          "visibleWhen": { "property": "combine", "equals": "blend" }
+        },
+        "maskingByGeometry": {
+          "type": "enum", "default": "above",
+          "options": [
+            { "value": "either", "label": "Either Side" },
+            { "value": "above", "label": "Above HeightField" },
+            { "value": "below", "label": "Below HeightField" }
+          ]
+        },
+        "invertMask": { "type": "boolean", "default": false },
+        "maxRayDistance": { "type": "number", "default": 1000.0, "minimum": 0.000001 },
+        "value": { "type": "number", "default": 1.0 },
+        "blurMethod": {
+          "type": "enum", "default": "gaussian",
+          "options": [
+            { "value": "gaussian", "label": "Blur" },
+            { "value": "box", "label": "Box Blur" }
+          ]
+        },
+        "blurRadius": { "type": "number", "default": 0.0, "minimum": 0.0 }
+      }
+    },
+    {
+      "type": "HeightFieldPattern",
+      "displayName": "HeightField Pattern",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "patternLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "combine": {
+          "type": "enum", "default": "add",
+          "options": [
+            { "value": "replace", "label": "Replace" },
+            { "value": "add", "label": "Add" },
+            { "value": "subtract", "label": "Subtract" },
+            { "value": "difference", "label": "Difference" },
+            { "value": "multiply", "label": "Multiply" },
+            { "value": "maximum", "label": "Maximum" },
+            { "value": "minimum", "label": "Minimum" },
+            { "value": "blend", "label": "Blend" }
+          ]
+        },
+        "blend": {
+          "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0,
+          "visibleWhen": { "property": "combine", "equals": "blend" }
+        },
+        "height": { "type": "number", "default": 10.0 },
+        "baseHeight": { "type": "number", "default": 0.0 },
+        "postBlurRadius": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "pattern": {
+          "type": "enum", "default": "ramp",
+          "options": [
+            { "value": "ramp", "label": "Ramp" },
+            { "value": "exponentialRamp", "label": "Exponential Ramp" },
+            { "value": "step", "label": "Step" },
+            { "value": "stripes", "label": "Stripes" }
+          ]
+        },
+        "rotate": { "type": "number", "default": 0.0 },
+        "size": { "type": "number", "default": 64.0, "minimum": 0.000001 },
+        "scaleX": { "type": "number", "default": 1.0 },
+        "scaleZ": { "type": "number", "default": 1.0 },
+        "centerX": { "type": "number", "default": 0.0 },
+        "centerZ": { "type": "number", "default": 0.0 },
+        "phase": { "type": "number", "default": 0.0 },
+        "rampMode": {
+          "type": "enum", "default": "linear",
+          "options": [
+            { "value": "linear", "label": "Linear" },
+            { "value": "concentric", "label": "Concentric" },
+            { "value": "radial", "label": "Radial" }
+          ],
+          "visibleWhen": { "property": "pattern", "equals": "ramp" }
+        },
+        "rampRepeat": { "type": "boolean", "default": false },
+        "rampMirror": { "type": "boolean", "default": false },
+        "riseOverRun": { "type": "number", "default": 0.5, "minimum": 0.000001 },
+        "stepHeight": { "type": "number", "default": 2.0 },
+        "stepReferenceHeight": { "type": "number", "default": 0.0 },
+        "stripeWidth": { "type": "number", "default": 0.5, "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    {
+      "type": "HeightFieldFlowField",
+      "displayName": "HeightField Flow Field",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "waterLayer": { "type": "string", "default": "water" },
+        "flowLayer": { "type": "string", "default": "flow" },
+        "flowDirLayer": { "type": "string", "default": "flowdir" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "slumpMode": {
+          "type": "enum", "default": "smooth",
+          "options": [
+            { "value": "smooth", "label": "Smooth" },
+            { "value": "granular", "label": "Granular" }
+          ]
+        },
+        "rainAmount": { "type": "number", "default": 0.5, "minimum": 0.0 },
+        "rainDensity": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "spreadIterations": { "type": "integer", "default": 40, "minimum": 1, "maximum": 500 },
+        "smoothingIterations": { "type": "integer", "default": 2, "minimum": 0, "maximum": 64 },
+        "copyToMask": { "type": "boolean", "default": true },
+        "maskScale": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "adjustHeight": { "type": "boolean", "default": false },
+        "adjustHeightScale": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "seed": { "type": "integer", "default": 0 }
+      }
+    },
+    {
+      "type": "HeightFieldSlump",
+      "displayName": "HeightField Slump",
+      "category": "Terrain",
+      "inputs": [
+        { "id": "in", "label": "HeightField", "pinType": "HeightField" },
+        { "id": "mask", "label": "Mask", "pinType": "HeightField" }
+      ],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "maskLayer": { "type": "string", "default": "mask" },
+        "materialLayer": { "type": "string", "default": "debris" },
+        "flowLayer": { "type": "string", "default": "flow" },
+        "flowDirLayer": { "type": "string", "default": "flowdir" },
+        "slumpMode": {
+          "type": "enum", "default": "smooth",
+          "options": [
+            { "value": "smooth", "label": "Smooth" },
+            { "value": "granular", "label": "Granular" }
+          ]
+        },
+        "spreadIterations": { "type": "integer", "default": 20, "minimum": 1, "maximum": 500 },
+        "spreadRate": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "reposeAngle": { "type": "number", "default": 30.0, "minimum": 0.0, "maximum": 89.999 },
+        "heightFactor": { "type": "number", "default": 1.0 },
+        "quantization": { "type": "number", "default": 0.0, "minimum": 0.0 },
+        "calculateFlowFields": { "type": "boolean", "default": true },
+        "flowSmoothingIterations": { "type": "integer", "default": 0, "minimum": 0, "maximum": 64 },
+        "allowMaterialOutflow": { "type": "boolean", "default": true },
+        "addToBedrock": { "type": "boolean", "default": true },
+        "seed": { "type": "integer", "default": 0 }
+      }
+    },
+    {
+      "type": "HeightFieldCopyLayer",
+      "displayName": "HeightField Copy Layer",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "source": { "type": "string", "default": "mask" },
+        "destination": { "type": "string", "default": "mask_copy" },
+        "copySourceData": { "type": "boolean", "default": true },
+        "replaceExisting": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "HeightFieldLayerClear",
+      "displayName": "HeightField Layer Clear",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "layer": { "type": "string", "default": "mask" },
+        "value": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "HeightFieldLayerProperties",
+      "displayName": "HeightField Layer Properties",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "layer": { "type": "string", "default": "height" },
+        "setBorder": { "type": "boolean", "default": true },
+        "borderType": {
+          "type": "enum", "default": "streak",
+          "options": [
+            { "value": "constant", "label": "Constant" },
+            { "value": "repeat", "label": "Repeat" },
+            { "value": "streak", "label": "Streak" }
+          ]
+        },
+        "borderValue": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "HeightFieldIsolateLayer",
+      "displayName": "HeightField Isolate Layer",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "layer": { "type": "string", "default": "mask" },
+        "overwriteHeight": { "type": "boolean", "default": false },
+        "overwriteMask": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "HeightFieldFile",
+      "displayName": "HeightField File",
+      "category": "Terrain",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "HeightField", "pinType": "HeightField" }],
+      "properties": {
+        "file": { "type": "string", "default": "" },
+        "layerType": {
+          "type": "enum", "default": "height",
+          "options": [
+            { "value": "height", "label": "Height" },
+            { "value": "mask", "label": "Mask" }
+          ]
+        },
+        "sizeMethod": {
+          "type": "enum", "default": "sizeOfLargestAxis",
+          "options": [
+            { "value": "sizeOfLargestAxis", "label": "Size of Largest Axis" },
+            { "value": "gridSpacing", "label": "Grid Spacing" }
+          ]
+        },
+        "size": { "type": "number", "default": 256.0, "minimum": 0.000001 },
+        "gridSpacing": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "uniformScale": { "type": "number", "default": 1.0 },
+        "heightScale": { "type": "number", "default": 1.0 },
+        "clampMinimum": { "type": "boolean", "default": false },
+        "minimum": { "type": "number", "default": 0.0 },
+        "clampMaximum": { "type": "boolean", "default": false },
+        "maximum": { "type": "number", "default": 1.0 },
+        "sampling": {
+          "type": "enum", "default": "corner",
+          "options": [
+            { "value": "corner", "label": "Corner" },
+            { "value": "center", "label": "Center" }
+          ]
+        },
+        "orientation": {
+          "type": "enum", "default": "zx",
+          "options": [
+            { "value": "zx", "label": "ZX" },
+            { "value": "xy", "label": "XY" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        },
+        "centerX": { "type": "number", "default": 0.0 },
+        "centerY": { "type": "number", "default": 0.0 },
+        "centerZ": { "type": "number", "default": 0.0 },
+        "rawResolutionX": { "type": "integer", "default": 0, "minimum": 0 },
+        "rawResolutionZ": { "type": "integer", "default": 0, "minimum": 0 }
+      }
+    },
+    {
+      "type": "ConvertHeightField",
+      "displayName": "Convert HeightField",
+      "category": "Terrain",
+      "inputs": [{ "id": "in", "label": "HeightField", "pinType": "HeightField" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "heightLayer": { "type": "string", "default": "height" },
+        "density": { "type": "number", "default": 1.0, "minimum": 0.01, "maximum": 4.0 }
+      }
+    },
+    {
       "type": "GetTerrainData",
       "displayName": "Get Terrain Data",
       "category": "Sampler",
       "inputs": [],
-      "outputs": [{ "id": "out", "label": "Terrain", "pinType": "Param" }],
+      "outputs": [{ "id": "out", "label": "Terrain", "pinType": "HeightField" }],
       "properties": {
+        "bindingKey": { "type": "string", "default": "targetTerrain" },
         "gridSize": { "type": "integer", "default": 32, "minimum": 2 },
         "cellSize": { "type": "number", "default": 2.0, "minimum": 0 },
         "amplitude": { "type": "number", "default": 5.0 },
@@ -161,7 +972,7 @@
       "category": "Sampler",
       "inputs": [
         { "id": "in", "label": "Points", "pinType": "SpatialPoint" },
-        { "id": "terrain", "label": "Terrain", "pinType": "Param" }
+        { "id": "terrain", "label": "Terrain", "pinType": "HeightField" }
       ],
       "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
       "properties": {
@@ -272,7 +1083,16 @@
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "properties": {
-        "levels": { "type": "integer", "default": 1, "minimum": 0, "maximum": 4 }
+        "levels": { "type": "integer", "default": 1, "minimum": 0, "maximum": 4 },
+        "method": {
+          "type": "enum",
+          "default": "catmullClark",
+          "options": [
+            { "value": "catmullClark", "label": "Catmull-Clark" },
+            { "value": "loop", "label": "Loop" },
+            { "value": "simple", "label": "Simple (Linear)" }
+          ]
+        }
       }
     },
     {
@@ -281,31 +1101,85 @@
       "category": "Mesh",
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "inspectorSections": [
+        { "id": "main", "label": "Bevel", "foldout": false },
+        { "id": "profile", "label": "Profile", "foldout": true, "defaultExpanded": true },
+        { "id": "geometry", "label": "Geometry", "foldout": true, "defaultExpanded": true },
+        { "id": "advanced", "label": "Advanced", "foldout": true, "defaultExpanded": false }
+      ],
       "properties": {
-        "method": {
-          "type": "enum",
-          "default": "edge",
-          "options": [
-            { "value": "edge", "label": "Edge (Blender)" },
-            { "value": "vertexPush", "label": "Vertex Push" }
-          ]
+        "edgeGroup": {
+          "type": "groupSelect",
+          "default": "",
+          "groupDomain": "edge",
+          "displayName": "Group",
+          "order": 0
         },
         "offsetType": {
           "type": "enum",
           "default": "offset",
+          "displayName": "Width Type",
+          "section": "main",
+          "order": 10,
           "options": [
             { "value": "offset", "label": "Offset" },
             { "value": "width", "label": "Width" }
           ]
         },
-        "amount": { "type": "number", "default": 0.1, "minimum": 0, "maximum": 1.0 },
-        "segments": { "type": "integer", "default": 2, "minimum": 1, "maximum": 8 },
-        "clampOverlap": { "type": "boolean", "default": true },
-        "angleLimit": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
-        "profile": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 },
+        "amount": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 1.0,
+          "displayName": "Amount",
+          "section": "main",
+          "order": 20
+        },
+        "segments": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 8,
+          "displayName": "Segments",
+          "section": "main",
+          "order": 30
+        },
+        "limitMethod": {
+          "type": "enum",
+          "default": "angle",
+          "displayName": "Limit Method",
+          "section": "main",
+          "order": 40,
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "angle", "label": "Angle" }
+          ]
+        },
+        "angleLimit": {
+          "type": "number",
+          "default": 30.0,
+          "minimum": 0,
+          "maximum": 180,
+          "displayName": "Angle",
+          "section": "main",
+          "order": 50,
+          "visibleWhen": { "property": "limitMethod", "equals": "angle" }
+        },
+        "profile": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "displayName": "Shape",
+          "section": "profile",
+          "order": 10
+        },
         "miterOuter": {
           "type": "enum",
           "default": "sharp",
+          "displayName": "Miter Outer",
+          "section": "geometry",
+          "order": 10,
           "options": [
             { "value": "sharp", "label": "Sharp" },
             { "value": "patch", "label": "Patch" },
@@ -315,6 +1189,9 @@
         "miterInner": {
           "type": "enum",
           "default": "sharp",
+          "displayName": "Miter Inner",
+          "section": "geometry",
+          "order": 20,
           "options": [
             { "value": "sharp", "label": "Sharp" },
             { "value": "patch", "label": "Patch" },
@@ -324,14 +1201,46 @@
         "vmeshMethod": {
           "type": "enum",
           "default": "adj",
+          "displayName": "Intersections",
+          "section": "geometry",
+          "order": 30,
           "options": [
-            { "value": "adj", "label": "ADJ (Catmull-Clark)" },
+            { "value": "adj", "label": "Grid Fill" },
             { "value": "cutoff", "label": "Cutoff" }
           ]
         },
-        "edgeGroup": { "type": "groupSelect", "default": "", "groupDomain": "edge" },
-        "excludeUnshared": { "type": "boolean", "default": true },
-        "excludeGroups": { "type": "groupMultiSelect", "default": "cap_start,cap_end" }
+        "clampOverlap": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Clamp Overlap",
+          "section": "geometry",
+          "order": 40
+        },
+        "method": {
+          "type": "enum",
+          "default": "edge",
+          "displayName": "Legacy Method",
+          "section": "advanced",
+          "order": 10,
+          "options": [
+            { "value": "edge", "label": "Edge (Blender)" },
+            { "value": "vertexPush", "label": "Vertex Push (Legacy)" }
+          ]
+        },
+        "excludeUnshared": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Exclude Unshared",
+          "section": "advanced",
+          "order": 20
+        },
+        "excludeGroups": {
+          "type": "groupMultiSelect",
+          "default": "cap_start,cap_end",
+          "displayName": "Exclude Groups",
+          "section": "advanced",
+          "order": 30
+        }
       }
     },
     {
@@ -362,8 +1271,8 @@
         },
         "minEdgeAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 },
         "includeUnshared": { "type": "boolean", "default": false },
-        "fromFaceGroup": { "type": "groupSelect", "default": "", "groupDomain": "face" },
-        "fromEdgeGroup": { "type": "groupSelect", "default": "", "groupDomain": "edge" }
+        "fromFaceGroup": { "type": "groupMultiSelect", "default": "", "groupDomain": "face" },
+        "fromEdgeGroup": { "type": "groupMultiSelect", "default": "", "groupDomain": "edge" }
       }
     },
     {
@@ -394,6 +1303,21 @@
           ]
         },
         "sourceGroups": { "type": "groupMultiSelect", "default": "" }
+      }
+    },
+    {
+      "type": "FaceGroupByNormal",
+      "displayName": "Face Group by Normal",
+      "category": "Geometry",
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputGroups": [{ "name": "outputGroup", "domain": "face", "label": "Output Group", "dynamic": true }],
+      "properties": {
+        "outputGroup": { "type": "string", "default": "material_faces", "displayName": "Output Group", "isGroupOutput": true },
+        "directionX": { "type": "number", "default": 0.0, "displayName": "Direction X" },
+        "directionY": { "type": "number", "default": 1.0, "displayName": "Direction Y" },
+        "directionZ": { "type": "number", "default": 0.0, "displayName": "Direction Z" },
+        "spreadAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180, "displayName": "Spread Angle" }
       }
     },
     {
@@ -513,6 +1437,41 @@
       }
     },
     {
+      "type": "CreateBezierSpline",
+      "displayName": "Create Bezier Spline",
+      "category": "Spline",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "mode": {
+          "type": "enum", "default": "catmullRom",
+          "options": [{ "value": "catmullRom", "label": "Cubic Bezier / Hermite" }]
+        },
+        "closed": { "type": "boolean", "default": false },
+        "subdivisions": { "type": "integer", "default": 12, "minimum": 1, "maximum": 64 },
+        "controlPoints": {
+          "type": "string",
+          "default": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":3,\"y\":1,\"z\":0}]"
+        },
+        "tangents": {
+          "type": "string",
+          "default": "[{\"x\":1,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0}]"
+        },
+        "editPlane": {
+          "type": "enum", "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "xy", "label": "XY" },
+            { "value": "xz", "label": "XZ" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        },
+        "sceneOffsetX": { "type": "number", "default": 0 },
+        "sceneOffsetY": { "type": "number", "default": 0 },
+        "sceneOffsetZ": { "type": "number", "default": 0 }
+      }
+    },
+    {
       "type": "GetSplineData",
       "displayName": "Get Spline Data",
       "category": "Input",
@@ -576,8 +1535,6 @@
         { "name": "side", "domain": "face", "label": "Side surfaces" },
         { "name": "cap_start", "domain": "face", "label": "Start cap", "condition": "capStart" },
         { "name": "cap_end", "domain": "face", "label": "End cap", "condition": "capEnd" },
-        { "name": "seam", "domain": "edge", "label": "Profile seam edges" },
-        { "name": "profile_corner", "domain": "edge", "label": "Profile corner edges" },
         { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
       ],
       "properties": {
@@ -700,6 +1657,243 @@
       }
     },
     {
+      "type": "LoftMesh",
+      "displayName": "Loft Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "profiles", "label": "Profiles", "pinType": "SpatialSpline", "variadic": true }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "side", "domain": "face", "label": "Loft surface" },
+        { "name": "cap_start", "domain": "face", "label": "Start cap", "condition": "capStart" },
+        { "name": "cap_end", "domain": "face", "label": "End cap", "condition": "capEnd" },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
+      "properties": {
+        "columns": { "type": "integer", "default": 32, "minimum": 2, "maximum": 256 },
+        "sortAxis": {
+          "type": "enum", "default": "x",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "closedProfile": { "type": "boolean", "default": true },
+        "capStart": { "type": "boolean", "default": true },
+        "capEnd": { "type": "boolean", "default": true },
+        "autoAlign": { "type": "boolean", "default": true },
+        "shadeMode": {
+          "type": "enum", "default": "auto",
+          "options": [
+            { "value": "auto", "label": "Auto (Group + Angle)" },
+            { "value": "smooth", "label": "Smooth" },
+            { "value": "flat", "label": "Flat" }
+          ]
+        },
+        "cuspAngle": { "type": "number", "default": 30.0, "minimum": 0, "maximum": 180 }
+      }
+    },
+    {
+      "type": "MirrorMesh",
+      "displayName": "Mirror Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "axis": {
+          "type": "enum", "default": "z",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "offset": { "type": "number", "default": 0.0 },
+        "mergeOriginal": { "type": "boolean", "default": true },
+        "weldSeam": { "type": "boolean", "default": true },
+        "weldTolerance": { "type": "number", "default": 0.0001, "minimum": 0.00000001 }
+      }
+    },
+    {
+      "type": "FuseMesh",
+      "displayName": "Fuse Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "tolerance": { "type": "number", "default": 0.0001, "minimum": 0.00000001 },
+        "removeDegenerate": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "PolyExtrude",
+      "displayName": "Poly Extrude",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "extrude_top", "domain": "face", "label": "Extruded top", "dynamic": true },
+        { "name": "extrude_side", "domain": "face", "label": "Extruded sides", "dynamic": true },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
+      "properties": {
+        "faceGroup": { "type": "groupSelect", "groupDomain": "face", "default": "" },
+        "distance": { "type": "number", "default": 0.02 },
+        "inset": { "type": "number", "default": 0.0 },
+        "keepOriginal": { "type": "boolean", "default": false },
+        "topGroup": { "type": "string", "default": "extrude_top", "isGroupOutput": true, "groupDomain": "face" },
+        "sideGroup": { "type": "string", "default": "extrude_side", "isGroupOutput": true, "groupDomain": "face" }
+      }
+    },
+    {
+      "type": "CopyMesh",
+      "displayName": "Copy Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "mode": {
+          "type": "enum", "default": "circular",
+          "options": [
+            { "value": "circular", "label": "Circular" },
+            { "value": "linear", "label": "Linear" }
+          ]
+        },
+        "count": { "type": "integer", "default": 6, "minimum": 1, "maximum": 256 },
+        "axis": {
+          "type": "enum", "default": "x",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "angle": { "type": "number", "default": 360.0 },
+        "translateX": { "type": "number", "default": 0.0 },
+        "translateY": { "type": "number", "default": 0.0 },
+        "translateZ": { "type": "number", "default": 0.0 },
+        "centerX": { "type": "number", "default": 0.0 },
+        "centerY": { "type": "number", "default": 0.0 },
+        "centerZ": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "ImportMesh",
+      "displayName": "Import Mesh",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "path": { "type": "string", "displayName": "Asset Path", "default": "" },
+        "projectRoot": { "type": "string", "displayName": "Project Root (optional)", "default": "" },
+        "scale": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "axisConversion": {
+          "type": "enum", "displayName": "Axis Conversion", "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "zUpToYUp", "label": "Z Up to Y Up" },
+            { "value": "yUpToZUp", "label": "Y Up to Z Up" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "MatchSize",
+      "displayName": "Match Size",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "source", "label": "Source", "pinType": "SpatialMesh" },
+        { "id": "reference", "label": "Reference (optional)", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "scaleToFit": { "type": "boolean", "default": true },
+        "uniformScale": { "type": "boolean", "default": false },
+        "uniformScaleMode": {
+          "type": "enum", "default": "fit",
+          "options": [
+            { "value": "fit", "label": "Fit Inside" },
+            { "value": "fill", "label": "Fill Bounds" }
+          ]
+        },
+        "sourceJustifyX": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "sourceJustifyY": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "sourceJustifyZ": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetJustifyX": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetJustifyY": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetJustifyZ": { "type": "enum", "default": "center", "options": [{ "value": "min", "label": "Min" }, { "value": "center", "label": "Center" }, { "value": "max", "label": "Max" }] },
+        "targetCenterX": { "type": "number", "default": 0.0 },
+        "targetCenterY": { "type": "number", "default": 0.0 },
+        "targetCenterZ": { "type": "number", "default": 0.0 },
+        "targetSizeX": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "targetSizeY": { "type": "number", "default": 1.0, "minimum": 0.0 },
+        "targetSizeZ": { "type": "number", "default": 1.0, "minimum": 0.0 }
+      }
+    },
+    {
+      "type": "BendMesh",
+      "displayName": "Bend Mesh",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "source", "label": "Source", "pinType": "SpatialMesh" },
+        { "id": "rest", "label": "Rest (optional)", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {
+        "captureOriginX": { "type": "number", "default": 0.0 },
+        "captureOriginY": { "type": "number", "default": 0.0 },
+        "captureOriginZ": { "type": "number", "default": 0.0 },
+        "captureDirectionX": { "type": "number", "default": 0.0 },
+        "captureDirectionY": { "type": "number", "default": 1.0 },
+        "captureDirectionZ": { "type": "number", "default": 0.0 },
+        "upDirectionX": { "type": "number", "default": 1.0 },
+        "upDirectionY": { "type": "number", "default": 0.0 },
+        "upDirectionZ": { "type": "number", "default": 0.0 },
+        "captureLength": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "angle": { "type": "number", "default": 0.0 },
+        "maskAttribute": { "type": "string", "default": "bendmask" }
+      }
+    },
+    {
+      "type": "CopyMeshToPoints",
+      "displayName": "Copy Mesh To Points",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "prototype", "label": "Prototype", "pinType": "SpatialMesh" },
+        { "id": "points", "label": "Points", "pinType": "SpatialPoint" }
+      ],
+      "outputs": [{ "id": "out", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "properties": {}
+    },
+    {
+      "type": "ShellMesh",
+      "displayName": "Shell Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "shell_outer", "domain": "face", "label": "Outer shell", "dynamic": true },
+        { "name": "shell_inner", "domain": "face", "label": "Inner shell", "dynamic": true },
+        { "name": "shell_rim", "domain": "face", "label": "Boundary walls", "dynamic": true },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+      ],
+      "properties": {
+        "thickness": { "type": "number", "default": 0.02, "minimum": 0.0001 },
+        "direction": {
+          "type": "enum", "default": "centered",
+          "options": [
+            { "value": "centered", "label": "Centered" },
+            { "value": "outward", "label": "Outward" },
+            { "value": "inward", "label": "Inward" }
+          ]
+        },
+        "closeBoundaries": { "type": "boolean", "default": true },
+        "outerGroup": { "type": "string", "default": "shell_outer", "isGroupOutput": true, "groupDomain": "face" },
+        "innerGroup": { "type": "string", "default": "shell_inner", "isGroupOutput": true, "groupDomain": "face" },
+        "rimGroup": { "type": "string", "default": "shell_rim", "isGroupOutput": true, "groupDomain": "face" }
+      }
+    },
+    {
       "type": "MergeMesh",
       "displayName": "Merge Mesh",
       "category": "Mesh",
@@ -777,6 +1971,175 @@
         "includeEnd": { "type": "boolean", "default": false },
         "alignToTangent": { "type": "boolean", "default": true },
         "scale": { "type": "number", "default": 1.0, "minimum": 0.001 }
+      }
+    },
+    {
+      "type": "CreateCylinderMesh",
+      "displayName": "Create Cylinder Mesh",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "height": { "type": "number", "default": 2.0, "minimum": 0.001 },
+        "radialSegments": { "type": "integer", "default": 16, "minimum": 3, "maximum": 128 },
+        "heightSegments": { "type": "integer", "default": 1, "minimum": 1, "maximum": 64 },
+        "capTop": { "type": "boolean", "default": true },
+        "capBottom": { "type": "boolean", "default": true }
+      }
+    },
+    {
+      "type": "RevolveMesh",
+      "displayName": "Revolve Mesh",
+      "category": "Mesh",
+      "inputs": [
+        { "id": "profile", "label": "Profile", "pinType": "SpatialSpline" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "axis": {
+          "type": "enum",
+          "default": "y",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "segments": { "type": "integer", "default": 16, "minimum": 3, "maximum": 256 },
+        "closeProfile": { "type": "boolean", "default": false },
+        "capStart": { "type": "boolean", "default": false },
+        "capEnd": { "type": "boolean", "default": false }
+      }
+    },
+    {
+      "type": "CreateSpiralSpline",
+      "displayName": "Create Spiral Spline",
+      "category": "Spline",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "pitch": { "type": "number", "default": 0.5 },
+        "turns": { "type": "number", "default": 3.0, "minimum": 0.001 },
+        "pointsPerTurn": { "type": "integer", "default": 24, "minimum": 4 },
+        "axis": {
+          "type": "enum",
+          "default": "y",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "VertexColor",
+      "displayName": "Vertex Color",
+      "category": "Material",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "r": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "g": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "b": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "a": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
+      }
+    },
+    {
+      "type": "AssignMaterial",
+      "displayName": "Assign Material",
+      "category": "Material",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "group": { "type": "groupMultiSelect", "default": "", "groupDomain": "face" },
+        "materialName": { "type": "string", "default": "" }
+      }
+    },
+    {
+      "type": "UVTexture",
+      "displayName": "UV Texture",
+      "category": "UV",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "projection": {
+          "type": "enum",
+          "default": "planar",
+          "options": [
+            { "value": "planar", "label": "Planar" },
+            { "value": "cylindrical", "label": "Cylindrical" },
+            { "value": "spherical", "label": "Spherical" }
+          ]
+        },
+        "axis": {
+          "type": "enum",
+          "default": "y",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "scaleU": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleV": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "offsetU": { "type": "number", "default": 0.0 },
+        "offsetV": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "ProjectTexture",
+      "displayName": "Project Texture",
+      "category": "UV",
+      "inputs": [
+        { "id": "in", "label": "Mesh", "pinType": "SpatialMesh" },
+        { "id": "texture", "label": "Texture", "pinType": "Texture" }
+      ],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "direction": {
+          "type": "enum",
+          "default": "z",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "scaleU": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "scaleV": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "offsetU": { "type": "number", "default": 0.0 },
+        "offsetV": { "type": "number", "default": 0.0 }
+      }
+    },
+    {
+      "type": "ExportFBX",
+      "displayName": "FBX Export",
+      "category": "Output",
+      "editorOnly": true,
+      "inputs": [{ "id": "in", "label": "Geometry", "pinType": "SpatialMesh" }],
+      "outputs": [],
+      "properties": {
+        "path": { "type": "string", "displayName": "Output Path", "default": "Exports/$GRAPH.fbx" },
+        "scale": { "type": "number", "displayName": "Scale", "default": 1.0, "minimum": 0.000001 },
+        "generateNormals": { "type": "boolean", "displayName": "Generate Smooth Normals", "default": true }
+      }
+    },
+    {
+      "type": "Switch",
+      "displayName": "Switch",
+      "category": "Flow",
+      "inputs": [
+        { "id": "in0", "label": "Input 0", "pinType": "SpatialMesh" },
+        { "id": "in1", "label": "Input 1", "pinType": "SpatialMesh" },
+        { "id": "in2", "label": "Input 2", "pinType": "SpatialMesh" },
+        { "id": "in3", "label": "Input 3", "pinType": "SpatialMesh" }
+      ],
+      "outputs": [{ "id": "out", "label": "Output", "pinType": "SpatialMesh" }],
+      "properties": {
+        "index": { "type": "integer", "default": 0, "minimum": 0, "maximum": 3 }
       }
     },
     {

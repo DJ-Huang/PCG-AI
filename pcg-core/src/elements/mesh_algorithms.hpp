@@ -2,6 +2,7 @@
 
 #include "data/pcg_geometry.hpp"
 #include "data/pcg_mesh_data.hpp"
+#include "data/pcg_spline_data.hpp"
 #include "data/pcg_texture_data.hpp"
 #include "elements/bevel_blender.hpp"
 
@@ -52,7 +53,41 @@ struct NoiseDeformOptions {
 };
 
 data::PcgMeshData create_box_mesh(double width, double height, double depth);
-data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels);
+
+/// Box as 8 shared corners + 6 quads (canonical Geometry; triangulate only at Sink).
+data::PcgGeometry create_box_geometry(double width, double height, double depth);
+
+data::PcgMeshData create_cylinder_mesh(double radius, double height,
+                                       int radial_segments, int height_segments,
+                                       bool cap_top, bool cap_bottom);
+
+/// Cylinder as quad side faces + optional n-gon caps (canonical Geometry;
+/// triangulate only at Sink).
+data::PcgGeometry create_cylinder_geometry(double radius, double height,
+                                           int radial_segments, int height_segments,
+                                           bool cap_top, bool cap_bottom);
+
+struct RevolveGeometryOptions {
+    std::string axis = "y";
+    int segments = 16;
+    bool close_profile = false;
+    bool cap_start = false;
+    bool cap_end = false;
+};
+
+data::PcgGeometry revolve_geometry(const data::PcgSplineData& profile,
+                                  const RevolveGeometryOptions& options);
+
+enum class SubdivideMethod {
+    CatmullClark,
+    Loop,
+    Simple,
+};
+
+data::PcgMeshData subdivide_mesh(const data::PcgMeshData& mesh, int levels,
+                                 SubdivideMethod method = SubdivideMethod::CatmullClark);
+data::PcgGeometry subdivide_geometry(const data::PcgGeometry& geometry, int levels,
+                                     SubdivideMethod method = SubdivideMethod::CatmullClark);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, const NoiseDeformOptions& options);
 data::PcgMeshData noise_deform_mesh(const data::PcgMeshData& mesh, double intensity, double noise_scale,
                                     NoiseDeformType noise_type, int seed);

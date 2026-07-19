@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -302,8 +303,8 @@ int main()
         { "id": "e1b", "source": "deck_profile", "target": "deck", "sourceHandle": "out", "targetHandle": "profile" },
         { "id": "e2", "source": "path", "target": "piers", "sourceHandle": "out", "targetHandle": "spline" },
         { "id": "e3", "source": "pier_proto", "target": "piers", "sourceHandle": "out", "targetHandle": "mesh" },
-        { "id": "e4", "source": "deck", "target": "merge", "sourceHandle": "out", "targetHandle": "a" },
-        { "id": "e5", "source": "piers", "target": "merge", "sourceHandle": "out", "targetHandle": "b" },
+        { "id": "e4", "source": "deck", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+        { "id": "e5", "source": "piers", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
         { "id": "e6", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
       ]
     })";
@@ -319,6 +320,56 @@ int main()
         return 1;
     }
     std::printf("PASS: bridge graph mesh (%d verts, %d indices)\n", vertex_count, index_count);
+
+    // Closed-backbone sweep: every edge must be shared by exactly 2 triangles.
+    CreateSplineOptions ring_opts;
+    ring_opts.mode = "catmullRom";
+    ring_opts.closed = true;
+    ring_opts.subdivisions = 8;
+    ring_opts.control_points = {
+        {0.4, 0.0, 0.0}, {0.283, 0.0, 0.283}, {0.0, 0.0, 0.4},
+        {-0.283, 0.0, 0.283}, {-0.4, 0.0, 0.0}, {-0.283, 0.0, -0.283},
+        {0.0, 0.0, -0.4}, {0.283, 0.0, -0.283},
+    };
+    const auto ring_spline = create_spline_data(ring_opts);
+
+    SweepAlongSplineOptions ring_sweep_opts;
+    ring_sweep_opts.surface_shape = "circle";
+    ring_sweep_opts.radius = 0.04;
+    ring_sweep_opts.columns = 12;
+    ring_sweep_opts.sample_spacing = 0.15;
+    const auto ring_mesh = sweep_along_spline(ring_spline, nullptr, ring_sweep_opts);
+    if (ring_mesh.vertices().empty() || ring_mesh.triangles().empty())
+    {
+        std::printf("FAIL: closed-backbone sweep produced empty mesh\n");
+        return 1;
+    }
+
+    {
+        std::unordered_map<int64_t, int> edge_count;
+        const auto tri = ring_mesh.triangles();
+        for (size_t i = 0; i + 2 < tri.size(); i += 3)
+        {
+            int a = tri[i], b = tri[i + 1], c = tri[i + 2];
+            auto add_edge = [&](int x, int y) {
+                if (x > y) std::swap(x, y);
+                edge_count[static_cast<int64_t>(x) * 1000000 + y]++;
+            };
+            add_edge(a, b);
+            add_edge(b, c);
+            add_edge(c, a);
+        }
+        int bad_edges = 0;
+        for (const auto& [key, count] : edge_count)
+            if (count != 2) ++bad_edges;
+        if (bad_edges != 0)
+        {
+            std::printf("FAIL: closed-backbone sweep has %d bad edges (expected 0)\n", bad_edges);
+            return 1;
+        }
+    }
+    std::printf("PASS: closed-backbone sweep is closed manifold (%zu verts, %zu tris)\n",
+                ring_mesh.vertices().size(), ring_mesh.triangles().size() / 3);
 
     std::printf("All phase45 spline tests passed.\n");
     return 0;

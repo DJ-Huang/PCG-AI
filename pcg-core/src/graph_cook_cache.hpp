@@ -15,7 +15,13 @@ struct NodeCookEntry {
     data::PcgDataCollection outputs;
 };
 
-/** Session-scoped graph cook cache with topology fingerprint invalidation. */
+/**
+ * Session-scoped, content-addressed node cook cache.
+ *
+ * Entries survive graph topology changes. A node input hash includes its incoming
+ * connections, so unchanged upstream nodes can be reused when an Editor preview
+ * swaps the graph sink or cooks an upstream-only subset.
+ */
 class GraphCookCache {
 public:
     void clear();

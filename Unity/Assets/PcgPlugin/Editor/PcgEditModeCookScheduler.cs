@@ -14,7 +14,10 @@ namespace DJTechEditor.PCG
     [InitializeOnLoad]
     internal static class PcgEditModeCookScheduler
     {
-        private static bool s_DeferPreviewCookOnEnable;
+        // Initialize as deferred: on a cold project open the scheduler can be created
+        // after sceneOpening has already fired, while scene component OnEnable calls are
+        // still pending.
+        private static bool s_DeferPreviewCookOnEnable = true;
 
         static PcgEditModeCookScheduler()
         {
@@ -23,6 +26,7 @@ namespace DJTechEditor.PCG
             EditorSceneManager.sceneOpening += OnSceneOpening;
             EditorSceneManager.sceneOpened += OnSceneOpened;
             PcgGraphComponent.EditorShouldDeferPreviewCookOnEnable = () => s_DeferPreviewCookOnEnable;
+            EditorApplication.delayCall += FinishSceneLoadDeferral;
         }
 
         private static void OnSceneOpening(string path, OpenSceneMode mode)
@@ -32,16 +36,24 @@ namespace DJTechEditor.PCG
 
         private static void OnSceneOpened(Scene scene, OpenSceneMode mode)
         {
-            EditorApplication.delayCall += () =>
+            EditorApplication.delayCall += FinishSceneLoadDeferral;
+        }
+
+        private static void FinishSceneLoadDeferral()
+        {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
             {
-                s_DeferPreviewCookOnEnable = false;
-                PcgGraphComponent.FlushDeferredEnablePreviewCooks();
-            };
+                EditorApplication.delayCall += FinishSceneLoadDeferral;
+                return;
+            }
+
+            s_DeferPreviewCookOnEnable = false;
+            PcgGraphComponent.FlushDeferredEnablePreviewCooks();
         }
 
         private static void Tick()
         {
-            if (Application.isPlaying)
+            if (Application.isPlaying || !PcgGraphComponent.HasPendingEditModePreviewCooks())
                 return;
 
             PcgGraphComponent.TickAllEditModePreviewCooks();
