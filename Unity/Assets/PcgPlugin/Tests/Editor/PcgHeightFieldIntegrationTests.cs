@@ -214,6 +214,42 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
+        public void NativeHeightFieldUpload_RejectsMismatchedOrOverflowingSampleCounts()
+        {
+            var uploads = new[]
+            {
+                new PcgHeightFieldUpload
+                {
+                    SlotId = "short-height", ResolutionX = 2, ResolutionZ = 2,
+                    Heights = new float[3],
+                },
+                new PcgHeightFieldUpload
+                {
+                    SlotId = "long-height", ResolutionX = 2, ResolutionZ = 2,
+                    Heights = new float[5],
+                },
+                new PcgHeightFieldUpload
+                {
+                    SlotId = "short-mask", ResolutionX = 2, ResolutionZ = 2,
+                    Heights = new float[4], Mask = new float[3],
+                },
+                new PcgHeightFieldUpload
+                {
+                    SlotId = "overflow", ResolutionX = int.MaxValue, ResolutionZ = 2,
+                    Heights = new float[1],
+                },
+            };
+
+            foreach (var upload in uploads)
+            {
+                var (code, result) = PcgNative.ExecuteGraph(
+                    "{}", 42, null, null, null, new[] { upload });
+                Assert.That(code, Is.EqualTo(PcgResultCode.InvalidArgument), upload.SlotId);
+                Assert.That(result.Error, Is.Not.Empty, upload.SlotId);
+            }
+        }
+
+        [Test]
         public void NativeHeightFieldSidecar_RetriesWhenInitialBufferIsTooSmall()
         {
             const string graph = @"{

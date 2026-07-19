@@ -437,9 +437,27 @@ namespace DJTechEditor.PCG.Graph
             if (selectedViews.Count == 0)
                 return;
 
+            var selectedIds = new HashSet<string>(selectedViews.Select(node => node.NodeId));
+            IEnumerable<PcgGraphParameter> parameterSource = IsInsideSubgraph
+                ? m_RootDocument?.parameters
+                : m_Blackboard?.Parameters;
+            var affectedBindings = PcgGraphParameterUtility.FindBindingsTargetingNodes(
+                parameterSource, selectedIds);
+            if (affectedBindings.Count > 0)
+            {
+                var names = string.Join(", ", affectedBindings.Select(parameter =>
+                    string.IsNullOrEmpty(parameter.name) ? parameter.id : parameter.name));
+                EditorUtility.DisplayDialog(
+                    "Cannot Create Subgraph",
+                    $"The selection contains node properties bound to graph parameter(s): {names}. " +
+                    "Clear or move those bindings before creating a subgraph; otherwise the " +
+                    "parameters would no longer target this graph scope.",
+                    "OK");
+                return;
+            }
+
             RecordUndo("Create Subgraph");
             var scope = CaptureVisibleDocument();
-            var selectedIds = new HashSet<string>(selectedViews.Select(node => node.NodeId));
             var selectedRecords = scope.nodes.Where(node => selectedIds.Contains(node.id)).ToList();
             var internalEdges = scope.edges.Where(edge =>
                 selectedIds.Contains(edge.source) && selectedIds.Contains(edge.target)).ToList();

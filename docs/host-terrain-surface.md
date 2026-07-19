@@ -58,10 +58,13 @@ Layer indexing is `((z * resolutionX) + x) * tupleSize + component`. All layers
 share the same transform. Layer names are stable data identifiers, not localized
 Inspector labels.
 
-The native v9 transport uses `PcgHeightFieldSlot` for host input and a versioned
-HeightField binary sidecar for output. ABI v1-v8 signatures are unchanged. The
+The native v10 transport uses `PcgHeightFieldSlotV10` for host input, including
+explicit `height_count` / `mask_count`, and a versioned HeightField binary
+sidecar for output. Invalid source lengths are rejected before any buffer read;
+the legacy v9 symbol remains available for calls without host uploads, while v9
+host uploads are rejected because their lengths cannot be verified. The
 sidecar preserves every named layer, including vector layers such as `flowdir`;
-when the first output buffer is too small, v9 reports the required size and the
+when the first output buffer is too small, v10 reports the required size and the
 Unity caller retries with an exact-size buffer. P0 Unity writes only `height` and
 retains the remaining layers for later adapters.
 

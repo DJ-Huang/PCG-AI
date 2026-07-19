@@ -245,7 +245,7 @@ private PcgPolygonPreviewData m_PolygonPreview;
 
 ### 6.3 步骤
 1. 打开 Unity 工程（`Unity/` 目录）
-2. **PCG → Print PcgCore Version** → 确认 Console 输出 `pcg-core 0.1.1 (bmesh-tier1)`
+2. **PCG → Print PcgCore Version** → 确认 Console 输出 `pcg-core 0.1.2 (bmesh-tier1)`
 3. **PCG → Run Graph from File…** → 选择 `schema/example.pcg`
 4. 观察 Scene 视图中的青色球体 Gizmo
 

@@ -299,6 +299,26 @@ namespace DJTechRuntime.PCG
             public IntPtr mask;
         }
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct NativeHeightFieldSlotV10
+        {
+            [MarshalAs(UnmanagedType.LPStr)]
+            public string slot_id;
+            public int resolution_x;
+            public int resolution_z;
+            public double size_x;
+            public double size_z;
+            public double center_x;
+            public double center_y;
+            public double center_z;
+            public int sampling;
+            public int orientation;
+            public int height_count;
+            public int mask_count;
+            public IntPtr height;
+            public IntPtr mask;
+        }
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int pcg_execute_graph_v9(
             string json,
@@ -310,6 +330,41 @@ namespace DJTechRuntime.PCG
             NativeSplineSlot[] splines,
             int spline_count,
             NativeHeightFieldSlot[] heightfields,
+            int heightfield_count,
+            out int outKind,
+            byte[] outJson,
+            int outJsonSize,
+            byte[] outMeshBuf,
+            int outMeshBufSize,
+            byte[] outPointsBuf,
+            int outPointsBufSize,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            int outPerfJsonSize,
+            byte[] outGeometryBuf,
+            int outGeometryBufSize,
+            out int outGeometryBytesWritten,
+            byte[] outHeightFieldBuf,
+            int outHeightFieldBufSize,
+            out int outHeightFieldBytesWritten,
+            StringBuilder errBuf,
+            int errBufSize);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        private static extern int pcg_execute_graph_v10(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            int texture_count,
+            NativeMeshSlot[] meshes,
+            int mesh_count,
+            NativeSplineSlot[] splines,
+            int spline_count,
+            NativeHeightFieldSlotV10[] heightfields,
             int heightfield_count,
             out int outKind,
             byte[] outJson,
@@ -379,6 +434,122 @@ namespace DJTechRuntime.PCG
             public IntPtr indices;
         }
 
+        private static bool TryValidateHeightFieldUploads(
+            IReadOnlyList<PcgHeightFieldUpload> heightfields,
+            out string error)
+        {
+            error = null;
+            if (heightfields == null)
+                return true;
+
+            for (var i = 0; i < heightfields.Count; i++)
+            {
+                var upload = heightfields[i];
+                if (upload == null)
+                {
+                    error = $"HeightField upload {i} is null.";
+                    return false;
+                }
+                if (upload.ResolutionX < 2 || upload.ResolutionZ < 2)
+                {
+                    error = $"HeightField upload {i} has an invalid resolution.";
+                    return false;
+                }
+
+                int sampleCount;
+                try
+                {
+                    sampleCount = checked(upload.ResolutionX * upload.ResolutionZ);
+                }
+                catch (OverflowException)
+                {
+                    error = $"HeightField upload {i} resolution exceeds the supported sample count.";
+                    return false;
+                }
+
+                if (upload.Heights == null || upload.Heights.Length != sampleCount)
+                {
+                    error = $"HeightField upload {i} requires exactly {sampleCount} height samples.";
+                    return false;
+                }
+                if (upload.Mask != null && upload.Mask.Length != sampleCount)
+                {
+                    error = $"HeightField upload {i} requires exactly {sampleCount} mask samples when a mask is provided.";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static int ExecuteGraphNative(
+            string json,
+            int seed,
+            NativeTextureSlot[] textures,
+            NativeMeshSlot[] meshes,
+            NativeSplineSlot[] splines,
+            NativeHeightFieldSlot[] heightfieldsV9,
+            NativeHeightFieldSlotV10[] heightfieldsV10,
+            out int outKind,
+            byte[] outJson,
+            byte[] outMeshBuf,
+            byte[] outPointsBuf,
+            out int outPointCount,
+            out uint outPointAttrFlags,
+            out int outVertexCount,
+            out int outIndexCount,
+            out NativeCookStats outStats,
+            byte[] outPerfJson,
+            byte[] outGeometryBuf,
+            out int outGeometryBytesWritten,
+            byte[] outHeightFieldBuf,
+            int outHeightFieldBufSize,
+            out int outHeightFieldBytesWritten,
+            StringBuilder errBuf)
+        {
+            try
+            {
+                return pcg_execute_graph_v10(
+                    json, seed,
+                    textures, textures?.Length ?? 0,
+                    meshes, meshes?.Length ?? 0,
+                    splines, splines?.Length ?? 0,
+                    heightfieldsV10, heightfieldsV10?.Length ?? 0,
+                    out outKind,
+                    outJson, OutJsonBufSize,
+                    outMeshBuf, OutMeshBufSize,
+                    outPointsBuf, OutPointsBufSize,
+                    out outPointCount, out outPointAttrFlags,
+                    out outVertexCount, out outIndexCount,
+                    out outStats,
+                    outPerfJson, OutPerfBufSize,
+                    outGeometryBuf, OutGeometryBufSize, out outGeometryBytesWritten,
+                    outHeightFieldBuf, outHeightFieldBufSize, out outHeightFieldBytesWritten,
+                    errBuf, ErrBufSize);
+            }
+            catch (EntryPointNotFoundException)
+            {
+                // Managed length validation makes the legacy v9 fallback safe for
+                // platforms whose bundled native plugin has not been upgraded yet.
+                return pcg_execute_graph_v9(
+                    json, seed,
+                    textures, textures?.Length ?? 0,
+                    meshes, meshes?.Length ?? 0,
+                    splines, splines?.Length ?? 0,
+                    heightfieldsV9, heightfieldsV9?.Length ?? 0,
+                    out outKind,
+                    outJson, OutJsonBufSize,
+                    outMeshBuf, OutMeshBufSize,
+                    outPointsBuf, OutPointsBufSize,
+                    out outPointCount, out outPointAttrFlags,
+                    out outVertexCount, out outIndexCount,
+                    out outStats,
+                    outPerfJson, OutPerfBufSize,
+                    outGeometryBuf, OutGeometryBufSize, out outGeometryBytesWritten,
+                    outHeightFieldBuf, outHeightFieldBufSize, out outHeightFieldBytesWritten,
+                    errBuf, ErrBufSize);
+            }
+        }
+
         public static (PcgResultCode code, PcgGraphExecuteResult result) ExecuteGraph(
             string json, int seed, IReadOnlyList<PcgTextureUpload> textures)
         {
@@ -409,6 +580,14 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgSplineUpload> splines,
             IReadOnlyList<PcgHeightFieldUpload> heightfields)
         {
+            if (!TryValidateHeightFieldUploads(heightfields, out var heightFieldError))
+            {
+                return (PcgResultCode.InvalidArgument, new PcgGraphExecuteResult
+                {
+                    Error = heightFieldError,
+                });
+            }
+
             ClearCancel();
             var errBuf = new StringBuilder(ErrBufSize);
             using var outputBuffers = new RentedOutputBuffers();
@@ -508,14 +687,14 @@ namespace DJTechRuntime.PCG
                 }
 
                 NativeHeightFieldSlot[] nativeHeightFields = null;
+                NativeHeightFieldSlotV10[] nativeHeightFieldsV10 = null;
                 if (hasHeightFields)
                 {
                     nativeHeightFields = new NativeHeightFieldSlot[heightfields.Count];
+                    nativeHeightFieldsV10 = new NativeHeightFieldSlotV10[heightfields.Count];
                     for (var i = 0; i < heightfields.Count; i++)
                     {
                         var upload = heightfields[i];
-                        if (upload?.Heights == null || upload.Heights.Length == 0)
-                            continue;
                         var heightPin = GCHandle.Alloc(upload.Heights, GCHandleType.Pinned);
                         heightfieldHandles.Add(heightPin);
                         var maskPointer = IntPtr.Zero;
@@ -540,42 +719,46 @@ namespace DJTechRuntime.PCG
                             height = heightPin.AddrOfPinnedObject(),
                             mask = maskPointer,
                         };
+                        nativeHeightFieldsV10[i] = new NativeHeightFieldSlotV10
+                        {
+                            slot_id = upload.SlotId,
+                            resolution_x = upload.ResolutionX,
+                            resolution_z = upload.ResolutionZ,
+                            size_x = upload.SizeX,
+                            size_z = upload.SizeZ,
+                            center_x = upload.CenterX,
+                            center_y = upload.CenterY,
+                            center_z = upload.CenterZ,
+                            sampling = upload.Sampling,
+                            orientation = upload.Orientation,
+                            height_count = upload.Heights.Length,
+                            mask_count = upload.Mask?.Length ?? 0,
+                            height = heightPin.AddrOfPinnedObject(),
+                            mask = maskPointer,
+                        };
                     }
                 }
 
-                rc = (PcgResultCode)pcg_execute_graph_v9(
-                    json,
-                    seed,
-                    nativeTextures,
-                    nativeTextures?.Length ?? 0,
-                    nativeMeshes,
-                    nativeMeshes?.Length ?? 0,
-                    nativeSplines,
-                    nativeSplines?.Length ?? 0,
-                    nativeHeightFields,
-                    nativeHeightFields?.Length ?? 0,
+                rc = (PcgResultCode)ExecuteGraphNative(
+                    json, seed,
+                    nativeTextures, nativeMeshes, nativeSplines,
+                    nativeHeightFields, nativeHeightFieldsV10,
                     out kind,
                     jsonBuf,
-                    OutJsonBufSize,
                     meshBuf,
-                    OutMeshBufSize,
                     pointsBuf,
-                    OutPointsBufSize,
                     out pointCount,
                     out pointAttrFlags,
                     out vertexCount,
                     out indexCount,
                     out cookStats,
                     perfBuf,
-                    OutPerfBufSize,
                     geometryBuf,
-                    OutGeometryBufSize,
                     out geometryBytesWritten,
                     heightfieldBuf,
-                    OutHeightFieldBufSize,
+                    heightfieldBuf.Length,
                     out heightfieldBytesWritten,
-                    errBuf,
-                    ErrBufSize);
+                    errBuf);
 
                 if (rc == PcgResultCode.Ok &&
                     heightfieldBytesWritten > heightfieldBuf.Length)
@@ -585,39 +768,26 @@ namespace DJTechRuntime.PCG
                     Buffer.BlockCopy(perfBuf, 0, primaryPerf, 0, primaryPerf.Length);
                     heightfieldBuf = new byte[heightfieldBytesWritten];
 
-                    rc = (PcgResultCode)pcg_execute_graph_v9(
-                        json,
-                        seed,
-                        nativeTextures,
-                        nativeTextures?.Length ?? 0,
-                        nativeMeshes,
-                        nativeMeshes?.Length ?? 0,
-                        nativeSplines,
-                        nativeSplines?.Length ?? 0,
-                        nativeHeightFields,
-                        nativeHeightFields?.Length ?? 0,
+                    rc = (PcgResultCode)ExecuteGraphNative(
+                        json, seed,
+                        nativeTextures, nativeMeshes, nativeSplines,
+                        nativeHeightFields, nativeHeightFieldsV10,
                         out kind,
                         jsonBuf,
-                        OutJsonBufSize,
                         meshBuf,
-                        OutMeshBufSize,
                         pointsBuf,
-                        OutPointsBufSize,
                         out pointCount,
                         out pointAttrFlags,
                         out vertexCount,
                         out indexCount,
                         out cookStats,
                         perfBuf,
-                        OutPerfBufSize,
                         geometryBuf,
-                        OutGeometryBufSize,
                         out geometryBytesWritten,
                         heightfieldBuf,
                         heightfieldBuf.Length,
                         out heightfieldBytesWritten,
-                        errBuf,
-                        ErrBufSize);
+                        errBuf);
 
                     // The retry is transport recovery; report the primary cook's
                     // executed/skipped nodes and per-node timings to callers.
@@ -867,6 +1037,7 @@ namespace DJTechRuntime.PCG
         CycleDetected = 2,
         UnknownNode = 3,
         Execution = 4,
+        InvalidArgument = 5,
     }
 
     public enum PcgExecuteKind
