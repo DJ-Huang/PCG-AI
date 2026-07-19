@@ -31,8 +31,6 @@ Unity/Assets/PcgPlugin/Runtime/PcgGraphTypes.cs
 Unity/Assets/PcgPlugin/Runtime/PcgGraphTypes.cs.meta
 Unity/Assets/PcgPlugin/Runtime/PcgMiniJson.cs
 Unity/Assets/PcgPlugin/Runtime/PcgMiniJson.cs.meta
-Unity/Assets/PcgPlugin/Runtime/PcgParameterApplicator.cs
-Unity/Assets/PcgPlugin/Runtime/PcgParameterApplicator.cs.meta
 Unity/Assets/PcgPlugin/Runtime/PcgRuntimeRunner.cs
 pcg-core/.deps/
 pcg-core/build-debug/
