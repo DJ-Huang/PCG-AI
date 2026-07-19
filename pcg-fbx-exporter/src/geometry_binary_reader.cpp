@@ -220,19 +220,6 @@ bool read_geometry_binary(const void* data, int size, Geometry& geometry, std::s
             error = "Corner UV count does not match total face corners.";
             return false;
         }
-        // Assimp mesh UV is per-point; expand corner → point (first writer wins)
-        // when point UV channel is empty so exporters still emit UV0.
-        if (geometry.uvs.empty()) {
-            geometry.uvs.assign(point_count, {{0.f, 0.f}});
-            size_t cursor = 0;
-            for (const auto& face : geometry.faces) {
-                for (uint32_t index : face) {
-                    if (index < point_count)
-                        geometry.uvs[index] = geometry.corner_uvs[cursor];
-                    ++cursor;
-                }
-            }
-        }
     }
     return true;
 }

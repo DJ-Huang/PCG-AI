@@ -33,6 +33,22 @@ namespace DJTechRuntime.PCG
         public float maxValue = 1f;
     }
 
+    public static class PcgGraphParameterUtility
+    {
+        public static List<PcgGraphParameter> FindBindingsTargetingNodes(
+            IEnumerable<PcgGraphParameter> parameters,
+            ISet<string> nodeIds)
+        {
+            if (parameters == null || nodeIds == null || nodeIds.Count == 0)
+                return new List<PcgGraphParameter>();
+
+            return parameters.Where(parameter =>
+                parameter != null &&
+                !string.IsNullOrEmpty(parameter.targetNode) &&
+                nodeIds.Contains(parameter.targetNode)).ToList();
+        }
+    }
+
     [Serializable]
     public class PcgParameterOverride
     {

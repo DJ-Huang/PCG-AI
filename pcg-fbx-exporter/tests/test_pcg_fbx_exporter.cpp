@@ -1,6 +1,7 @@
 #include "pcg_fbx_api.h"
 
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -56,6 +57,36 @@ std::vector<uint8_t> make_quad()
     return data;
 }
 
+std::vector<uint8_t> make_uv_seam()
+{
+    std::vector<uint8_t> data;
+    append_u32(data, 0x47475043u);
+    append_u32(data, 3u);
+    append_u32(data, 4u);
+    append_u32(data, 2u);
+    const float points[] = {-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1};
+    const uint32_t offsets[] = {0, 3};
+    const uint32_t indices[] = {0, 1, 2, 0, 2, 3};
+    const float point_uvs[] = {
+        0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f, 0.25f,
+    };
+    const float corner_uvs[] = {
+        0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+        0.75f, 0.25f, 1.0f, 1.0f, 0.0f, 1.0f,
+    };
+    append_chunk(data, 1u, points, sizeof(points));
+    append_chunk(data, 2u, offsets, sizeof(offsets));
+    append_chunk(data, 3u, indices, sizeof(indices));
+    append_chunk(data, 8u, point_uvs, sizeof(point_uvs));
+    append_chunk(data, 11u, corner_uvs, sizeof(corner_uvs));
+    return data;
+}
+
+bool near(float a, float b)
+{
+    return std::abs(a - b) < 1.0e-5f;
+}
+
 } // namespace
 
 int main()
@@ -95,6 +126,34 @@ int main()
     assert(unit_scale == 100.0);
 #endif
 
+    const auto seam_geometry = make_uv_seam();
+    const auto seam_path = std::filesystem::temp_directory_path() / "pcg_fbx_exporter_uv_seam.fbx";
+    const int seam_result = pcg_fbx_export_v1(
+        seam_geometry.data(), static_cast<int>(seam_geometry.size()),
+        seam_path.string().c_str(), &options, error, sizeof(error));
+    assert(seam_result == PCG_FBX_OK && error[0] == '\0');
+
+#if PCG_FBX_ENABLE_READBACK_TESTS
+    Assimp::Importer seam_importer;
+    const aiScene* seam_scene = seam_importer.ReadFile(seam_path.string(), 0u);
+    assert(seam_scene != nullptr && seam_scene->mNumMeshes == 1);
+    const aiMesh* seam_mesh = seam_scene->mMeshes[0];
+    assert(seam_mesh->mNumFaces == 2);
+    assert(seam_mesh->HasTextureCoords(0));
+    bool found_first_uv = false;
+    bool found_second_uv = false;
+    for (unsigned int i = 0; i < seam_mesh->mNumVertices; ++i) {
+        const auto& point = seam_mesh->mVertices[i];
+        if (!near(point.x, -1.0f) || !near(point.y, 0.0f) || !near(point.z, -1.0f))
+            continue;
+        const auto& uv = seam_mesh->mTextureCoords[0][i];
+        found_first_uv |= near(uv.x, 0.0f) && near(uv.y, 0.0f);
+        found_second_uv |= near(uv.x, 0.75f) && near(uv.y, 0.25f);
+    }
+    assert(found_first_uv && found_second_uv);
+#endif
+
     std::filesystem::remove(path);
+    std::filesystem::remove(seam_path);
     return 0;
 }

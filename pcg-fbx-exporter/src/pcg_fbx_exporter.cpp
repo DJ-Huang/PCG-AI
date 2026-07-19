@@ -88,6 +88,11 @@ std::unique_ptr<aiScene> build_scene(
     scene->mRootNode->mMeshes = new unsigned int[scene->mNumMeshes];
 
     const auto normals = generate_normals ? compute_normals(geometry) : std::vector<aiVector3D>();
+    const bool has_corner_uvs = !geometry.corner_uvs.empty();
+    std::vector<size_t> face_corner_offsets(geometry.faces.size() + 1u, 0u);
+    for (size_t i = 0; i < geometry.faces.size(); ++i)
+        face_corner_offsets[i + 1u] = face_corner_offsets[i] + geometry.faces[i].size();
+
     unsigned int mesh_index = 0;
     for (const auto& [material_name, face_ids] : faces_by_material) {
         auto* material = new aiMaterial();
@@ -98,40 +103,65 @@ std::unique_ptr<aiScene> build_scene(
         auto* mesh = new aiMesh();
         mesh->mName = aiString(material_name + "_Geometry");
         mesh->mMaterialIndex = mesh_index;
-        mesh->mNumVertices = static_cast<unsigned int>(geometry.points.size());
+        size_t material_vertex_count = geometry.points.size();
+        if (has_corner_uvs) {
+            material_vertex_count = 0;
+            for (size_t face_id : face_ids)
+                material_vertex_count += geometry.faces[face_id].size();
+        }
+        mesh->mNumVertices = static_cast<unsigned int>(material_vertex_count);
         mesh->mVertices = new aiVector3D[mesh->mNumVertices];
         if (generate_normals)
             mesh->mNormals = new aiVector3D[mesh->mNumVertices];
         if (!geometry.colors.empty())
             mesh->mColors[0] = new aiColor4D[mesh->mNumVertices];
-        if (!geometry.uvs.empty()) {
+        if (has_corner_uvs || !geometry.uvs.empty()) {
             mesh->mTextureCoords[0] = new aiVector3D[mesh->mNumVertices];
             mesh->mNumUVComponents[0] = 2;
         }
-        for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
-            const auto& point = geometry.points[i];
-            mesh->mVertices[i] = aiVector3D(point[0] * scale, point[1] * scale, point[2] * scale);
+
+        const auto write_vertex = [&](unsigned int destination,
+                                      uint32_t source,
+                                      const std::array<float, 2>* corner_uv) {
+            const auto& point = geometry.points[source];
+            mesh->mVertices[destination] =
+                aiVector3D(point[0] * scale, point[1] * scale, point[2] * scale);
             if (generate_normals)
-                mesh->mNormals[i] = normals[i];
+                mesh->mNormals[destination] = normals[source];
             if (mesh->mColors[0]) {
-                const auto& color = geometry.colors[i];
-                mesh->mColors[0][i] = aiColor4D(color[0], color[1], color[2], color[3]);
+                const auto& color = geometry.colors[source];
+                mesh->mColors[0][destination] = aiColor4D(color[0], color[1], color[2], color[3]);
             }
             if (mesh->mTextureCoords[0]) {
-                const auto& uv = geometry.uvs[i];
-                mesh->mTextureCoords[0][i] = aiVector3D(uv[0], uv[1], 0);
+                const auto& uv = corner_uv ? *corner_uv : geometry.uvs[source];
+                mesh->mTextureCoords[0][destination] = aiVector3D(uv[0], uv[1], 0);
             }
-        }
+        };
 
         mesh->mNumFaces = static_cast<unsigned int>(face_ids.size());
         mesh->mFaces = new aiFace[mesh->mNumFaces];
         mesh->mPrimitiveTypes = 0;
+        unsigned int next_vertex = 0;
+        if (!has_corner_uvs) {
+            for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+                write_vertex(i, i, nullptr);
+        }
         for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
-            const auto& polygon = geometry.faces[face_ids[i]];
+            const size_t face_id = face_ids[i];
+            const auto& polygon = geometry.faces[face_id];
             auto& face = mesh->mFaces[i];
             face.mNumIndices = static_cast<unsigned int>(polygon.size());
             face.mIndices = new unsigned int[face.mNumIndices];
-            std::copy(polygon.begin(), polygon.end(), face.mIndices);
+            if (has_corner_uvs) {
+                const size_t corner_offset = face_corner_offsets[face_id];
+                for (size_t corner = 0; corner < polygon.size(); ++corner) {
+                    write_vertex(next_vertex, polygon[corner],
+                                 &geometry.corner_uvs[corner_offset + corner]);
+                    face.mIndices[corner] = next_vertex++;
+                }
+            } else {
+                std::copy(polygon.begin(), polygon.end(), face.mIndices);
+            }
             mesh->mPrimitiveTypes |= polygon.size() == 3 ? aiPrimitiveType_TRIANGLE
                                                         : aiPrimitiveType_POLYGON;
         }

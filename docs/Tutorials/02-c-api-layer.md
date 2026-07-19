@@ -186,7 +186,7 @@ const char* pcg_get_version(void)
 }
 ```
 
-输出：`pcg-core 0.1.1 (bmesh-tier1)`。
+输出：`pcg-core 0.1.2 (bmesh-tier1)`。
 
 ### 4.3 v8 的 fallback 链
 

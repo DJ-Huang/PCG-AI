@@ -839,7 +839,7 @@ void test_terrain_demo_graph()
     assert(*std::max_element(decoded.triangles().begin(), decoded.triangles().end()) > 65535);
 }
 
-void test_host_heightfield_v9_round_trip_and_cache_dirty()
+void test_host_heightfield_v10_round_trip_and_cache_dirty()
 {
     const char* graph = R"({
       "version":"1.0",
@@ -862,7 +862,7 @@ void test_host_heightfield_v9_round_trip_and_cache_dirty()
         6.0f, 7.0f, 8.0f,
     };
     std::vector<float> mask(heights.size(), 1.0f);
-    PcgHeightFieldSlot slot{};
+    PcgHeightFieldSlotV10 slot{};
     slot.slot_id = "host";
     slot.resolution_x = 3;
     slot.resolution_z = 3;
@@ -873,6 +873,8 @@ void test_host_heightfield_v9_round_trip_and_cache_dirty()
     slot.center_z = 1.0;
     slot.sampling = 1;
     slot.orientation = 0;
+    slot.height_count = static_cast<int>(heights.size());
+    slot.mask_count = static_cast<int>(mask.size());
     slot.height = heights.data();
     slot.mask = mask.data();
 
@@ -892,7 +894,7 @@ void test_host_heightfield_v9_round_trip_and_cache_dirty()
         int geometry_bytes = 0;
         int heightfield_bytes = 0;
         PcgCookStats stats{};
-        const PcgResultCode code = pcg_execute_graph_v9(
+        const PcgResultCode code = pcg_execute_graph_v10(
             graph, 42,
             nullptr, 0,
             nullptr, 0,
@@ -910,7 +912,7 @@ void test_host_heightfield_v9_round_trip_and_cache_dirty()
             heightfield.data(), static_cast<int>(heightfield.size()), &heightfield_bytes,
             error, sizeof(error));
         if (code != PCG_OK)
-            std::printf("host HeightField v9 error: %s\n", error);
+            std::printf("host HeightField v10 error: %s\n", error);
         assert(code == PCG_OK);
         assert(kind == PCG_RESULT_KIND_MESH);
         assert(vertex_count == 9);
@@ -936,7 +938,7 @@ void test_host_heightfield_v9_round_trip_and_cache_dirty()
         int geometry_bytes = 0;
         int required_heightfield_bytes = 0;
         PcgCookStats stats{};
-        assert(pcg_execute_graph_v9(
+        assert(pcg_execute_graph_v10(
             graph, 42,
             nullptr, 0, nullptr, 0, nullptr, 0, &slot, 1,
             &kind,
@@ -964,6 +966,45 @@ void test_host_heightfield_v9_round_trip_and_cache_dirty()
     execute(second);
     assert(second.find_layer("height")->values == heights);
     assert(near(second.find_layer("height")->values[4], 19.0));
+
+    {
+        char error[1024] = {};
+        PcgHeightFieldSlot legacy_slot{};
+        legacy_slot.slot_id = "host";
+        legacy_slot.height = heights.data();
+        assert(pcg_execute_graph_v9(
+            graph, 42,
+            nullptr, 0, nullptr, 0, nullptr, 0, &legacy_slot, 1,
+            nullptr, nullptr, 0, nullptr, 0, nullptr, 0,
+            nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, 0, nullptr, 0, nullptr,
+            nullptr, 0, nullptr,
+            error, sizeof(error)) == PCG_ERR_INVALID_ARGUMENT);
+        assert(std::strstr(error, "use v10") != nullptr);
+
+        slot.height_count = static_cast<int>(heights.size()) - 1;
+        assert(pcg_execute_graph_v10(
+            graph, 42,
+            nullptr, 0, nullptr, 0, nullptr, 0, &slot, 1,
+            nullptr, nullptr, 0, nullptr, 0, nullptr, 0,
+            nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, 0, nullptr, 0, nullptr,
+            nullptr, 0, nullptr,
+            error, sizeof(error)) == PCG_ERR_INVALID_ARGUMENT);
+        assert(std::strstr(error, "height_count") != nullptr);
+
+        slot.height_count = static_cast<int>(heights.size());
+        slot.mask_count = static_cast<int>(mask.size()) - 1;
+        assert(pcg_execute_graph_v10(
+            graph, 42,
+            nullptr, 0, nullptr, 0, nullptr, 0, &slot, 1,
+            nullptr, nullptr, 0, nullptr, 0, nullptr, 0,
+            nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, 0, nullptr, 0, nullptr,
+            nullptr, 0, nullptr,
+            error, sizeof(error)) == PCG_ERR_INVALID_ARGUMENT);
+        assert(std::strstr(error, "mask_count") != nullptr);
+    }
 }
 
 } // namespace
@@ -983,7 +1024,7 @@ int main()
     test_l1_graph_pipeline();
     test_l2_project_and_scatter_graph_nodes();
     test_terrain_demo_graph();
-    test_host_heightfield_v9_round_trip_and_cache_dirty();
+    test_host_heightfield_v10_round_trip_and_cache_dirty();
     std::printf("PASS: HeightField typed contract, sampling, noise, convert, graph, demo\n");
     return 0;
 }

@@ -25,6 +25,35 @@ void expect_code(PcgResultCode actual, PcgResultCode expected, const char* label
     }
 }
 
+void expect_execute_rejects(const char* graph, PcgResultCode expected, const char* label)
+{
+    char out[1024] = {};
+    char err[512] = {};
+    int kind = PCG_RESULT_KIND_NONE;
+    int vertex_count = 0;
+    int index_count = 0;
+    PcgCookStats stats{};
+
+    expect_code(
+        pcg_execute_graph_v2(graph, 1, &kind, out, sizeof(out), nullptr, 0,
+                             &vertex_count, &index_count, err, sizeof(err)),
+        expected, label);
+    expect_code(
+        pcg_execute_graph_v5(graph, 1, nullptr, 0, nullptr, 0, &kind,
+                             out, sizeof(out), nullptr, 0, &vertex_count,
+                             &index_count, &stats, err, sizeof(err)),
+        expected, label);
+    expect_code(
+        pcg_execute_graph_v10(
+            graph, 1,
+            nullptr, 0, nullptr, 0, nullptr, 0, nullptr, 0,
+            &kind, out, sizeof(out), nullptr, 0, nullptr, 0,
+            nullptr, nullptr, &vertex_count, &index_count, &stats,
+            nullptr, 0, nullptr, 0, nullptr, nullptr, 0, nullptr,
+            err, sizeof(err)),
+        expected, label);
+}
+
 } // namespace
 
 int main()
@@ -102,6 +131,8 @@ int main()
     })";
     expect_code(pcg_validate_graph(invalid_handle_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
                 "invalid source handle");
+    expect_execute_rejects(invalid_handle_graph, PCG_ERR_INVALID_JSON,
+                           "execute rejects invalid source handle");
 
     const char* incompatible_pin_graph = R"({
       "version":"1.0",
@@ -110,6 +141,8 @@ int main()
     })";
     expect_code(pcg_validate_graph(incompatible_pin_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
                 "incompatible pin types");
+    expect_execute_rejects(incompatible_pin_graph, PCG_ERR_INVALID_JSON,
+                           "execute rejects incompatible pin types");
 
     const char* multiple_input_graph = R"({
       "version":"1.0",
@@ -119,6 +152,22 @@ int main()
     })";
     expect_code(pcg_validate_graph(multiple_input_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
                 "non-variadic input cardinality");
+    expect_execute_rejects(multiple_input_graph, PCG_ERR_INVALID_JSON,
+                           "execute rejects non-variadic input cardinality");
+
+    const char* duplicate_edge_graph = R"({
+      "version":"1.0",
+      "nodes":[{"id":"a","type":"SpawnPoints","data":{}},
+        {"id":"b","type":"PlaceInScene","data":{}}],
+      "edges":[
+        {"source":"a","target":"b","sourceHandle":"out","targetHandle":"in"},
+        {"source":"a","target":"b","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    expect_code(pcg_validate_graph(duplicate_edge_graph, err, sizeof(err)), PCG_ERR_INVALID_JSON,
+                "duplicate edge");
+    expect_execute_rejects(duplicate_edge_graph, PCG_ERR_INVALID_JSON,
+                           "execute rejects duplicate edge");
     std::printf("PASS: runtime graph pin contracts\n");
 
     const std::string roundtrip_graph = read_file("fixtures/roundtrip.pcg");

@@ -303,8 +303,8 @@ int main()
         { "id": "e1b", "source": "deck_profile", "target": "deck", "sourceHandle": "out", "targetHandle": "profile" },
         { "id": "e2", "source": "path", "target": "piers", "sourceHandle": "out", "targetHandle": "spline" },
         { "id": "e3", "source": "pier_proto", "target": "piers", "sourceHandle": "out", "targetHandle": "mesh" },
-        { "id": "e4", "source": "deck", "target": "merge", "sourceHandle": "out", "targetHandle": "a" },
-        { "id": "e5", "source": "piers", "target": "merge", "sourceHandle": "out", "targetHandle": "b" },
+        { "id": "e4", "source": "deck", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
+        { "id": "e5", "source": "piers", "target": "merge", "sourceHandle": "out", "targetHandle": "in" },
         { "id": "e6", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in" }
       ]
     })";

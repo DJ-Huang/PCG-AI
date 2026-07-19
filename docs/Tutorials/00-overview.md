@@ -25,7 +25,7 @@ PCG-AI 的核心是一条 **Web 画布编辑 → Graph JSON → C++ 执行 → U
 ```powershell
 # 验证 C++ 核心已就绪（M0 里程碑）
 # Unity 菜单：PCG → Print PcgCore Version
-# Console 应输出：pcg-core 0.1.1 (bmesh-tier1)
+# Console 应输出：pcg-core 0.1.2 (bmesh-tier1)
 ```
 
 证据：E-001。

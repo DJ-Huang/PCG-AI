@@ -1,5 +1,6 @@
 using DJTechRuntime.PCG;
 using NUnit.Framework;
+using System.Collections.Generic;
 
 namespace DJTechEditor.PCG.Tests
 {
@@ -60,6 +61,26 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(document.subgraphs[0].nodes[0].type, Is.EqualTo("Output"));
             Assert.That(prepared, Does.Not.Contain("ExportFBX"));
             Assert.That(prepared, Does.Not.Contain("file.fbx"));
+        }
+    }
+
+    public sealed class PcgGraphParameterUtilityTests
+    {
+        [Test]
+        public void FindBindingsTargetingNodes_ReturnsOnlyAffectedBindings()
+        {
+            var parameters = new List<PcgGraphParameter>
+            {
+                new() { id = "size", name = "Size", targetNode = "box", targetProperty = "size" },
+                new() { id = "seed", name = "Seed", targetNode = "scatter", targetProperty = "seed" },
+                new() { id = "free", name = "Free" },
+            };
+
+            var affected = PcgGraphParameterUtility.FindBindingsTargetingNodes(
+                parameters, new HashSet<string> { "box", "output" });
+
+            Assert.That(affected.Count, Is.EqualTo(1));
+            Assert.That(affected[0].id, Is.EqualTo("size"));
         }
     }
 }
