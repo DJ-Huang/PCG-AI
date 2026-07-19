@@ -1,37 +1,6 @@
 # >>> Codely setup.bat (synced rules — do not commit) >>>
 # Source: Codely main repo sync/ + CODELY.md — re-run setup.bat to refresh
 Unity/.vs/
-Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgGraphNodeBase.cs
-Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgManifestNodeView.cs
-Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgParseConfigNodeView.cs
-Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgPlaceInSceneNodeView.cs
-Unity/Assets/PcgPlugin/Editor/Graph/Nodes/PcgSpawnPointsNodeView.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgConnectionValidator.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphAsset.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphAssetEditor.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphBlackboard.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphBlackboard.cs.meta
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphEditorWindow.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphImporter.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphNodeFactory.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphSearchWindow.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphSerializer.cs.meta
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphTypes.cs.meta
-Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphView.cs
-Unity/Assets/PcgPlugin/Editor/Graph/PcgMiniJson.cs.meta
-Unity/Assets/PcgPlugin/Editor/Graph/PcgNodeManifest.cs
-Unity/Assets/PcgPlugin/Editor/PcgGraphRunner.cs
-Unity/Assets/PcgPlugin/Editor/PcgGraphWatcher.cs
-Unity/Assets/PcgPlugin/Editor/PcgJsonAssetHandler.cs
-Unity/Assets/PcgPlugin/Editor/PcgRuntimeRunnerEditor.cs
-Unity/Assets/PcgPlugin/Editor/PcgRuntimeRunnerEditor.cs.meta
-Unity/Assets/PcgPlugin/Runtime/PcgGraphSerializer.cs
-Unity/Assets/PcgPlugin/Runtime/PcgGraphSerializer.cs.meta
-Unity/Assets/PcgPlugin/Runtime/PcgGraphTypes.cs
-Unity/Assets/PcgPlugin/Runtime/PcgGraphTypes.cs.meta
-Unity/Assets/PcgPlugin/Runtime/PcgMiniJson.cs
-Unity/Assets/PcgPlugin/Runtime/PcgMiniJson.cs.meta
-Unity/Assets/PcgPlugin/Runtime/PcgRuntimeRunner.cs
 pcg-core/.deps/
 pcg-core/build-debug/
 pcg-core/build-manual/
