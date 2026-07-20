@@ -77,12 +77,43 @@ public:
     }
 };
 
+class PointRelaxElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "PointRelax"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "PointRelax missing node");
+
+        const bool has_points = ctx.inputs.find_points("in") != nullptr ||
+                                ctx.inputs.find_json("in") != nullptr;
+        if (!has_points)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "PointRelax missing points input");
+
+        PointRelaxOptions opts;
+        opts.max_iterations = std::clamp(ctx.node->data.value("maxIterations", 50), 1, 1000);
+        opts.radius = std::max(0.000001, ctx.node->data.value("radius", 1.0));
+        opts.use_pscale = ctx.node->data.value("usePscale", true);
+        opts.is_cancel_requested = ctx.is_cancel_requested;
+
+        const data::PcgPointData points =
+            get_points_input(ctx, "in", "PointRelax missing points input");
+        emit_points(ctx, relax_points(points, opts));
+
+        if (ctx.is_cancel_requested && ctx.is_cancel_requested())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Execution cancelled");
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_mesh_scatter_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("GetMeshData", std::make_unique<GetMeshDataElement>());
     map.emplace("SampleMeshSurface", std::make_unique<SampleMeshSurfaceElement>());
+    map.emplace("PointRelax", std::make_unique<PointRelaxElement>());
 }
 
 } // namespace pcg::internal::elements

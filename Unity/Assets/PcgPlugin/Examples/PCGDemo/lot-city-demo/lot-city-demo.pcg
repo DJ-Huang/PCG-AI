@@ -83,7 +83,7 @@
       "id": "bldg_lift",
       "type": "TransformMesh",
       "position": { "x": 520, "y": 640 },
-      "data": {"translateX": 0, "translateY": 2.25, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1.0, "scaleY": 1.0, "scaleZ": 1.0, "__nodeTitle": "Building Lift"}
+      "data": {"translateX": 0, "translateY": 2.25, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Building Lift"}
     },
     {
       "id": "merge_roads",
@@ -107,7 +107,13 @@
       "id": "sample",
       "type": "SampleMeshSurface",
       "position": { "x": 200, "y": 960 },
-      "data": {"count": 43, "seed": 3, "normalOffset": 0.05, "looseness": 0, "faceGroup": "extrude_top", "edgeMargin": 1.1, "__nodeTitle": "Building Sites"}
+      "data": {"count": 43, "seed": 3, "normalOffset": 0.05, "looseness": 0, "faceGroup": "extrude_top", "excludeGroups": "", "edgeMargin": 1.1, "__nodeTitle": "Building Sites"}
+    },
+    {
+      "id": "relax",
+      "type": "PointRelax",
+      "position": { "x": 200, "y": 1120 },
+      "data": {"maxIterations": 100, "radius": 1.5, "usePscale": false, "__nodeTitle": "Relax Sites"}
     },
     {
       "id": "mat_roads",
@@ -124,31 +130,31 @@
     {
       "id": "jitter",
       "type": "AttributeRandomize",
-      "position": { "x": 200, "y": 1120 },
+      "position": { "x": 200, "y": 1280 },
       "data": {"seed": 5, "translateX": 0.4, "translateY": 0, "translateZ": 0.4, "rotateX": 0, "rotateY": 25, "rotateZ": 0, "scaleMin": 0.7, "scaleMax": 1.35, "__nodeTitle": "Site Jitter"}
     },
     {
       "id": "place",
       "type": "CopyMeshToPoints",
-      "position": { "x": 520, "y": 1280 },
+      "position": { "x": 520, "y": 1440 },
       "data": {"__nodeTitle": "Place Buildings"}
     },
     {
       "id": "mat_bldg",
       "type": "AssignMaterial",
-      "position": { "x": 520, "y": 1440 },
+      "position": { "x": 520, "y": 1600 },
       "data": {"group": "", "materialName": "building", "__nodeTitle": "Mat Buildings"}
     },
     {
       "id": "merge",
       "type": "MergeMesh",
-      "position": { "x": 200, "y": 1600 },
+      "position": { "x": 200, "y": 1760 },
       "data": {"__nodeTitle": "City Merge"}
     },
     {
       "id": "out",
       "type": "Output",
-      "position": { "x": 200, "y": 1760 },
+      "position": { "x": 200, "y": 1920 },
       "data": {"label": "Lot City", "__nodeTitle": "Output"}
     }
   ],
@@ -163,7 +169,8 @@
     {"id": "e_merge_roads_bool", "source": "merge_roads", "target": "pad_bool", "sourceHandle": "out", "targetHandle": "b"},
     {"id": "e_bool_sample", "source": "pad_bool", "target": "lot_top", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_top_sample", "source": "lot_top", "target": "sample", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_sample_jitter", "source": "sample", "target": "jitter", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_sample_relax", "source": "sample", "target": "relax", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_relax_jitter", "source": "relax", "target": "jitter", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_proto_bevel", "source": "bldg_proto", "target": "bldg_bevel", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_bevel_lift", "source": "bldg_bevel", "target": "bldg_lift", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_lift_place", "source": "bldg_lift", "target": "place", "sourceHandle": "out", "targetHandle": "prototype"},
@@ -186,7 +193,9 @@
     {"id": "p_irregularity", "name": "irregularity", "type": "number", "default": 0.4512821, "exposed": true, "targetNode": "lots", "targetProperty": "irregularity", "hasRange": true, "min": 0, "max": 1},
     {"id": "p_sites", "name": "buildingCount", "type": "integer", "default": 43, "exposed": true, "targetNode": "sample", "targetProperty": "count", "hasRange": true, "min": 4, "max": 80},
     {"id": "p_edge_margin", "name": "edgeMargin", "type": "number", "default": 1.1, "exposed": true, "targetNode": "sample", "targetProperty": "edgeMargin", "hasRange": true, "min": 0, "max": 3},
-    {"id": "p_pad_height", "name": "padHeight", "type": "number", "default": 0.18, "exposed": true, "targetNode": "pads", "targetProperty": "distance", "hasRange": true, "min": 0.02, "max": 1}
+    {"id": "p_pad_height", "name": "padHeight", "type": "number", "default": 0.18, "exposed": true, "targetNode": "pads", "targetProperty": "distance", "hasRange": true, "min": 0.02, "max": 1},
+    {"id": "p_relax_radius", "name": "relaxRadius", "type": "number", "default": 1.5, "exposed": true, "targetNode": "relax", "targetProperty": "radius", "hasRange": true, "min": 0.5, "max": 4}
   ],
-  "subgraphs": []
+  "subgraphs": [
+  ]
 }

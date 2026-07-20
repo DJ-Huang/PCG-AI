@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -388,6 +390,146 @@ data::PcgPointData sample_mesh_surface(const data::PcgGeometry& geometry,
         options.edge_margin > 0.0 ? build_group_boundary_edges(geometry, allowed)
                                   : std::vector<BoundaryEdge>{};
     return sample_triangles(vertices, tris, boundary, options);
+}
+
+// ── Point Relax ──────────────────────────────────────────────────────────
+
+namespace {
+
+double read_pscale(const nlohmann::json& attributes, double fallback)
+{
+    if (attributes.contains("pscale") && attributes["pscale"].is_number())
+        return std::max(0.0, attributes["pscale"].get<double>());
+    return fallback;
+}
+
+bool read_normal(const nlohmann::json& attributes, double& nx, double& ny, double& nz)
+{
+    nx = ny = nz = 0.0;
+    if (attributes.contains("nx") && attributes["nx"].is_number())
+        nx = attributes["nx"].get<double>();
+    else
+        return false;
+    if (attributes.contains("ny") && attributes["ny"].is_number())
+        ny = attributes["ny"].get<double>();
+    if (attributes.contains("nz") && attributes["nz"].is_number())
+        nz = attributes["nz"].get<double>();
+    const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+    if (len < 1e-12)
+        return false;
+    nx /= len; ny /= len; nz /= len;
+    return true;
+}
+
+} // namespace
+
+data::PcgPointData relax_points(const data::PcgPointData& input,
+                                const PointRelaxOptions& options)
+{
+    data::PcgPointData output = input;
+    std::vector<data::PcgPoint>& pts = output.points_mut();
+    const int n = static_cast<int>(pts.size());
+    if (n < 2)
+        return output;
+
+    // Gather radii and normals.
+    std::vector<double> radii(n);
+    std::vector<double> normals(n * 3, 0.0);
+    std::vector<bool> has_normal(n, false);
+    for (int i = 0; i < n; ++i) {
+        radii[i] = options.use_pscale
+            ? read_pscale(pts[i].attributes, options.radius)
+            : options.radius;
+        double nx, ny, nz;
+        if (read_normal(pts[i].attributes, nx, ny, nz)) {
+            normals[i * 3]     = nx;
+            normals[i * 3 + 1] = ny;
+            normals[i * 3 + 2] = nz;
+            has_normal[i] = true;
+        }
+    }
+
+    for (int iter = 0; iter < options.max_iterations; ++iter) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            break;
+
+        std::vector<double> disp(n * 3, 0.0);
+        bool any_overlap = false;
+
+        for (int i = 0; i < n; ++i) {
+            for (int j = i + 1; j < n; ++j) {
+                double dx = pts[j].x - pts[i].x;
+                double dy = pts[j].y - pts[i].y;
+                double dz = pts[j].z - pts[i].z;
+                double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                const double min_dist = radii[i] + radii[j];
+                if (dist >= min_dist || dist < 1e-12)
+                    continue;
+
+                any_overlap = true;
+                double overlap = (min_dist - dist) * 0.5;
+                dx /= dist; dy /= dist; dz /= dist;
+
+                // Project push direction onto the surface plane (perpendicular
+                // to each point's normal) when a normal is available.
+                auto project = [&](double dirx, double diry, double dirz,
+                                   double nx, double ny, double nz) {
+                    const double dot = dirx * nx + diry * ny + dirz * nz;
+                    dirx -= nx * dot;
+                    diry -= ny * dot;
+                    dirz -= nz * dot;
+                    const double len = std::sqrt(dirx * dirx +
+                                                  diry * diry +
+                                                  dirz * dirz);
+                    if (len < 1e-12)
+                        return std::make_tuple(0.0, 0.0, 0.0);
+                    return std::make_tuple(dirx / len * overlap,
+                                            diry / len * overlap,
+                                            dirz / len * overlap);
+                };
+
+                // Push i away from j (negative direction), j away from i.
+                if (has_normal[i]) {
+                    auto [px, py, pz] = project(-dx, -dy, -dz,
+                                                 normals[i * 3],
+                                                 normals[i * 3 + 1],
+                                                 normals[i * 3 + 2]);
+                    disp[i * 3]     += px;
+                    disp[i * 3 + 1] += py;
+                    disp[i * 3 + 2] += pz;
+                } else {
+                    disp[i * 3]     += -dx * overlap;
+                    disp[i * 3 + 1] += -dy * overlap;
+                    disp[i * 3 + 2] += -dz * overlap;
+                }
+
+                if (has_normal[j]) {
+                    auto [px, py, pz] = project(dx, dy, dz,
+                                                 normals[j * 3],
+                                                 normals[j * 3 + 1],
+                                                 normals[j * 3 + 2]);
+                    disp[j * 3]     += px;
+                    disp[j * 3 + 1] += py;
+                    disp[j * 3 + 2] += pz;
+                } else {
+                    disp[j * 3]     += dx * overlap;
+                    disp[j * 3 + 1] += dy * overlap;
+                    disp[j * 3 + 2] += dz * overlap;
+                }
+            }
+        }
+
+        if (!any_overlap)
+            break;
+
+        for (int i = 0; i < n; ++i) {
+            pts[i].x += disp[i * 3];
+            pts[i].y += disp[i * 3 + 1];
+            pts[i].z += disp[i * 3 + 2];
+        }
+    }
+
+    return output;
 }
 
 } // namespace pcg::internal::elements

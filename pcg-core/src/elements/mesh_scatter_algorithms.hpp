@@ -34,4 +34,19 @@ data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
 data::PcgPointData sample_mesh_surface(const data::PcgGeometry& geometry,
                                        const SampleMeshSurfaceOptions& options);
 
+struct PointRelaxOptions {
+    int max_iterations = 50;
+    double radius = 1.0;
+    bool use_pscale = true;
+    bool (*is_cancel_requested)() = nullptr;
+};
+
+/// Generalized Lloyd's relaxation: iteratively push apart points whose
+/// spherical radii overlap, constrained to the surface plane defined by
+/// per-point normal attributes (nx, ny, nz) when present.
+/// Radii are read from the "pscale" attribute when use_pscale is true,
+/// falling back to the uniform radius parameter.
+data::PcgPointData relax_points(const data::PcgPointData& input,
+                                const PointRelaxOptions& options);
+
 } // namespace pcg::internal::elements

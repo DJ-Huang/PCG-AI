@@ -1434,6 +1434,18 @@
       }
     },
     {
+      "type": "PointRelax",
+      "displayName": "Point Relax",
+      "category": "Generation",
+      "inputs": [{ "id": "in", "label": "Points", "pinType": "SpatialPoint" }],
+      "outputs": [{ "id": "out", "label": "Points", "pinType": "SpatialPoint" }],
+      "properties": {
+        "maxIterations": { "type": "integer", "default": 50, "minimum": 1, "maximum": 1000 },
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "usePscale": { "type": "boolean", "default": true }
+      }
+    },
+    {
       "type": "CreateSpline",
       "displayName": "Create Spline",
       "category": "Spline",
