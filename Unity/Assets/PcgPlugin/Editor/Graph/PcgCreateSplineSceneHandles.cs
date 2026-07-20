@@ -64,10 +64,14 @@ namespace DJTechEditor.PCG.Graph
         private static PcgPolygonPreviewData s_WirePreviewCache;
         private static int[] s_WireEdgePairs; // flat: [a0, b0, a1, b1, ...]
 
-        // Blender-style screen-space thick wire: expand edges → camera-facing quads, 1× DrawMeshNow.
-        // Width is pixels (EditorPrefs); not N× DrawAAPolyLine (that was the V58 stall).
+        // Blender-style screen-constant thick wire: camera-facing quads, 1× DrawMeshNow.
+        // Not N× DrawAAPolyLine (V58). Width via EditorPrefs.
+        // Per-endpoint half-width (long floor edges stay thin when zoomed into a corner).
+        // Expand along cross(edge, view) so depth stays on the edge (ZTest occlusion).
         private const string WireWidthPrefsKey = "Pcg.PolygonWire.WidthPx";
         private const float WireWidthPxDefault = 3f;
+        // Unity HandleUtility.GetHandleSize ≈ world size of an 80 GUI-pixel handle.
+        private const float WireHandleGuiPixels = 80f;
         private static readonly Color s_WireColor = new(0f, 0.75f, 0.85f, 0.85f);
         private static Mesh s_WireMesh;
         private static Material s_WireMaterial;
@@ -76,15 +80,6 @@ namespace DJTechEditor.PCG.Graph
         private static int[] s_WireTris;
         private static int s_WireBuiltEdgeCount;
         private static int s_WireUploadedEdgeCount;
-        private static PcgPolygonPreviewData s_WireMeshPreviewCache;
-        private static Matrix4x4 s_WireLastLocalToWorld;
-        private static Vector3 s_WireLastCameraPosition;
-        private static Quaternion s_WireLastCameraRotation;
-        private static bool s_WireLastOrthographic;
-        private static float s_WireLastProjectionSize;
-        private static int s_WireLastPixelHeight;
-        private static float s_WireLastWidthPx;
-        private static bool s_WireMeshStateValid;
 
         private enum OthersDisplayMode
         {
@@ -483,8 +478,6 @@ namespace DJTechEditor.PCG.Graph
             s_WireEdgePairs = null;
             s_WireBuiltEdgeCount = 0;
             s_WireUploadedEdgeCount = 0;
-            s_WireMeshPreviewCache = null;
-            s_WireMeshStateValid = false;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
             s_SelectedGroupSource = null;
@@ -2049,71 +2042,34 @@ namespace DJTechEditor.PCG.Graph
             if (widthPx < 0.5f)
                 widthPx = 0.5f;
 
+            // Prefer Camera.current (set during SceneGUI Repaint) so HandleUtility
+            // and DrawMeshNow share the same view used for Scene View zoom/size.
+            var drawCam = Camera.current != null ? Camera.current : cam;
             var localToWorld = anchor.localToWorldMatrix;
-            if (NeedsWireMeshRebuild(preview, localToWorld, cam, widthPx))
+
+            // Every Repaint: screen-constant width (Blender). Edge topology stays cached.
+            ExpandEdgesToCameraFacingQuads(
+                preview.Points,
+                localToWorld,
+                drawCam,
+                widthPx,
+                edgeCount);
+
+            if (s_WireUploadedEdgeCount != edgeCount)
             {
-                ExpandEdgesToCameraFacingQuads(
-                    preview.Points,
-                    localToWorld,
-                    cam,
-                    widthPx,
-                    edgeCount);
-
-                if (s_WireUploadedEdgeCount != edgeCount)
-                {
-                    s_WireMesh.Clear(false);
-                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-                    s_WireMesh.SetColors(s_WireColors, 0, vertCount);
-                    s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
-                    s_WireUploadedEdgeCount = edgeCount;
-                }
-                else
-                {
-                    // Camera-facing vertices change while indices/colors do not.
-                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-                }
-
-                RememberWireMeshState(preview, localToWorld, cam, widthPx);
+                s_WireMesh.Clear(false);
+                s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                s_WireMesh.SetColors(s_WireColors, 0, vertCount);
+                s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+                s_WireUploadedEdgeCount = edgeCount;
+            }
+            else
+            {
+                s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
             }
 
             s_WireMaterial.SetPass(0);
             Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
-        }
-
-        private static bool NeedsWireMeshRebuild(
-            PcgPolygonPreviewData preview,
-            Matrix4x4 localToWorld,
-            Camera cam,
-            float widthPx)
-        {
-            if (!s_WireMeshStateValid || !ReferenceEquals(preview, s_WireMeshPreviewCache))
-                return true;
-
-            var projectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
-            return localToWorld != s_WireLastLocalToWorld ||
-                   cam.transform.position != s_WireLastCameraPosition ||
-                   cam.transform.rotation != s_WireLastCameraRotation ||
-                   cam.orthographic != s_WireLastOrthographic ||
-                   !Mathf.Approximately(projectionSize, s_WireLastProjectionSize) ||
-                   cam.pixelHeight != s_WireLastPixelHeight ||
-                   !Mathf.Approximately(widthPx, s_WireLastWidthPx);
-        }
-
-        private static void RememberWireMeshState(
-            PcgPolygonPreviewData preview,
-            Matrix4x4 localToWorld,
-            Camera cam,
-            float widthPx)
-        {
-            s_WireMeshPreviewCache = preview;
-            s_WireLastLocalToWorld = localToWorld;
-            s_WireLastCameraPosition = cam.transform.position;
-            s_WireLastCameraRotation = cam.transform.rotation;
-            s_WireLastOrthographic = cam.orthographic;
-            s_WireLastProjectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
-            s_WireLastPixelHeight = cam.pixelHeight;
-            s_WireLastWidthPx = widthPx;
-            s_WireMeshStateValid = true;
         }
 
         private static void DrawPolygonWireOverlayThinFallback(Transform anchor, Vector3[] points)
@@ -2145,7 +2101,6 @@ namespace DJTechEditor.PCG.Graph
                 s_WireMesh = new Mesh { name = "PcgPolygonWireOverlay", hideFlags = HideFlags.HideAndDontSave };
                 s_WireMesh.MarkDynamic();
                 s_WireUploadedEdgeCount = 0;
-                s_WireMeshStateValid = false;
             }
 
             if (s_WireMaterial == null)
@@ -2210,8 +2165,11 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Expand each unique edge into a camera-facing screen-space quad (Blender polyline style).
-        /// Half-width = widthPx * world-units-per-pixel at the edge midpoint.
+        /// Expand each unique edge into a camera-facing screen-constant quad.
+        /// Per-endpoint world half-width (long edges taper correctly when zoomed into
+        /// one corner). Offset is along cross(edge, view) so vertices stay near the
+        /// true edge depth — ScreenToWorldPoint expansion sits on a constant-Z plane
+        /// and breaks LessEqual occlusion when close.
         /// </summary>
         private static void ExpandEdgesToCameraFacingQuads(
             Vector3[] points,
@@ -2230,26 +2188,29 @@ namespace DJTechEditor.PCG.Graph
             var tanHalfFov = ortho
                 ? 0f
                 : Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            var useHandleSize = Camera.current != null;
+            var halfPx = widthPx * 0.5f;
 
             for (var e = 0; e < edgeCount; e++)
             {
                 var a = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2]]);
                 var b = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2 + 1]]);
-                var mid = (a + b) * 0.5f;
+                var vi = e * 4;
                 var dir = b - a;
                 var lenSq = dir.sqrMagnitude;
                 if (lenSq < 1e-12f)
                 {
-                    var vi0 = e * 4;
-                    s_WireVerts[vi0] = a;
-                    s_WireVerts[vi0 + 1] = a;
-                    s_WireVerts[vi0 + 2] = a;
-                    s_WireVerts[vi0 + 3] = a;
+                    s_WireVerts[vi] = a;
+                    s_WireVerts[vi + 1] = a;
+                    s_WireVerts[vi + 2] = a;
+                    s_WireVerts[vi + 3] = a;
                     continue;
                 }
 
                 dir *= 1f / Mathf.Sqrt(lenSq);
 
+                // Perp ⊥ edge and roughly ⊥ view → offset does not pull verts toward camera.
+                var mid = (a + b) * 0.5f;
                 var toCam = camPos - mid;
                 var perp = Vector3.Cross(dir, toCam);
                 if (perp.sqrMagnitude < 1e-10f)
@@ -2261,26 +2222,36 @@ namespace DJTechEditor.PCG.Graph
 
                 perp.Normalize();
 
-                float worldPerPixel;
-                if (ortho)
-                {
-                    worldPerPixel = orthoWorldPerPixel;
-                }
-                else
-                {
-                    var dist = Vector3.Dot(mid - camPos, camFwd);
-                    if (dist < 0.01f)
-                        dist = 0.01f;
-                    worldPerPixel = dist * tanHalfFov * 2f / pixelHeight;
-                }
-
-                var half = perp * (widthPx * 0.5f * worldPerPixel);
-                var vi = e * 4;
-                s_WireVerts[vi] = a + half;
-                s_WireVerts[vi + 1] = a - half;
-                s_WireVerts[vi + 2] = b + half;
-                s_WireVerts[vi + 3] = b - half;
+                var halfA = perp * (halfPx * WorldUnitsPerPixel(a, cam, camPos, camFwd, ortho, orthoWorldPerPixel, tanHalfFov, pixelHeight, useHandleSize));
+                var halfB = perp * (halfPx * WorldUnitsPerPixel(b, cam, camPos, camFwd, ortho, orthoWorldPerPixel, tanHalfFov, pixelHeight, useHandleSize));
+                s_WireVerts[vi] = a + halfA;
+                s_WireVerts[vi + 1] = a - halfA;
+                s_WireVerts[vi + 2] = b + halfB;
+                s_WireVerts[vi + 3] = b - halfB;
             }
+        }
+
+        private static float WorldUnitsPerPixel(
+            Vector3 worldPos,
+            Camera cam,
+            Vector3 camPos,
+            Vector3 camFwd,
+            bool ortho,
+            float orthoWorldPerPixel,
+            float tanHalfFov,
+            float pixelHeight,
+            bool useHandleSize)
+        {
+            if (useHandleSize)
+                return HandleUtility.GetHandleSize(worldPos) / WireHandleGuiPixels;
+
+            if (ortho)
+                return orthoWorldPerPixel;
+
+            var dist = Vector3.Dot(worldPos - camPos, camFwd);
+            if (dist < 0.01f)
+                dist = 0.01f;
+            return dist * tanHalfFov * 2f / pixelHeight;
         }
 
         /// <summary>
