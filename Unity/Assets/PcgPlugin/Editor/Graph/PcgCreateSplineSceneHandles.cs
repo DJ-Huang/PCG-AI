@@ -66,13 +66,16 @@ namespace DJTechEditor.PCG.Graph
 
         // Blender-style screen-constant thick wire: camera-facing quads, 1× DrawMeshNow.
         // Not N× DrawAAPolyLine (V58). Width via EditorPrefs.
-        // Per-endpoint half-width (long floor edges stay thin when zoomed into a corner).
-        // Expand along cross(edge, view) so depth stays on the edge (ZTest occlusion).
+        // Width model (Blender overlay engine, object-mode wire + smooth overlay wires):
+        //   theme.sizes.pixel (= U.pixelsize, default 1) — overlay_instance.cc
+        //   overlay_antialiasing.bsl.hh: line_kernel = theme.sizes.pixel * 0.5 - 0.5
+        //   overlay_edit_mesh_edge_vert.glsl: half_size += 0.5 when do_smooth_wire (default ON)
+        // Expand in camera screen pixels (NDC offset equivalent), not HandleUtility GUI pixels.
         private const string WireWidthPrefsKey = "Pcg.PolygonWire.WidthPx";
-        private const float WireWidthPxDefault = 3f;
-        // Unity HandleUtility.GetHandleSize ≈ world size of an 80 GUI-pixel handle.
-        private const float WireHandleGuiPixels = 80f;
-        private static readonly Color s_WireColor = new(0f, 0.75f, 0.85f, 0.85f);
+        private const float WireWidthPxDefault = 1f;
+        // Subtle AA padding (Blender smooth wires use +0.5; toned down for thinner look).
+        private const float BlenderSmoothWireHalfPx = 0.25f;
+        private static readonly Color s_WireColor = new(0f, 0f, 0f, 1f);
         private static Mesh s_WireMesh;
         private static Material s_WireMaterial;
         private static Vector3[] s_WireVerts;
@@ -251,6 +254,11 @@ namespace DJTechEditor.PCG.Graph
             Selection.selectionChanged -= OnSelectionChanged;
             SceneView.duringSceneGui += OnSceneGui;
             Selection.selectionChanged += OnSelectionChanged;
+
+            // Migrate legacy EditorPrefs from pre-Blender-alignment defaults.
+            var savedWidth = EditorPrefs.GetFloat(WireWidthPrefsKey, WireWidthPxDefault);
+            if (savedWidth is 3f or 2f or 1.5f or 0.5f)
+                EditorPrefs.SetFloat(WireWidthPrefsKey, WireWidthPxDefault);
         }
 
         private static void OnSelectionChanged()
@@ -2165,11 +2173,9 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Expand each unique edge into a camera-facing screen-constant quad.
-        /// Per-endpoint world half-width (long edges taper correctly when zoomed into
-        /// one corner). Offset is along cross(edge, view) so vertices stay near the
-        /// true edge depth — ScreenToWorldPoint expansion sits on a constant-Z plane
-        /// and breaks LessEqual occlusion when close.
+        /// Expand each unique edge into a screen-constant-width quad.
+        /// Uses camera screen-pixel offsets (Blender overlay_edit_mesh_edge NDC expansion)
+        /// so width matches render pixels, not HandleUtility GUI pixels.
         /// </summary>
         private static void ExpandEdgesToCameraFacingQuads(
             Vector3[] points,
@@ -2179,26 +2185,21 @@ namespace DJTechEditor.PCG.Graph
             int edgeCount)
         {
             var camPos = cam.transform.position;
-            var camFwd = cam.transform.forward;
-            var camUp = cam.transform.up;
-            var camRight = cam.transform.right;
-            var pixelHeight = Mathf.Max(1f, cam.pixelHeight);
-            var ortho = cam.orthographic;
-            var orthoWorldPerPixel = ortho ? (2f * cam.orthographicSize / pixelHeight) : 0f;
-            var tanHalfFov = ortho
-                ? 0f
-                : Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            var useHandleSize = Camera.current != null;
-            var halfPx = widthPx * 0.5f;
+            // widthPx = Blender theme.sizes.pixel; add smooth-wire AA padding on each side.
+            var halfPx = widthPx * 0.5f + BlenderSmoothWireHalfPx;
 
             for (var e = 0; e < edgeCount; e++)
             {
                 var a = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2]]);
                 var b = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2 + 1]]);
+
+                // Depth bias: overlay_wireframe_vert.glsl gl_Position.z -= ndc_offset_factor * 0.5
+                const float depthBiasRatio = 0.0005f;
+                a += (camPos - a) * depthBiasRatio;
+                b += (camPos - b) * depthBiasRatio;
+
                 var vi = e * 4;
-                var dir = b - a;
-                var lenSq = dir.sqrMagnitude;
-                if (lenSq < 1e-12f)
+                if ((b - a).sqrMagnitude < 1e-12f)
                 {
                     s_WireVerts[vi] = a;
                     s_WireVerts[vi + 1] = a;
@@ -2207,51 +2208,52 @@ namespace DJTechEditor.PCG.Graph
                     continue;
                 }
 
-                dir *= 1f / Mathf.Sqrt(lenSq);
-
-                // Perp ⊥ edge and roughly ⊥ view → offset does not pull verts toward camera.
-                var mid = (a + b) * 0.5f;
-                var toCam = camPos - mid;
-                var perp = Vector3.Cross(dir, toCam);
-                if (perp.sqrMagnitude < 1e-10f)
+                var screenA = cam.WorldToScreenPoint(a);
+                var screenB = cam.WorldToScreenPoint(b);
+                if (screenA.z < 0f || screenB.z < 0f)
                 {
-                    perp = Vector3.Cross(dir, camUp);
-                    if (perp.sqrMagnitude < 1e-10f)
-                        perp = Vector3.Cross(dir, camRight);
+                    s_WireVerts[vi] = a;
+                    s_WireVerts[vi + 1] = a;
+                    s_WireVerts[vi + 2] = b;
+                    s_WireVerts[vi + 3] = b;
+                    continue;
                 }
 
-                perp.Normalize();
+                var dir2d = new Vector2(screenB.x - screenA.x, screenB.y - screenA.y);
+                var lenSq2d = dir2d.sqrMagnitude;
+                if (lenSq2d < 1e-6f)
+                {
+                    s_WireVerts[vi] = a;
+                    s_WireVerts[vi + 1] = a;
+                    s_WireVerts[vi + 2] = b;
+                    s_WireVerts[vi + 3] = b;
+                    continue;
+                }
 
-                var halfA = perp * (halfPx * WorldUnitsPerPixel(a, cam, camPos, camFwd, ortho, orthoWorldPerPixel, tanHalfFov, pixelHeight, useHandleSize));
-                var halfB = perp * (halfPx * WorldUnitsPerPixel(b, cam, camPos, camFwd, ortho, orthoWorldPerPixel, tanHalfFov, pixelHeight, useHandleSize));
-                s_WireVerts[vi] = a + halfA;
-                s_WireVerts[vi + 1] = a - halfA;
-                s_WireVerts[vi + 2] = b + halfB;
-                s_WireVerts[vi + 3] = b - halfB;
+                dir2d *= 1f / Mathf.Sqrt(lenSq2d);
+                var perp2d = new Vector2(-dir2d.y, dir2d.x);
+                var offset = perp2d * halfPx;
+
+                s_WireVerts[vi] = ScreenPointOffsetToWorld(screenA, offset, cam);
+                s_WireVerts[vi + 1] = ScreenPointOffsetToWorld(screenA, -offset, cam);
+                s_WireVerts[vi + 2] = ScreenPointOffsetToWorld(screenB, offset, cam);
+                s_WireVerts[vi + 3] = ScreenPointOffsetToWorld(screenB, -offset, cam);
             }
         }
 
-        private static float WorldUnitsPerPixel(
-            Vector3 worldPos,
-            Camera cam,
-            Vector3 camPos,
-            Vector3 camFwd,
-            bool ortho,
-            float orthoWorldPerPixel,
-            float tanHalfFov,
-            float pixelHeight,
-            bool useHandleSize)
+        /// <summary>
+        /// Offset a world point by screen pixels at its current depth.
+        /// Equivalent to Blender gpu_position.xy += offset * 2 * w in NDC space.
+        /// </summary>
+        private static Vector3 ScreenPointOffsetToWorld(
+            Vector3 screen,
+            Vector2 screenOffset,
+            Camera cam)
         {
-            if (useHandleSize)
-                return HandleUtility.GetHandleSize(worldPos) / WireHandleGuiPixels;
-
-            if (ortho)
-                return orthoWorldPerPixel;
-
-            var dist = Vector3.Dot(worldPos - camPos, camFwd);
-            if (dist < 0.01f)
-                dist = 0.01f;
-            return dist * tanHalfFov * 2f / pixelHeight;
+            var p = screen;
+            p.x += screenOffset.x;
+            p.y += screenOffset.y;
+            return cam.ScreenToWorldPoint(p);
         }
 
         /// <summary>
