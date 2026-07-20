@@ -700,6 +700,9 @@ namespace DJTechRuntime.PCG
 
             m_LastCookKey = cookKey;
             m_HasAppliedCookResult = true;
+#if UNITY_EDITOR
+            MarkCookResultPersistable(m_GeneratedMesh);
+#endif
             return true;
         }
 
@@ -991,6 +994,9 @@ namespace DJTechRuntime.PCG
 #if UNITY_EDITOR
                 if (terrain.terrainData != null)
                     UnityEditor.EditorUtility.SetDirty(terrain.terrainData);
+                var scene = gameObject.scene;
+                if (scene.IsValid())
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
                 UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
 #endif
             }
@@ -1205,6 +1211,7 @@ namespace DJTechRuntime.PCG
             {
                 m_LastAsyncCookStatus = "completed";
 #if UNITY_EDITOR
+                MarkCookResultPersistable(m_GeneratedMesh);
                 EditorAfterPreviewCookApplied?.Invoke();
 #endif
             }
@@ -1335,6 +1342,11 @@ namespace DJTechRuntime.PCG
         private void ApplyMesh(Mesh mesh, IReadOnlyList<string> materialNames = null)
         {
             ClearGpuInstancingOnly();
+            EnsureMeshComponents();
+
+#if UNITY_EDITOR
+            mesh = AdoptSceneEmbeddedMesh(mesh);
+#endif
 
             if (m_GeneratedMesh != null && m_GeneratedMesh != mesh)
             {
@@ -1346,7 +1358,6 @@ namespace DJTechRuntime.PCG
             }
 
             m_GeneratedMesh = mesh;
-            EnsureMeshComponents();
             m_MeshFilter.sharedMesh = mesh;
             if (m_MeshRenderer != null)
             {
@@ -1354,6 +1365,69 @@ namespace DJTechRuntime.PCG
                 ApplyMaterialBindings(materialNames);
             }
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Write cooked geometry into the scene-embedded Mesh (if any) so Save Scene
+        /// persists the preview instead of leaving a stale sub-asset reference.
+        /// </summary>
+        private Mesh AdoptSceneEmbeddedMesh(Mesh cookedMesh)
+        {
+            if (cookedMesh == null || m_MeshFilter == null)
+                return cookedMesh;
+
+            var existing = m_MeshFilter.sharedMesh;
+            if (existing == null || existing == cookedMesh ||
+                UnityEditor.EditorUtility.IsPersistent(existing))
+            {
+                return cookedMesh;
+            }
+
+            CopyMeshGeometry(cookedMesh, existing);
+            if (cookedMesh != existing)
+                DestroyImmediate(cookedMesh);
+            return existing;
+        }
+
+        private static void CopyMeshGeometry(Mesh source, Mesh destination)
+        {
+            destination.Clear(false);
+            destination.indexFormat = source.indexFormat;
+            destination.vertices = source.vertices;
+            destination.normals = source.normals;
+            destination.tangents = source.tangents;
+            destination.colors = source.colors;
+            destination.uv = source.uv;
+            destination.uv2 = source.uv2;
+            destination.uv3 = source.uv3;
+            destination.uv4 = source.uv4;
+            destination.subMeshCount = source.subMeshCount;
+            for (var subMesh = 0; subMesh < source.subMeshCount; subMesh++)
+                destination.SetTriangles(source.GetTriangles(subMesh), subMesh, false);
+            destination.RecalculateBounds();
+            if (!string.IsNullOrEmpty(source.name))
+                destination.name = source.name;
+        }
+
+        private void MarkCookResultPersistable(Mesh mesh)
+        {
+            UnityEditor.EditorUtility.SetDirty(this);
+
+            if (mesh != null)
+                UnityEditor.EditorUtility.SetDirty(mesh);
+
+            if (m_MeshFilter != null)
+                UnityEditor.EditorUtility.SetDirty(m_MeshFilter);
+
+            var groupVisualizer = GetComponent<PcgGroupVisualizer>();
+            if (groupVisualizer != null)
+                UnityEditor.EditorUtility.SetDirty(groupVisualizer);
+
+            var scene = gameObject.scene;
+            if (scene.IsValid())
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+        }
+#endif
 
         private void ApplyMaterialBindings(IReadOnlyList<string> materialNames)
         {
