@@ -1763,52 +1763,79 @@ data::PcgGeometry bevel_geometry(const data::PcgGeometry& geometry, double amoun
                                  bool (*is_cancel_requested)(),
                                  const BevelEdgeSelection& edge_selection)
 {
-    // Shared-vertex triangulation: geometry.points() are already welded, so use
-    // them directly to ensure BMesh (from geometry) and WeldedMesh (from mesh)
-    // share the same vertex indices.
-    data::PcgMeshData mesh = data::triangulate_geometry_shared(geometry);
+    const auto bevel_single = [&](const data::PcgGeometry& input) -> data::PcgGeometry {
+        // Shared-vertex triangulation: geometry.points() are already welded, so use
+        // them directly to ensure BMesh (from geometry) and WeldedMesh (from mesh)
+        // share the same vertex indices.
+        data::PcgMeshData mesh = data::triangulate_geometry_shared(input);
 
-    if (method == BevelMethod::VertexPush) {
-        // VertexPush only moves vertices; preserve geometry topology + groups.
-        data::PcgMeshData result_mesh = bevel_mesh_vertex_push(mesh, amount, segments);
-        data::PcgGeometry result = geometry;
-        auto& pts = result.points_mut();
-        for (size_t i = 0; i < pts.size() && i < result_mesh.vertices().size(); ++i) {
-            pts[i] = {result_mesh.vertices()[i].x,
-                      result_mesh.vertices()[i].y,
-                      result_mesh.vertices()[i].z};
+        if (method == BevelMethod::VertexPush) {
+            // VertexPush only moves vertices; preserve geometry topology + groups.
+            data::PcgMeshData result_mesh = bevel_mesh_vertex_push(mesh, amount, segments);
+            data::PcgGeometry result = input;
+            auto& pts = result.points_mut();
+            for (size_t i = 0; i < pts.size() && i < result_mesh.vertices().size(); ++i) {
+                pts[i] = {result_mesh.vertices()[i].x,
+                          result_mesh.vertices()[i].y,
+                          result_mesh.vertices()[i].z};
+            }
+            return result;
         }
-        return result;
+
+        data::PcgGeometry out_geom;
+        const data::PcgMeshData result_mesh = bevel::bevel_mesh_blender(
+            mesh, amount, segments,
+            bevel::BevelOffsetType(offset_type),
+            clamp_overlap, angle_limit_deg, profile,
+            bevel::BevelMiter(miter_outer),
+            bevel::BevelMiter(miter_inner),
+            bevel::BevelVMeshMethod(vmesh_method),
+            is_cancel_requested,
+            edge_selection,
+            &input,
+            &out_geom);
+
+        if (!out_geom.points().empty()) {
+            out_geom.detail() = input.detail();
+            return out_geom;
+        }
+
+        // Fallback: fast paths (e.g. axis-aligned box) return PcgMeshData without
+        // populating out_geometry. Convert the mesh result back to geometry.
+        if (!result_mesh.vertices().empty()) {
+            data::PcgGeometry fallback = data::geometry_from_mesh(result_mesh);
+            fallback.detail() = input.detail();
+            return fallback;
+        }
+
+        // No-op / cancel / amount<=eps: return original geometry (preserves groups/loops).
+        return input;
+    };
+
+    if (method != BevelMethod::Edge || amount <= 1e-9)
+        return bevel_single(geometry);
+
+    const std::vector<data::PcgGeometry> shells = data::partition_geometry_bevel_shells(geometry);
+    if (shells.size() <= 1)
+        return bevel_single(geometry);
+
+    data::PcgGeometry merged;
+    bool has_shell = false;
+    for (const data::PcgGeometry& shell : shells) {
+        if (is_cancel_requested && is_cancel_requested())
+            return geometry;
+        data::PcgGeometry beveled = bevel_single(shell);
+        if (!has_shell) {
+            merged = std::move(beveled);
+            has_shell = true;
+        } else {
+            merged = data::merge_geometries(merged, beveled);
+        }
     }
-
-    data::PcgGeometry out_geom;
-    const data::PcgMeshData result_mesh = bevel::bevel_mesh_blender(
-        mesh, amount, segments,
-        bevel::BevelOffsetType(offset_type),
-        clamp_overlap, angle_limit_deg, profile,
-        bevel::BevelMiter(miter_outer),
-        bevel::BevelMiter(miter_inner),
-        bevel::BevelVMeshMethod(vmesh_method),
-        is_cancel_requested,
-        edge_selection,
-        &geometry,
-        &out_geom);
-
-    if (!out_geom.points().empty()) {
-        out_geom.detail() = geometry.detail();
-        return out_geom;
-    }
-
-    // Fallback: fast paths (e.g. axis-aligned box) return PcgMeshData without
-    // populating out_geometry. Convert the mesh result back to geometry.
-    if (!result_mesh.vertices().empty()) {
-        data::PcgGeometry fallback = data::geometry_from_mesh(result_mesh);
-        fallback.detail() = geometry.detail();
-        return fallback;
-    }
-
-    // No-op / cancel / amount<=eps: return original geometry (preserves groups/loops).
-    return geometry;
+    if (!has_shell)
+        return geometry;
+    merged.detail() = geometry.detail();
+    return merged;
 }
 
 data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,

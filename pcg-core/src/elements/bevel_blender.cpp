@@ -581,6 +581,21 @@ WeldedMesh weld_mesh(const data::PcgMeshData& mesh) {
     return welded;
 }
 
+WeldedMesh weld_mesh_preserve_topology(const data::PcgMeshData& mesh) {
+    WeldedMesh welded;
+    welded.positions.reserve(mesh.vertices().size());
+    for (const auto& v : mesh.vertices())
+        welded.positions.push_back({v.x, v.y, v.z});
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        welded.triangles.push_back({
+            mesh.triangles()[i],
+            mesh.triangles()[i + 1],
+            mesh.triangles()[i + 2],
+        });
+    }
+    return welded;
+}
+
 Vec3 tri_normal(const WeldedMesh& mesh, int tri_index) {
     const auto& tri = mesh.triangles[static_cast<size_t>(tri_index)];
     const Vec3& a = mesh.positions[static_cast<size_t>(tri[0])];
@@ -4278,8 +4293,9 @@ data::PcgMeshData bevel_mesh_blender(
         ? geometry::bmesh_from_geometry(*geometry, bmesh_opts)
         : geometry::bmesh_from_mesh(mesh, bmesh_opts);
 
-    // 2. Weld mesh for bevel internals
-    WeldedMesh welded = weld_mesh(mesh);
+    // 2. Weld mesh for bevel internals. When canonical geometry is provided,
+    // preserve mesh vertex indices so BMesh topology and welded triangles stay aligned.
+    WeldedMesh welded = geometry ? weld_mesh_preserve_topology(mesh) : weld_mesh(mesh);
     if (welded.triangles.empty())
         return mesh;
 

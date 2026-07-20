@@ -1,4 +1,6 @@
+#include "elements/geometry_algorithms.hpp"
 #include "elements/lot_subdivision_algorithms.hpp"
+#include "elements/mesh_algorithms.hpp"
 #include "elements/vehicle_modeling_algorithms.hpp"
 #include "graph_execution_result.hpp"
 #include "graph_executor.hpp"
@@ -229,6 +231,78 @@ void test_example_graphs()
     }
 }
 
+void test_pad_bevel_multi_lot_topology()
+{
+    PcgGeometry ground;
+    const double half = 24.0;
+    ground.points_mut() = {{-half, 0.0, -half},
+                           {half, 0.0, -half},
+                           {half, 0.0, half},
+                           {-half, 0.0, half}};
+    ground.faces_mut() = {{0, 3, 2, 1}};
+
+    LotSubdivisionOptions lot_opts;
+    lot_opts.min_size = 4.0;
+    lot_opts.iterations = 4;
+    lot_opts.irregularity = 0.4512821;
+    lot_opts.seed = 11;
+    lot_opts.alignment = "boundingBox";
+    const auto lots = lot_subdivide_geometry(ground, lot_opts);
+
+    PolyExtrudeOptions extrude;
+    extrude.distance = 0.18;
+    extrude.inset = 0.08;
+    extrude.keep_original = false;
+    extrude.top_group = "extrude_top";
+    extrude.side_group = "extrude_side";
+    const auto pads = poly_extrude_geometry(lots, extrude);
+
+    GroupCreateOptions rim_opts;
+    rim_opts.output_group = "pad_rim";
+    rim_opts.domain = "edge";
+    rim_opts.mode = "angle";
+    rim_opts.min_edge_angle_deg = 30.0;
+    rim_opts.from_face_groups = {"extrude_top"};
+    const auto rim = group_create(pads, rim_opts);
+
+    BevelEdgeSelection selection;
+    selection.edge_group = "pad_rim";
+    selection.exclude_unshared = true;
+    selection.limit_method_explicit = true;
+    selection.limit_method = bevel::BevelLimitMethod::None;
+
+    const auto beveled = bevel_geometry(
+        rim, 0.04, 2, BevelMethod::Edge, BevelOffsetType::Offset, true, 30.0, 0.5f,
+        BevelMiter::Sharp, BevelMiter::Sharp, BevelVMeshMethod::Adj, nullptr, selection);
+
+    auto max_edge_of = [](const PcgGeometry& geo) {
+        const auto tri = triangulate_geometry_shared(geo);
+        double max_edge = 0.0;
+        for (size_t i = 0; i + 2 < tri.triangles().size(); i += 3) {
+            const auto& a = tri.vertices()[static_cast<size_t>(tri.triangles()[i])];
+            const auto& b = tri.vertices()[static_cast<size_t>(tri.triangles()[i + 1])];
+            const auto& c = tri.vertices()[static_cast<size_t>(tri.triangles()[i + 2])];
+            const auto edge_len = [&](const PcgVertex& p, const PcgVertex& q) {
+                const double dx = p.x - q.x;
+                const double dy = p.y - q.y;
+                const double dz = p.z - q.z;
+                return std::sqrt(dx * dx + dy * dy + dz * dz);
+            };
+            max_edge = std::max(max_edge, edge_len(a, b));
+            max_edge = std::max(max_edge, edge_len(b, c));
+            max_edge = std::max(max_edge, edge_len(c, a));
+        }
+        return max_edge;
+    };
+
+    const double input_max_edge = max_edge_of(rim);
+    const double max_edge = max_edge_of(beveled);
+    expect(beveled.faces().size() > pads.faces().size(),
+           "multi-lot pad bevel should add faces");
+    expect(max_edge <= input_max_edge * 1.05 + 1e-3,
+           "multi-lot pad bevel should not create city-spanning triangle edges");
+}
+
 } // namespace
 
 int main()
@@ -239,6 +313,7 @@ int main()
     test_poly_extrude_chain();
     test_graph_node();
     test_example_graphs();
+    test_pad_bevel_multi_lot_topology();
     std::printf("test_lot_subdivision: OK\n");
     return 0;
 }
