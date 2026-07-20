@@ -64,22 +64,14 @@ namespace DJTechEditor.PCG.Graph
         private static PcgPolygonPreviewData s_WirePreviewCache;
         private static int[] s_WireEdgePairs; // flat: [a0, b0, a1, b1, ...]
 
-        // Blender-style screen-constant thick wire: camera-facing quads, 1× DrawMeshNow.
-        // Not N× DrawAAPolyLine (V58). Width via EditorPrefs.
-        // Width model (Blender overlay engine, object-mode wire + smooth overlay wires):
-        //   theme.sizes.pixel (= U.pixelsize, default 1) — overlay_instance.cc
-        //   overlay_antialiasing.bsl.hh: line_kernel = theme.sizes.pixel * 0.5 - 0.5
-        //   overlay_edit_mesh_edge_vert.glsl: half_size += 0.5 when do_smooth_wire (default ON)
-        // Expand in camera screen pixels (NDC offset equivalent), not HandleUtility GUI pixels.
-        private const string WireWidthPrefsKey = "Pcg.PolygonWire.WidthPx";
-        private const float WireWidthPxDefault = 1f;
-        // Subtle AA padding (Blender smooth wires use +0.5; toned down for thinner look).
-        private const float BlenderSmoothWireHalfPx = 0.25f;
+        // Hairline quads (1× DrawMeshNow) + fragment AA — matches Blender overlay_antialiasing
+        // without post-pass. Geometry half-width _HalfPx; visible core stays ~1 screen px.
+        private const float WireHalfPx = 1f;
         private static readonly Color s_WireColor = new(0f, 0f, 0f, 1f);
         private static Mesh s_WireMesh;
         private static Material s_WireMaterial;
         private static Vector3[] s_WireVerts;
-        private static Color[] s_WireColors;
+        private static Vector2[] s_WireEdgeCoords;
         private static int[] s_WireTris;
         private static int s_WireBuiltEdgeCount;
         private static int s_WireUploadedEdgeCount;
@@ -255,10 +247,6 @@ namespace DJTechEditor.PCG.Graph
             SceneView.duringSceneGui += OnSceneGui;
             Selection.selectionChanged += OnSelectionChanged;
 
-            // Migrate legacy EditorPrefs from pre-Blender-alignment defaults.
-            var savedWidth = EditorPrefs.GetFloat(WireWidthPrefsKey, WireWidthPxDefault);
-            if (savedWidth is 3f or 2f or 1.5f or 0.5f)
-                EditorPrefs.SetFloat(WireWidthPrefsKey, WireWidthPxDefault);
         }
 
         private static void OnSelectionChanged()
@@ -2004,8 +1992,7 @@ namespace DJTechEditor.PCG.Graph
             if (Event.current.type != EventType.Repaint)
                 return;
 
-            var cam = sceneView != null ? sceneView.camera : null;
-            if (cam == null)
+            if (sceneView == null || sceneView.camera == null)
                 return;
 
             var anchor = FindPreviewAnchor(window);
@@ -2036,8 +2023,7 @@ namespace DJTechEditor.PCG.Graph
 
             if (!EnsureWireDrawResources())
             {
-                // Shader missing: fall back to 1px batched DrawLines (still 1 draw call).
-                DrawPolygonWireOverlayThinFallback(anchor, preview.Points);
+                DrawPolygonWireOverlayHairlineFallback(anchor, preview.Points);
                 return;
             }
 
@@ -2046,28 +2032,14 @@ namespace DJTechEditor.PCG.Graph
             var indexCount = edgeCount * 6;
             EnsureWireBuffers(edgeCount, vertCount, indexCount);
 
-            var widthPx = EditorPrefs.GetFloat(WireWidthPrefsKey, WireWidthPxDefault);
-            if (widthPx < 0.5f)
-                widthPx = 0.5f;
-
-            // Prefer Camera.current (set during SceneGUI Repaint) so HandleUtility
-            // and DrawMeshNow share the same view used for Scene View zoom/size.
-            var drawCam = Camera.current != null ? Camera.current : cam;
-            var localToWorld = anchor.localToWorldMatrix;
-
-            // Every Repaint: screen-constant width (Blender). Edge topology stays cached.
-            ExpandEdgesToCameraFacingQuads(
-                preview.Points,
-                localToWorld,
-                drawCam,
-                widthPx,
-                edgeCount);
+            var drawCam = Camera.current != null ? Camera.current : sceneView.camera;
+            ExpandEdgesToScreenQuads(preview.Points, anchor.localToWorldMatrix, drawCam, edgeCount);
 
             if (s_WireUploadedEdgeCount != edgeCount)
             {
                 s_WireMesh.Clear(false);
                 s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-                s_WireMesh.SetColors(s_WireColors, 0, vertCount);
+                s_WireMesh.SetUVs(1, s_WireEdgeCoords, 0, vertCount);
                 s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
                 s_WireUploadedEdgeCount = edgeCount;
             }
@@ -2080,11 +2052,12 @@ namespace DJTechEditor.PCG.Graph
             Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
         }
 
-        private static void DrawPolygonWireOverlayThinFallback(Transform anchor, Vector3[] points)
+        private static void DrawPolygonWireOverlayHairlineFallback(Transform anchor, Vector3[] points)
         {
-            var linePoints = new Vector3[s_WireEdgePairs.Length];
+            var count = s_WireEdgePairs.Length;
+            var linePoints = new Vector3[count];
             var l2w = anchor.localToWorldMatrix;
-            for (var i = 0; i < s_WireEdgePairs.Length; i++)
+            for (var i = 0; i < count; i++)
                 linePoints[i] = l2w.MultiplyPoint(points[s_WireEdgePairs[i]]);
 
             var prevColor = Handles.color;
@@ -2111,25 +2084,19 @@ namespace DJTechEditor.PCG.Graph
                 s_WireUploadedEdgeCount = 0;
             }
 
-            if (s_WireMaterial == null)
+            if (s_WireMaterial != null)
+                return true;
+
+            var shader = Shader.Find("Hidden/PcgPolygonWireOverlay");
+            if (shader == null)
+                return false;
+
+            s_WireMaterial = new Material(shader)
             {
-                var shader = Shader.Find("Hidden/Internal-Colored");
-                if (shader == null)
-                    return false;
-
-                s_WireMaterial = new Material(shader)
-                {
-                    name = "PcgPolygonWireOverlay",
-                    hideFlags = HideFlags.HideAndDontSave,
-                };
-                s_WireMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                s_WireMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                s_WireMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-                s_WireMaterial.SetInt("_ZWrite", 0);
-                // LessEqual: respect depth so back edges are occluded by the Lit mesh.
-                s_WireMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual);
-            }
-
+                name = "PcgPolygonWireOverlay",
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            s_WireMaterial.SetFloat("_HalfPx", WireHalfPx);
             return true;
         }
 
@@ -2138,7 +2105,7 @@ namespace DJTechEditor.PCG.Graph
             if (s_WireVerts == null || s_WireVerts.Length < vertCount)
             {
                 s_WireVerts = new Vector3[vertCount];
-                s_WireColors = new Color[vertCount];
+                s_WireEdgeCoords = new Vector2[vertCount];
                 s_WireBuiltEdgeCount = 0;
             }
 
@@ -2148,17 +2115,16 @@ namespace DJTechEditor.PCG.Graph
                 s_WireBuiltEdgeCount = 0;
             }
 
-            // Indices and colors are deterministic from edgeCount — fill once per size.
             if (s_WireBuiltEdgeCount == edgeCount)
                 return;
 
             for (var e = 0; e < edgeCount; e++)
             {
                 var vi = e * 4;
-                s_WireColors[vi] = s_WireColor;
-                s_WireColors[vi + 1] = s_WireColor;
-                s_WireColors[vi + 2] = s_WireColor;
-                s_WireColors[vi + 3] = s_WireColor;
+                s_WireEdgeCoords[vi] = new Vector2(WireHalfPx, 0f);
+                s_WireEdgeCoords[vi + 1] = new Vector2(-WireHalfPx, 0f);
+                s_WireEdgeCoords[vi + 2] = new Vector2(WireHalfPx, 0f);
+                s_WireEdgeCoords[vi + 3] = new Vector2(-WireHalfPx, 0f);
 
                 var ti = e * 6;
                 s_WireTris[ti] = vi;
@@ -2173,27 +2139,22 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Expand each unique edge into a screen-constant-width quad.
-        /// Uses camera screen-pixel offsets (Blender overlay_edit_mesh_edge NDC expansion)
-        /// so width matches render pixels, not HandleUtility GUI pixels.
+        /// Screen-pixel quads with per-vertex edgeCoord for fragment AA (Blender edit-mesh edge model).
         /// </summary>
-        private static void ExpandEdgesToCameraFacingQuads(
+        private static void ExpandEdgesToScreenQuads(
             Vector3[] points,
             Matrix4x4 l2w,
             Camera cam,
-            float widthPx,
             int edgeCount)
         {
             var camPos = cam.transform.position;
-            // widthPx = Blender theme.sizes.pixel; add smooth-wire AA padding on each side.
-            var halfPx = widthPx * 0.5f + BlenderSmoothWireHalfPx;
+            var halfPx = WireHalfPx;
 
             for (var e = 0; e < edgeCount; e++)
             {
                 var a = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2]]);
                 var b = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2 + 1]]);
 
-                // Depth bias: overlay_wireframe_vert.glsl gl_Position.z -= ndc_offset_factor * 0.5
                 const float depthBiasRatio = 0.0005f;
                 a += (camPos - a) * depthBiasRatio;
                 b += (camPos - b) * depthBiasRatio;
@@ -2231,8 +2192,7 @@ namespace DJTechEditor.PCG.Graph
                 }
 
                 dir2d *= 1f / Mathf.Sqrt(lenSq2d);
-                var perp2d = new Vector2(-dir2d.y, dir2d.x);
-                var offset = perp2d * halfPx;
+                var offset = new Vector2(-dir2d.y, dir2d.x) * halfPx;
 
                 s_WireVerts[vi] = ScreenPointOffsetToWorld(screenA, offset, cam);
                 s_WireVerts[vi + 1] = ScreenPointOffsetToWorld(screenA, -offset, cam);
@@ -2241,14 +2201,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        /// <summary>
-        /// Offset a world point by screen pixels at its current depth.
-        /// Equivalent to Blender gpu_position.xy += offset * 2 * w in NDC space.
-        /// </summary>
-        private static Vector3 ScreenPointOffsetToWorld(
-            Vector3 screen,
-            Vector2 screenOffset,
-            Camera cam)
+        private static Vector3 ScreenPointOffsetToWorld(Vector3 screen, Vector2 screenOffset, Camera cam)
         {
             var p = screen;
             p.x += screenOffset.x;
