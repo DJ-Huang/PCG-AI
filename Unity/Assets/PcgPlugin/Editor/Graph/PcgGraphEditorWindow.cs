@@ -385,6 +385,7 @@ namespace DJTechEditor.PCG.Graph
             toolbar.Add(MakeButton("New", NewGraph));
             toolbar.Add(MakeButton("Save", SaveGraph));
             toolbar.Add(MakeButton("Save As…", SaveAsGraph));
+            toolbar.Add(MakeButton("Show in Project", LocateInProject));
 
             m_SubgraphBackButton = MakeButton("‹ Root", () => m_GraphView?.ExitSubgraph());
             m_SubgraphBackButton.style.display = DisplayStyle.None;
@@ -437,8 +438,6 @@ namespace DJTechEditor.PCG.Graph
 
             m_InspectorToggle = MakeButton("Inspector", ToggleInspector);
             toolbar.Add(m_InspectorToggle);
-
-            toolbar.Add(MakeButton("Show in Project", LocateInProject));
 
             rootVisualElement.Add(toolbar);
         }

@@ -510,11 +510,12 @@ function PcgEditor() {
 
   return (
     <div className="pcg-app">
-      {/* Toolbar — aligned with Unity: left=New/Save/Save As, right=Parameters/Inspector/Show in Project */}
+      {/* Toolbar — aligned with Unity: left=New/Save/Save As/Show in Project, right=Parameters/Inspector */}
       <div className="pcg-toolbar">
         <button type="button" onClick={() => handleNewGraph()} title="New Graph">New</button>
         <button type="button" onClick={handleSave} title="Save Graph">Save</button>
         <button type="button" onClick={handleSaveAs} title="Save As">Save As...</button>
+        <button type="button" onClick={handleShowInProject} title="Show in Project">Show in Project</button>
         <span className="pcg-toolbar__spacer" />
         <button
           type="button"
@@ -532,7 +533,6 @@ function PcgEditor() {
         >
           Inspector
         </button>
-        <button type="button" onClick={handleShowInProject} title="Show in Project">Show in Project</button>
         <span className="pcg-toolbar__separator" />
         <input
           ref={fileInputRef}
