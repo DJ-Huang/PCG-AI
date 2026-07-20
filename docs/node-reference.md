@@ -716,7 +716,7 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 **类别**：Generation
 
-**功能**：在输入网格表面均匀采样生成点云。支持法线偏移和松散度控制。
+**功能**：在输入网格表面均匀采样生成点云。支持法线偏移、松散度、face group 过滤与边缘避让（对齐 Houdini Scatter Group + Distance From Border 硬阈值）。
 
 **输入 Pin**：
 
@@ -738,14 +738,18 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 | `seed` | integer | 0 | — | 随机种子 |
 | `normalOffset` | number | 0.0 | — | 沿法线方向的偏移量 |
 | `looseness` | number | 0.0 | ≥ 0 | 松散度。0 = 严格在表面上，>0 = 点在表面附近随机分布 |
+| `faceGroup` | groupSelect | `""` | face | 只在指定 face group 上采样（Houdini Scatter Group）。空 = 全部面 |
+| `excludeGroups` | groupMultiSelect | `""` | face | 从采样池排除的 face group 列表 |
+| `edgeMargin` | number | 0.0 | ≥ 0 | 拒绝距采样面组边界 < margin 的点（Houdini Distance From Border 硬阈值） |
 
 **执行逻辑**：
-1. 读取输入网格的三角形列表
-2. 按面积加权随机选择三角形面
+1. 优先读取 `PcgGeometry`（保留 face group）；仅有 triangle soup 时回退 mesh 路径
+2. 按 `faceGroup` / `excludeGroups` 过滤可采样面，再 fan 三角化并按面积加权采样
 3. 在选中三角形内生成均匀分布的随机点（重心坐标采样）
-4. 若 `normalOffset` ≠ 0，沿该点法线方向偏移
-5. 若 `looseness` > 0，在表面附近添加随机扰动
-6. 输出 `SpatialPoint` 类型点云
+4. 若 `edgeMargin` > 0，拒绝距采样面组边界（组内出现一次的边）过近的点并重试
+5. 若 `normalOffset` ≠ 0，沿该点法线方向偏移
+6. 若 `looseness` > 0，在表面附近添加随机扰动
+7. 输出 `SpatialPoint` 类型点云
 
 **用法示例**：
 
@@ -754,11 +758,18 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
   "id": "sms2",
   "type": "SampleMeshSurface",
   "position": { "x": 300, "y": 0 },
-  "data": { "count": 500, "seed": 42, "normalOffset": 0.5, "looseness": 0.3 }
+  "data": {
+    "count": 500,
+    "seed": 42,
+    "normalOffset": 0.5,
+    "looseness": 0.3,
+    "faceGroup": "extrude_top",
+    "edgeMargin": 1.1
+  }
 }
 ```
 
-> 典型连接：`GetMeshData → SampleMeshSurface → PlaceInScene`，在网格表面散布物体。
+> 典型连接：`PolyExtrude(topGroup=extrude_top) → SampleMeshSurface(faceGroup=extrude_top, edgeMargin>0) → CopyMeshToPoints`。
 
 ---
 

@@ -1412,7 +1412,25 @@
         "count": { "type": "integer", "default": 100, "minimum": 0, "maximum": 1000000 },
         "seed": { "type": "integer", "default": 0 },
         "normalOffset": { "type": "number", "default": 0.0 },
-        "looseness": { "type": "number", "default": 0.0, "minimum": 0 }
+        "looseness": { "type": "number", "default": 0.0, "minimum": 0 },
+        "faceGroup": {
+          "type": "groupSelect",
+          "groupDomain": "face",
+          "default": "",
+          "displayName": "Face Group"
+        },
+        "excludeGroups": {
+          "type": "groupMultiSelect",
+          "default": "",
+          "displayName": "Exclude Groups",
+          "groupDomain": "face"
+        },
+        "edgeMargin": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0,
+          "displayName": "Edge Margin"
+        }
       }
     },
     {

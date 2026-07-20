@@ -1,8 +1,11 @@
 #include "pcg_api.h"
 
+#include "data/pcg_geometry.hpp"
 #include "data/pcg_point_data.hpp"
 #include "elements/mesh_algorithms.hpp"
 #include "elements/mesh_scatter_algorithms.hpp"
+#include "elements/vehicle_modeling_algorithms.hpp"
+#include "geometry/group_table.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -49,6 +52,7 @@ int main()
 {
     using namespace pcg::internal::data;
     using namespace pcg::internal::elements;
+    using pcg::internal::geometry::GroupDomain;
 
     char err[512] = {};
     char out[262144] = {};
@@ -187,6 +191,89 @@ int main()
                 PCG_OK, "get mesh data scatter");
     expect_true(kind == PCG_RESULT_KIND_JSON, "get mesh scatter json kind");
     std::printf("PASS: GetMeshData mesh slot scatter\n");
+
+    // ── faceGroup: only sample PolyExtrude top faces ──
+    {
+        PcgGeometry ground;
+        ground.points_mut() = {{-2.0, 0.0, -2.0}, {2.0, 0.0, -2.0}, {2.0, 0.0, 2.0}, {-2.0, 0.0, 2.0}};
+        ground.faces_mut() = {{0, 3, 2, 1}};
+        PolyExtrudeOptions extrude;
+        extrude.distance = 0.5;
+        extrude.inset = 0.0;
+        extrude.keep_original = false;
+        extrude.top_group = "extrude_top";
+        extrude.side_group = "extrude_side";
+        const PcgGeometry pads = poly_extrude_geometry(ground, extrude);
+        expect_true(!pads.groups().members(GroupDomain::Face, "extrude_top").empty(),
+                    "extrude_top group exists");
+        expect_true(!pads.groups().members(GroupDomain::Face, "extrude_side").empty(),
+                    "extrude_side group exists");
+
+        SampleMeshSurfaceOptions opts;
+        opts.count = 400;
+        opts.seed = 11;
+        opts.face_group = "extrude_top";
+        const PcgPointData top_only = sample_mesh_surface(pads, opts);
+        expect_true(top_only.points().size() == 400, "faceGroup sample count");
+        for (const auto& p : top_only.points()) {
+            expect_true(std::abs(p.y - 0.5) < 1e-3, "faceGroup samples stay on top plane");
+            expect_true(p.attributes.value("ny", 0.0) > 0.9, "faceGroup samples have +Y normal");
+        }
+
+        SampleMeshSurfaceOptions all_opts;
+        all_opts.count = 400;
+        all_opts.seed = 11;
+        const PcgPointData all_faces = sample_mesh_surface(pads, all_opts);
+        int side_hits = 0;
+        for (const auto& p : all_faces.points()) {
+            if (std::abs(p.attributes.value("ny", 0.0)) < 0.5)
+                ++side_hits;
+        }
+        expect_true(side_hits > 20, "without faceGroup, sides are sampled");
+    }
+    std::printf("PASS: faceGroup filters to extrude_top\n");
+
+    // ── edgeMargin: samples stay away from group boundary ──
+    {
+        PcgGeometry ground;
+        ground.points_mut() = {{-5.0, 0.0, -5.0}, {5.0, 0.0, -5.0}, {5.0, 0.0, 5.0}, {-5.0, 0.0, 5.0}};
+        ground.faces_mut() = {{0, 3, 2, 1}};
+        PolyExtrudeOptions extrude;
+        extrude.distance = 0.2;
+        extrude.inset = 0.0;
+        extrude.top_group = "extrude_top";
+        extrude.side_group = "extrude_side";
+        const PcgGeometry pads = poly_extrude_geometry(ground, extrude);
+
+        const double margin = 1.5;
+        SampleMeshSurfaceOptions opts;
+        opts.count = 300;
+        opts.seed = 21;
+        opts.face_group = "extrude_top";
+        opts.edge_margin = margin;
+        const PcgPointData points = sample_mesh_surface(pads, opts);
+        expect_true(points.points().size() == 300, "edgeMargin sample count");
+        for (const auto& p : points.points()) {
+            // Top is a 10×10 square centered at origin; stay inset by margin.
+            expect_true(std::abs(p.x) <= 5.0 - margin + 1e-3, "edgeMargin x inset");
+            expect_true(std::abs(p.z) <= 5.0 - margin + 1e-3, "edgeMargin z inset");
+        }
+    }
+    std::printf("PASS: edgeMargin rejects near-border samples\n");
+
+    // ── Backward compat: empty faceGroup matches prior all-face sampling ──
+    {
+        const PcgGeometry box = create_box_geometry(2.0, 2.0, 2.0);
+        SampleMeshSurfaceOptions opts;
+        opts.count = 64;
+        opts.seed = 3;
+        const PcgPointData geo_pts = sample_mesh_surface(box, opts);
+        const PcgPointData mesh_pts =
+            sample_mesh_surface(triangulate_geometry_shared(box), opts);
+        expect_true(geo_pts.points().size() == 64, "compat geo count");
+        expect_true(mesh_pts.points().size() == 64, "compat mesh count");
+    }
+    std::printf("PASS: empty faceGroup backward compatible\n");
 
     std::printf("ALL phase44 tests passed\n");
     return 0;

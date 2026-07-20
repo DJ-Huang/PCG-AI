@@ -1,9 +1,12 @@
 #include "elements/mesh_scatter_algorithms.hpp"
 
 #include "elements/element_utils.hpp"
+#include "geometry/bmesh.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace pcg::internal::elements {
@@ -16,7 +19,26 @@ struct TriangleRef {
     double area = 0.0;
 };
 
+struct BoundaryEdge {
+    data::PcgVec3 a;
+    data::PcgVec3 b;
+};
+
 double triangle_area(const data::PcgVertex& a, const data::PcgVertex& b, const data::PcgVertex& c)
+{
+    const double abx = b.x - a.x;
+    const double aby = b.y - a.y;
+    const double abz = b.z - a.z;
+    const double acx = c.x - a.x;
+    const double acy = c.y - a.y;
+    const double acz = c.z - a.z;
+    const double cx = aby * acz - abz * acy;
+    const double cy = abz * acx - abx * acz;
+    const double cz = abx * acy - aby * acx;
+    return 0.5 * std::sqrt(cx * cx + cy * cy + cz * cz);
+}
+
+double triangle_area_vec(const data::PcgVec3& a, const data::PcgVec3& b, const data::PcgVec3& c)
 {
     const double abx = b.x - a.x;
     const double aby = b.y - a.y;
@@ -67,43 +89,135 @@ int pick_triangle(const std::vector<double>& cumulative, double sample, int fall
     return static_cast<int>(std::distance(cumulative.begin(), it));
 }
 
-} // namespace
-
-data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
-                                       const SampleMeshSurfaceOptions& options)
+double point_segment_distance(double px,
+                              double py,
+                              double pz,
+                              const data::PcgVec3& a,
+                              const data::PcgVec3& b)
 {
-    data::PcgPointData points;
-    if (options.count <= 0)
-        return points;
+    const double abx = b.x - a.x;
+    const double aby = b.y - a.y;
+    const double abz = b.z - a.z;
+    const double apx = px - a.x;
+    const double apy = py - a.y;
+    const double apz = pz - a.z;
+    const double ab_len_sq = abx * abx + aby * aby + abz * abz;
+    double t = 0.0;
+    if (ab_len_sq > 1e-24)
+        t = std::clamp((apx * abx + apy * aby + apz * abz) / ab_len_sq, 0.0, 1.0);
+    const double dx = px - (a.x + abx * t);
+    const double dy = py - (a.y + aby * t);
+    const double dz = pz - (a.z + abz * t);
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
 
+double min_boundary_distance(double px,
+                             double py,
+                             double pz,
+                             const std::vector<BoundaryEdge>& edges)
+{
+    double best = 1e300;
+    for (const auto& edge : edges) {
+        const double d = point_segment_distance(px, py, pz, edge.a, edge.b);
+        if (d < best)
+            best = d;
+    }
+    return best;
+}
+
+std::unordered_set<geometry::GroupId> build_allowed_faces(const data::PcgGeometry& geometry,
+                                                          const SampleMeshSurfaceOptions& options)
+{
+    std::unordered_set<geometry::GroupId> allowed;
+    if (options.face_group.empty()) {
+        for (size_t i = 0; i < geometry.faces().size(); ++i)
+            allowed.insert(static_cast<geometry::GroupId>(i));
+    } else {
+        allowed = geometry.groups().eval(geometry::GroupDomain::Face, options.face_group);
+    }
+
+    for (const std::string& exclude : options.exclude_groups) {
+        if (exclude.empty())
+            continue;
+        const auto rejected = geometry.groups().eval(geometry::GroupDomain::Face, exclude);
+        for (geometry::GroupId id : rejected)
+            allowed.erase(id);
+    }
+    return allowed;
+}
+
+/** Edges that appear exactly once among the allowed faces — Houdini Blast(group)
+ *  then Distance-From-Border unshared-edge semantics. */
+std::vector<BoundaryEdge> build_group_boundary_edges(
+    const data::PcgGeometry& geometry,
+    const std::unordered_set<geometry::GroupId>& allowed)
+{
+    std::unordered_map<int64_t, int> use_count;
+    for (geometry::GroupId face_id : allowed) {
+        if (face_id < 0 || static_cast<size_t>(face_id) >= geometry.faces().size())
+            continue;
+        const auto& face = geometry.faces()[static_cast<size_t>(face_id)];
+        const int n = static_cast<int>(face.size());
+        for (int i = 0; i < n; ++i) {
+            const int a = face[static_cast<size_t>(i)];
+            const int b = face[static_cast<size_t>((i + 1) % n)];
+            use_count[geometry::edge_key(a, b)]++;
+        }
+    }
+
+    std::vector<BoundaryEdge> edges;
+    edges.reserve(use_count.size());
+    for (const auto& entry : use_count) {
+        if (entry.second != 1)
+            continue;
+        const auto ends = geometry::edge_group_points(entry.first);
+        if (ends[0] < 0 || ends[1] < 0 ||
+            static_cast<size_t>(ends[0]) >= geometry.points().size() ||
+            static_cast<size_t>(ends[1]) >= geometry.points().size())
+            continue;
+        edges.push_back({geometry.points()[static_cast<size_t>(ends[0])],
+                         geometry.points()[static_cast<size_t>(ends[1])]});
+    }
+    return edges;
+}
+
+std::vector<BoundaryEdge> build_mesh_boundary_edges(const data::PcgMeshData& mesh)
+{
     const auto& vertices = mesh.vertices();
     const auto& triangles = mesh.triangles();
-    if (vertices.empty() || triangles.size() < 3)
-        return points;
-
-    std::vector<TriangleRef> tris;
-    tris.reserve(triangles.size() / 3);
+    std::unordered_map<int64_t, int> use_count;
     for (size_t t = 0; t + 2 < triangles.size(); t += 3) {
-        if (options.is_cancel_requested && options.is_cancel_requested())
-            return points;
-
         const int i0 = triangles[t];
         const int i1 = triangles[t + 1];
         const int i2 = triangles[t + 2];
-        if (i0 < 0 || i1 < 0 || i2 < 0 || static_cast<size_t>(i0) >= vertices.size() ||
-            static_cast<size_t>(i1) >= vertices.size() || static_cast<size_t>(i2) >= vertices.size())
-            continue;
-
-        const double area =
-            triangle_area(vertices[static_cast<size_t>(i0)], vertices[static_cast<size_t>(i1)],
-                          vertices[static_cast<size_t>(i2)]);
-        if (area <= 1e-12)
-            continue;
-
-        tris.push_back({i0, i1, i2, area});
+        use_count[geometry::edge_key(i0, i1)]++;
+        use_count[geometry::edge_key(i1, i2)]++;
+        use_count[geometry::edge_key(i2, i0)]++;
     }
 
-    if (tris.empty())
+    std::vector<BoundaryEdge> edges;
+    for (const auto& entry : use_count) {
+        if (entry.second != 1)
+            continue;
+        const auto ends = geometry::edge_group_points(entry.first);
+        if (ends[0] < 0 || ends[1] < 0 ||
+            static_cast<size_t>(ends[0]) >= vertices.size() ||
+            static_cast<size_t>(ends[1]) >= vertices.size())
+            continue;
+        const auto& va = vertices[static_cast<size_t>(ends[0])];
+        const auto& vb = vertices[static_cast<size_t>(ends[1])];
+        edges.push_back({{va.x, va.y, va.z}, {vb.x, vb.y, vb.z}});
+    }
+    return edges;
+}
+
+data::PcgPointData sample_triangles(const std::vector<data::PcgVertex>& vertices,
+                                    const std::vector<TriangleRef>& tris,
+                                    const std::vector<BoundaryEdge>& boundary,
+                                    const SampleMeshSurfaceOptions& options)
+{
+    data::PcgPointData points;
+    if (options.count <= 0 || tris.empty())
         return points;
 
     std::vector<double> cumulative;
@@ -113,10 +227,15 @@ data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
         total_area += tri.area;
         cumulative.push_back(total_area);
     }
+    if (total_area <= 1e-12)
+        return points;
 
     uint32_t rng = mix_seed(options.seed, static_cast<int>(tris.size() * 97 + options.count));
+    const bool use_margin = options.edge_margin > 0.0 && !boundary.empty();
+    const int max_attempts = std::max(options.count * 50, options.count + 16);
 
-    for (int sample = 0; sample < options.count; ++sample) {
+    int accepted = 0;
+    for (int attempt = 0; attempt < max_attempts && accepted < options.count; ++attempt) {
         if (options.is_cancel_requested && options.is_cancel_requested())
             return points;
 
@@ -139,32 +258,136 @@ data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
         double nz = 0.0;
         face_normal(a, b, c, nx, ny, nz);
 
-        data::PcgPoint point;
-        point.x = u * a.x + v * b.x + w * c.x;
-        point.y = u * a.y + v * b.y + w * c.y;
-        point.z = u * a.z + v * b.z + w * c.z;
+        double px = u * a.x + v * b.x + w * c.x;
+        double py = u * a.y + v * b.y + w * c.y;
+        double pz = u * a.z + v * b.z + w * c.z;
+
+        if (use_margin &&
+            min_boundary_distance(px, py, pz, boundary) < options.edge_margin)
+            continue;
 
         if (options.looseness > 0.0) {
             const double jitter = (rand01(rng) - 0.5) * options.looseness;
-            point.x += nx * jitter;
-            point.y += ny * jitter;
-            point.z += nz * jitter;
+            px += nx * jitter;
+            py += ny * jitter;
+            pz += nz * jitter;
         }
 
         if (options.normal_offset != 0.0) {
-            point.x += nx * options.normal_offset;
-            point.y += ny * options.normal_offset;
-            point.z += nz * options.normal_offset;
+            px += nx * options.normal_offset;
+            py += ny * options.normal_offset;
+            pz += nz * options.normal_offset;
         }
 
+        data::PcgPoint point;
+        point.x = px;
+        point.y = py;
+        point.z = pz;
         point.attributes["nx"] = nx;
         point.attributes["ny"] = ny;
         point.attributes["nz"] = nz;
         point.attributes["triIndex"] = tri_index;
         points.add_point(point);
+        ++accepted;
     }
 
     return points;
+}
+
+} // namespace
+
+data::PcgPointData sample_mesh_surface(const data::PcgMeshData& mesh,
+                                       const SampleMeshSurfaceOptions& options)
+{
+    data::PcgPointData empty;
+    if (options.count <= 0)
+        return empty;
+
+    const auto& vertices = mesh.vertices();
+    const auto& triangles = mesh.triangles();
+    if (vertices.empty() || triangles.size() < 3)
+        return empty;
+
+    std::vector<TriangleRef> tris;
+    tris.reserve(triangles.size() / 3);
+    for (size_t t = 0; t + 2 < triangles.size(); t += 3) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            return empty;
+
+        const int i0 = triangles[t];
+        const int i1 = triangles[t + 1];
+        const int i2 = triangles[t + 2];
+        if (i0 < 0 || i1 < 0 || i2 < 0 || static_cast<size_t>(i0) >= vertices.size() ||
+            static_cast<size_t>(i1) >= vertices.size() || static_cast<size_t>(i2) >= vertices.size())
+            continue;
+
+        const double area =
+            triangle_area(vertices[static_cast<size_t>(i0)], vertices[static_cast<size_t>(i1)],
+                          vertices[static_cast<size_t>(i2)]);
+        if (area <= 1e-12)
+            continue;
+
+        tris.push_back({i0, i1, i2, area});
+    }
+
+    const std::vector<BoundaryEdge> boundary =
+        options.edge_margin > 0.0 ? build_mesh_boundary_edges(mesh) : std::vector<BoundaryEdge>{};
+    return sample_triangles(vertices, tris, boundary, options);
+}
+
+data::PcgPointData sample_mesh_surface(const data::PcgGeometry& geometry,
+                                       const SampleMeshSurfaceOptions& options)
+{
+    data::PcgPointData empty;
+    if (options.count <= 0)
+        return empty;
+    if (geometry.points().empty() || geometry.faces().empty())
+        return empty;
+
+    const auto allowed = build_allowed_faces(geometry, options);
+    if (allowed.empty())
+        return empty;
+
+    // Fan-triangulate like triangulate_geometry_shared, keeping face index mapping.
+    std::vector<data::PcgVertex> vertices;
+    vertices.reserve(geometry.points().size());
+    for (const auto& p : geometry.points())
+        vertices.push_back({p.x, p.y, p.z});
+
+    std::vector<TriangleRef> tris;
+    for (size_t face_index = 0; face_index < geometry.faces().size(); ++face_index) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            return empty;
+        if (allowed.count(static_cast<geometry::GroupId>(face_index)) == 0)
+            continue;
+
+        const auto& face = geometry.faces()[face_index];
+        if (face.size() < 3)
+            continue;
+
+        const auto triangles = data::triangulate_face_corners(geometry.points(), face);
+        for (const auto& triangle : triangles) {
+            const int i0 = face[static_cast<size_t>(triangle[0])];
+            const int i1 = face[static_cast<size_t>(triangle[1])];
+            const int i2 = face[static_cast<size_t>(triangle[2])];
+            if (i0 < 0 || i1 < 0 || i2 < 0 || static_cast<size_t>(i0) >= vertices.size() ||
+                static_cast<size_t>(i1) >= vertices.size() ||
+                static_cast<size_t>(i2) >= vertices.size())
+                continue;
+
+            const double area = triangle_area_vec(geometry.points()[static_cast<size_t>(i0)],
+                                                  geometry.points()[static_cast<size_t>(i1)],
+                                                  geometry.points()[static_cast<size_t>(i2)]);
+            if (area <= 1e-12)
+                continue;
+            tris.push_back({i0, i1, i2, area});
+        }
+    }
+
+    const std::vector<BoundaryEdge> boundary =
+        options.edge_margin > 0.0 ? build_group_boundary_edges(geometry, allowed)
+                                  : std::vector<BoundaryEdge>{};
+    return sample_triangles(vertices, tris, boundary, options);
 }
 
 } // namespace pcg::internal::elements

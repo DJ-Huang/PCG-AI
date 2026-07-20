@@ -84,7 +84,9 @@
         "count": 28,
         "seed": 3,
         "normalOffset": 0.05,
-        "looseness": 0.0
+        "looseness": 0.0,
+        "faceGroup": "extrude_top",
+        "edgeMargin": 1.1
       }
     },
     {
@@ -332,8 +334,8 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_lots_sample",
-      "source": "lots",
+      "id": "e_pad_sample",
+      "source": "pad_bevel",
       "target": "sample",
       "sourceHandle": "out",
       "targetHandle": "in"
