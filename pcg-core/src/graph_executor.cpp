@@ -29,6 +29,8 @@ PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const ch
 /// Output format: {"groups": [{"name": "side", "domain": "face", "count": 24, "members": [0,1,2,...]}, ...]}
 /// Face group members are remapped from geometry face indices to mesh triangle indices
 /// (fan-triangulation: an N-gon face at tri offset T produces triangles T..T+N-3).
+/// Face groups also emit facePolygons: packed rings [n, x,y,z * n, ...] so Scene View
+/// can highlight intermediate-node groups without indexing the final MeshFilter.
 nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
 {
     // Build face-index → first-mesh-triangle mapping
@@ -50,6 +52,8 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
             const auto& members = geometry.groups().members(domain, name);
             auto memberArray = nlohmann::json::array();
             auto edgeEndpoints = nlohmann::json::array();
+            auto facePolygons = nlohmann::json::array();
+            int face_count = 0;
             for (geometry::GroupId id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
                     // Expand face index into constituent mesh triangles
@@ -60,6 +64,27 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                             ? static_cast<int>(face.size()) - 2 : 0;
                         for (int t = 0; t < tri_count; ++t)
                             memberArray.push_back(first_tri + t);
+
+                        // Packed polygon ring for Scene View (independent of MeshFilter).
+                        if (face.size() >= 3) {
+                            bool ring_ok = true;
+                            for (int pi : face) {
+                                if (pi < 0 || pi >= static_cast<int>(points.size())) {
+                                    ring_ok = false;
+                                    break;
+                                }
+                            }
+                            if (ring_ok) {
+                                facePolygons.push_back(static_cast<int>(face.size()));
+                                for (int pi : face) {
+                                    const auto& p = points[static_cast<size_t>(pi)];
+                                    facePolygons.push_back(p.x);
+                                    facePolygons.push_back(p.y);
+                                    facePolygons.push_back(p.z);
+                                }
+                                ++face_count;
+                            }
+                        }
                     }
                 } else {
                     memberArray.push_back(id);
@@ -84,11 +109,15 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
             auto entry = nlohmann::json::object({
                 {"name", name},
                 {"domain", kDomainNames[d]},
-                {"count", static_cast<int>(memberArray.size())},
+                {"count", d == static_cast<int>(geometry::GroupDomain::Face)
+                    ? face_count
+                    : static_cast<int>(memberArray.size())},
                 {"members", std::move(memberArray)},
             });
             if (d == static_cast<int>(geometry::GroupDomain::Edge))
                 entry["edgeEndpoints"] = std::move(edgeEndpoints);
+            if (d == static_cast<int>(geometry::GroupDomain::Face) && !facePolygons.empty())
+                entry["facePolygons"] = std::move(facePolygons);
             groups.push_back(std::move(entry));
         }
     }

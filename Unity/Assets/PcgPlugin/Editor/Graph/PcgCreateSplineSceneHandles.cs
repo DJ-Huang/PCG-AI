@@ -1913,9 +1913,14 @@ namespace DJTechEditor.PCG.Graph
             bool hasGroups = hasOutput || hasInput;
             float height = hasGroups ? 74f : 40f;
 
-            // Check if selected group has member data for highlighting
-            bool canHighlight = !string.IsNullOrEmpty(s_SelectedGroupName) &&
-                FindGroupStats(s_SelectedGroupName, s_SelectedGroupSource == "output") != null;
+            // Check if selected group can be drawn (packed polygons preferred).
+            var selectedStats = string.IsNullOrEmpty(s_SelectedGroupName)
+                ? null
+                : FindGroupStats(s_SelectedGroupName, s_SelectedGroupSource == "output");
+            bool canHighlight = selectedStats != null && (
+                (selectedStats.facePolygons != null && selectedStats.facePolygons.Length >= 4) ||
+                (selectedStats.edgeEndpoints != null && selectedStats.edgeEndpoints.Length >= 6) ||
+                (selectedStats.members != null && selectedStats.members.Length > 0));
             if (!canHighlight && hasGroups && !string.IsNullOrEmpty(s_SelectedGroupName))
                 height += 16f;
 
@@ -2318,6 +2323,39 @@ namespace DJTechEditor.PCG.Graph
             return pairs.Count > 0 ? pairs.ToArray() : null;
         }
 
+        private static void DrawFacePolygonsHighlight(Matrix4x4 localToWorld, float[] packed)
+        {
+            var cursor = 0;
+            while (cursor < packed.Length)
+            {
+                var vertCount = Mathf.RoundToInt(packed[cursor++]);
+                if (vertCount < 3)
+                    break;
+
+                var floatsNeeded = vertCount * 3;
+                if (cursor + floatsNeeded > packed.Length)
+                    break;
+
+                var world = new Vector3[vertCount];
+                for (var i = 0; i < vertCount; ++i)
+                {
+                    world[i] = localToWorld.MultiplyPoint(new Vector3(
+                        packed[cursor], packed[cursor + 1], packed[cursor + 2]));
+                    cursor += 3;
+                }
+
+                Handles.color = new Color(1f, 0.85f, 0f, 0.35f);
+                Handles.DrawAAConvexPolygon(world);
+                Handles.color = new Color(1f, 0.85f, 0f, 0.95f);
+                // Close the ring for the outline.
+                var outline = new Vector3[vertCount + 1];
+                for (var i = 0; i < vertCount; ++i)
+                    outline[i] = world[i];
+                outline[vertCount] = world[0];
+                Handles.DrawAAPolyLine(3f, outline);
+            }
+        }
+
         private static void DrawNodeGroupHighlight(SceneView sceneView, PcgGraphEditorWindow window)
         {
             if (Event.current.type != EventType.Repaint)
@@ -2363,9 +2401,11 @@ namespace DJTechEditor.PCG.Graph
             if (group == null)
                 return;
 
-            // Edge groups can render via edgeEndpoints without members
+            // Face groups can render via facePolygons without depending on MeshFilter.
             bool hasEdgeEndpoints = group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6;
-            if (!hasEdgeEndpoints && (group.members == null || group.members.Length == 0))
+            bool hasFacePolygons = group.facePolygons != null && group.facePolygons.Length >= 4;
+            if (!hasEdgeEndpoints && !hasFacePolygons &&
+                (group.members == null || group.members.Length == 0))
                 return;
 
             if (ctx.Domain == SceneEditDomain.Edge)
@@ -2388,47 +2428,62 @@ namespace DJTechEditor.PCG.Graph
             }
             else if (ctx.Domain == SceneEditDomain.Face)
             {
-                var mf = anchor.GetComponent<MeshFilter>();
-                if (mf == null || mf.sharedMesh == null)
-                    return;
-                var mesh = mf.sharedMesh;
-                var vertices = mesh.vertices;
-                var triangles = mesh.triangles;
+                var prevZTest = Handles.zTest;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
 
-                // Filled translucent triangles
-                Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
-                foreach (var faceIdx in group.members)
+                // Prefer packed polygons from the source node — MeshFilter is usually the
+                // final merge and must not be indexed with intermediate-node face/tri ids.
+                if (group.facePolygons != null && group.facePolygons.Length >= 4)
                 {
-                    int baseIdx = (int)faceIdx * 3;
-                    if (triangles == null || baseIdx + 2 >= triangles.Length)
-                        continue;
-                    int v0 = triangles[baseIdx];
-                    int v1 = triangles[baseIdx + 1];
-                    int v2 = triangles[baseIdx + 2];
-                    if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
-                        continue;
-                    var p0 = l2w.MultiplyPoint(vertices[v0]);
-                    var p1 = l2w.MultiplyPoint(vertices[v1]);
-                    var p2 = l2w.MultiplyPoint(vertices[v2]);
-                    Handles.DrawAAConvexPolygon(p0, p1, p2);
+                    DrawFacePolygonsHighlight(l2w, group.facePolygons);
                 }
-                // Bright edges on top
-                Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
-                foreach (var faceIdx in group.members)
+                else
                 {
-                    int baseIdx = (int)faceIdx * 3;
-                    if (triangles == null || baseIdx + 2 >= triangles.Length)
-                        continue;
-                    int v0 = triangles[baseIdx];
-                    int v1 = triangles[baseIdx + 1];
-                    int v2 = triangles[baseIdx + 2];
-                    if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
-                        continue;
-                    var p0 = l2w.MultiplyPoint(vertices[v0]);
-                    var p1 = l2w.MultiplyPoint(vertices[v1]);
-                    var p2 = l2w.MultiplyPoint(vertices[v2]);
-                    Handles.DrawAAPolyLine(2f, p0, p1, p2, p0);
+                    var mf = anchor.GetComponent<MeshFilter>();
+                    if (mf == null || mf.sharedMesh == null)
+                    {
+                        Handles.zTest = prevZTest;
+                        return;
+                    }
+                    var mesh = mf.sharedMesh;
+                    var vertices = mesh.vertices;
+                    var triangles = mesh.triangles;
+
+                    Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
+                    foreach (var faceIdx in group.members)
+                    {
+                        int baseIdx = (int)faceIdx * 3;
+                        if (triangles == null || baseIdx + 2 >= triangles.Length)
+                            continue;
+                        int v0 = triangles[baseIdx];
+                        int v1 = triangles[baseIdx + 1];
+                        int v2 = triangles[baseIdx + 2];
+                        if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
+                            continue;
+                        var p0 = l2w.MultiplyPoint(vertices[v0]);
+                        var p1 = l2w.MultiplyPoint(vertices[v1]);
+                        var p2 = l2w.MultiplyPoint(vertices[v2]);
+                        Handles.DrawAAConvexPolygon(p0, p1, p2);
+                    }
+                    Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
+                    foreach (var faceIdx in group.members)
+                    {
+                        int baseIdx = (int)faceIdx * 3;
+                        if (triangles == null || baseIdx + 2 >= triangles.Length)
+                            continue;
+                        int v0 = triangles[baseIdx];
+                        int v1 = triangles[baseIdx + 1];
+                        int v2 = triangles[baseIdx + 2];
+                        if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
+                            continue;
+                        var p0 = l2w.MultiplyPoint(vertices[v0]);
+                        var p1 = l2w.MultiplyPoint(vertices[v1]);
+                        var p2 = l2w.MultiplyPoint(vertices[v2]);
+                        Handles.DrawAAPolyLine(2f, p0, p1, p2, p0);
+                    }
                 }
+
+                Handles.zTest = prevZTest;
             }
             else if (ctx.Domain == SceneEditDomain.Vertex)
             {

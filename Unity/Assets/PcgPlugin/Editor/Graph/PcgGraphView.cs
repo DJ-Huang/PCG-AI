@@ -1495,5 +1495,11 @@ namespace DJTechEditor.PCG.Graph
         public int count;
         public int[] members;
         public float[] edgeEndpoints;
+        /// <summary>
+        /// Packed face rings from the source node geometry:
+        /// [vertCount, x,y,z * vertCount, ...] — used for Scene View highlight
+        /// when MeshFilter is the final merge, not this node's mesh.
+        /// </summary>
+        public float[] facePolygons;
     }
 }

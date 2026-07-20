@@ -5,425 +5,131 @@
       "id": "ground",
       "type": "CreateBoxMesh",
       "position": { "x": 200, "y": 0 },
-      "data": {
-        "__nodeTitle": "City Ground",
-        "width": 48.0,
-        "height": 0.02,
-        "depth": 48.0
-      }
-    },
-    {
-      "id": "lots",
-      "type": "LotSubdivision",
-      "position": { "x": 200, "y": 160 },
-      "data": {
-        "__nodeTitle": "City Lots",
-        "minSize": 4.0,
-        "iterations": 4,
-        "irregularity": 0.4,
-        "seed": 11,
-        "alignment": "boundingBox"
-      }
-    },
-    {
-      "id": "pads",
-      "type": "PolyExtrude",
-      "position": { "x": -120, "y": 320 },
-      "data": {
-        "__nodeTitle": "Lot Pads",
-        "faceGroup": "",
-        "distance": 0.18,
-        "inset": 0.08,
-        "keepOriginal": false,
-        "topGroup": "extrude_top",
-        "sideGroup": "extrude_side"
-      }
-    },
-    {
-      "id": "pad_bevel",
-      "type": "BevelMesh",
-      "position": { "x": -120, "y": 480 },
-      "data": {
-        "__nodeTitle": "Pad Bevel",
-        "method": "edge",
-        "offsetType": "offset",
-        "amount": 0.04,
-        "segments": 2,
-        "clampOverlap": true,
-        "angleLimit": 30,
-        "profile": 0.5,
-        "edgeGroup": "",
-        "excludeUnshared": false
-      }
+      "data": {"width": 48, "height": 0.02, "depth": 48, "__nodeTitle": "City Ground"}
     },
     {
       "id": "sample",
       "type": "SampleMeshSurface",
       "position": { "x": 200, "y": 320 },
-      "data": {
-        "__nodeTitle": "Building Sites",
-        "count": 28,
-        "seed": 3,
-        "normalOffset": 0.05,
-        "looseness": 0.0
-      }
+      "data": {"count": 43, "seed": 3, "normalOffset": 0.05, "looseness": 0, "__nodeTitle": "Building Sites"}
     },
     {
       "id": "jitter",
       "type": "AttributeRandomize",
       "position": { "x": 200, "y": 480 },
-      "data": {
-        "__nodeTitle": "Site Jitter",
-        "seed": 5,
-        "translateX": 0.4,
-        "translateY": 0.0,
-        "translateZ": 0.4,
-        "rotateX": 0.0,
-        "rotateY": 25.0,
-        "rotateZ": 0.0,
-        "scaleMin": 0.7,
-        "scaleMax": 1.35
-      }
+      "data": {"seed": 5, "translateX": 0.4, "translateY": 0, "translateZ": 0.4, "rotateX": 0, "rotateY": 25, "rotateZ": 0, "scaleMin": 0.7, "scaleMax": 1.35, "__nodeTitle": "Site Jitter"}
     },
     {
       "id": "bldg_proto",
       "type": "CreateBoxMesh",
       "position": { "x": 520, "y": 320 },
-      "data": {
-        "__nodeTitle": "Building Proto",
-        "width": 2.2,
-        "height": 4.5,
-        "depth": 2.2
-      }
+      "data": {"width": 2.2, "height": 4.5, "depth": 2.2, "__nodeTitle": "Building Proto"}
     },
     {
       "id": "bldg_bevel",
       "type": "BevelMesh",
       "position": { "x": 520, "y": 480 },
-      "data": {
-        "__nodeTitle": "Building Bevel",
-        "method": "edge",
-        "offsetType": "offset",
-        "amount": 0.12,
-        "segments": 2,
-        "clampOverlap": true,
-        "angleLimit": 30,
-        "profile": 0.5,
-        "edgeGroup": "",
-        "excludeUnshared": false
-      }
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.12, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Building Bevel"}
     },
     {
       "id": "place",
       "type": "CopyMeshToPoints",
       "position": { "x": 360, "y": 640 },
-      "data": {
-        "__nodeTitle": "Place Buildings"
-      }
+      "data": {"__nodeTitle": "Place Buildings"}
     },
     {
       "id": "road_a",
       "type": "CreateSpline",
       "position": { "x": 840, "y": 160 },
-      "data": {
-        "__nodeTitle": "Road A",
-        "mode": "polyline",
-        "closed": false,
-        "subdivisions": 1,
-        "controlPoints": "[{\"x\":-22,\"y\":0.05,\"z\":-8},{\"x\":22,\"y\":0.05,\"z\":-8}]",
-        "editPlane": "xz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0
-      }
+      "data": {"mode": "polyline", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-22,\"y\":0.05,\"z\":-8},{\"x\":22,\"y\":0.05,\"z\":-8}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Road A"}
     },
     {
       "id": "road_b",
       "type": "CreateSpline",
       "position": { "x": 1160, "y": 160 },
-      "data": {
-        "__nodeTitle": "Road B",
-        "mode": "polyline",
-        "closed": false,
-        "subdivisions": 1,
-        "controlPoints": "[{\"x\":6,\"y\":0.05,\"z\":-22},{\"x\":6,\"y\":0.05,\"z\":22}]",
-        "editPlane": "xz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0
-      }
+      "data": {"mode": "polyline", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":6,\"y\":0.05,\"z\":-22},{\"x\":6,\"y\":0.05,\"z\":22}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Road B"}
     },
     {
       "id": "road_sweep_a",
       "type": "SweepAlongSpline",
       "position": { "x": 840, "y": 320 },
-      "data": {
-        "__nodeTitle": "Road Sweep A",
-        "surfaceShape": "rectangle",
-        "profileWidth": 3.2,
-        "profileHeight": 0.12,
-        "sampleSpacing": 1.0,
-        "capStart": true,
-        "capEnd": true,
-        "upX": 0,
-        "upY": 1,
-        "upZ": 0,
-        "scaleStart": 1.0,
-        "scaleEnd": 1.0
-      }
+      "data": {"surfaceShape": "rectangle", "profileWidth": 3.2, "profileHeight": 0.12, "radius": 1, "columns": 16, "sampleSpacing": 1, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Road Sweep A"}
     },
     {
       "id": "road_sweep_b",
       "type": "SweepAlongSpline",
       "position": { "x": 1160, "y": 320 },
-      "data": {
-        "__nodeTitle": "Road Sweep B",
-        "surfaceShape": "rectangle",
-        "profileWidth": 3.2,
-        "profileHeight": 0.12,
-        "sampleSpacing": 1.0,
-        "capStart": true,
-        "capEnd": true,
-        "upX": 0,
-        "upY": 1,
-        "upZ": 0,
-        "scaleStart": 1.0,
-        "scaleEnd": 1.0
-      }
+      "data": {"surfaceShape": "rectangle", "profileWidth": 3.2, "profileHeight": 0.12, "radius": 1, "columns": 16, "sampleSpacing": 1, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Road Sweep B"}
     },
     {
       "id": "road_bevel_a",
       "type": "BevelMesh",
       "position": { "x": 840, "y": 480 },
-      "data": {
-        "__nodeTitle": "Road Bevel A",
-        "method": "edge",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "clampOverlap": true,
-        "angleLimit": 30,
-        "profile": 0.5,
-        "edgeGroup": "",
-        "excludeUnshared": false
-      }
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.03, "segments": 1, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Road Bevel A"}
     },
     {
       "id": "road_bevel_b",
       "type": "BevelMesh",
       "position": { "x": 1160, "y": 480 },
-      "data": {
-        "__nodeTitle": "Road Bevel B",
-        "method": "edge",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "clampOverlap": true,
-        "angleLimit": 30,
-        "profile": 0.5,
-        "edgeGroup": "",
-        "excludeUnshared": false
-      }
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.03, "segments": 1, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Road Bevel B"}
     },
     {
       "id": "merge",
       "type": "MergeMesh",
       "position": { "x": 200, "y": 800 },
-      "data": {
-        "__nodeTitle": "City Merge"
-      }
+      "data": {"__nodeTitle": "City Merge"}
     },
     {
       "id": "out",
       "type": "Output",
       "position": { "x": 200, "y": 960 },
-      "data": {
-        "__nodeTitle": "Output",
-        "label": "Lot City"
-      }
+      "data": {"label": "Lot City", "__nodeTitle": "Output"}
+    },
+    {
+      "id": "lots",
+      "type": "LotSubdivision",
+      "position": { "x": 200, "y": 160 },
+      "data": {"minSize": 4, "iterations": 4, "irregularity": 0.4512821, "seed": 11, "alignment": "boundingBox", "__nodeTitle": "City Lots"}
+    },
+    {
+      "id": "pad_bevel",
+      "type": "BevelMesh",
+      "position": { "x": -120, "y": 480 },
+      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Pad Bevel"}
+    },
+    {
+      "id": "pads",
+      "type": "PolyExtrude",
+      "position": { "x": -120, "y": 344.5 },
+      "data": {"faceGroup": "", "distance": 0.18, "inset": 0.08, "keepOriginal": false, "topGroup": "extrude_top", "sideGroup": "extrude_side", "__nodeTitle": "Lot Pads"}
     }
   ],
   "edges": [
-    {
-      "id": "e_ground_lots",
-      "source": "ground",
-      "target": "lots",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_lots_pads",
-      "source": "lots",
-      "target": "pads",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_pads_bevel",
-      "source": "pads",
-      "target": "pad_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_lots_sample",
-      "source": "lots",
-      "target": "sample",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sample_jitter",
-      "source": "sample",
-      "target": "jitter",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_proto_bevel",
-      "source": "bldg_proto",
-      "target": "bldg_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_proto_place",
-      "source": "bldg_bevel",
-      "target": "place",
-      "sourceHandle": "out",
-      "targetHandle": "prototype"
-    },
-    {
-      "id": "e_points_place",
-      "source": "jitter",
-      "target": "place",
-      "sourceHandle": "out",
-      "targetHandle": "points"
-    },
-    {
-      "id": "e_road_a_sweep",
-      "source": "road_a",
-      "target": "road_sweep_a",
-      "sourceHandle": "out",
-      "targetHandle": "backbone"
-    },
-    {
-      "id": "e_road_b_sweep",
-      "source": "road_b",
-      "target": "road_sweep_b",
-      "sourceHandle": "out",
-      "targetHandle": "backbone"
-    },
-    {
-      "id": "e_road_a_bevel",
-      "source": "road_sweep_a",
-      "target": "road_bevel_a",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_road_b_bevel",
-      "source": "road_sweep_b",
-      "target": "road_bevel_b",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_merge_pads",
-      "source": "pad_bevel",
-      "target": "merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_merge_bldg",
-      "source": "place",
-      "target": "merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_merge_road_a",
-      "source": "road_bevel_a",
-      "target": "merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_merge_road_b",
-      "source": "road_bevel_b",
-      "target": "merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_out",
-      "source": "merge",
-      "target": "out",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    }
+    {"id": "e_ground_lots", "source": "ground", "target": "lots", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_lots_pads", "source": "lots", "target": "pads", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_pads_bevel", "source": "pads", "target": "pad_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_lots_sample", "source": "lots", "target": "sample", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_sample_jitter", "source": "sample", "target": "jitter", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_proto_bevel", "source": "bldg_proto", "target": "bldg_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_proto_place", "source": "bldg_bevel", "target": "place", "sourceHandle": "out", "targetHandle": "prototype"},
+    {"id": "e_points_place", "source": "jitter", "target": "place", "sourceHandle": "out", "targetHandle": "points"},
+    {"id": "e_road_a_sweep", "source": "road_a", "target": "road_sweep_a", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e_road_b_sweep", "source": "road_b", "target": "road_sweep_b", "sourceHandle": "out", "targetHandle": "backbone"},
+    {"id": "e_road_a_bevel", "source": "road_sweep_a", "target": "road_bevel_a", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_road_b_bevel", "source": "road_sweep_b", "target": "road_bevel_b", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_pads", "source": "pad_bevel", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_bldg", "source": "place", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_road_a", "source": "road_bevel_a", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_merge_road_b", "source": "road_bevel_b", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_out", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
-    {
-      "id": "p_min_size",
-      "name": "minSize",
-      "type": "number",
-      "default": 4.0,
-      "exposed": true,
-      "targetNode": "lots",
-      "targetProperty": "minSize",
-      "hasRange": true,
-      "min": 1.0,
-      "max": 16.0
-    },
-    {
-      "id": "p_iterations",
-      "name": "iterations",
-      "type": "integer",
-      "default": 4,
-      "exposed": true,
-      "targetNode": "lots",
-      "targetProperty": "iterations",
-      "hasRange": true,
-      "min": 0,
-      "max": 8
-    },
-    {
-      "id": "p_irregularity",
-      "name": "irregularity",
-      "type": "number",
-      "default": 0.4,
-      "exposed": true,
-      "targetNode": "lots",
-      "targetProperty": "irregularity",
-      "hasRange": true,
-      "min": 0.0,
-      "max": 1.0
-    },
-    {
-      "id": "p_sites",
-      "name": "buildingCount",
-      "type": "integer",
-      "default": 28,
-      "exposed": true,
-      "targetNode": "sample",
-      "targetProperty": "count",
-      "hasRange": true,
-      "min": 4,
-      "max": 80
-    },
-    {
-      "id": "p_pad_height",
-      "name": "padHeight",
-      "type": "number",
-      "default": 0.18,
-      "exposed": true,
-      "targetNode": "pads",
-      "targetProperty": "distance",
-      "hasRange": true,
-      "min": 0.02,
-      "max": 1.0
-    }
+    {"id": "p_min_size", "name": "minSize", "type": "number", "default": 4, "exposed": true, "targetNode": "lots", "targetProperty": "minSize", "hasRange": true, "min": 1, "max": 16},
+    {"id": "p_iterations", "name": "iterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "lots", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
+    {"id": "p_irregularity", "name": "irregularity", "type": "number", "default": 0.4, "exposed": true, "targetNode": "lots", "targetProperty": "irregularity", "hasRange": true, "min": 0, "max": 1},
+    {"id": "p_sites", "name": "buildingCount", "type": "integer", "default": 28, "exposed": true, "targetNode": "sample", "targetProperty": "count", "hasRange": true, "min": 4, "max": 80},
+    {"id": "p_pad_height", "name": "padHeight", "type": "number", "default": 0.18, "exposed": true, "targetNode": "pads", "targetProperty": "distance", "hasRange": true, "min": 0.02, "max": 1}
+  ],
+  "subgraphs": [
   ]
 }
