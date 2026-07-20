@@ -125,6 +125,7 @@ set(PCG_CORE_SOURCES
     src/elements/building_elements.cpp
     src/elements/assembly_algorithms.cpp
     src/elements/assembly_elements.cpp
+    src/elements/lot_subdivision_algorithms.cpp
     src/asset_path.cpp
 )
 
@@ -366,6 +367,11 @@ add_executable(test_assembly_nodes tests/test_assembly_nodes.cpp)
 target_link_libraries(test_assembly_nodes PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_assembly_nodes PRIVATE src)
 add_test(NAME test_assembly_nodes COMMAND test_assembly_nodes WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_lot_subdivision tests/test_lot_subdivision.cpp)
+target_link_libraries(test_lot_subdivision PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_lot_subdivision PRIVATE src)
+add_test(NAME test_lot_subdivision COMMAND test_lot_subdivision WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.

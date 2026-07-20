@@ -1507,6 +1507,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides: []
@@ -1515,6 +1521,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings:
   - materialName: Alloy_Bright
     material: {fileID: 0}
@@ -1722,6 +1729,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides:
@@ -1737,7 +1750,10 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
-  m_MaterialBindings: []
+  m_TerrainBindings: []
+  m_MaterialBindings:
+  - materialName: default
+    material: {fileID: 0}
   m_SplineBindings: []
   m_LastMaterialNames: []
   scatterPointScale: 0.2
@@ -2308,6 +2324,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides:
@@ -2386,6 +2408,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings: []
   m_SplineBindings: []
   m_LastMaterialNames: []
@@ -2500,6 +2523,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides: []
@@ -2508,6 +2537,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings:
   - materialName: test
     material: {fileID: 0}
@@ -2683,6 +2713,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides:
@@ -2719,6 +2755,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings: []
   m_SplineBindings: []
   m_LastMaterialNames: []
@@ -2902,6 +2939,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides: []
@@ -2910,6 +2953,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings:
   - materialName: pole
     material: {fileID: 0}
@@ -3068,6 +3112,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides:
@@ -3139,6 +3189,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 443326872}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings: []
   m_SplineBindings: []
   m_LastMaterialNames: []
@@ -3305,6 +3356,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides:
@@ -3341,6 +3398,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings:
   - materialName: plank
     material: {fileID: 2100000, guid: 316de02a10fc94d5c888273cd889fff8, type: 2}
@@ -3716,6 +3774,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides: []
@@ -3724,6 +3788,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings: []
   m_SplineBindings: []
   m_LastMaterialNames: []
@@ -3852,6 +3917,12 @@ MonoBehaviour:
     type: 3}
   seed: 42
   cookMode: 3
+  hostOutputMode: 0
+  showStampOverlays: 1
+  showMaskOverlay: 1
+  maskOverlayLayer: mask
+  maskOverlayOpacity: 0.55
+  stampLiveCookMode: 1
   editModeCookInterval: 0.25
   enableAsyncCookInEditor: 1
   m_ParameterOverrides: []
@@ -3860,6 +3931,7 @@ MonoBehaviour:
     source: 1
     sceneObject: {fileID: 0}
     meshAsset: {fileID: 0}
+  m_TerrainBindings: []
   m_MaterialBindings: []
   m_SplineBindings: []
   m_LastMaterialNames: []

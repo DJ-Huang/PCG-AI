@@ -1,0 +1,901 @@
+{
+  "url": "https://www.artstation.com/artwork/kQ3wgn",
+  "finalUrl": "https://www.artstation.com/artwork/kQ3wgn",
+  "title": "Labs Lot Subdivision, SideFX Labs",
+  "description": "This tool divides polygons into panels by iteratively subdividing polygons into smaller 'lots', with control over minimum size, number of iterations, and irregularity. \n———\nFor more information on SideFXLabs and how to get the tool visit: https://www.sidefx.com/products/sidefx-labs/\nHIP File: https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip",
+  "capturedAt": "2026-07-20T01:48:31.420Z",
+  "navigationError": null,
+  "files": {
+    "contentMd": "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/content.md",
+    "contentTxt": "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/content.txt",
+    "pageHtml": "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/page.html",
+    "screenshots": {
+      "viewport": "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/viewport.png",
+      "fullpage": "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/fullpage.png"
+    }
+  },
+  "meta": {
+    "og:type": "website",
+    "og:site_name": "ArtStation",
+    "fb:app_id": "389793728099810",
+    "twitter:site_name": "ArtStation",
+    "twitter:site": "@artstationhq",
+    "twitter:card": "summary_large_image",
+    "description": "This tool divides polygons into panels by iteratively subdividing polygons into smaller 'lots', with control over minimum size, number of iterations, and irregularity. \n———\nFor more information on SideFXLabs and how to get the tool visit: https://www.sidefx.com/products/sidefx-labs/\nHIP File: https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip",
+    "og:url": "https://www.artstation.com/artwork/kQ3wgn",
+    "og:title": "Labs Lot Subdivision, SideFX Labs",
+    "og:image": "https://cdna.artstation.com/p/assets/covers/images/069/830/452/large/sidefx-labs-sidefx-labs-artstation-thumbnail.jpg?1701116705",
+    "og:image:width": "1920",
+    "og:description": "This tool divides polygons into panels by iteratively subdividing polygons into smaller 'lots', with control over minimum size, number of iterations, and irregularity. \n———\nFor more information on SideFXLabs and how to get the tool visit: https://www.sidefx.com/products/sidefx-labs/\nHIP File: https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip",
+    "twitter:title": "Labs Lot Subdivision, SideFX Labs",
+    "twitter:description": "This tool divides polygons into panels by iteratively subdividing polygons into smaller 'lots', with control over minimum size, number of iterations, and irregularity. \n———\nFor more information on SideFXLabs and how to get the tool visit: https://www.sidefx.com/products/sidefx-labs/\nHIP File: https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip",
+    "twitter:image": "https://cdna.artstation.com/p/assets/covers/images/069/830/452/large/sidefx-labs-sidefx-labs-artstation-thumbnail.jpg?1701116705",
+    "image": "https://cdna.artstation.com/p/assets/covers/images/069/830/452/large/sidefx-labs-sidefx-labs-artstation-thumbnail.jpg?1701116705",
+    "og_twitter_card": "summary_large_image",
+    "twitter:label1": "Project",
+    "twitter:data1": "Labs Lot Subdivision",
+    "twitter:label2": "Author",
+    "twitter:data2": "SideFX Labs",
+    "robots": "NoAI, index",
+    "viewport": "width=device-width, initial-scale=1.0",
+    "theme-color": "#000000",
+    "msapplication-navbutton-color": "#000000",
+    "apple-mobile-web-app-status-bar-style": "#000000",
+    "public-csrf-token": "l0BMupmIzmNVSdMsaWPioiLmzrhgvG2NSu7LhjDlBeEAs+wejqZTt/Q/NRsXM3aMBt3xeKRvLKqeDddCwYB2lg=="
+  },
+  "jsonLd": [
+    {
+      "@context": "http://schema.org/",
+      "@type": "CreativeWork",
+      "author": "SideFX Labs",
+      "commentCount": 4,
+      "datePublished": "2023-11-17T17:18:00.044-06:00",
+      "discussionUrl": "https://www.artstation.com/artwork/kQ3wgn#comments",
+      "headline": "Labs Lot Subdivision",
+      "name": "Labs Lot Subdivision",
+      "keywords": "Unreal Engine, city, environment, tech art, tools, houdini, procedural, games, real-time, labs, gamedev, sidefx, modeling",
+      "description": "This tool divides polygons into panels by iteratively subdividing polygons into smaller 'lots', with control over minimum size, number of iterations, and irregularity. ——— For more information on SideFXLabs and how to get the tool visit: https://www.sidefx.com/products/sidefx-labs/ HIP File: https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip",
+      "url": "https://www.artstation.com/artwork/kQ3wgn"
+    },
+    {
+      "@context": "http://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "SideFX Labs",
+          "item": "https://www.artstation.com/sidefxlabs"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Labs Lot Subdivision",
+          "item": "https://www.artstation.com/artwork/kQ3wgn"
+        }
+      ]
+    }
+  ],
+  "textLength": 941,
+  "linkCount": 140,
+  "imageRefs": [
+    {
+      "src": "https://cdn.artstation.com/assets/logo-monochrome.svg",
+      "alt": "ArtStation",
+      "width": 148,
+      "height": 150
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/logo-epic-games.svg",
+      "alt": "Epic Games, Inc.",
+      "width": 129,
+      "height": 150
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/logo-monochrome.svg",
+      "alt": "ArtStation",
+      "width": 148,
+      "height": 150
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/logo-epic-games.svg",
+      "alt": "Epic Games, Inc.",
+      "width": 129,
+      "height": 150
+    },
+    {
+      "src": "https://cdna.artstation.com/p/users/avatars/002/963/268/medium/1e7895b8a7cef4493c9148ad7cc90903.jpg?1766413897",
+      "alt": "SideFX Labs",
+      "width": 72,
+      "height": 72
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/images/images/069/494/394/large/sidefx-labs-aerial-day.jpg?1700262330",
+      "alt": "Labs Lot Subdivision",
+      "width": null,
+      "height": null
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/images/images/069/494/471/large/sidefx-labs-aerial-night.jpg?1700262504",
+      "alt": "Labs Lot Subdivision",
+      "width": null,
+      "height": null
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/images/images/069/494/474/large/sidefx-labs-street-day.jpg?1700262510",
+      "alt": "Labs Lot Subdivision",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/images/images/069/494/476/large/sidefx-labs-cobble-night.jpg?1700262514",
+      "alt": "Labs Lot Subdivision",
+      "width": null,
+      "height": null
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/images/images/069/494/477/large/sidefx-labs-shop-day.jpg?1700262518",
+      "alt": "Labs Lot Subdivision",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/images/images/069/494/480/large/sidefx-labs-park-night.jpg?1700262523",
+      "alt": "Labs Lot Subdivision",
+      "width": null,
+      "height": null
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/images/images/069/494/482/large/sidefx-labs-pigeons-day.jpg?1700262527",
+      "alt": "Labs Lot Subdivision",
+      "width": null,
+      "height": null
+    },
+    {
+      "src": "https://cdna.artstation.com/p/users/avatars/002/963/268/medium/1e7895b8a7cef4493c9148ad7cc90903.jpg?1766413897",
+      "alt": "SideFX Labs",
+      "width": 72,
+      "height": 72
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/reactions/like.svg",
+      "alt": "Like",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/reactions/liked.svg",
+      "alt": "Like",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/reactions/amazing.svg",
+      "alt": "Amazing",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/reactions/magical.svg",
+      "alt": "Magical",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/reactions/brilliant.svg",
+      "alt": "Brilliant",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "src": "https://cdn.artstation.com/assets/reactions/creative.svg",
+      "alt": "Creative",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "src": "https://d1fpct1lcptzk.cloudfront.net/ap/assets/000/000/378/c373aea22cf41c67a1aaf49086ce7fa5.png",
+      "alt": "Learn Pro Workflows and Prepare for a Creative Career",
+      "width": 320,
+      "height": 180
+    },
+    {
+      "src": "https://www.artstation.com/ap/i.png?b=2BK&h=66d7aa1f5bc5607b8d3e998c78fa87ecdb9d1400b2b925091e4a729e74a1bf0b&t=1784515680",
+      "alt": "",
+      "width": null,
+      "height": null
+    },
+    {
+      "src": "https://cdna.artstation.com/p/softwares/icons/000/000/018/default/Houdini.png?1424684347",
+      "alt": "Houdini",
+      "width": 60,
+      "height": 60
+    },
+    {
+      "src": "https://cdna.artstation.com/p/softwares/icons/000/000/044/default/UE-Icon-2023-White.png?1742929206",
+      "alt": "Unreal Engine",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "src": "https://cdna.artstation.com/p/users/avatars/000/914/458/medium/64bd0313aef0e40e76d7391d85b5ab78.jpg?1617815014",
+      "alt": "Jan Trubač",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "src": "https://cdn.artstation.com/mailer/emoji/smiling_face.png",
+      "alt": "smiling_face",
+      "width": 16,
+      "height": null
+    },
+    {
+      "src": "https://cdna.artstation.com/p/users/avatars/003/636/830/medium/ffee8a1a645ed171f3f563713a70aff9.jpg?1636621824",
+      "alt": "AbductedbyPixel",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/users/avatars/002/673/319/medium/47137dab6a08f0ab33ee097f7cad7333.jpg?1708866195",
+      "alt": "Raghavendra Holla",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/covers/images/048/922/201/smaller_square/sidefx-labs-sidefx-labs-trim-thumbnail03.jpg?1651249573",
+      "alt": "Labs Trim Texture Tools",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/covers/images/041/929/401/smaller_square/sidefx-labs-sidefx-labs-sticker-placer-00.jpg?1633090776",
+      "alt": "Labs Sticker Placer",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/covers/images/040/537/597/smaller_square/sidefx-labs-sidefx-labs-samplescreencolor-00.jpg?1629158963",
+      "alt": "Labs Sample Screen Colors",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/covers/images/039/421/874/smaller_square/sidefx-labs-sidefx-labs-artstation-thumbnail-alicevision-tools.jpg?1625847322",
+      "alt": "AliceVision Photogrammetry Plugin",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/covers/images/040/360/020/smaller_square/sidefx-labs-sidefx-labs-artstation-thumbnail-vat3-0.jpg?1628619846",
+      "alt": "Labs Vertex Animation Textures 3.0 - Part 1",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/covers/images/048/447/749/smaller_square/sidefx-labs-sidefx-labs-triplanar-thumbnail2.jpg?1650047634",
+      "alt": "Labs Triplanar Displace",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdnb.artstation.com/p/assets/covers/images/042/597/085/smaller_square/sidefx-labs-sidefx-labs-artstation-thumbnail-calculate-occlusion.jpg?1634926020",
+      "alt": "Labs Calculate Occlusion",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/covers/images/074/242/840/smaller_square/sidefx-labs-sidefx-labs-artstation-post-thumbnail.jpg?1711569620",
+      "alt": "Labs Vertex Animation Textures 3.0:  PDG Example",
+      "width": 102,
+      "height": 102
+    },
+    {
+      "src": "https://cdna.artstation.com/p/assets/covers/images/075/277/140/smaller_square/sidefx-labs-sidefx-labs-snb-thumbnail.jpg?1714146854",
+      "alt": "Labs Snow Buildup 2.0",
+      "width": 102,
+      "height": 102
+    }
+  ],
+  "links": [
+    {
+      "href": "https://www.artstation.com/",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/",
+      "text": "Gallery"
+    },
+    {
+      "href": "https://www.artstation.com/blogs",
+      "text": "Blogs"
+    },
+    {
+      "href": "https://magazine.artstation.com/",
+      "text": "Magazine"
+    },
+    {
+      "href": "https://www.artstation.com/learning",
+      "text": "Learning"
+    },
+    {
+      "href": "https://www.artstation.com/challenges",
+      "text": "Challenges"
+    },
+    {
+      "href": "https://www.artstation.com/schools",
+      "text": "Schools and Training Centers"
+    },
+    {
+      "href": "https://www.artstation.com/marketplace/game-dev",
+      "text": "MarketplaceSale"
+    },
+    {
+      "href": "https://www.artstation.com/prints",
+      "text": "PrintsSale"
+    },
+    {
+      "href": "https://www.artstation.com/jobs/all",
+      "text": "Job Listings"
+    },
+    {
+      "href": "https://www.artstation.com/jobs/studios",
+      "text": "Hiring Studios"
+    },
+    {
+      "href": "https://www.artstation.com/users/sign_in",
+      "text": "Saved Jobs"
+    },
+    {
+      "href": "https://www.artstation.com/users/sign_in",
+      "text": "Job Preferences"
+    },
+    {
+      "href": "https://www.artstation.com/jobs/job_resources",
+      "text": "Job Resources"
+    },
+    {
+      "href": "https://www.artstation.com/hire",
+      "text": "Post a Job"
+    },
+    {
+      "href": "https://www.artstation.com/search/artists",
+      "text": "Find an Artist"
+    },
+    {
+      "href": "https://www.artstation.com/studios",
+      "text": "Find a Studio"
+    },
+    {
+      "href": "https://www.artstation.com/search",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/marketplace/cart",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/registration/signup",
+      "text": "Sign up"
+    },
+    {
+      "href": "https://www.artstation.com/users/sign_in",
+      "text": "Sign In"
+    },
+    {
+      "href": "https://www.artstation.com/about",
+      "text": "About ArtStation"
+    },
+    {
+      "href": "https://www.artstation.com/about/company",
+      "text": "About Company"
+    },
+    {
+      "href": "https://help.artstation.com/",
+      "text": "Help"
+    },
+    {
+      "href": "https://mt.artstation.com/subscription/q8BISXhn",
+      "text": "Newsletter"
+    },
+    {
+      "href": "https://www.facebook.com/artstationhq",
+      "text": "Facebook"
+    },
+    {
+      "href": "https://www.instagram.com/artstationhq",
+      "text": "Instagram"
+    },
+    {
+      "href": "https://twitter.com/ArtStationHQ",
+      "text": "Twitter"
+    },
+    {
+      "href": "https://www.artstation.com/tos",
+      "text": "Terms of Service"
+    },
+    {
+      "href": "https://www.artstation.com/privacy",
+      "text": "Privacy Policy"
+    },
+    {
+      "href": "https://www.epicgames.com/site/de/impressum?lang=de",
+      "text": "infoImpressum"
+    },
+    {
+      "href": "https://www.artstation.com/marketplace/cart",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/registration/signup",
+      "text": "Sign up"
+    },
+    {
+      "href": "https://www.artstation.com/",
+      "text": "Gallery"
+    },
+    {
+      "href": "https://www.artstation.com/blogs",
+      "text": "Blogs"
+    },
+    {
+      "href": "https://magazine.artstation.com/",
+      "text": "Magazine"
+    },
+    {
+      "href": "https://www.artstation.com/learning",
+      "text": "Learning"
+    },
+    {
+      "href": "https://www.artstation.com/challenges",
+      "text": "Challenges"
+    },
+    {
+      "href": "https://www.artstation.com/schools",
+      "text": "Schools and Training Centers"
+    },
+    {
+      "href": "https://www.artstation.com/marketplace/game-dev",
+      "text": "MarketplaceSale"
+    },
+    {
+      "href": "https://www.artstation.com/prints",
+      "text": "PrintsSale"
+    },
+    {
+      "href": "https://www.artstation.com/jobs/all",
+      "text": "Job Listings"
+    },
+    {
+      "href": "https://www.artstation.com/jobs/studios",
+      "text": "Hiring Studios"
+    },
+    {
+      "href": "https://www.artstation.com/users/sign_in",
+      "text": "Saved Jobs"
+    },
+    {
+      "href": "https://www.artstation.com/users/sign_in",
+      "text": "Job Preferences"
+    },
+    {
+      "href": "https://www.artstation.com/jobs/job_resources",
+      "text": "Job Resources"
+    },
+    {
+      "href": "https://www.artstation.com/hire",
+      "text": "Post a Job"
+    },
+    {
+      "href": "https://www.artstation.com/search/artists",
+      "text": "Find an Artist"
+    },
+    {
+      "href": "https://www.artstation.com/studios",
+      "text": "Find a Studio"
+    },
+    {
+      "href": "https://www.artstation.com/about",
+      "text": "About ArtStation"
+    },
+    {
+      "href": "https://www.artstation.com/about/company",
+      "text": "About Company"
+    },
+    {
+      "href": "https://help.artstation.com/",
+      "text": "Help"
+    },
+    {
+      "href": "https://mt.artstation.com/subscription/q8BISXhn",
+      "text": "Newsletter"
+    },
+    {
+      "href": "https://www.facebook.com/artstationhq",
+      "text": "Facebook"
+    },
+    {
+      "href": "https://www.instagram.com/artstationhq",
+      "text": "Instagram"
+    },
+    {
+      "href": "https://twitter.com/ArtStationHQ",
+      "text": "Twitter"
+    },
+    {
+      "href": "https://www.artstation.com/tos",
+      "text": "Terms of Service"
+    },
+    {
+      "href": "https://www.artstation.com/privacy",
+      "text": "Privacy Policy"
+    },
+    {
+      "href": "https://www.epicgames.com/site/de/impressum?lang=de",
+      "text": "infoImpressum"
+    },
+    {
+      "href": "https://www.artstation.com/api/v2/epic_auth/account/start",
+      "text": "Sign Up with Epic Games"
+    },
+    {
+      "href": "https://www.artstation.com/#signin",
+      "text": "Sign In here"
+    },
+    {
+      "href": "https://www.artstation.com/api/v2/epic_auth/session/start",
+      "text": "Sign In with Epic Games"
+    },
+    {
+      "href": "https://www.artstation.com/registration/account/password/new",
+      "text": "Forgot password?"
+    },
+    {
+      "href": "https://www.artstation.com/#signup",
+      "text": "Sign Up here"
+    },
+    {
+      "href": "https://cdn2.unrealengine.com/artstation-terms-of-service-eu-65335878bd2c.pdf",
+      "text": "Read New Terms"
+    },
+    {
+      "href": "https://www.artstation.com/sidefxlabs",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/sidefxlabs",
+      "text": "SideFX Labs"
+    },
+    {
+      "href": "https://www.artstation.com/subscribe",
+      "text": "Studio"
+    },
+    {
+      "href": "https://www.artstation.com/artwork/NyR86D",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/g08vZG",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/NyR86D",
+      "text": "Previous"
+    },
+    {
+      "href": "https://www.artstation.com/artwork/g08vZG",
+      "text": "Next"
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/394/large/sidefx-labs-aerial-day.jpg?1700262330&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/394/large/sidefx-labs-aerial-day.jpg?1700262330",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://cdnb.artstation.com/p/assets/images/images/069/494/471/large/sidefx-labs-aerial-night.jpg?1700262504&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdnb.artstation.com/p/assets/images/images/069/494/471/large/sidefx-labs-aerial-night.jpg?1700262504",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/474/large/sidefx-labs-street-day.jpg?1700262510&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/474/large/sidefx-labs-street-day.jpg?1700262510",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/476/large/sidefx-labs-cobble-night.jpg?1700262514&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/476/large/sidefx-labs-cobble-night.jpg?1700262514",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://cdnb.artstation.com/p/assets/images/images/069/494/477/large/sidefx-labs-shop-day.jpg?1700262518&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdnb.artstation.com/p/assets/images/images/069/494/477/large/sidefx-labs-shop-day.jpg?1700262518",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/480/large/sidefx-labs-park-night.jpg?1700262523&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/480/large/sidefx-labs-park-night.jpg?1700262523",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/482/large/sidefx-labs-pigeons-day.jpg?1700262527&dl=1",
+      "text": ""
+    },
+    {
+      "href": "https://cdna.artstation.com/p/assets/images/images/069/494/482/large/sidefx-labs-pigeons-day.jpg?1700262527",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/subscribe?utm_campaign=4k&utm_source=internal&utm_content=view_project",
+      "text": "4K8K Pro members can display assets in 4K and 8K.Subscribe here"
+    },
+    {
+      "href": "https://www.artstation.com/sidefxlabs",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/sidefxlabs",
+      "text": "SideFX Labs"
+    },
+    {
+      "href": "https://www.artstation.com/subscribe",
+      "text": "Studio"
+    },
+    {
+      "href": "https://www.artstation.com/ap/c?b=2BK&h=26736f8f3850e0ce498c1dfdaca46893b8963cd79cd65d1916c46608ffc1f3bb&t=1784515680",
+      "text": "Ad Learn Pro Workflows and Prepare for a Creative Career Discounted School Licenses available"
+    },
+    {
+      "href": "https://www.sidefx.com/products/sidefx-labs/",
+      "text": "https://www.sidefx.com/products/sidefx-labs/"
+    },
+    {
+      "href": "https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip",
+      "text": "https://github.com/sideeffects/SideFXLabsExamples/tree/main/artstation/lot_subdivision/lot_subdivision.zip"
+    },
+    {
+      "href": "https://www.artstation.com/ch/houdini",
+      "text": "Houdini"
+    },
+    {
+      "href": "https://www.artstation.com/ch/unreal-engine",
+      "text": "Unreal Engine"
+    },
+    {
+      "href": "https://www.artstation.com/jantru",
+      "text": ""
+    },
+    {
+      "href": "https://safety.epicgames.com/en-US/policies/reporting-misconduct/submit-report?product_id=artstation_content_report&content_id=7525389&content_type=project_comment",
+      "text": "Report abuse"
+    },
+    {
+      "href": "https://www.artstation.com/jantru",
+      "text": "Jan Trubač"
+    },
+    {
+      "href": "https://www.artstation.com/abductedbypixel",
+      "text": ""
+    },
+    {
+      "href": "https://safety.epicgames.com/en-US/policies/reporting-misconduct/submit-report?product_id=artstation_content_report&content_id=7525319&content_type=project_comment",
+      "text": "Report abuse"
+    },
+    {
+      "href": "https://www.artstation.com/abductedbypixel",
+      "text": "AbductedbyPixel"
+    },
+    {
+      "href": "https://www.artstation.com/raghuholla",
+      "text": ""
+    },
+    {
+      "href": "https://safety.epicgames.com/en-US/policies/reporting-misconduct/submit-report?product_id=artstation_content_report&content_id=7969147&content_type=project_comment",
+      "text": "Report abuse"
+    },
+    {
+      "href": "https://www.artstation.com/raghuholla",
+      "text": "Raghavendra Holla"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=Digital%203D",
+      "text": "#Digital 3D"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=Real-time",
+      "text": "#Real-time"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=Game%20Art",
+      "text": "#Game Art"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=Games%20and%20Real-Time%203D%20Environment%20Art",
+      "text": "#Games and Real-Time 3D Environment Art"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=Technical%20Art",
+      "text": "#Technical Art"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=Unreal%20Engine",
+      "text": "#Unreal Engine"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=city",
+      "text": "#city"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=environment",
+      "text": "#environment"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=tech%20art",
+      "text": "#tech art"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=tools",
+      "text": "#tools"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=houdini",
+      "text": "#houdini"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=procedural",
+      "text": "#procedural"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=games",
+      "text": "#games"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=real-time",
+      "text": "#real-time"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=labs",
+      "text": "#labs"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=gamedev",
+      "text": "#gamedev"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=sidefx",
+      "text": "#sidefx"
+    },
+    {
+      "href": "https://www.artstation.com/search?query=modeling",
+      "text": "#modeling"
+    },
+    {
+      "href": "https://www.artstation.com/sidefxlabs",
+      "text": "SideFX Labs"
+    },
+    {
+      "href": "https://www.artstation.com/artwork/qQP4ZR",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/KrnZxX",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/3dJN3Y",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/VgnRzg",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/zOyke6",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/Vy3X9X",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/Nx9k9D",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/1xq9k8",
+      "text": ""
+    },
+    {
+      "href": "https://www.artstation.com/artwork/LR13BA",
+      "text": ""
+    },
+    {
+      "href": "https://safety.epicgames.com/en-US/policies/reporting-misconduct/submit-report?product_id=artstation_content_report&content_id=17050235&content_type=project",
+      "text": "Report"
+    }
+  ],
+  "videos": [
+    "https://www.artstation.com/api/v2/animation/video_clips/d20d4eb0-7cc0-489a-b8af-384eb6540632/embed.html?s=a3a40995a1fa33c999bc8175a725ddeee0b964fe5f246c241fb8475709fae4dc&t=1784515679",
+    "https://www.artstation.com/api/v2/animation/video_clips/02447c49-fcdb-4be3-89ff-0bb7ddcd4959/embed.html?s=6dd58fdee095f0c378cb4035ad80a0b0c5c4974c7a49004b0fc58ed29e041e32&t=1784515679",
+    "https://js.stripe.com/v3/m-outer-3437aaddcdf6922d623e172c2d6f9278.html#url=https%3A%2F%2Fwww.artstation.com%2Fartwork%2FkQ3wgn&title=ArtStation%20-%20Labs%20Lot%20Subdivision&referrer=https%3A%2F%2Fwww.artstation.com%2Fartwork%2FkQ3wgn&muid=NA&sid=NA&version=6&preview=false&__shared_params__[version]=v3"
+  ],
+  "images": [
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/02.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/03.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/04.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/05.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/06.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/07.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/08.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/09.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/10.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/11.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/12.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/13.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/14.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/15.jpg",
+    "/Users/djhuang/PCG-AI-cursor/url-content-out/artstation-kQ3wgn/images/16.jpg"
+  ],
+  "assetUrls": [
+    "https://cdna.artstation.com/p/assets/images/images/069/494/474/large/sidefx-labs-street-day.jpg?1700262510",
+    "https://cdnb.artstation.com/p/assets/images/images/069/494/477/large/sidefx-labs-shop-day.jpg?1700262518",
+    "https://cdna.artstation.com/p/assets/images/images/069/494/394/large/sidefx-labs-aerial-day.jpg?1700262330",
+    "https://cdnb.artstation.com/p/assets/images/images/069/494/471/large/sidefx-labs-aerial-night.jpg?1700262504",
+    "https://cdna.artstation.com/p/assets/images/images/069/494/476/large/sidefx-labs-cobble-night.jpg?1700262514",
+    "https://cdna.artstation.com/p/assets/images/images/069/494/480/large/sidefx-labs-park-night.jpg?1700262523",
+    "https://cdna.artstation.com/p/assets/images/images/069/494/482/large/sidefx-labs-pigeons-day.jpg?1700262527",
+    "https://cdnb.artstation.com/p/assets/covers/images/048/922/201/large/sidefx-labs-sidefx-labs-trim-thumbnail03.jpg?1651249573",
+    "https://cdnb.artstation.com/p/assets/covers/images/041/929/401/large/sidefx-labs-sidefx-labs-sticker-placer-00.jpg?1633090776",
+    "https://cdnb.artstation.com/p/assets/covers/images/040/537/597/large/sidefx-labs-sidefx-labs-samplescreencolor-00.jpg?1629158963",
+    "https://cdna.artstation.com/p/assets/covers/images/039/421/874/large/sidefx-labs-sidefx-labs-artstation-thumbnail-alicevision-tools.jpg?1625847322",
+    "https://cdna.artstation.com/p/assets/covers/images/040/360/020/large/sidefx-labs-sidefx-labs-artstation-thumbnail-vat3-0.jpg?1628619846",
+    "https://cdnb.artstation.com/p/assets/covers/images/048/447/749/large/sidefx-labs-sidefx-labs-triplanar-thumbnail2.jpg?1650047634",
+    "https://cdnb.artstation.com/p/assets/covers/images/042/597/085/large/sidefx-labs-sidefx-labs-artstation-thumbnail-calculate-occlusion.jpg?1634926020",
+    "https://cdna.artstation.com/p/assets/covers/images/074/242/840/large/sidefx-labs-sidefx-labs-artstation-post-thumbnail.jpg?1711569620",
+    "https://cdna.artstation.com/p/assets/covers/images/075/277/140/large/sidefx-labs-sidefx-labs-snb-thumbnail.jpg?1714146854"
+  ]
+}

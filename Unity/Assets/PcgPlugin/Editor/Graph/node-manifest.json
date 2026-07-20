@@ -1732,17 +1732,41 @@
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputGroups": [
-        { "name": "extrude_top", "domain": "face", "label": "Extruded top", "dynamic": true },
-        { "name": "extrude_side", "domain": "face", "label": "Extruded sides", "dynamic": true },
-        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+        { "name": "topGroup", "domain": "face", "label": "Extruded top (Output)", "dynamic": true },
+        { "name": "sideGroup", "domain": "face", "label": "Extruded sides (Output)", "dynamic": true },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges (Output)" }
       ],
       "properties": {
-        "faceGroup": { "type": "groupSelect", "groupDomain": "face", "default": "" },
+        "faceGroup": { "type": "groupSelect", "groupDomain": "face", "default": "", "displayName": "Face Group (Input)" },
         "distance": { "type": "number", "default": 0.02 },
         "inset": { "type": "number", "default": 0.0 },
         "keepOriginal": { "type": "boolean", "default": false },
-        "topGroup": { "type": "string", "default": "extrude_top", "isGroupOutput": true, "groupDomain": "face" },
-        "sideGroup": { "type": "string", "default": "extrude_side", "isGroupOutput": true, "groupDomain": "face" }
+        "topGroup": { "type": "string", "default": "extrude_top", "displayName": "Top Group (Output)", "isGroupOutput": true, "groupDomain": "face" },
+        "sideGroup": { "type": "string", "default": "extrude_side", "displayName": "Side Group (Output)", "isGroupOutput": true, "groupDomain": "face" }
+      }
+    },
+    {
+      "type": "LotSubdivision",
+      "displayName": "Lot Subdivision",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Lots", "pinType": "SpatialMesh" }],
+      "outputGroups": [
+        { "name": "lots", "domain": "face", "label": "Lot faces (Output)" }
+      ],
+      "properties": {
+        "minSize": { "type": "number", "default": 1.0, "minimum": 0 },
+        "iterations": { "type": "integer", "default": 3, "minimum": 0, "maximum": 16 },
+        "irregularity": { "type": "number", "default": 0.5, "minimum": 0, "maximum": 1 },
+        "seed": { "type": "integer", "default": 0 },
+        "alignment": {
+          "type": "enum",
+          "default": "longestEdge",
+          "options": [
+            { "value": "longestEdge", "label": "Longest Edge" },
+            { "value": "boundingBox", "label": "Bounding Box" }
+          ]
+        }
       }
     },
     {
@@ -1872,10 +1896,10 @@
       "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
       "outputGroups": [
-        { "name": "shell_outer", "domain": "face", "label": "Outer shell", "dynamic": true },
-        { "name": "shell_inner", "domain": "face", "label": "Inner shell", "dynamic": true },
-        { "name": "shell_rim", "domain": "face", "label": "Boundary walls", "dynamic": true },
-        { "name": "unshared", "domain": "edge", "label": "Boundary edges" }
+        { "name": "outerGroup", "domain": "face", "label": "Outer shell (Output)", "dynamic": true },
+        { "name": "innerGroup", "domain": "face", "label": "Inner shell (Output)", "dynamic": true },
+        { "name": "rimGroup", "domain": "face", "label": "Boundary walls (Output)", "dynamic": true },
+        { "name": "unshared", "domain": "edge", "label": "Boundary edges (Output)" }
       ],
       "properties": {
         "thickness": { "type": "number", "default": 0.02, "minimum": 0.0001 },
@@ -1888,9 +1912,9 @@
           ]
         },
         "closeBoundaries": { "type": "boolean", "default": true },
-        "outerGroup": { "type": "string", "default": "shell_outer", "isGroupOutput": true, "groupDomain": "face" },
-        "innerGroup": { "type": "string", "default": "shell_inner", "isGroupOutput": true, "groupDomain": "face" },
-        "rimGroup": { "type": "string", "default": "shell_rim", "isGroupOutput": true, "groupDomain": "face" }
+        "outerGroup": { "type": "string", "default": "shell_outer", "displayName": "Outer Group (Output)", "isGroupOutput": true, "groupDomain": "face" },
+        "innerGroup": { "type": "string", "default": "shell_inner", "displayName": "Inner Group (Output)", "isGroupOutput": true, "groupDomain": "face" },
+        "rimGroup": { "type": "string", "default": "shell_rim", "displayName": "Rim Group (Output)", "isGroupOutput": true, "groupDomain": "face" }
       }
     },
     {

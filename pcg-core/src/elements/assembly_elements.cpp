@@ -3,8 +3,10 @@
 #include "asset_path.hpp"
 #include "elements/assembly_algorithms.hpp"
 #include "elements/element_utils.hpp"
+#include "elements/lot_subdivision_algorithms.hpp"
 #include "mesh_runtime.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace pcg::internal::elements {
@@ -123,6 +125,41 @@ public:
     }
 };
 
+class LotSubdivisionElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "LotSubdivision"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision missing node");
+
+        const auto input =
+            get_geometry_input(ctx, "in", "LotSubdivision missing mesh input");
+        if (input.faces().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision input has no faces");
+
+        LotSubdivisionOptions options;
+        options.min_size = ctx.node->data.value("minSize", 1.0);
+        options.iterations = ctx.node->data.value("iterations", 3);
+        options.irregularity = ctx.node->data.value("irregularity", 0.5);
+        options.seed = ctx.node->data.value("seed", 0);
+        options.alignment = ctx.node->data.value("alignment", "longestEdge");
+        options.seed ^= static_cast<int>(ctx.graph_seed);
+
+        if (!std::isfinite(options.min_size) || options.min_size < 0.0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision minSize must be >= 0");
+        if (options.iterations < 0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision iterations must be >= 0");
+        options.irregularity = std::clamp(options.irregularity, 0.0, 1.0);
+        if (options.alignment != "longestEdge" && options.alignment != "boundingBox")
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision alignment is invalid");
+
+        emit_geometry(ctx, lot_subdivide_geometry(input, options));
+        return PCG_OK;
+    }
+};
+
 class BendMeshElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "BendMesh"; }
@@ -162,6 +199,7 @@ void register_assembly_elements(
     map.emplace("ImportMesh", std::make_unique<ImportMeshElement>());
     map.emplace("MatchSize", std::make_unique<MatchSizeElement>());
     map.emplace("BendMesh", std::make_unique<BendMeshElement>());
+    map.emplace("LotSubdivision", std::make_unique<LotSubdivisionElement>());
 }
 
 } // namespace pcg::internal::elements

@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **89 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **90 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -89,6 +89,7 @@
   - [MirrorMesh](#mirrormesh)
   - [FuseMesh](#fusemesh)
   - [PolyExtrude](#polyextrude)
+  - [LotSubdivision](#lotsubdivision)
   - [CopyMesh](#copymesh)
   - [ShellMesh](#shellmesh)
   - [ImportMesh](#importmesh)
@@ -2326,6 +2327,40 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 生成元素从来源 face/corner/point 继承 attributes、UV 和材质；Position role 属性跟随新 point 位移。输出同时维护动态 top/side groups 与 `unshared`。
 
+### LotSubdivision
+
+**类别**：Mesh
+
+**功能**：对齐 SideFX Labs Lot Subdivision——迭代将 polygon 面切成更小的 lot 面，控制最小尺寸、迭代次数与不规则度。输出保留 n-gon 拓扑（`emit_geometry`），并带 primitive `lotid` 与 face group `lots`，可直接接 `PolyExtrude` / 散布链路。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `minSize` | `1.0` | 面平面 AABB **短边**低于此值不再切分（扁平 Box 侧面不会被误切） |
+| `iterations` | `3` | 切分轮数；矩形上约得到 `2^iterations` 个 lot（受 `minSize` 截断） |
+| `irregularity` | `0.5` | `0` 为中点切分，越大切点越偏，lot 尺寸越不均匀 |
+| `seed` | `0` | 随机种子（与 `graph_seed` 异或） |
+| `alignment` | `longestEdge` | `longestEdge` 沿最长边垂直切开；`boundingBox` 按世界平面 AABB 长轴切开 |
+
+**输入 Pin**：`in: SpatialMesh`（polygon faces）  
+**输出 Pin**：`out: SpatialMesh`（lot faces）  
+**输出组**：`lots`（face，全部 lot）
+
+```json
+{
+  "id": "lots",
+  "type": "LotSubdivision",
+  "data": {
+    "minSize": 2.0,
+    "iterations": 3,
+    "irregularity": 0.35,
+    "seed": 1,
+    "alignment": "boundingBox"
+  }
+}
+```
+
+> 典型连接：`平面 polygon → LotSubdivision → PolyExtrude → Output`（地块挤出）；或 `LotSubdivision →` 面中心点/`CopyMeshToPoints` 散布建筑。示例：`examples/lot-extrude-demo.pcg`、`examples/lot-city-demo.pcg`。
+
 ### CopyMesh
 
 **类别**：Mesh
@@ -3239,6 +3274,8 @@ CopyAttributes(tag, values=tree/rock)
 | `spiral-staircase.pcg` | 螺旋楼梯（InstanceAlongSpline + Sweep） |
 | `stone-arch-bridge.pcg` | 石拱桥（BooleanMesh + BevelMesh） |
 | `village-demo.pcg` | 村落场景（点生成 + 地形 + 实例放置） |
+| `lot-extrude-demo.pcg` | Labs Lot Subdivision：平面 → 切 lot → PolyExtrude |
+| `lot-city-demo.pcg` | Lot 城市场景：地块挤出 + 建筑散布 + 道路 Sweep（分件 Bevel 再 Merge） |
 
 ### Test
 

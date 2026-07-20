@@ -187,13 +187,12 @@ namespace DJTechEditor.PCG.Graph
                     }
                 }
 
-                if (node is PcgManifestNodeView groupNode &&
-                    (groupNode.NodeType == "GroupCreate" || groupNode.NodeType == "GroupCombine"))
+                if (node is PcgManifestNodeView groupCapable && NodeSupportsGroupViewer(groupCapable))
                 {
                     if (ctx.IsComponentMode && ctx.Domain != SceneEditDomain.None &&
                         ctx.Domain != SceneEditDomain.SplineControlPoint)
                     {
-                        m_Body.Add(new Label($"Group viewer: {ctx.Domain} — select groups in Scene View overlay")
+                        m_Body.Add(new Label($"Group viewer: {ctx.Domain} — pick Output/Input groups in Scene View overlay")
                         {
                             style =
                             {
@@ -206,7 +205,7 @@ namespace DJTechEditor.PCG.Graph
                     }
                     else
                     {
-                        m_Body.Add(new Label("Enter PCG Mode, then use V/E/F toolbar buttons to view group elements")
+                        m_Body.Add(new Label("Enter PCG Mode, then use V/E/F to highlight Output/Input groups")
                         {
                             style =
                             {
@@ -217,19 +216,6 @@ namespace DJTechEditor.PCG.Graph
                             },
                         });
                     }
-                }
-                else
-                {
-                    m_Body.Add(new Label("Mesh Vertex/Edge/Face: disabled (authoring source not confirmed)")
-                    {
-                        style =
-                        {
-                            color = new Color(0.4f, 0.4f, 0.4f),
-                            fontSize = 9,
-                            marginBottom = 6,
-                            whiteSpace = WhiteSpace.Normal,
-                        },
-                    });
                 }
 
                 if (node is PcgManifestNodeView manifestNode)
@@ -249,7 +235,13 @@ namespace DJTechEditor.PCG.Graph
 
         private void ShowManifestProperties(PcgManifestNodeView node)
         {
-            if (!PcgNodeManifest.TryGet(node.NodeType, out var def) || def.properties.Count == 0)
+            if (!PcgNodeManifest.TryGet(node.NodeType, out var def))
+            {
+                m_Body.Add(new Label("(no parameters)") { style = { color = new Color(0.5f, 0.5f, 0.5f) } });
+                return;
+            }
+
+            if (def.properties.Count == 0 && def.outputGroups.Count == 0)
             {
                 m_Body.Add(new Label("(no parameters)") { style = { color = new Color(0.5f, 0.5f, 0.5f) } });
                 return;
@@ -258,51 +250,143 @@ namespace DJTechEditor.PCG.Graph
             if (def.inspectorSections != null && def.inspectorSections.Count > 0)
             {
                 ShowSectionedManifestProperties(node, def);
+                AddFixedOutputGroupsIfNeeded(node, def);
                 return;
             }
 
-            // Legacy path: Groups then Parameters; no layout metadata required.
-            var groupProps = new List<(string key, ManifestPropertyDef prop)>();
+            // Legacy path: Input Groups / Output Groups / Parameters.
+            var inputGroupProps = new List<(string key, ManifestPropertyDef prop)>();
+            var outputGroupProps = new List<(string key, ManifestPropertyDef prop)>();
             var regularProps = new List<(string key, ManifestPropertyDef prop)>();
             foreach (var (key, prop) in def.properties)
             {
-                if (prop.type == "groupSelect" || prop.type == "groupMultiSelect" || prop.isGroupOutput)
-                    groupProps.Add((key, prop));
+                if (prop.type is "groupSelect" or "groupMultiSelect")
+                    inputGroupProps.Add((key, prop));
+                else if (prop.isGroupOutput)
+                    outputGroupProps.Add((key, prop));
                 else
                     regularProps.Add((key, prop));
             }
 
-            if (groupProps.Count > 0)
+            if (inputGroupProps.Count > 0)
             {
-                AddSectionHeader("Groups");
-                foreach (var (key, prop) in groupProps)
+                AddSectionHeader("Input Groups");
+                foreach (var (key, prop) in inputGroupProps)
                     m_Body.Add(CreatePropertyRow(node, key, prop));
 
                 var available = ResolveUpstreamGroups(node.NodeId);
                 if (available.Count > 0)
                 {
-                    m_Body.Add(new Label($"{available.Count} group{(available.Count != 1 ? "s" : "")} available from upstream")
+                    m_Body.Add(new Label($"{available.Count} upstream group{(available.Count != 1 ? "s" : "")} selectable")
                     {
                         style = { color = new Color(0.4f, 0.66f, 0.4f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4 },
                     });
                 }
                 else
                 {
-                    var hasConsumers = groupProps.Any(p => p.prop.type is "groupSelect" or "groupMultiSelect");
-                    if (hasConsumers)
+                    m_Body.Add(new Label("No upstream groups yet — empty Input selects all faces/edges as documented by the node")
                     {
-                        m_Body.Add(new Label("No groups from upstream — connect a Group Create or Sweep node")
-                        {
-                            style = { color = new Color(0.6f, 0.5f, 0.3f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4, whiteSpace = WhiteSpace.Normal },
-                        });
-                    }
+                        style = { color = new Color(0.6f, 0.5f, 0.3f), fontSize = 10, unityFontStyleAndWeight = FontStyle.Italic, paddingBottom = 4, whiteSpace = WhiteSpace.Normal },
+                    });
                 }
             }
 
-            if (groupProps.Count > 0 && regularProps.Count > 0)
+            if (outputGroupProps.Count > 0 || HasFixedOutputGroups(def, outputGroupProps))
+            {
+                AddSectionHeader("Output Groups");
+                foreach (var (key, prop) in outputGroupProps)
+                    m_Body.Add(CreatePropertyRow(node, key, prop));
+                AddFixedOutputGroupRows(node, def, outputGroupProps);
+            }
+
+            if ((inputGroupProps.Count > 0 || outputGroupProps.Count > 0 || def.outputGroups.Count > 0)
+                && regularProps.Count > 0)
                 AddSectionHeader("Parameters");
             foreach (var (key, prop) in regularProps)
                 m_Body.Add(CreatePropertyRow(node, key, prop));
+        }
+
+        private bool NodeSupportsGroupViewer(PcgManifestNodeView node)
+        {
+            if (PcgNodeManifest.TryGet(node.NodeType, out var def))
+            {
+                if (def.outputGroups.Count > 0)
+                    return true;
+                foreach (var prop in def.properties.Values)
+                {
+                    if (prop.isGroupOutput || prop.type is "groupSelect" or "groupMultiSelect")
+                        return true;
+                }
+            }
+
+            return ResolveUpstreamGroups(node.NodeId).Count > 0;
+        }
+
+        private static bool HasFixedOutputGroups(
+            ManifestNodeDef def,
+            List<(string key, ManifestPropertyDef prop)> editableOutputs)
+        {
+            var editableKeys = new HashSet<string>(editableOutputs.Select(p => p.key));
+            foreach (var og in def.outputGroups)
+            {
+                if (og.dynamic && editableKeys.Contains(og.name))
+                    continue;
+                if (!og.dynamic)
+                    return true;
+                // Dynamic but no matching editable property — still declare fixed/legacy name.
+                if (!editableKeys.Contains(og.name))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void AddFixedOutputGroupsIfNeeded(PcgManifestNodeView node, ManifestNodeDef def)
+        {
+            var editable = def.properties
+                .Where(kv => kv.Value.isGroupOutput)
+                .Select(kv => (kv.Key, kv.Value))
+                .ToList();
+            if (!HasFixedOutputGroups(def, editable))
+                return;
+
+            AddSectionHeader("Output Groups");
+            AddFixedOutputGroupRows(node, def, editable);
+        }
+
+        private void AddFixedOutputGroupRows(
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            List<(string key, ManifestPropertyDef prop)> editableOutputs)
+        {
+            var editableKeys = new HashSet<string>(editableOutputs.Select(p => p.key));
+            var data = node.CollectData();
+            foreach (var declared in PcgGroupResolution.ResolveOutputGroups(def, data))
+            {
+                // Skip groups already covered by editable isGroupOutput property rows.
+                if (!string.IsNullOrEmpty(declared.propertyKey) && editableKeys.Contains(declared.propertyKey))
+                    continue;
+
+                var row = new VisualElement { style = { marginBottom = 4 } };
+                row.Add(new Label($"{declared.label}")
+                {
+                    style =
+                    {
+                        color = new Color(0.8f, 0.8f, 0.8f),
+                        unityFontStyleAndWeight = FontStyle.Bold,
+                    },
+                });
+                row.Add(new Label($"{declared.name}  ·  {declared.domain}  ·  fixed output")
+                {
+                    style =
+                    {
+                        color = new Color(0.55f, 0.75f, 0.55f),
+                        fontSize = 11,
+                        unityFontStyleAndWeight = FontStyle.Italic,
+                    },
+                });
+                m_Body.Add(row);
+            }
         }
 
         private void ShowSectionedManifestProperties(PcgManifestNodeView node, ManifestNodeDef def)
@@ -449,7 +533,7 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
 
-            var label = new Label(string.IsNullOrEmpty(prop.displayName) ? key : prop.displayName)
+            var label = new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
             {
                 style =
                 {
@@ -1049,71 +1133,20 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             var data = node.CollectData();
-
-            // 1. Static output groups from manifest (e.g. SweepAlongSpline)
-            foreach (var og in def.outputGroups)
+            foreach (var declared in PcgGroupResolution.ResolveOutputGroups(def, data))
             {
-                // Check condition property
-                if (!string.IsNullOrEmpty(og.condition))
-                {
-                    var condVal = data.GetRaw(og.condition);
-                    if (condVal is bool b && !b)
-                        continue;
-                    if (condVal is string s && s != "true")
-                        continue;
-                }
-
-                string groupName = og.name;
-                if (og.dynamic)
-                {
-                    // Dynamic: group name comes from a property value
-                    var propValue = data.GetRaw(og.name)?.ToString();
-                    if (string.IsNullOrWhiteSpace(propValue))
-                        continue;
-                    groupName = propValue;
-                }
-
-                var dedupKey = $"{groupName}:{og.domain}";
-                if (seen.Contains(dedupKey))
+                var dedupKey = $"{declared.name}:{declared.domain}";
+                if (!seen.Add(dedupKey))
                     continue;
-                seen.Add(dedupKey);
 
                 result.Add(new AvailableGroup
                 {
-                    name = groupName,
-                    domain = og.domain,
+                    name = declared.name,
+                    domain = declared.domain,
                     sourceNodeId = node.NodeId,
                     sourceNodeType = node.NodeType,
-                    label = og.label,
+                    label = declared.label,
                 });
-            }
-
-            // 2. Dynamic output groups from properties with isGroupOutput flag
-            if (def.outputGroups.Count == 0)
-            {
-                foreach (var (key, prop) in def.properties)
-                {
-                    if (!prop.isGroupOutput)
-                        continue;
-
-                    var groupName = data.GetRaw(key)?.ToString();
-                    if (string.IsNullOrWhiteSpace(groupName))
-                        continue;
-
-                    var domain = string.IsNullOrEmpty(prop.groupDomain) ? "edge" : prop.groupDomain;
-                    var dedupKey = $"{groupName}:{domain}";
-                    if (seen.Contains(dedupKey))
-                        continue;
-                    seen.Add(dedupKey);
-
-                    result.Add(new AvailableGroup
-                    {
-                        name = groupName,
-                        domain = domain,
-                        sourceNodeId = node.NodeId,
-                        sourceNodeType = node.NodeType,
-                    });
-                }
             }
         }
 

@@ -63,15 +63,19 @@ namespace DJTechEditor.PCG.Graph
             Add(MakeHeader(def.displayName ?? def.type, def.type, def.category, categoryColor));
 
             // Output Groups
-            var outputGroups = CollectOutputGroups(def, data);
+            var outputGroups = PcgGroupResolution.ResolveOutputGroups(def, data);
             if (outputGroups.Count > 0)
             {
                 var rows = outputGroups.Select(g =>
-                    (g.name, $"{g.domain}{(g.condition != null ? "  [if " + g.condition + "]" : "")}"));
+                {
+                    var role = g.isDynamic ? "Output · rename via property" : "Output · fixed name";
+                    var domain = string.IsNullOrEmpty(g.domain) ? "" : g.domain;
+                    return (g.name, $"{g.label}  ·  {domain}  ·  {role}");
+                });
                 Add(MakeSection($"Output Groups ({outputGroups.Count})", rows));
             }
 
-            // Upstream Groups
+            // Upstream Groups (Input candidates)
             var inspector = m_GraphView.Inspector;
             if (inspector != null)
             {
@@ -79,12 +83,12 @@ namespace DJTechEditor.PCG.Graph
                 if (upstream.Count > 0)
                 {
                     var rows = upstream.Select(g =>
-                        ($"{g.name} ({g.domain})", g.sourceNodeType));
-                    Add(MakeSection($"Upstream Groups ({upstream.Count})", rows));
+                        ($"{g.name} ({g.domain})", $"Input candidate from {g.sourceNodeType}"));
+                    Add(MakeSection($"Upstream Groups / Input ({upstream.Count})", rows));
                 }
             }
 
-            // Properties
+            // Properties — annotate Input/Output group fields
             var propRows = new List<(string, string)>();
             foreach (var kv in def.properties)
             {
@@ -94,7 +98,8 @@ namespace DJTechEditor.PCG.Graph
                 string valStr = rawVal == null ? "—" :
                     prop.type == "boolean" ? (rawVal is bool b && b ? "true" : "false") :
                     rawVal.ToString();
-                propRows.Add((key, valStr));
+                var label = PcgGroupResolution.PropertyDisplayLabel(key, prop);
+                propRows.Add((label, valStr));
             }
             if (propRows.Count > 0)
                 Add(MakeSection($"Properties ({propRows.Count})", propRows));
@@ -304,60 +309,6 @@ namespace DJTechEditor.PCG.Graph
             }
 
             return container;
-        }
-
-        // ── Group collection ───────────────────────────────
-
-        private static List<(string name, string domain, string condition)> CollectOutputGroups(
-            ManifestNodeDef def, PcgNodeData data)
-        {
-            var result = new List<(string, string, string)>();
-
-            foreach (var og in def.outputGroups)
-            {
-                string condition = null;
-                if (!string.IsNullOrEmpty(og.condition))
-                {
-                    var condVal = data.GetRaw(og.condition);
-                    if (condVal is bool b && !b)
-                    {
-                        condition = og.condition;
-                        // Still list it, but marked as conditional/inactive
-                    }
-                    else
-                    {
-                        // condition met
-                    }
-                }
-
-                string name = og.name;
-                if (og.dynamic)
-                {
-                    var val = data.GetRaw(og.name)?.ToString();
-                    if (string.IsNullOrWhiteSpace(val))
-                        continue;
-                    name = val;
-                }
-
-                result.Add((name, og.domain, condition));
-            }
-
-            // Also check properties with isGroupOutput (dynamic groups without manifest outputGroups)
-            if (def.outputGroups.Count == 0)
-            {
-                foreach (var kv in def.properties)
-                {
-                    if (!kv.Value.isGroupOutput)
-                        continue;
-                    var groupName = data.GetRaw(kv.Key)?.ToString();
-                    if (string.IsNullOrWhiteSpace(groupName))
-                        continue;
-                    var domain = kv.Value.groupDomain ?? "edge";
-                    result.Add((groupName, domain, null));
-                }
-            }
-
-            return result;
         }
     }
 }
