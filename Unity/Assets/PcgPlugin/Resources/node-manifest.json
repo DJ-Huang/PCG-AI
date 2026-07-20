@@ -1065,6 +1065,28 @@
       }
     },
     {
+      "type": "CreateGridMesh",
+      "displayName": "Create Grid",
+      "category": "Mesh",
+      "inputs": [{ "id": "in", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "outputs": [{ "id": "out", "label": "Mesh", "pinType": "SpatialMesh" }],
+      "properties": {
+        "sizeX": { "type": "number", "default": 10.0, "minimum": 0, "displayName": "Size X" },
+        "sizeY": { "type": "number", "default": 10.0, "minimum": 0, "displayName": "Size Y" },
+        "rows": { "type": "integer", "default": 10, "minimum": 1, "maximum": 512 },
+        "cols": { "type": "integer", "default": 10, "minimum": 1, "maximum": 512 },
+        "plane": {
+          "type": "enum",
+          "default": "xz",
+          "options": [
+            { "value": "xz", "label": "XZ (Ground)" },
+            { "value": "xy", "label": "XY" },
+            { "value": "yz", "label": "YZ" }
+          ]
+        }
+      }
+    },
+    {
       "type": "CreateBoxMesh",
       "displayName": "Create Box Mesh",
       "category": "Mesh",

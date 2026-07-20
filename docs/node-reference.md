@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **90 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **91 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -80,6 +80,7 @@
   - [Voronoi](#voronoi)
   - [AStarPathfinding](#astarpathfinding)
 - [Mesh 类别](#mesh-类别)
+  - [CreateGridMesh](#creategridmesh)
   - [CreateBoxMesh](#createboxmesh)
   - [SubdivideMesh](#subdividemesh)
   - [BevelMesh](#bevelmesh)
@@ -1997,6 +1998,55 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 ## Mesh 类别
 
+### CreateGridMesh
+
+**类别**：Mesh
+
+**功能**：创建 Houdini Grid 风格的平面网格。在指定平面上以 `rows × cols` 个 quad 铺满 `sizeX × sizeY` 区域，居中于原点。支持合并上游输入网格。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `in` | Mesh | `SpatialMesh` | 可选。上游网格会与新 grid 合并 |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Mesh | `SpatialMesh` |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `sizeX` | number | 10.0 | ≥ 0 | 平面第一轴总尺寸 |
+| `sizeY` | number | 10.0 | ≥ 0 | 平面第二轴总尺寸 |
+| `rows` | integer | 10 | 1 ~ 512 | 行方向 quad 数量 |
+| `cols` | integer | 10 | 1 ~ 512 | 列方向 quad 数量 |
+| `plane` | enum | `xz` | `xz` / `xy` / `yz` | 平面朝向；`xz` 为地面（法线 +Y） |
+
+**执行逻辑**：
+1. 校验尺寸 ≥ 0，`rows`/`cols` ≥ 1
+2. 在选定平面上生成 `(rows+1) × (cols+1)` 顶点与 `rows × cols` 个 quad face
+3. 若有上游输入网格，合并（前缀 `in_`）
+4. 输出 `SpatialMesh`（保留 polygon 拓扑）
+
+**用法示例**：
+
+```json
+{
+  "id": "ground",
+  "type": "CreateGridMesh",
+  "position": { "x": 0, "y": 0 },
+  "data": { "sizeX": 48.0, "sizeY": 48.0, "rows": 1, "cols": 1, "plane": "xz" }
+}
+```
+
+> 典型连接：`CreateGridMesh → LotSubdivision → PolyExtrude`（地块划分）；`rows=1, cols=1` 等价于单 quad 地面，替代 thin `CreateBoxMesh`。
+
+---
+
 ### CreateBoxMesh
 
 **类别**：Mesh
@@ -2359,7 +2409,7 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 }
 ```
 
-> 典型连接：`平面 polygon → LotSubdivision → PolyExtrude → Output`（地块挤出）；或 `LotSubdivision →` 面中心点/`CopyMeshToPoints` 散布建筑。示例：`examples/lot-extrude-demo.pcg`、`examples/lot-city-demo.pcg`。
+> 典型连接：`CreateGridMesh / 平面 polygon → LotSubdivision → PolyExtrude → Output`（地块挤出）；或 `LotSubdivision →` 面中心点/`CopyMeshToPoints` 散布建筑。示例：`examples/lot-extrude-demo.pcg`、`examples/lot-city-demo.pcg`。
 
 ### CopyMesh
 

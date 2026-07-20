@@ -293,6 +293,62 @@ data::PcgGeometry create_box_geometry(double width, double height, double depth)
     return geo;
 }
 
+data::PcgGeometry create_grid_geometry(double size_x, double size_y,
+                                       int rows, int cols,
+                                       const std::string& plane)
+{
+    rows = std::max(1, std::min(rows, 512));
+    cols = std::max(1, std::min(cols, 512));
+    const double sx = std::max(size_x, 0.0);
+    const double sy = std::max(size_y, 0.0);
+
+    data::PcgGeometry geo;
+    auto& points = geo.points_mut();
+    auto& faces = geo.faces_mut();
+
+    const int point_cols = cols + 1;
+    const int point_rows = rows + 1;
+    points.reserve(static_cast<size_t>(point_cols * point_rows));
+    faces.reserve(static_cast<size_t>(rows * cols));
+
+    const auto lerp = [](double a, double b, double t) { return a + (b - a) * t; };
+
+    for (int row = 0; row < point_rows; ++row) {
+        const double v = rows > 0 ? static_cast<double>(row) / rows : 0.0;
+        const double axis1 = lerp(-sy * 0.5, sy * 0.5, v);
+        for (int col = 0; col < point_cols; ++col) {
+            const double u = cols > 0 ? static_cast<double>(col) / cols : 0.0;
+            const double axis0 = lerp(-sx * 0.5, sx * 0.5, u);
+            if (plane == "xy") {
+                points.push_back({axis0, axis1, 0.0});
+            } else if (plane == "yz") {
+                points.push_back({0.0, axis0, axis1});
+            } else {
+                points.push_back({axis0, 0.0, axis1});
+            }
+        }
+    }
+
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+            const int a = row * point_cols + col;
+            const int b = a + 1;
+            const int c = a + point_cols + 1;
+            const int d = a + point_cols;
+            // Match create_box_geometry outward winding (+Y / +Z / +X respectively).
+            if (plane == "xy") {
+                faces.push_back({a, b, c, d});
+            } else if (plane == "yz") {
+                faces.push_back({a, b, c, d});
+            } else {
+                faces.push_back({a, d, c, b});
+            }
+        }
+    }
+
+    return geo;
+}
+
 data::PcgMeshData create_cylinder_mesh(double radius, double height,
                                        int radial_segments, int height_segments,
                                        bool cap_top, bool cap_bottom)

@@ -105,9 +105,9 @@
     },
     {
       "id": "ground",
-      "type": "CreateBoxMesh",
+      "type": "CreateGridMesh",
       "position": { "x": 200, "y": 0 },
-      "data": {"width": 48, "height": 0.03, "depth": 48, "__nodeTitle": "City Ground"}
+      "data": {"sizeX": 48, "sizeY": 48, "rows": 1, "cols": 1, "plane": "xz", "__nodeTitle": "City Ground"}
     }
   ],
   "edges": [

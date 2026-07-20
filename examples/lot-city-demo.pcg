@@ -3,13 +3,15 @@
   "nodes": [
     {
       "id": "ground",
-      "type": "CreateBoxMesh",
+      "type": "CreateGridMesh",
       "position": { "x": 200, "y": 0 },
       "data": {
         "__nodeTitle": "City Ground",
-        "width": 48.0,
-        "height": 0.02,
-        "depth": 48.0
+        "sizeX": 48.0,
+        "sizeY": 48.0,
+        "rows": 1,
+        "cols": 1,
+        "plane": "xz"
       }
     },
     {

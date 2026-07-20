@@ -8,6 +8,43 @@
 namespace pcg::internal::elements {
 namespace {
 
+class CreateGridMeshElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "CreateGridMesh"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateGridMesh missing node");
+
+        const double size_x = ctx.node->data.value("sizeX", 10.0);
+        const double size_y = ctx.node->data.value("sizeY", 10.0);
+        const int rows = ctx.node->data.value("rows", 10);
+        const int cols = ctx.node->data.value("cols", 10);
+        const std::string plane = ctx.node->data.value("plane", std::string("xz"));
+        if (size_x < 0.0 || size_y < 0.0)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateGridMesh size must be >= 0");
+        if (rows < 1 || cols < 1)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateGridMesh rows/cols must be >= 1");
+
+        data::PcgGeometry geometry = create_grid_geometry(size_x, size_y, rows, cols, plane);
+
+        if (auto input_geometry = ctx.inputs.find_geometry_shared("in")) {
+            geometry = data::merge_geometries(geometry, *input_geometry, "in_");
+        } else if (const data::PcgMeshData* input = ctx.inputs.find_mesh("in")) {
+            geometry = data::merge_geometries(geometry, data::geometry_from_mesh(*input), "in_");
+        } else if (const nlohmann::json* input = ctx.inputs.find_json("in")) {
+            const data::PcgMeshData input_mesh = parse_mesh_input(*input);
+            if (!input_mesh.vertices().empty())
+                geometry = data::merge_geometries(
+                    geometry, data::geometry_from_mesh(input_mesh), "in_");
+        }
+
+        emit_geometry(ctx, std::move(geometry));
+        return PCG_OK;
+    }
+};
+
 class CreateBoxMeshElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "CreateBoxMesh"; }
@@ -289,6 +326,7 @@ public:
 
 void register_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
+    map.emplace("CreateGridMesh", std::make_unique<CreateGridMeshElement>());
     map.emplace("CreateBoxMesh", std::make_unique<CreateBoxMeshElement>());
     map.emplace("CreateCylinderMesh", std::make_unique<CreateCylinderMeshElement>());
     map.emplace("RevolveMesh", std::make_unique<RevolveMeshElement>());

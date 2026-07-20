@@ -373,6 +373,11 @@ target_link_libraries(test_lot_subdivision PRIVATE PcgCoreStatic nlohmann_json::
 target_include_directories(test_lot_subdivision PRIVATE src)
 add_test(NAME test_lot_subdivision COMMAND test_lot_subdivision WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_create_grid_mesh tests/test_create_grid_mesh.cpp)
+target_link_libraries(test_create_grid_mesh PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_create_grid_mesh PRIVATE src)
+add_test(NAME test_create_grid_mesh COMMAND test_create_grid_mesh WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.
 get_property(PCG_FAST_TESTS DIRECTORY PROPERTY TESTS)

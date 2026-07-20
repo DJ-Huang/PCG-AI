@@ -43,7 +43,7 @@ PcgGeometry make_ground_quad(double width, double depth)
         {hx, 0.0, hz},
         {-hx, 0.0, hz},
     };
-    geo.faces_mut() = {{0, 1, 2, 3}};
+    geo.faces_mut() = {{0, 3, 2, 1}};
     return geo;
 }
 
@@ -142,19 +142,20 @@ void test_poly_extrude_chain()
 
 void test_graph_node()
 {
-    // Build a single ground quad via CreateBoxMesh top is not ideal; use Import-free
-    // direct algorithm coverage above and a minimal Output graph with CreateBoxMesh
-    // filtered by large minSize on thin box is weak. Prefer cooking LotSubdivision
-    // through a hand-built geometry source is not exposed — use CreateBoxMesh and
-    // accept all faces: with iterations=1 and high minSize only large faces cut.
+    // Build ground via CreateGridMesh (Houdini Grid equivalent; single quad for lots).
     const auto document = nlohmann::json{
         {"version", "2.0"},
         {"nodes",
          nlohmann::json::array({
-             {{"id", "box"},
-              {"type", "CreateBoxMesh"},
+             {{"id", "grid"},
+              {"type", "CreateGridMesh"},
               {"position", {{"x", 0.0}, {"y", 0.0}}},
-              {"data", {{"width", 20.0}, {"height", 0.01}, {"depth", 20.0}}}},
+              {"data",
+               {{"sizeX", 20.0},
+                {"sizeY", 20.0},
+                {"rows", 1},
+                {"cols", 1},
+                {"plane", "xz"}}}},
              {{"id", "lots"},
               {"type", "LotSubdivision"},
               {"position", {{"x", 0.0}, {"y", 160.0}}},
@@ -176,7 +177,7 @@ void test_graph_node()
         {"edges",
          nlohmann::json::array({
              {{"id", "e0"},
-              {"source", "box"},
+              {"source", "grid"},
               {"target", "lots"},
               {"sourceHandle", "out"},
               {"targetHandle", "in"}},
