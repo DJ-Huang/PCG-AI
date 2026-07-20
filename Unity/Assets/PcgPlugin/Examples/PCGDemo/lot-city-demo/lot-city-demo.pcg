@@ -20,10 +20,28 @@
       "data": {"faceGroup": "", "distance": 0.18, "inset": 0.08, "keepOriginal": false, "topGroup": "extrude_top", "sideGroup": "extrude_side", "__nodeTitle": "Lot Pads"}
     },
     {
-      "id": "bldg_proto",
-      "type": "CreateBoxMesh",
-      "position": { "x": 520, "y": 320 },
-      "data": {"width": 2.2, "height": 4.5, "depth": 2.2, "__nodeTitle": "Building Proto"}
+      "id": "sg_bldg_tall",
+      "type": "Subgraph",
+      "position": { "x": 520, "y": 0 },
+      "data": {"__nodeTitle": "Tall Flat-Roof", "subgraphId": "building_tall_flat"}
+    },
+    {
+      "id": "sg_bldg_medium",
+      "type": "Subgraph",
+      "position": { "x": 840, "y": 0 },
+      "data": {"__nodeTitle": "Medium Pitched", "subgraphId": "building_medium_pitched"}
+    },
+    {
+      "id": "sg_bldg_short",
+      "type": "Subgraph",
+      "position": { "x": 1160, "y": 0 },
+      "data": {"__nodeTitle": "Short Flat-Roof", "subgraphId": "building_short_flat"}
+    },
+    {
+      "id": "bldg_switch",
+      "type": "Switch",
+      "position": { "x": 520, "y": 160 },
+      "data": {"index": 0, "__nodeTitle": "Building Type"}
     },
     {
       "id": "road_a",
@@ -56,12 +74,6 @@
       "data": {"outputGroup": "pad_rim", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "extrude_top", "fromEdgeGroup": "", "__nodeTitle": "Pad Rim Edges"}
     },
     {
-      "id": "bldg_bevel",
-      "type": "BevelMesh",
-      "position": { "x": 520, "y": 480 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.12, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Building Bevel"}
-    },
-    {
       "id": "road_bevel_a",
       "type": "BevelMesh",
       "position": { "x": 840, "y": 480 },
@@ -78,12 +90,6 @@
       "type": "BevelMesh",
       "position": { "x": -120, "y": 640 },
       "data": {"edgeGroup": "pad_rim", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "none", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": "Pad Bevel"}
-    },
-    {
-      "id": "bldg_lift",
-      "type": "TransformMesh",
-      "position": { "x": 520, "y": 640 },
-      "data": {"translateX": 0, "translateY": 2.25, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Building Lift"}
     },
     {
       "id": "merge_roads",
@@ -164,6 +170,10 @@
     {"id": "e_pads_rim", "source": "pads", "target": "pad_rim", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_rim_bevel", "source": "pad_rim", "target": "pad_bevel", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_pad_bool", "source": "pad_bevel", "target": "pad_bool", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e_tall_switch", "source": "sg_bldg_tall", "target": "bldg_switch", "sourceHandle": "mesh", "targetHandle": "in0"},
+    {"id": "e_medium_switch", "source": "sg_bldg_medium", "target": "bldg_switch", "sourceHandle": "mesh", "targetHandle": "in1"},
+    {"id": "e_short_switch", "source": "sg_bldg_short", "target": "bldg_switch", "sourceHandle": "mesh", "targetHandle": "in2"},
+    {"id": "e_switch_place", "source": "bldg_switch", "target": "place", "sourceHandle": "out", "targetHandle": "prototype"},
     {"id": "e_road_a_merge_roads", "source": "road_bevel_a", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_road_b_merge_roads", "source": "road_bevel_b", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_merge_roads_bool", "source": "merge_roads", "target": "pad_bool", "sourceHandle": "out", "targetHandle": "b"},
@@ -171,9 +181,6 @@
     {"id": "e_top_sample", "source": "lot_top", "target": "sample", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_sample_relax", "source": "sample", "target": "relax", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_relax_jitter", "source": "relax", "target": "jitter", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_proto_bevel", "source": "bldg_proto", "target": "bldg_bevel", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_bevel_lift", "source": "bldg_bevel", "target": "bldg_lift", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_lift_place", "source": "bldg_lift", "target": "place", "sourceHandle": "out", "targetHandle": "prototype"},
     {"id": "e_jitter_place", "source": "jitter", "target": "place", "sourceHandle": "out", "targetHandle": "points"},
     {"id": "e_road_a_sweep", "source": "road_a", "target": "road_sweep_a", "sourceHandle": "out", "targetHandle": "backbone"},
     {"id": "e_road_b_sweep", "source": "road_b", "target": "road_sweep_b", "sourceHandle": "out", "targetHandle": "backbone"},
@@ -194,8 +201,218 @@
     {"id": "p_sites", "name": "buildingCount", "type": "integer", "default": 43, "exposed": true, "targetNode": "sample", "targetProperty": "count", "hasRange": true, "min": 4, "max": 80},
     {"id": "p_edge_margin", "name": "edgeMargin", "type": "number", "default": 1.1, "exposed": true, "targetNode": "sample", "targetProperty": "edgeMargin", "hasRange": true, "min": 0, "max": 3},
     {"id": "p_pad_height", "name": "padHeight", "type": "number", "default": 0.18, "exposed": true, "targetNode": "pads", "targetProperty": "distance", "hasRange": true, "min": 0.02, "max": 1},
-    {"id": "p_relax_radius", "name": "relaxRadius", "type": "number", "default": 1.5, "exposed": true, "targetNode": "relax", "targetProperty": "radius", "hasRange": true, "min": 0.5, "max": 4}
+    {"id": "p_relax_radius", "name": "relaxRadius", "type": "number", "default": 1.5, "exposed": true, "targetNode": "relax", "targetProperty": "radius", "hasRange": true, "min": 0.5, "max": 4},
+    {"id": "p_bldg_type", "name": "buildingType", "type": "integer", "default": 0, "exposed": true, "targetNode": "bldg_switch", "targetProperty": "index", "hasRange": true, "min": 0, "max": 2}
   ],
   "subgraphs": [
+    {
+      "id": "building_tall_flat",
+      "name": "Tall Flat-Roof Building",
+      "inputs": [],
+      "outputs": [{ "id": "mesh", "name": "Mesh", "pinType": "SpatialMesh" }],
+      "nodes": [
+        {
+          "id": "tf_body",
+          "type": "CreateBoxMesh",
+          "position": { "x": 200, "y": 0 },
+          "data": {"width": 3.0, "height": 11.0, "depth": 3.0, "__nodeTitle": "Tall Body"}
+        },
+        {
+          "id": "tf_body_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 160 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.06, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Tall Body Bevel"}
+        },
+        {
+          "id": "tf_cornice",
+          "type": "CreateBoxMesh",
+          "position": { "x": 520, "y": 0 },
+          "data": {"width": 3.4, "height": 0.6, "depth": 3.4, "__nodeTitle": "Tall Cornice"}
+        },
+        {
+          "id": "tf_cornice_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 520, "y": 160 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Tall Cornice Bevel"}
+        },
+        {
+          "id": "tf_cornice_lift",
+          "type": "TransformMesh",
+          "position": { "x": 520, "y": 320 },
+          "data": {"translateX": 0, "translateY": 5.8, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Tall Cornice Lift"}
+        },
+        {
+          "id": "tf_merge",
+          "type": "MergeMesh",
+          "position": { "x": 360, "y": 480 },
+          "data": {"__nodeTitle": "Tall Merge"}
+        },
+        {
+          "id": "tf_lift",
+          "type": "TransformMesh",
+          "position": { "x": 360, "y": 640 },
+          "data": {"translateX": 0, "translateY": 5.5, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Tall Building Lift"}
+        },
+        {
+          "id": "tf_out",
+          "type": "SubgraphOutput",
+          "position": { "x": 360, "y": 800 },
+          "data": {"__nodeTitle": "Tall Building Out"}
+        }
+      ],
+      "edges": [
+        {"id": "e_tf_body_bevel", "source": "tf_body", "target": "tf_body_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_tf_cornice_bevel", "source": "tf_cornice", "target": "tf_cornice_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_tf_cornice_lift", "source": "tf_cornice_bevel", "target": "tf_cornice_lift", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_tf_body_merge", "source": "tf_body_bevel", "target": "tf_merge", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_tf_cornice_merge", "source": "tf_cornice_lift", "target": "tf_merge", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_tf_merge_lift", "source": "tf_merge", "target": "tf_lift", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_tf_lift_out", "source": "tf_lift", "target": "tf_out", "sourceHandle": "out", "targetHandle": "mesh"}
+      ]
+    },
+    {
+      "id": "building_medium_pitched",
+      "name": "Medium Pitched-Roof Building",
+      "inputs": [],
+      "outputs": [{ "id": "mesh", "name": "Mesh", "pinType": "SpatialMesh" }],
+      "nodes": [
+        {
+          "id": "mp_body",
+          "type": "CreateBoxMesh",
+          "position": { "x": 200, "y": 0 },
+          "data": {"width": 3.2, "height": 7.0, "depth": 3.2, "__nodeTitle": "Medium Body"}
+        },
+        {
+          "id": "mp_body_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 160 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.06, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Medium Body Bevel"}
+        },
+        {
+          "id": "mp_roof_base",
+          "type": "CreateSpline",
+          "position": { "x": 520, "y": 0 },
+          "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 0, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-1.6,\"y\":0,\"z\":-1.6},{\"x\":1.6,\"y\":0,\"z\":-1.6},{\"x\":1.6,\"y\":0,\"z\":1.6},{\"x\":-1.6,\"y\":0,\"z\":1.6}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Roof Base Profile"}
+        },
+        {
+          "id": "mp_roof_top",
+          "type": "CreateSpline",
+          "position": { "x": 840, "y": 0 },
+          "data": {"mode": "polyline", "closed": true, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 0, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-0.3,\"y\":2.2,\"z\":-0.3},{\"x\":0.3,\"y\":2.2,\"z\":-0.3},{\"x\":0.3,\"y\":2.2,\"z\":0.3},{\"x\":-0.3,\"y\":2.2,\"z\":0.3}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Roof Top Profile"}
+        },
+        {
+          "id": "mp_roof_loft",
+          "type": "LoftMesh",
+          "position": { "x": 680, "y": 160 },
+          "data": {"columns": 32, "sortAxis": "y", "closedProfile": true, "capStart": true, "capEnd": true, "autoAlign": true, "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Pitched Roof Loft"}
+        },
+        {
+          "id": "mp_roof_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 680, "y": 320 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Roof Bevel"}
+        },
+        {
+          "id": "mp_roof_lift",
+          "type": "TransformMesh",
+          "position": { "x": 680, "y": 480 },
+          "data": {"translateX": 0, "translateY": 3.5, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Roof Lift"}
+        },
+        {
+          "id": "mp_merge",
+          "type": "MergeMesh",
+          "position": { "x": 440, "y": 640 },
+          "data": {"__nodeTitle": "Medium Merge"}
+        },
+        {
+          "id": "mp_lift",
+          "type": "TransformMesh",
+          "position": { "x": 440, "y": 800 },
+          "data": {"translateX": 0, "translateY": 3.5, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Medium Building Lift"}
+        },
+        {
+          "id": "mp_out",
+          "type": "SubgraphOutput",
+          "position": { "x": 440, "y": 960 },
+          "data": {"__nodeTitle": "Medium Building Out"}
+        }
+      ],
+      "edges": [
+        {"id": "e_mp_body_bevel", "source": "mp_body", "target": "mp_body_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mp_base_loft", "source": "mp_roof_base", "target": "mp_roof_loft", "sourceHandle": "out", "targetHandle": "profiles"},
+        {"id": "e_mp_top_loft", "source": "mp_roof_top", "target": "mp_roof_loft", "sourceHandle": "out", "targetHandle": "profiles"},
+        {"id": "e_mp_loft_bevel", "source": "mp_roof_loft", "target": "mp_roof_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mp_bevel_lift", "source": "mp_roof_bevel", "target": "mp_roof_lift", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mp_body_merge", "source": "mp_body_bevel", "target": "mp_merge", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mp_roof_merge", "source": "mp_roof_lift", "target": "mp_merge", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mp_merge_lift", "source": "mp_merge", "target": "mp_lift", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mp_lift_out", "source": "mp_lift", "target": "mp_out", "sourceHandle": "out", "targetHandle": "mesh"}
+      ]
+    },
+    {
+      "id": "building_short_flat",
+      "name": "Short Flat-Roof Building",
+      "inputs": [],
+      "outputs": [{ "id": "mesh", "name": "Mesh", "pinType": "SpatialMesh" }],
+      "nodes": [
+        {
+          "id": "sf_body",
+          "type": "CreateBoxMesh",
+          "position": { "x": 200, "y": 0 },
+          "data": {"width": 4.0, "height": 5.0, "depth": 4.0, "__nodeTitle": "Short Body"}
+        },
+        {
+          "id": "sf_body_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 160 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.06, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Short Body Bevel"}
+        },
+        {
+          "id": "sf_cornice",
+          "type": "CreateBoxMesh",
+          "position": { "x": 520, "y": 0 },
+          "data": {"width": 4.4, "height": 0.5, "depth": 4.4, "__nodeTitle": "Short Cornice"}
+        },
+        {
+          "id": "sf_cornice_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 520, "y": 160 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Short Cornice Bevel"}
+        },
+        {
+          "id": "sf_cornice_lift",
+          "type": "TransformMesh",
+          "position": { "x": 520, "y": 320 },
+          "data": {"translateX": 0, "translateY": 2.75, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Short Cornice Lift"}
+        },
+        {
+          "id": "sf_merge",
+          "type": "MergeMesh",
+          "position": { "x": 360, "y": 480 },
+          "data": {"__nodeTitle": "Short Merge"}
+        },
+        {
+          "id": "sf_lift",
+          "type": "TransformMesh",
+          "position": { "x": 360, "y": 640 },
+          "data": {"translateX": 0, "translateY": 2.5, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Short Building Lift"}
+        },
+        {
+          "id": "sf_out",
+          "type": "SubgraphOutput",
+          "position": { "x": 360, "y": 800 },
+          "data": {"__nodeTitle": "Short Building Out"}
+        }
+      ],
+      "edges": [
+        {"id": "e_sf_body_bevel", "source": "sf_body", "target": "sf_body_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_sf_cornice_bevel", "source": "sf_cornice", "target": "sf_cornice_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_sf_cornice_lift", "source": "sf_cornice_bevel", "target": "sf_cornice_lift", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_sf_body_merge", "source": "sf_body_bevel", "target": "sf_merge", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_sf_cornice_merge", "source": "sf_cornice_lift", "target": "sf_merge", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_sf_merge_lift", "source": "sf_merge", "target": "sf_lift", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_sf_lift_out", "source": "sf_lift", "target": "sf_out", "sourceHandle": "out", "targetHandle": "mesh"}
+      ]
+    }
   ]
 }
