@@ -149,7 +149,7 @@
         "mode": "polyline",
         "closed": false,
         "subdivisions": 1,
-        "controlPoints": "[{\"x\":-22,\"y\":0.05,\"z\":-8},{\"x\":22,\"y\":0.05,\"z\":-8}]",
+        "controlPoints": "[{\"x\":-22,\"y\":0.20,\"z\":-8},{\"x\":22,\"y\":0.20,\"z\":-8}]",
         "editPlane": "xz",
         "sceneOffsetX": 0,
         "sceneOffsetY": 0,
@@ -165,7 +165,7 @@
         "mode": "polyline",
         "closed": false,
         "subdivisions": 1,
-        "controlPoints": "[{\"x\":6,\"y\":0.05,\"z\":-22},{\"x\":6,\"y\":0.05,\"z\":22}]",
+        "controlPoints": "[{\"x\":6,\"y\":0.20,\"z\":-22},{\"x\":6,\"y\":0.20,\"z\":22}]",
         "editPlane": "xz",
         "sceneOffsetX": 0,
         "sceneOffsetY": 0,
@@ -242,6 +242,46 @@
         "profile": 0.5,
         "edgeGroup": "",
         "excludeUnshared": false
+      }
+    },
+    {
+      "id": "mat_pad",
+      "type": "AssignMaterial",
+      "position": { "x": -120, "y": 560 },
+      "data": {
+        "group": "",
+        "materialName": "lot_pad",
+        "__nodeTitle": "Mat Lot Pads"
+      }
+    },
+    {
+      "id": "mat_bldg",
+      "type": "AssignMaterial",
+      "position": { "x": 360, "y": 720 },
+      "data": {
+        "group": "",
+        "materialName": "building",
+        "__nodeTitle": "Mat Buildings"
+      }
+    },
+    {
+      "id": "mat_road_a",
+      "type": "AssignMaterial",
+      "position": { "x": 840, "y": 560 },
+      "data": {
+        "group": "",
+        "materialName": "road",
+        "__nodeTitle": "Mat Road A"
+      }
+    },
+    {
+      "id": "mat_road_b",
+      "type": "AssignMaterial",
+      "position": { "x": 1160, "y": 560 },
+      "data": {
+        "group": "",
+        "materialName": "road",
+        "__nodeTitle": "Mat Road B"
       }
     },
     {
@@ -355,29 +395,57 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_merge_pads",
+      "id": "e_pad_mat",
       "source": "pad_bevel",
+      "target": "mat_pad",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bldg_mat",
+      "source": "place",
+      "target": "mat_bldg",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_road_a_mat",
+      "source": "road_bevel_a",
+      "target": "mat_road_a",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_road_b_mat",
+      "source": "road_bevel_b",
+      "target": "mat_road_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_merge_pads",
+      "source": "mat_pad",
       "target": "merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
       "id": "e_merge_bldg",
-      "source": "place",
+      "source": "mat_bldg",
       "target": "merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
       "id": "e_merge_road_a",
-      "source": "road_bevel_a",
+      "source": "mat_road_a",
       "target": "merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
       "id": "e_merge_road_b",
-      "source": "road_bevel_b",
+      "source": "mat_road_b",
       "target": "merge",
       "sourceHandle": "out",
       "targetHandle": "in"
