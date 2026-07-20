@@ -1747,29 +1747,69 @@ namespace DJTechEditor.PCG.Graph
             _ => "unknown",
         };
 
+        private const string GroupViewerNoneLabel = "None";
+
         /// <summary>
-        /// Popup defaults to index 0 visually, but selection state stays null until the user
-        /// changes the popup. Sync state so Scene View highlighting matches the displayed group.
+        /// Build popup labels with a leading None entry so the inactive side can show
+        /// None instead of falsely looking like the first group is selected.
         /// </summary>
-        private static void EnsureDefaultGroupSelection(
-            List<PcgNodeInspector.AvailableGroup> outputGroups,
-            List<PcgNodeInspector.AvailableGroup> inputGroups)
+        private static string[] BuildGroupPopupLabels(
+            List<PcgNodeInspector.AvailableGroup> groups,
+            System.Func<string, NodeGroupEntry> findStats)
         {
-            if (!string.IsNullOrEmpty(s_SelectedGroupName))
-                return;
-
-            if (outputGroups.Count > 0)
+            var labels = new string[groups.Count + 1];
+            labels[0] = GroupViewerNoneLabel;
+            for (var i = 0; i < groups.Count; ++i)
             {
-                s_SelectedGroupName = outputGroups[0].name;
-                s_SelectedGroupSource = "output";
+                var name = groups[i].name;
+                var stats = findStats(name);
+                labels[i + 1] = stats != null ? $"{name} ({stats.count})" : $"{name} (—)";
+            }
+
+            return labels;
+        }
+
+        /// <summary>
+        /// Active side → selected group index + 1 (None at 0). Inactive / cleared → 0 (None).
+        /// </summary>
+        private static int GroupPopupIndex(
+            string expectedSource,
+            List<PcgNodeInspector.AvailableGroup> groups)
+        {
+            if (s_SelectedGroupSource != expectedSource || string.IsNullOrEmpty(s_SelectedGroupName))
+                return 0;
+
+            var idx = groups.FindIndex(g => g.name == s_SelectedGroupName);
+            return idx >= 0 ? idx + 1 : 0;
+        }
+
+        private static void ApplyGroupPopupSelection(
+            int newIdx,
+            string source,
+            List<PcgNodeInspector.AvailableGroup> groups,
+            PcgGroupVisualizer visualizer)
+        {
+            if (newIdx <= 0)
+            {
+                if (s_SelectedGroupSource == source)
+                {
+                    s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
+                    visualizer?.ClearHighlight();
+                    SceneView.RepaintAll();
+                }
+
                 return;
             }
 
-            if (inputGroups.Count > 0)
-            {
-                s_SelectedGroupName = inputGroups[0].name;
-                s_SelectedGroupSource = "input";
-            }
+            var groupIdx = newIdx - 1;
+            if (groupIdx < 0 || groupIdx >= groups.Count)
+                return;
+
+            var group = groups[groupIdx];
+            s_SelectedGroupName = group.name;
+            s_SelectedGroupSource = source;
+            SceneView.RepaintAll();
         }
 
         private static void ParseGroupsFromJson(string json, List<GroupInfo> output)
@@ -1864,13 +1904,14 @@ namespace DJTechEditor.PCG.Graph
                 gv?.ClearHighlight();
             }
 
-            EnsureDefaultGroupSelection(outputFiltered, inputGroups);
+            // Default is None on both sides — never auto-pick the first group
+            // (that made Output look selected while debugging Input).
 
             // Compute dynamic height
             bool hasOutput = outputFiltered.Count > 0;
             bool hasInput = inputGroups.Count > 0;
             bool hasGroups = hasOutput || hasInput;
-            float height = hasGroups ? 58f : 40f;
+            float height = hasGroups ? 74f : 40f;
 
             // Check if selected group has member data for highlighting
             bool canHighlight = !string.IsNullOrEmpty(s_SelectedGroupName) &&
@@ -1901,25 +1942,12 @@ namespace DJTechEditor.PCG.Graph
                     {
                         GUILayout.BeginVertical();
                         GUILayout.Label("Output:", EditorStyles.miniLabel);
-                        var labels = outputFiltered.Select(g =>
-                        {
-                            var stats = FindGroupStats(g.name, true);
-                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
-                        }).ToArray();
-                        var currentIdx = s_SelectedGroupSource == "output"
-                            ? outputFiltered.FindIndex(g => g.name == s_SelectedGroupName)
-                            : -1;
-                        if (currentIdx < 0)
-                            currentIdx = 0;
+                        var labels = BuildGroupPopupLabels(outputFiltered, name => FindGroupStats(name, true));
+                        var currentIdx = GroupPopupIndex("output", outputFiltered);
                         EditorGUI.BeginChangeCheck();
                         var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
-                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < outputFiltered.Count)
-                        {
-                            var group = outputFiltered[newIdx];
-                            s_SelectedGroupName = group.name;
-                            s_SelectedGroupSource = "output";
-                            SceneView.RepaintAll();
-                        }
+                        if (EditorGUI.EndChangeCheck())
+                            ApplyGroupPopupSelection(newIdx, "output", outputFiltered, gv);
                         GUILayout.EndVertical();
                     }
 
@@ -1927,33 +1955,29 @@ namespace DJTechEditor.PCG.Graph
                     {
                         GUILayout.BeginVertical();
                         GUILayout.Label("Input:", EditorStyles.miniLabel);
-                        var labels = inputGroups.Select(g =>
-                        {
-                            var stats = FindGroupStats(g.name, false);
-                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
-                        }).ToArray();
-                        var currentIdx = s_SelectedGroupSource == "input"
-                            ? inputGroups.FindIndex(g => g.name == s_SelectedGroupName)
-                            : -1;
-                        if (currentIdx < 0)
-                            currentIdx = 0;
+                        var labels = BuildGroupPopupLabels(inputGroups, name => FindGroupStats(name, false));
+                        var currentIdx = GroupPopupIndex("input", inputGroups);
                         EditorGUI.BeginChangeCheck();
                         var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
-                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < inputGroups.Count)
-                        {
-                            var group = inputGroups[newIdx];
-                            s_SelectedGroupName = group.name;
-                            s_SelectedGroupSource = "input";
-                            SceneView.RepaintAll();
-                        }
+                        if (EditorGUI.EndChangeCheck())
+                            ApplyGroupPopupSelection(newIdx, "input", inputGroups, gv);
                         GUILayout.EndVertical();
                     }
 
                     GUILayout.EndHorizontal();
 
-                    if (!canHighlight && !string.IsNullOrEmpty(s_SelectedGroupName))
+                    if (string.IsNullOrEmpty(s_SelectedGroupName))
+                    {
+                        GUILayout.Label("Highlighting: None — pick Output or Input", EditorStyles.miniLabel);
+                    }
+                    else if (!canHighlight)
                     {
                         GUILayout.Label("Group has no member data in cook result.", EditorStyles.miniLabel);
+                    }
+                    else
+                    {
+                        var side = s_SelectedGroupSource == "input" ? "Input" : "Output";
+                        GUILayout.Label($"Highlighting: {side} · {s_SelectedGroupName}", EditorStyles.miniLabel);
                     }
                 }
                 else
