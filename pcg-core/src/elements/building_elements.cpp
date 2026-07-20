@@ -61,6 +61,13 @@ public:
         options.rotate_z_deg = ctx.node->data.value("rotateZ", 0.0);
         options.scale_min = ctx.node->data.value("scaleMin", 1.0);
         options.scale_max = ctx.node->data.value("scaleMax", 1.0);
+        options.color_min_r = ctx.node->data.value("colorMinR", 1.0);
+        options.color_min_g = ctx.node->data.value("colorMinG", 1.0);
+        options.color_min_b = ctx.node->data.value("colorMinB", 1.0);
+        options.color_max_r = ctx.node->data.value("colorMaxR", 1.0);
+        options.color_max_g = ctx.node->data.value("colorMaxG", 1.0);
+        options.color_max_b = ctx.node->data.value("colorMaxB", 1.0);
+        options.material_names = parse_name_list(ctx.node->data, "materialNames");
 
         const data::PcgPointData input =
             get_points_input(ctx, "in", "AttributeRandomize missing points input");

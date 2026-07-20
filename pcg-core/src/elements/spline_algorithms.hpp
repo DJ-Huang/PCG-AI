@@ -116,6 +116,16 @@ struct CreateSpiralSplineOptions {
 
 data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& options);
 
+struct CreateArcSplineOptions {
+    double radius = 1.0;
+    double start_angle_deg = 0.0;
+    double end_angle_deg = 180.0;
+    int segments = 16;
+    std::string axis = "z";
+};
+
+data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options);
+
 data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options);
 data::PcgPointData sample_along_spline(const data::PcgSplineData& splines, const SampleAlongSplineOptions& options);
 data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,

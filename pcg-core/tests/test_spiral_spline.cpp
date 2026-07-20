@@ -148,6 +148,41 @@ int main()
         expect(std::abs(pts.back().y - (-1.0)) < 1e-10, "spiral neg pitch: endpoint y = -1.0");
     }
 
+    // --- Arc: semicircle in XY (axis Z) ---
+    {
+        CreateArcSplineOptions opts;
+        opts.radius = 2.0;
+        opts.start_angle_deg = 0.0;
+        opts.end_angle_deg = 180.0;
+        opts.segments = 8;
+        opts.axis = "z";
+
+        auto spline_data = create_arc_spline_data(opts);
+        expect(spline_data.splines().size() == 1, "arc: 1 spline");
+        const auto& pts = spline_data.splines()[0].points;
+        expect(pts.size() == 9, "arc: segments+1 samples");
+        expect(!spline_data.splines()[0].closed, "arc: open polyline");
+        expect(std::abs(pts.front().x - 2.0) < 1e-10 && std::abs(pts.front().y) < 1e-10,
+               "arc: start at (radius,0,0)");
+        expect(std::abs(pts.back().x - (-2.0)) < 1e-10 && std::abs(pts.back().y) < 1e-10,
+               "arc: end at (-radius,0,0)");
+        expect(std::abs(pts[4].x) < 1e-10 && std::abs(pts[4].y - 2.0) < 1e-10,
+               "arc: midpoint at (0,radius,0)");
+    }
+
+    // --- Arc: reject invalid ---
+    {
+        CreateArcSplineOptions opts;
+        opts.radius = 0.0;
+        expect(create_arc_spline_data(opts).splines().empty(), "arc: radius=0 rejected");
+        opts.radius = 1.0;
+        opts.segments = 0;
+        expect(create_arc_spline_data(opts).splines().empty(), "arc: segments<1 rejected");
+        opts.segments = 4;
+        opts.axis = "w";
+        expect(create_arc_spline_data(opts).splines().empty(), "arc: invalid axis rejected");
+    }
+
     if (g_fail > 0) {
         std::printf("\n%d tests FAILED\n", g_fail);
         return 1;

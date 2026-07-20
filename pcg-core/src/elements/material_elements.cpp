@@ -2,6 +2,8 @@
 #include "elements/material_algorithms.hpp"
 #include "elements/element_utils.hpp"
 
+#include <algorithm>
+
 namespace pcg::internal::elements {
 
 class VertexColorElement final : public IPcgElement {
@@ -17,17 +19,32 @@ public:
         const double g = ctx.node->data.value("g", 1.0);
         const double b = ctx.node->data.value("b", 1.0);
         const double a = ctx.node->data.value("a", 1.0);
+        const double emission = ctx.node->data.value("emission", 0.0);
+        const double emission_r = ctx.node->data.value("emissionColorR", 1.0);
+        const double emission_g = ctx.node->data.value("emissionColorG", 1.0);
+        const double emission_b = ctx.node->data.value("emissionColorB", 1.0);
+
+        double out_r = r;
+        double out_g = g;
+        double out_b = b;
+        double out_a = a;
+        if (emission > 0.0) {
+            out_r = emission_r;
+            out_g = emission_g;
+            out_b = emission_b;
+            out_a = std::clamp(emission, 0.0, 1.0);
+        }
 
         if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
             data::PcgGeometry out = *geometry;
             out.set_colors(std::vector<data::PcgColor>(
-                out.points().size(), data::PcgColor{r, g, b, a}));
+                out.points().size(), data::PcgColor{out_r, out_g, out_b, out_a}));
             emit_geometry(ctx, std::move(out));
             return PCG_OK;
         }
 
         data::PcgMeshData mesh = get_mesh_input(ctx, "in", "VertexColor missing mesh input");
-        vertex_color_mesh(mesh, r, g, b, a);
+        vertex_color_mesh(mesh, r, g, b, a, emission, emission_r, emission_g, emission_b);
         emit_mesh(ctx, std::move(mesh));
         return PCG_OK;
     }

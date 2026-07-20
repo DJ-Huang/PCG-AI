@@ -7,7 +7,10 @@
 
 namespace pcg::internal::elements {
 
-void vertex_color_mesh(data::PcgMeshData& mesh, double r, double g, double b, double a);
+void vertex_color_mesh(data::PcgMeshData& mesh,
+                       double r, double g, double b, double a,
+                       double emission,
+                       double emission_r, double emission_g, double emission_b);
 void assign_material(data::PcgMeshData& mesh, const std::string& material_name);
 void assign_material(data::PcgGeometry& geometry,
                      const std::string& material_name,

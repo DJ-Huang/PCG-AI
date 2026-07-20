@@ -216,7 +216,14 @@
         "rotateY": { "type": "number", "default": 0.0, "minimum": 0.0 },
         "rotateZ": { "type": "number", "default": 0.0, "minimum": 0.0 },
         "scaleMin": { "type": "number", "default": 1.0, "minimum": 0.000001 },
-        "scaleMax": { "type": "number", "default": 1.0, "minimum": 0.000001 }
+        "scaleMax": { "type": "number", "default": 1.0, "minimum": 0.000001 },
+        "colorMinR": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "colorMinG": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "colorMinB": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "colorMaxR": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "colorMaxG": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "colorMaxB": { "type": "number", "default": 1.0, "minimum": 0.0, "maximum": 1.0 },
+        "materialNames": { "type": "string", "default": "" }
       }
     },
     {
@@ -2111,6 +2118,28 @@
       }
     },
     {
+      "type": "CreateArcSpline",
+      "displayName": "Create Arc Spline",
+      "category": "Spline",
+      "inputs": [],
+      "outputs": [{ "id": "out", "label": "Spline", "pinType": "SpatialSpline" }],
+      "properties": {
+        "radius": { "type": "number", "default": 1.0, "minimum": 0.001 },
+        "startAngle": { "type": "number", "default": 0.0 },
+        "endAngle": { "type": "number", "default": 180.0 },
+        "segments": { "type": "integer", "default": 16, "minimum": 1, "maximum": 256 },
+        "axis": {
+          "type": "enum",
+          "default": "z",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        }
+      }
+    },
+    {
       "type": "VertexColor",
       "displayName": "Vertex Color",
       "category": "Material",
@@ -2120,7 +2149,11 @@
         "r": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
         "g": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
         "b": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
-        "a": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
+        "a": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "emission": { "type": "number", "default": 0.0, "minimum": 0, "maximum": 1 },
+        "emissionColorR": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "emissionColorG": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 },
+        "emissionColorB": { "type": "number", "default": 1.0, "minimum": 0, "maximum": 1 }
       }
     },
     {

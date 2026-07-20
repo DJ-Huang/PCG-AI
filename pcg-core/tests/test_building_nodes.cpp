@@ -136,6 +136,75 @@ int main()
         expect(has_transform_attributes, "rotation and scale attributes are written");
     }
 
+    const std::string color_graph = R"({
+      "version":"1.0",
+      "nodes":[
+        {"id":"prototype","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+        {"id":"grid","type":"CreatePointGrid","data":{"pointCountX":2,"pointCountY":1,"spacing":3.0}},
+        {"id":"random","type":"AttributeRandomize","data":{
+          "seed":3,
+          "colorMinR":0.2,"colorMinG":0.4,"colorMinB":0.6,
+          "colorMaxR":0.2,"colorMaxG":0.4,"colorMaxB":0.6,
+          "materialNames":"brick,stucco"}},
+        {"id":"copy","type":"CopyMeshToPoints","data":{}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"source":"grid","target":"random","sourceHandle":"out","targetHandle":"in"},
+        {"source":"prototype","target":"copy","sourceHandle":"out","targetHandle":"prototype"},
+        {"source":"random","target":"copy","sourceHandle":"out","targetHandle":"points"},
+        {"source":"copy","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+
+    const auto colored = execute(color_graph);
+    expect(colored.source_geometry != nullptr, "Cd CopyMeshToPoints keeps Geometry");
+    if (colored.source_geometry) {
+        expect(colored.source_geometry->has_colors() &&
+                   colored.source_geometry->colors().size() == 16,
+               "point Cd fills copied vertex colors");
+        if (colored.source_geometry->has_colors() &&
+            !colored.source_geometry->colors().empty()) {
+            const auto& c0 = colored.source_geometry->colors()[0];
+            expect(std::abs(c0.r - 0.2) < 0.000001 &&
+                       std::abs(c0.g - 0.4) < 0.000001 &&
+                       std::abs(c0.b - 0.6) < 0.000001,
+                   "point Cd RGB is applied to copy vertices");
+        }
+        expect(colored.source_geometry->has_face_materials() &&
+                   colored.source_geometry->face_materials().size() == 12,
+               "point material fills face materials");
+        if (colored.source_geometry->has_face_materials() &&
+            !colored.source_geometry->face_materials().empty()) {
+            const std::string& mat = colored.source_geometry->face_materials()[0];
+            expect(mat == "brick" || mat == "stucco",
+                   "point material chooses from materialNames");
+        }
+    }
+
+    const auto color_points = execute(R"({
+      "version":"1.0",
+      "nodes":[
+        {"id":"grid","type":"CreatePointGrid","data":{"pointCountX":2,"pointCountY":1,"spacing":1.0}},
+        {"id":"random","type":"AttributeRandomize","data":{
+          "seed":11,
+          "colorMinR":0.1,"colorMinG":0.2,"colorMinB":0.3,
+          "colorMaxR":0.9,"colorMaxG":0.8,"colorMaxB":0.7}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"source":"grid","target":"random","sourceHandle":"out","targetHandle":"in"},
+        {"source":"random","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })");
+    expect(color_points.points != nullptr, "AttributeRandomize color mode outputs points");
+    if (color_points.points) {
+        bool has_cd = true;
+        for (const auto& point : color_points.points->points())
+            has_cd = has_cd && point.attributes.contains("Cd");
+        expect(has_cd, "AttributeRandomize writes Cd attributes");
+    }
+
     const std::string switch_graph = R"({
       "version":"1.0",
       "nodes":[
@@ -175,6 +244,33 @@ int main()
     if (clamped.source_geometry)
         expect(std::abs(max_abs_coordinate(*clamped.source_geometry) - 4.0) < 0.000000001,
                "Switch clamp preserves the selected geometry");
+
+    const std::string emission_graph = R"({
+      "version":"1.0",
+      "nodes":[
+        {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+        {"id":"vc","type":"VertexColor","data":{
+          "r":0.1,"g":0.1,"b":0.1,"a":1.0,
+          "emission":0.75,
+          "emissionColorR":1.0,"emissionColorG":0.8,"emissionColorB":0.2}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"source":"box","target":"vc","sourceHandle":"out","targetHandle":"in"},
+        {"source":"vc","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    const auto emission = execute(emission_graph);
+    expect(emission.source_geometry != nullptr, "VertexColor emission keeps Geometry");
+    if (emission.source_geometry && emission.source_geometry->has_colors() &&
+        !emission.source_geometry->colors().empty()) {
+        const auto& c = emission.source_geometry->colors()[0];
+        expect(std::abs(c.r - 1.0) < 0.000001 &&
+                   std::abs(c.g - 0.8) < 0.000001 &&
+                   std::abs(c.b - 0.2) < 0.000001 &&
+                   std::abs(c.a - 0.75) < 0.000001,
+               "emission overrides RGB and writes alpha mask");
+    }
 
     if (failures != 0) {
         std::printf("%d building node test(s) failed\n", failures);

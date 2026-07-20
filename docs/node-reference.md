@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **91 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **93 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -72,6 +72,7 @@
   - [CrossSectionProfile](#crosssectionprofile)
   - [InstanceAlongSpline](#instancealongspline)
   - [CreateSpiralSpline](#createspiralspline)
+  - [CreateArcSpline](#createarcspline)
 - [Structural 类别](#structural-类别)
   - [ConvexHull](#convexhull)
   - [ConnectNearest](#connectnearest)
@@ -1733,6 +1734,24 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 ---
 
+### CreateArcSpline
+
+生成圆弧样条（对齐 Houdini Circle SOP 的 arc 模式），用于拱窗剖面、拱门线脚等。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| radius | number | 1.0 | > 0 | 圆弧半径 |
+| startAngle | number | 0.0 | | 起始角（度） |
+| endAngle | number | 180.0 | | 结束角（度） |
+| segments | integer | 16 | 1–256 | 弧段数；采样点数 = segments + 1 |
+| axis | enum | z | x/y/z | 圆弧所在平面的法线轴（与 `CreateSpiralSpline.axis` 对齐） |
+
+**输出**：`out: SpatialSpline`（polyline，closed=false）。圆弧位于垂直于 `axis` 的平面上，圆心在原点。
+
+> 典型连接：`CreateArcSpline → SweepAlongSpline(rectangle) → TransformMesh`（拱门线脚）；或作为拱窗 Boolean cutter 的剖面轮廓。
+
+---
+
 ## Structural 类别
 
 ### ConvexHull
@@ -2921,6 +2940,8 @@ CreateSpline(profile) ──┘
 | `rotationX/Y/Z`（或 `rx/ry/rz`） | number | XYZ 欧拉角，单位为度 |
 | `orient` | `[x,y,z,w]` / `{x,y,z,w}` | 四元数；存在时优先于 frame 属性 |
 | `nx/ny/nz` + `tx/ty/tz` | number | 与 `SampleAlongSpline` 一致的 normal/tangent frame |
+| `Cd` | `[r,g,b]` / `{r,g,b[,a]}` | 每副本顶点色；有原型色时 RGB 相乘并保留原型 alpha，无原型色时填充 |
+| `material` | string | 覆盖该副本全部面的材质名 |
 
 原型以自身局部原点为放置基准，不自动居中。每个副本先 scale，再应用欧拉旋转与 `orient`/frame，最后平移到点坐标。
 
@@ -2930,7 +2951,7 @@ CreateSpline(profile) ──┘
 
 **类别**：Transform
 
-**功能**：以 `graph_seed + seed` 为确定性随机源，随机偏移点位置，并写入供 `CopyMeshToPoints` 消费的旋转与统一缩放属性。
+**功能**：以 `graph_seed + seed` 为确定性随机源，随机偏移点位置，并写入供 `CopyMeshToPoints` 消费的旋转、统一缩放、颜色（`Cd`）与材质名属性。
 
 **输入/输出 Pin**：`in` → `out`，均为 `SpatialPoint`。
 
@@ -2940,6 +2961,9 @@ CreateSpline(profile) ──┘
 | `translateX/Y/Z` | 0 | 各轴对称随机幅度 `[-value,+value]`，直接修改点坐标 |
 | `rotateX/Y/Z` | 0 | 各轴对称欧拉角幅度，写入 `rotationX/Y/Z` |
 | `scaleMin/scaleMax` | 1 / 1 | 统一缩放范围，写入 `scale`；上下限反置时自动交换 |
+| `colorMinR/G/B` | 1 / 1 / 1 | 颜色下界；与 Max 全为 1 时不写 `Cd` |
+| `colorMaxR/G/B` | 1 / 1 / 1 | 颜色上界；写入 `Cd = [r,g,b]` |
+| `materialNames` | `""` | 逗号分隔材质名列表；非空时随机写入 `material` |
 
 相同 graph seed、节点 seed 和输入点序列必定得到相同结果。
 
@@ -3033,7 +3057,19 @@ CreatePointGrid → AttributeRandomize → CopyMeshToPoints(points) → Output
 CreateBoxMesh ───────────────────────→ CopyMeshToPoints(prototype)
 ```
 
-规整立面可将 `AttributeRandomize` 幅度保持为 0；错位塔可设置水平平移、Y 轴旋转与 scale 范围。可选部件使用 `Switch` 在多路 Geometry 中选通，再进入后续 Merge。
+规整立面可将 `AttributeRandomize` 幅度保持为 0；错位塔可设置水平平移、Y 轴旋转与 scale 范围。可选部件使用 `Switch` 在多路 Geometry 中选通，再进入后续 Merge。设置 `colorMin/Max` 可让每栋建筑获得不同立面色；窗户分支可先接 `VertexColor(emission>0)` 再 Merge。
+
+### 建筑立面：已有节点即可实现的能力
+
+以下能力**不需要新节点**，用现有节点组合即可（Houdini 对标）：
+
+| 效果 | 推荐链路 |
+|------|----------|
+| 消防梯 zigzag | `CreatePoints` → `AttributeWrangle`(`@P.x` 交替 + `@rotationY`) → `CopyMeshToPoints` |
+| 栏杆 | `CreateSpline` → `SweepAlongSpline`(圆截面扶手) + `SampleAlongSpline` → `CopyMeshToPoints`(栏杆柱) |
+| 台阶 / stoop | `CreatePoints` → `AttributeWrangle`(`@P.y/@P.z` 递进) → `CopyMeshToPoints`(台阶 box) |
+| 多立面分组 | 串联多个 `FaceGroupByNormal`（不同 direction + outputGroup） |
+| Boolean 多 cutter | `MergeMesh` 所有 cutter → `BooleanMesh`(A=wall, B=merged, subtract) |
 
 ### 1. 基础点生成流水线
 
@@ -3225,7 +3261,7 @@ CreateSpline ──(profile)──┘
 
 ### VertexColor
 
-为 mesh 的每个顶点写入统一的 RGBA 颜色。
+为 mesh 的每个顶点写入统一的 RGBA 颜色；可选 emission 模式用于夜间窗户发光（alpha 作 emission mask）。
 
 | 属性 | 类型 | 默认值 | 范围 | 说明 |
 |------|------|--------|------|------|
@@ -3233,8 +3269,10 @@ CreateSpline ──(profile)──┘
 | g | number | 1.0 | [0, 1] | 绿色通道 |
 | b | number | 1.0 | [0, 1] | 蓝色通道 |
 | a | number | 1.0 | [0, 1] | Alpha 通道（不会丢失） |
+| emission | number | 0.0 | [0, 1] | >0 时启用发光：RGB 改为 emissionColor，alpha 写为 emission |
+| emissionColorR/G/B | number | 1 / 1 / 1 | [0, 1] | 发光颜色 |
 
-**执行逻辑**：读取输入 mesh，为所有顶点设置相同的颜色值，输出 mesh。
+**执行逻辑**：读取输入 geometry/mesh，为所有顶点设置相同颜色。`emission > 0` 时覆盖为发光色 + alpha mask。
 
 **范围限制**：本期仅支持 solid RGBA（统一颜色）。不支持按 face group 着色。应放在最后一个拓扑修改节点之后。
 

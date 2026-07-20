@@ -1,13 +1,30 @@
 #include "elements/material_algorithms.hpp"
 
+#include <algorithm>
+
 namespace pcg::internal::elements {
 
-void vertex_color_mesh(data::PcgMeshData& mesh, double r, double g, double b, double a)
+void vertex_color_mesh(data::PcgMeshData& mesh,
+                       double r, double g, double b, double a,
+                       double emission,
+                       double emission_r, double emission_g, double emission_b)
 {
     const int vc = static_cast<int>(mesh.vertices().size());
     if (vc == 0)
         return;
-    std::vector<data::PcgColor> colors(vc, {r, g, b, a});
+
+    double out_r = r;
+    double out_g = g;
+    double out_b = b;
+    double out_a = a;
+    if (emission > 0.0) {
+        out_r = emission_r;
+        out_g = emission_g;
+        out_b = emission_b;
+        out_a = std::clamp(emission, 0.0, 1.0);
+    }
+
+    std::vector<data::PcgColor> colors(vc, {out_r, out_g, out_b, out_a});
     mesh.set_colors(colors);
 }
 

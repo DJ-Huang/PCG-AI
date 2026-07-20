@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <string>
 
 namespace pcg::internal::elements {
 namespace {
@@ -200,6 +201,45 @@ data::PcgVec3 transform_for_point(const data::PcgVec3& point,
     return {value.x + placement.x, value.y + placement.y, value.z + placement.z};
 }
 
+bool read_cd(const nlohmann::json& attributes, data::PcgColor& color)
+{
+    const auto it = attributes.find("Cd");
+    if (it == attributes.end())
+        return false;
+
+    if (it->is_array() && it->size() >= 3 && (*it)[0].is_number() &&
+        (*it)[1].is_number() && (*it)[2].is_number()) {
+        color.r = (*it)[0].get<double>();
+        color.g = (*it)[1].get<double>();
+        color.b = (*it)[2].get<double>();
+        color.a = (it->size() >= 4 && (*it)[3].is_number()) ? (*it)[3].get<double>() : 1.0;
+        return std::isfinite(color.r) && std::isfinite(color.g) &&
+               std::isfinite(color.b) && std::isfinite(color.a);
+    }
+
+    if (it->is_object()) {
+        double r = 1.0;
+        double g = 1.0;
+        double b = 1.0;
+        double a = 1.0;
+        if (!read_number(*it, "r", r) || !read_number(*it, "g", g) || !read_number(*it, "b", b))
+            return false;
+        read_number(*it, "a", a);
+        color = {r, g, b, a};
+        return true;
+    }
+    return false;
+}
+
+bool read_material_name(const nlohmann::json& attributes, std::string& name)
+{
+    const auto it = attributes.find("material");
+    if (it == attributes.end() || !it->is_string())
+        return false;
+    name = it->get<std::string>();
+    return !name.empty();
+}
+
 } // namespace
 
 data::PcgPointData randomize_point_attributes(const data::PcgPointData& input,
@@ -212,6 +252,20 @@ data::PcgPointData randomize_point_attributes(const data::PcgPointData& input,
     const double scale_max = std::max(scale_min, std::max(options.scale_min, options.scale_max));
     const bool randomize_scale = std::abs(scale_min - 1.0) > 0.000000000001 ||
                                  std::abs(scale_max - 1.0) > 0.000000000001;
+
+    const auto near_one = [](double value) {
+        return std::abs(value - 1.0) <= 0.000000000001;
+    };
+    const bool color_disabled =
+        near_one(options.color_min_r) && near_one(options.color_min_g) &&
+        near_one(options.color_min_b) && near_one(options.color_max_r) &&
+        near_one(options.color_max_g) && near_one(options.color_max_b);
+    const double color_min_r = std::min(options.color_min_r, options.color_max_r);
+    const double color_max_r = std::max(options.color_min_r, options.color_max_r);
+    const double color_min_g = std::min(options.color_min_g, options.color_max_g);
+    const double color_max_g = std::max(options.color_min_g, options.color_max_g);
+    const double color_min_b = std::min(options.color_min_b, options.color_max_b);
+    const double color_max_b = std::max(options.color_min_b, options.color_max_b);
 
     for (auto& point : output.points_mut()) {
         point.x += random_signed(state, options.translate_x);
@@ -226,6 +280,22 @@ data::PcgPointData randomize_point_attributes(const data::PcgPointData& input,
             point.attributes["rotationZ"] = random_signed(state, options.rotate_z_deg);
         if (randomize_scale)
             point.attributes["scale"] = scale_min + random_unit(state) * (scale_max - scale_min);
+
+        if (!color_disabled) {
+            const double r = color_min_r + random_unit(state) * (color_max_r - color_min_r);
+            const double g = color_min_g + random_unit(state) * (color_max_g - color_min_g);
+            const double b = color_min_b + random_unit(state) * (color_max_b - color_min_b);
+            point.attributes["Cd"] = nlohmann::json::array({r, g, b});
+        }
+
+        if (!options.material_names.empty()) {
+            const double pick = random_unit(state) *
+                                static_cast<double>(options.material_names.size());
+            size_t index = static_cast<size_t>(pick);
+            if (index >= options.material_names.size())
+                index = options.material_names.size() - 1;
+            point.attributes["material"] = options.material_names[index];
+        }
     }
     return output;
 }
@@ -291,11 +361,42 @@ data::PcgGeometry copy_geometry_to_points(const data::PcgGeometry& prototype,
         output_counts[static_cast<size_t>(data::AttributeOwner::Primitive)] += prototype_counts[2];
     }
 
-    if (prototype.has_colors()) {
+    bool any_point_cd = false;
+    for (const auto& placement : points.points()) {
+        data::PcgColor unused;
+        if (read_cd(placement.attributes, unused)) {
+            any_point_cd = true;
+            break;
+        }
+    }
+
+    if (prototype.has_colors() || any_point_cd) {
         std::vector<data::PcgColor> colors;
-        colors.reserve(prototype.colors().size() * copy_count);
-        for (size_t copy = 0; copy < copy_count; ++copy)
-            colors.insert(colors.end(), prototype.colors().begin(), prototype.colors().end());
+        colors.reserve(prototype.points().size() * copy_count);
+        size_t copy_index = 0;
+        for (const auto& placement : points.points()) {
+            data::PcgColor point_cd{1.0, 1.0, 1.0, 1.0};
+            const bool has_cd = read_cd(placement.attributes, point_cd);
+            if (prototype.has_colors()) {
+                for (const auto& proto_color : prototype.colors()) {
+                    if (has_cd) {
+                        colors.push_back({proto_color.r * point_cd.r,
+                                          proto_color.g * point_cd.g,
+                                          proto_color.b * point_cd.b,
+                                          proto_color.a});
+                    } else {
+                        colors.push_back(proto_color);
+                    }
+                }
+            } else if (has_cd) {
+                colors.insert(colors.end(), prototype.points().size(), point_cd);
+            } else {
+                colors.insert(colors.end(), prototype.points().size(),
+                              data::PcgColor{1.0, 1.0, 1.0, 1.0});
+            }
+            ++copy_index;
+        }
+        (void)copy_index;
         output.set_colors(std::move(colors));
     }
 
@@ -316,12 +417,32 @@ data::PcgGeometry copy_geometry_to_points(const data::PcgGeometry& prototype,
         output.set_corner_uvs(std::move(corner_uvs));
     }
 
-    if (prototype.has_face_materials()) {
+    bool any_point_material = false;
+    for (const auto& placement : points.points()) {
+        std::string unused;
+        if (read_material_name(placement.attributes, unused)) {
+            any_point_material = true;
+            break;
+        }
+    }
+
+    if (prototype.has_face_materials() || any_point_material) {
         std::vector<std::string> materials;
-        materials.reserve(prototype.face_materials().size() * copy_count);
-        for (size_t copy = 0; copy < copy_count; ++copy) {
-            materials.insert(materials.end(), prototype.face_materials().begin(),
-                             prototype.face_materials().end());
+        materials.reserve(prototype.faces().size() * copy_count);
+        for (const auto& placement : points.points()) {
+            std::string point_material;
+            const bool has_material = read_material_name(placement.attributes, point_material);
+            if (has_material) {
+                materials.insert(materials.end(), prototype.faces().size(), point_material);
+            } else if (prototype.has_face_materials()) {
+                materials.insert(materials.end(), prototype.face_materials().begin(),
+                                 prototype.face_materials().end());
+            } else if (prototype.has_material()) {
+                materials.insert(materials.end(), prototype.faces().size(),
+                                 prototype.material_name());
+            } else {
+                materials.insert(materials.end(), prototype.faces().size(), std::string());
+            }
         }
         output.set_face_materials(std::move(materials));
     } else if (prototype.has_material()) {

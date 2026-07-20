@@ -171,6 +171,47 @@ data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& o
     return out;
 }
 
+data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options)
+{
+    data::PcgSplineData out;
+
+    if (options.radius <= 0.0 || options.segments < 1)
+        return out;
+
+    int axis = -1;
+    if (options.axis == "x" || options.axis == "X") axis = 0;
+    else if (options.axis == "y" || options.axis == "Y") axis = 1;
+    else if (options.axis == "z" || options.axis == "Z") axis = 2;
+    else return out;
+
+    constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+    const int sample_count = options.segments + 1;
+    const double start_rad = options.start_angle_deg * kDegToRad;
+    const double end_rad = options.end_angle_deg * kDegToRad;
+    const double span = end_rad - start_rad;
+
+    data::PcgSpline spline;
+    spline.closed = false;
+    spline.points.reserve(static_cast<size_t>(sample_count));
+
+    for (int i = 0; i < sample_count; ++i) {
+        const double t = static_cast<double>(i) / static_cast<double>(options.segments);
+        const double angle = start_rad + span * t;
+        const double c = options.radius * std::cos(angle);
+        const double s = options.radius * std::sin(angle);
+
+        data::PcgSplinePoint p{};
+        // Arc lies in the plane perpendicular to axis (Houdini Circle SOP arc mode).
+        if (axis == 0)      { p = {0.0, c, s}; }
+        else if (axis == 1) { p = {c, 0.0, s}; }
+        else                { p = {c, s, 0.0}; }
+        spline.points.push_back(p);
+    }
+
+    out.add_spline(std::move(spline));
+    return out;
+}
+
 data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options)
 {
     data::PcgSplineData out;
