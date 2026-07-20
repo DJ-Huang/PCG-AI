@@ -92,22 +92,54 @@
       "data": {"minSize": 4, "iterations": 4, "irregularity": 0.4512821, "seed": 11, "alignment": "boundingBox", "__nodeTitle": "City Lots"}
     },
     {
+      "id": "pads",
+      "type": "PolyExtrude",
+      "position": { "x": -120, "y": 320 },
+      "data": {"faceGroup": "", "distance": 0.18, "inset": 0.08, "keepOriginal": false, "topGroup": "extrude_top", "sideGroup": "extrude_side", "__nodeTitle": "Lot Pads"}
+    },
+    {
+      "id": "pad_rim",
+      "type": "GroupCreate",
+      "position": { "x": -120, "y": 400 },
+      "data": {
+        "outputGroup": "pad_rim",
+        "domain": "edge",
+        "mode": "angle",
+        "minEdgeAngle": 30,
+        "includeUnshared": false,
+        "fromFaceGroup": "extrude_top",
+        "fromEdgeGroup": "",
+        "__nodeTitle": "Pad Rim Edges"
+      }
+    },
+    {
       "id": "pad_bevel",
       "type": "BevelMesh",
       "position": { "x": -120, "y": 480 },
-      "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Pad Bevel"}
-    },
-    {
-      "id": "pads",
-      "type": "PolyExtrude",
-      "position": { "x": -120, "y": 344.5 },
-      "data": {"faceGroup": "", "distance": 0.18, "inset": 0.08, "keepOriginal": false, "topGroup": "extrude_top", "sideGroup": "extrude_side", "__nodeTitle": "Lot Pads"}
+      "data": {
+        "edgeGroup": "pad_rim",
+        "offsetType": "offset",
+        "amount": 0.04,
+        "segments": 2,
+        "limitMethod": "none",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": true,
+        "excludeGroups": "",
+        "__nodeTitle": "Pad Bevel"
+      }
     }
   ],
   "edges": [
     {"id": "e_ground_lots", "source": "ground", "target": "lots", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_lots_pads", "source": "lots", "target": "pads", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_pads_bevel", "source": "pads", "target": "pad_bevel", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_pads_rim", "source": "pads", "target": "pad_rim", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rim_bevel", "source": "pad_rim", "target": "pad_bevel", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_lots_sample", "source": "lots", "target": "sample", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_sample_jitter", "source": "sample", "target": "jitter", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_proto_bevel", "source": "bldg_proto", "target": "bldg_bevel", "sourceHandle": "out", "targetHandle": "in"},

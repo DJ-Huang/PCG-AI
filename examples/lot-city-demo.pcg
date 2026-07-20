@@ -40,6 +40,21 @@
       }
     },
     {
+      "id": "pad_rim",
+      "type": "GroupCreate",
+      "position": { "x": -120, "y": 400 },
+      "data": {
+        "__nodeTitle": "Pad Rim Edges",
+        "outputGroup": "pad_rim",
+        "domain": "edge",
+        "mode": "angle",
+        "minEdgeAngle": 30,
+        "includeUnshared": false,
+        "fromFaceGroup": "extrude_top",
+        "fromEdgeGroup": ""
+      }
+    },
+    {
       "id": "pad_bevel",
       "type": "BevelMesh",
       "position": { "x": -120, "y": 480 },
@@ -50,10 +65,12 @@
         "amount": 0.04,
         "segments": 2,
         "clampOverlap": true,
+        "limitMethod": "none",
         "angleLimit": 30,
         "profile": 0.5,
-        "edgeGroup": "",
-        "excludeUnshared": false
+        "edgeGroup": "pad_rim",
+        "excludeUnshared": true,
+        "excludeGroups": ""
       }
     },
     {
@@ -259,8 +276,15 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_pads_bevel",
+      "id": "e_pads_rim",
       "source": "pads",
+      "target": "pad_rim",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rim_bevel",
+      "source": "pad_rim",
       "target": "pad_bevel",
       "sourceHandle": "out",
       "targetHandle": "in"
