@@ -90,13 +90,6 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_lots_pads",
-      "source": "lots",
-      "target": "sg_pads",
-      "sourceHandle": "out",
-      "targetHandle": "lots"
-    },
-    {
       "id": "e_roads_pads",
       "source": "sg_roads",
       "target": "sg_pads",
@@ -123,6 +116,13 @@
       "target": "out",
       "sourceHandle": "out",
       "targetHandle": "in"
+    },
+    {
+      "id": "e_lots_pads",
+      "source": "lots",
+      "target": "sg_pads",
+      "sourceHandle": "out",
+      "targetHandle": "lots"
     }
   ],
   "parameters": [

@@ -504,9 +504,22 @@ public:
                 point.attributes["prefab"] = prefab;
             if (!mesh.empty())
                 point.attributes["mesh"] = mesh;
-            // Preserve per-point scale (e.g. lot-fit) and multiply by node scale.
-            const double existing = point.attributes.value("scale", 1.0);
-            point.attributes["scale"] = existing * scale;
+            // Preserve per-point scale / scaleX|Y|Z (e.g. lot-fit) and multiply by node scale.
+            const bool has_axis = point.attributes.contains("scaleX") ||
+                                  point.attributes.contains("scaleY") ||
+                                  point.attributes.contains("scaleZ");
+            if (has_axis) {
+                const double sx = point.attributes.value("scaleX", 1.0);
+                const double sy = point.attributes.value("scaleY", 1.0);
+                const double sz = point.attributes.value("scaleZ", 1.0);
+                point.attributes["scaleX"] = sx * scale;
+                point.attributes["scaleY"] = sy * scale;
+                point.attributes["scaleZ"] = sz * scale;
+                point.attributes.erase("scale");
+            } else {
+                const double existing = point.attributes.value("scale", 1.0);
+                point.attributes["scale"] = existing * scale;
+            }
         }
 
         nlohmann::json sidecar{

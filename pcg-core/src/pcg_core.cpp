@@ -1368,7 +1368,7 @@ PcgResultCode pcg_point_binary_size_for_counts(int point_count,
     if (attr_flags & PCG_POINT_ATTR_TRI_INDEX)
         size += point_count * static_cast<int>(sizeof(uint32_t));
     if (attr_flags & PCG_POINT_ATTR_SCALE)
-        size += point_count * static_cast<int>(sizeof(float));
+        size += point_count * 3 * static_cast<int>(sizeof(float));
     if (attr_flags & PCG_POINT_ATTR_ROTATION)
         size += point_count * 4 * static_cast<int>(sizeof(float));
 

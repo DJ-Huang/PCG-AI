@@ -89,7 +89,7 @@ typedef enum {
     PCG_POINT_ATTR_NORMAL = 1 << 0,  /* float32 nx,ny,nz */
     PCG_POINT_ATTR_UV = 1 << 1,      /* float32 u,v */
     PCG_POINT_ATTR_TRI_INDEX = 1 << 2, /* uint32 triIndex */
-    PCG_POINT_ATTR_SCALE = 1 << 3,   /* float32 scale */
+    PCG_POINT_ATTR_SCALE = 1 << 3,   /* float32 scaleX, scaleY, scaleZ */
     PCG_POINT_ATTR_ROTATION = 1 << 4 /* float32 quaternion xyzw */
 } PcgPointAttrFlags;
 

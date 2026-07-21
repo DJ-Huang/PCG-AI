@@ -75,7 +75,7 @@ namespace DJTechRuntime.PCG
         public Vector3 Position;
         public Vector3 Normal;
         public bool HasNormal;
-        public float Scale;
+        public Vector3 Scale;
         public bool HasScale;
         public Quaternion Rotation;
         public bool HasRotation;
@@ -479,7 +479,7 @@ namespace DJTechRuntime.PCG
                     if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
                         required += pointCount * 4;
                     if (flags.HasFlag(PcgPointAttrFlags.Scale))
-                        required += pointCount * 4;
+                        required += pointCount * 12;
                     if (flags.HasFlag(PcgPointAttrFlags.Rotation))
                         required += pointCount * 16;
 
@@ -500,7 +500,7 @@ namespace DJTechRuntime.PCG
                             Position = new Vector3(src[baseIndex], src[baseIndex + 1], src[baseIndex + 2]),
                             Normal = Vector3.up,
                             HasNormal = false,
-                            Scale = 1f,
+                            Scale = Vector3.one,
                             HasScale = false,
                             Rotation = Quaternion.identity,
                             HasRotation = false
@@ -532,11 +532,15 @@ namespace DJTechRuntime.PCG
                         var scales = (float*)(ptr + offset);
                         for (var i = 0; i < pointCount; i++)
                         {
-                            parsed[i].Scale = scales[i];
+                            var baseIndex = i * 3;
+                            parsed[i].Scale = new Vector3(
+                                scales[baseIndex],
+                                scales[baseIndex + 1],
+                                scales[baseIndex + 2]);
                             parsed[i].HasScale = true;
                         }
 
-                        offset += pointCount * 4;
+                        offset += pointCount * 12;
                     }
 
                     if (flags.HasFlag(PcgPointAttrFlags.Rotation))
@@ -729,7 +733,7 @@ namespace DJTechRuntime.PCG
                     Position = point,
                     Normal = Vector3.up,
                     HasNormal = false,
-                    Scale = 1f,
+                    Scale = Vector3.one,
                     HasScale = false,
                     Rotation = Quaternion.identity,
                     HasRotation = false

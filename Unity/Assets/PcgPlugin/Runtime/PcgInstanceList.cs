@@ -44,9 +44,12 @@ namespace DJTechRuntime.PCG
             else if (point.HasNormal && point.Normal.sqrMagnitude > 1e-8f)
                 rotation = Quaternion.FromToRotation(Vector3.up, point.Normal.normalized);
 
-            var perPointScale = point.HasScale ? point.Scale : 1f;
-            var uniformScale = Vector3.one * (globalScale * perPointScale);
-            return Matrix4x4.TRS(point.Position, rotation, uniformScale);
+            var perPointScale = point.HasScale ? point.Scale : Vector3.one;
+            var scale = new Vector3(
+                globalScale * perPointScale.x,
+                globalScale * perPointScale.y,
+                globalScale * perPointScale.z);
+            return Matrix4x4.TRS(point.Position, rotation, scale);
         }
     }
 }

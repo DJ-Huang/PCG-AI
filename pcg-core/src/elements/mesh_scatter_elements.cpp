@@ -92,7 +92,7 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "PointRelax missing points input");
 
         PointRelaxOptions opts;
-        opts.max_iterations = std::clamp(ctx.node->data.value("maxIterations", 50), 1, 1000);
+        opts.max_iterations = std::clamp(ctx.node->data.value("maxIterations", 50), 0, 1000);
         opts.radius = std::max(0.000001, ctx.node->data.value("radius", 1.0));
         opts.use_pscale = ctx.node->data.value("usePscale", true);
         opts.is_cancel_requested = ctx.is_cancel_requested;

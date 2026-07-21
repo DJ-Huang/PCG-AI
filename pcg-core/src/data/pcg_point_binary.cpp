@@ -22,6 +22,29 @@ bool has_attr_num(const nlohmann::json& attributes, const char* key)
     return attributes.is_object() && attributes.contains(key) && attributes[key].is_number();
 }
 
+bool has_scale_attr(const nlohmann::json& attributes)
+{
+    if (has_attr_num(attributes, "scaleX") || has_attr_num(attributes, "scaleY") ||
+        has_attr_num(attributes, "scaleZ"))
+        return true;
+    return has_attr_num(attributes, "scale");
+}
+
+void read_point_scale_xyz(const nlohmann::json& attributes, float& sx, float& sy, float& sz)
+{
+    sx = sy = sz = 1.0f;
+    if (has_attr_num(attributes, "scale")) {
+        const float s = static_cast<float>(attributes.value("scale", 1.0));
+        sx = sy = sz = s;
+    }
+    if (has_attr_num(attributes, "scaleX"))
+        sx *= static_cast<float>(attributes.value("scaleX", 1.0));
+    if (has_attr_num(attributes, "scaleY"))
+        sy *= static_cast<float>(attributes.value("scaleY", 1.0));
+    if (has_attr_num(attributes, "scaleZ"))
+        sz *= static_cast<float>(attributes.value("scaleZ", 1.0));
+}
+
 bool read_orient_quaternion(const nlohmann::json& attributes,
                             float& qx,
                             float& qy,
@@ -141,7 +164,7 @@ uint32_t detect_point_attr_flags(const PcgPointData& points)
                       has_attr_num(attributes, "nz");
         has_uv = has_uv && has_attr_num(attributes, "u") && has_attr_num(attributes, "v");
         has_tri = has_tri && has_attr_num(attributes, "triIndex");
-        has_scale = has_scale && has_attr_num(attributes, "scale");
+        has_scale = has_scale && has_scale_attr(attributes);
         has_rotation = has_rotation && has_rotation_attr(attributes);
     }
 
@@ -231,10 +254,13 @@ bool write_point_binary(const PcgPointData& points, void* buffer, int buffer_siz
 
     if (flags & PCG_POINT_ATTR_SCALE) {
         for (const auto& point : points.points()) {
-            const auto& attributes = point.attributes;
-            const float scale = static_cast<float>(attributes.value("scale", 1.0));
-            std::memcpy(bytes + offset, &scale, sizeof(scale));
-            offset += static_cast<int>(sizeof(scale));
+            float sx = 1.0f;
+            float sy = 1.0f;
+            float sz = 1.0f;
+            read_point_scale_xyz(point.attributes, sx, sy, sz);
+            const float s[3] = {sx, sy, sz};
+            std::memcpy(bytes + offset, s, sizeof(s));
+            offset += static_cast<int>(sizeof(s));
         }
     }
 

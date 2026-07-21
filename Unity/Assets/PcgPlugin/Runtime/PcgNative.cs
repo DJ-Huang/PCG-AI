@@ -1079,7 +1079,7 @@ namespace DJTechRuntime.PCG
                 if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
                     required += pointCount * 4;
                 if (flags.HasFlag(PcgPointAttrFlags.Scale))
-                    required += pointCount * 4;
+                    required += pointCount * 12;
                 if (flags.HasFlag(PcgPointAttrFlags.Rotation))
                     required += pointCount * 16;
 

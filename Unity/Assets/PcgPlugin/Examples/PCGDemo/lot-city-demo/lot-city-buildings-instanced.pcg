@@ -34,19 +34,6 @@
       }
     },
     {
-      "id": "shrink",
-      "type": "PrimitiveTransform",
-      "position": {
-        "x": 360,
-        "y": 480
-      },
-      "data": {
-        "scale": 0.85,
-        "faceGroup": "lots",
-        "__nodeTitle": "Shrink Lots 0.85"
-      }
-    },
-    {
       "id": "sg_roads",
       "type": "Subgraph",
       "position": {
@@ -134,20 +121,6 @@
         "scale": 1,
         "rotationY": 0,
         "__nodeTitle": "Lift Onto Pads"
-      }
-    },
-    {
-      "id": "relax",
-      "type": "PointRelax",
-      "position": {
-        "x": 360,
-        "y": 1200
-      },
-      "data": {
-        "maxIterations": 0,
-        "radius": 2.5,
-        "usePscale": false,
-        "__nodeTitle": "Relax Building Sites"
       }
     },
     {
@@ -372,9 +345,9 @@
       },
       "data": {
         "runOver": "points",
-        "expression": "@fp = (@btype == 0) * 3.7 + (@btype == 1) * 3.8 + (@btype == 2) * 4.5; @scale = min(@lotSizeX, @lotSizeZ) / max(@fp, 0.001);",
+        "expression": "@fp = (@btype == 0) * 3.7 + (@btype == 1) * 3.8 + (@btype == 2) * 4.5; @odd = abs(round(@rotationY / 90.0)) % 2; @inset = 0.88; @sxLot = (1 - @odd) * @lotSizeX + @odd * @lotSizeZ; @szLot = (1 - @odd) * @lotSizeZ + @odd * @lotSizeX; @scaleX = @sxLot * @inset / max(@fp, 0.001); @scaleY = 1; @scaleZ = @szLot * @inset / max(@fp, 0.001);",
         "parameters": "{}",
-        "__nodeTitle": "Scale To Lot Footprint"
+        "__nodeTitle": "Scale XYZ To Pad"
       }
     }
   ],
@@ -387,25 +360,11 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_lots_shrink",
-      "source": "lots",
-      "target": "shrink",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
       "id": "e_roads_group",
       "source": "sg_roads",
       "target": "road_group",
       "sourceHandle": "mesh",
       "targetHandle": "in"
-    },
-    {
-      "id": "e_shrink_xfer",
-      "source": "shrink",
-      "target": "xfer",
-      "sourceHandle": "out",
-      "targetHandle": "target"
     },
     {
       "id": "e_group_xfer",
@@ -432,20 +391,6 @@
       "id": "e_cent_lift",
       "source": "centroid",
       "target": "lift_pts",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_lift_relax",
-      "source": "lift_pts",
-      "target": "relax",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_relax_face",
-      "source": "relax",
-      "target": "face_road",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
@@ -553,6 +498,20 @@
       "target": "blast_short",
       "sourceHandle": "out",
       "targetHandle": "in"
+    },
+    {
+      "id": "e_lots_xfer",
+      "source": "lots",
+      "target": "xfer",
+      "sourceHandle": "out",
+      "targetHandle": "target"
+    },
+    {
+      "id": "e_lift_face",
+      "source": "lift_pts",
+      "target": "face_road",
+      "sourceHandle": "out",
+      "targetHandle": "in"
     }
   ],
   "parameters": [
@@ -591,30 +550,6 @@
       "hasRange": true,
       "min": 0,
       "max": 1
-    },
-    {
-      "id": "p_shrink",
-      "name": "lotShrink",
-      "type": "number",
-      "default": 0.85,
-      "exposed": true,
-      "targetNode": "shrink",
-      "targetProperty": "scale",
-      "hasRange": true,
-      "min": 0.5,
-      "max": 1
-    },
-    {
-      "id": "p_relax_radius",
-      "name": "siteRelaxRadius",
-      "type": "number",
-      "default": 2.5,
-      "exposed": true,
-      "targetNode": "relax",
-      "targetProperty": "radius",
-      "hasRange": true,
-      "min": 1,
-      "max": 5
     }
   ],
   "subgraphs": [
