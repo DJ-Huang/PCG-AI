@@ -2,10 +2,12 @@
 #include "elements/element_utils.hpp"
 #include "elements/pcg_element.hpp"
 #include "geometry/boolean_output.hpp"
+#include "geometry/arrangement.hpp"
 
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace pcg::internal::elements {
 
@@ -20,6 +22,33 @@ data::PcgGeometry boolean_geometry(const data::PcgGeometry& a,
     auto result = execute_boolean(a, b, opts);
     if (result.error != BooleanErrorType::Ok)
         return {};
+
+    // Best-effort: rematerialize user face groups onto boolean triangles using
+    // face_origins. Detriangulation may still drop them; callers should rebuild
+    // critical groups with GroupCreate when needed (PCG Block AI Core discipline).
+    if (result.face_origins.size() == result.geometry.faces().size()) {
+        auto rematerialize = [&](const data::PcgGeometry& source, int source_index) {
+            for (const auto& name :
+                 source.groups().group_names(geometry::GroupDomain::Face)) {
+                if (name == BooleanGroups::A_INSIDE_B || name == BooleanGroups::A_OUTSIDE_B ||
+                    name == BooleanGroups::B_INSIDE_A || name == BooleanGroups::B_OUTSIDE_A)
+                    continue;
+                const auto members =
+                    source.groups().members(geometry::GroupDomain::Face, name);
+                std::unordered_set<geometry::GroupId> member_set(members.begin(), members.end());
+                for (size_t fi = 0; fi < result.face_origins.size(); ++fi) {
+                    const auto& origin = result.face_origins[fi];
+                    if (origin.source != source_index || origin.original_face < 0)
+                        continue;
+                    if (member_set.count(origin.original_face) > 0)
+                        result.geometry.groups().add(geometry::GroupDomain::Face, name,
+                                                     static_cast<geometry::GroupId>(fi));
+                }
+            }
+        };
+        rematerialize(a, 0);
+        rematerialize(b, 1);
+    }
 
     return finalize_boolean_output(result, opts.detriangulate);
 }

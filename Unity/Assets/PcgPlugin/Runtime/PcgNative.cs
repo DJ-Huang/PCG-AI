@@ -84,26 +84,36 @@ namespace DJTechRuntime.PCG
             int errBufSize);
 
         public const int ErrBufSize = 1024;
-        // Large point/spline payloads can exceed 256KB in full-quality runs.
-        // Keep a larger static buffer to avoid false execution failures.
+        // Large city / facade cooks routinely exceed the old 8MB mesh ceiling
+        // (lot-city @ iterations=8 needs ~15–18MB). Rent a larger default, pass
+        // the *actual* rented length to native, and grow+retry when native
+        // reports "buffer too small (need N bytes...)".
         public const int OutJsonBufSize = 8 * 1024 * 1024;
-        public const int OutMeshBufSize = 8 * 1024 * 1024;
-        public const int OutPointsBufSize = 8 * 1024 * 1024;
-        public const int OutGeometryBufSize = 8 * 1024 * 1024;
+        public const int OutMeshBufSize = 32 * 1024 * 1024;
+        public const int OutPointsBufSize = 16 * 1024 * 1024;
+        public const int OutGeometryBufSize = 16 * 1024 * 1024;
         public const int OutHeightFieldBufSize = 8 * 1024 * 1024;
         public const int OutPerfBufSize = 64 * 1024;
+        public const int MaxOutBinaryBufSize = 256 * 1024 * 1024;
+        private const int MaxBufferGrowRetries = 3;
 
         private sealed class RentedOutputBuffers : IDisposable
         {
-            public readonly byte[] Json = ArrayPool<byte>.Shared.Rent(OutJsonBufSize);
-            public readonly byte[] Mesh = ArrayPool<byte>.Shared.Rent(OutMeshBufSize);
-            public readonly byte[] Points = ArrayPool<byte>.Shared.Rent(OutPointsBufSize);
-            public readonly byte[] Geometry = ArrayPool<byte>.Shared.Rent(OutGeometryBufSize);
-            public readonly byte[] HeightField = ArrayPool<byte>.Shared.Rent(OutHeightFieldBufSize);
-            public readonly byte[] Perf = ArrayPool<byte>.Shared.Rent(OutPerfBufSize);
+            public byte[] Json { get; private set; }
+            public byte[] Mesh { get; private set; }
+            public byte[] Points { get; private set; }
+            public byte[] Geometry { get; private set; }
+            public byte[] HeightField { get; private set; }
+            public byte[] Perf { get; private set; }
 
             public RentedOutputBuffers()
             {
+                Json = ArrayPool<byte>.Shared.Rent(OutJsonBufSize);
+                Mesh = ArrayPool<byte>.Shared.Rent(OutMeshBufSize);
+                Points = ArrayPool<byte>.Shared.Rent(OutPointsBufSize);
+                Geometry = ArrayPool<byte>.Shared.Rent(OutGeometryBufSize);
+                HeightField = ArrayPool<byte>.Shared.Rent(OutHeightFieldBufSize);
+                Perf = ArrayPool<byte>.Shared.Rent(OutPerfBufSize);
                 // Pool contents are undefined. Native writers null-terminate successful
                 // payloads, while these sentinels keep early-error perf reads empty.
                 Json[0] = 0;
@@ -112,6 +122,27 @@ namespace DJTechRuntime.PCG
                 Geometry[0] = 0;
                 HeightField[0] = 0;
                 Perf[0] = 0;
+            }
+
+            public bool TryEnsureMesh(int requiredBytes) => TryEnsure(b => Mesh = b, Mesh, requiredBytes);
+            public bool TryEnsurePoints(int requiredBytes) => TryEnsure(b => Points = b, Points, requiredBytes);
+            public bool TryEnsureGeometry(int requiredBytes) => TryEnsure(b => Geometry = b, Geometry, requiredBytes);
+            public bool TryEnsureJson(int requiredBytes) => TryEnsure(b => Json = b, Json, requiredBytes);
+            public bool TryEnsureHeightField(int requiredBytes) =>
+                TryEnsure(b => HeightField = b, HeightField, requiredBytes);
+
+            private static bool TryEnsure(Action<byte[]> assign, byte[] current, int requiredBytes)
+            {
+                if (requiredBytes <= 0 || current.Length >= requiredBytes)
+                    return true;
+                if (requiredBytes > MaxOutBinaryBufSize)
+                    return false;
+
+                ArrayPool<byte>.Shared.Return(current);
+                var next = ArrayPool<byte>.Shared.Rent(requiredBytes);
+                next[0] = 0;
+                assign(next);
+                return true;
             }
 
             public void Dispose()
@@ -123,6 +154,37 @@ namespace DJTechRuntime.PCG
                 ArrayPool<byte>.Shared.Return(HeightField);
                 ArrayPool<byte>.Shared.Return(Perf);
             }
+        }
+
+        private static bool TryParseBinaryBufferNeed(string error, out string kind, out int needBytes)
+        {
+            kind = null;
+            needBytes = 0;
+            if (string.IsNullOrEmpty(error))
+                return false;
+
+            // Native messages:
+            //   "Mesh binary buffer too small (need N bytes, got M)"
+            //   "Point binary buffer too small (need N bytes, got M)"
+            //   "Spawn mesh binary buffer too small (need N bytes, got M)"
+            const string needToken = "need ";
+            const string bytesToken = " bytes";
+            var needIdx = error.IndexOf(needToken, StringComparison.OrdinalIgnoreCase);
+            if (needIdx < 0)
+                return false;
+            var numStart = needIdx + needToken.Length;
+            var bytesIdx = error.IndexOf(bytesToken, numStart, StringComparison.OrdinalIgnoreCase);
+            if (bytesIdx <= numStart)
+                return false;
+            var numberText = error.Substring(numStart, bytesIdx - numStart);
+            if (!int.TryParse(numberText, out needBytes) || needBytes <= 0)
+                return false;
+
+            if (error.IndexOf("Point binary", StringComparison.OrdinalIgnoreCase) >= 0)
+                kind = "points";
+            else
+                kind = "mesh";
+            return true;
         }
 
         public static string GetVersion()
@@ -491,8 +553,11 @@ namespace DJTechRuntime.PCG
             NativeHeightFieldSlotV10[] heightfieldsV10,
             out int outKind,
             byte[] outJson,
+            int outJsonBufSize,
             byte[] outMeshBuf,
+            int outMeshBufSize,
             byte[] outPointsBuf,
+            int outPointsBufSize,
             out int outPointCount,
             out uint outPointAttrFlags,
             out int outVertexCount,
@@ -500,6 +565,7 @@ namespace DJTechRuntime.PCG
             out NativeCookStats outStats,
             byte[] outPerfJson,
             byte[] outGeometryBuf,
+            int outGeometryBufSize,
             out int outGeometryBytesWritten,
             byte[] outHeightFieldBuf,
             int outHeightFieldBufSize,
@@ -515,14 +581,14 @@ namespace DJTechRuntime.PCG
                     splines, splines?.Length ?? 0,
                     heightfieldsV10, heightfieldsV10?.Length ?? 0,
                     out outKind,
-                    outJson, OutJsonBufSize,
-                    outMeshBuf, OutMeshBufSize,
-                    outPointsBuf, OutPointsBufSize,
+                    outJson, outJsonBufSize,
+                    outMeshBuf, outMeshBufSize,
+                    outPointsBuf, outPointsBufSize,
                     out outPointCount, out outPointAttrFlags,
                     out outVertexCount, out outIndexCount,
                     out outStats,
                     outPerfJson, OutPerfBufSize,
-                    outGeometryBuf, OutGeometryBufSize, out outGeometryBytesWritten,
+                    outGeometryBuf, outGeometryBufSize, out outGeometryBytesWritten,
                     outHeightFieldBuf, outHeightFieldBufSize, out outHeightFieldBytesWritten,
                     errBuf, ErrBufSize);
             }
@@ -537,14 +603,14 @@ namespace DJTechRuntime.PCG
                     splines, splines?.Length ?? 0,
                     heightfieldsV9, heightfieldsV9?.Length ?? 0,
                     out outKind,
-                    outJson, OutJsonBufSize,
-                    outMeshBuf, OutMeshBufSize,
-                    outPointsBuf, OutPointsBufSize,
+                    outJson, outJsonBufSize,
+                    outMeshBuf, outMeshBufSize,
+                    outPointsBuf, outPointsBufSize,
                     out outPointCount, out outPointAttrFlags,
                     out outVertexCount, out outIndexCount,
                     out outStats,
                     outPerfJson, OutPerfBufSize,
-                    outGeometryBuf, OutGeometryBufSize, out outGeometryBytesWritten,
+                    outGeometryBuf, outGeometryBufSize, out outGeometryBytesWritten,
                     outHeightFieldBuf, outHeightFieldBufSize, out outHeightFieldBytesWritten,
                     errBuf, ErrBufSize);
             }
@@ -609,15 +675,16 @@ namespace DJTechRuntime.PCG
             var heightfieldHandles = new List<GCHandle>();
             var nativeSw = System.Diagnostics.Stopwatch.StartNew();
 
-            PcgResultCode rc;
-            int kind;
-            int pointCount;
-            uint pointAttrFlags;
-            int vertexCount;
-            int indexCount;
-            int geometryBytesWritten;
-            int heightfieldBytesWritten;
-            NativeCookStats cookStats;
+            // Definite assignment: try may throw before the cook loop assigns these.
+            PcgResultCode rc = PcgResultCode.Execution;
+            int kind = 0;
+            int pointCount = 0;
+            uint pointAttrFlags = 0;
+            int vertexCount = 0;
+            int indexCount = 0;
+            int geometryBytesWritten = 0;
+            int heightfieldBytesWritten = 0;
+            NativeCookStats cookStats = default;
 
             try
             {
@@ -739,61 +806,85 @@ namespace DJTechRuntime.PCG
                     }
                 }
 
-                rc = (PcgResultCode)ExecuteGraphNative(
-                    json, seed,
-                    nativeTextures, nativeMeshes, nativeSplines,
-                    nativeHeightFields, nativeHeightFieldsV10,
-                    out kind,
-                    jsonBuf,
-                    meshBuf,
-                    pointsBuf,
-                    out pointCount,
-                    out pointAttrFlags,
-                    out vertexCount,
-                    out indexCount,
-                    out cookStats,
-                    perfBuf,
-                    geometryBuf,
-                    out geometryBytesWritten,
-                    heightfieldBuf,
-                    heightfieldBuf.Length,
-                    out heightfieldBytesWritten,
-                    errBuf);
+                NativeCookStats primaryCookStats = default;
+                byte[] primaryPerf = null;
 
-                if (rc == PcgResultCode.Ok &&
-                    heightfieldBytesWritten > heightfieldBuf.Length)
+                for (var attempt = 0; attempt <= MaxBufferGrowRetries; attempt++)
                 {
-                    var primaryCookStats = cookStats;
-                    var primaryPerf = new byte[OutPerfBufSize];
-                    Buffer.BlockCopy(perfBuf, 0, primaryPerf, 0, primaryPerf.Length);
-                    heightfieldBuf = new byte[heightfieldBytesWritten];
+                    jsonBuf = outputBuffers.Json;
+                    meshBuf = outputBuffers.Mesh;
+                    pointsBuf = outputBuffers.Points;
+                    geometryBuf = outputBuffers.Geometry;
+                    heightfieldBuf = outputBuffers.HeightField;
+                    errBuf.Clear();
 
                     rc = (PcgResultCode)ExecuteGraphNative(
                         json, seed,
                         nativeTextures, nativeMeshes, nativeSplines,
                         nativeHeightFields, nativeHeightFieldsV10,
                         out kind,
-                        jsonBuf,
-                        meshBuf,
-                        pointsBuf,
+                        jsonBuf, jsonBuf.Length,
+                        meshBuf, meshBuf.Length,
+                        pointsBuf, pointsBuf.Length,
                         out pointCount,
                         out pointAttrFlags,
                         out vertexCount,
                         out indexCount,
                         out cookStats,
                         perfBuf,
-                        geometryBuf,
+                        geometryBuf, geometryBuf.Length,
                         out geometryBytesWritten,
                         heightfieldBuf,
                         heightfieldBuf.Length,
                         out heightfieldBytesWritten,
                         errBuf);
 
-                    // The retry is transport recovery; report the primary cook's
-                    // executed/skipped nodes and per-node timings to callers.
+                    if (rc == PcgResultCode.Ok &&
+                        heightfieldBytesWritten > heightfieldBuf.Length)
+                    {
+                        if (primaryPerf == null)
+                        {
+                            primaryCookStats = cookStats;
+                            primaryPerf = new byte[OutPerfBufSize];
+                            Buffer.BlockCopy(perfBuf, 0, primaryPerf, 0, primaryPerf.Length);
+                        }
+
+                        if (!outputBuffers.TryEnsureHeightField(heightfieldBytesWritten))
+                            break;
+
+                        continue;
+                    }
+
+                    if (rc == PcgResultCode.Ok)
+                        break;
+
+                    var errorText = errBuf.ToString();
+                    if (!TryParseBinaryBufferNeed(errorText, out var bufferKind, out var needBytes))
+                        break;
+                    if (attempt == MaxBufferGrowRetries)
+                        break;
+
+                    var grew = bufferKind == "points"
+                        ? outputBuffers.TryEnsurePoints(needBytes)
+                        : outputBuffers.TryEnsureMesh(needBytes);
+                    if (!grew)
+                        break;
+                }
+
+                if (primaryPerf != null && rc == PcgResultCode.Ok)
+                {
+                    // Heightfield transport recovery: report the first successful
+                    // cook's node timings (retry is serialize-capacity only).
                     cookStats = primaryCookStats;
                     Buffer.BlockCopy(primaryPerf, 0, perfBuf, 0, primaryPerf.Length);
                 }
+
+                // Refresh locals in case grow replaced pooled arrays.
+                jsonBuf = outputBuffers.Json;
+                meshBuf = outputBuffers.Mesh;
+                pointsBuf = outputBuffers.Points;
+                geometryBuf = outputBuffers.Geometry;
+                heightfieldBuf = outputBuffers.HeightField;
             }
             finally
             {

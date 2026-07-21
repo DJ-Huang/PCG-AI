@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **93 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **100 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -127,6 +127,13 @@
   - [Test](#test)
 
 ---
+  - [ForEachBegin](#foreachbegin)
+  - [ForEachEnd](#foreachend)
+  - [PrimitiveTransform](#primitivetransform)
+  - [ConvertLine](#convertline)
+  - [ExtractCentroid](#extractcentroid)
+  - [GroupTransfer](#grouptransfer)
+  - [Clip](#clip)
 
 ## Pin 数据类型
 
@@ -3389,3 +3396,59 @@ CopyAttributes(tag, values=tree/rock)
 | `test-project-texture.pcg` | `ImageTexture → ProjectTexture + CreateCylinderMesh → Output` | texture descriptor repeat 读取、planar UV 投射 |
 
 > **验证步骤**：在 Unity Editor 中打开 PCG Graph Editor → File → Open .pcg → Cook → 检查 Scene View mesh、Console 无报错。`test-color-uv-material.pcg` 可通过 mesh.colors / mesh.uv 长度验证属性传递。
+
+### ForEachBegin
+
+**类别**：Flow
+
+Houdini `block_begin` 子集：按 primitive / piece 属性 / count 迭代，输出当前件。执行器识别 Begin→End 区域并循环 cook。
+
+**输入**
+
+| id | label | pinType |
+|----|-------|---------|
+| in | Geometry | SpatialMesh |
+
+**输出**
+
+| id | label | pinType |
+|----|-------|---------|
+| out | Piece | SpatialMesh |
+
+**属性**：`method`（primitive|piece|count）、`pieceAttribute`、`iterations`
+
+### ForEachEnd
+
+**类别**：Flow
+
+Houdini `block_end` 子集：收集 Begin 区域结果。`gatherMethod=merge` 合并各次输出；`feedback` 将结果回喂下一轮（count 叠层）。
+
+### PrimitiveTransform
+
+**类别**：Mesh
+
+Houdini `primitive` SOP 子集：绕各面质心均匀缩放（默认 0.85），独立复制顶点，用于 lot inset。
+
+### ConvertLine
+
+**类别**：Spline
+
+Houdini `convertline`：面边 → 折线。`mode=unshared|all|group`。开窗链：`ConvertLine` → `ResampleSpline` → `CopyMeshToPoints` → `BooleanMesh`。
+
+### ExtractCentroid
+
+**类别**：Attribute
+
+Houdini `extractcentroid` 子集：输出每面质心点（或整体点云质心）。
+
+### GroupTransfer
+
+**类别**：Geometry
+
+Houdini `grouptransfer` 子集：按质心/点邻近，把 source 的命名 group 传到 target。
+
+### Clip
+
+**类别**：Mesh
+
+Houdini `clip` 子集：平面剖切，保留法线正侧（或负侧）整面。

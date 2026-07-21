@@ -125,6 +125,8 @@ set(PCG_CORE_SOURCES
     src/elements/building_elements.cpp
     src/elements/assembly_algorithms.cpp
     src/elements/assembly_elements.cpp
+    src/elements/facade_foundation_algorithms.cpp
+    src/elements/facade_foundation_elements.cpp
     src/elements/lot_subdivision_algorithms.cpp
     src/asset_path.cpp
 )
@@ -382,6 +384,11 @@ add_executable(test_point_relax tests/test_point_relax.cpp)
 target_link_libraries(test_point_relax PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_point_relax PRIVATE src)
 add_test(NAME test_point_relax COMMAND test_point_relax WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_facade_foundation tests/test_facade_foundation.cpp)
+target_link_libraries(test_facade_foundation PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_facade_foundation PRIVATE src)
+add_test(NAME test_facade_foundation COMMAND test_facade_foundation WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.

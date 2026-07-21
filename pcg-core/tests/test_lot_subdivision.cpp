@@ -142,6 +142,45 @@ void test_poly_extrude_chain()
            "LotSubdivision lots should extrude into buildings/pads");
 }
 
+void test_poly_extrude_discards_unselected()
+{
+    // Pad: extrude all lot faces, then extrude only tops into a building shell.
+    LotSubdivisionOptions lot_opts;
+    lot_opts.min_size = 0.5;
+    lot_opts.iterations = 1;
+    lot_opts.irregularity = 0.0;
+    lot_opts.seed = 1;
+    lot_opts.alignment = "boundingBox";
+    const auto lots = lot_subdivide_geometry(make_ground_quad(8.0, 8.0), lot_opts);
+
+    PolyExtrudeOptions pad;
+    pad.distance = 0.2;
+    pad.keep_original = false;
+    pad.top_group = "extrude_top";
+    pad.side_group = "extrude_side";
+    const auto pads = poly_extrude_geometry(lots, pad);
+    const auto top_count =
+        pads.groups().members(geometry::GroupDomain::Face, "extrude_top").size();
+    expect(top_count >= 1, "pads expose extrude_top faces");
+
+    PolyExtrudeOptions building;
+    building.face_group = "extrude_top";
+    building.distance = 2.0;
+    building.inset = 0.1;
+    building.keep_original = false;
+    building.top_group = "bldg_top";
+    building.side_group = "bldg_side";
+    const auto buildings = poly_extrude_geometry(pads, building);
+
+    expect(buildings.groups().members(geometry::GroupDomain::Face, "bldg_side").size() >= 3,
+           "building shell has side faces");
+    expect(buildings.groups().members(geometry::GroupDomain::Face, "bldg_top").size() >= 1,
+           "building shell has top faces");
+    // Unselected pad sides/bottoms must not remain when faceGroup is set.
+    expect(buildings.groups().members(geometry::GroupDomain::Face, "extrude_side").empty(),
+           "discard unselected: pad side group not carried into building-only output");
+}
+
 void test_graph_node()
 {
     // Build ground via CreateGridMesh (Houdini Grid equivalent; single quad for lots).
@@ -311,6 +350,7 @@ int main()
     test_min_size_stops_cutting();
     test_irregularity_changes_layout();
     test_poly_extrude_chain();
+    test_poly_extrude_discards_unselected();
     test_graph_node();
     test_example_graphs();
     test_pad_bevel_multi_lot_topology();

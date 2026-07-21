@@ -2,6 +2,7 @@
 
 #include "elements/building_algorithms.hpp"
 #include "elements/element_utils.hpp"
+#include "elements/expression.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -85,7 +86,24 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Switch missing node");
 
-        const int index = std::clamp(ctx.node->data.value("index", 0), 0, 3);
+        int index = ctx.node->data.value("index", 0);
+        const std::string index_expression =
+            ctx.node->data.value("indexExpression", std::string());
+        if (!index_expression.empty()) {
+            expression::Program program;
+            std::string error;
+            if (!expression::Program::compile_expression(index_expression, program, error))
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                ("Switch indexExpression parse error: " + error).c_str());
+            expression::EvalContext eval;
+            eval.parameters["index"] = static_cast<double>(index);
+            double value = 0.0;
+            if (!program.evaluate(eval, value, error))
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                ("Switch indexExpression error: " + error).c_str());
+            index = static_cast<int>(value);
+        }
+        index = std::clamp(index, 0, 3);
         const std::string pin = "in" + std::to_string(index);
         const data::PcgTaggedData* selected = ctx.inputs.find(pin);
         if (!selected)

@@ -5,7 +5,7 @@
       "id": "ground",
       "type": "CreateGridMesh",
       "position": {
-        "x": 200,
+        "x": 840,
         "y": 0
       },
       "data": {
@@ -21,517 +21,303 @@
       "id": "lots",
       "type": "LotSubdivision",
       "position": {
-        "x": 200,
+        "x": 840,
         "y": 160
       },
       "data": {
         "minSize": 4,
         "iterations": 4,
-        "irregularity": 0.4512821,
+        "irregularity": 0.45,
         "seed": 11,
         "alignment": "boundingBox",
-        "__nodeTitle": "City Lots"
+        "__nodeTitle": "Lot Subdivision"
       }
     },
     {
-      "id": "pads",
+      "id": "sg_roads",
+      "type": "Subgraph",
+      "position": {
+        "x": 1480,
+        "y": 320
+      },
+      "data": {
+        "subgraphId": "city_roads",
+        "__nodeTitle": "City Roads"
+      }
+    },
+    {
+      "id": "shrink",
+      "type": "PrimitiveTransform",
+      "position": {
+        "x": 840,
+        "y": 320
+      },
+      "data": {
+        "scale": 0.85,
+        "faceGroup": "lots",
+        "__nodeTitle": "Shrink Lots 0.85"
+      }
+    },
+    {
+      "id": "sg_pads",
+      "type": "Subgraph",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {
+        "subgraphId": "city_pads",
+        "__nodeTitle": "City Pads"
+      }
+    },
+    {
+      "id": "height_wrangle",
+      "type": "AttributeWrangle",
+      "position": {
+        "x": 840,
+        "y": 480
+      },
+      "data": {
+        "runOver": "primitives",
+        "expression": "@height = chf(\"shortH\") + (@primnum % 3 == 0) * (chf(\"tallH\") - chf(\"shortH\")) + (@primnum % 3 == 1) * (chf(\"medH\") - chf(\"shortH\"));",
+        "parameters": "{\"tallH\":4.5,\"medH\":2.8,\"shortH\":1.4}",
+        "__nodeTitle": "Lot Heights"
+      }
+    },
+    {
+      "id": "foreach_begin",
+      "type": "ForEachBegin",
+      "position": {
+        "x": 840,
+        "y": 640
+      },
+      "data": {
+        "method": "primitive",
+        "pieceAttribute": "piece",
+        "iterations": 1,
+        "__nodeTitle": "ForEach Lot Begin"
+      }
+    },
+    {
+      "id": "ex_lot",
       "type": "PolyExtrude",
       "position": {
-        "x": -120,
-        "y": 320
+        "x": 840,
+        "y": 800
       },
       "data": {
         "faceGroup": "",
-        "distance": 0.18,
-        "inset": 0.08,
+        "distance": 2.8,
+        "distanceAttribute": "height",
+        "inset": 0,
         "keepOriginal": false,
-        "topGroup": "extrude_top",
-        "sideGroup": "extrude_side",
-        "__nodeTitle": "Lot Pads"
+        "topGroup": "bldg_top",
+        "sideGroup": "bldg_side",
+        "__nodeTitle": "Extrude Lot Height"
       }
     },
     {
-      "id": "sg_bldg_tall",
-      "type": "Subgraph",
+      "id": "side_shell",
+      "type": "Blast",
       "position": {
         "x": 520,
-        "y": 0
-      },
-      "data": {
-        "subgraphId": "building_tall_flat",
-        "__nodeTitle": "Tall Flat-Roof"
-      }
-    },
-    {
-      "id": "sg_bldg_medium",
-      "type": "Subgraph",
-      "position": {
-        "x": 840,
-        "y": 0
-      },
-      "data": {
-        "subgraphId": "building_medium_pitched",
-        "__nodeTitle": "Medium Pitched"
-      }
-    },
-    {
-      "id": "sg_bldg_short",
-      "type": "Subgraph",
-      "position": {
-        "x": 1160,
-        "y": 0
-      },
-      "data": {
-        "subgraphId": "building_short_flat",
-        "__nodeTitle": "Short Flat-Roof"
-      }
-    },
-    {
-      "id": "road_a",
-      "type": "CreateSpline",
-      "position": {
-        "x": 1480,
-        "y": 160
-      },
-      "data": {
-        "mode": "polyline",
-        "closed": false,
-        "subdivisions": 1,
-        "startX": 0,
-        "startY": 0,
-        "startZ": 0,
-        "endX": 40,
-        "endY": 0,
-        "endZ": 0,
-        "controlPoints": "[{\"x\":-22,\"y\":0.20,\"z\":-8},{\"x\":22,\"y\":0.20,\"z\":-8}]",
-        "editPlane": "xz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Road A"
-      }
-    },
-    {
-      "id": "road_b",
-      "type": "CreateSpline",
-      "position": {
-        "x": 1800,
-        "y": 160
-      },
-      "data": {
-        "mode": "polyline",
-        "closed": false,
-        "subdivisions": 1,
-        "startX": 0,
-        "startY": 0,
-        "startZ": 0,
-        "endX": 40,
-        "endY": 0,
-        "endZ": 0,
-        "controlPoints": "[{\"x\":6,\"y\":0.20,\"z\":-22},{\"x\":6,\"y\":0.20,\"z\":22}]",
-        "editPlane": "xz",
-        "sceneOffsetX": 0,
-        "sceneOffsetY": 0,
-        "sceneOffsetZ": 0,
-        "__nodeTitle": "Road B"
-      }
-    },
-    {
-      "id": "road_sweep_a",
-      "type": "SweepAlongSpline",
-      "position": {
-        "x": 1480,
-        "y": 320
-      },
-      "data": {
-        "surfaceShape": "rectangle",
-        "profileWidth": 3.2,
-        "profileHeight": 0.12,
-        "radius": 1,
-        "columns": 16,
-        "sampleSpacing": 1,
-        "capStart": true,
-        "capEnd": true,
-        "upX": 0,
-        "upY": 1,
-        "upZ": 0,
-        "twist": 0,
-        "profileRoll": 0,
-        "scaleStart": 1,
-        "scaleEnd": 1,
-        "profilePlane": "xy",
-        "shadeMode": "auto",
-        "cuspAngle": 30,
-        "__nodeTitle": "Road Sweep A"
-      }
-    },
-    {
-      "id": "road_sweep_b",
-      "type": "SweepAlongSpline",
-      "position": {
-        "x": 1800,
-        "y": 320
-      },
-      "data": {
-        "surfaceShape": "rectangle",
-        "profileWidth": 3.2,
-        "profileHeight": 0.12,
-        "radius": 1,
-        "columns": 16,
-        "sampleSpacing": 1,
-        "capStart": true,
-        "capEnd": true,
-        "upX": 0,
-        "upY": 1,
-        "upZ": 0,
-        "twist": 0,
-        "profileRoll": 0,
-        "scaleStart": 1,
-        "scaleEnd": 1,
-        "profilePlane": "xy",
-        "shadeMode": "auto",
-        "cuspAngle": 30,
-        "__nodeTitle": "Road Sweep B"
-      }
-    },
-    {
-      "id": "pad_rim",
-      "type": "GroupCreate",
-      "position": {
-        "x": -120,
-        "y": 480
-      },
-      "data": {
-        "outputGroup": "pad_rim",
-        "domain": "edge",
-        "mode": "angle",
-        "minEdgeAngle": 30,
-        "includeUnshared": false,
-        "fromFaceGroup": "extrude_top",
-        "fromEdgeGroup": "",
-        "__nodeTitle": "Pad Rim Edges"
-      }
-    },
-    {
-      "id": "road_bevel_a",
-      "type": "BevelMesh",
-      "position": {
-        "x": 1480,
-        "y": 480
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Road Bevel A"
-      }
-    },
-    {
-      "id": "road_bevel_b",
-      "type": "BevelMesh",
-      "position": {
-        "x": 1800,
-        "y": 480
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Road Bevel B"
-      }
-    },
-    {
-      "id": "pad_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": -120,
-        "y": 640
-      },
-      "data": {
-        "edgeGroup": "pad_rim",
-        "offsetType": "offset",
-        "amount": 0.04,
-        "segments": 2,
-        "limitMethod": "none",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": true,
-        "excludeGroups": "",
-        "__nodeTitle": "Pad Bevel"
-      }
-    },
-    {
-      "id": "merge_roads",
-      "type": "MergeMesh",
-      "position": {
-        "x": 1640,
-        "y": 640
-      },
-      "data": {
-        "__nodeTitle": "Merge Roads"
-      }
-    },
-    {
-      "id": "pad_bool",
-      "type": "BooleanMesh",
-      "position": {
-        "x": -120,
-        "y": 800
-      },
-      "data": {
-        "operation": "subtract",
-        "treatAAs": "solid",
-        "treatBAs": "surface",
-        "useSelf": false,
-        "detriangulate": "all",
-        "weldEpsilon": 0.0001,
-        "triangleBudget": 500000,
-        "__nodeTitle": "Pad Cut Roads"
-      }
-    },
-    {
-      "id": "lot_top",
-      "type": "FaceGroupByNormal",
-      "position": {
-        "x": -120,
         "y": 960
       },
       "data": {
-        "outputGroup": "extrude_top",
-        "directionX": 0,
-        "directionY": 1,
-        "directionZ": 0,
-        "spreadAngle": 30,
-        "__nodeTitle": "Lot Top Faces"
+        "entity": "primitives",
+        "group": "bldg_side",
+        "expression": "",
+        "parameters": "{}",
+        "deleteNonSelected": true,
+        "removeUnusedPoints": true,
+        "__nodeTitle": "Keep Side Faces"
       }
     },
     {
-      "id": "sample",
-      "type": "SampleMeshSurface",
+      "id": "win_lines",
+      "type": "ConvertLine",
       "position": {
-        "x": 200,
-        "y": 960
-      },
-      "data": {
-        "count": 43,
-        "seed": 3,
-        "normalOffset": 0.05,
-        "looseness": 0,
-        "faceGroup": "extrude_top",
-        "excludeGroups": "",
-        "edgeMargin": 1.1,
-        "__nodeTitle": "Building Sites"
-      }
-    },
-    {
-      "id": "relax",
-      "type": "PointRelax",
-      "position": {
-        "x": 200,
+        "x": 520,
         "y": 1120
       },
       "data": {
-        "maxIterations": 100,
-        "radius": 1.5,
-        "usePscale": false,
-        "__nodeTitle": "Relax Sites"
+        "mode": "all",
+        "edgeGroup": "",
+        "__nodeTitle": "Side Edges To Lines"
       }
     },
     {
-      "id": "mat_roads",
-      "type": "AssignMaterial",
+      "id": "win_resample",
+      "type": "ResampleSpline",
       "position": {
-        "x": 1640,
-        "y": 800
+        "x": 520,
+        "y": 1280
       },
       "data": {
-        "group": "",
-        "materialName": "road",
-        "__nodeTitle": "Mat Roads"
+        "mode": "spacing",
+        "spacing": 0.85,
+        "pointCount": 8,
+        "edgeMode": "all",
+        "edgeGroup": "",
+        "__nodeTitle": "Resample Window Spans"
       }
     },
     {
-      "id": "mat_pad",
-      "type": "AssignMaterial",
+      "id": "win_pts",
+      "type": "SampleAlongSpline",
       "position": {
-        "x": -440,
-        "y": 960
+        "x": 520,
+        "y": 1440
       },
       "data": {
-        "group": "",
-        "materialName": "lot_pad",
-        "__nodeTitle": "Mat Lot Pads"
+        "spacing": 0.85,
+        "offset": 0.4,
+        "includeEnd": false,
+        "alignToTangent": true,
+        "seed": 3,
+        "__nodeTitle": "Window Sample Points"
       }
     },
     {
-      "id": "jitter",
-      "type": "AttributeRandomize",
+      "id": "win_box",
+      "type": "CreateBoxMesh",
       "position": {
         "x": 200,
         "y": 1280
       },
       "data": {
-        "seed": 5,
-        "translateX": 0.25,
-        "translateY": 0,
-        "translateZ": 0.25,
-        "rotateX": 0,
-        "rotateY": 20,
-        "rotateZ": 0,
-        "scaleMin": 0.85,
-        "scaleMax": 1.2,
-        "colorMinR": 1,
-        "colorMinG": 1,
-        "colorMinB": 1,
-        "colorMaxR": 1,
-        "colorMaxG": 1,
-        "colorMaxB": 1,
-        "materialNames": "",
-        "__nodeTitle": "Site Jitter"
+        "width": 0.55,
+        "height": 0.75,
+        "depth": 0.4,
+        "__nodeTitle": "Window Cutter"
       }
     },
     {
-      "id": "tag_type",
-      "type": "AttributeWrangle",
+      "id": "win_copy",
+      "type": "CopyMeshToPoints",
       "position": {
         "x": 200,
         "y": 1440
       },
       "data": {
-        "runOver": "points",
-        "expression": "@btype = @ptnum % 3;",
-        "parameters": "{}",
-        "__nodeTitle": "Tag Building Type"
+        "__nodeTitle": "Copy Window Cutters"
       }
     },
     {
-      "id": "blast_tall",
-      "type": "Blast",
-      "position": {
-        "x": 520,
-        "y": 1600
-      },
-      "data": {
-        "entity": "points",
-        "group": "",
-        "expression": "@btype != 0",
-        "parameters": "{}",
-        "deleteNonSelected": false,
-        "removeUnusedPoints": true,
-        "__nodeTitle": "Keep Tall Sites"
-      }
-    },
-    {
-      "id": "blast_med",
-      "type": "Blast",
+      "id": "win_bool",
+      "type": "BooleanMesh",
       "position": {
         "x": 840,
         "y": 1600
       },
       "data": {
-        "entity": "points",
-        "group": "",
-        "expression": "@btype != 1",
-        "parameters": "{}",
-        "deleteNonSelected": false,
-        "removeUnusedPoints": true,
-        "__nodeTitle": "Keep Medium Sites"
+        "operation": "subtract",
+        "treatAAs": "solid",
+        "treatBAs": "solid",
+        "useSelf": false,
+        "detriangulate": "all",
+        "weldEpsilon": 0.0001,
+        "triangleBudget": 500000,
+        "__nodeTitle": "Cut Windows"
       }
     },
     {
-      "id": "blast_short",
-      "type": "Blast",
-      "position": {
-        "x": 1160,
-        "y": 1600
-      },
-      "data": {
-        "entity": "points",
-        "group": "",
-        "expression": "@btype != 2",
-        "parameters": "{}",
-        "deleteNonSelected": false,
-        "removeUnusedPoints": true,
-        "__nodeTitle": "Keep Short Sites"
-      }
-    },
-    {
-      "id": "place_tall",
-      "type": "CopyMeshToPoints",
-      "position": {
-        "x": 520,
-        "y": 1760
-      },
-      "data": {
-        "__nodeTitle": "Place Tall"
-      }
-    },
-    {
-      "id": "place_med",
-      "type": "CopyMeshToPoints",
+      "id": "roof",
+      "type": "PolyExtrude",
       "position": {
         "x": 840,
         "y": 1760
       },
       "data": {
-        "__nodeTitle": "Place Medium"
+        "faceGroup": "bldg_top",
+        "distance": 0.55,
+        "inset": 0.35,
+        "keepOriginal": true,
+        "topGroup": "roof_top",
+        "sideGroup": "roof_side",
+        "__nodeTitle": "Pitched Roof"
       }
     },
     {
-      "id": "place_short",
-      "type": "CopyMeshToPoints",
-      "position": {
-        "x": 1160,
-        "y": 1760
-      },
-      "data": {
-        "__nodeTitle": "Place Short"
-      }
-    },
-    {
-      "id": "merge_bldgs",
-      "type": "MergeMesh",
+      "id": "foreach_end",
+      "type": "ForEachEnd",
       "position": {
         "x": 840,
         "y": 1920
       },
       "data": {
-        "__nodeTitle": "Merge Buildings"
+        "gatherMethod": "merge",
+        "__nodeTitle": "ForEach Lot End"
+      }
+    },
+    {
+      "id": "mat_walls",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 840,
+        "y": 2240
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Mat Walls"
+      }
+    },
+    {
+      "id": "fg_roof",
+      "type": "FaceGroupByNormal",
+      "position": {
+        "x": 840,
+        "y": 2400
+      },
+      "data": {
+        "outputGroup": "roof_faces",
+        "directionX": 0,
+        "directionY": 1,
+        "directionZ": 0,
+        "spreadAngle": 45,
+        "__nodeTitle": "Roof Faces"
+      }
+    },
+    {
+      "id": "mat_roof",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 840,
+        "y": 2560
+      },
+      "data": {
+        "group": "roof_faces",
+        "materialName": "roof_tile",
+        "__nodeTitle": "Mat Roof"
+      }
+    },
+    {
+      "id": "lift_bldgs",
+      "type": "TransformMesh",
+      "position": {
+        "x": 840,
+        "y": 2720
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0.18,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Lift Onto Pads"
       }
     },
     {
       "id": "merge",
       "type": "MergeMesh",
       "position": {
-        "x": 200,
-        "y": 2080
+        "x": 840,
+        "y": 2880
       },
       "data": {
         "__nodeTitle": "City Merge"
@@ -541,12 +327,12 @@
       "id": "out",
       "type": "Output",
       "position": {
-        "x": 200,
-        "y": 2240
+        "x": 840,
+        "y": 3040
       },
       "data": {
         "label": "Lot City",
-        "__nodeTitle": "Output"
+        "__nodeTitle": "Lot City Out"
       }
     }
   ],
@@ -559,232 +345,155 @@
       "targetHandle": "in"
     },
     {
+      "id": "e_lots_shrink",
+      "source": "lots",
+      "target": "shrink",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
       "id": "e_lots_pads",
       "source": "lots",
-      "target": "pads",
+      "target": "sg_pads",
+      "sourceHandle": "out",
+      "targetHandle": "lots"
+    },
+    {
+      "id": "e_roads_pads",
+      "source": "sg_roads",
+      "target": "sg_pads",
+      "sourceHandle": "mesh",
+      "targetHandle": "roads"
+    },
+    {
+      "id": "e_shrink_h",
+      "source": "shrink",
+      "target": "height_wrangle",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_pads_rim",
-      "source": "pads",
-      "target": "pad_rim",
+      "id": "e_h_begin",
+      "source": "height_wrangle",
+      "target": "foreach_begin",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_rim_bevel",
-      "source": "pad_rim",
-      "target": "pad_bevel",
+      "id": "e_begin_ex",
+      "source": "foreach_begin",
+      "target": "ex_lot",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_pad_bool",
-      "source": "pad_bevel",
-      "target": "pad_bool",
+      "id": "e_ex_sides",
+      "source": "ex_lot",
+      "target": "side_shell",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sides_lines",
+      "source": "side_shell",
+      "target": "win_lines",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_lines_rs",
+      "source": "win_lines",
+      "target": "win_resample",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_rs_pts",
+      "source": "win_resample",
+      "target": "win_pts",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_box_copy",
+      "source": "win_box",
+      "target": "win_copy",
+      "sourceHandle": "out",
+      "targetHandle": "prototype"
+    },
+    {
+      "id": "e_pts_copy",
+      "source": "win_pts",
+      "target": "win_copy",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    },
+    {
+      "id": "e_ex_bool",
+      "source": "ex_lot",
+      "target": "win_bool",
       "sourceHandle": "out",
       "targetHandle": "a"
     },
     {
-      "id": "e_road_a_sweep",
-      "source": "road_a",
-      "target": "road_sweep_a",
-      "sourceHandle": "out",
-      "targetHandle": "backbone"
-    },
-    {
-      "id": "e_road_b_sweep",
-      "source": "road_b",
-      "target": "road_sweep_b",
-      "sourceHandle": "out",
-      "targetHandle": "backbone"
-    },
-    {
-      "id": "e_road_a_bevel",
-      "source": "road_sweep_a",
-      "target": "road_bevel_a",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_road_b_bevel",
-      "source": "road_sweep_b",
-      "target": "road_bevel_b",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_road_a_merge",
-      "source": "road_bevel_a",
-      "target": "merge_roads",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_road_b_merge",
-      "source": "road_bevel_b",
-      "target": "merge_roads",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_merge_roads_bool",
-      "source": "merge_roads",
-      "target": "pad_bool",
+      "id": "e_copy_bool",
+      "source": "win_copy",
+      "target": "win_bool",
       "sourceHandle": "out",
       "targetHandle": "b"
     },
     {
-      "id": "e_bool_sample",
-      "source": "pad_bool",
-      "target": "lot_top",
+      "id": "e_bool_roof",
+      "source": "win_bool",
+      "target": "roof",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_top_sample",
-      "source": "lot_top",
-      "target": "sample",
+      "id": "e_roof_end",
+      "source": "roof",
+      "target": "foreach_end",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sample_relax",
-      "source": "sample",
-      "target": "relax",
+      "id": "e_mat_fg",
+      "source": "mat_walls",
+      "target": "fg_roof",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_relax_jitter",
-      "source": "relax",
-      "target": "jitter",
+      "id": "e_fg_mr",
+      "source": "fg_roof",
+      "target": "mat_roof",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_jitter_tag",
-      "source": "jitter",
-      "target": "tag_type",
+      "id": "e_mr_lift",
+      "source": "mat_roof",
+      "target": "lift_bldgs",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tag_bt",
-      "source": "tag_type",
-      "target": "blast_tall",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tag_bm",
-      "source": "tag_type",
-      "target": "blast_med",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tag_bs",
-      "source": "tag_type",
-      "target": "blast_short",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tall_proto",
-      "source": "sg_bldg_tall",
-      "target": "place_tall",
-      "sourceHandle": "mesh",
-      "targetHandle": "prototype"
-    },
-    {
-      "id": "e_med_proto",
-      "source": "sg_bldg_medium",
-      "target": "place_med",
-      "sourceHandle": "mesh",
-      "targetHandle": "prototype"
-    },
-    {
-      "id": "e_short_proto",
-      "source": "sg_bldg_short",
-      "target": "place_short",
-      "sourceHandle": "mesh",
-      "targetHandle": "prototype"
-    },
-    {
-      "id": "e_bt_pts",
-      "source": "blast_tall",
-      "target": "place_tall",
-      "sourceHandle": "out",
-      "targetHandle": "points"
-    },
-    {
-      "id": "e_bm_pts",
-      "source": "blast_med",
-      "target": "place_med",
-      "sourceHandle": "out",
-      "targetHandle": "points"
-    },
-    {
-      "id": "e_bs_pts",
-      "source": "blast_short",
-      "target": "place_short",
-      "sourceHandle": "out",
-      "targetHandle": "points"
-    },
-    {
-      "id": "e_pt_mb",
-      "source": "place_tall",
-      "target": "merge_bldgs",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_pm_mb",
-      "source": "place_med",
-      "target": "merge_bldgs",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_ps_mb",
-      "source": "place_short",
-      "target": "merge_bldgs",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_bool_mat_pad",
-      "source": "pad_bool",
-      "target": "mat_pad",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_roads_mat",
-      "source": "merge_roads",
-      "target": "mat_roads",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_merge_pads",
-      "source": "mat_pad",
+      "id": "e_pads_merge",
+      "source": "sg_pads",
       "target": "merge",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_merge_bldg",
-      "source": "merge_bldgs",
+      "id": "e_roads_merge",
+      "source": "sg_roads",
       "target": "merge",
-      "sourceHandle": "out",
+      "sourceHandle": "mesh",
       "targetHandle": "in"
     },
     {
-      "id": "e_merge_roads_out",
-      "source": "mat_roads",
+      "id": "e_lift_merge",
+      "source": "lift_bldgs",
       "target": "merge",
       "sourceHandle": "out",
       "targetHandle": "in"
@@ -793,6 +502,13 @@
       "id": "e_out",
       "source": "merge",
       "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_end_mat",
+      "source": "foreach_end",
+      "target": "mat_walls",
       "sourceHandle": "out",
       "targetHandle": "in"
     }
@@ -826,7 +542,7 @@
       "id": "p_irregularity",
       "name": "irregularity",
       "type": "number",
-      "default": 0.4512821,
+      "default": 0.45,
       "exposed": true,
       "targetNode": "lots",
       "targetProperty": "irregularity",
@@ -835,58 +551,46 @@
       "max": 1
     },
     {
-      "id": "p_sites",
-      "name": "buildingCount",
-      "type": "integer",
-      "default": 43,
-      "exposed": true,
-      "targetNode": "sample",
-      "targetProperty": "count",
-      "hasRange": true,
-      "min": 4,
-      "max": 80
-    },
-    {
-      "id": "p_edge_margin",
-      "name": "edgeMargin",
+      "id": "p_shrink",
+      "name": "lotShrink",
       "type": "number",
-      "default": 1.1,
+      "default": 0.85,
       "exposed": true,
-      "targetNode": "sample",
-      "targetProperty": "edgeMargin",
+      "targetNode": "shrink",
+      "targetProperty": "scale",
       "hasRange": true,
-      "min": 0,
-      "max": 3
-    },
-    {
-      "id": "p_pad_height",
-      "name": "padHeight",
-      "type": "number",
-      "default": 0.18,
-      "exposed": true,
-      "targetNode": "pads",
-      "targetProperty": "distance",
-      "hasRange": true,
-      "min": 0.02,
+      "min": 0.5,
       "max": 1
     },
     {
-      "id": "p_relax_radius",
-      "name": "relaxRadius",
+      "id": "p_win_spacing",
+      "name": "windowSpacing",
       "type": "number",
-      "default": 1.5,
+      "default": 0.85,
       "exposed": true,
-      "targetNode": "relax",
-      "targetProperty": "radius",
+      "targetNode": "win_resample",
+      "targetProperty": "spacing",
       "hasRange": true,
-      "min": 0.5,
-      "max": 4
+      "min": 0.3,
+      "max": 2
+    },
+    {
+      "id": "p_lift",
+      "name": "buildingLift",
+      "type": "number",
+      "default": 0.18,
+      "exposed": true,
+      "targetNode": "lift_bldgs",
+      "targetProperty": "translateY",
+      "hasRange": true,
+      "min": 0,
+      "max": 1
     }
   ],
   "subgraphs": [
     {
-      "id": "building_tall_flat",
-      "name": "Tall Flat-Roof Building",
+      "id": "city_roads",
+      "name": "City Roads",
       "inputs": [],
       "outputs": [
         {
@@ -897,886 +601,69 @@
       ],
       "nodes": [
         {
-          "id": "tf_body_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": -440,
-            "y": 0
-          },
-          "data": {
-            "width": 3.4,
-            "height": 10.8,
-            "depth": 3.4,
-            "__nodeTitle": "Tall Body"
-          }
-        },
-        {
-          "id": "tf_body_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": -440,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.05,
-            "segments": 2,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Body Bevel"
-          }
-        },
-        {
-          "id": "tf_body_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": -440,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "brick",
-            "__nodeTitle": "Tall Body Mat"
-          }
-        },
-        {
-          "id": "tf_body_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": -440,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Body Place"
-          }
-        },
-        {
-          "id": "tf_plinth_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": -120,
-            "y": 0
-          },
-          "data": {
-            "width": 3.6,
-            "height": 0.45,
-            "depth": 3.6,
-            "__nodeTitle": "Tall Plinth"
-          }
-        },
-        {
-          "id": "tf_plinth_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": -120,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Plinth Bevel"
-          }
-        },
-        {
-          "id": "tf_plinth_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": -120,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "plaster_cream",
-            "__nodeTitle": "Tall Plinth Mat"
-          }
-        },
-        {
-          "id": "tf_plinth_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": -120,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -5.2,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Plinth Place"
-          }
-        },
-        {
-          "id": "tf_band_box",
-          "type": "CreateBoxMesh",
+          "id": "road_a",
+          "type": "CreateSpline",
           "position": {
             "x": 200,
             "y": 0
           },
           "data": {
-            "width": 3.55,
-            "height": 0.12,
-            "depth": 0.12,
-            "__nodeTitle": "Tall Band"
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "startX": 0,
+            "startY": 0,
+            "startZ": 0,
+            "endX": 40,
+            "endY": 0,
+            "endZ": 0,
+            "controlPoints": "[{\"x\":-22,\"y\":0.20,\"z\":-8},{\"x\":22,\"y\":0.20,\"z\":-8}]",
+            "editPlane": "xz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Road A Path"
           }
         },
         {
-          "id": "tf_band_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 200,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Band Bevel"
-          }
-        },
-        {
-          "id": "tf_band_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 200,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Tall Band Mat"
-          }
-        },
-        {
-          "id": "tf_band_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 200,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -2.5,
-            "translateZ": 1.72,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Band Place"
-          }
-        },
-        {
-          "id": "tf_band_y",
-          "type": "CopyMesh",
-          "position": {
-            "x": 200,
-            "y": 640
-          },
-          "data": {
-            "mode": "linear",
-            "count": 3,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 2.4,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Tall Band Rows"
-          }
-        },
-        {
-          "id": "tf_cornice_box",
-          "type": "CreateBoxMesh",
+          "id": "road_b",
+          "type": "CreateSpline",
           "position": {
             "x": 520,
             "y": 0
           },
           "data": {
-            "width": 3.7,
-            "height": 0.35,
-            "depth": 3.7,
-            "__nodeTitle": "Tall Cornice"
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "startX": 0,
+            "startY": 0,
+            "startZ": 0,
+            "endX": 40,
+            "endY": 0,
+            "endZ": 0,
+            "controlPoints": "[{\"x\":6,\"y\":0.20,\"z\":-22},{\"x\":6,\"y\":0.20,\"z\":22}]",
+            "editPlane": "xz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Road B Path"
           }
         },
         {
-          "id": "tf_cornice_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 520,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Cornice Bevel"
-          }
-        },
-        {
-          "id": "tf_cornice_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 520,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Tall Cornice Mat"
-          }
-        },
-        {
-          "id": "tf_cornice_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 520,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 5.5,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Cornice Place"
-          }
-        },
-        {
-          "id": "tf_para_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 840,
-            "y": 0
-          },
-          "data": {
-            "width": 3.5,
-            "height": 0.55,
-            "depth": 0.18,
-            "__nodeTitle": "Tall Parapet F"
-          }
-        },
-        {
-          "id": "tf_para_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 840,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Parapet F Bevel"
-          }
-        },
-        {
-          "id": "tf_para_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 840,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "brick",
-            "__nodeTitle": "Tall Parapet F Mat"
-          }
-        },
-        {
-          "id": "tf_para_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 840,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 5.95,
-            "translateZ": 1.65,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Parapet F Place"
-          }
-        },
-        {
-          "id": "tf_parab_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 840,
-            "y": 800
-          },
-          "data": {
-            "width": 3.5,
-            "height": 0.55,
-            "depth": 0.18,
-            "__nodeTitle": "Tall Parapet B"
-          }
-        },
-        {
-          "id": "tf_parab_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 840,
-            "y": 960
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Parapet B Bevel"
-          }
-        },
-        {
-          "id": "tf_parab_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 840,
-            "y": 1120
-          },
-          "data": {
-            "group": "",
-            "materialName": "brick",
-            "__nodeTitle": "Tall Parapet B Mat"
-          }
-        },
-        {
-          "id": "tf_parab_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 840,
-            "y": 1280
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 5.95,
-            "translateZ": -1.65,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Parapet B Place"
-          }
-        },
-        {
-          "id": "tf_frame",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1160,
-            "y": 0
-          },
-          "data": {
-            "width": 0.95,
-            "height": 1.4,
-            "depth": 0.12,
-            "__nodeTitle": "Tall Win Frame"
-          }
-        },
-        {
-          "id": "tf_frame_bv",
-          "type": "BevelMesh",
-          "position": {
-            "x": 1160,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Frame Bevel"
-          }
-        },
-        {
-          "id": "tf_frame_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1160,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Tall Frame Mat"
-          }
-        },
-        {
-          "id": "tf_pane",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1480,
-            "y": 0
-          },
-          "data": {
-            "width": 0.72,
-            "height": 1.12,
-            "depth": 0.05,
-            "__nodeTitle": "Tall Win Pane"
-          }
-        },
-        {
-          "id": "tf_pane_vc",
-          "type": "VertexColor",
-          "position": {
-            "x": 1480,
-            "y": 160
-          },
-          "data": {
-            "r": 0.2,
-            "g": 0.15,
-            "b": 0.08,
-            "a": 1.0,
-            "emission": 0.9,
-            "emissionColorR": 1.0,
-            "emissionColorG": 0.82,
-            "emissionColorB": 0.4,
-            "__nodeTitle": "Tall Pane Glow"
-          }
-        },
-        {
-          "id": "tf_pane_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1480,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "window_glow",
-            "__nodeTitle": "Tall Pane Mat"
-          }
-        },
-        {
-          "id": "tf_pane_inset",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1480,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 0.04,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Pane Inset"
-          }
-        },
-        {
-          "id": "tf_win_unit",
-          "type": "MergeMesh",
-          "position": {
-            "x": 1320,
-            "y": 640
-          },
-          "data": {
-            "__nodeTitle": "Tall Win Unit"
-          }
-        },
-        {
-          "id": "tf_win_y",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1320,
-            "y": 800
-          },
-          "data": {
-            "mode": "linear",
-            "count": 4,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 2.35,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Tall Win Rows"
-          }
-        },
-        {
-          "id": "tf_win_x",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1320,
-            "y": 960
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "x",
-            "angle": 360,
-            "translateX": 1.35,
-            "translateY": 0,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Tall Win Cols"
-          }
-        },
-        {
-          "id": "tf_win_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1320,
-            "y": 1120
-          },
-          "data": {
-            "translateX": -0.675,
-            "translateY": -3.6,
-            "translateZ": 1.72,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Win Place"
-          }
-        },
-        {
-          "id": "tf_quoin_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1800,
-            "y": 0
-          },
-          "data": {
-            "width": 0.32,
-            "height": 0.42,
-            "depth": 0.32,
-            "__nodeTitle": "Tall Quoin"
-          }
-        },
-        {
-          "id": "tf_quoin_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 1800,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Quoin Bevel"
-          }
-        },
-        {
-          "id": "tf_quoin_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1800,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Tall Quoin Mat"
-          }
-        },
-        {
-          "id": "tf_quoin_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1800,
-            "y": 480
-          },
-          "data": {
-            "translateX": -1.7,
-            "translateY": -4.6,
-            "translateZ": -1.7,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Quoin Place"
-          }
-        },
-        {
-          "id": "tf_quoin_y",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1800,
-            "y": 640
-          },
-          "data": {
-            "mode": "linear",
-            "count": 5,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 2.1,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Tall Quoin Rows"
-          }
-        },
-        {
-          "id": "tf_quoin_x",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1800,
-            "y": 800
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "x",
-            "angle": 360,
-            "translateX": 3.4,
-            "translateY": 0,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Tall Quoin X"
-          }
-        },
-        {
-          "id": "tf_quoin_z",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1800,
-            "y": 960
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "z",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 3.4,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Tall Quoin Z"
-          }
-        },
-        {
-          "id": "tf_door",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 2120,
-            "y": 0
-          },
-          "data": {
-            "width": 1.0,
-            "height": 2.2,
-            "depth": 0.1,
-            "__nodeTitle": "Tall Door"
-          }
-        },
-        {
-          "id": "tf_door_bv",
-          "type": "BevelMesh",
-          "position": {
-            "x": 2120,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Tall Door Bevel"
-          }
-        },
-        {
-          "id": "tf_door_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 2120,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "plaster_cream",
-            "__nodeTitle": "Tall Door Mat"
-          }
-        },
-        {
-          "id": "tf_door_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 2120,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -4.3,
-            "translateZ": 1.72,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Door Place"
-          }
-        },
-        {
-          "id": "tf_arch",
-          "type": "CreateArcSpline",
-          "position": {
-            "x": 2440,
-            "y": 0
-          },
-          "data": {
-            "radius": 0.55,
-            "startAngle": 0,
-            "endAngle": 180,
-            "segments": 14,
-            "axis": "z",
-            "__nodeTitle": "Tall Door Arc"
-          }
-        },
-        {
-          "id": "tf_arch_sw",
+          "id": "road_sweep_a",
           "type": "SweepAlongSpline",
           "position": {
-            "x": 2440,
+            "x": 200,
             "y": 160
           },
           "data": {
             "surfaceShape": "rectangle",
-            "profileWidth": 0.12,
-            "profileHeight": 0.1,
+            "profileWidth": 3.2,
+            "profileHeight": 0.12,
             "radius": 1,
-            "columns": 12,
-            "sampleSpacing": 0.08,
+            "columns": 16,
+            "sampleSpacing": 1,
             "capStart": true,
             "capEnd": true,
             "upX": 0,
@@ -1789,534 +676,198 @@
             "profilePlane": "xy",
             "shadeMode": "auto",
             "cuspAngle": 30,
-            "__nodeTitle": "Tall Arch Sweep"
+            "__nodeTitle": "Road Sweep A"
           }
         },
         {
-          "id": "tf_arch_mat",
-          "type": "AssignMaterial",
+          "id": "road_sweep_b",
+          "type": "SweepAlongSpline",
           "position": {
-            "x": 2440,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Tall Arch Mat"
-          }
-        },
-        {
-          "id": "tf_arch_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 2440,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -3.15,
-            "translateZ": 1.75,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Arch Place"
-          }
-        },
-        {
-          "id": "tf_chim",
-          "type": "CreateCylinderMesh",
-          "position": {
-            "x": 2760,
-            "y": 0
-          },
-          "data": {
-            "radius": 0.18,
-            "height": 1.0,
-            "radialSegments": 8,
-            "heightSegments": 1,
-            "capTop": true,
-            "capBottom": true,
-            "__nodeTitle": "Tall Chimney"
-          }
-        },
-        {
-          "id": "tf_chim_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 2760,
+            "x": 520,
             "y": 160
           },
           "data": {
-            "group": "",
-            "materialName": "brick",
-            "__nodeTitle": "Tall Chimney Mat"
+            "surfaceShape": "rectangle",
+            "profileWidth": 3.2,
+            "profileHeight": 0.12,
+            "radius": 1,
+            "columns": 16,
+            "sampleSpacing": 1,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0,
+            "twist": 0,
+            "profileRoll": 0,
+            "scaleStart": 1,
+            "scaleEnd": 1,
+            "profilePlane": "xy",
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "Road Sweep B"
           }
         },
         {
-          "id": "tf_chim_xf",
-          "type": "TransformMesh",
+          "id": "road_bevel_a",
+          "type": "BevelMesh",
           "position": {
-            "x": 2760,
+            "x": 200,
             "y": 320
           },
           "data": {
-            "translateX": 0.7,
-            "translateY": 6.2,
-            "translateZ": 0.6,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Chimney Place"
+            "edgeGroup": "",
+            "offsetType": "offset",
+            "amount": 0.03,
+            "segments": 1,
+            "limitMethod": "angle",
+            "angleLimit": 30,
+            "profile": 0.5,
+            "miterOuter": "sharp",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": false,
+            "excludeGroups": "cap_start,cap_end",
+            "__nodeTitle": "Road Bevel A"
           }
         },
         {
-          "id": "tf_merge",
+          "id": "road_bevel_b",
+          "type": "BevelMesh",
+          "position": {
+            "x": 520,
+            "y": 320
+          },
+          "data": {
+            "edgeGroup": "",
+            "offsetType": "offset",
+            "amount": 0.03,
+            "segments": 1,
+            "limitMethod": "angle",
+            "angleLimit": 30,
+            "profile": 0.5,
+            "miterOuter": "sharp",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": false,
+            "excludeGroups": "cap_start,cap_end",
+            "__nodeTitle": "Road Bevel B"
+          }
+        },
+        {
+          "id": "merge_roads",
           "type": "MergeMesh",
           "position": {
-            "x": 400,
-            "y": 1440
+            "x": 360,
+            "y": 480
           },
           "data": {
-            "__nodeTitle": "Tall Merge"
+            "__nodeTitle": "Merge Roads"
           }
         },
         {
-          "id": "tf_lift",
-          "type": "TransformMesh",
+          "id": "mat_roads",
+          "type": "AssignMaterial",
           "position": {
-            "x": 400,
-            "y": 1600
+            "x": 360,
+            "y": 640
           },
           "data": {
-            "translateX": 0,
-            "translateY": 5.4,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Tall Lift"
+            "group": "",
+            "materialName": "road",
+            "__nodeTitle": "Mat Roads"
           }
         },
         {
-          "id": "tf_out",
+          "id": "roads_out",
           "type": "SubgraphOutput",
           "position": {
-            "x": 400,
-            "y": 1760
+            "x": 360,
+            "y": 800
           },
           "data": {
-            "__nodeTitle": "Tall Out"
+            "__nodeTitle": "Roads Out"
           }
         }
       ],
       "edges": [
         {
-          "id": "e_tf_body_bv",
-          "source": "tf_body_box",
-          "target": "tf_body_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_body_mat",
-          "source": "tf_body_bevel",
-          "target": "tf_body_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_body_xf",
-          "source": "tf_body_mat",
-          "target": "tf_body_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_plinth_bv",
-          "source": "tf_plinth_box",
-          "target": "tf_plinth_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_plinth_mat",
-          "source": "tf_plinth_bevel",
-          "target": "tf_plinth_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_plinth_xf",
-          "source": "tf_plinth_mat",
-          "target": "tf_plinth_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_band_bv",
-          "source": "tf_band_box",
-          "target": "tf_band_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_band_mat",
-          "source": "tf_band_bevel",
-          "target": "tf_band_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_band_xf",
-          "source": "tf_band_mat",
-          "target": "tf_band_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_band_y",
-          "source": "tf_band_xf",
-          "target": "tf_band_y",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_cornice_bv",
-          "source": "tf_cornice_box",
-          "target": "tf_cornice_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_cornice_mat",
-          "source": "tf_cornice_bevel",
-          "target": "tf_cornice_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_cornice_xf",
-          "source": "tf_cornice_mat",
-          "target": "tf_cornice_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_para_bv",
-          "source": "tf_para_box",
-          "target": "tf_para_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_para_mat",
-          "source": "tf_para_bevel",
-          "target": "tf_para_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_para_xf",
-          "source": "tf_para_mat",
-          "target": "tf_para_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_parab_bv",
-          "source": "tf_parab_box",
-          "target": "tf_parab_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_parab_mat",
-          "source": "tf_parab_bevel",
-          "target": "tf_parab_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_parab_xf",
-          "source": "tf_parab_mat",
-          "target": "tf_parab_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_fr_bv",
-          "source": "tf_frame",
-          "target": "tf_frame_bv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_fr_mat",
-          "source": "tf_frame_bv",
-          "target": "tf_frame_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_pn_vc",
-          "source": "tf_pane",
-          "target": "tf_pane_vc",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_pn_mat",
-          "source": "tf_pane_vc",
-          "target": "tf_pane_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_pn_in",
-          "source": "tf_pane_mat",
-          "target": "tf_pane_inset",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_fr_unit",
-          "source": "tf_frame_mat",
-          "target": "tf_win_unit",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_pn_unit",
-          "source": "tf_pane_inset",
-          "target": "tf_win_unit",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_win_y",
-          "source": "tf_win_unit",
-          "target": "tf_win_y",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_win_x",
-          "source": "tf_win_y",
-          "target": "tf_win_x",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_win_xf",
-          "source": "tf_win_x",
-          "target": "tf_win_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_quoin_bv",
-          "source": "tf_quoin_box",
-          "target": "tf_quoin_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_quoin_mat",
-          "source": "tf_quoin_bevel",
-          "target": "tf_quoin_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_quoin_xf",
-          "source": "tf_quoin_mat",
-          "target": "tf_quoin_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_qy",
-          "source": "tf_quoin_xf",
-          "target": "tf_quoin_y",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_qx",
-          "source": "tf_quoin_y",
-          "target": "tf_quoin_x",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_qz",
-          "source": "tf_quoin_x",
-          "target": "tf_quoin_z",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_d_bv",
-          "source": "tf_door",
-          "target": "tf_door_bv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_d_mat",
-          "source": "tf_door_bv",
-          "target": "tf_door_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_d_xf",
-          "source": "tf_door_mat",
-          "target": "tf_door_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_arch_sw",
-          "source": "tf_arch",
-          "target": "tf_arch_sw",
+          "id": "e_ra_sw",
+          "source": "road_a",
+          "target": "road_sweep_a",
           "sourceHandle": "out",
           "targetHandle": "backbone"
         },
         {
-          "id": "e_tf_arch_mat",
-          "source": "tf_arch_sw",
-          "target": "tf_arch_mat",
+          "id": "e_rb_sw",
+          "source": "road_b",
+          "target": "road_sweep_b",
+          "sourceHandle": "out",
+          "targetHandle": "backbone"
+        },
+        {
+          "id": "e_swa_bv",
+          "source": "road_sweep_a",
+          "target": "road_bevel_a",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_tf_arch_xf",
-          "source": "tf_arch_mat",
-          "target": "tf_arch_xf",
+          "id": "e_swb_bv",
+          "source": "road_sweep_b",
+          "target": "road_bevel_b",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_tf_chim_mat",
-          "source": "tf_chim",
-          "target": "tf_chim_mat",
+          "id": "e_bva_m",
+          "source": "road_bevel_a",
+          "target": "merge_roads",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_tf_chim_xf",
-          "source": "tf_chim_mat",
-          "target": "tf_chim_xf",
+          "id": "e_bvb_m",
+          "source": "road_bevel_b",
+          "target": "merge_roads",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_tf_m0",
-          "source": "tf_body_xf",
-          "target": "tf_merge",
+          "id": "e_m_mat",
+          "source": "merge_roads",
+          "target": "mat_roads",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_tf_m1",
-          "source": "tf_plinth_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m2",
-          "source": "tf_band_y",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m3",
-          "source": "tf_cornice_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m4",
-          "source": "tf_para_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m5",
-          "source": "tf_parab_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m6",
-          "source": "tf_win_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m7",
-          "source": "tf_quoin_z",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m8",
-          "source": "tf_door_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m9",
-          "source": "tf_arch_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_m10",
-          "source": "tf_chim_xf",
-          "target": "tf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_lift",
-          "source": "tf_merge",
-          "target": "tf_lift",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_tf_out",
-          "source": "tf_lift",
-          "target": "tf_out",
+          "id": "e_mat_out",
+          "source": "mat_roads",
+          "target": "roads_out",
           "sourceHandle": "out",
           "targetHandle": "mesh"
         }
       ]
     },
     {
-      "id": "building_medium_pitched",
-      "name": "Medium Pitched-Roof Building",
-      "inputs": [],
+      "id": "city_pads",
+      "name": "City Pads",
+      "inputs": [
+        {
+          "id": "lots",
+          "name": "Lots",
+          "pinType": "SpatialMesh"
+        },
+        {
+          "id": "roads",
+          "name": "Roads",
+          "pinType": "SpatialMesh"
+        }
+      ],
       "outputs": [
         {
           "id": "mesh",
@@ -2326,231 +877,75 @@
       ],
       "nodes": [
         {
-          "id": "mp_body_box",
-          "type": "CreateBoxMesh",
+          "id": "in_lots",
+          "type": "SubgraphInput",
           "position": {
-            "x": -440,
+            "x": 200,
             "y": 0
           },
           "data": {
-            "width": 3.6,
-            "height": 7.2,
-            "depth": 3.6,
-            "__nodeTitle": "Med Body"
+            "__nodeTitle": "Lots In"
           }
         },
         {
-          "id": "mp_body_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": -440,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.05,
-            "segments": 2,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Med Body Bevel"
-          }
-        },
-        {
-          "id": "mp_body_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": -440,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "plaster_teal",
-            "__nodeTitle": "Med Body Mat"
-          }
-        },
-        {
-          "id": "mp_body_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": -440,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Body Place"
-          }
-        },
-        {
-          "id": "mp_plinth_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": -120,
-            "y": 0
-          },
-          "data": {
-            "width": 3.8,
-            "height": 0.4,
-            "depth": 3.8,
-            "__nodeTitle": "Med Plinth"
-          }
-        },
-        {
-          "id": "mp_plinth_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": -120,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Med Plinth Bevel"
-          }
-        },
-        {
-          "id": "mp_plinth_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": -120,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "plaster_cream",
-            "__nodeTitle": "Med Plinth Mat"
-          }
-        },
-        {
-          "id": "mp_plinth_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": -120,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -3.5,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Plinth Place"
-          }
-        },
-        {
-          "id": "mp_roof_base",
-          "type": "CreateSpline",
+          "id": "in_roads",
+          "type": "SubgraphInput",
           "position": {
             "x": 520,
             "y": 0
           },
           "data": {
-            "mode": "polyline",
-            "closed": true,
-            "subdivisions": 1,
-            "startX": 0,
-            "startY": 0,
-            "startZ": 0,
-            "endX": 0,
-            "endY": 0,
-            "endZ": 0,
-            "controlPoints": "[{\"x\":-1.9,\"y\":0,\"z\":-1.9},{\"x\":1.9,\"y\":0,\"z\":-1.9},{\"x\":1.9,\"y\":0,\"z\":1.9},{\"x\":-1.9,\"y\":0,\"z\":1.9}]",
-            "editPlane": "xz",
-            "sceneOffsetX": 0,
-            "sceneOffsetY": 0,
-            "sceneOffsetZ": 0,
-            "__nodeTitle": "Roof Base"
+            "__nodeTitle": "Roads In"
           }
         },
         {
-          "id": "mp_roof_top",
-          "type": "CreateSpline",
+          "id": "pads",
+          "type": "PolyExtrude",
           "position": {
-            "x": 840,
-            "y": 0
-          },
-          "data": {
-            "mode": "polyline",
-            "closed": true,
-            "subdivisions": 1,
-            "startX": 0,
-            "startY": 0,
-            "startZ": 0,
-            "endX": 0,
-            "endY": 0,
-            "endZ": 0,
-            "controlPoints": "[{\"x\":-0.25,\"y\":2.4,\"z\":-0.25},{\"x\":0.25,\"y\":2.4,\"z\":-0.25},{\"x\":0.25,\"y\":2.4,\"z\":0.25},{\"x\":-0.25,\"y\":2.4,\"z\":0.25}]",
-            "editPlane": "xz",
-            "sceneOffsetX": 0,
-            "sceneOffsetY": 0,
-            "sceneOffsetZ": 0,
-            "__nodeTitle": "Roof Top"
-          }
-        },
-        {
-          "id": "mp_roof_loft",
-          "type": "LoftMesh",
-          "position": {
-            "x": 680,
+            "x": 200,
             "y": 160
           },
           "data": {
-            "columns": 32,
-            "sortAxis": "y",
-            "closedProfile": true,
-            "capStart": true,
-            "capEnd": true,
-            "autoAlign": true,
-            "shadeMode": "auto",
-            "cuspAngle": 30,
-            "__nodeTitle": "Pitched Roof"
+            "faceGroup": "",
+            "distance": 0.18,
+            "inset": 0.08,
+            "keepOriginal": false,
+            "topGroup": "extrude_top",
+            "sideGroup": "extrude_side",
+            "__nodeTitle": "Extrude Pads"
           }
         },
         {
-          "id": "mp_roof_bv",
-          "type": "BevelMesh",
+          "id": "pad_rim",
+          "type": "GroupCreate",
           "position": {
-            "x": 680,
+            "x": 200,
             "y": 320
           },
           "data": {
-            "edgeGroup": "",
+            "outputGroup": "pad_rim",
+            "domain": "edge",
+            "mode": "angle",
+            "minEdgeAngle": 30,
+            "includeUnshared": false,
+            "fromFaceGroup": "extrude_top",
+            "fromEdgeGroup": "",
+            "__nodeTitle": "Pad Rim Edges"
+          }
+        },
+        {
+          "id": "pad_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200,
+            "y": 480
+          },
+          "data": {
+            "edgeGroup": "pad_rim",
             "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
+            "amount": 0.04,
+            "segments": 2,
+            "limitMethod": "none",
             "angleLimit": 30,
             "profile": 0.5,
             "miterOuter": "sharp",
@@ -2558,1809 +953,101 @@
             "vmeshMethod": "adj",
             "clampOverlap": true,
             "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Roof Bevel"
+            "excludeUnshared": true,
+            "excludeGroups": "",
+            "__nodeTitle": "Pad Bevel"
           }
         },
         {
-          "id": "mp_roof_mat",
-          "type": "AssignMaterial",
+          "id": "pad_bool",
+          "type": "BooleanMesh",
           "position": {
-            "x": 680,
-            "y": 480
-          },
-          "data": {
-            "group": "",
-            "materialName": "roof_tile",
-            "__nodeTitle": "Roof Mat"
-          }
-        },
-        {
-          "id": "mp_roof_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 680,
+            "x": 360,
             "y": 640
           },
           "data": {
-            "translateX": 0,
-            "translateY": 3.6,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Roof Place"
+            "operation": "subtract",
+            "treatAAs": "solid",
+            "treatBAs": "surface",
+            "useSelf": false,
+            "detriangulate": "all",
+            "weldEpsilon": 0.0001,
+            "triangleBudget": 500000,
+            "__nodeTitle": "Pad Cut Roads"
           }
         },
         {
-          "id": "mp_frame",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1160,
-            "y": 0
-          },
-          "data": {
-            "width": 0.9,
-            "height": 1.35,
-            "depth": 0.12,
-            "__nodeTitle": "Med Win Frame"
-          }
-        },
-        {
-          "id": "mp_frame_bv",
-          "type": "BevelMesh",
-          "position": {
-            "x": 1160,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Med Frame Bevel"
-          }
-        },
-        {
-          "id": "mp_frame_mat",
+          "id": "mat_pad",
           "type": "AssignMaterial",
           "position": {
-            "x": 1160,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Med Frame Mat"
-          }
-        },
-        {
-          "id": "mp_pane",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1480,
-            "y": 0
-          },
-          "data": {
-            "width": 0.7,
-            "height": 1.1,
-            "depth": 0.05,
-            "__nodeTitle": "Med Win Pane"
-          }
-        },
-        {
-          "id": "mp_pane_vc",
-          "type": "VertexColor",
-          "position": {
-            "x": 1480,
-            "y": 160
-          },
-          "data": {
-            "r": 0.2,
-            "g": 0.15,
-            "b": 0.08,
-            "a": 1.0,
-            "emission": 0.9,
-            "emissionColorR": 1.0,
-            "emissionColorG": 0.82,
-            "emissionColorB": 0.4,
-            "__nodeTitle": "Med Pane Glow"
-          }
-        },
-        {
-          "id": "mp_pane_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1480,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "window_glow",
-            "__nodeTitle": "Med Pane Mat"
-          }
-        },
-        {
-          "id": "mp_pane_in",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1480,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 0.04,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Pane Inset"
-          }
-        },
-        {
-          "id": "mp_win_unit",
-          "type": "MergeMesh",
-          "position": {
-            "x": 1320,
-            "y": 640
-          },
-          "data": {
-            "__nodeTitle": "Med Win Unit"
-          }
-        },
-        {
-          "id": "mp_win_y",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1320,
-            "y": 800
-          },
-          "data": {
-            "mode": "linear",
-            "count": 3,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 2.2,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Med Win Rows"
-          }
-        },
-        {
-          "id": "mp_win_x",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1320,
-            "y": 960
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "x",
-            "angle": 360,
-            "translateX": 1.4,
-            "translateY": 0,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Med Win Cols"
-          }
-        },
-        {
-          "id": "mp_win_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1320,
-            "y": 1120
-          },
-          "data": {
-            "translateX": -0.7,
-            "translateY": -1.8,
-            "translateZ": 1.82,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Win Place"
-          }
-        },
-        {
-          "id": "mp_quoin_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1800,
-            "y": 0
-          },
-          "data": {
-            "width": 0.3,
-            "height": 0.4,
-            "depth": 0.3,
-            "__nodeTitle": "Med Quoin"
-          }
-        },
-        {
-          "id": "mp_quoin_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 1800,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Med Quoin Bevel"
-          }
-        },
-        {
-          "id": "mp_quoin_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1800,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Med Quoin Mat"
-          }
-        },
-        {
-          "id": "mp_quoin_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1800,
-            "y": 480
-          },
-          "data": {
-            "translateX": -1.8,
-            "translateY": -2.8,
-            "translateZ": -1.8,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Quoin Place"
-          }
-        },
-        {
-          "id": "mp_qy",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1800,
-            "y": 640
-          },
-          "data": {
-            "mode": "linear",
-            "count": 4,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 1.9,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Med Quoin Rows"
-          }
-        },
-        {
-          "id": "mp_qx",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1800,
-            "y": 800
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "x",
-            "angle": 360,
-            "translateX": 3.6,
-            "translateY": 0,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Med Quoin X"
-          }
-        },
-        {
-          "id": "mp_qz",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1800,
-            "y": 960
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "z",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 3.6,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Med Quoin Z"
-          }
-        },
-        {
-          "id": "mp_door",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 2120,
-            "y": 0
-          },
-          "data": {
-            "width": 0.95,
-            "height": 2.1,
-            "depth": 0.1,
-            "__nodeTitle": "Med Door"
-          }
-        },
-        {
-          "id": "mp_door_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 2120,
-            "y": 160
-          },
-          "data": {
-            "group": "",
-            "materialName": "plaster_cream",
-            "__nodeTitle": "Med Door Mat"
-          }
-        },
-        {
-          "id": "mp_door_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 2120,
-            "y": 320
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -2.55,
-            "translateZ": 1.82,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Door Place"
-          }
-        },
-        {
-          "id": "mp_dormer",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 2120,
-            "y": 480
-          },
-          "data": {
-            "width": 0.7,
-            "height": 0.9,
-            "depth": 0.55,
-            "__nodeTitle": "Med Dormer"
-          }
-        },
-        {
-          "id": "mp_dormer_bv",
-          "type": "BevelMesh",
-          "position": {
-            "x": 2120,
-            "y": 640
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Med Dormer Bevel"
-          }
-        },
-        {
-          "id": "mp_dormer_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 2120,
+            "x": 360,
             "y": 800
           },
           "data": {
             "group": "",
-            "materialName": "plaster_cream",
-            "__nodeTitle": "Med Dormer Mat"
+            "materialName": "lot_pad",
+            "__nodeTitle": "Mat Lot Pads"
           }
         },
         {
-          "id": "mp_dormer_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 2120,
-            "y": 960
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 4.5,
-            "translateZ": 0.9,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Dormer Place"
-          }
-        },
-        {
-          "id": "mp_merge",
-          "type": "MergeMesh",
-          "position": {
-            "x": 400,
-            "y": 1440
-          },
-          "data": {
-            "__nodeTitle": "Med Merge"
-          }
-        },
-        {
-          "id": "mp_lift",
-          "type": "TransformMesh",
-          "position": {
-            "x": 400,
-            "y": 1600
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 3.6,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Med Lift"
-          }
-        },
-        {
-          "id": "mp_out",
+          "id": "pads_out",
           "type": "SubgraphOutput",
           "position": {
-            "x": 400,
-            "y": 1760
+            "x": 360,
+            "y": 960
           },
           "data": {
-            "__nodeTitle": "Med Out"
+            "__nodeTitle": "Pads Out"
           }
         }
       ],
       "edges": [
         {
-          "id": "e_mp_body_bv",
-          "source": "mp_body_box",
-          "target": "mp_body_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_body_mat",
-          "source": "mp_body_bevel",
-          "target": "mp_body_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_body_xf",
-          "source": "mp_body_mat",
-          "target": "mp_body_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_plinth_bv",
-          "source": "mp_plinth_box",
-          "target": "mp_plinth_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_plinth_mat",
-          "source": "mp_plinth_bevel",
-          "target": "mp_plinth_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_plinth_xf",
-          "source": "mp_plinth_mat",
-          "target": "mp_plinth_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_rb",
-          "source": "mp_roof_base",
-          "target": "mp_roof_loft",
-          "sourceHandle": "out",
-          "targetHandle": "profiles"
-        },
-        {
-          "id": "e_mp_rt",
-          "source": "mp_roof_top",
-          "target": "mp_roof_loft",
-          "sourceHandle": "out",
-          "targetHandle": "profiles"
-        },
-        {
-          "id": "e_mp_rbv",
-          "source": "mp_roof_loft",
-          "target": "mp_roof_bv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_rmat",
-          "source": "mp_roof_bv",
-          "target": "mp_roof_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_rxf",
-          "source": "mp_roof_mat",
-          "target": "mp_roof_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_fbv",
-          "source": "mp_frame",
-          "target": "mp_frame_bv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_fmat",
-          "source": "mp_frame_bv",
-          "target": "mp_frame_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_pvc",
-          "source": "mp_pane",
-          "target": "mp_pane_vc",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_pmat",
-          "source": "mp_pane_vc",
-          "target": "mp_pane_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_pin",
-          "source": "mp_pane_mat",
-          "target": "mp_pane_in",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_fu",
-          "source": "mp_frame_mat",
-          "target": "mp_win_unit",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_pu",
-          "source": "mp_pane_in",
-          "target": "mp_win_unit",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_wy",
-          "source": "mp_win_unit",
-          "target": "mp_win_y",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_wx",
-          "source": "mp_win_y",
-          "target": "mp_win_x",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_wxf",
-          "source": "mp_win_x",
-          "target": "mp_win_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_quoin_bv",
-          "source": "mp_quoin_box",
-          "target": "mp_quoin_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_quoin_mat",
-          "source": "mp_quoin_bevel",
-          "target": "mp_quoin_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_quoin_xf",
-          "source": "mp_quoin_mat",
-          "target": "mp_quoin_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_qy",
-          "source": "mp_quoin_xf",
-          "target": "mp_qy",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_qx",
-          "source": "mp_qy",
-          "target": "mp_qx",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_qz",
-          "source": "mp_qx",
-          "target": "mp_qz",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_dm",
-          "source": "mp_door",
-          "target": "mp_door_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_dx",
-          "source": "mp_door_mat",
-          "target": "mp_door_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_dbv",
-          "source": "mp_dormer",
-          "target": "mp_dormer_bv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_dmat",
-          "source": "mp_dormer_bv",
-          "target": "mp_dormer_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_dxf",
-          "source": "mp_dormer_mat",
-          "target": "mp_dormer_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m0",
-          "source": "mp_body_xf",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m1",
-          "source": "mp_plinth_xf",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m2",
-          "source": "mp_roof_xf",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m3",
-          "source": "mp_win_xf",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m4",
-          "source": "mp_qz",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m5",
-          "source": "mp_door_xf",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_m6",
-          "source": "mp_dormer_xf",
-          "target": "mp_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_lift",
-          "source": "mp_merge",
-          "target": "mp_lift",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_mp_out",
-          "source": "mp_lift",
-          "target": "mp_out",
-          "sourceHandle": "out",
-          "targetHandle": "mesh"
-        }
-      ]
-    },
-    {
-      "id": "building_short_flat",
-      "name": "Short Flat-Roof Building",
-      "inputs": [],
-      "outputs": [
-        {
-          "id": "mesh",
-          "name": "Mesh",
-          "pinType": "SpatialMesh"
-        }
-      ],
-      "nodes": [
-        {
-          "id": "sf_body_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": -440,
-            "y": 0
-          },
-          "data": {
-            "width": 4.2,
-            "height": 5.2,
-            "depth": 4.2,
-            "__nodeTitle": "Short Body"
-          }
-        },
-        {
-          "id": "sf_body_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": -440,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.05,
-            "segments": 2,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Short Body Bevel"
-          }
-        },
-        {
-          "id": "sf_body_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": -440,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "plaster_cream",
-            "__nodeTitle": "Short Body Mat"
-          }
-        },
-        {
-          "id": "sf_body_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": -440,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Body Place"
-          }
-        },
-        {
-          "id": "sf_plinth_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": -120,
-            "y": 0
-          },
-          "data": {
-            "width": 4.4,
-            "height": 0.35,
-            "depth": 4.4,
-            "__nodeTitle": "Short Plinth"
-          }
-        },
-        {
-          "id": "sf_plinth_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": -120,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Short Plinth Bevel"
-          }
-        },
-        {
-          "id": "sf_plinth_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": -120,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "brick",
-            "__nodeTitle": "Short Plinth Mat"
-          }
-        },
-        {
-          "id": "sf_plinth_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": -120,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -2.45,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Plinth Place"
-          }
-        },
-        {
-          "id": "sf_cornice_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 200,
-            "y": 0
-          },
-          "data": {
-            "width": 4.5,
-            "height": 0.4,
-            "depth": 4.5,
-            "__nodeTitle": "Short Cornice"
-          }
-        },
-        {
-          "id": "sf_cornice_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 200,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Short Cornice Bevel"
-          }
-        },
-        {
-          "id": "sf_cornice_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 200,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Short Cornice Mat"
-          }
-        },
-        {
-          "id": "sf_cornice_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 200,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 2.7,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Cornice Place"
-          }
-        },
-        {
-          "id": "sf_roof_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 520,
-            "y": 0
-          },
-          "data": {
-            "width": 4.3,
-            "height": 0.2,
-            "depth": 4.3,
-            "__nodeTitle": "Short Roof Cap"
-          }
-        },
-        {
-          "id": "sf_roof_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 520,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Short Roof Cap Bevel"
-          }
-        },
-        {
-          "id": "sf_roof_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 520,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "roof_green",
-            "__nodeTitle": "Short Roof Cap Mat"
-          }
-        },
-        {
-          "id": "sf_roof_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 520,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 2.95,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Roof Cap Place"
-          }
-        },
-        {
-          "id": "sf_frame",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 840,
-            "y": 0
-          },
-          "data": {
-            "width": 1.1,
-            "height": 1.5,
-            "depth": 0.12,
-            "__nodeTitle": "Short Win Frame"
-          }
-        },
-        {
-          "id": "sf_frame_bv",
-          "type": "BevelMesh",
-          "position": {
-            "x": 840,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Short Frame Bevel"
-          }
-        },
-        {
-          "id": "sf_frame_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 840,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Short Frame Mat"
-          }
-        },
-        {
-          "id": "sf_pane",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1160,
-            "y": 0
-          },
-          "data": {
-            "width": 0.88,
-            "height": 1.25,
-            "depth": 0.05,
-            "__nodeTitle": "Short Win Pane"
-          }
-        },
-        {
-          "id": "sf_pane_vc",
-          "type": "VertexColor",
-          "position": {
-            "x": 1160,
-            "y": 160
-          },
-          "data": {
-            "r": 0.2,
-            "g": 0.15,
-            "b": 0.08,
-            "a": 1.0,
-            "emission": 0.9,
-            "emissionColorR": 1.0,
-            "emissionColorG": 0.82,
-            "emissionColorB": 0.4,
-            "__nodeTitle": "Short Pane Glow"
-          }
-        },
-        {
-          "id": "sf_pane_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1160,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "window_glow",
-            "__nodeTitle": "Short Pane Mat"
-          }
-        },
-        {
-          "id": "sf_pane_in",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1160,
-            "y": 480
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 0.04,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Pane Inset"
-          }
-        },
-        {
-          "id": "sf_win_unit",
-          "type": "MergeMesh",
-          "position": {
-            "x": 1000,
-            "y": 640
-          },
-          "data": {
-            "__nodeTitle": "Short Win Unit"
-          }
-        },
-        {
-          "id": "sf_win_y",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1000,
-            "y": 800
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 2.15,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Short Win Rows"
-          }
-        },
-        {
-          "id": "sf_win_x",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1000,
-            "y": 960
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "x",
-            "angle": 360,
-            "translateX": 1.7,
-            "translateY": 0,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Short Win Cols"
-          }
-        },
-        {
-          "id": "sf_win_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1000,
-            "y": 1120
-          },
-          "data": {
-            "translateX": -0.85,
-            "translateY": -0.7,
-            "translateZ": 2.12,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Win Place"
-          }
-        },
-        {
-          "id": "sf_quoin_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1480,
-            "y": 0
-          },
-          "data": {
-            "width": 0.32,
-            "height": 0.4,
-            "depth": 0.32,
-            "__nodeTitle": "Short Quoin"
-          }
-        },
-        {
-          "id": "sf_quoin_bevel",
-          "type": "BevelMesh",
-          "position": {
-            "x": 1480,
-            "y": 160
-          },
-          "data": {
-            "edgeGroup": "",
-            "offsetType": "offset",
-            "amount": 0.03,
-            "segments": 1,
-            "limitMethod": "angle",
-            "angleLimit": 30,
-            "profile": 0.5,
-            "miterOuter": "sharp",
-            "miterInner": "sharp",
-            "vmeshMethod": "adj",
-            "clampOverlap": true,
-            "method": "edge",
-            "excludeUnshared": false,
-            "excludeGroups": "cap_start,cap_end",
-            "__nodeTitle": "Short Quoin Bevel"
-          }
-        },
-        {
-          "id": "sf_quoin_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1480,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "trim",
-            "__nodeTitle": "Short Quoin Mat"
-          }
-        },
-        {
-          "id": "sf_quoin_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1480,
-            "y": 480
-          },
-          "data": {
-            "translateX": -2.1,
-            "translateY": -1.8,
-            "translateZ": -2.1,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Quoin Place"
-          }
-        },
-        {
-          "id": "sf_qy",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1480,
-            "y": 640
-          },
-          "data": {
-            "mode": "linear",
-            "count": 3,
-            "axis": "y",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 1.8,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Short Quoin Rows"
-          }
-        },
-        {
-          "id": "sf_qx",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1480,
-            "y": 800
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "x",
-            "angle": 360,
-            "translateX": 4.2,
-            "translateY": 0,
-            "translateZ": 0,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Short Quoin X"
-          }
-        },
-        {
-          "id": "sf_qz",
-          "type": "CopyMesh",
-          "position": {
-            "x": 1480,
-            "y": 960
-          },
-          "data": {
-            "mode": "linear",
-            "count": 2,
-            "axis": "z",
-            "angle": 360,
-            "translateX": 0,
-            "translateY": 0,
-            "translateZ": 4.2,
-            "centerX": 0,
-            "centerY": 0,
-            "centerZ": 0,
-            "__nodeTitle": "Short Quoin Z"
-          }
-        },
-        {
-          "id": "sf_door",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 1800,
-            "y": 0
-          },
-          "data": {
-            "width": 1.15,
-            "height": 2.2,
-            "depth": 0.1,
-            "__nodeTitle": "Short Door"
-          }
-        },
-        {
-          "id": "sf_door_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1800,
-            "y": 160
-          },
-          "data": {
-            "group": "",
-            "materialName": "brick",
-            "__nodeTitle": "Short Door Mat"
-          }
-        },
-        {
-          "id": "sf_door_xf",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1800,
-            "y": 320
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": -1.5,
-            "translateZ": 2.12,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Door Place"
-          }
-        },
-        {
-          "id": "sf_merge",
-          "type": "MergeMesh",
-          "position": {
-            "x": 400,
-            "y": 1440
-          },
-          "data": {
-            "__nodeTitle": "Short Merge"
-          }
-        },
-        {
-          "id": "sf_lift",
-          "type": "TransformMesh",
-          "position": {
-            "x": 400,
-            "y": 1600
-          },
-          "data": {
-            "translateX": 0,
-            "translateY": 2.6,
-            "translateZ": 0,
-            "rotationX": 0,
-            "rotationY": 0,
-            "rotationZ": 0,
-            "scaleX": 1,
-            "scaleY": 1,
-            "scaleZ": 1,
-            "__nodeTitle": "Short Lift"
-          }
-        },
-        {
-          "id": "sf_out",
-          "type": "SubgraphOutput",
-          "position": {
-            "x": 400,
-            "y": 1760
-          },
-          "data": {
-            "__nodeTitle": "Short Out"
-          }
-        }
-      ],
-      "edges": [
-        {
-          "id": "e_sf_body_bv",
-          "source": "sf_body_box",
-          "target": "sf_body_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_body_mat",
-          "source": "sf_body_bevel",
-          "target": "sf_body_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_body_xf",
-          "source": "sf_body_mat",
-          "target": "sf_body_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_plinth_bv",
-          "source": "sf_plinth_box",
-          "target": "sf_plinth_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_plinth_mat",
-          "source": "sf_plinth_bevel",
-          "target": "sf_plinth_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_plinth_xf",
-          "source": "sf_plinth_mat",
-          "target": "sf_plinth_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_cornice_bv",
-          "source": "sf_cornice_box",
-          "target": "sf_cornice_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_cornice_mat",
-          "source": "sf_cornice_bevel",
-          "target": "sf_cornice_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_cornice_xf",
-          "source": "sf_cornice_mat",
-          "target": "sf_cornice_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_roof_bv",
-          "source": "sf_roof_box",
-          "target": "sf_roof_bevel",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_roof_mat",
-          "source": "sf_roof_bevel",
-          "target": "sf_roof_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_roof_xf",
-          "source": "sf_roof_mat",
-          "target": "sf_roof_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_fbv",
-          "source": "sf_frame",
-          "target": "sf_frame_bv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_fmat",
-          "source": "sf_frame_bv",
-          "target": "sf_frame_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_pvc",
-          "source": "sf_pane",
-          "target": "sf_pane_vc",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_pmat",
-          "source": "sf_pane_vc",
-          "target": "sf_pane_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_pin",
-          "source": "sf_pane_mat",
-          "target": "sf_pane_in",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_fu",
-          "source": "sf_frame_mat",
-          "target": "sf_win_unit",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_pu",
-          "source": "sf_pane_in",
-          "target": "sf_win_unit",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_wy",
-          "source": "sf_win_unit",
-          "target": "sf_win_y",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_wx",
-          "source": "sf_win_y",
-          "target": "sf_win_x",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_wxf",
-          "source": "sf_win_x",
-          "target": "sf_win_xf",
-          "sourceHandle": "out",
+          "id": "e_in_pads",
+          "source": "in_lots",
+          "target": "pads",
+          "sourceHandle": "lots",
           "targetHandle": "in"
         },
         {
-          "id": "e_sf_quoin_bv",
-          "source": "sf_quoin_box",
-          "target": "sf_quoin_bevel",
+          "id": "e_pads_rim",
+          "source": "pads",
+          "target": "pad_rim",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_sf_quoin_mat",
-          "source": "sf_quoin_bevel",
-          "target": "sf_quoin_mat",
+          "id": "e_rim_bv",
+          "source": "pad_rim",
+          "target": "pad_bevel",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_sf_quoin_xf",
-          "source": "sf_quoin_mat",
-          "target": "sf_quoin_xf",
+          "id": "e_bv_bool",
+          "source": "pad_bevel",
+          "target": "pad_bool",
           "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_qy",
-          "source": "sf_quoin_xf",
-          "target": "sf_qy",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_qx",
-          "source": "sf_qy",
-          "target": "sf_qx",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_qz",
-          "source": "sf_qx",
-          "target": "sf_qz",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_dm",
-          "source": "sf_door",
-          "target": "sf_door_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_dx",
-          "source": "sf_door_mat",
-          "target": "sf_door_xf",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_m0",
-          "source": "sf_body_xf",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_m1",
-          "source": "sf_plinth_xf",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_m2",
-          "source": "sf_cornice_xf",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_m3",
-          "source": "sf_roof_xf",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_m4",
-          "source": "sf_win_xf",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
+          "targetHandle": "a"
         },
         {
-          "id": "e_sf_m5",
-          "source": "sf_qz",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_sf_m6",
-          "source": "sf_door_xf",
-          "target": "sf_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
+          "id": "e_rd_bool",
+          "source": "in_roads",
+          "target": "pad_bool",
+          "sourceHandle": "roads",
+          "targetHandle": "b"
         },
         {
-          "id": "e_sf_lift",
-          "source": "sf_merge",
-          "target": "sf_lift",
+          "id": "e_bool_mat",
+          "source": "pad_bool",
+          "target": "mat_pad",
           "sourceHandle": "out",
           "targetHandle": "in"
         },
         {
-          "id": "e_sf_out",
-          "source": "sf_lift",
-          "target": "sf_out",
+          "id": "e_mat_out",
+          "source": "mat_pad",
+          "target": "pads_out",
           "sourceHandle": "out",
           "targetHandle": "mesh"
         }

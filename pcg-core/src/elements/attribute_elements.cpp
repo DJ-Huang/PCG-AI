@@ -2,10 +2,12 @@
 
 #include "elements/element_utils.hpp"
 #include "elements/expression.hpp"
+#include "data/pcg_attribute_table.hpp"
 #include "geometry/bmesh.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -29,7 +31,74 @@ struct ElementVariables {
     int point_count = 0;
     int primitive_number = 0;
     int primitive_count = 0;
+    data::AttributeTable* attribute_table = nullptr;
+    data::AttributeOwner attribute_owner = data::AttributeOwner::Point;
+    size_t attribute_index = 0;
 };
+
+bool read_table_attribute(ElementVariables& variables, const std::string& key, double& value)
+{
+    if (!variables.attribute_table)
+        return false;
+    const data::AttributeArray* attr =
+        variables.attribute_table->find(variables.attribute_owner, key);
+    if (!attr || variables.attribute_index >= attr->size())
+        return false;
+    if (attr->schema().type == data::AttributeType::Float) {
+        const size_t offset = variables.attribute_index *
+                              static_cast<size_t>(std::max(1, attr->schema().tuple_size));
+        if (offset >= attr->float_values().size())
+            return false;
+        value = attr->float_values()[offset];
+        return true;
+    }
+    if (attr->schema().type == data::AttributeType::Int) {
+        const size_t offset = variables.attribute_index *
+                              static_cast<size_t>(std::max(1, attr->schema().tuple_size));
+        if (offset >= attr->int_values().size())
+            return false;
+        value = static_cast<double>(attr->int_values()[offset]);
+        return true;
+    }
+    return false;
+}
+
+bool write_table_attribute(ElementVariables& variables, const std::string& key, double value)
+{
+    if (!variables.attribute_table)
+        return false;
+    data::AttributeArray* attr =
+        variables.attribute_table->find(variables.attribute_owner, key);
+    if (!attr) {
+        attr = &variables.attribute_table->create_float(variables.attribute_owner, key, 1, {0.0});
+        const size_t count = variables.attribute_owner == data::AttributeOwner::Detail
+            ? 1
+            : (variables.attribute_owner == data::AttributeOwner::Primitive
+                   ? static_cast<size_t>(std::max(1, variables.primitive_count))
+                   : static_cast<size_t>(std::max(1, variables.point_count)));
+        attr->resize(count);
+    }
+    if (attr->schema().type == data::AttributeType::Float) {
+        const size_t tuple = static_cast<size_t>(std::max(1, attr->schema().tuple_size));
+        const size_t offset = variables.attribute_index * tuple;
+        if (offset >= attr->float_values_mut().size())
+            attr->resize(variables.attribute_index + 1);
+        if (offset < attr->float_values_mut().size()) {
+            attr->float_values_mut()[offset] = value;
+            return true;
+        }
+    } else if (attr->schema().type == data::AttributeType::Int) {
+        const size_t tuple = static_cast<size_t>(std::max(1, attr->schema().tuple_size));
+        const size_t offset = variables.attribute_index * tuple;
+        if (offset >= attr->int_values_mut().size())
+            attr->resize(variables.attribute_index + 1);
+        if (offset < attr->int_values_mut().size()) {
+            attr->int_values_mut()[offset] = static_cast<int64_t>(value);
+            return true;
+        }
+    }
+    return false;
+}
 
 std::unordered_map<std::string, double> parse_parameters(const nlohmann::json& data,
                                                          std::string& error)
@@ -106,6 +175,8 @@ EvalContext make_context(ElementVariables& variables,
             if (!variables.attributes->contains(key) ||
                 !json_number((*variables.attributes)[key], value))
                 return false;
+        } else if (name.size() > 1 && name.front() == '@') {
+            return read_table_attribute(variables, name.substr(1), value);
         } else {
             return false;
         }
@@ -119,6 +190,10 @@ EvalContext make_context(ElementVariables& variables,
                  name != "@curveu" && name != "@ptnum" && name != "@numpt" &&
                  name != "@primnum" && name != "@numprim") {
             (*variables.attributes)[name.substr(1)] = value;
+        } else if (name.size() > 1 && name.front() == '@' &&
+                   name != "@curveu" && name != "@ptnum" && name != "@numpt" &&
+                   name != "@primnum" && name != "@numprim") {
+            return write_table_attribute(variables, name.substr(1), value);
         } else {
             return false;
         }
@@ -232,12 +307,78 @@ bool apply_wrangle_geometry(data::PcgGeometry& geometry,
         auto& point = geometry.points_mut()[static_cast<size_t>(index)];
         ElementVariables variables{&point.x, &point.y, &point.z, nullptr,
                                    indexed_curve_u(static_cast<size_t>(index), geometry.points().size()),
-                                   index, count, 0, static_cast<int>(geometry.faces().size())};
+                                   index, count, 0, static_cast<int>(geometry.faces().size()),
+                                   &geometry.attributes(), data::AttributeOwner::Point,
+                                   static_cast<size_t>(index)};
         EvalContext context = make_context(variables, parameters);
         if (!program.execute(context, error)) {
             error = "geometry point " + std::to_string(index) + ": " + error;
             return false;
         }
+    }
+    return true;
+}
+
+bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
+                                       const Program& program,
+                                       const std::unordered_map<std::string, double>& parameters,
+                                       std::string& error)
+{
+    const int prim_count = static_cast<int>(geometry.faces().size());
+    const int point_count = static_cast<int>(geometry.points().size());
+    for (int prim = 0; prim < prim_count; ++prim) {
+        const auto& face = geometry.faces()[static_cast<size_t>(prim)];
+        if (face.empty())
+            continue;
+        data::PcgVec3 center{};
+        for (int pi : face) {
+            const auto& p = geometry.points()[static_cast<size_t>(pi)];
+            center.x += p.x;
+            center.y += p.y;
+            center.z += p.z;
+        }
+        const double inv = 1.0 / static_cast<double>(face.size());
+        center.x *= inv;
+        center.y *= inv;
+        center.z *= inv;
+        const data::PcgVec3 old_center = center;
+        ElementVariables variables{&center.x, &center.y, &center.z, nullptr,
+                                   0.0, 0, point_count, prim, prim_count,
+                                   &geometry.attributes(), data::AttributeOwner::Primitive,
+                                   static_cast<size_t>(prim)};
+        EvalContext context = make_context(variables, parameters);
+        if (!program.execute(context, error)) {
+            error = "geometry prim " + std::to_string(prim) + ": " + error;
+            return false;
+        }
+        const double dx = center.x - old_center.x;
+        const double dy = center.y - old_center.y;
+        const double dz = center.z - old_center.z;
+        if (dx != 0.0 || dy != 0.0 || dz != 0.0) {
+            for (int pi : face) {
+                auto& p = geometry.points_mut()[static_cast<size_t>(pi)];
+                p.x += dx;
+                p.y += dy;
+                p.z += dz;
+            }
+        }
+    }
+    return true;
+}
+
+bool apply_wrangle_geometry_detail(data::PcgGeometry& geometry,
+                                   const Program& program,
+                                   const std::unordered_map<std::string, double>& parameters,
+                                   std::string& error)
+{
+    ElementVariables variables{nullptr, nullptr, nullptr, nullptr,
+                               0.0, 0, static_cast<int>(geometry.points().size()),
+                               0, static_cast<int>(geometry.faces().size()),
+                               &geometry.attributes(), data::AttributeOwner::Detail, 0};
+    EvalContext context = make_context(variables, parameters);
+    if (!program.execute(context, error)) {
+        error = std::string("geometry detail: ") + error;
+        return false;
     }
     return true;
 }
@@ -611,9 +752,9 @@ public:
         if (!input)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "AttributeWrangle missing input");
         const std::string run_over = ctx.node->data.value("runOver", std::string("points"));
-        if (run_over != "points")
+        if (run_over != "points" && run_over != "primitives" && run_over != "detail")
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
-                            "AttributeWrangle currently supports runOver=points only");
+                            "AttributeWrangle runOver must be points, primitives, or detail");
 
         const std::string source = ctx.node->data.value("expression", std::string());
         Program program;
@@ -626,7 +767,14 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             ("AttributeWrangle " + error).c_str());
 
+        if (run_over != "points" && !input->geometry)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "AttributeWrangle primitives/detail require Geometry input");
+
         if (input->points) {
+            if (run_over != "points")
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "AttributeWrangle Point input only supports runOver=points");
             data::PcgPointData output = *input->points;
             if (!apply_wrangle_points(output, program, parameters, error))
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
@@ -635,6 +783,9 @@ public:
             return PCG_OK;
         }
         if (input->splines) {
+            if (run_over != "points")
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "AttributeWrangle Spline input only supports runOver=points");
             data::PcgSplineData output = *input->splines;
             if (!apply_wrangle_splines(output, program, parameters, error))
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
@@ -644,13 +795,23 @@ public:
         }
         if (input->geometry) {
             data::PcgGeometry output = *input->geometry;
-            if (!apply_wrangle_geometry(output, program, parameters, error))
+            bool ok = false;
+            if (run_over == "primitives")
+                ok = apply_wrangle_geometry_primitives(output, program, parameters, error);
+            else if (run_over == "detail")
+                ok = apply_wrangle_geometry_detail(output, program, parameters, error);
+            else
+                ok = apply_wrangle_geometry(output, program, parameters, error);
+            if (!ok)
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 ("AttributeWrangle " + error).c_str());
             emit_geometry(ctx, std::move(output));
             return PCG_OK;
         }
         if (input->mesh) {
+            if (run_over != "points")
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "AttributeWrangle Mesh input only supports runOver=points");
             data::PcgMeshData output = mesh_without_stale_normals(*input->mesh);
             if (!apply_wrangle_mesh(output, program, parameters, error))
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,

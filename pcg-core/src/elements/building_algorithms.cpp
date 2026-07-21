@@ -158,19 +158,39 @@ bool read_frame(const nlohmann::json& attributes, geometry::Frame3& frame)
     double nx = 0.0;
     double ny = 0.0;
     double nz = 0.0;
+    if (!read_number(attributes, "nx", nx) || !read_number(attributes, "ny", ny) ||
+        !read_number(attributes, "nz", nz)) {
+        // Accept packed N = [x,y,z]
+        const auto it = attributes.find("N");
+        if (it == attributes.end() || !it->is_array() || it->size() < 3)
+            return false;
+        if (!(*it)[0].is_number() || !(*it)[1].is_number() || !(*it)[2].is_number())
+            return false;
+        nx = (*it)[0].get<double>();
+        ny = (*it)[1].get<double>();
+        nz = (*it)[2].get<double>();
+    }
+
+    Vec3 normal = geometry::normalize({nx, ny, nz});
+    if (geometry::length(normal) <= 0.000000000001)
+        return false;
+
     double tx = 0.0;
     double ty = 0.0;
     double tz = 0.0;
-    if (!read_number(attributes, "nx", nx) || !read_number(attributes, "ny", ny) ||
-        !read_number(attributes, "nz", nz) || !read_number(attributes, "tx", tx) ||
-        !read_number(attributes, "ty", ty) || !read_number(attributes, "tz", tz))
-        return false;
-
-    Vec3 normal = geometry::normalize({nx, ny, nz});
-    Vec3 tangent = geometry::normalize({tx, ty, tz});
+    Vec3 tangent;
+    if (read_number(attributes, "tx", tx) && read_number(attributes, "ty", ty) &&
+        read_number(attributes, "tz", tz)) {
+        tangent = geometry::normalize({tx, ty, tz});
+    } else {
+        // N-only: build a stable tangent from world up (or X if N ~ up).
+        Vec3 up{0.0, 1.0, 0.0};
+        if (std::abs(geometry::dot(normal, up)) > 0.9)
+            up = {1.0, 0.0, 0.0};
+        tangent = geometry::normalize(geometry::cross(up, normal));
+    }
     Vec3 binormal = geometry::normalize(geometry::cross(normal, tangent));
-    if (geometry::length(normal) <= 0.000000000001 ||
-        geometry::length(tangent) <= 0.000000000001 ||
+    if (geometry::length(tangent) <= 0.000000000001 ||
         geometry::length(binormal) <= 0.000000000001)
         return false;
     tangent = geometry::normalize(geometry::cross(binormal, normal));

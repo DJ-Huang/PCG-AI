@@ -35,6 +35,7 @@ struct FuseMeshOptions {
 struct PolyExtrudeOptions {
     std::string face_group;
     double distance = 0.02;
+    std::string distance_attribute;
     double inset = 0.0;
     bool keep_original = false;
     std::string top_group = "extrude_top";

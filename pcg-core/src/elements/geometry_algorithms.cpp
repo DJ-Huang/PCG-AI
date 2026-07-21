@@ -45,6 +45,19 @@ data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreate
         return result;
     }
 
+    if (options.mode == "all") {
+        if (domain == geometry::GroupDomain::Face) {
+            for (size_t i = 0; i < input.faces().size(); ++i)
+                result.groups().add(domain, options.output_group,
+                                    static_cast<geometry::GroupId>(i));
+        } else if (domain == geometry::GroupDomain::Point) {
+            for (size_t i = 0; i < input.points().size(); ++i)
+                result.groups().add(domain, options.output_group,
+                                    static_cast<geometry::GroupId>(i));
+        }
+        return result;
+    }
+
     if (domain != geometry::GroupDomain::Edge)
         return result;
 

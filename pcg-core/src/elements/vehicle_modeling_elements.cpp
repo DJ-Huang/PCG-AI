@@ -183,10 +183,12 @@ public:
     PcgResultCode execute(PcgContext& ctx) const override
     {
         const auto input = get_geometry_input(ctx, "in", "PolyExtrude missing mesh input");
-        if (input.points().empty()) return PCG_ERR_EXECUTION;
+        if (input.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "PolyExtrude input has no points");
         PolyExtrudeOptions options;
         options.face_group = ctx.node->data.value("faceGroup", std::string());
         options.distance = ctx.node->data.value("distance", 0.02);
+        options.distance_attribute = ctx.node->data.value("distanceAttribute", std::string());
         options.inset = ctx.node->data.value("inset", 0.0);
         options.keep_original = ctx.node->data.value("keepOriginal", false);
         options.top_group = ctx.node->data.value("topGroup", std::string("extrude_top"));

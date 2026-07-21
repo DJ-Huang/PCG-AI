@@ -1207,20 +1207,29 @@ std::vector<int> face_connected_component_ids(const PcgGeometry& geometry)
     return component;
 }
 
-PcgGeometry extract_face_cluster(const PcgGeometry& geometry,
-                                 const std::unordered_set<int>& cluster_faces)
+} // namespace
+
+PcgGeometry extract_faces(const PcgGeometry& geometry,
+                          const std::unordered_set<int>& face_indices)
 {
     PcgGeometry output;
-    if (cluster_faces.empty())
+    if (face_indices.empty())
         return output;
 
     std::unordered_map<int, int> point_map;
     GeometryElementRemap remap;
     std::vector<int> old_face_indices;
-    old_face_indices.reserve(cluster_faces.size());
-    for (int fi : cluster_faces)
+    old_face_indices.reserve(face_indices.size());
+    for (int fi : face_indices) {
+        if (fi < 0 || static_cast<size_t>(fi) >= geometry.faces().size())
+            continue;
         old_face_indices.push_back(fi);
+    }
     std::sort(old_face_indices.begin(), old_face_indices.end());
+    old_face_indices.erase(std::unique(old_face_indices.begin(), old_face_indices.end()),
+                           old_face_indices.end());
+    if (old_face_indices.empty())
+        return output;
 
     for (int fi : old_face_indices) {
         const auto& source_face = geometry.faces()[static_cast<size_t>(fi)];
@@ -1249,8 +1258,6 @@ PcgGeometry extract_face_cluster(const PcgGeometry& geometry,
     return output;
 }
 
-} // namespace
-
 std::vector<PcgGeometry> partition_geometry_bevel_shells(const PcgGeometry& geometry)
 {
     const int face_count = static_cast<int>(geometry.faces().size());
@@ -1276,7 +1283,7 @@ std::vector<PcgGeometry> partition_geometry_bevel_shells(const PcgGeometry& geom
     std::vector<PcgGeometry> shells;
     shells.reserve(clusters.size());
     for (const auto& entry : clusters)
-        shells.push_back(extract_face_cluster(geometry, entry.second));
+        shells.push_back(extract_faces(geometry, entry.second));
     return shells;
 }
 
