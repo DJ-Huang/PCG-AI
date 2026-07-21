@@ -461,6 +461,10 @@ bool eval_function(const Expr& expression, EvalContext& context, Value& out, std
     else if (expression.text == "min" && arity(2) && numeric_arg(0, a) && numeric_arg(1, b)) out = Value::numeric(std::min(a, b));
     else if (expression.text == "max" && arity(2) && numeric_arg(0, a) && numeric_arg(1, b)) out = Value::numeric(std::max(a, b));
     else if (expression.text == "pow" && arity(2) && numeric_arg(0, a) && numeric_arg(1, b)) out = Value::numeric(std::pow(a, b));
+    else if (expression.text == "atan2" && arity(2) && numeric_arg(0, a) && numeric_arg(1, b))
+        out = Value::numeric(std::atan2(a, b));
+    else if (expression.text == "sign" && arity(1) && numeric_arg(0, a))
+        out = Value::numeric(a > 0.0 ? 1.0 : (a < 0.0 ? -1.0 : 0.0));
     else if (expression.text == "clamp" && arity(3) && numeric_arg(0, a) && numeric_arg(1, b) && numeric_arg(2, c)) out = Value::numeric(std::clamp(a, b, c));
     else if (expression.text == "lerp" && arity(3) && numeric_arg(0, a) && numeric_arg(1, b) && numeric_arg(2, c)) out = Value::numeric(a + (b - a) * c);
     else {

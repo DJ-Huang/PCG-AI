@@ -151,11 +151,25 @@
       }
     },
     {
-      "id": "tag_type",
+      "id": "face_road",
       "type": "AttributeWrangle",
       "position": {
         "x": 360,
         "y": 1280
+      },
+      "data": {
+        "runOver": "points",
+        "expression": "@cxA = clamp(@P.x, chf(\"roadAMinX\"), chf(\"roadAMaxX\")); @czA = chf(\"roadAz\"); @cxB = chf(\"roadBx\"); @czB = clamp(@P.z, chf(\"roadBMinZ\"), chf(\"roadBMaxZ\")); @dxA = @cxA - @P.x; @dzA = @czA - @P.z; @dxB = @cxB - @P.x; @dzB = @czB - @P.z; @dA2 = @dxA * @dxA + @dzA * @dzA; @dB2 = @dxB * @dxB + @dzB * @dzB; @useA = @dA2 <= @dB2; @fx = @useA * @dxA + (1 - @useA) * @dxB; @fz = @useA * @dzA + (1 - @useA) * @dzB; @rotationY = atan2(@fx, @fz) * 180.0 / PI;",
+        "parameters": "{\"roadAz\":-8,\"roadBx\":6,\"roadAMinX\":-22,\"roadAMaxX\":22,\"roadBMinZ\":-22,\"roadBMaxZ\":22}",
+        "__nodeTitle": "Face Nearest Road"
+      }
+    },
+    {
+      "id": "tag_type",
+      "type": "AttributeWrangle",
+      "position": {
+        "x": 360,
+        "y": 1440
       },
       "data": {
         "runOver": "points",
@@ -169,7 +183,7 @@
       "type": "Blast",
       "position": {
         "x": 40,
-        "y": 1440
+        "y": 1600
       },
       "data": {
         "entity": "points",
@@ -186,7 +200,7 @@
       "type": "Blast",
       "position": {
         "x": 360,
-        "y": 1440
+        "y": 1600
       },
       "data": {
         "entity": "points",
@@ -203,7 +217,7 @@
       "type": "Blast",
       "position": {
         "x": 680,
-        "y": 1440
+        "y": 1600
       },
       "data": {
         "entity": "points",
@@ -220,7 +234,7 @@
       "type": "SubgraphAsset",
       "position": {
         "x": 40,
-        "y": 1600
+        "y": 1760
       },
       "data": {
         "__nodeTitle": "Tall Flat-Roof",
@@ -243,7 +257,7 @@
       "type": "SubgraphAsset",
       "position": {
         "x": 360,
-        "y": 1600
+        "y": 1760
       },
       "data": {
         "__nodeTitle": "Medium Pitched",
@@ -266,7 +280,7 @@
       "type": "SubgraphAsset",
       "position": {
         "x": 680,
-        "y": 1600
+        "y": 1760
       },
       "data": {
         "__nodeTitle": "Short Flat-Roof",
@@ -289,7 +303,7 @@
       "type": "StaticMeshSpawner",
       "position": {
         "x": 40,
-        "y": 1760
+        "y": 1920
       },
       "data": {
         "prefab": "",
@@ -303,7 +317,7 @@
       "type": "StaticMeshSpawner",
       "position": {
         "x": 360,
-        "y": 1760
+        "y": 1920
       },
       "data": {
         "prefab": "",
@@ -317,7 +331,7 @@
       "type": "StaticMeshSpawner",
       "position": {
         "x": 680,
-        "y": 1760
+        "y": 1920
       },
       "data": {
         "prefab": "",
@@ -331,7 +345,7 @@
       "type": "MergeSpawnPoints",
       "position": {
         "x": 360,
-        "y": 1920
+        "y": 2080
       },
       "data": {
         "__nodeTitle": "Merge Spawn Streams"
@@ -342,7 +356,7 @@
       "type": "Output",
       "position": {
         "x": 360,
-        "y": 2080
+        "y": 2240
       },
       "data": {
         "label": "Lot City Buildings",
@@ -415,8 +429,15 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_relax_tag",
+      "id": "e_relax_face",
       "source": "relax",
+      "target": "face_road",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_face_tag",
+      "source": "face_road",
       "target": "tag_type",
       "sourceHandle": "out",
       "targetHandle": "in"

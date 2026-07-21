@@ -77,6 +77,8 @@ namespace DJTechRuntime.PCG
         public bool HasNormal;
         public float Scale;
         public bool HasScale;
+        public Quaternion Rotation;
+        public bool HasRotation;
     }
 
     /// <summary>
@@ -499,7 +501,9 @@ namespace DJTechRuntime.PCG
                             Normal = Vector3.up,
                             HasNormal = false,
                             Scale = 1f,
-                            HasScale = false
+                            HasScale = false,
+                            Rotation = Quaternion.identity,
+                            HasRotation = false
                         };
                     }
 
@@ -536,7 +540,27 @@ namespace DJTechRuntime.PCG
                     }
 
                     if (flags.HasFlag(PcgPointAttrFlags.Rotation))
+                    {
+                        var rotations = (float*)(ptr + offset);
+                        for (var i = 0; i < pointCount; i++)
+                        {
+                            var baseIndex = i * 4;
+                            var rotation = new Quaternion(
+                                rotations[baseIndex],
+                                rotations[baseIndex + 1],
+                                rotations[baseIndex + 2],
+                                rotations[baseIndex + 3]);
+                            var magSq = rotation.x * rotation.x + rotation.y * rotation.y +
+                                        rotation.z * rotation.z + rotation.w * rotation.w;
+                            if (magSq > 1e-8f)
+                            {
+                                parsed[i].Rotation = rotation.normalized;
+                                parsed[i].HasRotation = true;
+                            }
+                        }
+
                         offset += pointCount * 16;
+                    }
 
                     points = new List<PcgScatterPoint>(pointCount);
                     for (var i = 0; i < pointCount; i++)
@@ -706,7 +730,9 @@ namespace DJTechRuntime.PCG
                     Normal = Vector3.up,
                     HasNormal = false,
                     Scale = 1f,
-                    HasScale = false
+                    HasScale = false,
+                    Rotation = Quaternion.identity,
+                    HasRotation = false
                 });
             }
 

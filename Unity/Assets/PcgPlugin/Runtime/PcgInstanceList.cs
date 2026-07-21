@@ -39,7 +39,9 @@ namespace DJTechRuntime.PCG
         public static Matrix4x4 BuildLocalMatrix(PcgScatterPoint point, float globalScale)
         {
             var rotation = Quaternion.identity;
-            if (point.HasNormal && point.Normal.sqrMagnitude > 1e-8f)
+            if (point.HasRotation)
+                rotation = point.Rotation;
+            else if (point.HasNormal && point.Normal.sqrMagnitude > 1e-8f)
                 rotation = Quaternion.FromToRotation(Vector3.up, point.Normal.normalized);
 
             var perPointScale = point.HasScale ? point.Scale : 1f;

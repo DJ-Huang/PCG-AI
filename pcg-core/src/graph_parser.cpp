@@ -309,7 +309,7 @@ PcgResultCode validate_graph_structure(const Graph& graph,
                                        char* err_buf,
                                        int err_buf_size)
 {
-    if (graph.version != "1.0" && graph.version != "2.0")
+    if (graph.version != "1.0" && graph.version != "2.0" && graph.version != "3.0")
         return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON, "Unsupported graph version");
 
     if (graph.nodes.empty())

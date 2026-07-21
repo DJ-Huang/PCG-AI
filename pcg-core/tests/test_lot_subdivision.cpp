@@ -2,9 +2,11 @@
 #include "elements/lot_subdivision_algorithms.hpp"
 #include "elements/mesh_algorithms.hpp"
 #include "elements/vehicle_modeling_algorithms.hpp"
+#include "data/pcg_point_binary.hpp"
 #include "graph_execution_result.hpp"
 #include "graph_executor.hpp"
 #include "graph_parser.hpp"
+#include "pcg_api.h"
 
 #include <nlohmann/json.hpp>
 
@@ -15,6 +17,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <vector>
 
 using namespace pcg::internal;
 using namespace pcg::internal::data;
@@ -373,45 +376,105 @@ void test_instanced_city_example_graphs()
                "buildings must spawn tall/medium/short prototypes");
         expect(count_node_type(document, "MergeSpawnPoints") == 1,
                "buildings must merge spawn streams");
+        expect(count_root_node_type(document, "AttributeWrangle") >= 2,
+               "buildings must tag types and face roads via AttributeWrangle");
+        bool has_face_road = false;
+        for (const auto& node : document.at("nodes")) {
+            if (node.value("id", "") == "face_road") {
+                has_face_road = true;
+                break;
+            }
+        }
+        expect(has_face_road, "buildings must include face_road wrangle");
         expect(count_root_node_type(document, "CopyMeshToPoints") == 0,
                "buildings root must not bake city via CopyMeshToPoints");
         expect(count_root_node_type(document, "MergeMesh") == 0,
                "buildings root must not MergeMesh the city");
+        expect(count_root_node_type(document, "SubgraphAsset") == 3,
+               "buildings use 3 linked SubgraphAsset prototypes (Unity bakes before cook)");
 
-        shrink_lot_params(document, /*iterations=*/2, /*min_size=*/4.0);
-        char error[1024] = {};
-        Graph graph;
-        const std::string json = document.dump();
-        expect(parse_graph(json.c_str(), graph, error, sizeof(error)) == PCG_OK,
-               std::string("buildings parse: ") + error);
-        expect(validate_graph_structure(graph, error, sizeof(error)) == PCG_OK,
-               std::string("buildings validate: ") + error);
-        GraphExecutionResult result;
-        expect(execute_graph(graph, 17, result, error, sizeof(error)) == PCG_OK,
-               std::string("buildings execute: ") + error);
-        expect(result.kind == GraphResultKind::Points, "buildings result kind is Points");
-        expect(result.points != nullptr && !result.points->points().empty(),
-               "buildings emits points");
-        expect(result.spawn_meshes.size() == 3, "buildings expose 3 spawn prototypes");
-        expect(result.spawn_point_counts.size() == 3, "buildings expose 3 spawn point counts");
-
-        size_t counted = 0;
-        for (int c : result.spawn_point_counts)
-            counted += static_cast<size_t>(c);
-        expect(counted == result.points->points().size(),
-               "spawn point counts cover all points");
-
-        for (const auto& mesh : result.spawn_meshes) {
-            expect(!mesh.vertices().empty() && mesh.triangles().size() >= 3,
-                   "each spawn prototype non-empty");
-            expect(mesh.material_slots().size() >= 2,
-                   "each spawn prototype has multi material slots");
+        // Micrograph: AttributeWrangle faces nearest road and emits rotationY for point binary.
+        {
+            const nlohmann::json face_doc = {
+                {"version", "1.0"},
+                {"nodes",
+                 nlohmann::json::array({
+                     {{"id", "grid"},
+                      {"type", "CreatePointGrid"},
+                      {"data",
+                       {{"pointCountX", 2},
+                        {"pointCountY", 2},
+                        {"spacing", 10.0},
+                        {"__nodeTitle", "Sites"}}}},
+                     {{"id", "face_road"},
+                      {"type", "AttributeWrangle"},
+                      {"data",
+                       {{"runOver", "points"},
+                        {"expression",
+                         "@cxA = clamp(@P.x, chf(\"roadAMinX\"), chf(\"roadAMaxX\")); "
+                         "@czA = chf(\"roadAz\"); @cxB = chf(\"roadBx\"); "
+                         "@czB = clamp(@P.z, chf(\"roadBMinZ\"), chf(\"roadBMaxZ\")); "
+                         "@dxA = @cxA - @P.x; @dzA = @czA - @P.z; "
+                         "@dxB = @cxB - @P.x; @dzB = @czB - @P.z; "
+                         "@dA2 = @dxA * @dxA + @dzA * @dzA; "
+                         "@dB2 = @dxB * @dxB + @dzB * @dzB; "
+                         "@useA = @dA2 <= @dB2; "
+                         "@fx = @useA * @dxA + (1 - @useA) * @dxB; "
+                         "@fz = @useA * @dzA + (1 - @useA) * @dzB; "
+                         "@rotationY = atan2(@fx, @fz) * 180.0 / PI;"},
+                        {"parameters",
+                         "{\"roadAz\":-8,\"roadBx\":6,\"roadAMinX\":-22,\"roadAMaxX\":22,"
+                         "\"roadBMinZ\":-22,\"roadBMaxZ\":22}"},
+                        {"__nodeTitle", "Face Nearest Road"}}}},
+                     {{"id", "out"},
+                      {"type", "Output"},
+                      {"data", {{"__nodeTitle", "Out"}}}},
+                 })},
+                {"edges",
+                 nlohmann::json::array({
+                     {{"id", "e0"},
+                      {"source", "grid"},
+                      {"target", "face_road"},
+                      {"sourceHandle", "out"},
+                      {"targetHandle", "in"}},
+                     {{"id", "e1"},
+                      {"source", "face_road"},
+                      {"target", "out"},
+                      {"sourceHandle", "out"},
+                      {"targetHandle", "in"}},
+                 })},
+            };
+            char error[1024] = {};
+            Graph graph;
+            const std::string json = face_doc.dump();
+            expect(parse_graph(json.c_str(), graph, error, sizeof(error)) == PCG_OK,
+                   std::string("face_road parse: ") + error);
+            expect(validate_graph_structure(graph, error, sizeof(error)) == PCG_OK,
+                   std::string("face_road validate: ") + error);
+            GraphExecutionResult result;
+            expect(execute_graph(graph, 17, result, error, sizeof(error)) == PCG_OK,
+                   std::string("face_road execute: ") + error);
+            expect(result.points != nullptr && result.points->points().size() == 4,
+                   "face_road micrograph emits 4 points");
+            for (const auto& point : result.points->points()) {
+                expect(point.attributes.contains("rotationY") &&
+                           point.attributes["rotationY"].is_number(),
+                       "face_road writes rotationY");
+            }
+            const uint32_t flags = detect_point_attr_flags(*result.points);
+            expect((flags & PCG_POINT_ATTR_ROTATION) != 0,
+                   "point binary advertises rotation from rotationY");
+            std::vector<uint8_t> buffer(64 * 1024);
+            uint32_t written_flags = 0;
+            expect(write_point_binary(*result.points, buffer.data(),
+                                      static_cast<int>(buffer.size()), &written_flags),
+                   "write_point_binary with rotation succeeds");
+            expect((written_flags & PCG_POINT_ATTR_ROTATION) != 0,
+                   "written flags include rotation");
+            std::printf("lot-city-buildings-instanced: structural ok; "
+                        "face_road micrograph points=%zu\n",
+                        result.points->points().size());
         }
-
-        std::printf("lot-city-buildings-instanced: points=%zu protos=%zu slots0=%zu\n",
-                    result.points->points().size(),
-                    result.spawn_meshes.size(),
-                    result.spawn_meshes[0].material_slots().size());
     }
 }
 

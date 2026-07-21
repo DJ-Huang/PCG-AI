@@ -62,33 +62,44 @@
       "data": {"maxIterations": 80, "radius": 2.5, "usePscale": false, "__nodeTitle": "Relax Building Sites"}
     },
     {
-      "id": "tag_type",
+      "id": "face_road",
       "type": "AttributeWrangle",
       "position": { "x": 360, "y": 1280 },
+      "data": {
+        "runOver": "points",
+        "expression": "@cxA = clamp(@P.x, chf(\"roadAMinX\"), chf(\"roadAMaxX\")); @czA = chf(\"roadAz\"); @cxB = chf(\"roadBx\"); @czB = clamp(@P.z, chf(\"roadBMinZ\"), chf(\"roadBMaxZ\")); @dxA = @cxA - @P.x; @dzA = @czA - @P.z; @dxB = @cxB - @P.x; @dzB = @czB - @P.z; @dA2 = @dxA * @dxA + @dzA * @dzA; @dB2 = @dxB * @dxB + @dzB * @dzB; @useA = @dA2 <= @dB2; @fx = @useA * @dxA + (1 - @useA) * @dxB; @fz = @useA * @dzA + (1 - @useA) * @dzB; @rotationY = atan2(@fx, @fz) * 180.0 / PI;",
+        "parameters": "{\"roadAz\":-8,\"roadBx\":6,\"roadAMinX\":-22,\"roadAMaxX\":22,\"roadBMinZ\":-22,\"roadBMaxZ\":22}",
+        "__nodeTitle": "Face Nearest Road"
+      }
+    },
+    {
+      "id": "tag_type",
+      "type": "AttributeWrangle",
+      "position": { "x": 360, "y": 1440 },
       "data": {"runOver": "points", "expression": "@btype = @ptnum % 3;", "parameters": "{}", "__nodeTitle": "Tag Building Type"}
     },
     {
       "id": "blast_tall",
       "type": "Blast",
-      "position": { "x": 40, "y": 1440 },
+      "position": { "x": 40, "y": 1600 },
       "data": {"entity": "points", "group": "", "expression": "@btype != 0", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Tall Sites"}
     },
     {
       "id": "blast_med",
       "type": "Blast",
-      "position": { "x": 360, "y": 1440 },
+      "position": { "x": 360, "y": 1600 },
       "data": {"entity": "points", "group": "", "expression": "@btype != 1", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Medium Sites"}
     },
     {
       "id": "blast_short",
       "type": "Blast",
-      "position": { "x": 680, "y": 1440 },
+      "position": { "x": 680, "y": 1600 },
       "data": {"entity": "points", "group": "", "expression": "@btype != 2", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Short Sites"}
     },
     {
       "id": "sg_bldg_tall",
       "type": "SubgraphAsset",
-      "position": { "x": 40, "y": 1600 },
+      "position": { "x": 40, "y": 1760 },
       "data": {"__nodeTitle": "Tall Flat-Roof", "assetGuid": "763260a9ec7574a6a9144b9c628ccd35"},
       "subgraphInterface": {
         "name": "Tall Flat-Roof Building",
@@ -99,7 +110,7 @@
     {
       "id": "sg_bldg_short",
       "type": "SubgraphAsset",
-      "position": { "x": 680, "y": 1600 },
+      "position": { "x": 680, "y": 1760 },
       "data": {"__nodeTitle": "Short Flat-Roof", "assetGuid": "0b9f4d95394564f3d887f6bf5678403d"},
       "subgraphInterface": {
         "name": "Short Flat-Roof Building",
@@ -110,37 +121,37 @@
     {
       "id": "spawn_tall",
       "type": "StaticMeshSpawner",
-      "position": { "x": 40, "y": 1760 },
+      "position": { "x": 40, "y": 1920 },
       "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Tall"}
     },
     {
       "id": "spawn_med",
       "type": "StaticMeshSpawner",
-      "position": { "x": 360, "y": 1760 },
+      "position": { "x": 360, "y": 1920 },
       "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Medium"}
     },
     {
       "id": "spawn_short",
       "type": "StaticMeshSpawner",
-      "position": { "x": 680, "y": 1760 },
+      "position": { "x": 680, "y": 1920 },
       "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Short"}
     },
     {
       "id": "merge_spawn",
       "type": "MergeSpawnPoints",
-      "position": { "x": 360, "y": 1920 },
+      "position": { "x": 360, "y": 2080 },
       "data": {"__nodeTitle": "Merge Spawn Streams"}
     },
     {
       "id": "out",
       "type": "Output",
-      "position": { "x": 360, "y": 2080 },
+      "position": { "x": 360, "y": 2240 },
       "data": {"label": "Lot City Buildings", "__nodeTitle": "Buildings Out"}
     },
     {
       "id": "sg_bldg_medium",
       "type": "SubgraphAsset",
-      "position": { "x": 431, "y": 1622.5 },
+      "position": { "x": 360, "y": 1760 },
       "data": {"__nodeTitle": "Medium Pitched", "assetGuid": "413e2346c53a541c096707b7c06341bf"},
       "subgraphInterface": {
         "name": "Medium Pitched-Roof Building",
@@ -159,7 +170,8 @@
     {"id": "e_blast_cent", "source": "blast", "target": "centroid", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_cent_lift", "source": "centroid", "target": "lift_pts", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_lift_relax", "source": "lift_pts", "target": "relax", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_relax_tag", "source": "relax", "target": "tag_type", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_relax_face", "source": "relax", "target": "face_road", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_face_tag", "source": "face_road", "target": "tag_type", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_tag_bt", "source": "tag_type", "target": "blast_tall", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_tag_bm", "source": "tag_type", "target": "blast_med", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_tag_bs", "source": "tag_type", "target": "blast_short", "sourceHandle": "out", "targetHandle": "in"},
