@@ -398,6 +398,10 @@ namespace DJTechEditor.PCG.Graph
             toolbar.Add(MakeButton("Save As…", SaveAsGraph));
             toolbar.Add(MakeButton("Show in Project", LocateInProject));
 
+            m_ClearPreviewButton = MakeButton("Clear Preview", () => ClearNodePreview());
+            m_ClearPreviewButton.style.display = DisplayStyle.None;
+            toolbar.Add(m_ClearPreviewButton);
+
             m_SubgraphBackButton = MakeButton("‹ Root", () => m_GraphView?.ExitSubgraph());
             m_SubgraphBackButton.style.display = DisplayStyle.None;
             toolbar.Add(m_SubgraphBackButton);
@@ -412,22 +416,6 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
             toolbar.Add(m_SubgraphBreadcrumb);
-
-            m_PreviewStatusLabel = new Label
-            {
-                style =
-                {
-                    marginRight = 8,
-                    unityTextAlign = TextAnchor.MiddleLeft,
-                    color = new Color(0.55f, 0.85f, 1f),
-                    display = DisplayStyle.None,
-                },
-            };
-            toolbar.Add(m_PreviewStatusLabel);
-
-            m_ClearPreviewButton = MakeButton("Clear Preview", () => ClearNodePreview());
-            m_ClearPreviewButton.style.display = DisplayStyle.None;
-            toolbar.Add(m_ClearPreviewButton);
 
             var spacer = new VisualElement { style = { flexGrow = 1 } };
             toolbar.Add(spacer);
@@ -506,12 +494,51 @@ namespace DJTechEditor.PCG.Graph
 
             m_Blackboard.OnParametersChanged += () => m_Inspector.OnSelectionChanged();
 
+            var graphHost = new VisualElement
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    position = Position.Relative,
+                },
+            };
+            graphHost.Add(m_GraphView);
+
+            // Status tip over the graph (not toolbar) so long preview names don't steal chrome space.
+            m_PreviewStatusLabel = new Label
+            {
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    position = Position.Absolute,
+                    left = 8,
+                    bottom = 8,
+                    maxWidth = Length.Percent(70),
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                    color = new Color(0.55f, 0.85f, 1f),
+                    display = DisplayStyle.None,
+                    whiteSpace = WhiteSpace.Normal,
+                    // Soft backdrop so text stays readable over dense graphs.
+                    backgroundColor = new Color(0.08f, 0.1f, 0.14f, 0.72f),
+                    paddingLeft = 8,
+                    paddingRight = 8,
+                    paddingTop = 3,
+                    paddingBottom = 3,
+                    borderTopLeftRadius = 4,
+                    borderTopRightRadius = 4,
+                    borderBottomLeftRadius = 4,
+                    borderBottomRightRadius = 4,
+                },
+            };
+            graphHost.Add(m_PreviewStatusLabel);
+
             contentRow.Add(m_Blackboard);
             contentRow.Add(m_InterfacePanel);
-            contentRow.Add(m_GraphView);
+            contentRow.Add(graphHost);
             contentRow.Add(m_Inspector);
 
             rootVisualElement.Add(contentRow);
+            RefreshPreviewToolbar();
         }
 
         private void RefreshSubgraphBreadcrumb()
