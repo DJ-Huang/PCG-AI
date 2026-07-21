@@ -2,7 +2,8 @@
     "name": "PcgPlugin.Editor.Tests",
     "rootNamespace": "DJTechEditor.PCG.Tests",
     "references": [
-        "PcgPlugin.Runtime"
+        "PcgPlugin.Runtime",
+        "PcgPlugin.Editor"
     ],
     "includePlatforms": [
         "Editor"

@@ -50,6 +50,13 @@ export function parseGraphJson(text: string): ImportResult {
   }
 
   const root = parsed as Record<string, unknown>;
+  if (root.version === '3.0') {
+    return {
+      ok: false,
+      error:
+        'Linked Subgraph (graph version 3.0) is not editable in the Web editor. Open this file in the Unity Graph Editor.',
+    };
+  }
   if (root.version !== '1.0' && root.version !== '2.0') {
     return { ok: false, error: 'Unsupported or missing version (expected 1.0 or 2.0).' };
   }

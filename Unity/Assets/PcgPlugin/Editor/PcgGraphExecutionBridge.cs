@@ -60,6 +60,12 @@ namespace DJTechEditor.PCG
                 if (!window.MatchesGraphAsset(assetPath, assetGuid))
                     continue;
 
+                if (window.IsSubgraphAssetMode)
+                {
+                    Debug.LogWarning("[PCG] Subgraph Asset mode cannot cook standalone; open a consuming .pcg graph.");
+                    return null;
+                }
+
                 var liveDoc = window.ExportLiveDocument();
                 if (liveDoc == null)
                     continue;
@@ -91,8 +97,19 @@ namespace DJTechEditor.PCG
                     Debug.Log($"[PCG] Run uses live Graph Editor state for '{assetPath}'.");
                 }
 
-                var json = PcgGraphSerializer.ToJson(cookDoc, pretty: false);
-                return json;
+                if (!PcgExecutionDocumentBuilder.TryBuildJson(
+                        cookDoc,
+                        PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader(),
+                        out var flatJson,
+                        out _,
+                        out var buildError,
+                        pretty: false))
+                {
+                    Debug.LogError($"[PCG] Failed to build execution document: {buildError}");
+                    return null;
+                }
+
+                return flatJson;
             }
 
             return null;

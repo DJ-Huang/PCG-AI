@@ -1,0 +1,993 @@
+{
+  "version": "1.0",
+  "name": "Short Flat-Roof Building",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "mesh",
+      "name": "Mesh",
+      "pinType": "SpatialMesh"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "sf_body_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -440,
+        "y": 0
+      },
+      "data": {
+        "width": 4.2,
+        "height": 5.2,
+        "depth": 4.2,
+        "__nodeTitle": "Short Body"
+      }
+    },
+    {
+      "id": "sf_body_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -440,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Short Body Bevel"
+      }
+    },
+    {
+      "id": "sf_body_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -440,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Short Body Mat"
+      }
+    },
+    {
+      "id": "sf_body_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -440,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Body Place"
+      }
+    },
+    {
+      "id": "sf_plinth_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -120,
+        "y": 0
+      },
+      "data": {
+        "width": 4.4,
+        "height": 0.35,
+        "depth": 4.4,
+        "__nodeTitle": "Short Plinth"
+      }
+    },
+    {
+      "id": "sf_plinth_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -120,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Short Plinth Bevel"
+      }
+    },
+    {
+      "id": "sf_plinth_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -120,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Short Plinth Mat"
+      }
+    },
+    {
+      "id": "sf_plinth_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -120,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -2.45,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Plinth Place"
+      }
+    },
+    {
+      "id": "sf_cornice_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 4.5,
+        "height": 0.4,
+        "depth": 4.5,
+        "__nodeTitle": "Short Cornice"
+      }
+    },
+    {
+      "id": "sf_cornice_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Short Cornice Bevel"
+      }
+    },
+    {
+      "id": "sf_cornice_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Short Cornice Mat"
+      }
+    },
+    {
+      "id": "sf_cornice_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 2.7,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Cornice Place"
+      }
+    },
+    {
+      "id": "sf_roof_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "width": 4.3,
+        "height": 0.2,
+        "depth": 4.3,
+        "__nodeTitle": "Short Roof Cap"
+      }
+    },
+    {
+      "id": "sf_roof_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 520,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Short Roof Cap Bevel"
+      }
+    },
+    {
+      "id": "sf_roof_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 520,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "roof_green",
+        "__nodeTitle": "Short Roof Cap Mat"
+      }
+    },
+    {
+      "id": "sf_roof_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 520,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 2.95,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Roof Cap Place"
+      }
+    },
+    {
+      "id": "sf_frame",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "data": {
+        "width": 1.1,
+        "height": 1.5,
+        "depth": 0.12,
+        "__nodeTitle": "Short Win Frame"
+      }
+    },
+    {
+      "id": "sf_frame_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 840,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Short Frame Bevel"
+      }
+    },
+    {
+      "id": "sf_frame_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 840,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Short Frame Mat"
+      }
+    },
+    {
+      "id": "sf_pane",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1160,
+        "y": 0
+      },
+      "data": {
+        "width": 0.88,
+        "height": 1.25,
+        "depth": 0.05,
+        "__nodeTitle": "Short Win Pane"
+      }
+    },
+    {
+      "id": "sf_pane_vc",
+      "type": "VertexColor",
+      "position": {
+        "x": 1160,
+        "y": 160
+      },
+      "data": {
+        "r": 0.2,
+        "g": 0.15,
+        "b": 0.08,
+        "a": 1.0,
+        "emission": 0.9,
+        "emissionColorR": 1.0,
+        "emissionColorG": 0.82,
+        "emissionColorB": 0.4,
+        "__nodeTitle": "Short Pane Glow"
+      }
+    },
+    {
+      "id": "sf_pane_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1160,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "window_glow",
+        "__nodeTitle": "Short Pane Mat"
+      }
+    },
+    {
+      "id": "sf_pane_in",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1160,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0.04,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Pane Inset"
+      }
+    },
+    {
+      "id": "sf_win_unit",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1000,
+        "y": 640
+      },
+      "data": {
+        "__nodeTitle": "Short Win Unit"
+      }
+    },
+    {
+      "id": "sf_win_y",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1000,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 2.15,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Short Win Rows"
+      }
+    },
+    {
+      "id": "sf_win_x",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1000,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 2.7,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Short Win Cols"
+      }
+    },
+    {
+      "id": "sf_win_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1000,
+        "y": 1120
+      },
+      "data": {
+        "translateX": -1.35,
+        "translateY": -0.7,
+        "translateZ": 2.12,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Win Place"
+      }
+    },
+    {
+      "id": "sf_quoin_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1480,
+        "y": 0
+      },
+      "data": {
+        "width": 0.32,
+        "height": 0.4,
+        "depth": 0.32,
+        "__nodeTitle": "Short Quoin"
+      }
+    },
+    {
+      "id": "sf_quoin_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1480,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Short Quoin Bevel"
+      }
+    },
+    {
+      "id": "sf_quoin_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1480,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Short Quoin Mat"
+      }
+    },
+    {
+      "id": "sf_quoin_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1480,
+        "y": 480
+      },
+      "data": {
+        "translateX": -2.1,
+        "translateY": -1.8,
+        "translateZ": -2.1,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Quoin Place"
+      }
+    },
+    {
+      "id": "sf_qy",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1480,
+        "y": 640
+      },
+      "data": {
+        "mode": "linear",
+        "count": 3,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 1.8,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Short Quoin Rows"
+      }
+    },
+    {
+      "id": "sf_qx",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1480,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 4.2,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Short Quoin X"
+      }
+    },
+    {
+      "id": "sf_qz",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1480,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "z",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 4.2,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Short Quoin Z"
+      }
+    },
+    {
+      "id": "sf_door",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "width": 1.15,
+        "height": 2.2,
+        "depth": 0.1,
+        "__nodeTitle": "Short Door"
+      }
+    },
+    {
+      "id": "sf_door_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1800,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Short Door Mat"
+      }
+    },
+    {
+      "id": "sf_door_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1800,
+        "y": 320
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -1.5,
+        "translateZ": 2.12,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Door Place"
+      }
+    },
+    {
+      "id": "sf_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 400,
+        "y": 1440
+      },
+      "data": {
+        "__nodeTitle": "Short Merge"
+      }
+    },
+    {
+      "id": "sf_lift",
+      "type": "TransformMesh",
+      "position": {
+        "x": 400,
+        "y": 1600
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 2.6,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Short Lift"
+      }
+    },
+    {
+      "id": "sf_out",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 400,
+        "y": 1760
+      },
+      "data": {
+        "__nodeTitle": "Short Out"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_sf_body_bv",
+      "source": "sf_body_box",
+      "target": "sf_body_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_body_mat",
+      "source": "sf_body_bevel",
+      "target": "sf_body_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_body_xf",
+      "source": "sf_body_mat",
+      "target": "sf_body_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_plinth_bv",
+      "source": "sf_plinth_box",
+      "target": "sf_plinth_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_plinth_mat",
+      "source": "sf_plinth_bevel",
+      "target": "sf_plinth_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_plinth_xf",
+      "source": "sf_plinth_mat",
+      "target": "sf_plinth_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_cornice_bv",
+      "source": "sf_cornice_box",
+      "target": "sf_cornice_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_cornice_mat",
+      "source": "sf_cornice_bevel",
+      "target": "sf_cornice_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_cornice_xf",
+      "source": "sf_cornice_mat",
+      "target": "sf_cornice_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_roof_bv",
+      "source": "sf_roof_box",
+      "target": "sf_roof_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_roof_mat",
+      "source": "sf_roof_bevel",
+      "target": "sf_roof_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_roof_xf",
+      "source": "sf_roof_mat",
+      "target": "sf_roof_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_fbv",
+      "source": "sf_frame",
+      "target": "sf_frame_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_fmat",
+      "source": "sf_frame_bv",
+      "target": "sf_frame_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_pvc",
+      "source": "sf_pane",
+      "target": "sf_pane_vc",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_pmat",
+      "source": "sf_pane_vc",
+      "target": "sf_pane_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_pin",
+      "source": "sf_pane_mat",
+      "target": "sf_pane_in",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_fu",
+      "source": "sf_frame_mat",
+      "target": "sf_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_pu",
+      "source": "sf_pane_in",
+      "target": "sf_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_wy",
+      "source": "sf_win_unit",
+      "target": "sf_win_y",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_wx",
+      "source": "sf_win_y",
+      "target": "sf_win_x",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_wxf",
+      "source": "sf_win_x",
+      "target": "sf_win_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_quoin_bv",
+      "source": "sf_quoin_box",
+      "target": "sf_quoin_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_quoin_mat",
+      "source": "sf_quoin_bevel",
+      "target": "sf_quoin_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_quoin_xf",
+      "source": "sf_quoin_mat",
+      "target": "sf_quoin_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_qy",
+      "source": "sf_quoin_xf",
+      "target": "sf_qy",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_qx",
+      "source": "sf_qy",
+      "target": "sf_qx",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_qz",
+      "source": "sf_qx",
+      "target": "sf_qz",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_dm",
+      "source": "sf_door",
+      "target": "sf_door_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_dx",
+      "source": "sf_door_mat",
+      "target": "sf_door_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m0",
+      "source": "sf_body_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m1",
+      "source": "sf_plinth_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m2",
+      "source": "sf_cornice_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m3",
+      "source": "sf_roof_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m4",
+      "source": "sf_win_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m5",
+      "source": "sf_qz",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_m6",
+      "source": "sf_door_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_lift",
+      "source": "sf_merge",
+      "target": "sf_lift",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sf_out",
+      "source": "sf_lift",
+      "target": "sf_out",
+      "sourceHandle": "out",
+      "targetHandle": "mesh"
+    }
+  ],
+  "subgraphs": []
+}

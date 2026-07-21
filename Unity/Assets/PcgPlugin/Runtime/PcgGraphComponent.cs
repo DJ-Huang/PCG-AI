@@ -758,7 +758,24 @@ namespace DJTechRuntime.PCG
             }
 
             ApplyOverridesToDocument(execDoc);
-            json = PcgGraphSerializer.ToJson(execDoc, pretty: false);
+
+#if UNITY_EDITOR
+            var loader = PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader();
+#else
+            PcgExternalSubgraphLoader loader = null;
+#endif
+            if (!PcgExecutionDocumentBuilder.TryBuildJson(
+                    execDoc,
+                    loader,
+                    out json,
+                    out _,
+                    out var buildError,
+                    pretty: false))
+            {
+                Debug.LogError($"[PCG] Failed to build execution document: {buildError}", this);
+                return false;
+            }
+
             return true;
         }
 
@@ -1871,12 +1888,20 @@ namespace DJTechRuntime.PCG
 
         private void DestroyOwnedSpawnPrototypes()
         {
+            // Point-only previews (e.g. Keep Short Sites) reuse shared/builtin meshes
+            // from ResolveScatterPointMesh(); those must never be destroyed.
+            var sharedPointMesh = ResolveScatterPointMesh();
             for (var i = 0; i < m_OwnedSpawnPrototypeMeshes.Count; i++)
             {
                 var mesh = m_OwnedSpawnPrototypeMeshes[i];
                 if (mesh == null)
                     continue;
+                if (mesh == scatterPointMesh || mesh == sharedPointMesh)
+                    continue;
 #if UNITY_EDITOR
+                // Project / builtin assets are tracked for GPU cache but are not owned.
+                if (UnityEditor.EditorUtility.IsPersistent(mesh))
+                    continue;
                 DestroyImmediate(mesh);
 #else
                 Destroy(mesh);

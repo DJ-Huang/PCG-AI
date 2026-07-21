@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using UnityEngine;
 
 namespace DJTechRuntime.PCG
 {
@@ -17,7 +16,8 @@ namespace DJTechRuntime.PCG
     }
 
     /// <summary>
-    /// Serializes Graph JSON v1/v2 aligned with the C++ runtime wire contract.
+    /// Serializes Graph JSON v1/v2/v3 aligned with the C++ runtime wire contract.
+    /// v3 is authoring-only and may include linked <c>SubgraphAsset</c> nodes with interface snapshots.
     /// </summary>
     public static class PcgGraphSerializer
     {
@@ -33,12 +33,13 @@ namespace DJTechRuntime.PCG
             var nl = pretty ? "\n" : "";
             var sb = new StringBuilder(512);
             sb.Append('{').Append(nl);
-            var version = doc.version == "2.0" ? "2.0" : "1.0";
+            var version = NormalizeVersion(doc.version, doc);
+            var writeInterface = version == "3.0";
             sb.Append(indent).Append("\"version\": ").Append(JsonString(version)).Append(',').Append(nl);
             sb.Append(indent).Append("\"nodes\": [").Append(nl);
             for (var i = 0; i < doc.nodes.Count; i++)
             {
-                AppendNode(sb, doc.nodes[i], pretty, indent);
+                AppendNode(sb, doc.nodes[i], pretty, indent, writeInterface);
                 if (i < doc.nodes.Count - 1)
                     sb.Append(',');
                 sb.Append(nl);
@@ -69,7 +70,7 @@ namespace DJTechRuntime.PCG
             sb.Append(indent).Append("\"subgraphs\": [").Append(nl);
             for (var i = 0; i < doc.subgraphs.Count; i++)
             {
-                AppendSubgraph(sb, doc.subgraphs[i], pretty, indent);
+                AppendSubgraph(sb, doc.subgraphs[i], pretty, indent, writeInterface);
                 if (i < doc.subgraphs.Count - 1)
                     sb.Append(',');
                 sb.Append(nl);
@@ -102,63 +103,19 @@ namespace DJTechRuntime.PCG
                 var version = root.TryGetValue("version", out var versionObj)
                     ? versionObj?.ToString()
                     : null;
-                if (version != "1.0" && version != "2.0")
+                if (version != "1.0" && version != "2.0" && version != "3.0")
                 {
-                    error = "Unsupported or missing version (expected 1.0 or 2.0).";
+                    error = "Unsupported or missing version (expected 1.0, 2.0, or 3.0).";
                     return false;
                 }
 
                 doc = new PcgGraphDocument { version = version };
+                var allowInterface = version == "3.0";
 
-                if (root.TryGetValue("nodes", out var nodesObj) && nodesObj is List<object> nodesList)
-                {
-                    foreach (var nodeObj in nodesList)
-                    {
-                        if (nodeObj is not Dictionary<string, object> nodeDict)
-                            continue;
+                if (!TryParseNodes(root, doc.nodes, allowInterface, out error))
+                    return false;
 
-                        var record = new PcgGraphNodeRecord
-                        {
-                            id = GetString(nodeDict, "id"),
-                            type = GetString(nodeDict, "type"),
-                        };
-
-                        if (nodeDict.TryGetValue("position", out var posObj) && posObj is Dictionary<string, object> posDict)
-                        {
-                            record.position = new PcgGraphPosition
-                            {
-                                x = GetFloat(posDict, "x"),
-                                y = GetFloat(posDict, "y"),
-                            };
-                        }
-
-                        record.data = PcgNodeData.DefaultForType(record.type);
-                        if (nodeDict.TryGetValue("data", out var dataObj) && dataObj is Dictionary<string, object> dataDict)
-                            MergeData(record.type, record.data, dataDict);
-
-                        doc.nodes.Add(record);
-                    }
-                }
-
-                if (root.TryGetValue("edges", out var edgesObj) && edgesObj is List<object> edgesList)
-                {
-                    foreach (var edgeObj in edgesList)
-                    {
-                        if (edgeObj is not Dictionary<string, object> edgeDict)
-                            continue;
-
-                        doc.edges.Add(new PcgGraphEdgeRecord
-                        {
-                            id = GetString(edgeDict, "id"),
-                            source = GetString(edgeDict, "source"),
-                            target = GetString(edgeDict, "target"),
-                            sourceHandle = GetString(edgeDict, "sourceHandle", "out"),
-                            targetHandle = GetString(edgeDict, "targetHandle", "in"),
-                            sourcePinType = GetString(edgeDict, "sourcePinType"),
-                            targetPinType = GetString(edgeDict, "targetPinType"),
-                        });
-                    }
-                }
+                ParseEdges(root, doc.edges);
 
                 if (root.TryGetValue("parameters", out var paramsObj) && paramsObj is List<object> paramsList)
                 {
@@ -183,24 +140,8 @@ namespace DJTechRuntime.PCG
                     }
                 }
 
-                if (root.TryGetValue("subgraphs", out var subgraphsObj) && subgraphsObj is List<object> subgraphsList)
-                {
-                    foreach (var subgraphObj in subgraphsList)
-                    {
-                        if (subgraphObj is not Dictionary<string, object> subgraphDict)
-                            continue;
-                        var subgraph = new PcgSubgraphDefinition
-                        {
-                            id = GetString(subgraphDict, "id"),
-                            name = GetString(subgraphDict, "name"),
-                        };
-                        ParsePorts(subgraphDict, "inputs", subgraph.inputs);
-                        ParsePorts(subgraphDict, "outputs", subgraph.outputs);
-                        ParseNodes(subgraphDict, subgraph.nodes);
-                        ParseEdges(subgraphDict, subgraph.edges);
-                        doc.subgraphs.Add(subgraph);
-                    }
-                }
+                if (!TryParseSubgraphs(root, doc.subgraphs, allowInterface, out error))
+                    return false;
 
                 return true;
             }
@@ -211,26 +152,150 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private static void ParseNodes(Dictionary<string, object> root, List<PcgGraphNodeRecord> output)
+        internal static void AppendNodePublic(StringBuilder sb, PcgGraphNodeRecord node, bool pretty, string indent, bool writeInterface) =>
+            AppendNode(sb, node, pretty, indent, writeInterface);
+
+        internal static void AppendEdgePublic(StringBuilder sb, PcgGraphEdgeRecord edge, bool pretty, string indent) =>
+            AppendEdge(sb, edge, pretty, indent);
+
+        internal static void AppendSubgraphPublic(StringBuilder sb, PcgSubgraphDefinition subgraph, bool pretty, string indent, bool writeInterface) =>
+            AppendSubgraph(sb, subgraph, pretty, indent, writeInterface);
+
+        internal static bool TryParseNodesPublic(Dictionary<string, object> root, List<PcgGraphNodeRecord> output, bool allowInterface, out string error) =>
+            TryParseNodes(root, output, allowInterface, out error);
+
+        internal static void ParseEdgesPublic(Dictionary<string, object> root, List<PcgGraphEdgeRecord> output) =>
+            ParseEdges(root, output);
+
+        internal static bool TryParseSubgraphsPublic(Dictionary<string, object> root, List<PcgSubgraphDefinition> output, bool allowInterface, out string error) =>
+            TryParseSubgraphs(root, output, allowInterface, out error);
+
+        private static string NormalizeVersion(string version, PcgGraphDocument doc)
         {
+            if (version == "3.0" || (doc != null && doc.HasExternalSubgraphAssets()))
+                return "3.0";
+            if (version == "2.0")
+                return "2.0";
+            return "1.0";
+        }
+
+        private static bool TryParseNodes(Dictionary<string, object> root, List<PcgGraphNodeRecord> output, bool allowInterface, out string error)
+        {
+            error = null;
             if (!root.TryGetValue("nodes", out var nodesObj) || nodesObj is not List<object> nodesList)
-                return;
+                return true;
             foreach (var nodeObj in nodesList)
             {
                 if (nodeObj is not Dictionary<string, object> nodeDict)
                     continue;
-                var record = new PcgGraphNodeRecord
-                {
-                    id = GetString(nodeDict, "id"),
-                    type = GetString(nodeDict, "type"),
-                };
-                if (nodeDict.TryGetValue("position", out var posObj) && posObj is Dictionary<string, object> posDict)
-                    record.position = new PcgGraphPosition { x = GetFloat(posDict, "x"), y = GetFloat(posDict, "y") };
-                record.data = PcgNodeData.DefaultForType(record.type);
-                if (nodeDict.TryGetValue("data", out var dataObj) && dataObj is Dictionary<string, object> dataDict)
-                    MergeData(record.type, record.data, dataDict);
+                if (!TryParseNodeRecord(nodeDict, allowInterface, out var record, out error))
+                    return false;
                 output.Add(record);
             }
+            return true;
+        }
+
+        private static bool TryParseSubgraphs(Dictionary<string, object> root, List<PcgSubgraphDefinition> output, bool allowInterface, out string error)
+        {
+            error = null;
+            if (!root.TryGetValue("subgraphs", out var subgraphsObj) || subgraphsObj is not List<object> subgraphsList)
+                return true;
+            foreach (var subgraphObj in subgraphsList)
+            {
+                if (subgraphObj is not Dictionary<string, object> subgraphDict)
+                    continue;
+                var subgraph = new PcgSubgraphDefinition
+                {
+                    id = GetString(subgraphDict, "id"),
+                    name = GetString(subgraphDict, "name"),
+                };
+                ParsePorts(subgraphDict, "inputs", subgraph.inputs);
+                ParsePorts(subgraphDict, "outputs", subgraph.outputs);
+                if (!TryParseNodes(subgraphDict, subgraph.nodes, allowInterface, out error))
+                    return false;
+                ParseEdges(subgraphDict, subgraph.edges);
+                output.Add(subgraph);
+            }
+            return true;
+        }
+
+        private static bool TryParseNodeRecord(
+            Dictionary<string, object> nodeDict,
+            bool allowInterface,
+            out PcgGraphNodeRecord record,
+            out string error)
+        {
+            error = null;
+            record = new PcgGraphNodeRecord
+            {
+                id = GetString(nodeDict, "id"),
+                type = GetString(nodeDict, "type"),
+            };
+
+            if (nodeDict.TryGetValue("position", out var posObj) && posObj is Dictionary<string, object> posDict)
+            {
+                record.position = new PcgGraphPosition
+                {
+                    x = GetFloat(posDict, "x"),
+                    y = GetFloat(posDict, "y"),
+                };
+            }
+
+            record.data = PcgNodeData.DefaultForType(record.type);
+            if (nodeDict.TryGetValue("data", out var dataObj) && dataObj is Dictionary<string, object> dataDict)
+                MergeData(record.type, record.data, dataDict);
+
+            if (nodeDict.TryGetValue("subgraphInterface", out var interfaceObj))
+            {
+                if (!allowInterface)
+                {
+                    error = $"Node '{record.id}' has subgraphInterface but graph version does not allow it.";
+                    return false;
+                }
+
+                if (interfaceObj is not Dictionary<string, object> interfaceDict)
+                {
+                    error = $"Node '{record.id}' subgraphInterface must be an object.";
+                    return false;
+                }
+
+                record.subgraphInterface = ParseInterfaceSnapshot(interfaceDict);
+            }
+
+            if (record.type == PcgStructuralNodeTypes.SubgraphAsset)
+            {
+                if (!allowInterface)
+                {
+                    error = $"Node '{record.id}' type SubgraphAsset requires graph version 3.0.";
+                    return false;
+                }
+
+                var guid = record.data.GetRaw("assetGuid")?.ToString() ?? "";
+                if (!PcgAssetGuidUtility.IsValid(guid))
+                {
+                    error = $"Node '{record.id}' SubgraphAsset.assetGuid must be 32 hex characters.";
+                    return false;
+                }
+
+                if (record.subgraphInterface == null)
+                {
+                    error = $"Node '{record.id}' SubgraphAsset requires subgraphInterface snapshot.";
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static PcgSubgraphInterfaceSnapshot ParseInterfaceSnapshot(Dictionary<string, object> dict)
+        {
+            var snapshot = new PcgSubgraphInterfaceSnapshot
+            {
+                name = GetString(dict, "name"),
+            };
+            ParsePorts(dict, "inputs", snapshot.inputs);
+            ParsePorts(dict, "outputs", snapshot.outputs);
+            return snapshot;
         }
 
         private static void ParseEdges(Dictionary<string, object> root, List<PcgGraphEdgeRecord> output)
@@ -243,7 +308,8 @@ namespace DJTechRuntime.PCG
                     continue;
                 output.Add(new PcgGraphEdgeRecord
                 {
-                    id = GetString(edgeDict, "id"), source = GetString(edgeDict, "source"),
+                    id = GetString(edgeDict, "id"),
+                    source = GetString(edgeDict, "source"),
                     target = GetString(edgeDict, "target"),
                     sourceHandle = GetString(edgeDict, "sourceHandle", "out"),
                     targetHandle = GetString(edgeDict, "targetHandle", "in"),
@@ -263,13 +329,14 @@ namespace DJTechRuntime.PCG
                     continue;
                 output.Add(new PcgSubgraphPort
                 {
-                    id = GetString(port, "id"), name = GetString(port, "name"),
+                    id = GetString(port, "id"),
+                    name = GetString(port, "name"),
                     pinType = GetString(port, "pinType", "Any"),
                 });
             }
         }
 
-        private static void AppendSubgraph(StringBuilder sb, PcgSubgraphDefinition subgraph, bool pretty, string indent)
+        private static void AppendSubgraph(StringBuilder sb, PcgSubgraphDefinition subgraph, bool pretty, string indent, bool writeInterface)
         {
             var inner = pretty ? indent + "  " : "";
             var deep = pretty ? inner + "  " : "";
@@ -284,7 +351,7 @@ namespace DJTechRuntime.PCG
             sb.Append(deep).Append("\"nodes\": [").Append(nl);
             for (var i = 0; i < subgraph.nodes.Count; i++)
             {
-                AppendNode(sb, subgraph.nodes[i], pretty, deep);
+                AppendNode(sb, subgraph.nodes[i], pretty, deep, writeInterface);
                 if (i < subgraph.nodes.Count - 1) sb.Append(',');
                 sb.Append(nl);
             }
@@ -321,20 +388,39 @@ namespace DJTechRuntime.PCG
                 data.SetRaw(key, value);
         }
 
-        private static void AppendNode(StringBuilder sb, PcgGraphNodeRecord node, bool pretty, string indent)
+        private static void AppendNode(StringBuilder sb, PcgGraphNodeRecord node, bool pretty, string indent, bool writeInterface)
         {
             var inner = pretty ? indent + "  " : "";
-            sb.Append(inner).Append('{').Append(pretty ? "\n" : "");
-            sb.Append(inner).Append(pretty ? "  " : "").Append("\"id\": ").Append(JsonString(node.id)).Append(',').Append(pretty ? "\n" : "");
-            sb.Append(inner).Append(pretty ? "  " : "").Append("\"type\": ").Append(JsonString(node.type)).Append(',').Append(pretty ? "\n" : "");
+            var nl = pretty ? "\n" : "";
+            sb.Append(inner).Append('{').Append(nl);
+            sb.Append(inner).Append(pretty ? "  " : "").Append("\"id\": ").Append(JsonString(node.id)).Append(',').Append(nl);
+            sb.Append(inner).Append(pretty ? "  " : "").Append("\"type\": ").Append(JsonString(node.type)).Append(',').Append(nl);
             sb.Append(inner).Append(pretty ? "  " : "").Append("\"position\": { \"x\": ")
                 .Append(node.position.x.ToString(CultureInfo.InvariantCulture))
                 .Append(", \"y\": ")
                 .Append(node.position.y.ToString(CultureInfo.InvariantCulture))
-                .Append(" }").Append(',').Append(pretty ? "\n" : "");
+                .Append(" }").Append(',').Append(nl);
             sb.Append(inner).Append(pretty ? "  " : "").Append("\"data\": ");
             AppendData(sb, node.type, node.data);
-            sb.Append(pretty ? "\n" : "").Append(inner).Append('}');
+            if (writeInterface && node.subgraphInterface != null)
+            {
+                sb.Append(',').Append(nl);
+                sb.Append(inner).Append(pretty ? "  " : "").Append("\"subgraphInterface\": ");
+                AppendInterfaceSnapshot(sb, node.subgraphInterface, pretty, pretty ? inner + "  " : "");
+            }
+            sb.Append(nl).Append(inner).Append('}');
+        }
+
+        private static void AppendInterfaceSnapshot(StringBuilder sb, PcgSubgraphInterfaceSnapshot snapshot, bool pretty, string indent)
+        {
+            var nl = pretty ? "\n" : "";
+            var inner = pretty ? indent + "  " : "";
+            sb.Append('{').Append(nl);
+            sb.Append(inner).Append("\"name\": ").Append(JsonString(snapshot.name ?? "")).Append(',').Append(nl);
+            AppendPorts(sb, "inputs", snapshot.inputs, pretty, inner);
+            sb.Append(',').Append(nl);
+            AppendPorts(sb, "outputs", snapshot.outputs, pretty, inner);
+            sb.Append(nl).Append(indent).Append('}');
         }
 
         private static void AppendData(StringBuilder sb, string type, PcgNodeData data)
@@ -353,8 +439,6 @@ namespace DJTechRuntime.PCG
                     AppendJsonProperty(sb, key, value, propInfo.type);
                 }
 
-                // Append non-manifest keys (e.g., __nodeTitle) that are stored
-                // in PcgNodeData but not declared in the manifest.
                 var manifestKeys = new HashSet<string>(manifestProps.Keys);
                 foreach (var (key, value) in data.EnumerateRaw())
                 {
@@ -370,7 +454,6 @@ namespace DJTechRuntime.PCG
                 return;
             }
 
-            // Fallback: serialize raw key-values with type inference
             var firstRaw = true;
             foreach (var (key, value) in data.EnumerateRaw())
             {

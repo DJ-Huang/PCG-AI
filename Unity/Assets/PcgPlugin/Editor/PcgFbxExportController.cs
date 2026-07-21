@@ -51,7 +51,17 @@ namespace DJTechEditor.PCG
                 return Fail($"Failed to build export cook: {buildError}");
             }
 
-            var json = PcgGraphSerializer.ToJson(cookDocument, pretty: false);
+            if (!PcgExecutionDocumentBuilder.TryBuildJson(
+                    cookDocument,
+                    PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader(),
+                    out var json,
+                    out _,
+                    out var flattenError,
+                    pretty: false))
+            {
+                return Fail($"Failed to flatten export cook: {flattenError}");
+            }
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             var meshes = PcgMeshResolver.CollectFromGraphJson(
                 json,

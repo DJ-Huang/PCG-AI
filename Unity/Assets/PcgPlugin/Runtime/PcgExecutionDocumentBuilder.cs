@@ -1,0 +1,194 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+namespace DJTechRuntime.PCG
+{
+    /// <summary>
+    /// Shared authoring → resolve → flatten pipeline used by Editor cook, preview, FBX, and importers.
+    /// </summary>
+    public static class PcgExecutionDocumentBuilder
+    {
+        public static bool TryBuild(
+            PcgGraphDocument authoring,
+            PcgExternalSubgraphLoader loader,
+            out PcgGraphDocument flat,
+            out PcgExternalResolveResult resolveResult,
+            out string error)
+        {
+            flat = null;
+            resolveResult = null;
+            error = null;
+
+            if (authoring == null)
+            {
+                error = "Authoring document is null.";
+                return false;
+            }
+
+            var working = authoring.Clone();
+            if (!working.HasExternalSubgraphAssets())
+            {
+                if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error))
+                    return false;
+                resolveResult = new PcgExternalResolveResult
+                {
+                    Document = working,
+                    DependencyGuids = new List<string>(),
+                };
+                return true;
+            }
+
+            if (loader == null)
+            {
+                error = "Graph contains SubgraphAsset nodes but no external loader was provided.";
+                return false;
+            }
+
+            if (!PcgExternalSubgraphResolver.TryResolveToInline(working, loader, out resolveResult))
+            {
+                error = resolveResult?.Error ?? "External subgraph resolve failed.";
+                if (!string.IsNullOrEmpty(resolveResult?.ErrorChain))
+                    error += " | chain: " + resolveResult.ErrorChain;
+                return false;
+            }
+
+            if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error))
+                return false;
+
+            return true;
+        }
+
+        public static bool TryBuildJson(
+            PcgGraphDocument authoring,
+            PcgExternalSubgraphLoader loader,
+            out string flatJson,
+            out PcgExternalResolveResult resolveResult,
+            out string error,
+            bool pretty = false)
+        {
+            flatJson = null;
+            if (!TryBuild(authoring, loader, out var flat, out resolveResult, out error))
+                return false;
+            flatJson = PcgGraphSerializer.ToJson(flat, pretty);
+            return true;
+        }
+
+        public static bool TryBuildFromJson(
+            string authoringJson,
+            PcgExternalSubgraphLoader loader,
+            out string flatJson,
+            out PcgExternalResolveResult resolveResult,
+            out string error,
+            bool pretty = false)
+        {
+            flatJson = null;
+            resolveResult = null;
+            if (!PcgGraphSerializer.TryFromJson(authoringJson, out var doc, out error))
+                return false;
+            return TryBuildJson(doc, loader, out flatJson, out resolveResult, out error, pretty);
+        }
+
+#if UNITY_EDITOR
+        public static PcgExternalSubgraphLoader CreateEditorAssetDatabaseLoader()
+        {
+            return (string assetGuid, out string sourceJson, out string loadError) =>
+            {
+                sourceJson = null;
+                loadError = null;
+                var canonical = PcgAssetGuidUtility.Canonicalize(assetGuid);
+                var path = UnityEditor.AssetDatabase.GUIDToAssetPath(canonical);
+                if (string.IsNullOrEmpty(path))
+                {
+                    // Unity GUIDToAssetPath expects lowercase 32-hex without dashes.
+                    path = UnityEditor.AssetDatabase.GUIDToAssetPath(assetGuid);
+                }
+
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                {
+                    loadError = "Asset path not found for GUID " + canonical;
+                    return false;
+                }
+
+                if (!path.EndsWith(".pcgsubgraph", StringComparison.OrdinalIgnoreCase))
+                {
+                    loadError = "Asset is not a .pcgsubgraph: " + path;
+                    return false;
+                }
+
+                try
+                {
+                    sourceJson = File.ReadAllText(path);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    loadError = ex.Message;
+                    return false;
+                }
+            };
+        }
+#endif
+
+        public static bool ContainsExternalOrAuthoringV3(string json, out string reason)
+        {
+            reason = null;
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+            if (!PcgGraphSerializer.TryFromJson(json, out var doc, out _))
+            {
+                // Unknown / parse failure: let callers decide.
+                return false;
+            }
+
+            if (doc.version == "3.0")
+            {
+                reason = "Graph version 3.0 requires Editor bake before Player/StreamingAssets execution.";
+                return true;
+            }
+
+            if (doc.HasExternalSubgraphAssets())
+            {
+                reason = "Graph contains SubgraphAsset references that must be baked in the Editor.";
+                return true;
+            }
+
+            return false;
+        }
+
+        public static IEnumerable<string> CollectExternalGuids(PcgGraphDocument doc)
+        {
+            if (doc == null)
+                yield break;
+
+            foreach (var guid in CollectExternalGuids(doc.nodes))
+                yield return guid;
+
+            if (doc.subgraphs == null)
+                yield break;
+
+            foreach (var definition in doc.subgraphs)
+            {
+                if (definition?.nodes == null)
+                    continue;
+                foreach (var guid in CollectExternalGuids(definition.nodes))
+                    yield return guid;
+            }
+        }
+
+        private static IEnumerable<string> CollectExternalGuids(List<PcgGraphNodeRecord> nodes)
+        {
+            if (nodes == null)
+                yield break;
+            foreach (var node in nodes)
+            {
+                if (node == null || node.type != PcgStructuralNodeTypes.SubgraphAsset)
+                    continue;
+                var guid = PcgAssetGuidUtility.Canonicalize(node.data?.GetRaw("assetGuid")?.ToString());
+                if (PcgAssetGuidUtility.IsValid(guid))
+                    yield return guid;
+            }
+        }
+    }
+}

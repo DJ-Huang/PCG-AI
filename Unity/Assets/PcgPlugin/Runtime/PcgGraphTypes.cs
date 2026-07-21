@@ -112,12 +112,71 @@ namespace DJTechRuntime.PCG
     }
 
     [Serializable]
+    public class PcgSubgraphInterfaceSnapshot
+    {
+        public string name = "";
+        public List<PcgSubgraphPort> inputs = new();
+        public List<PcgSubgraphPort> outputs = new();
+
+        public PcgSubgraphInterfaceSnapshot Clone()
+        {
+            return new PcgSubgraphInterfaceSnapshot
+            {
+                name = name,
+                inputs = inputs.Select(ClonePort).ToList(),
+                outputs = outputs.Select(ClonePort).ToList(),
+            };
+        }
+
+        public static PcgSubgraphInterfaceSnapshot FromDefinition(PcgSubgraphDefinition definition)
+        {
+            if (definition == null)
+                return null;
+            return new PcgSubgraphInterfaceSnapshot
+            {
+                name = definition.name ?? "",
+                inputs = definition.inputs.Select(ClonePort).ToList(),
+                outputs = definition.outputs.Select(ClonePort).ToList(),
+            };
+        }
+
+        private static PcgSubgraphPort ClonePort(PcgSubgraphPort port)
+        {
+            if (port == null)
+                return null;
+            return new PcgSubgraphPort
+            {
+                id = port.id,
+                name = port.name,
+                pinType = port.pinType,
+            };
+        }
+    }
+
+    [Serializable]
     public class PcgGraphNodeRecord
     {
         public string id;
         public string type;
         public PcgGraphPosition position;
         public PcgNodeData data = new();
+        /// <summary>
+        /// Authoring-only interface snapshot for linked <c>SubgraphAsset</c> nodes (v3).
+        /// Null for ordinary nodes and v1/v2 graphs.
+        /// </summary>
+        public PcgSubgraphInterfaceSnapshot subgraphInterface;
+
+        public PcgGraphNodeRecord Clone()
+        {
+            return new PcgGraphNodeRecord
+            {
+                id = id,
+                type = type,
+                position = position,
+                data = data?.Clone() ?? new PcgNodeData(),
+                subgraphInterface = subgraphInterface?.Clone(),
+            };
+        }
     }
 
     [Serializable]
@@ -130,6 +189,20 @@ namespace DJTechRuntime.PCG
         public string targetHandle = "in";
         public string sourcePinType;
         public string targetPinType;
+
+        public PcgGraphEdgeRecord Clone()
+        {
+            return new PcgGraphEdgeRecord
+            {
+                id = id,
+                source = source,
+                target = target,
+                sourceHandle = sourceHandle,
+                targetHandle = targetHandle,
+                sourcePinType = sourcePinType,
+                targetPinType = targetPinType,
+            };
+        }
     }
 
     [Serializable]
@@ -149,6 +222,29 @@ namespace DJTechRuntime.PCG
         public List<PcgSubgraphPort> outputs = new();
         public List<PcgGraphNodeRecord> nodes = new();
         public List<PcgGraphEdgeRecord> edges = new();
+
+        public PcgSubgraphDefinition Clone()
+        {
+            return new PcgSubgraphDefinition
+            {
+                id = id,
+                name = name,
+                inputs = inputs.Select(port => port == null ? null : new PcgSubgraphPort
+                {
+                    id = port.id,
+                    name = port.name,
+                    pinType = port.pinType,
+                }).ToList(),
+                outputs = outputs.Select(port => port == null ? null : new PcgSubgraphPort
+                {
+                    id = port.id,
+                    name = port.name,
+                    pinType = port.pinType,
+                }).ToList(),
+                nodes = nodes.Select(node => node?.Clone()).ToList(),
+                edges = edges.Select(edge => edge?.Clone()).ToList(),
+            };
+        }
     }
 
     [Serializable]
@@ -159,6 +255,58 @@ namespace DJTechRuntime.PCG
         public List<PcgGraphEdgeRecord> edges = new();
         public List<PcgGraphParameter> parameters = new();
         public List<PcgSubgraphDefinition> subgraphs = new();
+
+        public bool HasExternalSubgraphAssets()
+        {
+            if (nodes != null && nodes.Any(IsExternalSubgraphAsset))
+                return true;
+            if (subgraphs == null)
+                return false;
+            return subgraphs.Any(definition =>
+                definition?.nodes != null && definition.nodes.Any(IsExternalSubgraphAsset));
+        }
+
+        public PcgGraphDocument Clone()
+        {
+            return new PcgGraphDocument
+            {
+                version = version,
+                nodes = nodes.Select(node => node?.Clone()).ToList(),
+                edges = edges.Select(edge => edge?.Clone()).ToList(),
+                parameters = parameters.Select(CloneParameter).ToList(),
+                subgraphs = subgraphs.Select(definition => definition?.Clone()).ToList(),
+            };
+        }
+
+        private static bool IsExternalSubgraphAsset(PcgGraphNodeRecord node) =>
+            node != null && node.type == PcgStructuralNodeTypes.SubgraphAsset;
+
+        private static PcgGraphParameter CloneParameter(PcgGraphParameter parameter)
+        {
+            if (parameter == null)
+                return null;
+            return new PcgGraphParameter
+            {
+                id = parameter.id,
+                name = parameter.name,
+                type = parameter.type,
+                defaultValue = parameter.defaultValue,
+                exposed = parameter.exposed,
+                targetNode = parameter.targetNode,
+                targetProperty = parameter.targetProperty,
+                hasRange = parameter.hasRange,
+                minValue = parameter.minValue,
+                maxValue = parameter.maxValue,
+            };
+        }
+    }
+
+    public static class PcgStructuralNodeTypes
+    {
+        public const string Subgraph = "Subgraph";
+        public const string SubgraphInput = "SubgraphInput";
+        public const string SubgraphOutput = "SubgraphOutput";
+        public const string SubgraphAsset = "SubgraphAsset";
     }
 
     [Serializable]

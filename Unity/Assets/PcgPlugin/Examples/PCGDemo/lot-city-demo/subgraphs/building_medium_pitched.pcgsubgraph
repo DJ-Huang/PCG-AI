@@ -1,0 +1,1062 @@
+{
+  "version": "1.0",
+  "name": "Medium Pitched-Roof Building",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "mesh",
+      "name": "Mesh",
+      "pinType": "SpatialMesh"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "mp_body_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -440,
+        "y": 0
+      },
+      "data": {
+        "width": 3.6,
+        "height": 7.2,
+        "depth": 3.6,
+        "__nodeTitle": "Med Body"
+      }
+    },
+    {
+      "id": "mp_body_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -440,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Med Body Bevel"
+      }
+    },
+    {
+      "id": "mp_body_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -440,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_teal",
+        "__nodeTitle": "Med Body Mat"
+      }
+    },
+    {
+      "id": "mp_body_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -440,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Body Place"
+      }
+    },
+    {
+      "id": "mp_plinth_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -120,
+        "y": 0
+      },
+      "data": {
+        "width": 3.8,
+        "height": 0.4,
+        "depth": 3.8,
+        "__nodeTitle": "Med Plinth"
+      }
+    },
+    {
+      "id": "mp_plinth_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -120,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Med Plinth Bevel"
+      }
+    },
+    {
+      "id": "mp_plinth_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -120,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Med Plinth Mat"
+      }
+    },
+    {
+      "id": "mp_plinth_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -120,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -3.5,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Plinth Place"
+      }
+    },
+    {
+      "id": "mp_roof_base",
+      "type": "CreateSpline",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "mode": "polyline",
+        "closed": true,
+        "subdivisions": 1,
+        "startX": 0,
+        "startY": 0,
+        "startZ": 0,
+        "endX": 0,
+        "endY": 0,
+        "endZ": 0,
+        "controlPoints": "[{\"x\":-1.9,\"y\":0,\"z\":-1.9},{\"x\":1.9,\"y\":0,\"z\":-1.9},{\"x\":1.9,\"y\":0,\"z\":1.9},{\"x\":-1.9,\"y\":0,\"z\":1.9}]",
+        "editPlane": "xz",
+        "sceneOffsetX": 0,
+        "sceneOffsetY": 0,
+        "sceneOffsetZ": 0,
+        "__nodeTitle": "Roof Base"
+      }
+    },
+    {
+      "id": "mp_roof_top",
+      "type": "CreateSpline",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "data": {
+        "mode": "polyline",
+        "closed": true,
+        "subdivisions": 1,
+        "startX": 0,
+        "startY": 0,
+        "startZ": 0,
+        "endX": 0,
+        "endY": 0,
+        "endZ": 0,
+        "controlPoints": "[{\"x\":-0.25,\"y\":2.4,\"z\":-0.25},{\"x\":0.25,\"y\":2.4,\"z\":-0.25},{\"x\":0.25,\"y\":2.4,\"z\":0.25},{\"x\":-0.25,\"y\":2.4,\"z\":0.25}]",
+        "editPlane": "xz",
+        "sceneOffsetX": 0,
+        "sceneOffsetY": 0,
+        "sceneOffsetZ": 0,
+        "__nodeTitle": "Roof Top"
+      }
+    },
+    {
+      "id": "mp_roof_loft",
+      "type": "LoftMesh",
+      "position": {
+        "x": 680,
+        "y": 160
+      },
+      "data": {
+        "columns": 32,
+        "sortAxis": "y",
+        "closedProfile": true,
+        "capStart": true,
+        "capEnd": true,
+        "autoAlign": true,
+        "shadeMode": "auto",
+        "cuspAngle": 30,
+        "__nodeTitle": "Pitched Roof"
+      }
+    },
+    {
+      "id": "mp_roof_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 680,
+        "y": 320
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Roof Bevel"
+      }
+    },
+    {
+      "id": "mp_roof_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 680,
+        "y": 480
+      },
+      "data": {
+        "group": "",
+        "materialName": "roof_tile",
+        "__nodeTitle": "Roof Mat"
+      }
+    },
+    {
+      "id": "mp_roof_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 680,
+        "y": 640
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 3.6,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Roof Place"
+      }
+    },
+    {
+      "id": "mp_frame",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1160,
+        "y": 0
+      },
+      "data": {
+        "width": 0.9,
+        "height": 1.35,
+        "depth": 0.12,
+        "__nodeTitle": "Med Win Frame"
+      }
+    },
+    {
+      "id": "mp_frame_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1160,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Med Frame Bevel"
+      }
+    },
+    {
+      "id": "mp_frame_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1160,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Med Frame Mat"
+      }
+    },
+    {
+      "id": "mp_pane",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1480,
+        "y": 0
+      },
+      "data": {
+        "width": 0.7,
+        "height": 1.1,
+        "depth": 0.05,
+        "__nodeTitle": "Med Win Pane"
+      }
+    },
+    {
+      "id": "mp_pane_vc",
+      "type": "VertexColor",
+      "position": {
+        "x": 1480,
+        "y": 160
+      },
+      "data": {
+        "r": 0.2,
+        "g": 0.15,
+        "b": 0.08,
+        "a": 1.0,
+        "emission": 0.9,
+        "emissionColorR": 1.0,
+        "emissionColorG": 0.82,
+        "emissionColorB": 0.4,
+        "__nodeTitle": "Med Pane Glow"
+      }
+    },
+    {
+      "id": "mp_pane_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1480,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "window_glow",
+        "__nodeTitle": "Med Pane Mat"
+      }
+    },
+    {
+      "id": "mp_pane_in",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1480,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0.04,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Pane Inset"
+      }
+    },
+    {
+      "id": "mp_win_unit",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1320,
+        "y": 640
+      },
+      "data": {
+        "__nodeTitle": "Med Win Unit"
+      }
+    },
+    {
+      "id": "mp_win_y",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1320,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 3,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 2.2,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Med Win Rows"
+      }
+    },
+    {
+      "id": "mp_win_x",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1320,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 2.3,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Med Win Cols"
+      }
+    },
+    {
+      "id": "mp_win_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1320,
+        "y": 1120
+      },
+      "data": {
+        "translateX": -1.15,
+        "translateY": -1.8,
+        "translateZ": 1.82,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Win Place"
+      }
+    },
+    {
+      "id": "mp_quoin_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "width": 0.3,
+        "height": 0.4,
+        "depth": 0.3,
+        "__nodeTitle": "Med Quoin"
+      }
+    },
+    {
+      "id": "mp_quoin_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1800,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Med Quoin Bevel"
+      }
+    },
+    {
+      "id": "mp_quoin_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1800,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Med Quoin Mat"
+      }
+    },
+    {
+      "id": "mp_quoin_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1800,
+        "y": 480
+      },
+      "data": {
+        "translateX": -1.8,
+        "translateY": -2.8,
+        "translateZ": -1.8,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Quoin Place"
+      }
+    },
+    {
+      "id": "mp_qy",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1800,
+        "y": 640
+      },
+      "data": {
+        "mode": "linear",
+        "count": 4,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 1.9,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Med Quoin Rows"
+      }
+    },
+    {
+      "id": "mp_qx",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1800,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 3.6,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Med Quoin X"
+      }
+    },
+    {
+      "id": "mp_qz",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1800,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "z",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 3.6,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Med Quoin Z"
+      }
+    },
+    {
+      "id": "mp_door",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2120,
+        "y": 0
+      },
+      "data": {
+        "width": 0.95,
+        "height": 2.1,
+        "depth": 0.1,
+        "__nodeTitle": "Med Door"
+      }
+    },
+    {
+      "id": "mp_door_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2120,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Med Door Mat"
+      }
+    },
+    {
+      "id": "mp_door_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2120,
+        "y": 320
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -2.55,
+        "translateZ": 1.82,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Door Place"
+      }
+    },
+    {
+      "id": "mp_dormer",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2120,
+        "y": 480
+      },
+      "data": {
+        "width": 0.7,
+        "height": 0.9,
+        "depth": 0.55,
+        "__nodeTitle": "Med Dormer"
+      }
+    },
+    {
+      "id": "mp_dormer_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 2120,
+        "y": 640
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Med Dormer Bevel"
+      }
+    },
+    {
+      "id": "mp_dormer_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2120,
+        "y": 800
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Med Dormer Mat"
+      }
+    },
+    {
+      "id": "mp_dormer_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2120,
+        "y": 960
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 4.5,
+        "translateZ": 0.9,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Dormer Place"
+      }
+    },
+    {
+      "id": "mp_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 400,
+        "y": 1440
+      },
+      "data": {
+        "__nodeTitle": "Med Merge"
+      }
+    },
+    {
+      "id": "mp_lift",
+      "type": "TransformMesh",
+      "position": {
+        "x": 400,
+        "y": 1600
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 3.6,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Med Lift"
+      }
+    },
+    {
+      "id": "mp_out",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 400,
+        "y": 1760
+      },
+      "data": {
+        "__nodeTitle": "Med Out"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_mp_body_bv",
+      "source": "mp_body_box",
+      "target": "mp_body_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_body_mat",
+      "source": "mp_body_bevel",
+      "target": "mp_body_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_body_xf",
+      "source": "mp_body_mat",
+      "target": "mp_body_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_plinth_bv",
+      "source": "mp_plinth_box",
+      "target": "mp_plinth_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_plinth_mat",
+      "source": "mp_plinth_bevel",
+      "target": "mp_plinth_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_plinth_xf",
+      "source": "mp_plinth_mat",
+      "target": "mp_plinth_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_rb",
+      "source": "mp_roof_base",
+      "target": "mp_roof_loft",
+      "sourceHandle": "out",
+      "targetHandle": "profiles"
+    },
+    {
+      "id": "e_mp_rt",
+      "source": "mp_roof_top",
+      "target": "mp_roof_loft",
+      "sourceHandle": "out",
+      "targetHandle": "profiles"
+    },
+    {
+      "id": "e_mp_rbv",
+      "source": "mp_roof_loft",
+      "target": "mp_roof_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_rmat",
+      "source": "mp_roof_bv",
+      "target": "mp_roof_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_rxf",
+      "source": "mp_roof_mat",
+      "target": "mp_roof_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_fbv",
+      "source": "mp_frame",
+      "target": "mp_frame_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_fmat",
+      "source": "mp_frame_bv",
+      "target": "mp_frame_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_pvc",
+      "source": "mp_pane",
+      "target": "mp_pane_vc",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_pmat",
+      "source": "mp_pane_vc",
+      "target": "mp_pane_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_pin",
+      "source": "mp_pane_mat",
+      "target": "mp_pane_in",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_fu",
+      "source": "mp_frame_mat",
+      "target": "mp_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_pu",
+      "source": "mp_pane_in",
+      "target": "mp_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_wy",
+      "source": "mp_win_unit",
+      "target": "mp_win_y",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_wx",
+      "source": "mp_win_y",
+      "target": "mp_win_x",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_wxf",
+      "source": "mp_win_x",
+      "target": "mp_win_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_quoin_bv",
+      "source": "mp_quoin_box",
+      "target": "mp_quoin_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_quoin_mat",
+      "source": "mp_quoin_bevel",
+      "target": "mp_quoin_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_quoin_xf",
+      "source": "mp_quoin_mat",
+      "target": "mp_quoin_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_qy",
+      "source": "mp_quoin_xf",
+      "target": "mp_qy",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_qx",
+      "source": "mp_qy",
+      "target": "mp_qx",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_qz",
+      "source": "mp_qx",
+      "target": "mp_qz",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_dm",
+      "source": "mp_door",
+      "target": "mp_door_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_dx",
+      "source": "mp_door_mat",
+      "target": "mp_door_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_dbv",
+      "source": "mp_dormer",
+      "target": "mp_dormer_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_dmat",
+      "source": "mp_dormer_bv",
+      "target": "mp_dormer_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_dxf",
+      "source": "mp_dormer_mat",
+      "target": "mp_dormer_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m0",
+      "source": "mp_body_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m1",
+      "source": "mp_plinth_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m2",
+      "source": "mp_roof_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m3",
+      "source": "mp_win_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m4",
+      "source": "mp_qz",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m5",
+      "source": "mp_door_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_m6",
+      "source": "mp_dormer_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_lift",
+      "source": "mp_merge",
+      "target": "mp_lift",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mp_out",
+      "source": "mp_lift",
+      "target": "mp_out",
+      "sourceHandle": "out",
+      "targetHandle": "mesh"
+    }
+  ],
+  "subgraphs": []
+}

@@ -98,8 +98,16 @@ namespace DJTechEditor.PCG.Graph
         {
             m_CurrentNode = null;
             m_Body.Clear();
-            if (style.display.value == DisplayStyle.Flex)
-                style.display = DisplayStyle.None;
+            // Visibility is manual (toolbar / I); selection only updates content.
+            m_Body.Add(new Label("No node selected")
+            {
+                style =
+                {
+                    color = new Color(0.55f, 0.55f, 0.55f),
+                    unityFontStyleAndWeight = FontStyle.Italic,
+                    paddingTop = 8,
+                },
+            });
         }
 
         private void ShowNode(PcgGraphNodeBase node)
@@ -112,7 +120,6 @@ namespace DJTechEditor.PCG.Graph
             {
                 m_CurrentNode = node;
                 m_Body.Clear();
-                style.display = DisplayStyle.Flex;
 
                 var titleLabel = new Label(node.GetDisplayTitle())
                 {
