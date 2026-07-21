@@ -15,6 +15,9 @@ namespace DJTechEditor.PCG.Graph
     /// </summary>
     public sealed class PcgExternalSubgraphNodeView : PcgGraphNodeBase
     {
+        /// <summary>Type subtitle shown under the instance name (same pattern as renamed manifest nodes).</summary>
+        private const string TypeSubtitle = "subgraph";
+
         private readonly Dictionary<string, Port> m_Inputs = new();
         private readonly Dictionary<string, Port> m_Outputs = new();
         private readonly HashSet<string> m_GhostHandles = new(StringComparer.Ordinal);
@@ -38,7 +41,8 @@ namespace DJTechEditor.PCG.Graph
         public PcgExternalSubgraphNodeView(PcgSubgraphInterfaceSnapshot snapshot)
         {
             m_Snapshot = snapshot?.Clone() ?? new PcgSubgraphInterfaceSnapshot();
-            title = string.IsNullOrEmpty(m_Snapshot.name) ? "Subgraph Asset" : m_Snapshot.name;
+            title = TypeSubtitle;
+            RefreshDisplayedTitle();
         }
 
         protected override void BuildPorts()
@@ -55,16 +59,31 @@ namespace DJTechEditor.PCG.Graph
         public override void ApplyData(PcgNodeData data)
         {
             m_Data = data?.Clone() ?? new PcgNodeData();
+            title = TypeSubtitle;
+            RefreshDisplayedTitle();
         }
 
-        public override PcgNodeData CollectData() => m_Data?.Clone() ?? new PcgNodeData();
+        public override PcgNodeData CollectData()
+        {
+            var data = m_Data?.Clone() ?? new PcgNodeData();
+            var assetName = string.IsNullOrEmpty(m_Snapshot?.name) ? "Subgraph Asset" : m_Snapshot.name;
+            var userTitle = GetUserTitle();
+            // Only persist a rename when it differs from the asset display name so
+            // source renames still refresh the default title.
+            data.SetRaw(
+                "__nodeTitle",
+                string.IsNullOrEmpty(userTitle) || string.Equals(userTitle, assetName, StringComparison.Ordinal)
+                    ? ""
+                    : userTitle);
+            return data;
+        }
 
         public PcgSubgraphInterfaceSnapshot CollectInterfaceSnapshot() => m_Snapshot?.Clone();
 
         public void SetSnapshot(PcgSubgraphInterfaceSnapshot snapshot, IEnumerable<string> ghostHandles = null)
         {
             m_Snapshot = snapshot?.Clone() ?? new PcgSubgraphInterfaceSnapshot();
-            title = string.IsNullOrEmpty(m_Snapshot.name) ? "Subgraph Asset" : m_Snapshot.name;
+            title = TypeSubtitle;
             m_GhostHandles.Clear();
             if (ghostHandles != null)
             {
@@ -74,6 +93,7 @@ namespace DJTechEditor.PCG.Graph
                         m_GhostHandles.Add(handle);
                 }
             }
+            RefreshDisplayedTitle();
             RebuildPorts(m_Snapshot, m_GhostHandles);
         }
 
@@ -160,11 +180,22 @@ namespace DJTechEditor.PCG.Graph
 
         private Port InstantiatePort(Direction direction, string handle, string displayName, string pinType)
         {
-            var port = InstantiatePort(Orientation.Vertical, direction, Port.Capacity.Multi, typeof(float));
-            port.portName = string.IsNullOrEmpty(displayName) ? handle : displayName;
+            // Match manifest / inline subgraph nodes: empty portName + Houdini pin styling
+            // (GraphView's default portName would render a "Mesh" pill next to the connector).
+            var port = PcgPort.Create(Orientation.Vertical, direction, Port.Capacity.Multi, typeof(float));
+            port.portName = "";
             port.userData = handle;
-            port.tooltip = $"{handle} ({pinType ?? "Any"})";
+            var label = string.IsNullOrEmpty(displayName) ? handle : displayName;
+            port.tooltip = $"{label} ({pinType ?? "Any"})";
+            StyleHoudiniPin(port, direction, pinType);
             return port;
+        }
+
+        private void RefreshDisplayedTitle()
+        {
+            var custom = m_Data?.GetRaw("__nodeTitle")?.ToString()?.Trim() ?? "";
+            var assetName = string.IsNullOrEmpty(m_Snapshot?.name) ? "Subgraph Asset" : m_Snapshot.name;
+            SetUserTitle(string.IsNullOrEmpty(custom) ? assetName : custom);
         }
 
         private static void MarkGhost(Port port)
