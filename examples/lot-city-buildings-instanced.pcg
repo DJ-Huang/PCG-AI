@@ -25,7 +25,7 @@
         "y": 320
       },
       "data": {
-        "minSize": 4,
+        "minSize": 8,
         "iterations": 4,
         "irregularity": 0.45,
         "seed": 11,
@@ -41,9 +41,9 @@
         "y": 480
       },
       "data": {
-        "scale": 0.85,
+        "scale": 0.72,
         "faceGroup": "lots",
-        "__nodeTitle": "Shrink Lots 0.85"
+        "__nodeTitle": "Shrink Lots 0.72"
       }
     },
     {
@@ -133,6 +133,20 @@
         "scale": 1.0,
         "rotationY": 0,
         "__nodeTitle": "Lift Onto Pads"
+      }
+    },
+    {
+      "id": "relax",
+      "type": "PointRelax",
+      "position": {
+        "x": 360,
+        "y": 1200
+      },
+      "data": {
+        "maxIterations": 80,
+        "radius": 2.5,
+        "usePscale": false,
+        "__nodeTitle": "Relax Building Sites"
       }
     },
     {
@@ -360,8 +374,15 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_lift_tag",
+      "id": "e_lift_relax",
       "source": "lift_pts",
+      "target": "relax",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_relax_tag",
+      "source": "relax",
       "target": "tag_type",
       "sourceHandle": "out",
       "targetHandle": "in"
@@ -463,12 +484,12 @@
       "id": "p_min_size",
       "name": "minSize",
       "type": "number",
-      "default": 4,
+      "default": 8,
       "exposed": true,
       "targetNode": "lots",
       "targetProperty": "minSize",
       "hasRange": true,
-      "min": 1,
+      "min": 4,
       "max": 16
     },
     {
@@ -499,13 +520,25 @@
       "id": "p_shrink",
       "name": "lotShrink",
       "type": "number",
-      "default": 0.85,
+      "default": 0.72,
       "exposed": true,
       "targetNode": "shrink",
       "targetProperty": "scale",
       "hasRange": true,
       "min": 0.5,
       "max": 1
+    },
+    {
+      "id": "p_relax_radius",
+      "name": "siteRelaxRadius",
+      "type": "number",
+      "default": 2.5,
+      "exposed": true,
+      "targetNode": "relax",
+      "targetProperty": "radius",
+      "hasRange": true,
+      "min": 1.0,
+      "max": 5.0
     }
   ],
   "subgraphs": [
@@ -1401,7 +1434,7 @@
             "count": 2,
             "axis": "x",
             "angle": 360,
-            "translateX": 1.35,
+            "translateX": 2.35,
             "translateY": 0,
             "translateZ": 0,
             "centerX": 0,
@@ -1418,7 +1451,7 @@
             "y": 1120
           },
           "data": {
-            "translateX": -0.675,
+            "translateX": -1.175,
             "translateY": -3.6,
             "translateZ": 1.72,
             "rotationX": 0,
@@ -2648,7 +2681,7 @@
             "count": 2,
             "axis": "x",
             "angle": 360,
-            "translateX": 1.4,
+            "translateX": 2.3,
             "translateY": 0,
             "translateZ": 0,
             "centerX": 0,
@@ -2665,7 +2698,7 @@
             "y": 1120
           },
           "data": {
-            "translateX": -0.7,
+            "translateX": -1.15,
             "translateY": -1.8,
             "translateZ": 1.82,
             "rotationX": 0,
@@ -3726,7 +3759,7 @@
             "count": 2,
             "axis": "x",
             "angle": 360,
-            "translateX": 1.7,
+            "translateX": 2.7,
             "translateY": 0,
             "translateZ": 0,
             "centerX": 0,
@@ -3743,7 +3776,7 @@
             "y": 1120
           },
           "data": {
-            "translateX": -0.85,
+            "translateX": -1.35,
             "translateY": -0.7,
             "translateZ": 2.12,
             "rotationX": 0,

@@ -60,7 +60,7 @@ globs:
 | ComfyUI | 始终 | `core/comfyui`, `core/anti-ai-trace` |
 | ComfyUI | review | `reviews/comfyui-review-rules`, `agents/comfyui-expert` |
 | PCG | 始终 | `pcg/project-engineering`, `pcg/index`, `pcg/graph-contract`, `pcg/assembly-bevel` |
-| PCG | 按模型类型 | `pcg/vehicle`, `pcg/bridge`, `pcg/spiral-staircase`, `pcg/scatter` |
+| PCG | 按模型类型 | `pcg/vehicle`, `pcg/bridge`, `pcg/building`, `pcg/spiral-staircase`, `pcg/scatter` |
 | 通用 | — | （无域专属规则，`no hit` 正常） |
 
 **AlwaysApply gates**（`rule-router-gate`、`codely-pre-code-gate` 等）仍在 `.cursor/rules/gates/`，由 `setup.bat` 同步，不迁入 Vault。
