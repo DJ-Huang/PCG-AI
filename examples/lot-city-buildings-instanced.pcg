@@ -25,9 +25,9 @@
         "y": 320
       },
       "data": {
-        "minSize": 8,
-        "iterations": 4,
-        "irregularity": 0.45,
+        "minSize": 6.5,
+        "iterations": 8,
+        "irregularity": 0.3611111,
         "seed": 11,
         "alignment": "boundingBox",
         "__nodeTitle": "Lot Subdivision"
@@ -41,9 +41,9 @@
         "y": 480
       },
       "data": {
-        "scale": 0.72,
+        "scale": 0.85,
         "faceGroup": "lots",
-        "__nodeTitle": "Shrink Lots 0.72"
+        "__nodeTitle": "Shrink Lots 0.85"
       }
     },
     {
@@ -144,7 +144,7 @@
         "y": 1200
       },
       "data": {
-        "maxIterations": 80,
+        "maxIterations": 0,
         "radius": 2.5,
         "usePscale": false,
         "__nodeTitle": "Relax Building Sites"
@@ -159,9 +159,9 @@
       },
       "data": {
         "runOver": "points",
-        "expression": "@cxA = clamp(@P.x, chf(\"roadAMinX\"), chf(\"roadAMaxX\")); @czA = chf(\"roadAz\"); @cxB = chf(\"roadBx\"); @czB = clamp(@P.z, chf(\"roadBMinZ\"), chf(\"roadBMaxZ\")); @dxA = @cxA - @P.x; @dzA = @czA - @P.z; @dxB = @cxB - @P.x; @dzB = @czB - @P.z; @dA2 = @dxA * @dxA + @dzA * @dzA; @dB2 = @dxB * @dxB + @dzB * @dzB; @useA = @dA2 <= @dB2; @fx = @useA * @dxA + (1 - @useA) * @dxB; @fz = @useA * @dzA + (1 - @useA) * @dzB; @rotationY = atan2(@fx, @fz) * 180.0 / PI;",
+        "expression": "@cxA = clamp(@P.x, chf(\"roadAMinX\"), chf(\"roadAMaxX\")); @czA = chf(\"roadAz\"); @cxB = chf(\"roadBx\"); @czB = clamp(@P.z, chf(\"roadBMinZ\"), chf(\"roadBMaxZ\")); @dxA = @cxA - @P.x; @dzA = @czA - @P.z; @dxB = @cxB - @P.x; @dzB = @czB - @P.z; @dA2 = @dxA * @dxA + @dzA * @dzA; @dB2 = @dxB * @dxB + @dzB * @dzB; @useA = @dA2 <= @dB2; @fx = @useA * @dxA + (1 - @useA) * @dxB; @fz = @useA * @dzA + (1 - @useA) * @dzB; @yaw = atan2(@fx, @fz) * 180.0 / PI; @rotationY = round(@yaw / 90.0) * 90.0;",
         "parameters": "{\"roadAz\":-8,\"roadBx\":6,\"roadAMinX\":-22,\"roadAMaxX\":22,\"roadBMinZ\":-22,\"roadBMaxZ\":22}",
-        "__nodeTitle": "Face Nearest Road"
+        "__nodeTitle": "Face Nearest Road (90°)"
       }
     },
     {
@@ -362,6 +362,20 @@
         "label": "Lot City Buildings",
         "__nodeTitle": "Buildings Out"
       }
+    },
+    {
+      "id": "scale_lot",
+      "type": "AttributeWrangle",
+      "position": {
+        "x": 360,
+        "y": 1520
+      },
+      "data": {
+        "runOver": "points",
+        "expression": "@fp = (@btype == 0) * 3.7 + (@btype == 1) * 3.8 + (@btype == 2) * 4.5; @scale = min(@lotSizeX, @lotSizeZ) / max(@fp, 0.001);",
+        "parameters": "{}",
+        "__nodeTitle": "Scale To Lot Footprint"
+      }
     }
   ],
   "edges": [
@@ -443,27 +457,6 @@
       "targetHandle": "in"
     },
     {
-      "id": "e_tag_bt",
-      "source": "tag_type",
-      "target": "blast_tall",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tag_bm",
-      "source": "tag_type",
-      "target": "blast_med",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tag_bs",
-      "source": "tag_type",
-      "target": "blast_short",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
       "id": "e_tall_proto",
       "source": "sg_bldg_tall",
       "target": "spawn_tall",
@@ -532,6 +525,34 @@
       "target": "out",
       "sourceHandle": "out",
       "targetHandle": "in"
+    },
+    {
+      "id": "e_tag_scale",
+      "source": "tag_type",
+      "target": "scale_lot",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_scale_bt",
+      "source": "scale_lot",
+      "target": "blast_tall",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_scale_bm",
+      "source": "scale_lot",
+      "target": "blast_med",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_scale_bs",
+      "source": "scale_lot",
+      "target": "blast_short",
+      "sourceHandle": "out",
+      "targetHandle": "in"
     }
   ],
   "parameters": [
@@ -539,7 +560,7 @@
       "id": "p_min_size",
       "name": "minSize",
       "type": "number",
-      "default": 8,
+      "default": 6.5,
       "exposed": true,
       "targetNode": "lots",
       "targetProperty": "minSize",
@@ -551,7 +572,7 @@
       "id": "p_iterations",
       "name": "iterations",
       "type": "integer",
-      "default": 4,
+      "default": 8,
       "exposed": true,
       "targetNode": "lots",
       "targetProperty": "iterations",
@@ -563,7 +584,7 @@
       "id": "p_irregularity",
       "name": "irregularity",
       "type": "number",
-      "default": 0.45,
+      "default": 0.3611111,
       "exposed": true,
       "targetNode": "lots",
       "targetProperty": "irregularity",
@@ -575,7 +596,7 @@
       "id": "p_shrink",
       "name": "lotShrink",
       "type": "number",
-      "default": 0.72,
+      "default": 0.85,
       "exposed": true,
       "targetNode": "shrink",
       "targetProperty": "scale",

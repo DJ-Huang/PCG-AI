@@ -204,9 +204,36 @@ data::PcgPointData extract_centroid_geometry(const data::PcgGeometry& input,
         const int fi = static_cast<int>(face_id);
         if (fi < 0 || static_cast<size_t>(fi) >= input.faces().size())
             continue;
-        const auto center = face_centroid(input, input.faces()[static_cast<size_t>(fi)]);
+        const auto& face = input.faces()[static_cast<size_t>(fi)];
+        const auto center = face_centroid(input, face);
         data::PcgPoint point{center.x, center.y, center.z};
         point.attributes["primnum"] = fi;
+
+        // Horizontal AABB of the face — used to scale building footprints to lots.
+        if (!face.empty()) {
+            double min_x = 0.0, max_x = 0.0, min_z = 0.0, max_z = 0.0;
+            bool first = true;
+            for (int index : face) {
+                if (index < 0 || static_cast<size_t>(index) >= input.points().size())
+                    continue;
+                const auto& p = input.points()[static_cast<size_t>(index)];
+                if (first) {
+                    min_x = max_x = p.x;
+                    min_z = max_z = p.z;
+                    first = false;
+                } else {
+                    min_x = std::min(min_x, p.x);
+                    max_x = std::max(max_x, p.x);
+                    min_z = std::min(min_z, p.z);
+                    max_z = std::max(max_z, p.z);
+                }
+            }
+            if (!first) {
+                point.attributes["lotSizeX"] = std::max(0.0, max_x - min_x);
+                point.attributes["lotSizeZ"] = std::max(0.0, max_z - min_z);
+            }
+        }
+
         output.add_point(std::move(point));
     }
     return output;

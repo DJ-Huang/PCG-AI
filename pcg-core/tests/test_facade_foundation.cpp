@@ -196,6 +196,35 @@ int main()
         }
     }
 
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"grid","type":"CreateGridMesh","data":{"sizeX":8.0,"sizeY":6.0,"rows":1,"cols":1,"plane":"xz"}},
+            {"id":"cent","type":"ExtractCentroid","data":{"method":"primitives"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"grid","target":"cent","sourceHandle":"out","targetHandle":"in"},
+            {"source":"cent","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.points != nullptr && result.points->points().size() == 1,
+               "ExtractCentroid emits one point for single face");
+        if (result.points && !result.points->points().empty()) {
+            const auto& attrs = result.points->points()[0].attributes;
+            expect(attrs.contains("lotSizeX") && attrs.contains("lotSizeZ"),
+                   "ExtractCentroid writes lotSizeX/Z");
+            if (attrs.contains("lotSizeX") && attrs.contains("lotSizeZ")) {
+                expect(std::abs(attrs["lotSizeX"].get<double>() - 8.0) < 1e-6,
+                       "lotSizeX matches grid sizeX");
+                expect(std::abs(attrs["lotSizeZ"].get<double>() - 6.0) < 1e-6,
+                       "lotSizeZ matches grid sizeY on xz");
+            }
+        }
+    }
+
     std::printf("failures=%d\n", failures);
     return failures == 0 ? 0 : 1;
 }

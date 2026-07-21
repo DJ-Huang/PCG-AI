@@ -504,7 +504,9 @@ public:
                 point.attributes["prefab"] = prefab;
             if (!mesh.empty())
                 point.attributes["mesh"] = mesh;
-            point.attributes["scale"] = scale;
+            // Preserve per-point scale (e.g. lot-fit) and multiply by node scale.
+            const double existing = point.attributes.value("scale", 1.0);
+            point.attributes["scale"] = existing * scale;
         }
 
         nlohmann::json sidecar{
