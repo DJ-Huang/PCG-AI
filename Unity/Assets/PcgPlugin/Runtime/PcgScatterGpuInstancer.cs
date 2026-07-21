@@ -1,11 +1,37 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace DJTechRuntime.PCG
 {
     /// <summary>
+    /// One indirect draw for a non-empty prototype submesh.
+    /// </summary>
+    internal readonly struct PcgScatterDrawCommand
+    {
+        public readonly int SubMeshIndex;
+        public readonly uint IndexCount;
+        public readonly uint StartIndex;
+        public readonly uint BaseVertexIndex;
+
+        public PcgScatterDrawCommand(
+            int subMeshIndex,
+            uint indexCount,
+            uint startIndex,
+            uint baseVertexIndex)
+        {
+            SubMeshIndex = subMeshIndex;
+            IndexCount = indexCount;
+            StartIndex = startIndex;
+            BaseVertexIndex = baseVertexIndex;
+        }
+    }
+
+    /// <summary>
     /// Draws a scatter <see cref="PcgInstanceList"/> with
     /// <see cref="Graphics.RenderMeshIndirect"/> and a GPU transform buffer.
+    /// Each non-empty prototype submesh becomes one indirect command sharing the
+    /// same instance transforms.
     /// </summary>
     internal sealed class PcgScatterGpuInstancer
     {
@@ -13,7 +39,8 @@ namespace DJTechRuntime.PCG
         private static readonly int TransformBufferId = Shader.PropertyToID("_PcgTransformBuffer");
 
         private Mesh m_PrototypeMesh;
-        private Material m_DrawMaterial;
+        private Material[] m_DrawMaterials;
+        private PcgScatterDrawCommand[] m_Commands;
         private GraphicsBuffer m_TransformBuffer;
         private GraphicsBuffer m_ArgsBuffer;
         private MaterialPropertyBlock m_PropertyBlock;
@@ -24,22 +51,51 @@ namespace DJTechRuntime.PCG
         public bool IsActive =>
             m_InstanceCount > 0 &&
             m_PrototypeMesh != null &&
-            m_DrawMaterial != null &&
+            m_Commands != null &&
+            m_Commands.Length > 0 &&
+            m_DrawMaterials != null &&
+            m_DrawMaterials.Length == m_Commands.Length &&
             m_TransformBuffer != null &&
             m_ArgsBuffer != null;
 
-        public void Set(PcgInstanceList instanceList, Material sourceMaterial, int layer, Matrix4x4 localToWorld)
+        public int CommandCount => m_Commands?.Length ?? 0;
+        public int InstanceCount => m_InstanceCount;
+        public Mesh PrototypeMesh => m_PrototypeMesh;
+
+        public void Set(
+            PcgInstanceList instanceList,
+            Material[] sourceMaterials,
+            int layer,
+            Matrix4x4 localToWorld)
         {
             Clear();
             if (instanceList == null || instanceList.Count == 0)
                 return;
 
             m_PrototypeMesh = instanceList.PrototypeMesh;
-            m_DrawMaterial = PcgScatterInstancingMaterial.CreateFromSource(sourceMaterial);
-            if (m_PrototypeMesh == null || m_DrawMaterial == null)
+            if (m_PrototypeMesh == null)
             {
                 Clear();
                 return;
+            }
+
+            m_Commands = BuildDrawCommands(m_PrototypeMesh);
+            if (m_Commands.Length == 0)
+            {
+                Clear();
+                return;
+            }
+
+            m_DrawMaterials = new Material[m_Commands.Length];
+            for (var i = 0; i < m_Commands.Length; i++)
+            {
+                var source = ResolveSourceMaterial(sourceMaterials, m_Commands[i].SubMeshIndex);
+                m_DrawMaterials[i] = PcgScatterInstancingMaterial.CreateFromSource(source);
+                if (m_DrawMaterials[i] == null)
+                {
+                    Clear();
+                    return;
+                }
             }
 
             m_InstanceCount = instanceList.Count;
@@ -54,24 +110,47 @@ namespace DJTechRuntime.PCG
                 MatrixStrideBytes);
             m_TransformBuffer.SetData(worldMatrices);
 
+            var args = new GraphicsBuffer.IndirectDrawIndexedArgs[m_Commands.Length];
+            for (var i = 0; i < m_Commands.Length; i++)
+            {
+                args[i] = new GraphicsBuffer.IndirectDrawIndexedArgs
+                {
+                    indexCountPerInstance = m_Commands[i].IndexCount,
+                    instanceCount = (uint)m_InstanceCount,
+                    startIndex = m_Commands[i].StartIndex,
+                    baseVertexIndex = m_Commands[i].BaseVertexIndex,
+                    startInstance = 0
+                };
+            }
+
             m_ArgsBuffer = new GraphicsBuffer(
                 GraphicsBuffer.Target.IndirectArguments,
-                1,
+                m_Commands.Length,
                 GraphicsBuffer.IndirectDrawIndexedArgs.size);
-            m_ArgsBuffer.SetData(new[]
-            {
-                new GraphicsBuffer.IndirectDrawIndexedArgs
-                {
-                    indexCountPerInstance = m_PrototypeMesh.GetIndexCount(0),
-                    instanceCount = (uint)m_InstanceCount,
-                    startIndex = m_PrototypeMesh.GetIndexStart(0),
-                    baseVertexIndex = m_PrototypeMesh.GetBaseVertex(0),
-                    startInstance = 0
-                }
-            });
+            m_ArgsBuffer.SetData(args);
 
             m_PropertyBlock ??= new MaterialPropertyBlock();
             m_PropertyBlock.SetBuffer(TransformBufferId, m_TransformBuffer);
+        }
+
+        /// <summary>
+        /// Replace cloned draw materials without rebuilding transform/args buffers.
+        /// </summary>
+        public void RefreshDrawMaterials(Material[] sourceMaterials)
+        {
+            if (!IsActive || m_Commands == null || m_DrawMaterials == null)
+                return;
+
+            for (var i = 0; i < m_Commands.Length; i++)
+            {
+                var source = ResolveSourceMaterial(sourceMaterials, m_Commands[i].SubMeshIndex);
+                var replacement = PcgScatterInstancingMaterial.CreateFromSource(source);
+                if (replacement == null)
+                    continue;
+
+                DestroyMaterial(m_DrawMaterials[i]);
+                m_DrawMaterials[i] = replacement;
+            }
         }
 
         public void Clear()
@@ -79,17 +158,14 @@ namespace DJTechRuntime.PCG
             ReleaseBuffer(ref m_TransformBuffer);
             ReleaseBuffer(ref m_ArgsBuffer);
 
-            if (m_DrawMaterial != null)
+            if (m_DrawMaterials != null)
             {
-#if UNITY_EDITOR
-                if (!Application.isPlaying)
-                    Object.DestroyImmediate(m_DrawMaterial);
-                else
-#endif
-                    Object.Destroy(m_DrawMaterial);
-                m_DrawMaterial = null;
+                for (var i = 0; i < m_DrawMaterials.Length; i++)
+                    DestroyMaterial(m_DrawMaterials[i]);
+                m_DrawMaterials = null;
             }
 
+            m_Commands = null;
             m_PrototypeMesh = null;
             m_InstanceCount = 0;
         }
@@ -99,17 +175,52 @@ namespace DJTechRuntime.PCG
             if (!IsActive || camera == null)
                 return;
 
-            var renderParams = new RenderParams(m_DrawMaterial)
+            for (var i = 0; i < m_Commands.Length; i++)
             {
-                layer = m_Layer,
-                worldBounds = m_WorldBounds,
-                matProps = m_PropertyBlock,
-                shadowCastingMode = ShadowCastingMode.On,
-                receiveShadows = true,
-                camera = camera
-            };
+                var renderParams = new RenderParams(m_DrawMaterials[i])
+                {
+                    layer = m_Layer,
+                    worldBounds = m_WorldBounds,
+                    matProps = m_PropertyBlock,
+                    shadowCastingMode = ShadowCastingMode.On,
+                    receiveShadows = true,
+                    camera = camera
+                };
 
-            Graphics.RenderMeshIndirect(renderParams, m_PrototypeMesh, m_ArgsBuffer, 1, 0);
+                Graphics.RenderMeshIndirect(renderParams, m_PrototypeMesh, m_ArgsBuffer, 1, i);
+            }
+        }
+
+        /// <summary>
+        /// Pure mapping: one command per non-empty submesh, preserving original indices.
+        /// </summary>
+        internal static PcgScatterDrawCommand[] BuildDrawCommands(Mesh mesh)
+        {
+            if (mesh == null || mesh.subMeshCount <= 0)
+                return System.Array.Empty<PcgScatterDrawCommand>();
+
+            var commands = new List<PcgScatterDrawCommand>(mesh.subMeshCount);
+            for (var subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
+            {
+                var indexCount = mesh.GetIndexCount(subMesh);
+                if (indexCount == 0)
+                    continue;
+
+                commands.Add(new PcgScatterDrawCommand(
+                    subMesh,
+                    indexCount,
+                    mesh.GetIndexStart(subMesh),
+                    (uint)mesh.GetBaseVertex(subMesh)));
+            }
+
+            return commands.ToArray();
+        }
+
+        private static Material ResolveSourceMaterial(Material[] sourceMaterials, int subMeshIndex)
+        {
+            if (sourceMaterials == null || subMeshIndex < 0 || subMeshIndex >= sourceMaterials.Length)
+                return null;
+            return sourceMaterials[subMeshIndex];
         }
 
         private static Matrix4x4[] BuildWorldMatrices(Matrix4x4[] localMatrices, Matrix4x4 localToWorld)
@@ -144,6 +255,19 @@ namespace DJTechRuntime.PCG
                 Mathf.Abs(axisX.z) * extents.x + Mathf.Abs(axisY.z) * extents.y + Mathf.Abs(axisZ.z) * extents.z);
 
             return new Bounds(center, worldExtents * 2f);
+        }
+
+        private static void DestroyMaterial(Material material)
+        {
+            if (material == null)
+                return;
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+                Object.DestroyImmediate(material);
+            else
+#endif
+                Object.Destroy(material);
         }
 
         private static void ReleaseBuffer(ref GraphicsBuffer buffer)

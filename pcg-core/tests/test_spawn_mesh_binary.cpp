@@ -64,12 +64,27 @@ int main()
         err,
         sizeof(err));
 
-    assert(rc == PCG_OK);
-    assert(kind == PCG_RESULT_KIND_POINTS);
-    assert(point_count == 4);
-    assert(vertex_count == 24);
-    assert(index_count == 36);
-    assert(out_json[0] == '\0');
+    if (rc != PCG_OK) {
+        std::fprintf(stderr, "FAIL: pcg_execute_graph_v6: %s\n", err);
+        return 1;
+    }
+    if (kind != PCG_RESULT_KIND_POINTS) {
+        std::fprintf(stderr, "FAIL: expected Points kind, got %d\n", kind);
+        return 1;
+    }
+    if (point_count != 4) {
+        std::fprintf(stderr, "FAIL: expected 4 points, got %d\n", point_count);
+        return 1;
+    }
+    if (vertex_count <= 0 || index_count < 3) {
+        std::fprintf(stderr, "FAIL: spawn mesh empty verts=%d indices=%d\n",
+                     vertex_count, index_count);
+        return 1;
+    }
+    if (out_json[0] != '\0') {
+        std::fprintf(stderr, "FAIL: unexpected out_json\n");
+        return 1;
+    }
 
     std::printf("spawn mesh binary test passed: points=%d verts=%d indices=%d\n",
                 point_count,

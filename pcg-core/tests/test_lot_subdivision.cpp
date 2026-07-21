@@ -270,6 +270,155 @@ void test_example_graphs()
     }
 }
 
+nlohmann::json load_example_json(const std::filesystem::path& root, const char* rel)
+{
+    const auto path = root / rel;
+    std::ifstream in(path);
+    expect(static_cast<bool>(in), std::string("open example: ") + path.string());
+    return nlohmann::json::parse(in);
+}
+
+void shrink_lot_params(nlohmann::json& document, int iterations, double min_size)
+{
+    for (auto& node : document.at("nodes")) {
+        if (node.value("type", "") != "LotSubdivision")
+            continue;
+        auto& data = node["data"];
+        data["iterations"] = iterations;
+        data["minSize"] = min_size;
+        data["irregularity"] = 0.0;
+        data["seed"] = 11;
+    }
+}
+
+size_t count_node_type(const nlohmann::json& document, const std::string& type)
+{
+    size_t count = 0;
+    auto count_nodes = [&](const nlohmann::json& nodes) {
+        for (const auto& node : nodes) {
+            if (node.value("type", "") == type)
+                ++count;
+        }
+    };
+    count_nodes(document.at("nodes"));
+    if (document.contains("subgraphs")) {
+        for (const auto& sg : document.at("subgraphs")) {
+            if (sg.contains("nodes"))
+                count_nodes(sg.at("nodes"));
+        }
+    }
+    return count;
+}
+
+bool has_foreach(const nlohmann::json& document)
+{
+    return count_node_type(document, "ForEachBegin") > 0 ||
+           count_node_type(document, "ForEachEnd") > 0;
+}
+
+void test_instanced_city_example_graphs()
+{
+    const std::filesystem::path root =
+        std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
+
+    // --- Infra: Mesh with lot_pad + road slots ---
+    {
+        auto document = load_example_json(root, "examples/lot-city-infra.pcg");
+        shrink_lot_params(document, /*iterations=*/2, /*min_size=*/4.0);
+        char error[1024] = {};
+        Graph graph;
+        const std::string json = document.dump();
+        expect(parse_graph(json.c_str(), graph, error, sizeof(error)) == PCG_OK,
+               std::string("infra parse: ") + error);
+        expect(validate_graph_structure(graph, error, sizeof(error)) == PCG_OK,
+               std::string("infra validate: ") + error);
+        GraphExecutionResult result;
+        expect(execute_graph(graph, 17, result, error, sizeof(error)) == PCG_OK,
+               std::string("infra execute: ") + error);
+        expect(result.kind == GraphResultKind::Mesh, "infra result kind is Mesh");
+        expect(!result.mesh.vertices().empty() && result.mesh.triangles().size() >= 3,
+               "infra mesh non-empty");
+        const auto& slots = result.mesh.material_slots();
+        bool has_pad = false;
+        bool has_road = false;
+        for (const auto& slot : slots) {
+            if (slot == "lot_pad")
+                has_pad = true;
+            if (slot == "road")
+                has_road = true;
+        }
+        expect(has_pad, "infra has lot_pad material slot");
+        expect(has_road, "infra has road material slot");
+        std::printf("lot-city-infra: verts=%zu tris=%zu slots=%zu\n",
+                    result.mesh.vertices().size(),
+                    result.mesh.triangles().size() / 3,
+                    slots.size());
+    }
+
+    // --- Buildings: Points + spawnMesh, no ForEach, single Boolean ---
+    {
+        auto document = load_example_json(root, "examples/lot-city-buildings-instanced.pcg");
+        expect(!has_foreach(document), "buildings graph must not use ForEach");
+        expect(count_node_type(document, "BooleanMesh") == 1,
+               "buildings prototype must contain exactly one BooleanMesh");
+
+        shrink_lot_params(document, /*iterations=*/2, /*min_size=*/4.0);
+        char error[1024] = {};
+        Graph graph;
+        const std::string json = document.dump();
+        expect(parse_graph(json.c_str(), graph, error, sizeof(error)) == PCG_OK,
+               std::string("buildings parse: ") + error);
+        expect(validate_graph_structure(graph, error, sizeof(error)) == PCG_OK,
+               std::string("buildings validate: ") + error);
+        GraphExecutionResult result;
+        expect(execute_graph(graph, 17, result, error, sizeof(error)) == PCG_OK,
+               std::string("buildings execute: ") + error);
+        expect(result.kind == GraphResultKind::Points, "buildings result kind is Points");
+        expect(result.points != nullptr && !result.points->points().empty(),
+               "buildings emits points");
+
+        // Unfiltered lot count from the same ground+lots params.
+        LotSubdivisionOptions lot_opts;
+        lot_opts.min_size = 4.0;
+        lot_opts.iterations = 2;
+        lot_opts.irregularity = 0.0;
+        lot_opts.seed = 11;
+        lot_opts.alignment = "boundingBox";
+        const auto lots = lot_subdivide_geometry(make_ground_quad(48.0, 48.0), lot_opts);
+        const size_t unfiltered_lots = lots.faces().size();
+        const size_t point_count = result.points->points().size();
+        expect(point_count > 0, "buildings point count > 0");
+        expect(point_count < unfiltered_lots,
+               "road clearance must remove some building points");
+
+        expect(!result.spawn_mesh.vertices().empty() &&
+                   result.spawn_mesh.triangles().size() >= 3,
+               "buildings spawn_mesh non-empty");
+        expect(result.spawn_mesh.material_slots().size() >= 2,
+               "spawn prototype has at least 2 material slots");
+
+        // Prototype size is fixed and much smaller than a merged city mesh.
+        const size_t spawn_verts = result.spawn_mesh.vertices().size();
+        const size_t spawn_indices = result.spawn_mesh.triangles().size();
+        expect(spawn_verts < 5000, "spawn prototype vertex count stays compact");
+        expect(spawn_indices < 20000, "spawn prototype index count stays compact");
+        expect(spawn_verts * point_count > spawn_verts,
+               "spawn size does not scale with instance count (sanity)");
+
+        for (const auto& pt : result.points->points()) {
+            expect(std::abs(pt.y - 0.18) < 1e-6,
+                   "building points sit on pad top Y=0.18");
+        }
+
+        std::printf("lot-city-buildings-instanced: points=%zu/%zu spawn_verts=%zu spawn_tris=%zu slots=%zu\n",
+                    point_count,
+                    unfiltered_lots,
+                    spawn_verts,
+                    spawn_indices / 3,
+                    result.spawn_mesh.material_slots().size());
+    }
+}
+
 void test_pad_bevel_multi_lot_topology()
 {
     PcgGeometry ground;
@@ -353,6 +502,7 @@ int main()
     test_poly_extrude_discards_unselected();
     test_graph_node();
     test_example_graphs();
+    test_instanced_city_example_graphs();
     test_pad_bevel_multi_lot_topology();
     std::printf("test_lot_subdivision: OK\n");
     return 0;

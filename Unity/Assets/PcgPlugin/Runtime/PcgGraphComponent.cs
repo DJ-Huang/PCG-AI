@@ -187,11 +187,21 @@ namespace DJTechRuntime.PCG
         public int TerrainApplyGeneration => m_TerrainApplyGeneration;
 
         /// <summary>
-        /// Re-apply <see cref="MaterialBindings"/> / fallback to the current MeshRenderer
-        /// without re-cooking. No-op until a mesh cook has produced material slots.
+        /// Re-apply <see cref="MaterialBindings"/> / fallback without re-cooking.
+        /// GPU mode only replaces cloned draw materials (no transform/args rebuild).
         /// </summary>
         public void RefreshAppliedMaterials()
         {
+            if (scatterDisplayMode == PcgScatterDisplayMode.GpuInstancing && m_GpuInstancer.IsActive)
+            {
+                var subMeshCount = m_GpuInstancer.PrototypeMesh != null
+                    ? m_GpuInstancer.PrototypeMesh.subMeshCount
+                    : 0;
+                var materials = ResolveMaterialBindings(m_LastMaterialNames, subMeshCount);
+                m_GpuInstancer.RefreshDrawMaterials(materials);
+                return;
+            }
+
             EnsureMeshComponents();
             if (m_MeshRenderer == null)
                 return;
@@ -250,6 +260,8 @@ namespace DJTechRuntime.PCG
 #if UNITY_EDITOR
             s_EditModePreviewCooks.Add(this);
 #endif
+            TryRestoreGpuInstancingFromCache();
+
             if (!Application.isPlaying && SupportsEditModePreview())
             {
 #if UNITY_EDITOR
@@ -272,7 +284,15 @@ namespace DJTechRuntime.PCG
             s_EditModePreviewCooks.Remove(this);
 #endif
             PcgScatterRenderBridge.Unregister(this);
+            m_GpuInstancer.Clear();
             CancelAsyncCook(null, log: false);
+        }
+
+        private void OnDestroy()
+        {
+            PcgScatterRenderBridge.Unregister(this);
+            m_GpuInstancer.Clear();
+            ClearScatterCpuCache();
         }
 
         private void Start()
@@ -854,14 +874,21 @@ namespace DJTechRuntime.PCG
                         }
                         var spawnHash = ComputeBinaryHash(result.MeshBinary);
                         Mesh spawnPrototype;
-                        if (spawnHash != 0 && spawnHash == m_LastMeshBinaryHash && m_OwnedSpawnPrototypeMesh != null)
+                        string[] spawnMaterialNames;
+                        if (spawnHash != 0 &&
+                            spawnHash == m_LastMeshBinaryHash &&
+                            m_OwnedSpawnPrototypeMesh != null)
+                        {
                             spawnPrototype = m_OwnedSpawnPrototypeMesh;
+                            spawnMaterialNames = m_LastMaterialNames;
+                        }
                         else
                         {
-                            spawnPrototype = BuildSpawnPrototypeMesh(result);
+                            spawnPrototype = BuildSpawnPrototypeMesh(result, out spawnMaterialNames);
                             m_LastMeshBinaryHash = spawnHash;
+                            m_LastMaterialNames = spawnMaterialNames ?? Array.Empty<string>();
                         }
-                        ApplyPoints(points, spawnPrototype);
+                        ApplyPoints(points, spawnPrototype, m_LastMaterialNames);
                     }
                     else
                     {
@@ -870,7 +897,12 @@ namespace DJTechRuntime.PCG
                             Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
                             return false;
                         }
-                        ApplyPoints(PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)), BuildSpawnPrototypeMesh(result));
+                        var spawnPrototype = BuildSpawnPrototypeMesh(result, out var spawnMaterialNames);
+                        m_LastMaterialNames = spawnMaterialNames ?? Array.Empty<string>();
+                        ApplyPoints(
+                            PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)),
+                            spawnPrototype,
+                            m_LastMaterialNames);
                     }
                     break;
 
@@ -1256,18 +1288,23 @@ namespace DJTechRuntime.PCG
         {
             InvalidateCookResult();
             ClearGeneratedMesh();
+            ClearScatterCpuCache();
             ClearLastCookedHeightField();
             m_PolygonPreview = null;
         }
 
         // --- Result rendering ---
 
-        private void ApplyPoints(List<PcgScatterPoint> points, Mesh pointPrototypeMesh = null)
+        private void ApplyPoints(
+            List<PcgScatterPoint> points,
+            Mesh pointPrototypeMesh = null,
+            IReadOnlyList<string> materialNames = null)
         {
             var prototypeMesh = pointPrototypeMesh != null ? pointPrototypeMesh : ResolveScatterPointMesh();
             if (!PcgInstanceList.TryBuild(points, prototypeMesh, scatterPointScale, out var instanceList))
             {
                 ClearScatterDisplay();
+                ClearScatterCpuCache();
                 return;
             }
 
@@ -1275,15 +1312,26 @@ namespace DJTechRuntime.PCG
             {
                 ClearMergedMeshOnly();
                 SetOwnedSpawnPrototype(pointPrototypeMesh);
-                var material = ResolveMeshMaterial();
-                m_GpuInstancer.Set(instanceList, material, gameObject.layer, transform.localToWorldMatrix);
-                PcgScatterRenderBridge.Register(this);
+                CacheScatterCpuState(instanceList, materialNames);
+                var materials = ResolveMaterialBindings(
+                    materialNames,
+                    prototypeMesh != null ? prototypeMesh.subMeshCount : 0);
+                m_GpuInstancer.Set(
+                    instanceList,
+                    materials,
+                    gameObject.layer,
+                    transform.localToWorldMatrix);
+                if (m_GpuInstancer.IsActive)
+                    PcgScatterRenderBridge.Register(this);
+                else
+                    PcgScatterRenderBridge.Unregister(this);
                 if (m_MeshRenderer != null)
                     m_MeshRenderer.enabled = false;
                 return;
             }
 
             ClearGpuInstancingOnly();
+            ClearScatterCpuCache();
             var scatterMesh = BuildScatterMesh(instanceList);
             ApplyMesh(scatterMesh);
         }
@@ -1302,6 +1350,8 @@ namespace DJTechRuntime.PCG
         private MeshFilter m_MeshFilter;
         private MeshRenderer m_MeshRenderer;
         private readonly PcgScatterGpuInstancer m_GpuInstancer = new();
+        private PcgInstanceList m_CachedScatterInstances;
+        private string[] m_CachedScatterMaterialNames;
 
         private void ClearScatterDisplay()
         {
@@ -1313,7 +1363,60 @@ namespace DJTechRuntime.PCG
         {
             PcgScatterRenderBridge.Unregister(this);
             m_GpuInstancer.Clear();
+        }
+
+        private void CacheScatterCpuState(
+            PcgInstanceList instanceList,
+            IReadOnlyList<string> materialNames)
+        {
+            m_CachedScatterInstances = instanceList;
+            if (materialNames == null || materialNames.Count == 0)
+            {
+                m_CachedScatterMaterialNames = Array.Empty<string>();
+                return;
+            }
+
+            var copy = new string[materialNames.Count];
+            for (var i = 0; i < materialNames.Count; i++)
+                copy[i] = materialNames[i];
+            m_CachedScatterMaterialNames = copy;
+        }
+
+        private void ClearScatterCpuCache()
+        {
+            m_CachedScatterInstances = null;
+            m_CachedScatterMaterialNames = null;
             DestroyOwnedSpawnPrototype();
+        }
+
+        private void TryRestoreGpuInstancingFromCache()
+        {
+            if (scatterDisplayMode != PcgScatterDisplayMode.GpuInstancing)
+                return;
+            if (m_CachedScatterInstances == null || m_CachedScatterInstances.Count == 0)
+                return;
+
+            var prototype = m_CachedScatterInstances.PrototypeMesh;
+            if (prototype == null)
+            {
+                ClearScatterCpuCache();
+                return;
+            }
+
+            var materials = ResolveMaterialBindings(
+                m_CachedScatterMaterialNames,
+                prototype.subMeshCount);
+            m_GpuInstancer.Set(
+                m_CachedScatterInstances,
+                materials,
+                gameObject.layer,
+                transform.localToWorldMatrix);
+            if (m_GpuInstancer.IsActive)
+            {
+                PcgScatterRenderBridge.Register(this);
+                if (m_MeshRenderer != null)
+                    m_MeshRenderer.enabled = false;
+            }
         }
 
         private void ClearMergedMeshOnly()
@@ -1337,11 +1440,13 @@ namespace DJTechRuntime.PCG
         private void ClearGeneratedMesh()
         {
             ClearScatterDisplay();
+            ClearScatterCpuCache();
         }
 
         private void ApplyMesh(Mesh mesh, IReadOnlyList<string> materialNames = null)
         {
             ClearGpuInstancingOnly();
+            ClearScatterCpuCache();
             EnsureMeshComponents();
 
 #if UNITY_EDITOR
@@ -1434,20 +1539,38 @@ namespace DJTechRuntime.PCG
             if (m_MeshRenderer == null)
                 return;
 
-            var fallback = meshMaterial != null ? meshMaterial : m_MeshRenderer.sharedMaterial;
-            if (materialNames == null || materialNames.Count == 0)
-            {
-                m_MeshRenderer.sharedMaterials = new[] { fallback };
-                return;
-            }
+            var subMeshCount = m_MeshFilter != null && m_MeshFilter.sharedMesh != null
+                ? m_MeshFilter.sharedMesh.subMeshCount
+                : (materialNames?.Count ?? 0);
+            m_MeshRenderer.sharedMaterials = ResolveMaterialBindings(materialNames, subMeshCount);
+        }
 
-            var resolved = new Material[materialNames.Count];
-            for (var slot = 0; slot < materialNames.Count; slot++)
+        /// <summary>
+        /// Resolve slot names → Materials for MeshRenderer and GPU instancing.
+        /// Truncates or pads to <paramref name="subMeshCount"/>; empty/missing names use fallback.
+        /// </summary>
+        internal Material[] ResolveMaterialBindings(
+            IReadOnlyList<string> materialNames,
+            int subMeshCount)
+        {
+            var fallback = ResolveFallbackMaterial();
+            var count = subMeshCount > 0
+                ? subMeshCount
+                : (materialNames != null && materialNames.Count > 0 ? materialNames.Count : 1);
+            if (count <= 0)
+                count = 1;
+
+            var resolved = new Material[count];
+            for (var slot = 0; slot < count; slot++)
             {
                 resolved[slot] = fallback;
+                if (materialNames == null || slot >= materialNames.Count)
+                    continue;
+
                 var name = materialNames[slot];
                 if (string.IsNullOrEmpty(name))
                     continue;
+
                 foreach (var binding in m_MaterialBindings)
                 {
                     if (binding != null && binding.material != null && binding.materialName == name)
@@ -1457,7 +1580,62 @@ namespace DJTechRuntime.PCG
                     }
                 }
             }
-            m_MeshRenderer.sharedMaterials = resolved;
+
+            return resolved;
+        }
+
+        /// <summary>
+        /// Pure resolver for EditMode tests (no MeshRenderer required).
+        /// </summary>
+        internal static Material[] ResolveMaterialBindings(
+            IReadOnlyList<string> materialNames,
+            int subMeshCount,
+            IReadOnlyList<PcgMaterialBinding> bindings,
+            Material fallback)
+        {
+            var count = subMeshCount > 0
+                ? subMeshCount
+                : (materialNames != null && materialNames.Count > 0 ? materialNames.Count : 1);
+            if (count <= 0)
+                count = 1;
+
+            var resolved = new Material[count];
+            for (var slot = 0; slot < count; slot++)
+            {
+                resolved[slot] = fallback;
+                if (materialNames == null || slot >= materialNames.Count)
+                    continue;
+
+                var name = materialNames[slot];
+                if (string.IsNullOrEmpty(name) || bindings == null)
+                    continue;
+
+                foreach (var binding in bindings)
+                {
+                    if (binding != null && binding.material != null && binding.materialName == name)
+                    {
+                        resolved[slot] = binding.material;
+                        break;
+                    }
+                }
+            }
+
+            return resolved;
+        }
+
+        private Material ResolveFallbackMaterial()
+        {
+            if (meshMaterial != null)
+                return meshMaterial;
+
+            EnsureMeshComponents();
+            if (m_MeshRenderer != null && m_MeshRenderer.sharedMaterial != null)
+                return m_MeshRenderer.sharedMaterial;
+
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            return shader != null
+                ? new Material(shader) { color = new Color(0.55f, 0.75f, 0.95f) }
+                : null;
         }
 
         private void EnsureMeshComponents()
@@ -1509,15 +1687,23 @@ namespace DJTechRuntime.PCG
             return mesh;
         }
 
-        private static Mesh BuildSpawnPrototypeMesh(PcgGraphExecuteResult result)
+        private static Mesh BuildSpawnPrototypeMesh(
+            PcgGraphExecuteResult result,
+            out string[] materialNames)
         {
+            materialNames = Array.Empty<string>();
             if (result?.MeshBinary == null || result.MeshBinary.Length < PcgNative.MeshBinaryHeaderSize)
                 return null;
 
-            if (!PcgResultParser.TryParseMeshBinary(result.MeshBinary, out var mesh, out _))
+            if (!PcgResultParser.TryParseMeshBinary(
+                    result.MeshBinary, out var mesh, out materialNames, out _))
+            {
+                materialNames = Array.Empty<string>();
                 return null;
+            }
 
             mesh.name = "PCG Spawn Prototype Mesh";
+            materialNames ??= Array.Empty<string>();
             return mesh;
         }
 
@@ -1548,18 +1734,6 @@ namespace DJTechRuntime.PCG
 
             var cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
             return cube;
-        }
-
-        private Material ResolveMeshMaterial()
-        {
-            EnsureMeshComponents();
-            if (m_MeshRenderer == null)
-                return null;
-
-            var material = m_MeshRenderer.sharedMaterial;
-            if (material != null)
-                material.enableInstancing = true;
-            return material;
         }
 
         private void SetOwnedSpawnPrototype(Mesh spawnPrototypeMesh)

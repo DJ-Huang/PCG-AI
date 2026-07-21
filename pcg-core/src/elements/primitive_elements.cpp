@@ -517,8 +517,12 @@ public:
 
         if (auto prototype = ctx.inputs.find_mesh_shared("mesh")) {
             emit_mesh_shared(ctx, "spawnMesh", prototype);
-        } else if (const nlohmann::json* mesh_json = ctx.inputs.find_json("mesh")) {
-            data::PcgMeshData spawn_mesh = parse_mesh_input(*mesh_json);
+        } else if (ctx.inputs.find_mesh("mesh") ||
+                   ctx.inputs.find_geometry("mesh") ||
+                   ctx.inputs.find_json("mesh")) {
+            // CreateBoxMesh / Boolean / AssignMaterial emit Geometry; convert like get_mesh_input.
+            data::PcgMeshData spawn_mesh =
+                get_mesh_input(ctx, "mesh", "StaticMeshSpawner mesh");
             if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3)
                 ctx.outputs.add_mesh("spawnMesh", std::move(spawn_mesh));
         }

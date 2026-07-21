@@ -232,7 +232,8 @@ namespace DJTechEditor.PCG
                     new GUIContent(
                         "Display Mode",
                         "Merged Mesh: combine instances into one MeshFilter (default). " +
-                        "GPU Instancing: draw scatter with Graphics.DrawMeshInstanced (faster for many points)."));
+                        "GPU Instancing: draw with Graphics.RenderMeshIndirect " +
+                        "(one batch per non-empty prototype material/submesh slot)."));
             }
             else
             {
