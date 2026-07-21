@@ -347,6 +347,104 @@ namespace DJTechRuntime.PCG
             }
         }
 
+        public sealed class PcgSpawnPrototype
+        {
+            public Mesh Mesh;
+            public string[] MaterialNames = Array.Empty<string>();
+            public int PointCount = -1;
+        }
+
+        /// <summary>
+        /// Parses single PCGM spawn mesh or PCMS multi-prototype pack.
+        /// </summary>
+        public static bool TryParseSpawnMeshBinary(
+            byte[] data,
+            out List<PcgSpawnPrototype> prototypes,
+            out string error)
+        {
+            prototypes = new List<PcgSpawnPrototype>();
+            error = null;
+            if (data == null || data.Length < 4)
+            {
+                error = "Spawn mesh binary payload is too small.";
+                return false;
+            }
+
+            var magic = BitConverter.ToUInt32(data, 0);
+            if (magic == PcgNative.MeshBinaryMagic)
+            {
+                if (!TryParseMeshBinary(data, out var mesh, out var names, out error))
+                    return false;
+                prototypes.Add(new PcgSpawnPrototype
+                {
+                    Mesh = mesh,
+                    MaterialNames = names ?? Array.Empty<string>(),
+                    PointCount = -1
+                });
+                return true;
+            }
+
+            if (magic != PcgNative.MultiSpawnMagic)
+            {
+                error = $"Invalid spawn mesh magic: 0x{magic:X8}";
+                return false;
+            }
+
+            if (data.Length < 12)
+            {
+                error = "Multi-spawn pack header too small.";
+                return false;
+            }
+
+            var version = BitConverter.ToUInt32(data, 4);
+            var count = BitConverter.ToInt32(data, 8);
+            if (version != 1u || count <= 0)
+            {
+                error = $"Unsupported multi-spawn pack (version={version}, count={count}).";
+                return false;
+            }
+
+            var header = 12 + count * 8;
+            if (data.Length < header)
+            {
+                error = "Multi-spawn pack truncated header.";
+                return false;
+            }
+
+            var pointCounts = new int[count];
+            var meshSizes = new int[count];
+            for (var i = 0; i < count; i++)
+                pointCounts[i] = BitConverter.ToInt32(data, 12 + i * 4);
+            var sizeOffset = 12 + count * 4;
+            for (var i = 0; i < count; i++)
+                meshSizes[i] = BitConverter.ToInt32(data, sizeOffset + i * 4);
+
+            var offset = header;
+            for (var i = 0; i < count; i++)
+            {
+                if (offset + meshSizes[i] > data.Length)
+                {
+                    error = $"Multi-spawn pack truncated at prototype {i}.";
+                    return false;
+                }
+
+                var slice = new byte[meshSizes[i]];
+                Buffer.BlockCopy(data, offset, slice, 0, meshSizes[i]);
+                if (!TryParseMeshBinary(slice, out var mesh, out var names, out error))
+                    return false;
+
+                prototypes.Add(new PcgSpawnPrototype
+                {
+                    Mesh = mesh,
+                    MaterialNames = names ?? Array.Empty<string>(),
+                    PointCount = pointCounts[i]
+                });
+                offset += meshSizes[i];
+            }
+
+            return true;
+        }
+
         public static unsafe bool TryParsePointBinary(byte[] data, out List<PcgScatterPoint> points, out string error)
         {
             points = new List<PcgScatterPoint>();

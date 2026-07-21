@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
-#if UNITY_EDITOR
-using System.Linq;
-#endif
 
 namespace DJTechRuntime.PCG
 {
@@ -192,13 +190,23 @@ namespace DJTechRuntime.PCG
         /// </summary>
         public void RefreshAppliedMaterials()
         {
-            if (scatterDisplayMode == PcgScatterDisplayMode.GpuInstancing && m_GpuInstancer.IsActive)
+            if (scatterDisplayMode == PcgScatterDisplayMode.GpuInstancing &&
+                m_GpuInstancers != null &&
+                m_GpuInstancers.Count > 0)
             {
-                var subMeshCount = m_GpuInstancer.PrototypeMesh != null
-                    ? m_GpuInstancer.PrototypeMesh.subMeshCount
-                    : 0;
-                var materials = ResolveMaterialBindings(m_LastMaterialNames, subMeshCount);
-                m_GpuInstancer.RefreshDrawMaterials(materials);
+                for (var i = 0; i < m_GpuInstancers.Count; i++)
+                {
+                    var instancer = m_GpuInstancers[i];
+                    if (instancer == null || !instancer.IsActive)
+                        continue;
+                    var names = i < m_CachedScatterMaterialNamesList.Count
+                        ? m_CachedScatterMaterialNamesList[i]
+                        : m_LastMaterialNames;
+                    var subMeshCount = instancer.PrototypeMesh != null
+                        ? instancer.PrototypeMesh.subMeshCount
+                        : 0;
+                    instancer.RefreshDrawMaterials(ResolveMaterialBindings(names, subMeshCount));
+                }
                 return;
             }
 
@@ -284,14 +292,14 @@ namespace DJTechRuntime.PCG
             s_EditModePreviewCooks.Remove(this);
 #endif
             PcgScatterRenderBridge.Unregister(this);
-            m_GpuInstancer.Clear();
+            ClearGpuInstancers();
             CancelAsyncCook(null, log: false);
         }
 
         private void OnDestroy()
         {
             PcgScatterRenderBridge.Unregister(this);
-            m_GpuInstancer.Clear();
+            ClearGpuInstancers();
             ClearScatterCpuCache();
         }
 
@@ -315,7 +323,10 @@ namespace DJTechRuntime.PCG
             if (scatterDisplayMode != PcgScatterDisplayMode.GpuInstancing)
                 return;
 
-            m_GpuInstancer.Draw(camera);
+            if (m_GpuInstancers == null)
+                return;
+            for (var i = 0; i < m_GpuInstancers.Count; i++)
+                m_GpuInstancers[i]?.Draw(camera);
         }
 
 #if UNITY_EDITOR
@@ -873,22 +884,17 @@ namespace DJTechRuntime.PCG
                             return false;
                         }
                         var spawnHash = ComputeBinaryHash(result.MeshBinary);
-                        Mesh spawnPrototype;
-                        string[] spawnMaterialNames;
                         if (spawnHash != 0 &&
                             spawnHash == m_LastMeshBinaryHash &&
-                            m_OwnedSpawnPrototypeMesh != null)
+                            m_OwnedSpawnPrototypeMeshes.Count > 0 &&
+                            m_CachedScatterInstancesList.Count == m_OwnedSpawnPrototypeMeshes.Count)
                         {
-                            spawnPrototype = m_OwnedSpawnPrototypeMesh;
-                            spawnMaterialNames = m_LastMaterialNames;
+                            ApplyCachedSpawnPrototypes(points);
                         }
-                        else
+                        else if (!TryApplySpawnPrototypes(result.MeshBinary, points, spawnHash))
                         {
-                            spawnPrototype = BuildSpawnPrototypeMesh(result, out spawnMaterialNames);
-                            m_LastMeshBinaryHash = spawnHash;
-                            m_LastMaterialNames = spawnMaterialNames ?? Array.Empty<string>();
+                            return false;
                         }
-                        ApplyPoints(points, spawnPrototype, m_LastMaterialNames);
                     }
                     else
                     {
@@ -897,12 +903,13 @@ namespace DJTechRuntime.PCG
                             Debug.LogError($"[PCG] Failed to parse point result: {parseError}");
                             return false;
                         }
-                        var spawnPrototype = BuildSpawnPrototypeMesh(result, out var spawnMaterialNames);
-                        m_LastMaterialNames = spawnMaterialNames ?? Array.Empty<string>();
-                        ApplyPoints(
-                            PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)),
-                            spawnPrototype,
-                            m_LastMaterialNames);
+                        if (!TryApplySpawnPrototypes(
+                                result.MeshBinary,
+                                PcgResultParser.ToScatterPoints(PcgResultParser.ToVector3List(parsed)),
+                                ComputeBinaryHash(result.MeshBinary)))
+                        {
+                            return false;
+                        }
                     }
                     break;
 
@@ -1300,40 +1307,157 @@ namespace DJTechRuntime.PCG
             Mesh pointPrototypeMesh = null,
             IReadOnlyList<string> materialNames = null)
         {
-            var prototypeMesh = pointPrototypeMesh != null ? pointPrototypeMesh : ResolveScatterPointMesh();
-            if (!PcgInstanceList.TryBuild(points, prototypeMesh, scatterPointScale, out var instanceList))
+            var names = Array.Empty<string>();
+            if (materialNames != null)
+            {
+                names = new string[materialNames.Count];
+                for (var i = 0; i < materialNames.Count; i++)
+                    names[i] = materialNames[i];
+            }
+
+            ApplyPrototypeBatches(
+                new List<PcgResultParser.PcgSpawnPrototype>
+                {
+                    new PcgResultParser.PcgSpawnPrototype
+                    {
+                        Mesh = pointPrototypeMesh != null ? pointPrototypeMesh : ResolveScatterPointMesh(),
+                        MaterialNames = names,
+                        PointCount = points?.Count ?? 0
+                    }
+                },
+                points);
+        }
+
+        private bool TryApplySpawnPrototypes(
+            byte[] meshBinary,
+            List<PcgScatterPoint> points,
+            ulong spawnHash)
+        {
+            if (meshBinary == null || meshBinary.Length == 0)
+            {
+                ApplyPoints(points, null, null);
+                return true;
+            }
+
+            if (!PcgResultParser.TryParseSpawnMeshBinary(meshBinary, out var prototypes, out var error))
+            {
+                Debug.LogError($"[PCG] Failed to parse spawn mesh binary: {error}");
+                return false;
+            }
+
+            m_LastMeshBinaryHash = spawnHash;
+            if (prototypes.Count == 1 && prototypes[0].PointCount < 0)
+                prototypes[0].PointCount = points?.Count ?? 0;
+
+            var allNames = new List<string>();
+            foreach (var proto in prototypes)
+            {
+                if (proto.MaterialNames == null)
+                    continue;
+                foreach (var name in proto.MaterialNames)
+                {
+                    if (!string.IsNullOrEmpty(name) && !allNames.Contains(name))
+                        allNames.Add(name);
+                }
+            }
+            m_LastMaterialNames = allNames.ToArray();
+            ApplyPrototypeBatches(prototypes, points);
+            return true;
+        }
+
+        private void ApplyCachedSpawnPrototypes(List<PcgScatterPoint> points)
+        {
+            var prototypes = new List<PcgResultParser.PcgSpawnPrototype>(m_OwnedSpawnPrototypeMeshes.Count);
+            for (var i = 0; i < m_OwnedSpawnPrototypeMeshes.Count; i++)
+            {
+                prototypes.Add(new PcgResultParser.PcgSpawnPrototype
+                {
+                    Mesh = m_OwnedSpawnPrototypeMeshes[i],
+                    MaterialNames = i < m_CachedScatterMaterialNamesList.Count
+                        ? m_CachedScatterMaterialNamesList[i]
+                        : Array.Empty<string>(),
+                    PointCount = i < m_CachedScatterPointCounts.Count
+                        ? m_CachedScatterPointCounts[i]
+                        : 0
+                });
+            }
+            ApplyPrototypeBatches(prototypes, points, reuseOwnedMeshes: true);
+        }
+
+        private void ApplyPrototypeBatches(
+            List<PcgResultParser.PcgSpawnPrototype> prototypes,
+            List<PcgScatterPoint> points,
+            bool reuseOwnedMeshes = false)
+        {
+            if (prototypes == null || prototypes.Count == 0 || points == null || points.Count == 0)
             {
                 ClearScatterDisplay();
                 ClearScatterCpuCache();
                 return;
             }
 
-            if (scatterDisplayMode == PcgScatterDisplayMode.GpuInstancing)
+            if (scatterDisplayMode != PcgScatterDisplayMode.GpuInstancing)
             {
-                ClearMergedMeshOnly();
-                SetOwnedSpawnPrototype(pointPrototypeMesh);
-                CacheScatterCpuState(instanceList, materialNames);
-                var materials = ResolveMaterialBindings(
-                    materialNames,
-                    prototypeMesh != null ? prototypeMesh.subMeshCount : 0);
-                m_GpuInstancer.Set(
-                    instanceList,
-                    materials,
-                    gameObject.layer,
-                    transform.localToWorldMatrix);
-                if (m_GpuInstancer.IsActive)
-                    PcgScatterRenderBridge.Register(this);
-                else
-                    PcgScatterRenderBridge.Unregister(this);
-                if (m_MeshRenderer != null)
-                    m_MeshRenderer.enabled = false;
+                ClearGpuInstancingOnly();
+                ClearScatterCpuCache();
+                var first = prototypes[0].Mesh != null ? prototypes[0].Mesh : ResolveScatterPointMesh();
+                if (!PcgInstanceList.TryBuild(points, first, scatterPointScale, out var mergedList))
+                {
+                    ClearScatterDisplay();
+                    return;
+                }
+                ApplyMesh(BuildScatterMesh(mergedList));
                 return;
             }
 
-            ClearGpuInstancingOnly();
-            ClearScatterCpuCache();
-            var scatterMesh = BuildScatterMesh(instanceList);
-            ApplyMesh(scatterMesh);
+            ClearMergedMeshOnly();
+            ClearGpuInstancers();
+            if (!reuseOwnedMeshes)
+                SetOwnedSpawnPrototypes(prototypes);
+
+            m_CachedScatterInstancesList.Clear();
+            m_CachedScatterMaterialNamesList.Clear();
+            m_CachedScatterPointCounts.Clear();
+            m_GpuInstancers.Clear();
+
+            var offset = 0;
+            var anyActive = false;
+            for (var i = 0; i < prototypes.Count; i++)
+            {
+                var proto = prototypes[i];
+                var count = proto.PointCount;
+                if (count < 0)
+                    count = points.Count - offset;
+                if (count <= 0 || offset >= points.Count)
+                    continue;
+                if (offset + count > points.Count)
+                    count = points.Count - offset;
+
+                var slice = points.GetRange(offset, count);
+                offset += count;
+                if (proto.Mesh == null)
+                    continue;
+                if (!PcgInstanceList.TryBuild(slice, proto.Mesh, scatterPointScale, out var instanceList))
+                    continue;
+
+                var names = proto.MaterialNames ?? Array.Empty<string>();
+                var materials = ResolveMaterialBindings(names, proto.Mesh.subMeshCount);
+                var instancer = new PcgScatterGpuInstancer();
+                instancer.Set(instanceList, materials, gameObject.layer, transform.localToWorldMatrix);
+                m_GpuInstancers.Add(instancer);
+                m_CachedScatterInstancesList.Add(instanceList);
+                m_CachedScatterMaterialNamesList.Add(names);
+                m_CachedScatterPointCounts.Add(count);
+                if (instancer.IsActive)
+                    anyActive = true;
+            }
+
+            if (anyActive)
+                PcgScatterRenderBridge.Register(this);
+            else
+                PcgScatterRenderBridge.Unregister(this);
+            if (m_MeshRenderer != null)
+                m_MeshRenderer.enabled = false;
         }
 
         private void ApplySplines(List<List<Vector3>> splines)
@@ -1346,12 +1470,13 @@ namespace DJTechRuntime.PCG
         }
 
         private Mesh m_GeneratedMesh;
-        private Mesh m_OwnedSpawnPrototypeMesh;
+        private readonly List<Mesh> m_OwnedSpawnPrototypeMeshes = new();
         private MeshFilter m_MeshFilter;
         private MeshRenderer m_MeshRenderer;
-        private readonly PcgScatterGpuInstancer m_GpuInstancer = new();
-        private PcgInstanceList m_CachedScatterInstances;
-        private string[] m_CachedScatterMaterialNames;
+        private readonly List<PcgScatterGpuInstancer> m_GpuInstancers = new();
+        private readonly List<PcgInstanceList> m_CachedScatterInstancesList = new();
+        private readonly List<string[]> m_CachedScatterMaterialNamesList = new();
+        private readonly List<int> m_CachedScatterPointCounts = new();
 
         private void ClearScatterDisplay()
         {
@@ -1359,59 +1484,53 @@ namespace DJTechRuntime.PCG
             ClearMergedMeshOnly();
         }
 
+        private void ClearGpuInstancers()
+        {
+            for (var i = 0; i < m_GpuInstancers.Count; i++)
+                m_GpuInstancers[i]?.Clear();
+            m_GpuInstancers.Clear();
+        }
+
         private void ClearGpuInstancingOnly()
         {
             PcgScatterRenderBridge.Unregister(this);
-            m_GpuInstancer.Clear();
-        }
-
-        private void CacheScatterCpuState(
-            PcgInstanceList instanceList,
-            IReadOnlyList<string> materialNames)
-        {
-            m_CachedScatterInstances = instanceList;
-            if (materialNames == null || materialNames.Count == 0)
-            {
-                m_CachedScatterMaterialNames = Array.Empty<string>();
-                return;
-            }
-
-            var copy = new string[materialNames.Count];
-            for (var i = 0; i < materialNames.Count; i++)
-                copy[i] = materialNames[i];
-            m_CachedScatterMaterialNames = copy;
+            ClearGpuInstancers();
         }
 
         private void ClearScatterCpuCache()
         {
-            m_CachedScatterInstances = null;
-            m_CachedScatterMaterialNames = null;
-            DestroyOwnedSpawnPrototype();
+            m_CachedScatterInstancesList.Clear();
+            m_CachedScatterMaterialNamesList.Clear();
+            m_CachedScatterPointCounts.Clear();
+            DestroyOwnedSpawnPrototypes();
         }
 
         private void TryRestoreGpuInstancingFromCache()
         {
             if (scatterDisplayMode != PcgScatterDisplayMode.GpuInstancing)
                 return;
-            if (m_CachedScatterInstances == null || m_CachedScatterInstances.Count == 0)
+            if (m_CachedScatterInstancesList.Count == 0)
                 return;
 
-            var prototype = m_CachedScatterInstances.PrototypeMesh;
-            if (prototype == null)
+            ClearGpuInstancers();
+            var anyActive = false;
+            for (var i = 0; i < m_CachedScatterInstancesList.Count; i++)
             {
-                ClearScatterCpuCache();
-                return;
+                var instances = m_CachedScatterInstancesList[i];
+                if (instances == null || instances.Count == 0 || instances.PrototypeMesh == null)
+                    continue;
+                var names = i < m_CachedScatterMaterialNamesList.Count
+                    ? m_CachedScatterMaterialNamesList[i]
+                    : Array.Empty<string>();
+                var materials = ResolveMaterialBindings(names, instances.PrototypeMesh.subMeshCount);
+                var instancer = new PcgScatterGpuInstancer();
+                instancer.Set(instances, materials, gameObject.layer, transform.localToWorldMatrix);
+                m_GpuInstancers.Add(instancer);
+                if (instancer.IsActive)
+                    anyActive = true;
             }
 
-            var materials = ResolveMaterialBindings(
-                m_CachedScatterMaterialNames,
-                prototype.subMeshCount);
-            m_GpuInstancer.Set(
-                m_CachedScatterInstances,
-                materials,
-                gameObject.layer,
-                transform.localToWorldMatrix);
-            if (m_GpuInstancer.IsActive)
+            if (anyActive)
             {
                 PcgScatterRenderBridge.Register(this);
                 if (m_MeshRenderer != null)
@@ -1736,32 +1855,34 @@ namespace DJTechRuntime.PCG
             return cube;
         }
 
-        private void SetOwnedSpawnPrototype(Mesh spawnPrototypeMesh)
+        private void SetOwnedSpawnPrototypes(List<PcgResultParser.PcgSpawnPrototype> prototypes)
         {
-            if (spawnPrototypeMesh == null || spawnPrototypeMesh == scatterPointMesh)
+            DestroyOwnedSpawnPrototypes();
+            if (prototypes == null)
+                return;
+            for (var i = 0; i < prototypes.Count; i++)
             {
-                DestroyOwnedSpawnPrototype();
-                return;
+                var mesh = prototypes[i]?.Mesh;
+                if (mesh == null || mesh == scatterPointMesh)
+                    continue;
+                m_OwnedSpawnPrototypeMeshes.Add(mesh);
             }
-
-            if (m_OwnedSpawnPrototypeMesh == spawnPrototypeMesh)
-                return;
-
-            DestroyOwnedSpawnPrototype();
-            m_OwnedSpawnPrototypeMesh = spawnPrototypeMesh;
         }
 
-        private void DestroyOwnedSpawnPrototype()
+        private void DestroyOwnedSpawnPrototypes()
         {
-            if (m_OwnedSpawnPrototypeMesh == null)
-                return;
-
+            for (var i = 0; i < m_OwnedSpawnPrototypeMeshes.Count; i++)
+            {
+                var mesh = m_OwnedSpawnPrototypeMeshes[i];
+                if (mesh == null)
+                    continue;
 #if UNITY_EDITOR
-            DestroyImmediate(m_OwnedSpawnPrototypeMesh);
+                DestroyImmediate(mesh);
 #else
-            Destroy(m_OwnedSpawnPrototypeMesh);
+                Destroy(mesh);
 #endif
-            m_OwnedSpawnPrototypeMesh = null;
+            }
+            m_OwnedSpawnPrototypeMeshes.Clear();
         }
     }
 }

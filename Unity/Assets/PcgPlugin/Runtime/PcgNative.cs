@@ -22,6 +22,7 @@ namespace DJTechRuntime.PCG
 #endif
 
         public const uint MeshBinaryMagic = 0x4D474350u;
+        public const uint MultiSpawnMagic = 0x534D4350u; // 'PCMS'
         public const int MeshBinaryHeaderSize = 16;
         public const int MeshBinaryV2HeaderSize = 20;
         public const int MeshBinaryV3HeaderSize = 24;
@@ -960,6 +961,10 @@ namespace DJTechRuntime.PCG
         /// </summary>
         private static int ComputeMeshBinaryPayloadSize(byte[] meshBuf, int vertexCount, int indexCount)
         {
+            if (meshBuf != null && meshBuf.Length >= 12 &&
+                BitConverter.ToUInt32(meshBuf, 0) == MultiSpawnMagic)
+                return ComputeMultiSpawnPayloadSize(meshBuf);
+
             int headerSize = MeshBinaryHeaderSize;
             int normalSize = 0;
             int colorSize = 0;
@@ -987,6 +992,21 @@ namespace DJTechRuntime.PCG
             }
 
             return headerSize + vertexCount * 12 + indexCount * 4 + normalSize + colorSize + uvSize + materialSize;
+        }
+
+        private static int ComputeMultiSpawnPayloadSize(byte[] meshBuf)
+        {
+            var count = BitConverter.ToInt32(meshBuf, 8);
+            if (count <= 0)
+                return 12;
+            var header = 12 + count * 8;
+            if (meshBuf.Length < header)
+                return meshBuf.Length;
+            var total = header;
+            var sizeOffset = 12 + count * 4;
+            for (var i = 0; i < count; i++)
+                total += BitConverter.ToInt32(meshBuf, sizeOffset + i * 4);
+            return total;
         }
 
         private static (PcgResultCode code, PcgGraphExecuteResult result) BuildSuccessResult(

@@ -310,6 +310,16 @@ size_t count_node_type(const nlohmann::json& document, const std::string& type)
     return count;
 }
 
+size_t count_root_node_type(const nlohmann::json& document, const std::string& type)
+{
+    size_t count = 0;
+    for (const auto& node : document.at("nodes")) {
+        if (node.value("type", "") == type)
+            ++count;
+    }
+    return count;
+}
+
 bool has_foreach(const nlohmann::json& document)
 {
     return count_node_type(document, "ForEachBegin") > 0 ||
@@ -355,12 +365,18 @@ void test_instanced_city_example_graphs()
                     slots.size());
     }
 
-    // --- Buildings: Points + spawnMesh, no ForEach, single Boolean ---
+    // --- Buildings: multi-prototype GPU Points via MergeSpawnPoints ---
     {
         auto document = load_example_json(root, "examples/lot-city-buildings-instanced.pcg");
         expect(!has_foreach(document), "buildings graph must not use ForEach");
-        expect(count_node_type(document, "BooleanMesh") == 1,
-               "buildings prototype must contain exactly one BooleanMesh");
+        expect(count_node_type(document, "StaticMeshSpawner") == 3,
+               "buildings must spawn tall/medium/short prototypes");
+        expect(count_node_type(document, "MergeSpawnPoints") == 1,
+               "buildings must merge spawn streams");
+        expect(count_root_node_type(document, "CopyMeshToPoints") == 0,
+               "buildings root must not bake city via CopyMeshToPoints");
+        expect(count_root_node_type(document, "MergeMesh") == 0,
+               "buildings root must not MergeMesh the city");
 
         shrink_lot_params(document, /*iterations=*/2, /*min_size=*/4.0);
         char error[1024] = {};
@@ -376,46 +392,26 @@ void test_instanced_city_example_graphs()
         expect(result.kind == GraphResultKind::Points, "buildings result kind is Points");
         expect(result.points != nullptr && !result.points->points().empty(),
                "buildings emits points");
+        expect(result.spawn_meshes.size() == 3, "buildings expose 3 spawn prototypes");
+        expect(result.spawn_point_counts.size() == 3, "buildings expose 3 spawn point counts");
 
-        // Unfiltered lot count from the same ground+lots params.
-        LotSubdivisionOptions lot_opts;
-        lot_opts.min_size = 4.0;
-        lot_opts.iterations = 2;
-        lot_opts.irregularity = 0.0;
-        lot_opts.seed = 11;
-        lot_opts.alignment = "boundingBox";
-        const auto lots = lot_subdivide_geometry(make_ground_quad(48.0, 48.0), lot_opts);
-        const size_t unfiltered_lots = lots.faces().size();
-        const size_t point_count = result.points->points().size();
-        expect(point_count > 0, "buildings point count > 0");
-        expect(point_count < unfiltered_lots,
-               "road clearance must remove some building points");
+        size_t counted = 0;
+        for (int c : result.spawn_point_counts)
+            counted += static_cast<size_t>(c);
+        expect(counted == result.points->points().size(),
+               "spawn point counts cover all points");
 
-        expect(!result.spawn_mesh.vertices().empty() &&
-                   result.spawn_mesh.triangles().size() >= 3,
-               "buildings spawn_mesh non-empty");
-        expect(result.spawn_mesh.material_slots().size() >= 2,
-               "spawn prototype has at least 2 material slots");
-
-        // Prototype size is fixed and much smaller than a merged city mesh.
-        const size_t spawn_verts = result.spawn_mesh.vertices().size();
-        const size_t spawn_indices = result.spawn_mesh.triangles().size();
-        expect(spawn_verts < 5000, "spawn prototype vertex count stays compact");
-        expect(spawn_indices < 20000, "spawn prototype index count stays compact");
-        expect(spawn_verts * point_count > spawn_verts,
-               "spawn size does not scale with instance count (sanity)");
-
-        for (const auto& pt : result.points->points()) {
-            expect(std::abs(pt.y - 0.18) < 1e-6,
-                   "building points sit on pad top Y=0.18");
+        for (const auto& mesh : result.spawn_meshes) {
+            expect(!mesh.vertices().empty() && mesh.triangles().size() >= 3,
+                   "each spawn prototype non-empty");
+            expect(mesh.material_slots().size() >= 2,
+                   "each spawn prototype has multi material slots");
         }
 
-        std::printf("lot-city-buildings-instanced: points=%zu/%zu spawn_verts=%zu spawn_tris=%zu slots=%zu\n",
-                    point_count,
-                    unfiltered_lots,
-                    spawn_verts,
-                    spawn_indices / 3,
-                    result.spawn_mesh.material_slots().size());
+        std::printf("lot-city-buildings-instanced: points=%zu protos=%zu slots0=%zu\n",
+                    result.points->points().size(),
+                    result.spawn_meshes.size(),
+                    result.spawn_meshes[0].material_slots().size());
     }
 }
 

@@ -149,8 +149,10 @@ public:
         if (const data::PcgTaggedData* in_item = ctx.inputs.find("in");
             in_item && in_item->points) {
             ctx.outputs.add_points_shared_with_meta("out", in_item->points, in_item->payload);
-            if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
-                ctx.outputs.add_mesh_shared("spawnMesh", spawn_mesh);
+            for (const auto& item : ctx.inputs.items()) {
+                if (item.tag == "spawnMesh" && item.mesh)
+                    ctx.outputs.add_mesh_shared("spawnMesh", item.mesh);
+            }
             return PCG_OK;
         }
 

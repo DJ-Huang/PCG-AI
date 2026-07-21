@@ -189,9 +189,17 @@ void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
         const data::PcgDataCollection& upstream = it->second;
 
         if (auto points = upstream.find_points_shared(source_pin)) {
-            inputs.add_points_shared(pin, points);
-            if (auto spawn_mesh = upstream.find_mesh_shared("spawnMesh"))
-                inputs.add_mesh_shared("spawnMesh", spawn_mesh);
+            if (const data::PcgTaggedData* src_item = upstream.find(source_pin);
+                src_item && src_item->points) {
+                inputs.add_points_shared_with_meta(pin, points, src_item->payload);
+            } else {
+                inputs.add_points_shared(pin, points);
+            }
+            // Forward every spawnMesh sidecar (multi-prototype MergeSpawnPoints).
+            for (const auto& item : upstream.items()) {
+                if (item.tag == "spawnMesh" && item.mesh)
+                    inputs.add_mesh_shared("spawnMesh", item.mesh);
+            }
             continue;
         }
 
@@ -823,23 +831,49 @@ PcgResultCode execute_graph(const Graph& graph,
         return nullptr;
     };
     out_result.source_heightfield = find_nearest_heightfield();
-    if (const data::PcgMeshData* spawn_mesh = sink_output.find_mesh("spawnMesh")) {
-        out_result.spawn_mesh = *spawn_mesh;
-    } else {
-        out_result.spawn_mesh = data::PcgMeshData{};
-        for (const auto& [node_id, collection] : outputs) {
-            (void)node_id;
-            if (const data::PcgMeshData* upstream_spawn = collection.find_mesh("spawnMesh")) {
-                out_result.spawn_mesh = *upstream_spawn;
-                break;
-            }
+    out_result.spawn_meshes.clear();
+    out_result.spawn_point_counts.clear();
+    for (const auto& item : sink_output.items()) {
+        if (item.tag == "spawnMesh" && item.mesh &&
+            !item.mesh->vertices().empty() && item.mesh->triangles().size() >= 3) {
+            out_result.spawn_meshes.push_back(*item.mesh);
         }
     }
+    if (out_result.spawn_meshes.empty()) {
+        for (const auto& [node_id, collection] : outputs) {
+            (void)node_id;
+            for (const auto& item : collection.items()) {
+                if (item.tag == "spawnMesh" && item.mesh &&
+                    !item.mesh->vertices().empty() && item.mesh->triangles().size() >= 3) {
+                    out_result.spawn_meshes.push_back(*item.mesh);
+                }
+            }
+            if (!out_result.spawn_meshes.empty())
+                break;
+        }
+    }
+    if (!out_result.spawn_meshes.empty())
+        out_result.spawn_mesh = out_result.spawn_meshes.front();
+    else
+        out_result.spawn_mesh = data::PcgMeshData{};
 
     if (const data::PcgTaggedData* out_item = sink_output.find("out"); out_item && out_item->points) {
         out_result.kind = GraphResultKind::Points;
         out_result.points = out_item->points;
         out_result.point_sidecar = out_item->payload;
+        if (out_result.point_sidecar.is_object() &&
+            out_result.point_sidecar.contains("spawnProtoCounts") &&
+            out_result.point_sidecar["spawnProtoCounts"].is_array()) {
+            for (const auto& count : out_result.point_sidecar["spawnProtoCounts"]) {
+                if (count.is_number_integer())
+                    out_result.spawn_point_counts.push_back(count.get<int>());
+            }
+        }
+        if (out_result.spawn_point_counts.empty() && out_result.spawn_meshes.size() == 1 &&
+            out_result.points) {
+            out_result.spawn_point_counts.push_back(
+                static_cast<int>(out_result.points->points().size()));
+        }
         out_result.json = nlohmann::json::object();
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;

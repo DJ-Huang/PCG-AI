@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **100 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **101 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -62,6 +62,7 @@
 - [Spawner 类别](#spawner-类别)
   - [PlaceInScene](#placeinscene)
   - [StaticMeshSpawner](#staticmeshspawner)
+  - [MergeSpawnPoints](#mergespawnpoints)
 - [Spline 类别](#spline-类别)
   - [CreateSpline](#createspline)
   - [CreateBezierSpline](#createbezierspline)
@@ -1292,6 +1293,41 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
   "position": { "x": 900, "y": 0 },
   "data": { "prefab": "RockPrefab", "mesh": "Assets/Meshes/Rock.obj", "scale": 0.8 }
 }
+```
+
+---
+
+### MergeSpawnPoints
+
+**类别**：Spawner
+
+**功能**：合并多路 `StaticMeshSpawner` 输出。按输入顺序拼接 Points，并为每一路保留独立的 `spawnMesh` 原型（一种 building → 一批 GPU instance）。Unity 侧按 `spawnProtoCounts` 切片后，对每个原型分别做 multi-submesh `RenderMeshIndirect`。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `in` | Spawn Streams | `SpatialPoint`（variadic） | 每路来自 `StaticMeshSpawner.out`，并携带对应 `spawnMesh` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Instances | `SpatialPoint` |
+
+**属性**：无
+
+**执行逻辑**：
+1. 按输入顺序收集 Points 与同序 `spawnMesh`
+2. 拼接 Points，sidecar 写入 `spawnProtoCounts`
+3. 输出全部 `spawnMesh`（多原型）
+
+**典型连接**：
+
+```text
+blast_tall  → StaticMeshSpawner(tall)  ─┐
+blast_med   → StaticMeshSpawner(med)   ─┼→ MergeSpawnPoints → Output
+blast_short → StaticMeshSpawner(short) ─┘
 ```
 
 ---

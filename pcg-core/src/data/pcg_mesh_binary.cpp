@@ -354,4 +354,106 @@ bool read_mesh_binary(const void* buffer, int buffer_size, PcgMeshData& out)
     return false;
 }
 
+int multi_spawn_binary_size(const std::vector<PcgMeshData>& meshes,
+                            const std::vector<int>& point_counts)
+{
+    if (meshes.empty() || meshes.size() != point_counts.size())
+        return 0;
+
+    // magic|version|count + point_counts[N] + mesh_sizes[N] + binaries
+    int size = 12 + static_cast<int>(meshes.size()) * 8;
+    for (const auto& mesh : meshes)
+        size += mesh_binary_size(mesh);
+    return size;
+}
+
+bool write_multi_spawn_binary(const std::vector<PcgMeshData>& meshes,
+                              const std::vector<int>& point_counts,
+                              void* buffer,
+                              int buffer_size)
+{
+    const int required = multi_spawn_binary_size(meshes, point_counts);
+    if (required <= 0 || buffer == nullptr || buffer_size < required)
+        return false;
+
+    auto* bytes = static_cast<uint8_t*>(buffer);
+    write_u32(bytes + 0, kPcgMultiSpawnMagic);
+    write_u32(bytes + 4, kPcgMultiSpawnVersion);
+    write_u32(bytes + 8, static_cast<uint32_t>(meshes.size()));
+    int offset = 12;
+    for (int count : point_counts) {
+        write_u32(bytes + offset, static_cast<uint32_t>(count < 0 ? 0 : count));
+        offset += 4;
+    }
+
+    std::vector<int> mesh_sizes;
+    mesh_sizes.reserve(meshes.size());
+    for (const auto& mesh : meshes) {
+        const int mesh_size = mesh_binary_size(mesh);
+        mesh_sizes.push_back(mesh_size);
+        write_u32(bytes + offset, static_cast<uint32_t>(mesh_size));
+        offset += 4;
+    }
+
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        if (!write_mesh_binary(meshes[i], bytes + offset, mesh_sizes[i]))
+            return false;
+        offset += mesh_sizes[i];
+    }
+    return offset == required;
+}
+
+bool read_multi_spawn_binary(const void* buffer,
+                             int buffer_size,
+                             std::vector<PcgMeshData>& out_meshes,
+                             std::vector<int>& out_point_counts)
+{
+    out_meshes.clear();
+    out_point_counts.clear();
+    if (buffer == nullptr || buffer_size < 12)
+        return false;
+
+    const auto* bytes = static_cast<const uint8_t*>(buffer);
+    uint32_t magic = 0;
+    uint32_t version = 0;
+    uint32_t count = 0;
+    if (!read_u32(bytes + 0, buffer_size, magic) || magic != kPcgMultiSpawnMagic)
+        return false;
+    if (!read_u32(bytes + 4, buffer_size - 4, version) || version != kPcgMultiSpawnVersion)
+        return false;
+    if (!read_u32(bytes + 8, buffer_size - 8, count) || count == 0)
+        return false;
+
+    const int header = 12 + static_cast<int>(count) * 8;
+    if (buffer_size < header)
+        return false;
+
+    out_point_counts.resize(count);
+    out_meshes.resize(count);
+    int offset = 12;
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t pc = 0;
+        if (!read_u32(bytes + offset, buffer_size - offset, pc))
+            return false;
+        out_point_counts[i] = static_cast<int>(pc);
+        offset += 4;
+    }
+
+    std::vector<uint32_t> mesh_sizes(count);
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!read_u32(bytes + offset, buffer_size - offset, mesh_sizes[i]))
+            return false;
+        offset += 4;
+    }
+
+    for (uint32_t i = 0; i < count; ++i) {
+        if (offset + static_cast<int>(mesh_sizes[i]) > buffer_size)
+            return false;
+        if (!read_mesh_binary(bytes + offset, static_cast<int>(mesh_sizes[i]), out_meshes[i]))
+            return false;
+        offset += static_cast<int>(mesh_sizes[i]);
+    }
+    return true;
+}
+
 } // namespace pcg::internal::data

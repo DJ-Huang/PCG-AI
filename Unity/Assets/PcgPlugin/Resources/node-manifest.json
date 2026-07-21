@@ -6444,6 +6444,27 @@
       }
     },
     {
+      "type": "MergeSpawnPoints",
+      "displayName": "Merge Spawn Points",
+      "category": "Spawner",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Spawn Streams",
+          "pinType": "SpatialPoint",
+          "variadic": true
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Instances",
+          "pinType": "SpatialPoint"
+        }
+      ],
+      "properties": {}
+    },
+    {
       "type": "Output",
       "displayName": "Output",
       "category": "Output",
