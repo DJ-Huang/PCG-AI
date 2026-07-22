@@ -429,6 +429,80 @@
       }
     },
     {
+      "type": "Split",
+      "displayName": "Split",
+      "category": "Filter",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "Any"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Selected",
+          "pinType": "Any"
+        },
+        {
+          "id": "rest",
+          "label": "Remainder",
+          "pinType": "Any"
+        }
+      ],
+      "properties": {
+        "entity": {
+          "type": "enum",
+          "displayName": "Group Type",
+          "default": "primitives",
+          "options": [
+            {
+              "value": "primitives",
+              "label": "Primitives"
+            },
+            {
+              "value": "points",
+              "label": "Points"
+            }
+          ]
+        },
+        "group": {
+          "type": "string",
+          "displayName": "Group",
+          "default": ""
+        },
+        "expression": {
+          "type": "string",
+          "displayName": "Selection Expression",
+          "default": "",
+          "multiline": true,
+          "lines": 4
+        },
+        "parameters": {
+          "type": "string",
+          "displayName": "Parameters (JSON)",
+          "default": "{}",
+          "multiline": true,
+          "lines": 3
+        },
+        "invertSelection": {
+          "type": "boolean",
+          "displayName": "Invert Selection",
+          "default": false
+        },
+        "removeUnusedPoints": {
+          "type": "boolean",
+          "displayName": "Remove Unused Points",
+          "default": true,
+          "visibleWhen": {
+            "property": "entity",
+            "equals": "primitives"
+          }
+        }
+      }
+    },
+    {
       "type": "TransformPoints",
       "displayName": "Transform Points",
       "category": "Transform",
@@ -7097,7 +7171,19 @@
           "displayName": "Ordering Attribute",
           "default": "sort_index",
           "section": "points",
-          "order": 120
+          "order": 120,
+          "visibleWhen": {
+            "any": [
+              {
+                "property": "pointMethod",
+                "equals": "reorder"
+              },
+              {
+                "property": "pointSortIndices",
+                "equals": true
+              }
+            ]
+          }
         },
         "reversePoints": {
           "type": "boolean",
@@ -7305,7 +7391,19 @@
           "displayName": "Ordering Attribute",
           "default": "sort_index",
           "section": "primitives",
-          "order": 120
+          "order": 120,
+          "visibleWhen": {
+            "any": [
+              {
+                "property": "primitiveMethod",
+                "equals": "reorder"
+              },
+              {
+                "property": "primitiveSortIndices",
+                "equals": true
+              }
+            ]
+          }
         },
         "reversePrimitives": {
           "type": "boolean",

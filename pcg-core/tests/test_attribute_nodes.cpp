@@ -154,6 +154,109 @@ int main()
     expect(kind == PCG_RESULT_KIND_MESH, "Blast primitive group outputs mesh");
     expect(index_count == 30, "Blast removes one quad face from a box");
 
+    const char* split_group_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"top","type":"FaceGroupByNormal","data":{
+          "outputGroup":"top","directionX":0,"directionY":1,"directionZ":0,"spreadAngle":1}},
+        {"id":"split","type":"Split","data":{
+          "entity":"primitives","group":"top","invertSelection":false,"removeUnusedPoints":true}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"top"},
+        {"id":"e2","source":"top","target":"split"},
+        {"id":"e3","source":"split","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode split_selected_code = pcg_execute_graph_v2(
+        split_group_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(split_selected_code == PCG_OK, "Split selected output graph executes");
+    expect(kind == PCG_RESULT_KIND_MESH, "Split selected output is mesh");
+    expect(index_count == 6, "Split out keeps the top face only");
+
+    const char* split_rest_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"top","type":"FaceGroupByNormal","data":{
+          "outputGroup":"top","directionX":0,"directionY":1,"directionZ":0,"spreadAngle":1}},
+        {"id":"split","type":"Split","data":{
+          "entity":"primitives","group":"top","invertSelection":false,"removeUnusedPoints":true}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"top"},
+        {"id":"e2","source":"top","target":"split"},
+        {"id":"e3","source":"split","target":"out","sourceHandle":"rest","targetHandle":"in"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode split_rest_code = pcg_execute_graph_v2(
+        split_rest_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(split_rest_code == PCG_OK, "Split remainder output graph executes");
+    expect(index_count == 30, "Split rest keeps the five non-top faces");
+
+    const char* split_invert_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"top","type":"FaceGroupByNormal","data":{
+          "outputGroup":"top","directionX":0,"directionY":1,"directionZ":0,"spreadAngle":1}},
+        {"id":"split","type":"Split","data":{
+          "entity":"primitives","group":"top","invertSelection":true,"removeUnusedPoints":true}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"top"},
+        {"id":"e2","source":"top","target":"split"},
+        {"id":"e3","source":"split","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode split_invert_code = pcg_execute_graph_v2(
+        split_invert_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(split_invert_code == PCG_OK, "Split invertSelection graph executes");
+    expect(index_count == 30, "Split invert puts non-group on first output");
+
+    const char* group_wrangle_split_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"grid","type":"CreateGridMesh","data":{
+          "sizeX":5,"sizeY":4,"rows":1,"cols":5,"plane":"xz"}},
+        {"id":"park","type":"AttributeWrangle","data":{
+          "runOver":"primitives",
+          "expression":"@group.park = ((@primnum + 1) % 5 == 0);"}},
+        {"id":"split","type":"Split","data":{
+          "entity":"primitives","group":"park","invertSelection":true,"removeUnusedPoints":true}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"grid","target":"park"},
+        {"id":"e2","source":"park","target":"split"},
+        {"id":"e3","source":"split","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode group_wrangle_code = pcg_execute_graph_v2(
+        group_wrangle_split_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(group_wrangle_code == PCG_OK, "@group.park wrangle + Split executes");
+    expect(index_count == 24, "Invert Split keeps 4 of 5 grid faces");
+
     const char* invalid_graph = R"({
       "version":"1.0",
       "nodes":[

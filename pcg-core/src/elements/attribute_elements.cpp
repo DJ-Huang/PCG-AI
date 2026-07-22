@@ -34,7 +34,41 @@ struct ElementVariables {
     data::AttributeTable* attribute_table = nullptr;
     data::AttributeOwner attribute_owner = data::AttributeOwner::Point;
     size_t attribute_index = 0;
+    data::PcgGeometry* geometry = nullptr;
 };
+
+bool read_group_membership(ElementVariables& variables, const std::string& group_name, double& value)
+{
+    if (!variables.geometry || group_name.empty())
+        return false;
+    const geometry::GroupDomain domain =
+        variables.attribute_owner == data::AttributeOwner::Primitive
+            ? geometry::GroupDomain::Face
+            : geometry::GroupDomain::Point;
+    const geometry::GroupId id = variables.attribute_owner == data::AttributeOwner::Primitive
+        ? static_cast<geometry::GroupId>(variables.primitive_number)
+        : static_cast<geometry::GroupId>(variables.point_number);
+    value = variables.geometry->groups().contains(domain, group_name, id) ? 1.0 : 0.0;
+    return true;
+}
+
+bool write_group_membership(ElementVariables& variables, const std::string& group_name, double value)
+{
+    if (!variables.geometry || group_name.empty())
+        return false;
+    const geometry::GroupDomain domain =
+        variables.attribute_owner == data::AttributeOwner::Primitive
+            ? geometry::GroupDomain::Face
+            : geometry::GroupDomain::Point;
+    const geometry::GroupId id = variables.attribute_owner == data::AttributeOwner::Primitive
+        ? static_cast<geometry::GroupId>(variables.primitive_number)
+        : static_cast<geometry::GroupId>(variables.point_number);
+    if (value != 0.0)
+        variables.geometry->groups().add(domain, group_name, id);
+    else
+        variables.geometry->groups().remove(domain, group_name, id);
+    return true;
+}
 
 bool read_table_attribute(ElementVariables& variables, const std::string& key, double& value)
 {
@@ -177,6 +211,8 @@ EvalContext make_context(ElementVariables& variables,
         else if (name == "@numpt") value = variables.point_count;
         else if (name == "@primnum") value = variables.primitive_number;
         else if (name == "@numprim") value = variables.primitive_count;
+        else if (name.rfind("@group.", 0) == 0)
+            return read_group_membership(variables, name.substr(7), value);
         else if (name.size() > 1 && name.front() == '@') {
             const std::string key = name.substr(1);
             if (variables.attributes && variables.attributes->contains(key) &&
@@ -192,6 +228,8 @@ EvalContext make_context(ElementVariables& variables,
         if (name == "@P.x" && variables.x) *variables.x = value;
         else if (name == "@P.y" && variables.y) *variables.y = value;
         else if (name == "@P.z" && variables.z) *variables.z = value;
+        else if (name.rfind("@group.", 0) == 0)
+            return write_group_membership(variables, name.substr(7), value);
         else if (variables.attributes && name.size() > 1 && name.front() == '@' &&
                  name != "@curveu" && name != "@ptnum" && name != "@numpt" &&
                  name != "@primnum" && name != "@numprim") {
@@ -316,6 +354,7 @@ bool apply_wrangle_geometry(data::PcgGeometry& geometry,
                                    index, count, 0, static_cast<int>(geometry.faces().size()),
                                    &geometry.attributes(), data::AttributeOwner::Point,
                                    static_cast<size_t>(index)};
+        variables.geometry = &geometry;
         EvalContext context = make_context(variables, parameters);
         if (!program.execute(context, error)) {
             error = "geometry point " + std::to_string(index) + ": " + error;
@@ -352,6 +391,7 @@ bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
                                    0.0, 0, point_count, prim, prim_count,
                                    &geometry.attributes(), data::AttributeOwner::Primitive,
                                    static_cast<size_t>(prim)};
+        variables.geometry = &geometry;
         EvalContext context = make_context(variables, parameters);
         if (!program.execute(context, error)) {
             error = "geometry prim " + std::to_string(prim) + ": " + error;
@@ -912,6 +952,92 @@ public:
     }
 };
 
+class SplitElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "Split"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Split missing node");
+        const data::PcgTaggedData* input = ctx.inputs.find("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Split missing input");
+
+        const std::string entity = ctx.node->data.value("entity", std::string("primitives"));
+        const std::string group = ctx.node->data.value("group", std::string());
+        const std::string source = ctx.node->data.value("expression", std::string());
+        const bool invert_selection = ctx.node->data.value("invertSelection", false);
+        const bool remove_unused_points = ctx.node->data.value("removeUnusedPoints", true);
+
+        Program program;
+        Program* program_ptr = nullptr;
+        std::string error;
+        if (!source.empty()) {
+            if (!Program::compile_expression(source, program, error))
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                ("Split parse error: " + error).c_str());
+            program_ptr = &program;
+        }
+        if (group.empty() && !program_ptr)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "Split requires a group or selection expression");
+        const auto parameters = parse_parameters(ctx.node->data, error);
+        if (!error.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+
+        // Houdini Split: first output = selection (after Invert), second = complement.
+        // deleteNonSelected=true keeps selection; false deletes selection (keeps complement).
+        if (input->points) {
+            auto selected = blast_points(*input->points, group, program_ptr, parameters,
+                                         true, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+            auto remainder = blast_points(*input->points, group, program_ptr, parameters,
+                                          false, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+            if (invert_selection)
+                std::swap(selected, remainder);
+            ctx.outputs.add_points("out", std::move(selected));
+            ctx.outputs.add_points("rest", std::move(remainder));
+            return PCG_OK;
+        }
+        if (input->splines) {
+            auto selected = blast_splines(*input->splines, group, program_ptr, parameters,
+                                          true, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+            auto remainder = blast_splines(*input->splines, group, program_ptr, parameters,
+                                           false, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+            if (invert_selection)
+                std::swap(selected, remainder);
+            ctx.outputs.add_splines("out", std::move(selected));
+            ctx.outputs.add_splines("rest", std::move(remainder));
+            return PCG_OK;
+        }
+        if (input->geometry) {
+            auto selected = blast_geometry(*input->geometry, entity, group, program_ptr,
+                                           parameters, true, remove_unused_points, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+            auto remainder = blast_geometry(*input->geometry, entity, group, program_ptr,
+                                            parameters, false, remove_unused_points, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
+            if (invert_selection)
+                std::swap(selected, remainder);
+            ctx.outputs.add_geometry("out", std::move(selected));
+            ctx.outputs.add_geometry("rest", std::move(remainder));
+            return PCG_OK;
+        }
+        return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                        "Split supports Point, Spline, or Geometry input");
+    }
+};
+
 } // namespace
 
 void register_attribute_elements(
@@ -919,6 +1045,7 @@ void register_attribute_elements(
 {
     map.emplace("AttributeWrangle", std::make_unique<AttributeWrangleElement>());
     map.emplace("Blast", std::make_unique<BlastElement>());
+    map.emplace("Split", std::make_unique<SplitElement>());
 }
 
 } // namespace pcg::internal::elements

@@ -32,12 +32,6 @@
       "data": {"subgraphId": "city_pads", "__nodeTitle": "City Pads"}
     },
     {
-      "id": "keep_built",
-      "type": "Blast",
-      "position": { "x": 840, "y": 800 },
-      "data": {"entity": "primitives", "group": "", "expression": "@park == 0", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Keep Non-Park Lots"}
-    },
-    {
       "id": "floors_attrs",
       "type": "AttributeWrangle",
       "position": { "x": 840, "y": 840 },
@@ -328,8 +322,20 @@
     {
       "id": "floors_wrangle",
       "type": "AttributeWrangle",
-      "position": { "x": 840, "y": 720 },
-      "data": {"runOver": "primitives", "expression": "@park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "__nodeTitle": "park_group"}
+      "position": { "x": 840, "y": 694.5 },
+      "data": {"runOver": "primitives", "expression": "@group.park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "__nodeTitle": "park_group"}
+    },
+    {
+      "id": "keep_built",
+      "type": "Split",
+      "position": { "x": 840, "y": 756.5 },
+      "data": {"entity": "primitives", "group": "park", "expression": "", "parameters": "{}", "invertSelection": true, "removeUnusedPoints": true, "__nodeTitle": "split4"}
+    },
+    {
+      "id": "n102",
+      "type": "LotSubdivision",
+      "position": { "x": 954.5, "y": 795 },
+      "data": {"minSize": 1, "iterations": 3, "irregularity": 0.5, "seed": 0, "alignment": "longestEdge", "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -395,7 +401,8 @@
     {"id": "e_balc_fe_f", "source": "switch_balc", "target": "switch_fe", "sourceHandle": "out", "targetHandle": "false"},
     {"id": "e_femerge_sw", "source": "fe_merge", "target": "switch_fe", "sourceHandle": "out", "targetHandle": "true"},
     {"id": "e9413", "source": "shrink_blocks", "target": "n101", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e10110", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
