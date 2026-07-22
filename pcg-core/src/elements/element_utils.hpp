@@ -28,6 +28,10 @@ data::PcgSplineData parse_spline_input(const nlohmann::json& json);
 data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
 data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* label);
 data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const char* label);
+/// Returns nullptr when the pin is disconnected or empty (optional second inputs).
+const data::PcgGeometry* optional_geometry_input(PcgContext& ctx,
+                                                 const char* pin,
+                                                 data::PcgGeometry& storage);
 data::PcgHeightField get_heightfield_input(PcgContext& ctx, const char* pin, const char* label);
 void emit_geometry(PcgContext& ctx, data::PcgGeometry data);
 void emit_geometry_shared(PcgContext& ctx,

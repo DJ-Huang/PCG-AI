@@ -55,12 +55,25 @@
       "data": {
         "outputGroup": "road_exclusion",
         "domain": "face",
-        "mode": "all",
+        "mode": "angle",
         "minEdgeAngle": 30,
         "includeUnshared": false,
         "fromFaceGroup": "",
         "fromEdgeGroup": "",
-        "__nodeTitle": "Tag Road Faces"
+        "__nodeTitle": "Tag Road Faces",
+        "initialMerge": "replace",
+        "baseGroup": "",
+        "enableBounding": false,
+        "enableNormals": false,
+        "enableRandom": false,
+        "directionX": 0.0,
+        "directionY": 1.0,
+        "directionZ": 0.0,
+        "spreadAngle": 30.0,
+        "randomChance": 1.0,
+        "randomSeed": 0,
+        "enableBaseGroup": true,
+        "enableEdges": false
       }
     },
     {
@@ -326,43 +339,166 @@
       }
     },
     {
-      "id": "blast_tall_wide", "type": "Blast", "position": {"x": 1000, "y": 1840},
-      "data": {"entity": "points", "group": "", "expression": "@variant != 1", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Tall Wide Sites"}
+      "id": "blast_tall_wide",
+      "type": "Blast",
+      "position": {
+        "x": 1000,
+        "y": 1840
+      },
+      "data": {
+        "entity": "points",
+        "group": "",
+        "expression": "@variant != 1",
+        "parameters": "{}",
+        "deleteNonSelected": false,
+        "removeUnusedPoints": true,
+        "__nodeTitle": "Keep Tall Wide Sites"
+      }
     },
     {
-      "id": "blast_med_wide", "type": "Blast", "position": {"x": 1320, "y": 1840},
-      "data": {"entity": "points", "group": "", "expression": "@variant != 3", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Medium Wide Sites"}
+      "id": "blast_med_wide",
+      "type": "Blast",
+      "position": {
+        "x": 1320,
+        "y": 1840
+      },
+      "data": {
+        "entity": "points",
+        "group": "",
+        "expression": "@variant != 3",
+        "parameters": "{}",
+        "deleteNonSelected": false,
+        "removeUnusedPoints": true,
+        "__nodeTitle": "Keep Medium Wide Sites"
+      }
     },
     {
-      "id": "blast_short_wide", "type": "Blast", "position": {"x": 1640, "y": 1840},
-      "data": {"entity": "points", "group": "", "expression": "@variant != 5", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Short Wide Sites"}
+      "id": "blast_short_wide",
+      "type": "Blast",
+      "position": {
+        "x": 1640,
+        "y": 1840
+      },
+      "data": {
+        "entity": "points",
+        "group": "",
+        "expression": "@variant != 5",
+        "parameters": "{}",
+        "deleteNonSelected": false,
+        "removeUnusedPoints": true,
+        "__nodeTitle": "Keep Short Wide Sites"
+      }
     },
     {
-      "id": "sg_bldg_tall_wide", "type": "SubgraphAsset", "position": {"x": 1000, "y": 2000},
-      "data": {"__nodeTitle": "Tall Flat Wide", "assetGuid": "9d0ee8ab6f32a48c79b1bc1497564914"},
-      "subgraphInterface": {"name": "Tall Flat-Roof Wide Building", "inputs": [], "outputs": [{"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"}]}
+      "id": "sg_bldg_tall_wide",
+      "type": "SubgraphAsset",
+      "position": {
+        "x": 1000,
+        "y": 2000
+      },
+      "data": {
+        "__nodeTitle": "Tall Flat Wide",
+        "assetGuid": "9d0ee8ab6f32a48c79b1bc1497564914"
+      },
+      "subgraphInterface": {
+        "name": "Tall Flat-Roof Wide Building",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "mesh",
+            "name": "Mesh",
+            "pinType": "SpatialMesh"
+          }
+        ]
+      }
     },
     {
-      "id": "sg_bldg_medium_wide", "type": "SubgraphAsset", "position": {"x": 1320, "y": 2000},
-      "data": {"__nodeTitle": "Medium Pitched Wide", "assetGuid": "748f06f5aa84f4286a0ab7ebca09144e"},
-      "subgraphInterface": {"name": "Medium Pitched-Roof Wide Building", "inputs": [], "outputs": [{"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"}]}
+      "id": "sg_bldg_medium_wide",
+      "type": "SubgraphAsset",
+      "position": {
+        "x": 1320,
+        "y": 2000
+      },
+      "data": {
+        "__nodeTitle": "Medium Pitched Wide",
+        "assetGuid": "748f06f5aa84f4286a0ab7ebca09144e"
+      },
+      "subgraphInterface": {
+        "name": "Medium Pitched-Roof Wide Building",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "mesh",
+            "name": "Mesh",
+            "pinType": "SpatialMesh"
+          }
+        ]
+      }
     },
     {
-      "id": "sg_bldg_short_wide", "type": "SubgraphAsset", "position": {"x": 1640, "y": 2000},
-      "data": {"__nodeTitle": "Short Flat Wide", "assetGuid": "c2f84366be1f34d3d99492f9c1de22ca"},
-      "subgraphInterface": {"name": "Short Flat-Roof Wide Building", "inputs": [], "outputs": [{"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"}]}
+      "id": "sg_bldg_short_wide",
+      "type": "SubgraphAsset",
+      "position": {
+        "x": 1640,
+        "y": 2000
+      },
+      "data": {
+        "__nodeTitle": "Short Flat Wide",
+        "assetGuid": "c2f84366be1f34d3d99492f9c1de22ca"
+      },
+      "subgraphInterface": {
+        "name": "Short Flat-Roof Wide Building",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "mesh",
+            "name": "Mesh",
+            "pinType": "SpatialMesh"
+          }
+        ]
+      }
     },
     {
-      "id": "spawn_tall_wide", "type": "StaticMeshSpawner", "position": {"x": 1000, "y": 2160},
-      "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Tall Wide"}
+      "id": "spawn_tall_wide",
+      "type": "StaticMeshSpawner",
+      "position": {
+        "x": 1000,
+        "y": 2160
+      },
+      "data": {
+        "prefab": "",
+        "mesh": "",
+        "scale": 1,
+        "__nodeTitle": "Spawn Tall Wide"
+      }
     },
     {
-      "id": "spawn_med_wide", "type": "StaticMeshSpawner", "position": {"x": 1320, "y": 2160},
-      "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Medium Wide"}
+      "id": "spawn_med_wide",
+      "type": "StaticMeshSpawner",
+      "position": {
+        "x": 1320,
+        "y": 2160
+      },
+      "data": {
+        "prefab": "",
+        "mesh": "",
+        "scale": 1,
+        "__nodeTitle": "Spawn Medium Wide"
+      }
     },
     {
-      "id": "spawn_short_wide", "type": "StaticMeshSpawner", "position": {"x": 1640, "y": 2160},
-      "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Short Wide"}
+      "id": "spawn_short_wide",
+      "type": "StaticMeshSpawner",
+      "position": {
+        "x": 1640,
+        "y": 2160
+      },
+      "data": {
+        "prefab": "",
+        "mesh": "",
+        "scale": 1,
+        "__nodeTitle": "Spawn Short Wide"
+      }
     },
     {
       "id": "merge_spawn",
@@ -494,12 +630,48 @@
       "sourceHandle": "out",
       "targetHandle": "in"
     },
-    {"id":"e_st_merge","source":"spawn_tall","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_stw_merge","source":"spawn_tall_wide","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_sm_merge","source":"spawn_med","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_smw_merge","source":"spawn_med_wide","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_ss_merge","source":"spawn_short","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_ssw_merge","source":"spawn_short_wide","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "e_st_merge",
+      "source": "spawn_tall",
+      "target": "merge_spawn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_stw_merge",
+      "source": "spawn_tall_wide",
+      "target": "merge_spawn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sm_merge",
+      "source": "spawn_med",
+      "target": "merge_spawn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_smw_merge",
+      "source": "spawn_med_wide",
+      "target": "merge_spawn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_ss_merge",
+      "source": "spawn_short",
+      "target": "merge_spawn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_ssw_merge",
+      "source": "spawn_short_wide",
+      "target": "merge_spawn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
     {
       "id": "e_merge_out",
       "source": "merge_spawn",
@@ -535,15 +707,69 @@
       "sourceHandle": "out",
       "targetHandle": "in"
     },
-    {"id":"e_scale_btw","source":"scale_lot","target":"blast_tall_wide","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_scale_bmw","source":"scale_lot","target":"blast_med_wide","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_scale_bsw","source":"scale_lot","target":"blast_short_wide","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_btw_spawn","source":"blast_tall_wide","target":"spawn_tall_wide","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_bmw_spawn","source":"blast_med_wide","target":"spawn_med_wide","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_bsw_spawn","source":"blast_short_wide","target":"spawn_short_wide","sourceHandle":"out","targetHandle":"in"},
-    {"id":"e_tww_proto","source":"sg_bldg_tall_wide","target":"spawn_tall_wide","sourceHandle":"mesh","targetHandle":"mesh"},
-    {"id":"e_mww_proto","source":"sg_bldg_medium_wide","target":"spawn_med_wide","sourceHandle":"mesh","targetHandle":"mesh"},
-    {"id":"e_sww_proto","source":"sg_bldg_short_wide","target":"spawn_short_wide","sourceHandle":"mesh","targetHandle":"mesh"},
+    {
+      "id": "e_scale_btw",
+      "source": "scale_lot",
+      "target": "blast_tall_wide",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_scale_bmw",
+      "source": "scale_lot",
+      "target": "blast_med_wide",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_scale_bsw",
+      "source": "scale_lot",
+      "target": "blast_short_wide",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_btw_spawn",
+      "source": "blast_tall_wide",
+      "target": "spawn_tall_wide",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bmw_spawn",
+      "source": "blast_med_wide",
+      "target": "spawn_med_wide",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bsw_spawn",
+      "source": "blast_short_wide",
+      "target": "spawn_short_wide",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tww_proto",
+      "source": "sg_bldg_tall_wide",
+      "target": "spawn_tall_wide",
+      "sourceHandle": "mesh",
+      "targetHandle": "mesh"
+    },
+    {
+      "id": "e_mww_proto",
+      "source": "sg_bldg_medium_wide",
+      "target": "spawn_med_wide",
+      "sourceHandle": "mesh",
+      "targetHandle": "mesh"
+    },
+    {
+      "id": "e_sww_proto",
+      "source": "sg_bldg_short_wide",
+      "target": "spawn_short_wide",
+      "sourceHandle": "mesh",
+      "targetHandle": "mesh"
+    },
     {
       "id": "e_lots_xfer",
       "source": "lots",

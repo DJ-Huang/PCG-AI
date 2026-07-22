@@ -33,6 +33,13 @@ bool AABB::overlaps(const AABB& other) const
            (min.z <= other.max.z && max.z >= other.min.z);
 }
 
+bool AABB::contains(const Vec3& v) const
+{
+    return v.x >= min.x && v.x <= max.x &&
+           v.y >= min.y && v.y <= max.y &&
+           v.z >= min.z && v.z <= max.z;
+}
+
 Vec3 AABB::center() const
 {
     return {(min.x + max.x) * 0.5, (min.y + max.y) * 0.5, (min.z + max.z) * 0.5};

@@ -348,6 +348,30 @@
       "type": "Carve",
       "position": { "x": 1065.5, "y": 817.5 },
       "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n105",
+      "type": "Resample",
+      "position": { "x": 1023, "y": 420.5 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": true, "maxSegmentLength": 0.1, "useMaxSegments": false, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
+    },
+    {
+      "id": "n106",
+      "type": "GroupCreate",
+      "position": { "x": 1222, "y": 764.5 },
+      "data": {"outputGroup": "streetFacingPoints", "domain": "point", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "n107",
+      "type": "Resample",
+      "position": { "x": 1065.5, "y": 879 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 0.1, "useMaxSegments": true, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
+    },
+    {
+      "id": "n108",
+      "type": "GroupTransfer",
+      "position": { "x": 1161, "y": 940 },
+      "data": {"groupName": "", "domain": "face", "distance": 0.01, "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -416,7 +440,12 @@
     {"id": "e111206", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111936", "source": "n102", "target": "n103", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e114122", "source": "n103", "target": "n104", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e114122", "source": "n103", "target": "n104", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139346", "source": "shrink_blocks", "target": "n105", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139347", "source": "n105", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139348", "source": "n104", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139349", "source": "n107", "target": "n108", "sourceHandle": "out", "targetHandle": "target"},
+    {"id": "e139350", "source": "n106", "target": "n108", "sourceHandle": "out", "targetHandle": "source"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
@@ -528,7 +557,7 @@
           "id": "pad_rim",
           "type": "GroupCreate",
           "position": { "x": 200, "y": 320 },
-          "data": {"outputGroup": "pad_rim", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "extrude_top", "fromEdgeGroup": "", "__nodeTitle": "Pad Rim Edges"}
+          "data": {"outputGroup": "pad_rim", "domain": "edge", "initialMerge": "replace", "enableBaseGroup": false, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": true, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "extrude_top", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": "Pad Rim Edges"}
         },
         {
           "id": "pad_bevel",

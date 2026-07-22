@@ -168,6 +168,36 @@ int main()
     if (with_group.groups().members(GroupDomain::Edge, "hard_edges").empty()) fail("GroupCreate");
     std::printf("PASS: GroupCreate angle selection\n");
 
+    {
+        GroupCreateOptions bound_opts;
+        bound_opts.output_group = "inside_pts";
+        bound_opts.domain = "point";
+        bound_opts.enable_edges = false;
+        bound_opts.enable_base_group = true;
+        bound_opts.enable_bounding = true;
+        PcgGeometry bounds = create_box_geometry(0.5, 0.5, 0.5); // unit box centered? check create_box
+        // create_box_geometry typically spans [-s/2,s/2]; 0.5 box keeps center point of 2.0 box.
+        const PcgGeometry filtered = group_create(box, bound_opts, &bounds);
+        const auto members = filtered.groups().members(GroupDomain::Point, "inside_pts");
+        if (members.empty())
+            fail("GroupCreate bounding should keep center-region points");
+        std::printf("PASS: GroupCreate bounding filter (%zu points)\n", members.size());
+    }
+
+    {
+        GroupCreateOptions normal_opts;
+        normal_opts.output_group = "top_faces";
+        normal_opts.domain = "face";
+        normal_opts.enable_edges = false;
+        normal_opts.enable_normals = true;
+        normal_opts.direction_y = 1.0;
+        normal_opts.spread_angle_deg = 20.0;
+        const PcgGeometry tops = group_create(box, normal_opts);
+        if (tops.groups().members(GroupDomain::Face, "top_faces").empty())
+            fail("GroupCreate normals should select top faces");
+        std::printf("PASS: GroupCreate normals filter\n");
+    }
+
     bevel::BevelEdgeSelection edge_sel;
     edge_sel.exclude_unshared = true;
     const PcgMeshData beveled =

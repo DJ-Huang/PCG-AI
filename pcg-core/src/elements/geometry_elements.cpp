@@ -25,16 +25,60 @@ public:
         if (input.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupCreate missing geometry input");
 
+        data::PcgGeometry bounding_storage;
+        const data::PcgGeometry* bounding =
+            optional_geometry_input(ctx, "bounding", bounding_storage);
+
         GroupCreateOptions opts;
         opts.output_group = ctx.node->data.value("outputGroup", std::string("bevel_edges"));
         opts.domain = ctx.node->data.value("domain", std::string("edge"));
+        opts.initial_merge = ctx.node->data.value("initialMerge", std::string("replace"));
+
+        const bool has_new_enables =
+            ctx.node->data.contains("enableBaseGroup") || ctx.node->data.contains("enableBounding")
+            || ctx.node->data.contains("enableNormals") || ctx.node->data.contains("enableEdges")
+            || ctx.node->data.contains("enableRandom");
+
         opts.mode = ctx.node->data.value("mode", std::string("angle"));
         opts.min_edge_angle_deg = ctx.node->data.value("minEdgeAngle", 30.0);
         opts.include_unshared = ctx.node->data.value("includeUnshared", false);
         opts.from_face_groups = parse_name_list(ctx.node->data, "fromFaceGroup");
         opts.from_edge_groups = parse_name_list(ctx.node->data, "fromEdgeGroup");
+        opts.base_groups = parse_name_list(ctx.node->data, "baseGroup");
 
-        emit_geometry(ctx, group_create(input, opts));
+        opts.enable_base_group = ctx.node->data.value("enableBaseGroup", false);
+        opts.enable_bounding = ctx.node->data.value("enableBounding", false);
+        opts.enable_normals = ctx.node->data.value("enableNormals", false);
+        opts.enable_edges = ctx.node->data.value("enableEdges", true);
+        opts.enable_random = ctx.node->data.value("enableRandom", false);
+
+        opts.direction_x = ctx.node->data.value("directionX", 0.0);
+        opts.direction_y = ctx.node->data.value("directionY", 1.0);
+        opts.direction_z = ctx.node->data.value("directionZ", 0.0);
+        opts.spread_angle_deg = ctx.node->data.value("spreadAngle", 30.0);
+        opts.random_chance = ctx.node->data.value("randomChance", 1.0);
+        opts.random_seed = ctx.node->data.value("randomSeed", 0);
+
+        if (!has_new_enables) {
+            // Legacy graphs: mode drives which filter is active.
+            if (opts.mode == "all") {
+                opts.enable_edges = false;
+                opts.enable_base_group = true;
+                opts.base_groups.clear();
+            } else {
+                opts.enable_edges = true;
+                opts.enable_base_group = false;
+            }
+            opts.enable_bounding = false;
+            opts.enable_normals = false;
+            opts.enable_random = false;
+        }
+
+        if (opts.enable_bounding && bounding == nullptr)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "GroupCreate enableBounding requires bounding input");
+
+        emit_geometry(ctx, group_create(input, opts, bounding));
         return PCG_OK;
     }
 };
