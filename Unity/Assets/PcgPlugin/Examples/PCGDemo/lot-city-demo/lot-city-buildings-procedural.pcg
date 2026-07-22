@@ -371,7 +371,7 @@
       "id": "n108",
       "type": "GroupTransfer",
       "position": { "x": 1161, "y": 940 },
-      "data": {"groupName": "", "domain": "face", "distance": 0.01, "__nodeTitle": ""}
+      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 0.4, "createEmptyGroups": true, "__nodeTitle": ""}
     }
   ],
   "edges": [

@@ -239,6 +239,79 @@ int main()
         }
     }
 
+    {
+        // Houdini-style GroupTransfer: nearest face within threshold inherits source group.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"target","type":"CreateGridMesh","data":{"sizeX":2.0,"sizeY":2.0,"rows":1,"cols":2,"plane":"xz"}},
+            {"id":"source","type":"CreateGridMesh","data":{"sizeX":1.0,"sizeY":2.0,"rows":1,"cols":1,"plane":"xz"}},
+            {"id":"tag","type":"GroupCreate","data":{
+              "outputGroup":"near","domain":"face","initialMerge":"replace",
+              "enableBaseGroup":false,"enableBounding":false,"enableNormals":false,
+              "enableEdges":false,"enableRandom":true,"randomChance":1.0,"randomSeed":0
+            }},
+            {"id":"xfer","type":"GroupTransfer","data":{
+              "transferPrimitiveGroups":true,"primitiveGroups":"near",
+              "transferPointGroups":false,"transferEdgeGroups":false,
+              "groupNameConflict":"overwrite",
+              "enableDistanceThreshold":true,"distanceThreshold":0.6,
+              "createEmptyGroups":true
+            }},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"source","target":"tag","sourceHandle":"out","targetHandle":"in"},
+            {"source":"target","target":"xfer","sourceHandle":"out","targetHandle":"target"},
+            {"source":"tag","target":"xfer","sourceHandle":"out","targetHandle":"source"},
+            {"source":"xfer","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr, "GroupTransfer keeps geometry");
+        if (result.source_geometry) {
+            const auto members = result.source_geometry->groups().members(
+                pcg::internal::geometry::GroupDomain::Face, "near");
+            expect(!members.empty(), "GroupTransfer copies nearest face group");
+            expect(result.source_geometry->groups().has_group(
+                       pcg::internal::geometry::GroupDomain::Face, "near"),
+                   "GroupTransfer creates destination group");
+        }
+    }
+
+    {
+        // Legacy groupName/domain/distance still cooks.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"target","type":"CreateGridMesh","data":{"sizeX":2.0,"sizeY":2.0,"rows":1,"cols":1,"plane":"xz"}},
+            {"id":"source","type":"CreateGridMesh","data":{"sizeX":2.0,"sizeY":2.0,"rows":1,"cols":1,"plane":"xz"}},
+            {"id":"tag","type":"GroupCreate","data":{
+              "outputGroup":"legacy","domain":"face","initialMerge":"replace",
+              "enableBaseGroup":false,"enableBounding":false,"enableNormals":false,
+              "enableEdges":false,"enableRandom":true,"randomChance":1.0,"randomSeed":0
+            }},
+            {"id":"xfer","type":"GroupTransfer","data":{
+              "groupName":"legacy","domain":"face","distance":1.0
+            }},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"source","target":"tag","sourceHandle":"out","targetHandle":"in"},
+            {"source":"target","target":"xfer","sourceHandle":"out","targetHandle":"target"},
+            {"source":"tag","target":"xfer","sourceHandle":"out","targetHandle":"source"},
+            {"source":"xfer","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr, "legacy GroupTransfer keeps geometry");
+        if (result.source_geometry) {
+            expect(result.source_geometry->groups().has_group(
+                       pcg::internal::geometry::GroupDomain::Face, "legacy"),
+                   "legacy GroupTransfer still transfers named face group");
+        }
+    }
+
     std::printf("failures=%d\n", failures);
     return failures == 0 ? 0 : 1;
 }

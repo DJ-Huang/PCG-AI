@@ -63,9 +63,21 @@ bool GroupTable::contains(GroupDomain domain, const std::string& name, GroupId i
     return it->second.count(id) > 0;
 }
 
+bool GroupTable::has_group(GroupDomain domain, const std::string& name) const
+{
+    return map_for(domain).count(name) > 0;
+}
+
 void GroupTable::add(GroupDomain domain, const std::string& name, GroupId id)
 {
     map_for(domain)[name].insert(id);
+}
+
+void GroupTable::ensure_group(GroupDomain domain, const std::string& name)
+{
+    if (name.empty())
+        return;
+    map_for(domain)[name];
 }
 
 void GroupTable::remove(GroupDomain domain, const std::string& name, GroupId id)

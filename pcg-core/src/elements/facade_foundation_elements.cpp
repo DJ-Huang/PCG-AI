@@ -109,11 +109,44 @@ public:
         const auto source =
             get_geometry_input(ctx, "source", "GroupTransfer missing source input");
         GroupTransferOptions options;
-        options.group_name = ctx.node->data.value("groupName", std::string());
-        options.domain = ctx.node->data.value("domain", std::string("face"));
-        options.distance = ctx.node->data.value("distance", 0.01);
-        if (options.group_name.empty())
-            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupTransfer requires groupName");
+        options.transfer_primitives = ctx.node->data.value("transferPrimitiveGroups", true);
+        options.primitive_groups = ctx.node->data.value("primitiveGroups", std::string());
+        options.primitive_group_prefix =
+            ctx.node->data.value("primitiveGroupPrefix", std::string());
+        options.transfer_points = ctx.node->data.value("transferPointGroups", true);
+        options.point_groups = ctx.node->data.value("pointGroups", std::string());
+        options.point_group_prefix = ctx.node->data.value("pointGroupPrefix", std::string());
+        options.transfer_edges = ctx.node->data.value("transferEdgeGroups", true);
+        options.edge_groups = ctx.node->data.value("edgeGroups", std::string());
+        options.edge_group_prefix = ctx.node->data.value("edgeGroupPrefix", std::string());
+        options.group_name_conflict =
+            ctx.node->data.value("groupNameConflict", std::string("skip"));
+        options.enable_distance_threshold =
+            ctx.node->data.value("enableDistanceThreshold", true);
+        options.distance_threshold = ctx.node->data.value("distanceThreshold", 10.0);
+        options.create_empty_groups = ctx.node->data.value("createEmptyGroups", true);
+
+        // Legacy single-group API: groupName + domain + distance.
+        const std::string legacy_name = ctx.node->data.value("groupName", std::string());
+        if (!legacy_name.empty()) {
+            const std::string domain = ctx.node->data.value("domain", std::string("face"));
+            options.transfer_primitives = domain == "face";
+            options.transfer_points = domain == "point";
+            options.transfer_edges = false;
+            options.primitive_groups = domain == "face" ? legacy_name : std::string();
+            options.point_groups = domain == "point" ? legacy_name : std::string();
+            options.edge_groups.clear();
+            options.enable_distance_threshold = true;
+            if (ctx.node->data.contains("distance"))
+                options.distance_threshold = ctx.node->data.value("distance", 0.01);
+            options.group_name_conflict = "overwrite";
+            options.create_empty_groups = false;
+        }
+
+        if (!options.transfer_primitives && !options.transfer_points && !options.transfer_edges)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "GroupTransfer: enable at least one of Primitive/Point/Edge Groups");
+
         emit_geometry(ctx, group_transfer_geometry(target, source, options));
         return PCG_OK;
     }

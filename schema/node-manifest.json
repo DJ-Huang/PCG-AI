@@ -7110,29 +7110,153 @@
           "pinType": "SpatialMesh"
         }
       ],
-      "properties": {
-        "groupName": {
-          "type": "string",
-          "default": ""
+      "inspectorSections": [
+        {
+          "id": "groupSelection",
+          "label": "Group Selection",
+          "foldout": false,
+          "header": true
         },
-        "domain": {
+        {
+          "id": "transferSettings",
+          "label": "Transfer Settings",
+          "foldout": false,
+          "header": true
+        }
+      ],
+      "properties": {
+        "transferPrimitiveGroups": {
+          "type": "boolean",
+          "displayName": "Primitive Groups",
+          "default": true,
+          "section": "groupSelection",
+          "order": 10,
+          "companionField": "primitiveGroups"
+        },
+        "primitiveGroups": {
+          "type": "groupMultiSelect",
+          "displayName": "Primitive Groups",
+          "default": "",
+          "groupDomain": "face",
+          "section": "groupSelection",
+          "order": 11
+        },
+        "primitiveGroupPrefix": {
+          "type": "string",
+          "displayName": "Primitive Group Prefix",
+          "default": "",
+          "section": "groupSelection",
+          "order": 12,
+          "indent": true,
+          "enabledWhen": {
+            "property": "transferPrimitiveGroups",
+            "equals": "true"
+          }
+        },
+        "transferPointGroups": {
+          "type": "boolean",
+          "displayName": "Point Groups",
+          "default": true,
+          "section": "groupSelection",
+          "order": 20,
+          "companionField": "pointGroups"
+        },
+        "pointGroups": {
+          "type": "groupMultiSelect",
+          "displayName": "Point Groups",
+          "default": "",
+          "groupDomain": "point",
+          "section": "groupSelection",
+          "order": 21
+        },
+        "pointGroupPrefix": {
+          "type": "string",
+          "displayName": "Point Group Prefix",
+          "default": "",
+          "section": "groupSelection",
+          "order": 22,
+          "indent": true,
+          "enabledWhen": {
+            "property": "transferPointGroups",
+            "equals": "true"
+          }
+        },
+        "transferEdgeGroups": {
+          "type": "boolean",
+          "displayName": "Edge Groups",
+          "default": true,
+          "section": "groupSelection",
+          "order": 30,
+          "companionField": "edgeGroups"
+        },
+        "edgeGroups": {
+          "type": "groupMultiSelect",
+          "displayName": "Edge Groups",
+          "default": "",
+          "groupDomain": "edge",
+          "section": "groupSelection",
+          "order": 31
+        },
+        "edgeGroupPrefix": {
+          "type": "string",
+          "displayName": "Edge Group Prefix",
+          "default": "",
+          "section": "groupSelection",
+          "order": 32,
+          "indent": true,
+          "enabledWhen": {
+            "property": "transferEdgeGroups",
+            "equals": "true"
+          }
+        },
+        "groupNameConflict": {
           "type": "enum",
-          "default": "face",
+          "displayName": "Group Name Conflict",
+          "default": "skip",
+          "section": "transferSettings",
+          "order": 10,
           "options": [
             {
-              "value": "face",
-              "label": "Face"
+              "value": "skip",
+              "label": "Skip Group"
             },
             {
-              "value": "point",
-              "label": "Point"
+              "value": "overwrite",
+              "label": "Overwrite"
+            },
+            {
+              "value": "addSuffix",
+              "label": "Add Suffix"
             }
           ]
         },
-        "distance": {
+        "enableDistanceThreshold": {
+          "type": "boolean",
+          "displayName": "Enable Distance Threshold",
+          "default": true,
+          "section": "transferSettings",
+          "order": 20
+        },
+        "distanceThreshold": {
           "type": "number",
-          "default": 0.01,
-          "minimum": 0
+          "displayName": "Distance Threshold",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "transferSettings",
+          "order": 21,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableDistanceThreshold",
+            "equals": "true"
+          }
+        },
+        "createEmptyGroups": {
+          "type": "boolean",
+          "displayName": "Create Groups Even If Empty",
+          "default": true,
+          "section": "transferSettings",
+          "order": 30
         }
       }
     },

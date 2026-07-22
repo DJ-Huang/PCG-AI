@@ -24,10 +24,26 @@ struct ExtractCentroidOptions {
     std::string face_group;
 };
 
+/// Houdini Group Transfer SOP subset.
 struct GroupTransferOptions {
-    std::string group_name;
-    std::string domain = "face"; // face | point
-    double distance = 0.01;
+    bool transfer_primitives = true;
+    std::string primitive_groups; // empty / "*" = all
+    std::string primitive_group_prefix;
+
+    bool transfer_points = true;
+    std::string point_groups;
+    std::string point_group_prefix;
+
+    bool transfer_edges = true;
+    std::string edge_groups;
+    std::string edge_group_prefix;
+
+    /// skip | overwrite | addSuffix
+    std::string group_name_conflict = "skip";
+
+    bool enable_distance_threshold = true;
+    double distance_threshold = 10.0;
+    bool create_empty_groups = true;
 };
 
 struct ClipOptions {

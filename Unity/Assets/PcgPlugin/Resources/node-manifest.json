@@ -3473,6 +3473,11 @@
           "id": "in",
           "label": "Geometry",
           "pinType": "SpatialMesh"
+        },
+        {
+          "id": "bounding",
+          "label": "Bounding (optional)",
+          "pinType": "SpatialMesh"
         }
       ],
       "outputs": [
@@ -3490,33 +3495,191 @@
           "dynamic": true
         }
       ],
+      "inspectorSections": [
+        {
+          "id": "base",
+          "label": "Base Group",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "bounding",
+          "label": "Keep in Bounding Regions",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "normals",
+          "label": "Keep by Normals",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "edges",
+          "label": "Include by Edges",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "random",
+          "label": "Keep by Random Chance",
+          "foldout": false,
+          "header": true
+        }
+      ],
       "properties": {
         "outputGroup": {
           "type": "string",
+          "displayName": "Group Name",
           "default": "bevel_edges",
-          "isGroupOutput": true
+          "isGroupOutput": true,
+          "order": 0
         },
         "domain": {
           "type": "enum",
+          "displayName": "Group Type",
           "default": "edge",
+          "order": 1,
           "options": [
             {
               "value": "edge",
-              "label": "Edge"
+              "label": "Edges"
             },
             {
               "value": "face",
-              "label": "Face"
+              "label": "Primitives"
             },
             {
               "value": "point",
-              "label": "Point"
+              "label": "Points"
             }
           ]
         },
+        "initialMerge": {
+          "type": "enum",
+          "displayName": "Initial Merge",
+          "default": "replace",
+          "order": 2,
+          "options": [
+            {
+              "value": "replace",
+              "label": "Replace Existing"
+            },
+            {
+              "value": "union",
+              "label": "Union with Existing"
+            },
+            {
+              "value": "intersect",
+              "label": "Intersect with Existing"
+            },
+            {
+              "value": "subtract",
+              "label": "Subtract from Existing"
+            }
+          ]
+        },
+        "enableBaseGroup": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "base",
+          "order": 10
+        },
+        "baseGroup": {
+          "type": "groupMultiSelect",
+          "displayName": "Base Group",
+          "default": "",
+          "section": "base",
+          "order": 11,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableBaseGroup",
+            "equals": "true"
+          }
+        },
+        "enableBounding": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "bounding",
+          "order": 20
+        },
+        "enableNormals": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "normals",
+          "order": 30
+        },
+        "directionX": {
+          "type": "number",
+          "displayName": "Direction X",
+          "default": 0.0,
+          "section": "normals",
+          "order": 31,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableNormals",
+            "equals": "true"
+          }
+        },
+        "directionY": {
+          "type": "number",
+          "displayName": "Direction Y",
+          "default": 1.0,
+          "section": "normals",
+          "order": 32,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableNormals",
+            "equals": "true"
+          }
+        },
+        "directionZ": {
+          "type": "number",
+          "displayName": "Direction Z",
+          "default": 0.0,
+          "section": "normals",
+          "order": 33,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableNormals",
+            "equals": "true"
+          }
+        },
+        "spreadAngle": {
+          "type": "number",
+          "displayName": "Spread Angle",
+          "default": 30.0,
+          "minimum": 0,
+          "maximum": 180,
+          "section": "normals",
+          "order": 34,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableNormals",
+            "equals": "true"
+          }
+        },
+        "enableEdges": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": true,
+          "section": "edges",
+          "order": 40
+        },
         "mode": {
           "type": "enum",
+          "displayName": "Edge Mode",
           "default": "angle",
+          "section": "edges",
+          "order": 41,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableEdges",
+            "equals": "true"
+          },
           "options": [
             {
               "value": "angle",
@@ -3528,29 +3691,94 @@
             },
             {
               "value": "all",
-              "label": "All Elements"
+              "label": "All Edges"
             }
           ]
         },
         "minEdgeAngle": {
           "type": "number",
+          "displayName": "Min Edge Angle",
           "default": 30.0,
           "minimum": 0,
-          "maximum": 180
+          "maximum": 180,
+          "section": "edges",
+          "order": 42,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableEdges",
+            "equals": "true"
+          }
         },
         "includeUnshared": {
           "type": "boolean",
-          "default": false
+          "displayName": "Include Unshared",
+          "default": false,
+          "section": "edges",
+          "order": 43,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableEdges",
+            "equals": "true"
+          }
         },
         "fromFaceGroup": {
           "type": "groupMultiSelect",
+          "displayName": "From Face Group",
           "default": "",
-          "groupDomain": "face"
+          "groupDomain": "face",
+          "section": "edges",
+          "order": 44,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableEdges",
+            "equals": "true"
+          }
         },
         "fromEdgeGroup": {
           "type": "groupMultiSelect",
+          "displayName": "From Edge Group",
           "default": "",
-          "groupDomain": "edge"
+          "groupDomain": "edge",
+          "section": "edges",
+          "order": 45,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableEdges",
+            "equals": "true"
+          }
+        },
+        "enableRandom": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "random",
+          "order": 50
+        },
+        "randomChance": {
+          "type": "number",
+          "displayName": "Chance",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 1,
+          "section": "random",
+          "order": 51,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableRandom",
+            "equals": "true"
+          }
+        },
+        "randomSeed": {
+          "type": "integer",
+          "displayName": "Seed",
+          "default": 0,
+          "section": "random",
+          "order": 52,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableRandom",
+            "equals": "true"
+          }
         }
       }
     },
@@ -6882,29 +7110,153 @@
           "pinType": "SpatialMesh"
         }
       ],
-      "properties": {
-        "groupName": {
-          "type": "string",
-          "default": ""
+      "inspectorSections": [
+        {
+          "id": "groupSelection",
+          "label": "Group Selection",
+          "foldout": false,
+          "header": true
         },
-        "domain": {
+        {
+          "id": "transferSettings",
+          "label": "Transfer Settings",
+          "foldout": false,
+          "header": true
+        }
+      ],
+      "properties": {
+        "transferPrimitiveGroups": {
+          "type": "boolean",
+          "displayName": "Primitive Groups",
+          "default": true,
+          "section": "groupSelection",
+          "order": 10,
+          "companionField": "primitiveGroups"
+        },
+        "primitiveGroups": {
+          "type": "groupMultiSelect",
+          "displayName": "Primitive Groups",
+          "default": "",
+          "groupDomain": "face",
+          "section": "groupSelection",
+          "order": 11
+        },
+        "primitiveGroupPrefix": {
+          "type": "string",
+          "displayName": "Primitive Group Prefix",
+          "default": "",
+          "section": "groupSelection",
+          "order": 12,
+          "indent": true,
+          "enabledWhen": {
+            "property": "transferPrimitiveGroups",
+            "equals": "true"
+          }
+        },
+        "transferPointGroups": {
+          "type": "boolean",
+          "displayName": "Point Groups",
+          "default": true,
+          "section": "groupSelection",
+          "order": 20,
+          "companionField": "pointGroups"
+        },
+        "pointGroups": {
+          "type": "groupMultiSelect",
+          "displayName": "Point Groups",
+          "default": "",
+          "groupDomain": "point",
+          "section": "groupSelection",
+          "order": 21
+        },
+        "pointGroupPrefix": {
+          "type": "string",
+          "displayName": "Point Group Prefix",
+          "default": "",
+          "section": "groupSelection",
+          "order": 22,
+          "indent": true,
+          "enabledWhen": {
+            "property": "transferPointGroups",
+            "equals": "true"
+          }
+        },
+        "transferEdgeGroups": {
+          "type": "boolean",
+          "displayName": "Edge Groups",
+          "default": true,
+          "section": "groupSelection",
+          "order": 30,
+          "companionField": "edgeGroups"
+        },
+        "edgeGroups": {
+          "type": "groupMultiSelect",
+          "displayName": "Edge Groups",
+          "default": "",
+          "groupDomain": "edge",
+          "section": "groupSelection",
+          "order": 31
+        },
+        "edgeGroupPrefix": {
+          "type": "string",
+          "displayName": "Edge Group Prefix",
+          "default": "",
+          "section": "groupSelection",
+          "order": 32,
+          "indent": true,
+          "enabledWhen": {
+            "property": "transferEdgeGroups",
+            "equals": "true"
+          }
+        },
+        "groupNameConflict": {
           "type": "enum",
-          "default": "face",
+          "displayName": "Group Name Conflict",
+          "default": "skip",
+          "section": "transferSettings",
+          "order": 10,
           "options": [
             {
-              "value": "face",
-              "label": "Face"
+              "value": "skip",
+              "label": "Skip Group"
             },
             {
-              "value": "point",
-              "label": "Point"
+              "value": "overwrite",
+              "label": "Overwrite"
+            },
+            {
+              "value": "addSuffix",
+              "label": "Add Suffix"
             }
           ]
         },
-        "distance": {
+        "enableDistanceThreshold": {
+          "type": "boolean",
+          "displayName": "Enable Distance Threshold",
+          "default": true,
+          "section": "transferSettings",
+          "order": 20
+        },
+        "distanceThreshold": {
           "type": "number",
-          "default": 0.01,
-          "minimum": 0
+          "displayName": "Distance Threshold",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "transferSettings",
+          "order": 21,
+          "indent": true,
+          "enabledWhen": {
+            "property": "enableDistanceThreshold",
+            "equals": "true"
+          }
+        },
+        "createEmptyGroups": {
+          "type": "boolean",
+          "displayName": "Create Groups Even If Empty",
+          "default": true,
+          "section": "transferSettings",
+          "order": 30
         }
       }
     },

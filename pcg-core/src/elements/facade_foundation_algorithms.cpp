@@ -4,7 +4,10 @@
 #include "geometry/group_table.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <functional>
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -244,59 +247,273 @@ data::PcgGeometry group_transfer_geometry(const data::PcgGeometry& target,
                                           const GroupTransferOptions& options)
 {
     data::PcgGeometry output = target;
-    if (options.group_name.empty())
-        return output;
 
-    const geometry::GroupDomain domain = options.domain == "point"
-        ? geometry::GroupDomain::Point
-        : geometry::GroupDomain::Face;
-    output.groups().clear_group(domain, options.group_name);
+    const auto trim = [](std::string s) {
+        while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front())))
+            s.erase(s.begin());
+        while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back())))
+            s.pop_back();
+        return s;
+    };
 
-    const auto source_members = source.groups().members(domain, options.group_name);
-    if (source_members.empty())
-        return output;
-
-    const double max_dist2 = options.distance * options.distance;
-
-    if (domain == geometry::GroupDomain::Face) {
-        std::vector<data::PcgVec3> source_centers;
-        source_centers.reserve(source_members.size());
-        for (geometry::GroupId id : source_members) {
-            if (id < 0 || static_cast<size_t>(id) >= source.faces().size())
-                continue;
-            source_centers.push_back(face_centroid(source, source.faces()[static_cast<size_t>(id)]));
+    const auto split_tokens = [&](const std::string& pattern) {
+        std::vector<std::string> tokens;
+        std::string current;
+        for (char ch : pattern) {
+            if (ch == ',' || ch == ';' || std::isspace(static_cast<unsigned char>(ch))) {
+                if (!current.empty()) {
+                    tokens.push_back(current);
+                    current.clear();
+                }
+            } else {
+                current.push_back(ch);
+            }
         }
-        for (size_t fi = 0; fi < output.faces().size(); ++fi) {
-            const auto center = face_centroid(output, output.faces()[fi]);
-            for (const auto& sc : source_centers) {
-                const double dx = center.x - sc.x;
-                const double dy = center.y - sc.y;
-                const double dz = center.z - sc.z;
-                if (dx * dx + dy * dy + dz * dz <= max_dist2) {
-                    output.groups().add(domain, options.group_name,
-                                        static_cast<geometry::GroupId>(fi));
+        if (!current.empty())
+            tokens.push_back(current);
+        return tokens;
+    };
+
+    const auto glob_match = [](const std::string& name, const std::string& pattern) {
+        if (pattern == "*")
+            return true;
+        const auto star = pattern.find('*');
+        if (star == std::string::npos)
+            return name == pattern;
+        if (pattern.size() == 1)
+            return true;
+        if (star == 0) {
+            const std::string suffix = pattern.substr(1);
+            return name.size() >= suffix.size() &&
+                   name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+        }
+        if (star + 1 == pattern.size()) {
+            const std::string prefix = pattern.substr(0, star);
+            return name.size() >= prefix.size() && name.compare(0, prefix.size(), prefix) == 0;
+        }
+        const std::string prefix = pattern.substr(0, star);
+        const std::string suffix = pattern.substr(star + 1);
+        return name.size() >= prefix.size() + suffix.size() &&
+               name.compare(0, prefix.size(), prefix) == 0 &&
+               name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+    };
+
+    const auto select_group_names = [&](geometry::GroupDomain domain,
+                                        const std::string& pattern) {
+        const auto all = source.groups().group_names(domain);
+        const std::string trimmed = trim(pattern);
+        if (trimmed.empty() || trimmed == "*")
+            return all;
+        const auto tokens = split_tokens(trimmed);
+        std::vector<std::string> selected;
+        for (const auto& name : all) {
+            for (const auto& token : tokens) {
+                if (glob_match(name, token)) {
+                    selected.push_back(name);
                     break;
                 }
             }
         }
-    } else {
-        for (size_t pi = 0; pi < output.points().size(); ++pi) {
-            const auto& tp = output.points()[pi];
-            for (geometry::GroupId id : source_members) {
-                if (id < 0 || static_cast<size_t>(id) >= source.points().size())
+        return selected;
+    };
+
+    const auto resolve_dest_name = [&](geometry::GroupDomain domain,
+                                       const std::string& source_name,
+                                       const std::string& prefix) -> std::string {
+        const std::string proposed = prefix + source_name;
+        const bool exists = output.groups().has_group(domain, proposed);
+        if (!exists)
+            return proposed;
+        if (options.group_name_conflict == "overwrite")
+            return proposed;
+        if (options.group_name_conflict == "addSuffix") {
+            for (int suffix = 2; suffix < 100000; ++suffix) {
+                const std::string candidate = proposed + std::to_string(suffix);
+                if (!output.groups().has_group(domain, candidate))
+                    return candidate;
+            }
+            return proposed + "_dup";
+        }
+        // skip
+        return {};
+    };
+
+    const auto dist2 = [](const data::PcgVec3& a, const data::PcgVec3& b) {
+        const double dx = a.x - b.x;
+        const double dy = a.y - b.y;
+        const double dz = a.z - b.z;
+        return dx * dx + dy * dy + dz * dz;
+    };
+
+    const auto find_closest = [&](const std::vector<data::PcgVec3>& source_centers,
+                                  const data::PcgVec3& query, int& out_index,
+                                  double& out_dist2) {
+        out_index = -1;
+        out_dist2 = std::numeric_limits<double>::infinity();
+        for (size_t i = 0; i < source_centers.size(); ++i) {
+            const double d2 = dist2(query, source_centers[i]);
+            if (d2 < out_dist2) {
+                out_dist2 = d2;
+                out_index = static_cast<int>(i);
+            }
+        }
+    };
+
+    const auto within_threshold = [&](double d2) {
+        if (!options.enable_distance_threshold)
+            return true;
+        const double max_d = std::max(0.0, options.distance_threshold);
+        return d2 <= max_d * max_d;
+    };
+
+    const auto transfer_domain =
+        [&](geometry::GroupDomain domain, bool enabled, const std::string& pattern,
+            const std::string& prefix,
+            const std::function<std::vector<data::PcgVec3>(const data::PcgGeometry&)>&
+                collect_centers,
+            const std::function<std::vector<geometry::GroupId>(const data::PcgGeometry&)>&
+                collect_ids) {
+            if (!enabled)
+                return;
+
+            const auto source_names = select_group_names(domain, pattern);
+            if (source_names.empty())
+                return;
+
+            const auto source_centers = collect_centers(source);
+            const auto source_ids = collect_ids(source);
+            if (source_centers.empty() || source_centers.size() != source_ids.size())
+                return;
+
+            const auto dest_centers = collect_centers(output);
+            const auto dest_ids = collect_ids(output);
+            if (dest_centers.size() != dest_ids.size())
+                return;
+
+            // Closest-source map per destination element (Houdini proximity).
+            std::vector<int> closest(dest_centers.size(), -1);
+            for (size_t di = 0; di < dest_centers.size(); ++di) {
+                int idx = -1;
+                double d2 = 0.0;
+                find_closest(source_centers, dest_centers[di], idx, d2);
+                if (idx >= 0 && within_threshold(d2))
+                    closest[di] = idx;
+            }
+
+            for (const auto& source_name : source_names) {
+                const std::string dest_name = resolve_dest_name(domain, source_name, prefix);
+                if (dest_name.empty())
                     continue;
-                const auto& sp = source.points()[static_cast<size_t>(id)];
-                const double dx = tp.x - sp.x;
-                const double dy = tp.y - sp.y;
-                const double dz = tp.z - sp.z;
-                if (dx * dx + dy * dy + dz * dz <= max_dist2) {
-                    output.groups().add(domain, options.group_name,
-                                        static_cast<geometry::GroupId>(pi));
-                    break;
+
+                if (options.group_name_conflict == "overwrite" ||
+                    !output.groups().has_group(domain, dest_name)) {
+                    output.groups().clear_group(domain, dest_name);
+                }
+
+                const auto& members = source.groups().members(domain, source_name);
+                size_t added = 0;
+                for (size_t di = 0; di < closest.size(); ++di) {
+                    const int si = closest[di];
+                    if (si < 0)
+                        continue;
+                    if (members.count(source_ids[static_cast<size_t>(si)]) == 0)
+                        continue;
+                    output.groups().add(domain, dest_name, dest_ids[di]);
+                    ++added;
+                }
+
+                if (added == 0) {
+                    if (options.create_empty_groups)
+                        output.groups().ensure_group(domain, dest_name);
+                    else
+                        output.groups().clear_group(domain, dest_name);
                 }
             }
+        };
+
+    const auto face_centers = [](const data::PcgGeometry& geo) {
+        std::vector<data::PcgVec3> centers;
+        centers.reserve(geo.faces().size());
+        for (const auto& face : geo.faces())
+            centers.push_back(face_centroid(geo, face));
+        return centers;
+    };
+    const auto face_ids = [](const data::PcgGeometry& geo) {
+        std::vector<geometry::GroupId> ids;
+        ids.reserve(geo.faces().size());
+        for (size_t i = 0; i < geo.faces().size(); ++i)
+            ids.push_back(static_cast<geometry::GroupId>(i));
+        return ids;
+    };
+
+    const auto point_centers = [](const data::PcgGeometry& geo) {
+        return geo.points();
+    };
+    const auto point_ids = [](const data::PcgGeometry& geo) {
+        std::vector<geometry::GroupId> ids;
+        ids.reserve(geo.points().size());
+        for (size_t i = 0; i < geo.points().size(); ++i)
+            ids.push_back(static_cast<geometry::GroupId>(i));
+        return ids;
+    };
+
+    const auto collect_edge_keys = [](const data::PcgGeometry& geo) {
+        std::vector<geometry::GroupId> keys;
+        std::unordered_set<geometry::GroupId> seen;
+        for (const auto& face : geo.faces()) {
+            if (face.size() < 2)
+                continue;
+            for (size_t i = 0; i < face.size(); ++i) {
+                const int a = face[i];
+                const int b = face[(i + 1) % face.size()];
+                if (a < 0 || b < 0)
+                    continue;
+                const geometry::GroupId key = geometry::edge_group_id(a, b);
+                if (seen.insert(key).second)
+                    keys.push_back(key);
+            }
         }
-    }
+        // Also include edge-group members that may not appear in faces (rare).
+        for (const auto& name : geo.groups().group_names(geometry::GroupDomain::Edge)) {
+            for (geometry::GroupId id : geo.groups().members(geometry::GroupDomain::Edge, name)) {
+                if (seen.insert(id).second)
+                    keys.push_back(id);
+            }
+        }
+        return keys;
+    };
+
+    const auto edge_centers = [&](const data::PcgGeometry& geo) {
+        const auto keys = collect_edge_keys(geo);
+        std::vector<data::PcgVec3> centers;
+        centers.reserve(keys.size());
+        for (geometry::GroupId key : keys) {
+            const auto ends = geometry::edge_group_points(key);
+            data::PcgVec3 mid{};
+            if (ends[0] >= 0 && ends[1] >= 0 &&
+                static_cast<size_t>(ends[0]) < geo.points().size() &&
+                static_cast<size_t>(ends[1]) < geo.points().size()) {
+                const auto& a = geo.points()[static_cast<size_t>(ends[0])];
+                const auto& b = geo.points()[static_cast<size_t>(ends[1])];
+                mid.x = 0.5 * (a.x + b.x);
+                mid.y = 0.5 * (a.y + b.y);
+                mid.z = 0.5 * (a.z + b.z);
+            }
+            centers.push_back(mid);
+        }
+        return centers;
+    };
+    const auto edge_ids = [&](const data::PcgGeometry& geo) {
+        return collect_edge_keys(geo);
+    };
+
+    transfer_domain(geometry::GroupDomain::Face, options.transfer_primitives,
+                    options.primitive_groups, options.primitive_group_prefix, face_centers,
+                    face_ids);
+    transfer_domain(geometry::GroupDomain::Point, options.transfer_points, options.point_groups,
+                    options.point_group_prefix, point_centers, point_ids);
+    transfer_domain(geometry::GroupDomain::Edge, options.transfer_edges, options.edge_groups,
+                    options.edge_group_prefix, edge_centers, edge_ids);
     return output;
 }
 

@@ -84,9 +84,19 @@
         "y": 640
       },
       "data": {
-        "groupName": "road_exclusion",
-        "domain": "face",
-        "distance": 3.5,
+        "transferPrimitiveGroups": true,
+        "primitiveGroups": "road_exclusion",
+        "primitiveGroupPrefix": "",
+        "transferPointGroups": false,
+        "pointGroups": "",
+        "pointGroupPrefix": "",
+        "transferEdgeGroups": false,
+        "edgeGroups": "",
+        "edgeGroupPrefix": "",
+        "groupNameConflict": "overwrite",
+        "enableDistanceThreshold": true,
+        "distanceThreshold": 3.5,
+        "createEmptyGroups": false,
         "__nodeTitle": "Transfer Road Exclusion"
       }
     },

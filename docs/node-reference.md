@@ -3481,7 +3481,17 @@ Houdini `extractcentroid` 子集：输出每面质心点（或整体点云质心
 
 **类别**：Geometry
 
-Houdini `grouptransfer` 子集：按质心/点邻近，把 source 的命名 group 传到 target。
+Houdini `grouptransfer`：按最近邻把 source 的 Primitive / Point / Edge 命名 group 传到 target。
+
+| 参数 | 说明 |
+|------|------|
+| Primitive / Point / Edge Groups | 开关 + 源 group 选择（空 = `*`） |
+| * Group Prefix | 目标 group 名前缀 |
+| Group Name Conflict | `Skip Group` / `Overwrite` / `Add Suffix` |
+| Enable Distance Threshold + Distance Threshold | 最近邻距离上限 |
+| Create Groups Even If Empty | 传空组时是否仍创建 |
+
+兼容旧属性：`groupName` + `domain` + `distance`（单组 overwrite）。
 
 ### Clip
 
