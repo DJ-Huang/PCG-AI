@@ -23,6 +23,13 @@ namespace DJTechEditor.PCG.Graph
         public string label;
     }
 
+    public class ManifestVisibleWhenClause
+    {
+        public string property;
+        public string equals;
+        public List<string> oneOf;
+    }
+
     public class ManifestOutputGroupDef
     {
         public string name;
@@ -48,6 +55,8 @@ namespace DJTechEditor.PCG.Graph
         public bool hasOrder;
         public string visibleWhenProperty;
         public string visibleWhenEquals;
+        public List<string> visibleWhenOneOf;
+        public List<ManifestVisibleWhenClause> visibleWhenAny;
         public bool multiline;
         public int lines = 1;
     }
@@ -336,6 +345,45 @@ namespace DJTechEditor.PCG.Graph
                         {
                             propDef.visibleWhenProperty = GetString(visibleDict, "property");
                             propDef.visibleWhenEquals = GetString(visibleDict, "equals");
+                            if (visibleDict.TryGetValue("oneOf", out var oneOfObj) &&
+                                oneOfObj is List<object> oneOfList)
+                            {
+                                propDef.visibleWhenOneOf = new List<string>();
+                                foreach (var item in oneOfList)
+                                {
+                                    if (item == null)
+                                        continue;
+                                    propDef.visibleWhenOneOf.Add(item.ToString());
+                                }
+                            }
+                            if (visibleDict.TryGetValue("any", out var anyObj) &&
+                                anyObj is List<object> anyList)
+                            {
+                                propDef.visibleWhenAny = new List<ManifestVisibleWhenClause>();
+                                foreach (var item in anyList)
+                                {
+                                    if (item is not Dictionary<string, object> clauseDict)
+                                        continue;
+                                    var clause = new ManifestVisibleWhenClause
+                                    {
+                                        property = GetString(clauseDict, "property"),
+                                        equals = GetString(clauseDict, "equals"),
+                                    };
+                                    if (clauseDict.TryGetValue("oneOf", out var clauseOneOfObj) &&
+                                        clauseOneOfObj is List<object> clauseOneOfList)
+                                    {
+                                        clause.oneOf = new List<string>();
+                                        foreach (var one in clauseOneOfList)
+                                        {
+                                            if (one == null)
+                                                continue;
+                                            clause.oneOf.Add(one.ToString());
+                                        }
+                                    }
+                                    if (!string.IsNullOrEmpty(clause.property))
+                                        propDef.visibleWhenAny.Add(clause);
+                                }
+                            }
                         }
 
                         if (propObj.TryGetValue("options", out var optionsObj) &&

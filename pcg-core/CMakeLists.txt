@@ -127,6 +127,8 @@ set(PCG_CORE_SOURCES
     src/elements/assembly_elements.cpp
     src/elements/facade_foundation_algorithms.cpp
     src/elements/facade_foundation_elements.cpp
+    src/elements/topology_parity_algorithms.cpp
+    src/elements/topology_parity_elements.cpp
     src/elements/lot_subdivision_algorithms.cpp
     src/asset_path.cpp
 )
@@ -389,6 +391,11 @@ add_executable(test_facade_foundation tests/test_facade_foundation.cpp)
 target_link_libraries(test_facade_foundation PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_facade_foundation PRIVATE src)
 add_test(NAME test_facade_foundation COMMAND test_facade_foundation WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_topology_parity tests/test_topology_parity.cpp)
+target_link_libraries(test_topology_parity PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_topology_parity PRIVATE src)
+add_test(NAME test_topology_parity COMMAND test_topology_parity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.

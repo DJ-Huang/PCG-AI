@@ -15,6 +15,7 @@
 #include "elements/heightfield_elements.hpp"
 #include "elements/assembly_elements.hpp"
 #include "elements/facade_foundation_elements.hpp"
+#include "elements/topology_parity_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -205,6 +206,7 @@ void register_builtin_elements()
     register_heightfield_elements(map);
     register_assembly_elements(map);
     register_facade_foundation_elements(map);
+    register_topology_parity_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

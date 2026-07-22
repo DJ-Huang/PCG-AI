@@ -232,7 +232,11 @@ bool bipartition_polygon(const std::vector<Vec2>& poly,
             cut_c = min_y + height * t;
         }
     } else {
-        // longestEdge: cut perpendicular to the longest boundary edge.
+        // longestEdge: cut across the polygon with a line perpendicular to the
+        // longest boundary edge. The 2D clip normal must be parallel to that
+        // edge (so the clip line is perpendicular to it). Using a normal
+        // perpendicular to the edge makes the clip line coincide with the
+        // boundary and bipartition always fails (1 lot forever).
         size_t longest = 0;
         double longest_len2 = -1.0;
         for (size_t i = 0; i < poly.size(); ++i) {
@@ -249,7 +253,7 @@ bool bipartition_polygon(const std::vector<Vec2>& poly,
         if (edge_len <= kEps)
             return false;
         const Vec2 mid{a.x + edge.x * t, a.y + edge.y * t};
-        cut_n = {-edge.y / edge_len, edge.x / edge_len};
+        cut_n = {edge.x / edge_len, edge.y / edge_len};
         cut_c = cut_n.x * mid.x + cut_n.y * mid.y;
     }
 

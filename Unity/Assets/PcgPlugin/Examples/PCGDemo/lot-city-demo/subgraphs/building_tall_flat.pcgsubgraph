@@ -11,1415 +11,1004 @@
   ],
   "nodes": [
     {
-      "id": "tf_body_box",
+      "id": "tf_body",
       "type": "CreateBoxMesh",
       "position": {
-        "x": -440,
+        "x": -960,
         "y": 0
       },
       "data": {
-        "width": 3.4,
-        "height": 10.8,
-        "depth": 3.4,
-        "__nodeTitle": "Tall Body"
+        "width": 3.7,
+        "height": 9.6,
+        "depth": 3.7,
+        "__nodeTitle": "Tall 3-Story Body"
       }
     },
     {
-      "id": "tf_body_bevel",
+      "id": "tf_body_bv",
       "type": "BevelMesh",
       "position": {
-        "x": -440,
+        "x": -960,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.05,
+        "amount": 0.14,
         "segments": 2,
         "limitMethod": "angle",
         "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Body Bevel"
+        "__nodeTitle": "Body Bevel"
       }
     },
     {
       "id": "tf_body_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": -440,
+        "x": -960,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "brick",
-        "__nodeTitle": "Tall Body Mat"
+        "__nodeTitle": "Brick Body"
       }
     },
     {
-      "id": "tf_body_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": -440,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Body Place"
-      }
-    },
-    {
-      "id": "tf_plinth_box",
+      "id": "tf_plinth",
       "type": "CreateBoxMesh",
       "position": {
-        "x": -120,
+        "x": -640,
         "y": 0
       },
       "data": {
-        "width": 3.6,
-        "height": 0.45,
-        "depth": 3.6,
-        "__nodeTitle": "Tall Plinth"
+        "width": 3.9,
+        "height": 0.4,
+        "depth": 3.9,
+        "__nodeTitle": "Shop Plinth"
       }
     },
     {
-      "id": "tf_plinth_bevel",
+      "id": "tf_plinth_bv",
       "type": "BevelMesh",
       "position": {
-        "x": -120,
+        "x": -640,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
+        "amount": 0.05,
+        "segments": 2,
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Plinth Bevel"
+        "__nodeTitle": "Plinth Bevel"
       }
     },
     {
       "id": "tf_plinth_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": -120,
+        "x": -640,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "plaster_cream",
-        "__nodeTitle": "Tall Plinth Mat"
+        "__nodeTitle": "Plinth Trim"
       }
     },
     {
       "id": "tf_plinth_xf",
       "type": "TransformMesh",
       "position": {
-        "x": -120,
+        "x": -640,
         "y": 480
       },
       "data": {
-        "translateX": 0,
-        "translateY": -5.2,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Plinth Place"
+        "translateY": -4.6,
+        "__nodeTitle": "Plinth At Grade"
       }
     },
     {
-      "id": "tf_band_box",
+      "id": "tf_roof",
       "type": "CreateBoxMesh",
       "position": {
-        "x": 200,
+        "x": -320,
         "y": 0
       },
       "data": {
-        "width": 3.55,
-        "height": 0.12,
-        "depth": 0.12,
-        "__nodeTitle": "Tall Band"
+        "width": 3.95,
+        "height": 0.28,
+        "depth": 3.95,
+        "__nodeTitle": "Parapet Roof Slab"
       }
     },
     {
-      "id": "tf_band_bevel",
+      "id": "tf_roof_bv",
       "type": "BevelMesh",
       "position": {
-        "x": 200,
+        "x": -320,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
+        "amount": 0.06,
+        "segments": 2,
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Band Bevel"
+        "__nodeTitle": "Roof Slab Bevel"
       }
     },
     {
-      "id": "tf_band_mat",
+      "id": "tf_roof_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 200,
+        "x": -320,
         "y": 320
       },
       "data": {
         "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Tall Band Mat"
+        "materialName": "roof_green",
+        "__nodeTitle": "Flat Roof Material"
       }
     },
     {
-      "id": "tf_band_xf",
+      "id": "tf_roof_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 200,
+        "x": -320,
         "y": 480
       },
       "data": {
-        "translateX": 0,
-        "translateY": -2.5,
-        "translateZ": 1.72,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Band Place"
+        "translateY": 4.82,
+        "__nodeTitle": "Roof Slab Place"
       }
     },
     {
-      "id": "tf_band_y",
-      "type": "CopyMesh",
-      "position": {
-        "x": 200,
-        "y": 640
-      },
-      "data": {
-        "mode": "linear",
-        "count": 3,
-        "axis": "y",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 2.4,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Tall Band Rows"
-      }
-    },
-    {
-      "id": "tf_cornice_box",
+      "id": "tf_para",
       "type": "CreateBoxMesh",
       "position": {
-        "x": 520,
+        "x": 0,
         "y": 0
       },
       "data": {
-        "width": 3.7,
-        "height": 0.35,
-        "depth": 3.7,
-        "__nodeTitle": "Tall Cornice"
-      }
-    },
-    {
-      "id": "tf_cornice_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 520,
-        "y": 160
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Cornice Bevel"
-      }
-    },
-    {
-      "id": "tf_cornice_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 520,
-        "y": 320
-      },
-      "data": {
-        "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Tall Cornice Mat"
-      }
-    },
-    {
-      "id": "tf_cornice_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": 520,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 5.5,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Cornice Place"
-      }
-    },
-    {
-      "id": "tf_para_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 840,
-        "y": 0
-      },
-      "data": {
-        "width": 3.5,
+        "width": 3.9,
         "height": 0.55,
         "depth": 0.18,
-        "__nodeTitle": "Tall Parapet F"
+        "__nodeTitle": "Parapet Edge"
       }
     },
     {
-      "id": "tf_para_bevel",
+      "id": "tf_para_bv",
       "type": "BevelMesh",
       "position": {
-        "x": 840,
+        "x": 0,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
+        "amount": 0.04,
+        "segments": 2,
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Parapet F Bevel"
+        "__nodeTitle": "Parapet Bevel"
       }
     },
     {
       "id": "tf_para_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 840,
+        "x": 0,
         "y": 320
       },
       "data": {
         "group": "",
-        "materialName": "brick",
-        "__nodeTitle": "Tall Parapet F Mat"
+        "materialName": "trim",
+        "__nodeTitle": "Parapet Trim"
+      }
+    },
+    {
+      "id": "tf_para_pair",
+      "type": "CopyMesh",
+      "position": {
+        "x": 0,
+        "y": 480
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "z",
+        "translateZ": 3.72,
+        "__nodeTitle": "Front Back Parapets"
       }
     },
     {
       "id": "tf_para_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 840,
-        "y": 480
+        "x": 0,
+        "y": 640
       },
       "data": {
-        "translateX": 0,
-        "translateY": 5.95,
-        "translateZ": 1.65,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Parapet F Place"
+        "translateY": 5.14,
+        "translateZ": -1.86,
+        "__nodeTitle": "Parapet Place"
       }
     },
     {
-      "id": "tf_parab_box",
+      "id": "tf_shop",
       "type": "CreateBoxMesh",
       "position": {
-        "x": 840,
-        "y": 800
-      },
-      "data": {
-        "width": 3.5,
-        "height": 0.55,
-        "depth": 0.18,
-        "__nodeTitle": "Tall Parapet B"
-      }
-    },
-    {
-      "id": "tf_parab_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 840,
-        "y": 960
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Parapet B Bevel"
-      }
-    },
-    {
-      "id": "tf_parab_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 840,
-        "y": 1120
-      },
-      "data": {
-        "group": "",
-        "materialName": "brick",
-        "__nodeTitle": "Tall Parapet B Mat"
-      }
-    },
-    {
-      "id": "tf_parab_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": 840,
-        "y": 1280
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 5.95,
-        "translateZ": -1.65,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Parapet B Place"
-      }
-    },
-    {
-      "id": "tf_frame",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 1160,
+        "x": 320,
         "y": 0
       },
       "data": {
-        "width": 0.95,
-        "height": 1.4,
-        "depth": 0.12,
-        "__nodeTitle": "Tall Win Frame"
+        "width": 1.0,
+        "height": 2.1,
+        "depth": 0.1,
+        "__nodeTitle": "Shop Glass Bay"
       }
     },
     {
-      "id": "tf_frame_bv",
+      "id": "tf_shop_bv",
       "type": "BevelMesh",
       "position": {
-        "x": 1160,
+        "x": 320,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
+        "amount": 0.04,
+        "segments": 2,
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Frame Bevel"
+        "__nodeTitle": "Shop Bay Bevel"
       }
     },
     {
-      "id": "tf_frame_mat",
+      "id": "tf_shop_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 1160,
-        "y": 320
-      },
-      "data": {
-        "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Tall Frame Mat"
-      }
-    },
-    {
-      "id": "tf_pane",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 1480,
-        "y": 0
-      },
-      "data": {
-        "width": 0.72,
-        "height": 1.12,
-        "depth": 0.05,
-        "__nodeTitle": "Tall Win Pane"
-      }
-    },
-    {
-      "id": "tf_pane_vc",
-      "type": "VertexColor",
-      "position": {
-        "x": 1480,
-        "y": 160
-      },
-      "data": {
-        "r": 0.2,
-        "g": 0.15,
-        "b": 0.08,
-        "a": 1.0,
-        "emission": 0.9,
-        "emissionColorR": 1.0,
-        "emissionColorG": 0.82,
-        "emissionColorB": 0.4,
-        "__nodeTitle": "Tall Pane Glow"
-      }
-    },
-    {
-      "id": "tf_pane_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 1480,
+        "x": 320,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "window_glow",
-        "__nodeTitle": "Tall Pane Mat"
+        "__nodeTitle": "Shop Glass"
       }
     },
     {
-      "id": "tf_pane_inset",
-      "type": "TransformMesh",
+      "id": "tf_shop_pair",
+      "type": "CopyMesh",
       "position": {
-        "x": 1480,
+        "x": 320,
         "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0.04,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Pane Inset"
-      }
-    },
-    {
-      "id": "tf_win_unit",
-      "type": "MergeMesh",
-      "position": {
-        "x": 1320,
-        "y": 640
-      },
-      "data": {
-        "__nodeTitle": "Tall Win Unit"
-      }
-    },
-    {
-      "id": "tf_win_y",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1320,
-        "y": 800
-      },
-      "data": {
-        "mode": "linear",
-        "count": 4,
-        "axis": "y",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 2.35,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Tall Win Rows"
-      }
-    },
-    {
-      "id": "tf_win_x",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1320,
-        "y": 960
       },
       "data": {
         "mode": "linear",
         "count": 2,
         "axis": "x",
-        "angle": 360,
         "translateX": 2.35,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Tall Win Cols"
+        "__nodeTitle": "Shop Front Bays"
       }
     },
     {
-      "id": "tf_win_xf",
+      "id": "tf_shop_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 1320,
-        "y": 1120
+        "x": 320,
+        "y": 640
       },
       "data": {
         "translateX": -1.175,
-        "translateY": -3.6,
-        "translateZ": 1.72,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Win Place"
-      }
-    },
-    {
-      "id": "tf_quoin_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 1800,
-        "y": 0
-      },
-      "data": {
-        "width": 0.32,
-        "height": 0.42,
-        "depth": 0.32,
-        "__nodeTitle": "Tall Quoin"
-      }
-    },
-    {
-      "id": "tf_quoin_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 1800,
-        "y": 160
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Quoin Bevel"
-      }
-    },
-    {
-      "id": "tf_quoin_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 1800,
-        "y": 320
-      },
-      "data": {
-        "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Tall Quoin Mat"
-      }
-    },
-    {
-      "id": "tf_quoin_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": 1800,
-        "y": 480
-      },
-      "data": {
-        "translateX": -1.7,
-        "translateY": -4.6,
-        "translateZ": -1.7,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Quoin Place"
-      }
-    },
-    {
-      "id": "tf_quoin_y",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1800,
-        "y": 640
-      },
-      "data": {
-        "mode": "linear",
-        "count": 5,
-        "axis": "y",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 2.1,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Tall Quoin Rows"
-      }
-    },
-    {
-      "id": "tf_quoin_x",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1800,
-        "y": 800
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "x",
-        "angle": 360,
-        "translateX": 3.4,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Tall Quoin X"
-      }
-    },
-    {
-      "id": "tf_quoin_z",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1800,
-        "y": 960
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "z",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 3.4,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Tall Quoin Z"
+        "translateY": -3.65,
+        "translateZ": 1.9,
+        "__nodeTitle": "Shopfront Place"
       }
     },
     {
       "id": "tf_door",
       "type": "CreateBoxMesh",
       "position": {
-        "x": 2120,
+        "x": 640,
         "y": 0
       },
       "data": {
-        "width": 1.0,
-        "height": 2.2,
-        "depth": 0.1,
-        "__nodeTitle": "Tall Door"
+        "width": 0.9,
+        "height": 2.1,
+        "depth": 0.12,
+        "__nodeTitle": "Road-Facing Door"
       }
     },
     {
       "id": "tf_door_bv",
       "type": "BevelMesh",
       "position": {
-        "x": 2120,
+        "x": 640,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
+        "amount": 0.05,
+        "segments": 2,
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Tall Door Bevel"
+        "__nodeTitle": "Door Bevel"
       }
     },
     {
       "id": "tf_door_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 2120,
+        "x": 640,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "plaster_cream",
-        "__nodeTitle": "Tall Door Mat"
+        "__nodeTitle": "Door Material"
       }
     },
     {
       "id": "tf_door_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 2120,
+        "x": 640,
         "y": 480
       },
       "data": {
-        "translateX": 0,
-        "translateY": -4.3,
-        "translateZ": 1.72,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Door Place"
+        "translateY": -3.65,
+        "translateZ": 1.91,
+        "__nodeTitle": "Door On Local +Z"
       }
     },
     {
-      "id": "tf_arch",
-      "type": "CreateArcSpline",
+      "id": "tf_win_frame",
+      "type": "CreateBoxMesh",
       "position": {
-        "x": 2440,
+        "x": 960,
         "y": 0
       },
       "data": {
-        "radius": 0.55,
-        "startAngle": 0,
-        "endAngle": 180,
-        "segments": 14,
-        "axis": "z",
-        "__nodeTitle": "Tall Door Arc"
+        "width": 0.9,
+        "height": 1.35,
+        "depth": 0.12,
+        "__nodeTitle": "Upper Window Frame"
       }
     },
     {
-      "id": "tf_arch_sw",
-      "type": "SweepAlongSpline",
+      "id": "tf_win_frame_bv",
+      "type": "BevelMesh",
       "position": {
-        "x": 2440,
+        "x": 960,
         "y": 160
       },
       "data": {
-        "surfaceShape": "rectangle",
-        "profileWidth": 0.12,
-        "profileHeight": 0.1,
-        "radius": 1,
-        "columns": 12,
-        "sampleSpacing": 0.08,
-        "capStart": true,
-        "capEnd": true,
-        "upX": 0,
-        "upY": 1,
-        "upZ": 0,
-        "twist": 0,
-        "profileRoll": 0,
-        "scaleStart": 1,
-        "scaleEnd": 1,
-        "profilePlane": "xy",
-        "shadeMode": "auto",
-        "cuspAngle": 30,
-        "__nodeTitle": "Tall Arch Sweep"
+        "amount": 0.04,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Window Frame Bevel"
       }
     },
     {
-      "id": "tf_arch_mat",
+      "id": "tf_win_frame_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 2440,
+        "x": 960,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "trim",
-        "__nodeTitle": "Tall Arch Mat"
+        "__nodeTitle": "Window Frame Trim"
       }
     },
     {
-      "id": "tf_arch_xf",
-      "type": "TransformMesh",
+      "id": "tf_win_pane",
+      "type": "CreateBoxMesh",
       "position": {
-        "x": 2440,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": -3.15,
-        "translateZ": 1.75,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Arch Place"
-      }
-    },
-    {
-      "id": "tf_chim",
-      "type": "CreateCylinderMesh",
-      "position": {
-        "x": 2760,
+        "x": 1280,
         "y": 0
       },
       "data": {
-        "radius": 0.18,
-        "height": 1.0,
-        "radialSegments": 8,
-        "heightSegments": 1,
-        "capTop": true,
-        "capBottom": true,
-        "__nodeTitle": "Tall Chimney"
+        "width": 0.7,
+        "height": 1.12,
+        "depth": 0.05,
+        "__nodeTitle": "Upper Window Pane"
       }
     },
     {
-      "id": "tf_chim_mat",
+      "id": "tf_win_pane_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 2760,
+        "x": 1280,
         "y": 160
       },
       "data": {
         "group": "",
-        "materialName": "brick",
-        "__nodeTitle": "Tall Chimney Mat"
+        "materialName": "window_glow",
+        "__nodeTitle": "Window Glass"
       }
     },
     {
-      "id": "tf_chim_xf",
+      "id": "tf_win_pane_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 2760,
+        "x": 1280,
         "y": 320
       },
       "data": {
-        "translateX": 0.7,
-        "translateY": 6.2,
-        "translateZ": 0.6,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Chimney Place"
+        "translateZ": 0.05,
+        "__nodeTitle": "Inset Window Glass"
       }
     },
+    {
+      "id": "tf_win_unit",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1120,
+        "y": 480
+      },
+      "data": {
+        "__nodeTitle": "Upper Window Unit"
+      }
+    },
+    {
+      "id": "tf_front_cols",
+      "type": "CopyMesh",
+      "position": {
+        "x": 960,
+        "y": 640
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "translateX": 2.2,
+        "__nodeTitle": "Front Window Columns"
+      }
+    },
+    {
+      "id": "tf_front_rows",
+      "type": "CopyMesh",
+      "position": {
+        "x": 960,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "y",
+        "translateY": 3.2,
+        "__nodeTitle": "Two Upper Floors"
+      }
+    },
+    {
+      "id": "tf_front_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 960,
+        "y": 960
+      },
+      "data": {
+        "translateX": -1.1,
+        "translateY": -0.8,
+        "translateZ": 1.9,
+        "__nodeTitle": "Front Upper Facade"
+      }
+    },
+    {
+      "id": "tf_side_turn",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1280,
+        "y": 640
+      },
+      "data": {
+        "rotationY": 90,
+        "__nodeTitle": "Turn Side Windows"
+      }
+    },
+    {
+      "id": "tf_side_cols",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1280,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "z",
+        "translateZ": 2.2,
+        "__nodeTitle": "Side Window Columns"
+      }
+    },
+    {
+      "id": "tf_side_rows",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1280,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "y",
+        "translateY": 3.2,
+        "__nodeTitle": "Side Upper Floors"
+      }
+    },
+    {
+      "id": "tf_side_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1280,
+        "y": 1120
+      },
+      "data": {
+        "translateX": 1.9,
+        "translateY": -0.8,
+        "translateZ": -1.1,
+        "__nodeTitle": "Right Side Facade"
+      }
+    },
+    {
+      "id": "tf_fire",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1600,
+        "y": 0
+      },
+      "data": {
+        "width": 0.72,
+        "height": 0.12,
+        "depth": 1.25,
+        "__nodeTitle": "Fire Escape Platform"
+      }
+    },
+    {
+      "id": "tf_fire_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1600,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.03,
+        "segments": 1,
+        "clampOverlap": true,
+        "__nodeTitle": "Fire Escape Bevel"
+      }
+    },
+    {
+      "id": "tf_fire_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1600,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Fire Escape Metal"
+      }
+    },
+    {
+      "id": "tf_fire_rows",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1600,
+        "y": 480
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "y",
+        "translateY": 3.2,
+        "__nodeTitle": "Fire Escape Floors"
+      }
+    },
+    {
+      "id": "tf_fire_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1600,
+        "y": 640
+      },
+      "data": {
+        "translateX": -2.18,
+        "translateY": -0.65,
+        "__nodeTitle": "Fire Escape -X"
+      }
+    },
+    {"id":"tf_fire_rail","type":"CreateBoxMesh","position":{"x":1920,"y":0},"data":{"width":0.08,"height":0.95,"depth":1.35,"__nodeTitle":"Fire Escape Outer Rail"}},
+    {"id":"tf_fire_rail_bv","type":"BevelMesh","position":{"x":1920,"y":160},"data":{"amount":0.025,"segments":1,"clampOverlap":true,"__nodeTitle":"Fire Rail Bevel"}},
+    {"id":"tf_fire_rail_mat","type":"AssignMaterial","position":{"x":1920,"y":320},"data":{"group":"","materialName":"trim","__nodeTitle":"Fire Rail Metal"}},
+    {"id":"tf_fire_rail_rows","type":"CopyMesh","position":{"x":1920,"y":480},"data":{"mode":"linear","count":2,"axis":"y","translateY":3.2,"__nodeTitle":"Fire Rail Floors"}},
+    {"id":"tf_fire_rail_xf","type":"TransformMesh","position":{"x":1920,"y":640},"data":{"translateX":-2.62,"translateY":-0.12,"__nodeTitle":"Fire Rail Place"}},
+    {"id":"tf_fire_front","type":"CreateBoxMesh","position":{"x":2240,"y":0},"data":{"width":0.75,"height":0.08,"depth":0.08,"__nodeTitle":"Fire Escape Front Rail"}},
+    {"id":"tf_fire_front_mat","type":"AssignMaterial","position":{"x":2240,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Fire Front Metal"}},
+    {"id":"tf_fire_front_rows","type":"CopyMesh","position":{"x":2240,"y":320},"data":{"mode":"linear","count":2,"axis":"y","translateY":3.2,"__nodeTitle":"Fire Front Floors"}},
+    {"id":"tf_fire_front_xf","type":"TransformMesh","position":{"x":2240,"y":480},"data":{"translateX":-2.18,"translateY":-0.12,"translateZ":0.68,"__nodeTitle":"Fire Front Rail Place"}},
+    {"id":"tf_door_frame","type":"CreateBoxMesh","position":{"x":2560,"y":0},"data":{"width":1.18,"height":2.36,"depth":0.08,"__nodeTitle":"Tall Door Surround"}},
+    {"id":"tf_door_frame_bv","type":"BevelMesh","position":{"x":2560,"y":160},"data":{"amount":0.04,"segments":2,"clampOverlap":true,"__nodeTitle":"Tall Door Bevel"}},
+    {"id":"tf_door_frame_mat","type":"AssignMaterial","position":{"x":2560,"y":320},"data":{"group":"","materialName":"trim","__nodeTitle":"Tall Door Trim"}},
+    {"id":"tf_door_frame_xf","type":"TransformMesh","position":{"x":2560,"y":480},"data":{"translateY":-3.62,"translateZ":1.9,"__nodeTitle":"Tall Door Surround +Z"}},
+    {"id":"tf_bracket","type":"CreateBoxMesh","position":{"x":2880,"y":0},"data":{"width":0.28,"height":0.35,"depth":0.25,"__nodeTitle":"Cornice Bracket"}},
+    {"id":"tf_bracket_bv","type":"BevelMesh","position":{"x":2880,"y":160},"data":{"amount":0.03,"segments":1,"clampOverlap":true,"__nodeTitle":"Bracket Bevel"}},
+    {"id":"tf_bracket_mat","type":"AssignMaterial","position":{"x":2880,"y":320},"data":{"group":"","materialName":"plaster_cream","__nodeTitle":"Bracket Stone"}},
+    {"id":"tf_brackets","type":"CopyMesh","position":{"x":2880,"y":480},"data":{"mode":"linear","count":4,"axis":"x","translateX":1.05,"__nodeTitle":"Cornice Brackets"}},
+    {"id":"tf_brackets_xf","type":"TransformMesh","position":{"x":2880,"y":640},"data":{"translateX":-1.58,"translateY":4.28,"translateZ":1.9,"__nodeTitle":"Cornice Brackets Place"}},
+    {"id":"tf_mullion","type":"CreateBoxMesh","position":{"x":3200,"y":0},"data":{"width":0.08,"height":1.12,"depth":0.07,"__nodeTitle":"Window Center Mullion"}},
+    {"id":"tf_mullion_bv","type":"BevelMesh","position":{"x":3200,"y":160},"data":{"amount":0.02,"segments":1,"clampOverlap":true,"__nodeTitle":"Mullion Bevel"}},
+    {"id":"tf_mullion_mat","type":"AssignMaterial","position":{"x":3200,"y":320},"data":{"group":"","materialName":"trim","__nodeTitle":"Mullion Trim"}},
+    {"id":"tf_door_panel","type":"CreateBoxMesh","position":{"x":3520,"y":0},"data":{"width":0.64,"height":0.62,"depth":0.05,"__nodeTitle":"Door Raised Panel"}},
+    {"id":"tf_door_panel_bv","type":"BevelMesh","position":{"x":3520,"y":160},"data":{"amount":0.025,"segments":1,"clampOverlap":true,"__nodeTitle":"Door Panel Bevel"}},
+    {"id":"tf_door_panel_mat","type":"AssignMaterial","position":{"x":3520,"y":320},"data":{"group":"","materialName":"trim","__nodeTitle":"Door Panel Trim"}},
+    {"id":"tf_door_panels","type":"CopyMesh","position":{"x":3520,"y":480},"data":{"mode":"linear","count":2,"axis":"y","translateY":0.82,"__nodeTitle":"Door Panel Pair"}},
+    {"id":"tf_door_panels_xf","type":"TransformMesh","position":{"x":3520,"y":640},"data":{"translateY":-4.05,"translateZ":1.99,"__nodeTitle":"Door Panels +Z"}},
+    {"id":"tf_handle","type":"CreateBoxMesh","position":{"x":3840,"y":0},"data":{"width":0.08,"height":0.12,"depth":0.08,"__nodeTitle":"Door Handle"}},
+    {"id":"tf_handle_mat","type":"AssignMaterial","position":{"x":3840,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Door Handle Metal"}},
+    {"id":"tf_handle_xf","type":"TransformMesh","position":{"x":3840,"y":320},"data":{"translateX":0.28,"translateY":-3.65,"translateZ":2.04,"__nodeTitle":"Door Handle +Z"}},
     {
       "id": "tf_merge",
       "type": "MergeMesh",
       "position": {
-        "x": 400,
+        "x": 320,
         "y": 1440
       },
       "data": {
-        "__nodeTitle": "Tall Merge"
+        "__nodeTitle": "Tall Building Assembly"
       }
     },
     {
       "id": "tf_lift",
       "type": "TransformMesh",
       "position": {
-        "x": 400,
+        "x": 320,
         "y": 1600
       },
       "data": {
-        "translateX": 0,
-        "translateY": 5.4,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Tall Lift"
+        "translateY": 4.8,
+        "__nodeTitle": "Set Base Y Zero"
       }
     },
     {
       "id": "tf_out",
       "type": "SubgraphOutput",
       "position": {
-        "x": 400,
+        "x": 320,
         "y": 1760
       },
       "data": {
-        "__nodeTitle": "Tall Out"
+        "__nodeTitle": "Tall Building Out"
       }
     }
   ],
   "edges": [
     {
-      "id": "e_tf_body_bv",
-      "source": "tf_body_box",
-      "target": "tf_body_bevel",
+      "id": "e1",
+      "source": "tf_body",
+      "target": "tf_body_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_body_mat",
-      "source": "tf_body_bevel",
+      "id": "e2",
+      "source": "tf_body_bv",
       "target": "tf_body_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_body_xf",
-      "source": "tf_body_mat",
-      "target": "tf_body_xf",
+      "id": "e3",
+      "source": "tf_plinth",
+      "target": "tf_plinth_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_plinth_bv",
-      "source": "tf_plinth_box",
-      "target": "tf_plinth_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_plinth_mat",
-      "source": "tf_plinth_bevel",
+      "id": "e4",
+      "source": "tf_plinth_bv",
       "target": "tf_plinth_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_plinth_xf",
+      "id": "e5",
       "source": "tf_plinth_mat",
       "target": "tf_plinth_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_band_bv",
-      "source": "tf_band_box",
-      "target": "tf_band_bevel",
+      "id": "e6",
+      "source": "tf_roof",
+      "target": "tf_roof_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_band_mat",
-      "source": "tf_band_bevel",
-      "target": "tf_band_mat",
+      "id": "e7",
+      "source": "tf_roof_bv",
+      "target": "tf_roof_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_band_xf",
-      "source": "tf_band_mat",
-      "target": "tf_band_xf",
+      "id": "e8",
+      "source": "tf_roof_mat",
+      "target": "tf_roof_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_band_y",
-      "source": "tf_band_xf",
-      "target": "tf_band_y",
+      "id": "e9",
+      "source": "tf_para",
+      "target": "tf_para_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_cornice_bv",
-      "source": "tf_cornice_box",
-      "target": "tf_cornice_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_cornice_mat",
-      "source": "tf_cornice_bevel",
-      "target": "tf_cornice_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_cornice_xf",
-      "source": "tf_cornice_mat",
-      "target": "tf_cornice_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_para_bv",
-      "source": "tf_para_box",
-      "target": "tf_para_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_para_mat",
-      "source": "tf_para_bevel",
+      "id": "e10",
+      "source": "tf_para_bv",
       "target": "tf_para_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_para_xf",
+      "id": "e11",
       "source": "tf_para_mat",
+      "target": "tf_para_pair",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e12",
+      "source": "tf_para_pair",
       "target": "tf_para_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_parab_bv",
-      "source": "tf_parab_box",
-      "target": "tf_parab_bevel",
+      "id": "e13",
+      "source": "tf_shop",
+      "target": "tf_shop_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_parab_mat",
-      "source": "tf_parab_bevel",
-      "target": "tf_parab_mat",
+      "id": "e14",
+      "source": "tf_shop_bv",
+      "target": "tf_shop_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_parab_xf",
-      "source": "tf_parab_mat",
-      "target": "tf_parab_xf",
+      "id": "e15",
+      "source": "tf_shop_mat",
+      "target": "tf_shop_pair",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_fr_bv",
-      "source": "tf_frame",
-      "target": "tf_frame_bv",
+      "id": "e16",
+      "source": "tf_shop_pair",
+      "target": "tf_shop_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_fr_mat",
-      "source": "tf_frame_bv",
-      "target": "tf_frame_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_pn_vc",
-      "source": "tf_pane",
-      "target": "tf_pane_vc",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_pn_mat",
-      "source": "tf_pane_vc",
-      "target": "tf_pane_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_pn_in",
-      "source": "tf_pane_mat",
-      "target": "tf_pane_inset",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_fr_unit",
-      "source": "tf_frame_mat",
-      "target": "tf_win_unit",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_pn_unit",
-      "source": "tf_pane_inset",
-      "target": "tf_win_unit",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_win_y",
-      "source": "tf_win_unit",
-      "target": "tf_win_y",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_win_x",
-      "source": "tf_win_y",
-      "target": "tf_win_x",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_win_xf",
-      "source": "tf_win_x",
-      "target": "tf_win_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_quoin_bv",
-      "source": "tf_quoin_box",
-      "target": "tf_quoin_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_quoin_mat",
-      "source": "tf_quoin_bevel",
-      "target": "tf_quoin_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_quoin_xf",
-      "source": "tf_quoin_mat",
-      "target": "tf_quoin_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_qy",
-      "source": "tf_quoin_xf",
-      "target": "tf_quoin_y",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_qx",
-      "source": "tf_quoin_y",
-      "target": "tf_quoin_x",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_qz",
-      "source": "tf_quoin_x",
-      "target": "tf_quoin_z",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_d_bv",
+      "id": "e17",
       "source": "tf_door",
       "target": "tf_door_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_d_mat",
+      "id": "e18",
       "source": "tf_door_bv",
       "target": "tf_door_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_d_xf",
+      "id": "e19",
       "source": "tf_door_mat",
       "target": "tf_door_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_arch_sw",
-      "source": "tf_arch",
-      "target": "tf_arch_sw",
-      "sourceHandle": "out",
-      "targetHandle": "backbone"
-    },
-    {
-      "id": "e_tf_arch_mat",
-      "source": "tf_arch_sw",
-      "target": "tf_arch_mat",
+      "id": "e20",
+      "source": "tf_win_frame",
+      "target": "tf_win_frame_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_arch_xf",
-      "source": "tf_arch_mat",
-      "target": "tf_arch_xf",
+      "id": "e21",
+      "source": "tf_win_frame_bv",
+      "target": "tf_win_frame_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_chim_mat",
-      "source": "tf_chim",
-      "target": "tf_chim_mat",
+      "id": "e22",
+      "source": "tf_win_pane",
+      "target": "tf_win_pane_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_chim_xf",
-      "source": "tf_chim_mat",
-      "target": "tf_chim_xf",
+      "id": "e23",
+      "source": "tf_win_pane_mat",
+      "target": "tf_win_pane_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m0",
-      "source": "tf_body_xf",
+      "id": "e24",
+      "source": "tf_win_frame_mat",
+      "target": "tf_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e25",
+      "source": "tf_win_pane_xf",
+      "target": "tf_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e26",
+      "source": "tf_win_unit",
+      "target": "tf_front_cols",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e27",
+      "source": "tf_front_cols",
+      "target": "tf_front_rows",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e28",
+      "source": "tf_front_rows",
+      "target": "tf_front_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e29",
+      "source": "tf_win_unit",
+      "target": "tf_side_turn",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e30",
+      "source": "tf_side_turn",
+      "target": "tf_side_cols",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e31",
+      "source": "tf_side_cols",
+      "target": "tf_side_rows",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e32",
+      "source": "tf_side_rows",
+      "target": "tf_side_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e33",
+      "source": "tf_fire",
+      "target": "tf_fire_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e34",
+      "source": "tf_fire_bv",
+      "target": "tf_fire_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e35",
+      "source": "tf_fire_mat",
+      "target": "tf_fire_rows",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e36",
+      "source": "tf_fire_rows",
+      "target": "tf_fire_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {"id":"e39","source":"tf_fire_rail","target":"tf_fire_rail_bv","sourceHandle":"out","targetHandle":"in"},{"id":"e40","source":"tf_fire_rail_bv","target":"tf_fire_rail_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e41","source":"tf_fire_rail_mat","target":"tf_fire_rail_rows","sourceHandle":"out","targetHandle":"in"},{"id":"e42","source":"tf_fire_rail_rows","target":"tf_fire_rail_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e43","source":"tf_fire_front","target":"tf_fire_front_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e44","source":"tf_fire_front_mat","target":"tf_fire_front_rows","sourceHandle":"out","targetHandle":"in"},{"id":"e45","source":"tf_fire_front_rows","target":"tf_fire_front_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e46","source":"tf_door_frame","target":"tf_door_frame_bv","sourceHandle":"out","targetHandle":"in"},{"id":"e47","source":"tf_door_frame_bv","target":"tf_door_frame_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e48","source":"tf_door_frame_mat","target":"tf_door_frame_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e49","source":"tf_bracket","target":"tf_bracket_bv","sourceHandle":"out","targetHandle":"in"},{"id":"e50","source":"tf_bracket_bv","target":"tf_bracket_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e51","source":"tf_bracket_mat","target":"tf_brackets","sourceHandle":"out","targetHandle":"in"},{"id":"e52","source":"tf_brackets","target":"tf_brackets_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e53","source":"tf_mullion","target":"tf_mullion_bv","sourceHandle":"out","targetHandle":"in"},{"id":"e54","source":"tf_mullion_bv","target":"tf_mullion_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e55","source":"tf_mullion_mat","target":"tf_win_unit","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e56","source":"tf_door_panel","target":"tf_door_panel_bv","sourceHandle":"out","targetHandle":"in"},{"id":"e57","source":"tf_door_panel_bv","target":"tf_door_panel_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e58","source":"tf_door_panel_mat","target":"tf_door_panels","sourceHandle":"out","targetHandle":"in"},{"id":"e59","source":"tf_door_panels","target":"tf_door_panels_xf","sourceHandle":"out","targetHandle":"in"},{"id":"e60","source":"tf_handle","target":"tf_handle_mat","sourceHandle":"out","targetHandle":"in"},{"id":"e61","source":"tf_handle_mat","target":"tf_handle_xf","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "m1",
+      "source": "tf_body_mat",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m1",
+      "id": "m2",
       "source": "tf_plinth_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m2",
-      "source": "tf_band_y",
+      "id": "m3",
+      "source": "tf_roof_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m3",
-      "source": "tf_cornice_xf",
-      "target": "tf_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_m4",
+      "id": "m4",
       "source": "tf_para_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m5",
-      "source": "tf_parab_xf",
+      "id": "m5",
+      "source": "tf_shop_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m6",
-      "source": "tf_win_xf",
-      "target": "tf_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_m7",
-      "source": "tf_quoin_z",
-      "target": "tf_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_tf_m8",
+      "id": "m6",
       "source": "tf_door_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m9",
-      "source": "tf_arch_xf",
+      "id": "m7",
+      "source": "tf_front_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_m10",
-      "source": "tf_chim_xf",
+      "id": "m8",
+      "source": "tf_side_xf",
       "target": "tf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_lift",
+      "id": "m9",
+      "source": "tf_fire_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {"id":"m10","source":"tf_fire_rail_xf","target":"tf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m11","source":"tf_fire_front_xf","target":"tf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m12","source":"tf_door_frame_xf","target":"tf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m13","source":"tf_brackets_xf","target":"tf_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m14","source":"tf_door_panels_xf","target":"tf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m15","source":"tf_handle_xf","target":"tf_merge","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "e37",
       "source": "tf_merge",
       "target": "tf_lift",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_tf_out",
+      "id": "e38",
       "source": "tf_lift",
       "target": "tf_out",
       "sourceHandle": "out",

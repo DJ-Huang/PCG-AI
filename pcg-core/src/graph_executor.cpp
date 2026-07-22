@@ -4,6 +4,7 @@
 #include "data/pcg_context.hpp"
 #include "data/pcg_geometry.hpp"
 #include "elements/facade_foundation_algorithms.hpp"
+#include "elements/topology_parity_algorithms.hpp"
 #include "elements/pcg_element.hpp"
 #include "internal/error_util.hpp"
 #include "texture_runtime.hpp"
@@ -395,55 +396,44 @@ bool discover_foreach_regions(
         reverse_adjacency[edge.target].push_back(edge.source);
     }
 
-    std::unordered_set<std::string> claimed_ends;
-    for (const auto& node : graph.nodes) {
-        if (node.type != "ForEachBegin")
+    // Parentheses-style pairing so nested ForEachBegin/End match correctly.
+    // Nearest-reachable-End pairing incorrectly binds an outer Begin to an inner End.
+    std::vector<std::string> begin_stack;
+    std::vector<std::pair<std::string, std::string>> pairs;
+    for (const auto& id : topo_order) {
+        const auto it = node_by_id.find(id);
+        if (it == node_by_id.end())
             continue;
-
-        std::vector<std::string> end_candidates;
-        for (const auto& reached : reachable_from(node.id, adjacency)) {
-            if (reached == node.id)
-                continue;
-            const auto it = node_by_id.find(reached);
-            if (it != node_by_id.end() && it->second->type == "ForEachEnd")
-                end_candidates.push_back(reached);
+        if (it->second->type == "ForEachBegin") {
+            begin_stack.push_back(id);
+            continue;
         }
-        if (end_candidates.empty()) {
+        if (it->second->type != "ForEachEnd")
+            continue;
+        if (begin_stack.empty()) {
             code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION,
-                        "ForEachBegin has no reachable ForEachEnd");
+                        "ForEachEnd has no matching ForEachBegin");
             return false;
         }
-        // Prefer the nearest End (fewest hops among topo-later ends).
-        std::string end_id;
-        size_t best_index = topo_order.size();
-        for (const auto& candidate : end_candidates) {
-            if (claimed_ends.count(candidate) > 0)
-                continue;
-            const auto pos = std::find(topo_order.begin(), topo_order.end(), candidate);
-            if (pos == topo_order.end())
-                continue;
-            const size_t index = static_cast<size_t>(pos - topo_order.begin());
-            if (index < best_index) {
-                best_index = index;
-                end_id = candidate;
-            }
-        }
-        if (end_id.empty()) {
-            code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION,
-                        "ForEachBegin could not pair a unique ForEachEnd");
-            return false;
-        }
-        claimed_ends.insert(end_id);
+        pairs.emplace_back(begin_stack.back(), id);
+        begin_stack.pop_back();
+    }
+    if (!begin_stack.empty()) {
+        code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION,
+                    "ForEachBegin has no matching ForEachEnd");
+        return false;
+    }
 
-        const auto from_begin = reachable_from(node.id, adjacency);
+    for (const auto& [begin_id, end_id] : pairs) {
+        const auto from_begin = reachable_from(begin_id, adjacency);
         const auto from_end_rev = reachable_from(end_id, reverse_adjacency);
         std::unordered_set<std::string> can_reach_end(from_end_rev.begin(), from_end_rev.end());
 
         ForEachRegion region;
-        region.begin_id = node.id;
+        region.begin_id = begin_id;
         region.end_id = end_id;
         for (const auto& id : topo_order) {
-            if (id == node.id || id == end_id)
+            if (id == begin_id || id == end_id)
                 continue;
             const bool from_begin_hit =
                 std::find(from_begin.begin(), from_begin.end(), id) != from_begin.end();
@@ -559,6 +549,8 @@ PcgResultCode cook_single_node(
 
 PcgResultCode cook_foreach_region(
     const ForEachRegion& region,
+    const std::vector<ForEachRegion>& all_regions,
+    const std::unordered_map<std::string, const ForEachRegion*>& foreach_by_begin,
     const Graph& graph,
     const std::unordered_map<std::string, const GraphNode*>& node_by_id,
     const std::unordered_map<std::string, std::vector<const GraphEdge*>>& incoming_by_node,
@@ -602,9 +594,35 @@ PcgResultCode cook_foreach_region(
     const std::string method = begin_node->data.value("method", std::string("primitive"));
     const std::string piece_attribute =
         begin_node->data.value("pieceAttribute", std::string("piece"));
-    const int iterations = std::max(1, begin_node->data.value("iterations", 1));
+    const int configured_iterations = std::max(0, begin_node->data.value("iterations", 1));
+    const std::string iterations_attribute =
+        begin_node->data.value("iterationsAttribute", std::string());
+    const int iterations = elements::read_iterations_attribute(
+        *seed_geometry, iterations_attribute, configured_iterations);
     const std::string gather_method =
         end_node->data.value("gatherMethod", std::string("merge"));
+
+    auto inject_loop_metadata = [](data::PcgGeometry& geometry,
+                                   int iteration,
+                                   int num_iterations,
+                                   int64_t value) {
+        elements::set_detail_int(geometry, "iteration", iteration);
+        elements::set_detail_int(geometry, "numiterations", num_iterations);
+        elements::set_detail_int(geometry, "ivalue", value);
+        elements::set_detail_float(geometry, "value", static_cast<double>(value));
+    };
+
+    auto is_nested_managed = [&](const std::string& body_id) -> bool {
+        for (const auto& other : all_regions) {
+            if (other.begin_id == region.begin_id)
+                continue;
+            if (region.body_nodes.count(other.begin_id) == 0)
+                continue;
+            if (other.body_nodes.count(body_id) > 0 || other.end_id == body_id)
+                return true;
+        }
+        return false;
+    };
 
     auto cook_body_once = [&](const data::PcgGeometry& piece,
                               data::PcgGeometry& end_geometry) -> PcgResultCode {
@@ -614,6 +632,19 @@ PcgResultCode cook_foreach_region(
         output_hashes[region.begin_id] = compute_output_hash(outputs[region.begin_id]);
 
         for (const auto& body_id : region.body_order) {
+            if (const auto nested_it = foreach_by_begin.find(body_id);
+                nested_it != foreach_by_begin.end()) {
+                const PcgResultCode nested_rc = cook_foreach_region(
+                    *nested_it->second, all_regions, foreach_by_begin, graph, node_by_id,
+                    incoming_by_node, seed, outputs, output_hashes, textures, meshes, splines,
+                    heightfields, is_cancel_requested, perf, err_buf, err_buf_size);
+                if (nested_rc != PCG_OK)
+                    return nested_rc;
+                continue;
+            }
+            if (is_nested_managed(body_id))
+                continue;
+
             const GraphNode* body_node = node_by_id.at(body_id);
             const auto incoming_it = incoming_by_node.find(body_id);
             const auto& incoming = incoming_it != incoming_by_node.end()
@@ -648,10 +679,19 @@ PcgResultCode cook_foreach_region(
 
     data::PcgGeometry accumulated;
     if (method == "count") {
+        if (iterations <= 0) {
+            data::PcgDataCollection end_out;
+            end_out.add_geometry("out", data::PcgGeometry{});
+            outputs[region.end_id] = std::move(end_out);
+            output_hashes[region.end_id] = compute_output_hash(outputs[region.end_id]);
+            return PCG_OK;
+        }
         data::PcgGeometry current = *seed_geometry;
         for (int i = 0; i < iterations; ++i) {
+            data::PcgGeometry piece = current;
+            inject_loop_metadata(piece, i, iterations, i);
             data::PcgGeometry end_geometry;
-            const PcgResultCode rc = cook_body_once(current, end_geometry);
+            const PcgResultCode rc = cook_body_once(piece, end_geometry);
             if (rc != PCG_OK)
                 return rc;
             if (gather_method == "feedback") {
@@ -664,12 +704,17 @@ PcgResultCode cook_foreach_region(
         }
     } else {
         const auto pieces = elements::foreach_pieces(*seed_geometry, method, piece_attribute);
-        for (const auto& piece : pieces) {
+        const int num_pieces = static_cast<int>(pieces.size());
+        int piece_index = 0;
+        for (const auto& piece_in : pieces) {
+            data::PcgGeometry piece = piece_in;
+            inject_loop_metadata(piece, piece_index, num_pieces, piece_index);
             data::PcgGeometry end_geometry;
             const PcgResultCode rc = cook_body_once(piece, end_geometry);
             if (rc != PCG_OK)
                 return rc;
             accumulated = data::merge_geometries(accumulated, end_geometry);
+            ++piece_index;
         }
     }
 
@@ -738,12 +783,19 @@ PcgResultCode execute_graph(const Graph& graph,
 
     std::unordered_map<std::string, const ForEachRegion*> foreach_by_begin;
     std::unordered_set<std::string> foreach_managed;
+    std::unordered_set<std::string> nested_foreach_begins;
     for (const auto& region : foreach_regions) {
         foreach_by_begin[region.begin_id] = &region;
         foreach_managed.insert(region.begin_id);
         foreach_managed.insert(region.end_id);
         for (const auto& body_id : region.body_nodes)
             foreach_managed.insert(body_id);
+    }
+    for (const auto& region : foreach_regions) {
+        for (const auto& body_id : region.body_nodes) {
+            if (foreach_by_begin.count(body_id) > 0)
+                nested_foreach_begins.insert(body_id);
+        }
     }
 
     std::unordered_map<std::string, uint64_t> output_hashes;
@@ -753,10 +805,13 @@ PcgResultCode execute_graph(const Graph& graph,
             return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
         if (const auto begin_it = foreach_by_begin.find(node_id); begin_it != foreach_by_begin.end()) {
+            // Nested regions are cooked by their parent ForEach body.
+            if (nested_foreach_begins.count(node_id) > 0)
+                continue;
             const PcgResultCode rc = cook_foreach_region(
-                *begin_it->second, graph, node_by_id, incoming_by_node, seed, outputs,
-                output_hashes, textures, meshes, splines, heightfields, is_cancel_requested,
-                perf, err_buf, err_buf_size);
+                *begin_it->second, foreach_regions, foreach_by_begin, graph, node_by_id,
+                incoming_by_node, seed, outputs, output_hashes, textures, meshes, splines,
+                heightfields, is_cancel_requested, perf, err_buf, err_buf_size);
             if (rc != PCG_OK)
                 return rc;
             continue;

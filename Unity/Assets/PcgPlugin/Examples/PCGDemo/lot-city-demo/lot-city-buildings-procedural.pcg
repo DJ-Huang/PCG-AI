@@ -1,0 +1,541 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "ground",
+      "type": "CreateGridMesh",
+      "position": { "x": 840, "y": 0 },
+      "data": {"sizeX": 48, "sizeY": 48, "rows": 1, "cols": 1, "plane": "xz", "__nodeTitle": "City Ground"}
+    },
+    {
+      "id": "blocks",
+      "type": "LotSubdivision",
+      "position": { "x": 840, "y": 160 },
+      "data": {"minSize": 0.1, "iterations": 4, "irregularity": 0.35, "seed": 2, "alignment": "longestEdge", "__nodeTitle": "City Blocks iter=3"}
+    },
+    {
+      "id": "shrink_blocks",
+      "type": "PrimitiveTransform",
+      "position": { "x": 840, "y": 320 },
+      "data": {"scale": 0.75, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
+    },
+    {
+      "id": "sg_roads",
+      "type": "Subgraph",
+      "position": { "x": 1480, "y": 4560 },
+      "data": {"subgraphId": "city_roads", "__nodeTitle": "City Roads"}
+    },
+    {
+      "id": "sg_pads",
+      "type": "Subgraph",
+      "position": { "x": 200, "y": 4560 },
+      "data": {"subgraphId": "city_pads", "__nodeTitle": "City Pads"}
+    },
+    {
+      "id": "keep_built",
+      "type": "Blast",
+      "position": { "x": 840, "y": 800 },
+      "data": {"entity": "primitives", "group": "", "expression": "@numFloors > 0", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Keep Built Lots"}
+    },
+    {
+      "id": "foreach_begin",
+      "type": "ForEachBegin",
+      "position": { "x": 840, "y": 880 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": "ForEach Building Lot"}
+    },
+    {
+      "id": "ex_lot",
+      "type": "PolyExtrude",
+      "position": { "x": 840, "y": 1040 },
+      "data": {"faceGroup": "", "distance": 2.8, "inset": 0, "keepOriginal": false, "topGroup": "bldg_top", "sideGroup": "bldg_side", "distanceAttribute": "height", "__nodeTitle": "Extrude numFloors*floorH"}
+    },
+    {
+      "id": "win_keep",
+      "type": "Blast",
+      "position": { "x": 200, "y": 2480 },
+      "data": {"entity": "points", "group": "", "expression": "@P.y > 2.9 && @P.y < 7.2", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Upper Window Points"}
+    },
+    {
+      "id": "win_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": -120, "y": 2320 },
+      "data": {"width": 0.85, "height": 0.4, "depth": 0.95, "__nodeTitle": "Window Cutter (N=out)"}
+    },
+    {
+      "id": "win_copy",
+      "type": "CopyMeshToPoints",
+      "position": { "x": 200, "y": 2640 },
+      "data": {"__nodeTitle": "Copy Windows"}
+    },
+    {
+      "id": "door_keep",
+      "type": "Blast",
+      "position": { "x": 520, "y": 2480 },
+      "data": {"entity": "points", "group": "", "expression": "@P.y > 0.2 && @P.y < 2.2", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Shop Door Points"}
+    },
+    {
+      "id": "door_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 840, "y": 2320 },
+      "data": {"width": 2.05, "height": 0.5, "depth": 1.05, "__nodeTitle": "Shop Door Cutter (N=out)"}
+    },
+    {
+      "id": "door_copy",
+      "type": "CopyMeshToPoints",
+      "position": { "x": 520, "y": 2640 },
+      "data": {"__nodeTitle": "Copy Shop Doors"}
+    },
+    {
+      "id": "cutters_merge",
+      "type": "MergeMesh",
+      "position": { "x": 360, "y": 2800 },
+      "data": {"__nodeTitle": "Merge Cutters"}
+    },
+    {
+      "id": "win_bool",
+      "type": "BooleanMesh",
+      "position": { "x": 840, "y": 2800 },
+      "data": {"operation": "subtract", "treatAAs": "solid", "treatBAs": "solid", "useSelf": false, "detriangulate": "all", "weldEpsilon": 0.0005, "triangleBudget": 500000, "__nodeTitle": "Cut Windows+Doors (shallow)"}
+    },
+    {
+      "id": "roof_pitched",
+      "type": "PolyExtrude",
+      "position": { "x": 520, "y": 3280 },
+      "data": {"faceGroup": "bldg_top", "distance": 0.7, "inset": 0.28, "keepOriginal": true, "topGroup": "roof_top", "sideGroup": "roof_side", "distanceAttribute": "", "__nodeTitle": "Roof (pitched)"}
+    },
+    {
+      "id": "switch_roof",
+      "type": "SwitchIf",
+      "position": { "x": 840, "y": 3280 },
+      "data": {"condition": true, "conditionExpression": "", "__nodeTitle": "Pitched Roof On"}
+    },
+    {
+      "id": "switch_balc",
+      "type": "SwitchIf",
+      "position": { "x": 840, "y": 3600 },
+      "data": {"condition": true, "conditionExpression": "", "__nodeTitle": "Balcony On (discrete, N=out)"}
+    },
+    {
+      "id": "switch_fe",
+      "type": "SwitchIf",
+      "position": { "x": 840, "y": 3760 },
+      "data": {"condition": true, "conditionExpression": "", "__nodeTitle": "FE On (discrete, N=out)"}
+    },
+    {
+      "id": "foreach_end",
+      "type": "ForEachEnd",
+      "position": { "x": 840, "y": 3920 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": "ForEach Lot End"}
+    },
+    {
+      "id": "mat_walls",
+      "type": "AssignMaterial",
+      "position": { "x": 840, "y": 4080 },
+      "data": {"group": "", "materialName": "brick", "__nodeTitle": "Mat Walls"}
+    },
+    {
+      "id": "fg_roof",
+      "type": "FaceGroupByNormal",
+      "position": { "x": 840, "y": 4240 },
+      "data": {"outputGroup": "roof_faces", "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 45, "__nodeTitle": "Roof Faces"}
+    },
+    {
+      "id": "mat_roof",
+      "type": "AssignMaterial",
+      "position": { "x": 840, "y": 4400 },
+      "data": {"group": "roof_faces", "materialName": "roof_tile", "__nodeTitle": "Mat Roof"}
+    },
+    {
+      "id": "lift_bldgs",
+      "type": "TransformMesh",
+      "position": { "x": 840, "y": 4560 },
+      "data": {"translateX": 0, "translateY": 0.18, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Lift Onto Pads"}
+    },
+    {
+      "id": "merge",
+      "type": "MergeMesh",
+      "position": { "x": 840, "y": 4720 },
+      "data": {"__nodeTitle": "City Merge"}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 840, "y": 4880 },
+      "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
+    },
+    {
+      "id": "top_face",
+      "type": "Blast",
+      "position": { "x": 520, "y": 1200 },
+      "data": {"entity": "primitives", "group": "bldg_top", "expression": "", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Keep Roof Face"}
+    },
+    {
+      "id": "ring_inset",
+      "type": "PrimitiveTransform",
+      "position": { "x": 520, "y": 1360 },
+      "data": {"scale": 1.012, "faceGroup": "", "__nodeTitle": "Facade Ring (outset)"}
+    },
+    {
+      "id": "floor_begin",
+      "type": "ForEachBegin",
+      "position": { "x": 520, "y": 1520 },
+      "data": {"method": "count", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "numFloors", "__nodeTitle": "ForEach Floor Ring"}
+    },
+    {
+      "id": "ring_drop",
+      "type": "AttributeWrangle",
+      "position": { "x": 520, "y": 1680 },
+      "data": {"runOver": "points", "expression": "@P.y = (@iteration + 0.55) * chf(\"floorH\");", "parameters": "{\"floorH\": 2.8}", "__nodeTitle": "Place Ring Height"}
+    },
+    {
+      "id": "floor_end",
+      "type": "ForEachEnd",
+      "position": { "x": 520, "y": 1840 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": "Merge Floor Rings"}
+    },
+    {
+      "id": "ring_lines",
+      "type": "ConvertLine",
+      "position": { "x": 520, "y": 2000 },
+      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": "Ring Edges"}
+    },
+    {
+      "id": "win_pts",
+      "type": "SampleAlongSpline",
+      "position": { "x": 200, "y": 2160 },
+      "data": {"spacing": 0.85, "offset": 1.5, "includeEnd": false, "alignToTangent": true, "seed": 3, "__nodeTitle": "Window Samples"}
+    },
+    {
+      "id": "door_pts",
+      "type": "SampleAlongSpline",
+      "position": { "x": 520, "y": 2160 },
+      "data": {"spacing": 6, "offset": 2.8, "includeEnd": false, "alignToTangent": true, "seed": 5, "__nodeTitle": "Door Samples"}
+    },
+    {
+      "id": "win_push",
+      "type": "AttributeWrangle",
+      "position": { "x": 200, "y": 2320 },
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.06; @P.z += @nz * 0.06;", "parameters": "{}", "__nodeTitle": "Orient+Push Window (N=out)"}
+    },
+    {
+      "id": "door_push",
+      "type": "AttributeWrangle",
+      "position": { "x": 520, "y": 2320 },
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.08; @P.z += @nz * 0.08;", "parameters": "{}", "__nodeTitle": "Orient+Push Door (N=out)"}
+    },
+    {
+      "id": "rebuild_top",
+      "type": "FaceGroupByNormal",
+      "position": { "x": 840, "y": 2960 },
+      "data": {"outputGroup": "bldg_top", "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 40, "__nodeTitle": "Rebuild Roof Faces"}
+    },
+    {
+      "id": "balc_pts",
+      "type": "SampleAlongSpline",
+      "position": { "x": 200, "y": 3120 },
+      "data": {"spacing": 2.4, "offset": 1.2, "includeEnd": false, "alignToTangent": true, "seed": 11, "__nodeTitle": "Balcony Samples"}
+    },
+    {
+      "id": "balc_push",
+      "type": "AttributeWrangle",
+      "position": { "x": 200, "y": 3280 },
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.6; @P.z += @nz * 0.6;", "parameters": "{}", "__nodeTitle": "Orient+Push Balcony (N=out)"}
+    },
+    {
+      "id": "balc_keep",
+      "type": "Blast",
+      "position": { "x": 200, "y": 3440 },
+      "data": {"entity": "points", "group": "", "expression": "@P.y > 3.0 && @P.y < 7.0 && @nx > 0.55", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Upper +X Balcony Pts"}
+    },
+    {
+      "id": "balc_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": -120, "y": 3440 },
+      "data": {"width": 0.22, "height": 1.1, "depth": 1.6, "__nodeTitle": "Balcony Slab (N=out)"}
+    },
+    {
+      "id": "balc_copy",
+      "type": "CopyMeshToPoints",
+      "position": { "x": 200, "y": 3600 },
+      "data": {"__nodeTitle": "Copy Balconies"}
+    },
+    {
+      "id": "balc_merge",
+      "type": "MergeMesh",
+      "position": { "x": 520, "y": 3600 },
+      "data": {"__nodeTitle": "Merge Balconies"}
+    },
+    {
+      "id": "fe_pts",
+      "type": "SampleAlongSpline",
+      "position": { "x": 1160, "y": 3120 },
+      "data": {"spacing": 3, "offset": 1.4, "includeEnd": false, "alignToTangent": true, "seed": 13, "__nodeTitle": "Fire Escape Samples"}
+    },
+    {
+      "id": "fe_push",
+      "type": "AttributeWrangle",
+      "position": { "x": 1160, "y": 3280 },
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.55; @P.z += @nz * 0.55;", "parameters": "{}", "__nodeTitle": "Orient+Push FE (N=out)"}
+    },
+    {
+      "id": "fe_keep",
+      "type": "Blast",
+      "position": { "x": 1160, "y": 3440 },
+      "data": {"entity": "points", "group": "", "expression": "@P.y > 2.9 && @P.y < 7.0 && @nx < -0.55", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Upper -X FE Pts"}
+    },
+    {
+      "id": "fe_box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 1480, "y": 3440 },
+      "data": {"width": 2.4, "height": 0.95, "depth": 0.7, "__nodeTitle": "Fire Escape Box (N=out)"}
+    },
+    {
+      "id": "fe_copy",
+      "type": "CopyMeshToPoints",
+      "position": { "x": 1160, "y": 3600 },
+      "data": {"__nodeTitle": "Copy Fire Escapes"}
+    },
+    {
+      "id": "fe_merge",
+      "type": "MergeMesh",
+      "position": { "x": 1000, "y": 3760 },
+      "data": {"__nodeTitle": "Merge Fire Escapes"}
+    },
+    {
+      "id": "lots",
+      "type": "LotSubdivision",
+      "position": { "x": 778.5, "y": 480 },
+      "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "boundingBox", "__nodeTitle": "Building Lots iter=2"}
+    },
+    {
+      "id": "shrink_lots",
+      "type": "PrimitiveTransform",
+      "position": { "x": 703, "y": 612 },
+      "data": {"scale": 0.85, "faceGroup": "lots", "__nodeTitle": "Shrink Lots 0.85"}
+    },
+    {
+      "id": "n101",
+      "type": "SortGeometry",
+      "position": { "x": 847.5, "y": 569 },
+      "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "proximity", "primitiveSeed": 0, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "floors_wrangle",
+      "type": "AttributeWrangle",
+      "position": { "x": 840, "y": 720 },
+      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7 && @bucket < 9) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "park_group"}
+    }
+  ],
+  "edges": [
+    {"id": "e0", "source": "ground", "target": "blocks", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1", "source": "blocks", "target": "shrink_blocks", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e2", "source": "shrink_blocks", "target": "lots", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e3", "source": "lots", "target": "shrink_lots", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e5", "source": "floors_wrangle", "target": "keep_built", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e6", "source": "keep_built", "target": "foreach_begin", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e7", "source": "foreach_begin", "target": "ex_lot", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e18", "source": "switch_fe", "target": "foreach_end", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e19", "source": "foreach_end", "target": "mat_walls", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e20", "source": "mat_walls", "target": "fg_roof", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e21", "source": "fg_roof", "target": "mat_roof", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e22", "source": "mat_roof", "target": "lift_bldgs", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e23", "source": "lift_bldgs", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e24", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_lots_pads", "source": "lots", "target": "sg_pads", "sourceHandle": "out", "targetHandle": "lots"},
+    {"id": "e_roads_pads", "source": "sg_roads", "target": "sg_pads", "sourceHandle": "mesh", "targetHandle": "roads"},
+    {"id": "e_box_wincopy", "source": "win_box", "target": "win_copy", "sourceHandle": "out", "targetHandle": "prototype"},
+    {"id": "e_winkeep_copy", "source": "win_keep", "target": "win_copy", "sourceHandle": "out", "targetHandle": "points"},
+    {"id": "e_box_doorcopy", "source": "door_box", "target": "door_copy", "sourceHandle": "out", "targetHandle": "prototype"},
+    {"id": "e_doorkeep_copy", "source": "door_keep", "target": "door_copy", "sourceHandle": "out", "targetHandle": "points"},
+    {"id": "e_win_cutmerge", "source": "win_copy", "target": "cutters_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_door_cutmerge", "source": "door_copy", "target": "cutters_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_ex_bool", "source": "ex_lot", "target": "win_bool", "sourceHandle": "out", "targetHandle": "a"},
+    {"id": "e_cut_bool", "source": "cutters_merge", "target": "win_bool", "sourceHandle": "out", "targetHandle": "b"},
+    {"id": "e_pitch_roof_t", "source": "roof_pitched", "target": "switch_roof", "sourceHandle": "out", "targetHandle": "true"},
+    {"id": "e_pads_merge", "source": "sg_pads", "target": "merge", "sourceHandle": "mesh", "targetHandle": "in"},
+    {"id": "e_roads_merge", "source": "sg_roads", "target": "merge", "sourceHandle": "mesh", "targetHandle": "in"},
+    {"id": "e_ex_top", "source": "ex_lot", "target": "top_face", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_top_inset", "source": "top_face", "target": "ring_inset", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_inset_fbegin", "source": "ring_inset", "target": "floor_begin", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_fbegin_drop", "source": "floor_begin", "target": "ring_drop", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_drop_fend", "source": "ring_drop", "target": "floor_end", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_fend_lines", "source": "floor_end", "target": "ring_lines", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_lines_winpts", "source": "ring_lines", "target": "win_pts", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_lines_doorpts", "source": "ring_lines", "target": "door_pts", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_winpts_push", "source": "win_pts", "target": "win_push", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_doorpts_push", "source": "door_pts", "target": "door_push", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_winpush_keep", "source": "win_push", "target": "win_keep", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_doorpush_keep", "source": "door_push", "target": "door_keep", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_bool_rebuild", "source": "win_bool", "target": "rebuild_top", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rebuild_pitch", "source": "rebuild_top", "target": "roof_pitched", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_rebuild_roof_f", "source": "rebuild_top", "target": "switch_roof", "sourceHandle": "out", "targetHandle": "false"},
+    {"id": "e_lines_balcpts", "source": "ring_lines", "target": "balc_pts", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_balcpts_push", "source": "balc_pts", "target": "balc_push", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_balcpush_keep", "source": "balc_push", "target": "balc_keep", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_balcbox_copy", "source": "balc_box", "target": "balc_copy", "sourceHandle": "out", "targetHandle": "prototype"},
+    {"id": "e_balckeep_copy", "source": "balc_keep", "target": "balc_copy", "sourceHandle": "out", "targetHandle": "points"},
+    {"id": "e_roof_balc_body", "source": "switch_roof", "target": "balc_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_balccopy_merge", "source": "balc_copy", "target": "balc_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_roof_balc_f", "source": "switch_roof", "target": "switch_balc", "sourceHandle": "out", "targetHandle": "false"},
+    {"id": "e_balcmerge_sw", "source": "balc_merge", "target": "switch_balc", "sourceHandle": "out", "targetHandle": "true"},
+    {"id": "e_lines_fepts", "source": "ring_lines", "target": "fe_pts", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_fepts_push", "source": "fe_pts", "target": "fe_push", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_fepush_keep", "source": "fe_push", "target": "fe_keep", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_febox_copy", "source": "fe_box", "target": "fe_copy", "sourceHandle": "out", "targetHandle": "prototype"},
+    {"id": "e_fekeep_copy", "source": "fe_keep", "target": "fe_copy", "sourceHandle": "out", "targetHandle": "points"},
+    {"id": "e_balc_fe_body", "source": "switch_balc", "target": "fe_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_fecopy_merge", "source": "fe_copy", "target": "fe_merge", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_balc_fe_f", "source": "switch_balc", "target": "switch_fe", "sourceHandle": "out", "targetHandle": "false"},
+    {"id": "e_femerge_sw", "source": "fe_merge", "target": "switch_fe", "sourceHandle": "out", "targetHandle": "true"},
+    {"id": "e9413", "source": "shrink_blocks", "target": "n101", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"}
+  ],
+  "parameters": [
+    {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
+    {"id": "p_lot_iter", "name": "lotIterations", "type": "integer", "default": 2, "exposed": true, "targetNode": "lots", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 6},
+    {"id": "p_lot_min", "name": "lotMinSize", "type": "number", "default": 2, "exposed": true, "targetNode": "lots", "targetProperty": "minSize", "hasRange": true, "min": 0.5, "max": 8},
+    {"id": "p_block_shrink", "name": "blockShrink", "type": "number", "default": 0.75, "exposed": true, "targetNode": "shrink_blocks", "targetProperty": "scale", "hasRange": true, "min": 0.5, "max": 1},
+    {"id": "p_lot_shrink", "name": "lotShrink", "type": "number", "default": 0.85, "exposed": true, "targetNode": "shrink_lots", "targetProperty": "scale", "hasRange": true, "min": 0.5, "max": 1},
+    {"id": "p_win_spacing", "name": "windowSpacing", "type": "number", "default": 1.25, "exposed": true, "targetNode": "win_pts", "targetProperty": "spacing", "hasRange": true, "min": 0.3, "max": 2},
+    {"id": "p_lift", "name": "buildingLift", "type": "number", "default": 0.18, "exposed": true, "targetNode": "lift_bldgs", "targetProperty": "translateY", "hasRange": true, "min": 0, "max": 1}
+  ],
+  "subgraphs": [
+    {
+      "id": "city_roads",
+      "name": "City Roads",
+      "inputs": [],
+      "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
+      "nodes": [
+        {
+          "id": "road_a",
+          "type": "CreateSpline",
+          "position": { "x": 200, "y": 0 },
+          "data": {"mode": "polyline", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-22,\"y\":0.20,\"z\":-8},{\"x\":22,\"y\":0.20,\"z\":-8}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Road A Path"}
+        },
+        {
+          "id": "road_b",
+          "type": "CreateSpline",
+          "position": { "x": 520, "y": 0 },
+          "data": {"mode": "polyline", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":6,\"y\":0.20,\"z\":-22},{\"x\":6,\"y\":0.20,\"z\":22}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Road B Path"}
+        },
+        {
+          "id": "road_sweep_a",
+          "type": "SweepAlongSpline",
+          "position": { "x": 200, "y": 160 },
+          "data": {"surfaceShape": "rectangle", "profileWidth": 3.2, "profileHeight": 0.12, "radius": 1, "columns": 16, "sampleSpacing": 1, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Road Sweep A"}
+        },
+        {
+          "id": "road_sweep_b",
+          "type": "SweepAlongSpline",
+          "position": { "x": 520, "y": 160 },
+          "data": {"surfaceShape": "rectangle", "profileWidth": 3.2, "profileHeight": 0.12, "radius": 1, "columns": 16, "sampleSpacing": 1, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Road Sweep B"}
+        },
+        {
+          "id": "road_bevel_a",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 320 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.03, "segments": 1, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Road Bevel A"}
+        },
+        {
+          "id": "road_bevel_b",
+          "type": "BevelMesh",
+          "position": { "x": 520, "y": 320 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.03, "segments": 1, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Road Bevel B"}
+        },
+        {
+          "id": "merge_roads",
+          "type": "MergeMesh",
+          "position": { "x": 360, "y": 480 },
+          "data": {"__nodeTitle": "Merge Roads"}
+        },
+        {
+          "id": "mat_roads",
+          "type": "AssignMaterial",
+          "position": { "x": 360, "y": 640 },
+          "data": {"group": "", "materialName": "road", "__nodeTitle": "Mat Roads"}
+        },
+        {
+          "id": "roads_out",
+          "type": "SubgraphOutput",
+          "position": { "x": 360, "y": 800 },
+          "data": {"__nodeTitle": "Roads Out"}
+        }
+      ],
+      "edges": [
+        {"id": "e_ra_sw", "source": "road_a", "target": "road_sweep_a", "sourceHandle": "out", "targetHandle": "backbone"},
+        {"id": "e_rb_sw", "source": "road_b", "target": "road_sweep_b", "sourceHandle": "out", "targetHandle": "backbone"},
+        {"id": "e_swa_bv", "source": "road_sweep_a", "target": "road_bevel_a", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_swb_bv", "source": "road_sweep_b", "target": "road_bevel_b", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_bva_m", "source": "road_bevel_a", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_bvb_m", "source": "road_bevel_b", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_m_mat", "source": "merge_roads", "target": "mat_roads", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mat_out", "source": "mat_roads", "target": "roads_out", "sourceHandle": "out", "targetHandle": "mesh"}
+      ]
+    },
+    {
+      "id": "city_pads",
+      "name": "City Pads",
+      "inputs": [ {"id": "lots", "name": "Lots", "pinType": "SpatialMesh"}, {"id": "roads", "name": "Roads", "pinType": "SpatialMesh"} ],
+      "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
+      "nodes": [
+        {
+          "id": "in_lots",
+          "type": "SubgraphInput",
+          "position": { "x": 200, "y": 0 },
+          "data": {"__nodeTitle": "Lots In"}
+        },
+        {
+          "id": "in_roads",
+          "type": "SubgraphInput",
+          "position": { "x": 520, "y": 0 },
+          "data": {"__nodeTitle": "Roads In"}
+        },
+        {
+          "id": "pads",
+          "type": "PolyExtrude",
+          "position": { "x": 200, "y": 160 },
+          "data": {"faceGroup": "", "distance": 0.18, "inset": 0.08, "keepOriginal": false, "topGroup": "extrude_top", "sideGroup": "extrude_side", "distanceAttribute": "", "__nodeTitle": "Extrude Pads"}
+        },
+        {
+          "id": "pad_rim",
+          "type": "GroupCreate",
+          "position": { "x": 200, "y": 320 },
+          "data": {"outputGroup": "pad_rim", "domain": "edge", "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "extrude_top", "fromEdgeGroup": "", "__nodeTitle": "Pad Rim Edges"}
+        },
+        {
+          "id": "pad_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 480 },
+          "data": {"edgeGroup": "pad_rim", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "none", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": "Pad Bevel"}
+        },
+        {
+          "id": "pad_bool",
+          "type": "BooleanMesh",
+          "position": { "x": 360, "y": 640 },
+          "data": {"operation": "subtract", "treatAAs": "solid", "treatBAs": "surface", "useSelf": false, "detriangulate": "all", "weldEpsilon": 0.0001, "triangleBudget": 500000, "__nodeTitle": "Pad Cut Roads"}
+        },
+        {
+          "id": "mat_pad",
+          "type": "AssignMaterial",
+          "position": { "x": 360, "y": 800 },
+          "data": {"group": "", "materialName": "lot_pad", "__nodeTitle": "Mat Lot Pads"}
+        },
+        {
+          "id": "pads_out",
+          "type": "SubgraphOutput",
+          "position": { "x": 360, "y": 960 },
+          "data": {"__nodeTitle": "Pads Out"}
+        }
+      ],
+      "edges": [
+        {"id": "e_in_pads", "source": "in_lots", "target": "pads", "sourceHandle": "lots", "targetHandle": "in"},
+        {"id": "e_pads_rim", "source": "pads", "target": "pad_rim", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_rim_bv", "source": "pad_rim", "target": "pad_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_bv_bool", "source": "pad_bevel", "target": "pad_bool", "sourceHandle": "out", "targetHandle": "a"},
+        {"id": "e_rd_bool", "source": "in_roads", "target": "pad_bool", "sourceHandle": "roads", "targetHandle": "b"},
+        {"id": "e_bool_mat", "source": "pad_bool", "target": "mat_pad", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mat_out", "source": "mat_pad", "target": "pads_out", "sourceHandle": "out", "targetHandle": "mesh"}
+      ]
+    }
+  ]
+}

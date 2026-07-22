@@ -731,6 +731,9 @@ namespace DJTechRuntime.PCG
 
             m_LastCookKey = cookKey;
             m_HasAppliedCookResult = true;
+            // Sync / cache-hit cooks also clear a sticky prior async failure so the
+            // Inspector status matches the mesh that was just applied.
+            m_LastAsyncCookStatus = "completed";
 #if UNITY_EDITOR
             MarkCookResultPersistable(m_GeneratedMesh);
 #endif

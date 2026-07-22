@@ -124,11 +124,23 @@
       }
     },
     {
+      "id": "density",
+      "type": "DensityFilter",
+      "position": {
+        "x": 360,
+        "y": 1200
+      },
+      "data": {
+        "density": 0.9,
+        "__nodeTitle": "Building Density 90%"
+      }
+    },
+    {
       "id": "face_road",
       "type": "AttributeWrangle",
       "position": {
         "x": 360,
-        "y": 1280
+        "y": 1360
       },
       "data": {
         "runOver": "points",
@@ -142,11 +154,11 @@
       "type": "AttributeWrangle",
       "position": {
         "x": 360,
-        "y": 1440
+        "y": 1520
       },
       "data": {
         "runOver": "points",
-        "expression": "@btype = @ptnum % 3;",
+        "expression": "@bucket = @ptnum % 9; @btype = (@bucket >= 2) + (@bucket >= 7); @odd = abs(round(@rotationY / 90.0)) % 2; @sxLot = (1 - @odd) * @lotSizeX + @odd * @lotSizeZ; @szLot = (1 - @odd) * @lotSizeZ + @odd * @lotSizeX; @wide = @sxLot >= 1.35 * @szLot; @variant = @btype * 2 + @wide;",
         "parameters": "{}",
         "__nodeTitle": "Tag Building Type"
       }
@@ -156,12 +168,12 @@
       "type": "Blast",
       "position": {
         "x": 40,
-        "y": 1600
+        "y": 1840
       },
       "data": {
         "entity": "points",
         "group": "",
-        "expression": "@btype != 0",
+        "expression": "@variant != 0",
         "parameters": "{}",
         "deleteNonSelected": false,
         "removeUnusedPoints": true,
@@ -173,12 +185,12 @@
       "type": "Blast",
       "position": {
         "x": 360,
-        "y": 1600
+        "y": 1840
       },
       "data": {
         "entity": "points",
         "group": "",
-        "expression": "@btype != 1",
+        "expression": "@variant != 2",
         "parameters": "{}",
         "deleteNonSelected": false,
         "removeUnusedPoints": true,
@@ -190,12 +202,12 @@
       "type": "Blast",
       "position": {
         "x": 680,
-        "y": 1600
+        "y": 1840
       },
       "data": {
         "entity": "points",
         "group": "",
-        "expression": "@btype != 2",
+        "expression": "@variant != 4",
         "parameters": "{}",
         "deleteNonSelected": false,
         "removeUnusedPoints": true,
@@ -207,7 +219,7 @@
       "type": "SubgraphAsset",
       "position": {
         "x": 40,
-        "y": 1760
+        "y": 2000
       },
       "data": {
         "__nodeTitle": "Tall Flat-Roof",
@@ -230,7 +242,7 @@
       "type": "SubgraphAsset",
       "position": {
         "x": 360,
-        "y": 1760
+        "y": 2000
       },
       "data": {
         "__nodeTitle": "Medium Pitched",
@@ -253,7 +265,7 @@
       "type": "SubgraphAsset",
       "position": {
         "x": 680,
-        "y": 1760
+        "y": 2000
       },
       "data": {
         "__nodeTitle": "Short Flat-Roof",
@@ -276,7 +288,7 @@
       "type": "StaticMeshSpawner",
       "position": {
         "x": 40,
-        "y": 1920
+        "y": 2160
       },
       "data": {
         "prefab": "",
@@ -290,7 +302,7 @@
       "type": "StaticMeshSpawner",
       "position": {
         "x": 360,
-        "y": 1920
+        "y": 2160
       },
       "data": {
         "prefab": "",
@@ -304,7 +316,7 @@
       "type": "StaticMeshSpawner",
       "position": {
         "x": 680,
-        "y": 1920
+        "y": 2160
       },
       "data": {
         "prefab": "",
@@ -314,11 +326,50 @@
       }
     },
     {
+      "id": "blast_tall_wide", "type": "Blast", "position": {"x": 1000, "y": 1840},
+      "data": {"entity": "points", "group": "", "expression": "@variant != 1", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Tall Wide Sites"}
+    },
+    {
+      "id": "blast_med_wide", "type": "Blast", "position": {"x": 1320, "y": 1840},
+      "data": {"entity": "points", "group": "", "expression": "@variant != 3", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Medium Wide Sites"}
+    },
+    {
+      "id": "blast_short_wide", "type": "Blast", "position": {"x": 1640, "y": 1840},
+      "data": {"entity": "points", "group": "", "expression": "@variant != 5", "parameters": "{}", "deleteNonSelected": false, "removeUnusedPoints": true, "__nodeTitle": "Keep Short Wide Sites"}
+    },
+    {
+      "id": "sg_bldg_tall_wide", "type": "SubgraphAsset", "position": {"x": 1000, "y": 2000},
+      "data": {"__nodeTitle": "Tall Flat Wide", "assetGuid": "9d0ee8ab6f32a48c79b1bc1497564914"},
+      "subgraphInterface": {"name": "Tall Flat-Roof Wide Building", "inputs": [], "outputs": [{"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"}]}
+    },
+    {
+      "id": "sg_bldg_medium_wide", "type": "SubgraphAsset", "position": {"x": 1320, "y": 2000},
+      "data": {"__nodeTitle": "Medium Pitched Wide", "assetGuid": "748f06f5aa84f4286a0ab7ebca09144e"},
+      "subgraphInterface": {"name": "Medium Pitched-Roof Wide Building", "inputs": [], "outputs": [{"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"}]}
+    },
+    {
+      "id": "sg_bldg_short_wide", "type": "SubgraphAsset", "position": {"x": 1640, "y": 2000},
+      "data": {"__nodeTitle": "Short Flat Wide", "assetGuid": "c2f84366be1f34d3d99492f9c1de22ca"},
+      "subgraphInterface": {"name": "Short Flat-Roof Wide Building", "inputs": [], "outputs": [{"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"}]}
+    },
+    {
+      "id": "spawn_tall_wide", "type": "StaticMeshSpawner", "position": {"x": 1000, "y": 2160},
+      "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Tall Wide"}
+    },
+    {
+      "id": "spawn_med_wide", "type": "StaticMeshSpawner", "position": {"x": 1320, "y": 2160},
+      "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Medium Wide"}
+    },
+    {
+      "id": "spawn_short_wide", "type": "StaticMeshSpawner", "position": {"x": 1640, "y": 2160},
+      "data": {"prefab": "", "mesh": "", "scale": 1, "__nodeTitle": "Spawn Short Wide"}
+    },
+    {
       "id": "merge_spawn",
       "type": "MergeSpawnPoints",
       "position": {
         "x": 360,
-        "y": 2080
+        "y": 2320
       },
       "data": {
         "__nodeTitle": "Merge Spawn Streams"
@@ -329,7 +380,7 @@
       "type": "Output",
       "position": {
         "x": 360,
-        "y": 2240
+        "y": 2480
       },
       "data": {
         "label": "Lot City Buildings",
@@ -341,11 +392,11 @@
       "type": "AttributeWrangle",
       "position": {
         "x": 360,
-        "y": 1520
+        "y": 1680
       },
       "data": {
         "runOver": "points",
-        "expression": "@fp = (@btype == 0) * 3.7 + (@btype == 1) * 3.8 + (@btype == 2) * 4.5; @odd = abs(round(@rotationY / 90.0)) % 2; @inset = 0.88; @sxLot = (1 - @odd) * @lotSizeX + @odd * @lotSizeZ; @szLot = (1 - @odd) * @lotSizeZ + @odd * @lotSizeX; @scaleX = @sxLot * @inset / max(@fp, 0.001); @scaleY = 1; @scaleZ = @szLot * @inset / max(@fp, 0.001);",
+        "expression": "@protoX = (@variant == 0) * 3.7 + (@variant == 1) * 6.0 + (@variant == 2) * 3.8 + (@variant == 3) * 6.2 + (@variant == 4) * 4.5 + (@variant == 5) * 6.5; @protoZ = (@variant == 0) * 3.7 + (@variant == 1) * 3.7 + (@variant == 2) * 3.8 + (@variant == 3) * 3.8 + (@variant == 4) * 4.5 + (@variant == 5) * 4.2; @s = min(@sxLot * 0.88 / max(@protoX, 0.001), @szLot * 0.88 / max(@protoZ, 0.001)); @scaleX = @s; @scaleY = 1; @scaleZ = @s;",
         "parameters": "{}",
         "__nodeTitle": "Scale XYZ To Pad"
       }
@@ -443,27 +494,12 @@
       "sourceHandle": "out",
       "targetHandle": "in"
     },
-    {
-      "id": "e_st_merge",
-      "source": "spawn_tall",
-      "target": "merge_spawn",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sm_merge",
-      "source": "spawn_med",
-      "target": "merge_spawn",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_ss_merge",
-      "source": "spawn_short",
-      "target": "merge_spawn",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
+    {"id":"e_st_merge","source":"spawn_tall","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_stw_merge","source":"spawn_tall_wide","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_sm_merge","source":"spawn_med","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_smw_merge","source":"spawn_med_wide","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_ss_merge","source":"spawn_short","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_ssw_merge","source":"spawn_short_wide","target":"merge_spawn","sourceHandle":"out","targetHandle":"in"},
     {
       "id": "e_merge_out",
       "source": "merge_spawn",
@@ -499,6 +535,15 @@
       "sourceHandle": "out",
       "targetHandle": "in"
     },
+    {"id":"e_scale_btw","source":"scale_lot","target":"blast_tall_wide","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_scale_bmw","source":"scale_lot","target":"blast_med_wide","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_scale_bsw","source":"scale_lot","target":"blast_short_wide","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_btw_spawn","source":"blast_tall_wide","target":"spawn_tall_wide","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_bmw_spawn","source":"blast_med_wide","target":"spawn_med_wide","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_bsw_spawn","source":"blast_short_wide","target":"spawn_short_wide","sourceHandle":"out","targetHandle":"in"},
+    {"id":"e_tww_proto","source":"sg_bldg_tall_wide","target":"spawn_tall_wide","sourceHandle":"mesh","targetHandle":"mesh"},
+    {"id":"e_mww_proto","source":"sg_bldg_medium_wide","target":"spawn_med_wide","sourceHandle":"mesh","targetHandle":"mesh"},
+    {"id":"e_sww_proto","source":"sg_bldg_short_wide","target":"spawn_short_wide","sourceHandle":"mesh","targetHandle":"mesh"},
     {
       "id": "e_lots_xfer",
       "source": "lots",
@@ -509,6 +554,13 @@
     {
       "id": "e_lift_face",
       "source": "lift_pts",
+      "target": "density",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_density_face",
+      "source": "density",
       "target": "face_road",
       "sourceHandle": "out",
       "targetHandle": "in"
@@ -547,6 +599,18 @@
       "exposed": true,
       "targetNode": "lots",
       "targetProperty": "irregularity",
+      "hasRange": true,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "p_building_density",
+      "name": "buildingDensity",
+      "type": "number",
+      "default": 0.9,
+      "exposed": true,
+      "targetNode": "density",
+      "targetProperty": "density",
       "hasRange": true,
       "min": 0,
       "max": 1

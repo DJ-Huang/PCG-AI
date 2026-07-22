@@ -1,6 +1,7 @@
 #include "elements/boolean_elements.hpp"
 #include "elements/element_utils.hpp"
 #include "elements/pcg_element.hpp"
+#include "elements/topology_parity_algorithms.hpp"
 #include "geometry/boolean_output.hpp"
 #include "geometry/arrangement.hpp"
 
@@ -12,6 +13,33 @@
 namespace pcg::internal::elements {
 
 using namespace ::pcg::internal::geometry;
+
+namespace {
+
+// Boolean rebuilds topology and drops AttributeTable. Lot-city SwitchIf flags
+// (hasBalcony / hasFireEscape / roofType / numFloors) live on detail or prim0 —
+// promote them onto the result so downstream SwitchIf still resolves.
+void preserve_control_attributes(const data::PcgGeometry& source, data::PcgGeometry& dest)
+{
+    auto promote_number = [&](data::AttributeOwner owner, const std::string& name) {
+        if (dest.attributes().find(data::AttributeOwner::Detail, name) != nullptr)
+            return;
+        const data::AttributeArray* attr = source.attributes().find(owner, name);
+        if (!attr || attr->size() == 0)
+            return;
+        if (attr->schema().type == data::AttributeType::Int)
+            set_detail_int(dest, name, attr->int_values()[0]);
+        else if (attr->schema().type == data::AttributeType::Float)
+            set_detail_float(dest, name, attr->float_values()[0]);
+    };
+
+    for (const auto& name : source.attributes().names(data::AttributeOwner::Detail))
+        promote_number(data::AttributeOwner::Detail, name);
+    for (const auto& name : source.attributes().names(data::AttributeOwner::Primitive))
+        promote_number(data::AttributeOwner::Primitive, name);
+}
+
+} // namespace
 
 // ── boolean_geometry implementation ────────────────────────
 
@@ -50,7 +78,9 @@ data::PcgGeometry boolean_geometry(const data::PcgGeometry& a,
         rematerialize(b, 1);
     }
 
-    return finalize_boolean_output(result, opts.detriangulate);
+    data::PcgGeometry output = finalize_boolean_output(result, opts.detriangulate);
+    preserve_control_attributes(a, output);
+    return output;
 }
 
 namespace {

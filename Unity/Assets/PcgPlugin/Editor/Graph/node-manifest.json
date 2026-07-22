@@ -6192,6 +6192,11 @@
           "default": 1,
           "minimum": 1,
           "maximum": 256
+        },
+        "iterationsAttribute": {
+          "type": "string",
+          "default": "",
+          "displayName": "Iterations Attribute"
         }
       }
     },
@@ -6480,6 +6485,1011 @@
         "label": {
           "type": "string",
           "default": "Output"
+        }
+      }
+    },
+    {
+      "type": "MeasureMesh",
+      "displayName": "Measure Mesh",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "measure": {
+          "type": "enum",
+          "default": "perimeter",
+          "options": [
+            {
+              "value": "perimeter",
+              "label": "Perimeter"
+            },
+            {
+              "value": "area",
+              "label": "Area"
+            },
+            {
+              "value": "size",
+              "label": "BBox Size"
+            },
+            {
+              "value": "volume_approx",
+              "label": "Volume Approx"
+            }
+          ]
+        },
+        "attributeName": {
+          "type": "string",
+          "default": "length"
+        },
+        "pieceAttribute": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    {
+      "type": "BoundMesh",
+      "displayName": "Bound Mesh",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "oriented": {
+          "type": "boolean",
+          "default": false
+        },
+        "padding": {
+          "type": "number",
+          "default": 0.0
+        }
+      }
+    },
+    {
+      "type": "ComputeNormals",
+      "displayName": "Compute Normals",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "shadeMode": {
+          "type": "enum",
+          "default": "auto",
+          "options": [
+            {
+              "value": "auto",
+              "label": "Auto"
+            },
+            {
+              "value": "smooth",
+              "label": "Smooth"
+            },
+            {
+              "value": "flat",
+              "label": "Flat"
+            }
+          ]
+        },
+        "cuspAngle": {
+          "type": "number",
+          "default": 30.0
+        },
+        "writePointN": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    {
+      "type": "SmoothMesh",
+      "displayName": "Smooth Mesh",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "iterations": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0
+        },
+        "strength": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "fixBoundary": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    {
+      "type": "ReverseMesh",
+      "displayName": "Reverse Mesh",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "type": "ThickenMesh",
+      "displayName": "Thicken Mesh",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "depth": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0.0001
+        },
+        "direction": {
+          "type": "enum",
+          "default": "both",
+          "options": [
+            {
+              "value": "both",
+              "label": "Both"
+            },
+            {
+              "value": "outward",
+              "label": "Outward"
+            },
+            {
+              "value": "inward",
+              "label": "Inward"
+            }
+          ]
+        },
+        "dissolveMiddleEdge": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    {
+      "type": "PolySlice",
+      "displayName": "Poly Slice",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "originX": {
+          "type": "number",
+          "default": 0.0
+        },
+        "originY": {
+          "type": "number",
+          "default": 0.0
+        },
+        "originZ": {
+          "type": "number",
+          "default": 0.0
+        },
+        "normalX": {
+          "type": "number",
+          "default": 0.0
+        },
+        "normalY": {
+          "type": "number",
+          "default": 1.0
+        },
+        "normalZ": {
+          "type": "number",
+          "default": 0.0
+        }
+      }
+    },
+    {
+      "type": "PolyWire",
+      "displayName": "Poly Wire",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Spline",
+          "pinType": "Spline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "radius": {
+          "type": "number",
+          "default": 0.05,
+          "minimum": 0.0001
+        },
+        "columns": {
+          "type": "integer",
+          "default": 8,
+          "minimum": 3
+        },
+        "capStart": {
+          "type": "boolean",
+          "default": true
+        },
+        "capEnd": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    {
+      "type": "Connectivity",
+      "displayName": "Connectivity",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "attributeName": {
+          "type": "string",
+          "default": "class"
+        },
+        "connectivity": {
+          "type": "enum",
+          "default": "face",
+          "options": [
+            {
+              "value": "face",
+              "label": "Face (shared edge)"
+            },
+            {
+              "value": "point",
+              "label": "Point (shared vertex)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Assemble",
+      "displayName": "Assemble",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "pieceAttribute": {
+          "type": "string",
+          "default": "piece"
+        },
+        "classAttribute": {
+          "type": "string",
+          "default": "class"
+        },
+        "createIfMissing": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    {
+      "type": "SortGeometry",
+      "displayName": "Sort Geometry",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "points",
+          "label": "Points",
+          "foldout": true,
+          "defaultExpanded": true
+        },
+        {
+          "id": "primitives",
+          "label": "Primitives",
+          "foldout": true,
+          "defaultExpanded": true
+        }
+      ],
+      "properties": {
+        "pointGroup": {
+          "type": "groupSelect",
+          "groupDomain": "point",
+          "displayName": "Point Group",
+          "default": "",
+          "section": "points",
+          "order": 0
+        },
+        "pointMethod": {
+          "type": "enum",
+          "displayName": "Point Sort",
+          "default": "nochange",
+          "section": "points",
+          "order": 10,
+          "options": [
+            {
+              "value": "nochange",
+              "label": "No Change"
+            },
+            {
+              "value": "vertexorder",
+              "label": "By Vertex Order"
+            },
+            {
+              "value": "x",
+              "label": "By X"
+            },
+            {
+              "value": "y",
+              "label": "By Y"
+            },
+            {
+              "value": "z",
+              "label": "By Z"
+            },
+            {
+              "value": "reverse",
+              "label": "Reverse"
+            },
+            {
+              "value": "random",
+              "label": "Random"
+            },
+            {
+              "value": "shift",
+              "label": "Shift"
+            },
+            {
+              "value": "proximity",
+              "label": "Proximity to Point"
+            },
+            {
+              "value": "vector",
+              "label": "Along Vector"
+            },
+            {
+              "value": "spatial",
+              "label": "Spatial Locality"
+            },
+            {
+              "value": "attribute",
+              "label": "By Attribute"
+            },
+            {
+              "value": "primindex",
+              "label": "By Primitive Index"
+            },
+            {
+              "value": "reorder",
+              "label": "Reorder by Index Attribute"
+            }
+          ]
+        },
+        "pointSeed": {
+          "type": "integer",
+          "displayName": "Seed",
+          "default": 0,
+          "section": "points",
+          "order": 20,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "random"
+          }
+        },
+        "pointOffset": {
+          "type": "integer",
+          "displayName": "Offset",
+          "default": 1,
+          "section": "points",
+          "order": 30,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "shift"
+          }
+        },
+        "pointProximityX": {
+          "type": "number",
+          "displayName": "Point X",
+          "default": 0.0,
+          "section": "points",
+          "order": 40,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "proximity"
+          }
+        },
+        "pointProximityY": {
+          "type": "number",
+          "displayName": "Point Y",
+          "default": 0.0,
+          "section": "points",
+          "order": 50,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "proximity"
+          }
+        },
+        "pointProximityZ": {
+          "type": "number",
+          "displayName": "Point Z",
+          "default": 0.0,
+          "section": "points",
+          "order": 60,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "proximity"
+          }
+        },
+        "pointVectorX": {
+          "type": "number",
+          "displayName": "Vector X",
+          "default": 0.0,
+          "section": "points",
+          "order": 70,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "vector"
+          }
+        },
+        "pointVectorY": {
+          "type": "number",
+          "displayName": "Vector Y",
+          "default": 1.0,
+          "section": "points",
+          "order": 80,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "vector"
+          }
+        },
+        "pointVectorZ": {
+          "type": "number",
+          "displayName": "Vector Z",
+          "default": 0.0,
+          "section": "points",
+          "order": 90,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "vector"
+          }
+        },
+        "pointAttributeName": {
+          "type": "string",
+          "displayName": "Attribute",
+          "default": "",
+          "section": "points",
+          "order": 100,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "attribute"
+          }
+        },
+        "pointComponent": {
+          "type": "integer",
+          "displayName": "Component",
+          "default": 0,
+          "minimum": 0,
+          "section": "points",
+          "order": 110,
+          "visibleWhen": {
+            "property": "pointMethod",
+            "equals": "attribute"
+          }
+        },
+        "pointOrderingAttribute": {
+          "type": "string",
+          "displayName": "Ordering Attribute",
+          "default": "sort_index",
+          "section": "points",
+          "order": 120
+        },
+        "reversePoints": {
+          "type": "boolean",
+          "displayName": "Reverse Point Sort",
+          "default": false,
+          "section": "points",
+          "order": 130
+        },
+        "pointSortIndices": {
+          "type": "boolean",
+          "displayName": "Sort Indices",
+          "default": false,
+          "section": "points",
+          "order": 140
+        },
+        "pointCombineSortIndices": {
+          "type": "boolean",
+          "displayName": "Combine Sort Indices",
+          "default": true,
+          "section": "points",
+          "order": 150,
+          "visibleWhen": {
+            "property": "pointSortIndices",
+            "equals": true
+          }
+        },
+        "primitiveGroup": {
+          "type": "groupSelect",
+          "groupDomain": "face",
+          "displayName": "Primitive Group",
+          "default": "",
+          "section": "primitives",
+          "order": 0
+        },
+        "primitiveMethod": {
+          "type": "enum",
+          "displayName": "Primitive Sort",
+          "default": "nochange",
+          "section": "primitives",
+          "order": 10,
+          "options": [
+            {
+              "value": "nochange",
+              "label": "No Change"
+            },
+            {
+              "value": "x",
+              "label": "By X"
+            },
+            {
+              "value": "y",
+              "label": "By Y"
+            },
+            {
+              "value": "z",
+              "label": "By Z"
+            },
+            {
+              "value": "reverse",
+              "label": "Reverse"
+            },
+            {
+              "value": "random",
+              "label": "Random"
+            },
+            {
+              "value": "shift",
+              "label": "Shift"
+            },
+            {
+              "value": "proximity",
+              "label": "Proximity to Point"
+            },
+            {
+              "value": "vector",
+              "label": "Along Vector"
+            },
+            {
+              "value": "spatial",
+              "label": "Spatial Locality"
+            },
+            {
+              "value": "attribute",
+              "label": "By Attribute"
+            },
+            {
+              "value": "reorder",
+              "label": "Reorder by Index Attribute"
+            }
+          ]
+        },
+        "primitiveSeed": {
+          "type": "integer",
+          "displayName": "Seed",
+          "default": 0,
+          "section": "primitives",
+          "order": 20,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "random"
+          }
+        },
+        "primitiveOffset": {
+          "type": "integer",
+          "displayName": "Offset",
+          "default": 1,
+          "section": "primitives",
+          "order": 30,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "shift"
+          }
+        },
+        "primitiveProximityX": {
+          "type": "number",
+          "displayName": "Point X",
+          "default": 0.0,
+          "section": "primitives",
+          "order": 40,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "proximity"
+          }
+        },
+        "primitiveProximityY": {
+          "type": "number",
+          "displayName": "Point Y",
+          "default": 0.0,
+          "section": "primitives",
+          "order": 50,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "proximity"
+          }
+        },
+        "primitiveProximityZ": {
+          "type": "number",
+          "displayName": "Point Z",
+          "default": 0.0,
+          "section": "primitives",
+          "order": 60,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "proximity"
+          }
+        },
+        "primitiveVectorX": {
+          "type": "number",
+          "displayName": "Vector X",
+          "default": 0.0,
+          "section": "primitives",
+          "order": 70,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "vector"
+          }
+        },
+        "primitiveVectorY": {
+          "type": "number",
+          "displayName": "Vector Y",
+          "default": 1.0,
+          "section": "primitives",
+          "order": 80,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "vector"
+          }
+        },
+        "primitiveVectorZ": {
+          "type": "number",
+          "displayName": "Vector Z",
+          "default": 0.0,
+          "section": "primitives",
+          "order": 90,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "vector"
+          }
+        },
+        "primitiveAttributeName": {
+          "type": "string",
+          "displayName": "Attribute",
+          "default": "",
+          "section": "primitives",
+          "order": 100,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "attribute"
+          }
+        },
+        "primitiveComponent": {
+          "type": "integer",
+          "displayName": "Component",
+          "default": 0,
+          "minimum": 0,
+          "section": "primitives",
+          "order": 110,
+          "visibleWhen": {
+            "property": "primitiveMethod",
+            "equals": "attribute"
+          }
+        },
+        "primitiveOrderingAttribute": {
+          "type": "string",
+          "displayName": "Ordering Attribute",
+          "default": "sort_index",
+          "section": "primitives",
+          "order": 120
+        },
+        "reversePrimitives": {
+          "type": "boolean",
+          "displayName": "Reverse Primitive Sort",
+          "default": false,
+          "section": "primitives",
+          "order": 130
+        },
+        "primitiveSortIndices": {
+          "type": "boolean",
+          "displayName": "Sort Indices",
+          "default": false,
+          "section": "primitives",
+          "order": 140
+        },
+        "primitiveCombineSortIndices": {
+          "type": "boolean",
+          "displayName": "Combine Sort Indices",
+          "default": true,
+          "section": "primitives",
+          "order": 150,
+          "visibleWhen": {
+            "property": "primitiveSortIndices",
+            "equals": true
+          }
+        },
+        "optimizeVertexOrder": {
+          "type": "boolean",
+          "displayName": "Modify Vertex Order",
+          "default": true,
+          "section": "primitives",
+          "order": 900
+        }
+      }
+    },
+    {
+      "type": "CarveSpline",
+      "displayName": "Carve Spline",
+      "category": "Spline",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Spline",
+          "pinType": "Spline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Spline",
+          "pinType": "Spline"
+        }
+      ],
+      "properties": {
+        "uStart": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "uEnd": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    },
+    {
+      "type": "FindShortestPath",
+      "displayName": "Find Shortest Path",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Spline",
+          "pinType": "Spline"
+        }
+      ],
+      "properties": {
+        "startPoint": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0
+        },
+        "endPoint": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 0
+        },
+        "startGroup": {
+          "type": "string",
+          "default": ""
+        },
+        "endGroup": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    {
+      "type": "TreeSimpleLeaf",
+      "displayName": "Tree Simple Leaf",
+      "category": "Scatter",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Points",
+          "pinType": "Point"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "leafWidth": {
+          "type": "number",
+          "default": 0.08
+        },
+        "leafHeight": {
+          "type": "number",
+          "default": 0.12
+        },
+        "leafThickness": {
+          "type": "number",
+          "default": 0.005
+        },
+        "seed": {
+          "type": "integer",
+          "default": 0
+        },
+        "scaleMin": {
+          "type": "number",
+          "default": 0.7
+        },
+        "scaleMax": {
+          "type": "number",
+          "default": 1.3
+        }
+      }
+    },
+    {
+      "type": "SwitchIf",
+      "displayName": "Switch If",
+      "category": "Flow",
+      "inputs": [
+        {
+          "id": "true",
+          "label": "True",
+          "pinType": "SpatialMesh"
+        },
+        {
+          "id": "false",
+          "label": "False",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Output",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "condition": {
+          "type": "boolean",
+          "default": false
+        },
+        "conditionExpression": {
+          "type": "string",
+          "default": "",
+          "displayName": "Condition Expression"
         }
       }
     }

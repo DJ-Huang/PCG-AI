@@ -11,978 +11,477 @@
   ],
   "nodes": [
     {
-      "id": "sf_body_box",
+      "id": "sf_body",
       "type": "CreateBoxMesh",
       "position": {
-        "x": -440,
+        "x": -640,
         "y": 0
       },
       "data": {
-        "width": 4.2,
-        "height": 5.2,
-        "depth": 4.2,
-        "__nodeTitle": "Short Body"
+        "width": 4.5,
+        "height": 3.2,
+        "depth": 4.5,
+        "__nodeTitle": "Short One-Story Body"
       }
     },
     {
-      "id": "sf_body_bevel",
+      "id": "sf_body_bv",
       "type": "BevelMesh",
       "position": {
-        "x": -440,
+        "x": -640,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.05,
+        "amount": 0.12,
         "segments": 2,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Short Body Bevel"
+        "__nodeTitle": "Body Bevel"
       }
     },
     {
       "id": "sf_body_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": -440,
+        "x": -640,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "plaster_cream",
-        "__nodeTitle": "Short Body Mat"
+        "__nodeTitle": "Cream Body"
       }
     },
     {
-      "id": "sf_body_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": -440,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Body Place"
-      }
-    },
-    {
-      "id": "sf_plinth_box",
+      "id": "sf_roof",
       "type": "CreateBoxMesh",
       "position": {
-        "x": -120,
+        "x": -320,
         "y": 0
       },
       "data": {
-        "width": 4.4,
-        "height": 0.35,
-        "depth": 4.4,
-        "__nodeTitle": "Short Plinth"
+        "width": 4.8,
+        "height": 0.32,
+        "depth": 4.8,
+        "__nodeTitle": "Flat Edge Roof"
       }
     },
     {
-      "id": "sf_plinth_bevel",
+      "id": "sf_roof_bv",
       "type": "BevelMesh",
       "position": {
-        "x": -120,
+        "x": -320,
         "y": 160
       },
       "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
+        "amount": 0.07,
+        "segments": 2,
         "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Short Plinth Bevel"
-      }
-    },
-    {
-      "id": "sf_plinth_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": -120,
-        "y": 320
-      },
-      "data": {
-        "group": "",
-        "materialName": "brick",
-        "__nodeTitle": "Short Plinth Mat"
-      }
-    },
-    {
-      "id": "sf_plinth_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": -120,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": -2.45,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Plinth Place"
-      }
-    },
-    {
-      "id": "sf_cornice_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 200,
-        "y": 0
-      },
-      "data": {
-        "width": 4.5,
-        "height": 0.4,
-        "depth": 4.5,
-        "__nodeTitle": "Short Cornice"
-      }
-    },
-    {
-      "id": "sf_cornice_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 200,
-        "y": 160
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Short Cornice Bevel"
-      }
-    },
-    {
-      "id": "sf_cornice_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 200,
-        "y": 320
-      },
-      "data": {
-        "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Short Cornice Mat"
-      }
-    },
-    {
-      "id": "sf_cornice_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": 200,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 2.7,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Cornice Place"
-      }
-    },
-    {
-      "id": "sf_roof_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 520,
-        "y": 0
-      },
-      "data": {
-        "width": 4.3,
-        "height": 0.2,
-        "depth": 4.3,
-        "__nodeTitle": "Short Roof Cap"
-      }
-    },
-    {
-      "id": "sf_roof_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 520,
-        "y": 160
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Short Roof Cap Bevel"
+        "__nodeTitle": "Roof Edge Bevel"
       }
     },
     {
       "id": "sf_roof_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 520,
+        "x": -320,
         "y": 320
       },
       "data": {
         "group": "",
         "materialName": "roof_green",
-        "__nodeTitle": "Short Roof Cap Mat"
+        "__nodeTitle": "Green Roof Edge"
       }
     },
     {
       "id": "sf_roof_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 520,
+        "x": -320,
         "y": 480
       },
       "data": {
-        "translateX": 0,
-        "translateY": 2.95,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Roof Cap Place"
+        "translateY": 1.72,
+        "__nodeTitle": "Roof Place"
       }
     },
     {
-      "id": "sf_frame",
+      "id": "sf_shop",
       "type": "CreateBoxMesh",
       "position": {
-        "x": 840,
+        "x": 0,
         "y": 0
       },
       "data": {
-        "width": 1.1,
-        "height": 1.5,
-        "depth": 0.12,
-        "__nodeTitle": "Short Win Frame"
+        "width": 1.15,
+        "height": 2.1,
+        "depth": 0.1,
+        "__nodeTitle": "Shop Glass"
       }
     },
     {
-      "id": "sf_frame_bv",
-      "type": "BevelMesh",
-      "position": {
-        "x": 840,
-        "y": 160
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Short Frame Bevel"
-      }
-    },
-    {
-      "id": "sf_frame_mat",
+      "id": "sf_shop_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 840,
-        "y": 320
-      },
-      "data": {
-        "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Short Frame Mat"
-      }
-    },
-    {
-      "id": "sf_pane",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 1160,
-        "y": 0
-      },
-      "data": {
-        "width": 0.88,
-        "height": 1.25,
-        "depth": 0.05,
-        "__nodeTitle": "Short Win Pane"
-      }
-    },
-    {
-      "id": "sf_pane_vc",
-      "type": "VertexColor",
-      "position": {
-        "x": 1160,
+        "x": 0,
         "y": 160
-      },
-      "data": {
-        "r": 0.2,
-        "g": 0.15,
-        "b": 0.08,
-        "a": 1.0,
-        "emission": 0.9,
-        "emissionColorR": 1.0,
-        "emissionColorG": 0.82,
-        "emissionColorB": 0.4,
-        "__nodeTitle": "Short Pane Glow"
-      }
-    },
-    {
-      "id": "sf_pane_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 1160,
-        "y": 320
       },
       "data": {
         "group": "",
         "materialName": "window_glow",
-        "__nodeTitle": "Short Pane Mat"
+        "__nodeTitle": "Shop Glass Material"
       }
     },
     {
-      "id": "sf_pane_in",
-      "type": "TransformMesh",
-      "position": {
-        "x": 1160,
-        "y": 480
-      },
-      "data": {
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 0.04,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Pane Inset"
-      }
-    },
-    {
-      "id": "sf_win_unit",
-      "type": "MergeMesh",
-      "position": {
-        "x": 1000,
-        "y": 640
-      },
-      "data": {
-        "__nodeTitle": "Short Win Unit"
-      }
-    },
-    {
-      "id": "sf_win_y",
+      "id": "sf_shop_pair",
       "type": "CopyMesh",
       "position": {
-        "x": 1000,
-        "y": 800
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "y",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 2.15,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Short Win Rows"
-      }
-    },
-    {
-      "id": "sf_win_x",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1000,
-        "y": 960
-      },
-      "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "x",
-        "angle": 360,
-        "translateX": 2.7,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Short Win Cols"
-      }
-    },
-    {
-      "id": "sf_win_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": 1000,
-        "y": 1120
-      },
-      "data": {
-        "translateX": -1.35,
-        "translateY": -0.7,
-        "translateZ": 2.12,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Win Place"
-      }
-    },
-    {
-      "id": "sf_quoin_box",
-      "type": "CreateBoxMesh",
-      "position": {
-        "x": 1480,
-        "y": 0
-      },
-      "data": {
-        "width": 0.32,
-        "height": 0.4,
-        "depth": 0.32,
-        "__nodeTitle": "Short Quoin"
-      }
-    },
-    {
-      "id": "sf_quoin_bevel",
-      "type": "BevelMesh",
-      "position": {
-        "x": 1480,
-        "y": 160
-      },
-      "data": {
-        "edgeGroup": "",
-        "offsetType": "offset",
-        "amount": 0.03,
-        "segments": 1,
-        "limitMethod": "angle",
-        "angleLimit": 30,
-        "profile": 0.5,
-        "miterOuter": "sharp",
-        "miterInner": "sharp",
-        "vmeshMethod": "adj",
-        "clampOverlap": true,
-        "method": "edge",
-        "excludeUnshared": false,
-        "excludeGroups": "cap_start,cap_end",
-        "__nodeTitle": "Short Quoin Bevel"
-      }
-    },
-    {
-      "id": "sf_quoin_mat",
-      "type": "AssignMaterial",
-      "position": {
-        "x": 1480,
+        "x": 0,
         "y": 320
       },
       "data": {
-        "group": "",
-        "materialName": "trim",
-        "__nodeTitle": "Short Quoin Mat"
-      }
-    },
-    {
-      "id": "sf_quoin_xf",
-      "type": "TransformMesh",
-      "position": {
-        "x": 1480,
-        "y": 480
-      },
-      "data": {
-        "translateX": -2.1,
-        "translateY": -1.8,
-        "translateZ": -2.1,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Quoin Place"
-      }
-    },
-    {
-      "id": "sf_qy",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1480,
-        "y": 640
-      },
-      "data": {
-        "mode": "linear",
-        "count": 3,
-        "axis": "y",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 1.8,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Short Quoin Rows"
-      }
-    },
-    {
-      "id": "sf_qx",
-      "type": "CopyMesh",
-      "position": {
-        "x": 1480,
-        "y": 800
-      },
-      "data": {
         "mode": "linear",
         "count": 2,
         "axis": "x",
-        "angle": 360,
-        "translateX": 4.2,
-        "translateY": 0,
-        "translateZ": 0,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Short Quoin X"
+        "translateX": 2.45,
+        "__nodeTitle": "Shop Front Bays"
       }
     },
     {
-      "id": "sf_qz",
-      "type": "CopyMesh",
+      "id": "sf_shop_xf",
+      "type": "TransformMesh",
       "position": {
-        "x": 1480,
-        "y": 960
+        "x": 0,
+        "y": 480
       },
       "data": {
-        "mode": "linear",
-        "count": 2,
-        "axis": "z",
-        "angle": 360,
-        "translateX": 0,
-        "translateY": 0,
-        "translateZ": 4.2,
-        "centerX": 0,
-        "centerY": 0,
-        "centerZ": 0,
-        "__nodeTitle": "Short Quoin Z"
+        "translateX": -1.225,
+        "translateY": -0.45,
+        "translateZ": 2.3,
+        "__nodeTitle": "Shopfront +Z"
       }
     },
     {
       "id": "sf_door",
       "type": "CreateBoxMesh",
       "position": {
-        "x": 1800,
+        "x": 320,
         "y": 0
       },
       "data": {
-        "width": 1.15,
-        "height": 2.2,
-        "depth": 0.1,
-        "__nodeTitle": "Short Door"
+        "width": 1.0,
+        "height": 2.1,
+        "depth": 0.12,
+        "__nodeTitle": "Central Door"
       }
     },
     {
       "id": "sf_door_mat",
       "type": "AssignMaterial",
       "position": {
-        "x": 1800,
+        "x": 320,
         "y": 160
       },
       "data": {
         "group": "",
         "materialName": "brick",
-        "__nodeTitle": "Short Door Mat"
+        "__nodeTitle": "Door Material"
       }
     },
     {
       "id": "sf_door_xf",
       "type": "TransformMesh",
       "position": {
-        "x": 1800,
+        "x": 320,
         "y": 320
       },
       "data": {
-        "translateX": 0,
-        "translateY": -1.5,
-        "translateZ": 2.12,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Door Place"
+        "translateY": -0.45,
+        "translateZ": 2.31,
+        "__nodeTitle": "Door On Local +Z"
       }
     },
+    {
+      "id": "sf_awning",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 640,
+        "y": 0
+      },
+      "data": {
+        "width": 3.8,
+        "height": 0.12,
+        "depth": 0.7,
+        "__nodeTitle": "Shop Awning"
+      }
+    },
+    {
+      "id": "sf_awning_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 640,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.04,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Awning Bevel"
+      }
+    },
+    {
+      "id": "sf_awning_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 640,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Shop Sign Trim"
+      }
+    },
+    {
+      "id": "sf_awning_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 640,
+        "y": 480
+      },
+      "data": {
+        "translateY": 0.65,
+        "translateZ": 2.55,
+        "__nodeTitle": "Awning +Z"
+      }
+    },
+    {
+      "id": "sf_side",
+      "type": "TransformMesh",
+      "position": {
+        "x": 960,
+        "y": 0
+      },
+      "data": {
+        "rotationY": 90,
+        "translateX": 2.3,
+        "translateY": -0.45,
+        "__nodeTitle": "Turn Side Shop"
+      }
+    },
+    {"id":"sf_shop_frame","type":"CreateBoxMesh","position":{"x":1280,"y":0},"data":{"width":1.42,"height":2.35,"depth":0.08,"__nodeTitle":"Shop Window Surround"}},
+    {"id":"sf_shop_frame_bv","type":"BevelMesh","position":{"x":1280,"y":160},"data":{"amount":0.04,"segments":2,"clampOverlap":true,"__nodeTitle":"Shop Surround Bevel"}},
+    {"id":"sf_shop_frame_mat","type":"AssignMaterial","position":{"x":1280,"y":320},"data":{"group":"","materialName":"trim","__nodeTitle":"Shop Surround Trim"}},
+    {"id":"sf_shop_frames","type":"CopyMesh","position":{"x":1280,"y":480},"data":{"mode":"linear","count":2,"axis":"x","translateX":2.45,"__nodeTitle":"Shop Window Surrounds"}},
+    {"id":"sf_shop_frames_xf","type":"TransformMesh","position":{"x":1280,"y":640},"data":{"translateX":-1.225,"translateY":-0.425,"translateZ":2.24,"__nodeTitle":"Shop Surrounds +Z"}},
+    {"id":"sf_door_frame","type":"CreateBoxMesh","position":{"x":1600,"y":0},"data":{"width":1.28,"height":2.4,"depth":0.08,"__nodeTitle":"Short Door Surround"}},
+    {"id":"sf_door_frame_bv","type":"BevelMesh","position":{"x":1600,"y":160},"data":{"amount":0.04,"segments":2,"clampOverlap":true,"__nodeTitle":"Short Door Bevel"}},
+    {"id":"sf_door_frame_mat","type":"AssignMaterial","position":{"x":1600,"y":320},"data":{"group":"","materialName":"trim","__nodeTitle":"Short Door Trim"}},
+    {"id":"sf_door_frame_xf","type":"TransformMesh","position":{"x":1600,"y":480},"data":{"translateY":-0.4,"translateZ":2.24,"__nodeTitle":"Short Door Surround +Z"}},
+    {"id":"sf_valance","type":"CreateBoxMesh","position":{"x":1920,"y":0},"data":{"width":3.8,"height":0.32,"depth":0.18,"__nodeTitle":"Awning Front Valance"}},
+    {"id":"sf_valance_bv","type":"BevelMesh","position":{"x":1920,"y":160},"data":{"amount":0.05,"segments":2,"clampOverlap":true,"__nodeTitle":"Valance Bevel"}},
+    {"id":"sf_valance_mat","type":"AssignMaterial","position":{"x":1920,"y":320},"data":{"group":"","materialName":"roof_green","__nodeTitle":"Valance Material"}},
+    {"id":"sf_valance_xf","type":"TransformMesh","position":{"x":1920,"y":480},"data":{"translateY":0.48,"translateZ":2.86,"__nodeTitle":"Valance +Z"}},
+    {"id":"sf_quoin","type":"CreateBoxMesh","position":{"x":2240,"y":0},"data":{"width":0.34,"height":0.38,"depth":0.28,"__nodeTitle":"Front Corner Stone"}},
+    {"id":"sf_quoin_bv","type":"BevelMesh","position":{"x":2240,"y":160},"data":{"amount":0.035,"segments":1,"clampOverlap":true,"__nodeTitle":"Corner Stone Bevel"}},
+    {"id":"sf_quoin_mat","type":"AssignMaterial","position":{"x":2240,"y":320},"data":{"group":"","materialName":"plaster_cream","__nodeTitle":"Corner Stone Material"}},
+    {"id":"sf_quoin_rows","type":"CopyMesh","position":{"x":2240,"y":480},"data":{"mode":"linear","count":3,"axis":"y","translateY":0.95,"__nodeTitle":"Corner Stone Rows"}},
+    {"id":"sf_quoin_pair","type":"CopyMesh","position":{"x":2240,"y":640},"data":{"mode":"linear","count":2,"axis":"x","translateX":4.3,"__nodeTitle":"Front Corner Stones"}},
+    {"id":"sf_quoin_xf","type":"TransformMesh","position":{"x":2240,"y":800},"data":{"translateX":-2.15,"translateY":-0.95,"translateZ":2.2,"__nodeTitle":"Corner Stones Place"}},
+    {"id":"sf_shop_mullion","type":"CreateBoxMesh","position":{"x":2560,"y":0},"data":{"width":0.08,"height":1.75,"depth":0.07,"__nodeTitle":"Shop Center Mullion"}},{"id":"sf_shop_mullion_mat","type":"AssignMaterial","position":{"x":2560,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Shop Mullion Trim"}},{"id":"sf_shop_mullions","type":"CopyMesh","position":{"x":2560,"y":320},"data":{"mode":"linear","count":2,"axis":"x","translateX":2.45,"__nodeTitle":"Shop Mullion Pair"}},{"id":"sf_shop_mullions_xf","type":"TransformMesh","position":{"x":2560,"y":480},"data":{"translateX":-1.225,"translateY":-0.45,"translateZ":2.36,"__nodeTitle":"Shop Mullions +Z"}},
+    {"id":"sf_door_panel","type":"CreateBoxMesh","position":{"x":2880,"y":0},"data":{"width":0.68,"height":0.62,"depth":0.05,"__nodeTitle":"Short Door Panel"}},{"id":"sf_door_panel_mat","type":"AssignMaterial","position":{"x":2880,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Short Door Panel Trim"}},{"id":"sf_door_panels","type":"CopyMesh","position":{"x":2880,"y":320},"data":{"mode":"linear","count":2,"axis":"y","translateY":0.82,"__nodeTitle":"Short Door Panels"}},{"id":"sf_door_panels_xf","type":"TransformMesh","position":{"x":2880,"y":480},"data":{"translateY":-0.85,"translateZ":2.39,"__nodeTitle":"Short Door Panels +Z"}},
+    {"id":"sf_handle","type":"CreateBoxMesh","position":{"x":3200,"y":0},"data":{"width":0.08,"height":0.12,"depth":0.08,"__nodeTitle":"Short Door Handle"}},{"id":"sf_handle_mat","type":"AssignMaterial","position":{"x":3200,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Short Handle Metal"}},{"id":"sf_handle_xf","type":"TransformMesh","position":{"x":3200,"y":320},"data":{"translateX":0.32,"translateY":-0.45,"translateZ":2.44,"__nodeTitle":"Short Handle +Z"}},
     {
       "id": "sf_merge",
       "type": "MergeMesh",
       "position": {
-        "x": 400,
-        "y": 1440
+        "x": 320,
+        "y": 800
       },
       "data": {
-        "__nodeTitle": "Short Merge"
+        "__nodeTitle": "Short Building Assembly"
       }
     },
     {
       "id": "sf_lift",
       "type": "TransformMesh",
       "position": {
-        "x": 400,
-        "y": 1600
+        "x": 320,
+        "y": 960
       },
       "data": {
-        "translateX": 0,
-        "translateY": 2.6,
-        "translateZ": 0,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "scaleX": 1,
-        "scaleY": 1,
-        "scaleZ": 1,
-        "__nodeTitle": "Short Lift"
+        "translateY": 1.6,
+        "__nodeTitle": "Set Base Y Zero"
       }
     },
     {
       "id": "sf_out",
       "type": "SubgraphOutput",
       "position": {
-        "x": 400,
-        "y": 1760
+        "x": 320,
+        "y": 1120
       },
       "data": {
-        "__nodeTitle": "Short Out"
+        "__nodeTitle": "Short Building Out"
       }
     }
   ],
   "edges": [
     {
-      "id": "e_sf_body_bv",
-      "source": "sf_body_box",
-      "target": "sf_body_bevel",
+      "id": "a1",
+      "source": "sf_body",
+      "target": "sf_body_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_body_mat",
-      "source": "sf_body_bevel",
+      "id": "a2",
+      "source": "sf_body_bv",
       "target": "sf_body_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_body_xf",
-      "source": "sf_body_mat",
-      "target": "sf_body_xf",
+      "id": "a3",
+      "source": "sf_roof",
+      "target": "sf_roof_bv",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_plinth_bv",
-      "source": "sf_plinth_box",
-      "target": "sf_plinth_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_plinth_mat",
-      "source": "sf_plinth_bevel",
-      "target": "sf_plinth_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_plinth_xf",
-      "source": "sf_plinth_mat",
-      "target": "sf_plinth_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_cornice_bv",
-      "source": "sf_cornice_box",
-      "target": "sf_cornice_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_cornice_mat",
-      "source": "sf_cornice_bevel",
-      "target": "sf_cornice_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_cornice_xf",
-      "source": "sf_cornice_mat",
-      "target": "sf_cornice_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_roof_bv",
-      "source": "sf_roof_box",
-      "target": "sf_roof_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_roof_mat",
-      "source": "sf_roof_bevel",
+      "id": "a4",
+      "source": "sf_roof_bv",
       "target": "sf_roof_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_roof_xf",
+      "id": "a5",
       "source": "sf_roof_mat",
       "target": "sf_roof_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_fbv",
-      "source": "sf_frame",
-      "target": "sf_frame_bv",
+      "id": "a6",
+      "source": "sf_shop",
+      "target": "sf_shop_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_fmat",
-      "source": "sf_frame_bv",
-      "target": "sf_frame_mat",
+      "id": "a7",
+      "source": "sf_shop_mat",
+      "target": "sf_shop_pair",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_pvc",
-      "source": "sf_pane",
-      "target": "sf_pane_vc",
+      "id": "a8",
+      "source": "sf_shop_pair",
+      "target": "sf_shop_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_pmat",
-      "source": "sf_pane_vc",
-      "target": "sf_pane_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_pin",
-      "source": "sf_pane_mat",
-      "target": "sf_pane_in",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_fu",
-      "source": "sf_frame_mat",
-      "target": "sf_win_unit",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_pu",
-      "source": "sf_pane_in",
-      "target": "sf_win_unit",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_wy",
-      "source": "sf_win_unit",
-      "target": "sf_win_y",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_wx",
-      "source": "sf_win_y",
-      "target": "sf_win_x",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_wxf",
-      "source": "sf_win_x",
-      "target": "sf_win_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_quoin_bv",
-      "source": "sf_quoin_box",
-      "target": "sf_quoin_bevel",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_quoin_mat",
-      "source": "sf_quoin_bevel",
-      "target": "sf_quoin_mat",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_quoin_xf",
-      "source": "sf_quoin_mat",
-      "target": "sf_quoin_xf",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_qy",
-      "source": "sf_quoin_xf",
-      "target": "sf_qy",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_qx",
-      "source": "sf_qy",
-      "target": "sf_qx",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_qz",
-      "source": "sf_qx",
-      "target": "sf_qz",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_dm",
+      "id": "a9",
       "source": "sf_door",
       "target": "sf_door_mat",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_dx",
+      "id": "a10",
       "source": "sf_door_mat",
       "target": "sf_door_xf",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_m0",
-      "source": "sf_body_xf",
+      "id": "a11",
+      "source": "sf_awning",
+      "target": "sf_awning_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a12",
+      "source": "sf_awning_bv",
+      "target": "sf_awning_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a13",
+      "source": "sf_awning_mat",
+      "target": "sf_awning_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a14",
+      "source": "sf_shop_pair",
+      "target": "sf_side",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {"id":"a17","source":"sf_shop_frame","target":"sf_shop_frame_bv","sourceHandle":"out","targetHandle":"in"},{"id":"a18","source":"sf_shop_frame_bv","target":"sf_shop_frame_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a19","source":"sf_shop_frame_mat","target":"sf_shop_frames","sourceHandle":"out","targetHandle":"in"},{"id":"a20","source":"sf_shop_frames","target":"sf_shop_frames_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a21","source":"sf_door_frame","target":"sf_door_frame_bv","sourceHandle":"out","targetHandle":"in"},{"id":"a22","source":"sf_door_frame_bv","target":"sf_door_frame_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a23","source":"sf_door_frame_mat","target":"sf_door_frame_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a24","source":"sf_valance","target":"sf_valance_bv","sourceHandle":"out","targetHandle":"in"},{"id":"a25","source":"sf_valance_bv","target":"sf_valance_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a26","source":"sf_valance_mat","target":"sf_valance_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a27","source":"sf_quoin","target":"sf_quoin_bv","sourceHandle":"out","targetHandle":"in"},{"id":"a28","source":"sf_quoin_bv","target":"sf_quoin_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a29","source":"sf_quoin_mat","target":"sf_quoin_rows","sourceHandle":"out","targetHandle":"in"},{"id":"a30","source":"sf_quoin_rows","target":"sf_quoin_pair","sourceHandle":"out","targetHandle":"in"},{"id":"a31","source":"sf_quoin_pair","target":"sf_quoin_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a32","source":"sf_shop_mullion","target":"sf_shop_mullion_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a33","source":"sf_shop_mullion_mat","target":"sf_shop_mullions","sourceHandle":"out","targetHandle":"in"},{"id":"a34","source":"sf_shop_mullions","target":"sf_shop_mullions_xf","sourceHandle":"out","targetHandle":"in"},{"id":"a35","source":"sf_door_panel","target":"sf_door_panel_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a36","source":"sf_door_panel_mat","target":"sf_door_panels","sourceHandle":"out","targetHandle":"in"},{"id":"a37","source":"sf_door_panels","target":"sf_door_panels_xf","sourceHandle":"out","targetHandle":"in"},{"id":"a38","source":"sf_handle","target":"sf_handle_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a39","source":"sf_handle_mat","target":"sf_handle_xf","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "m1",
+      "source": "sf_body_mat",
       "target": "sf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_m1",
-      "source": "sf_plinth_xf",
-      "target": "sf_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_m2",
-      "source": "sf_cornice_xf",
-      "target": "sf_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_m3",
+      "id": "m2",
       "source": "sf_roof_xf",
       "target": "sf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_m4",
-      "source": "sf_win_xf",
+      "id": "m3",
+      "source": "sf_shop_xf",
       "target": "sf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_m5",
-      "source": "sf_qz",
-      "target": "sf_merge",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_sf_m6",
+      "id": "m4",
       "source": "sf_door_xf",
       "target": "sf_merge",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_lift",
+      "id": "m5",
+      "source": "sf_awning_xf",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m6",
+      "source": "sf_side",
+      "target": "sf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {"id":"m7","source":"sf_shop_frames_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m8","source":"sf_door_frame_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m9","source":"sf_valance_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m10","source":"sf_quoin_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m11","source":"sf_shop_mullions_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m12","source":"sf_door_panels_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m13","source":"sf_handle_xf","target":"sf_merge","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "a15",
       "source": "sf_merge",
       "target": "sf_lift",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_sf_out",
+      "id": "a16",
       "source": "sf_lift",
       "target": "sf_out",
       "sourceHandle": "out",

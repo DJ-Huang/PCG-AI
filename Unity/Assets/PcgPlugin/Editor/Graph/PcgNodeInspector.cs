@@ -458,22 +458,65 @@ namespace DJTechEditor.PCG.Graph
 
         private static bool IsVisibilityDriver(ManifestNodeDef def, string key) =>
             def.properties.Values.Any(p =>
-                !string.IsNullOrEmpty(p.visibleWhenProperty) && p.visibleWhenProperty == key);
+                (!string.IsNullOrEmpty(p.visibleWhenProperty) && p.visibleWhenProperty == key) ||
+                (p.visibleWhenAny != null &&
+                 p.visibleWhenAny.Any(c => c.property == key)));
 
         private static bool IsPropertyVisible(PcgManifestNodeView node, ManifestPropertyDef prop)
         {
+            if (prop.visibleWhenAny != null && prop.visibleWhenAny.Count > 0)
+            {
+                foreach (var clause in prop.visibleWhenAny)
+                {
+                    if (MatchesVisibleClause(node, clause.property, clause.equals, clause.oneOf))
+                        return true;
+                }
+                return false;
+            }
+
             if (string.IsNullOrEmpty(prop.visibleWhenProperty))
                 return true;
 
-            var current = node.CollectData().GetRaw(prop.visibleWhenProperty)?.ToString();
+            return MatchesVisibleClause(node, prop.visibleWhenProperty, prop.visibleWhenEquals,
+                prop.visibleWhenOneOf);
+        }
+
+        private static bool MatchesVisibleClause(
+            PcgManifestNodeView node, string property, string equals, List<string> oneOf)
+        {
+            if (string.IsNullOrEmpty(property))
+                return true;
+
+            var current = NormalizeVisibleValue(node.CollectData().GetRaw(property));
             if (string.IsNullOrEmpty(current) &&
                 PcgNodeManifest.TryGet(node.NodeType, out var def) &&
-                def.properties.TryGetValue(prop.visibleWhenProperty, out var driver))
+                def.properties.TryGetValue(property, out var driver))
             {
-                current = driver.defaultValue?.ToString() ?? "";
+                current = NormalizeVisibleValue(driver.defaultValue);
             }
 
-            return string.Equals(current ?? "", prop.visibleWhenEquals ?? "", StringComparison.Ordinal);
+            if (oneOf != null && oneOf.Count > 0)
+            {
+                foreach (var candidate in oneOf)
+                {
+                    if (string.Equals(current, NormalizeVisibleValue(candidate), StringComparison.Ordinal))
+                        return true;
+                }
+                return false;
+            }
+
+            return string.Equals(current, NormalizeVisibleValue(equals), StringComparison.Ordinal);
+        }
+
+        private static string NormalizeVisibleValue(object value)
+        {
+            return value switch
+            {
+                null => "",
+                bool b => b ? "true" : "false",
+                string s when bool.TryParse(s, out var parsed) => parsed ? "true" : "false",
+                _ => value.ToString() ?? "",
+            };
         }
 
         private void ScheduleInspectorRebuild(PcgManifestNodeView node)

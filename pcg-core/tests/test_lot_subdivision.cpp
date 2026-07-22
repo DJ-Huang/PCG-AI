@@ -10,12 +10,15 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -52,7 +55,7 @@ PcgGeometry make_ground_quad(double width, double depth)
     return geo;
 }
 
-PcgGeometry execute_geometry_graph(const nlohmann::json& document)
+GraphExecutionResult execute_graph_document(const nlohmann::json& document)
 {
     char error[1024] = {};
     Graph graph;
@@ -64,6 +67,12 @@ PcgGeometry execute_geometry_graph(const nlohmann::json& document)
     GraphExecutionResult result;
     expect(execute_graph(graph, 17, result, error, sizeof(error)) == PCG_OK,
            std::string("execute graph: ") + error);
+    return result;
+}
+
+PcgGeometry execute_geometry_graph(const nlohmann::json& document)
+{
+    const auto result = execute_graph_document(document);
     expect(result.source_geometry != nullptr, "graph did not preserve source geometry");
     return *result.source_geometry;
 }
@@ -85,6 +94,25 @@ void test_rectangle_iterations()
     expect(lots.groups().members(geometry::GroupDomain::Face, "lots").size() ==
                lots.faces().size(),
            "lots face group");
+}
+
+void test_longest_edge_create_grid_mesh()
+{
+    // Demo graph default: CreateGridMesh xz + LotSubdivision longestEdge.
+    // Regression: cut normal was 90° wrong, so bipartition always failed → 1 lot.
+    LotSubdivisionOptions options;
+    options.min_size = 0.1;
+    options.iterations = 3;
+    options.irregularity = 0.35;
+    options.seed = 2;
+    options.alignment = "longestEdge";
+
+    const auto ground = create_grid_geometry(48.0, 48.0, 1, 1, "xz");
+    expect(ground.faces().size() == 1, "ground is one quad");
+    const auto lots = lot_subdivide_geometry(ground, options);
+    expect(lots.faces().size() == 8, "longestEdge iterations=3 should yield 8 lots");
+    expect(lots.groups().members(geometry::GroupDomain::Face, "lots").size() == 8,
+           "lots face group count matches");
 }
 
 void test_min_size_stops_cutting()
@@ -323,6 +351,130 @@ size_t count_root_node_type(const nlohmann::json& document, const std::string& t
     return count;
 }
 
+void test_building_asset_wrapper(const std::filesystem::path& root, const char* rel)
+{
+    auto definition = load_example_json(root, rel);
+    definition["id"] = "building_asset";
+    const nlohmann::json document = {
+        {"version", "1.0"},
+        {"nodes",
+         nlohmann::json::array({
+             {{"id", "asset"},
+              {"type", "Subgraph"},
+              {"data", {{"subgraphId", "building_asset"}}}},
+             {{"id", "out"}, {"type", "Output"}, {"data", nlohmann::json::object()}},
+         })},
+        {"edges",
+         nlohmann::json::array({
+             {{"id", "asset_out"},
+              {"source", "asset"},
+              {"target", "out"},
+              {"sourceHandle", "mesh"},
+              {"targetHandle", "in"}},
+         })},
+        {"subgraphs", nlohmann::json::array({std::move(definition)})},
+    };
+
+    const auto result = execute_graph_document(document);
+    expect(result.kind == GraphResultKind::Mesh, std::string(rel) + " wrapper returns Mesh");
+    expect(!result.mesh.vertices().empty() && result.mesh.triangles().size() >= 3,
+           std::string(rel) + " wrapper cooks non-empty mesh");
+
+    double min_y = result.mesh.vertices().front().y;
+    for (const auto& vertex : result.mesh.vertices())
+        min_y = std::min(min_y, vertex.y);
+    expect(std::abs(min_y) < 1.0e-6, std::string(rel) + " mesh base is Y=0");
+
+    const std::set<std::string> allowed = {
+        "brick", "plaster_cream", "plaster_teal", "trim", "window_glow",
+        "roof_tile", "roof_green",
+    };
+    expect(result.mesh.has_materials(), std::string(rel) + " has material slots");
+    for (const auto& slot : result.mesh.material_slots())
+        expect(allowed.count(slot) != 0, std::string(rel) + " uses allowed material: " + slot);
+}
+
+void test_building_classification_and_scale_micrograph()
+{
+    const nlohmann::json document = {
+        {"version", "1.0"},
+        {"nodes",
+         nlohmann::json::array({
+             {{"id", "sites"}, {"type", "CreatePoints"}, {"data", {{"count", 18}}}},
+             {{"id", "sizes"},
+              {"type", "AttributeWrangle"},
+              {"data", {{"runOver", "points"},
+                         {"expression",
+                          "@rotationY = (@ptnum % 2) * 90.0; "
+                          "@wantWide = @ptnum >= 9; "
+                          "@targetX = 6.0 + 3.0 * @wantWide; @targetZ = 6.0; "
+                          "@odd = abs(round(@rotationY / 90.0)) % 2; "
+                          "@lotSizeX = (1 - @odd) * @targetX + @odd * @targetZ; "
+                          "@lotSizeZ = (1 - @odd) * @targetZ + @odd * @targetX;"}}}},
+             {{"id", "classify"},
+              {"type", "AttributeWrangle"},
+              {"data", {{"runOver", "points"},
+                         {"expression",
+                          "@bucket = @ptnum % 9; "
+                          "@btype = (@bucket >= 2) + (@bucket >= 7); "
+                          "@odd = abs(round(@rotationY / 90.0)) % 2; "
+                          "@sxLot = (1 - @odd) * @lotSizeX + @odd * @lotSizeZ; "
+                          "@szLot = (1 - @odd) * @lotSizeZ + @odd * @lotSizeX; "
+                          "@wide = @sxLot >= 1.35 * @szLot; "
+                          "@variant = @btype * 2 + @wide;"}}}},
+             {{"id", "scale"},
+              {"type", "AttributeWrangle"},
+              {"data", {{"runOver", "points"},
+                         {"expression",
+                          "@protoX = (@variant == 0) * 3.7 + (@variant == 1) * 6.0 + "
+                          "(@variant == 2) * 3.8 + (@variant == 3) * 6.2 + "
+                          "(@variant == 4) * 4.5 + (@variant == 5) * 6.5; "
+                          "@protoZ = (@variant == 0) * 3.7 + (@variant == 1) * 3.7 + "
+                          "(@variant == 2) * 3.8 + (@variant == 3) * 3.8 + "
+                          "(@variant == 4) * 4.5 + (@variant == 5) * 4.2; "
+                          "@s = min(@sxLot * 0.88 / max(@protoX, 0.001), "
+                          "@szLot * 0.88 / max(@protoZ, 0.001)); "
+                          "@scaleX = @s; @scaleY = 1.0; @scaleZ = @s;"}}}},
+             {{"id", "out"}, {"type", "Output"}, {"data", nlohmann::json::object()}},
+         })},
+        {"edges",
+         nlohmann::json::array({
+             {{"source", "sites"}, {"target", "sizes"}},
+             {{"source", "sizes"}, {"target", "classify"}},
+             {{"source", "classify"}, {"target", "scale"}},
+             {{"source", "scale"}, {"target", "out"}},
+         })},
+    };
+
+    const auto result = execute_graph_document(document);
+    expect(result.kind == GraphResultKind::Points && result.points != nullptr,
+           "classification micrograph returns points");
+    expect(result.points->points().size() == 18, "classification preserves 18 points");
+    std::array<int, 6> variant_counts{};
+    for (const auto& point : result.points->points()) {
+        expect(point.attributes.contains("rotationY") && point.attributes["rotationY"].is_number(),
+               "classification point has rotation");
+        expect(point.attributes.contains("scaleX") && point.attributes.contains("scaleY") &&
+                   point.attributes.contains("scaleZ"),
+               "classification point has axis scales");
+        const double sx = point.attributes.value("scaleX", 0.0);
+        const double sy = point.attributes.value("scaleY", 0.0);
+        const double sz = point.attributes.value("scaleZ", 0.0);
+        expect(std::abs(sx - sz) < 1.0e-6 && std::abs(sy - 1.0) < 1.0e-6,
+               "classification scale is horizontal-isotropic with Y=1");
+        const int variant = point.attributes.value("variant", -1);
+        expect(variant >= 0 && variant < 6, "classification variant is in range");
+        ++variant_counts[static_cast<size_t>(variant)];
+    }
+    expect(variant_counts == std::array<int, 6>({2, 2, 5, 5, 2, 2}),
+           "classification reaches six variants with 2:5:2 square/wide buckets");
+    const uint32_t flags = detect_point_attr_flags(*result.points);
+    expect((flags & PCG_POINT_ATTR_ROTATION) != 0,
+           "classification binary advertises rotation");
+    expect((flags & PCG_POINT_ATTR_SCALE) != 0,
+           "classification binary advertises scale");
+}
+
 bool has_foreach(const nlohmann::json& document)
 {
     return count_node_type(document, "ForEachBegin") > 0 ||
@@ -371,9 +523,12 @@ void test_instanced_city_example_graphs()
     // --- Buildings: multi-prototype GPU Points via MergeSpawnPoints ---
     {
         auto document = load_example_json(root, "examples/lot-city-buildings-instanced.pcg");
+        test_building_classification_and_scale_micrograph();
         expect(!has_foreach(document), "buildings graph must not use ForEach");
-        expect(count_node_type(document, "StaticMeshSpawner") == 3,
-               "buildings must spawn tall/medium/short prototypes");
+        expect(count_root_node_type(document, "StaticMeshSpawner") == 6,
+               "buildings must spawn six square/wide prototypes");
+        expect(count_root_node_type(document, "Blast") == 7,
+               "buildings have one road blast plus six variant blasts");
         expect(count_node_type(document, "MergeSpawnPoints") == 1,
                "buildings must merge spawn streams");
         expect(count_root_node_type(document, "AttributeWrangle") >= 2,
@@ -390,8 +545,35 @@ void test_instanced_city_example_graphs()
                "buildings root must not bake city via CopyMeshToPoints");
         expect(count_root_node_type(document, "MergeMesh") == 0,
                "buildings root must not MergeMesh the city");
-        expect(count_root_node_type(document, "SubgraphAsset") == 3,
-               "buildings use 3 linked SubgraphAsset prototypes (Unity bakes before cook)");
+        expect(count_root_node_type(document, "SubgraphAsset") == 6,
+               "buildings use six linked SubgraphAsset prototypes (Unity bakes before cook)");
+
+        std::set<int> variant_lanes;
+        for (const auto& node : document.at("nodes")) {
+            if (node.value("type", "") != "Blast")
+                continue;
+            const std::string expression = node.value("data", nlohmann::json::object())
+                                               .value("expression", "");
+            const std::string marker = "@variant != ";
+            const auto pos = expression.find(marker);
+            if (pos == std::string::npos)
+                continue;
+            variant_lanes.insert(std::stoi(expression.substr(pos + marker.size())));
+
+            bool feeds_spawner = false;
+            for (const auto& edge : document.at("edges")) {
+                if (edge.value("source", "") != node.value("id", ""))
+                    continue;
+                for (const auto& target : document.at("nodes")) {
+                    if (target.value("id", "") == edge.value("target", "") &&
+                        target.value("type", "") == "StaticMeshSpawner")
+                        feeds_spawner = true;
+                }
+            }
+            expect(feeds_spawner, "each variant Blast feeds a StaticMeshSpawner");
+        }
+        expect(variant_lanes == std::set<int>({0, 1, 2, 3, 4, 5}),
+               "variant Blast lanes cover six variants");
 
         // Micrograph: AttributeWrangle faces nearest road and emits rotationY for point binary.
         {
@@ -475,6 +657,16 @@ void test_instanced_city_example_graphs()
                         "face_road micrograph points=%zu\n",
                         result.points->points().size());
         }
+
+        for (const char* asset : {
+                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_tall_flat.pcgsubgraph",
+                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_tall_flat_wide.pcgsubgraph",
+                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_medium_pitched.pcgsubgraph",
+                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_medium_pitched_wide.pcgsubgraph",
+                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_short_flat.pcgsubgraph",
+                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_short_flat_wide.pcgsubgraph",
+             })
+            test_building_asset_wrapper(root, asset);
     }
 }
 
@@ -555,6 +747,7 @@ void test_pad_bevel_multi_lot_topology()
 int main()
 {
     test_rectangle_iterations();
+    test_longest_edge_create_grid_mesh();
     test_min_size_stops_cutting();
     test_irregularity_changes_layout();
     test_poly_extrude_chain();

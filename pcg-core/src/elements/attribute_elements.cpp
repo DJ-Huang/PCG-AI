@@ -40,26 +40,33 @@ bool read_table_attribute(ElementVariables& variables, const std::string& key, d
 {
     if (!variables.attribute_table)
         return false;
-    const data::AttributeArray* attr =
-        variables.attribute_table->find(variables.attribute_owner, key);
-    if (!attr || variables.attribute_index >= attr->size())
+    auto try_read = [&](data::AttributeOwner owner, size_t index) -> bool {
+        const data::AttributeArray* attr = variables.attribute_table->find(owner, key);
+        if (!attr || index >= attr->size())
+            return false;
+        if (attr->schema().type == data::AttributeType::Float) {
+            const size_t offset = index *
+                                  static_cast<size_t>(std::max(1, attr->schema().tuple_size));
+            if (offset >= attr->float_values().size())
+                return false;
+            value = attr->float_values()[offset];
+            return true;
+        }
+        if (attr->schema().type == data::AttributeType::Int) {
+            const size_t offset = index *
+                                  static_cast<size_t>(std::max(1, attr->schema().tuple_size));
+            if (offset >= attr->int_values().size())
+                return false;
+            value = static_cast<double>(attr->int_values()[offset]);
+            return true;
+        }
         return false;
-    if (attr->schema().type == data::AttributeType::Float) {
-        const size_t offset = variables.attribute_index *
-                              static_cast<size_t>(std::max(1, attr->schema().tuple_size));
-        if (offset >= attr->float_values().size())
-            return false;
-        value = attr->float_values()[offset];
+    };
+    if (try_read(variables.attribute_owner, variables.attribute_index))
         return true;
-    }
-    if (attr->schema().type == data::AttributeType::Int) {
-        const size_t offset = variables.attribute_index *
-                              static_cast<size_t>(std::max(1, attr->schema().tuple_size));
-        if (offset >= attr->int_values().size())
-            return false;
-        value = static_cast<double>(attr->int_values()[offset]);
-        return true;
-    }
+    // Houdini-style promotion: point/prim wrangles can read detail attributes.
+    if (variables.attribute_owner != data::AttributeOwner::Detail)
+        return try_read(data::AttributeOwner::Detail, 0);
     return false;
 }
 
@@ -170,13 +177,12 @@ EvalContext make_context(ElementVariables& variables,
         else if (name == "@numpt") value = variables.point_count;
         else if (name == "@primnum") value = variables.primitive_number;
         else if (name == "@numprim") value = variables.primitive_count;
-        else if (variables.attributes && name.size() > 1 && name.front() == '@') {
+        else if (name.size() > 1 && name.front() == '@') {
             const std::string key = name.substr(1);
-            if (!variables.attributes->contains(key) ||
-                !json_number((*variables.attributes)[key], value))
-                return false;
-        } else if (name.size() > 1 && name.front() == '@') {
-            return read_table_attribute(variables, name.substr(1), value);
+            if (variables.attributes && variables.attributes->contains(key) &&
+                json_number((*variables.attributes)[key], value))
+                return true;
+            return read_table_attribute(variables, key, value);
         } else {
             return false;
         }
@@ -558,16 +564,23 @@ data::PcgGeometry rebuild_geometry(const data::PcgGeometry& source,
     }
 
     data::PcgGeometry output;
-    output.detail() = source.detail();
+    data::GeometryElementRemap topology_remap;
     std::vector<int> point_remap(source.points().size(), -1);
     for (size_t index = 0; index < source.points().size(); ++index) {
         if (!keep_points[index]) continue;
         point_remap[index] = static_cast<int>(output.points().size());
         output.points_mut().push_back(source.points()[index]);
+        topology_remap.points.push_back(static_cast<int>(index));
     }
 
     std::vector<int> face_remap(source.faces().size(), -1);
     std::vector<std::string> face_materials;
+    std::vector<int> source_corner_offsets(source.faces().size(), 0);
+    int corner_cursor = 0;
+    for (size_t face_index = 0; face_index < source.faces().size(); ++face_index) {
+        source_corner_offsets[face_index] = corner_cursor;
+        corner_cursor += static_cast<int>(source.faces()[face_index].size());
+    }
     for (size_t face_index = 0; face_index < source.faces().size(); ++face_index) {
         if (!keep_faces[face_index]) continue;
         std::vector<int> face;
@@ -582,10 +595,16 @@ data::PcgGeometry rebuild_geometry(const data::PcgGeometry& source,
         }
         if (!valid || face.size() < 3) continue;
         face_remap[face_index] = static_cast<int>(output.faces().size());
+        for (size_t c = 0; c < source.faces()[face_index].size(); ++c)
+            topology_remap.vertices.push_back(
+                source_corner_offsets[face_index] + static_cast<int>(c));
+        topology_remap.primitives.push_back(static_cast<int>(face_index));
         output.faces_mut().push_back(std::move(face));
         if (source.has_face_materials())
             face_materials.push_back(source.face_materials()[face_index]);
     }
+
+    data::propagate_geometry_data(source, output, topology_remap);
 
     for (const auto& name : source.groups().group_names(geometry::GroupDomain::Point)) {
         for (int old_index : source.groups().members(geometry::GroupDomain::Point, name)) {
@@ -690,7 +709,10 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
                                        indexed_curve_u(face_index, source.faces().size()),
                                        0, static_cast<int>(source.points().size()),
                                        static_cast<int>(face_index),
-                                       static_cast<int>(source.faces().size())};
+                                       static_cast<int>(source.faces().size()),
+                                       const_cast<data::AttributeTable*>(&source.attributes()),
+                                       data::AttributeOwner::Primitive,
+                                       face_index};
             bool expression_selected = true;
             if (!evaluate_selection(program, variables, parameters, expression_selected, error)) {
                 error = "primitive " + std::to_string(face_index) + ": " + error;
@@ -713,7 +735,10 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
                                        indexed_curve_u(point_index, source.points().size()),
                                        static_cast<int>(point_index),
                                        static_cast<int>(source.points().size()), 0,
-                                       static_cast<int>(source.faces().size())};
+                                       static_cast<int>(source.faces().size()),
+                                       const_cast<data::AttributeTable*>(&source.attributes()),
+                                       data::AttributeOwner::Point,
+                                       point_index};
             bool expression_selected = true;
             if (!evaluate_selection(program, variables, parameters, expression_selected, error)) {
                 error = "geometry point " + std::to_string(point_index) + ": " + error;
