@@ -71,6 +71,7 @@ namespace DJTechEditor.PCG.Graph
         private PcgNodeInfoPanel m_InfoPanel;
         private Dictionary<string, PcgNodeMeshStats> m_NodeMeshStats = new();
         private Dictionary<string, List<NodeGroupEntry>> m_NodeGroups = new();
+        private Dictionary<string, List<NodeAttrEntry>> m_NodeAttrs = new();
         private string m_LastStatsJson;
         private PcgGraphDocument m_RootDocument;
         private string m_CurrentSubgraphId;
@@ -160,6 +161,7 @@ namespace DJTechEditor.PCG.Graph
                 m_LastStatsJson = json;
                 m_NodeMeshStats.Clear();
                 m_NodeGroups.Clear();
+                m_NodeAttrs.Clear();
                 if (!string.IsNullOrEmpty(json))
                 {
                     try
@@ -173,7 +175,11 @@ namespace DJTechEditor.PCG.Graph
                                 {
                                     pointCount = entry.point_count,
                                     faceCount = entry.face_count,
+                                    vertexCount = entry.vertex_count,
                                     triangleCount = entry.triangle_count,
+                                    hasBBox = entry.has_bbox,
+                                    bboxMin = new Vector3(entry.bbox_min_x, entry.bbox_min_y, entry.bbox_min_z),
+                                    bboxMax = new Vector3(entry.bbox_max_x, entry.bbox_max_y, entry.bbox_max_z),
                                 };
                             }
                         }
@@ -184,6 +190,17 @@ namespace DJTechEditor.PCG.Graph
                                 if (!m_NodeGroups.ContainsKey(g.node_id))
                                     m_NodeGroups[g.node_id] = new List<NodeGroupEntry>();
                                 m_NodeGroups[g.node_id].Add(g);
+                            }
+                        }
+                        if (wrapper?.node_attrs != null)
+                        {
+                            foreach (var a in wrapper.node_attrs)
+                            {
+                                if (string.IsNullOrEmpty(a.node_id))
+                                    continue;
+                                if (!m_NodeAttrs.ContainsKey(a.node_id))
+                                    m_NodeAttrs[a.node_id] = new List<NodeAttrEntry>();
+                                m_NodeAttrs[a.node_id].Add(a);
                             }
                         }
                     }
@@ -197,6 +214,12 @@ namespace DJTechEditor.PCG.Graph
         {
             TryGetNodeMeshStats(nodeId, out _);
             return m_NodeGroups.TryGetValue(nodeId, out groups);
+        }
+
+        internal bool TryGetNodeAttrs(string nodeId, out List<NodeAttrEntry> attrs)
+        {
+            TryGetNodeMeshStats(nodeId, out _);
+            return m_NodeAttrs.TryGetValue(nodeId, out attrs);
         }
 
         private string ResolveCookResultJson()
@@ -2183,7 +2206,11 @@ namespace DJTechEditor.PCG.Graph
     {
         public int pointCount;
         public int faceCount;
+        public int vertexCount;
         public int triangleCount;
+        public bool hasBBox;
+        public Vector3 bboxMin;
+        public Vector3 bboxMax;
     }
 
     [System.Serializable]
@@ -2191,6 +2218,7 @@ namespace DJTechEditor.PCG.Graph
     {
         public NodeStatEntry[] node_stats;
         public NodeGroupEntry[] node_groups;
+        public NodeAttrEntry[] node_attrs;
     }
 
     [System.Serializable]
@@ -2200,7 +2228,25 @@ namespace DJTechEditor.PCG.Graph
         public string node_type;
         public int point_count;
         public int face_count;
+        public int vertex_count;
         public int triangle_count;
+        public bool has_bbox;
+        public float bbox_min_x;
+        public float bbox_min_y;
+        public float bbox_min_z;
+        public float bbox_max_x;
+        public float bbox_max_y;
+        public float bbox_max_z;
+    }
+
+    [System.Serializable]
+    public class NodeAttrEntry
+    {
+        public string node_id;
+        public string owner;
+        public string name;
+        public string type;
+        public int tuple_size;
     }
 
     [System.Serializable]

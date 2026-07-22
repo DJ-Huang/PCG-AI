@@ -252,7 +252,7 @@ namespace DJTechRuntime.PCG
         /// <summary>Invoked after a preview cook applies results (SceneView repaint).</summary>
         public static System.Action EditorAfterPreviewCookApplied;
 
-        /// <summary>Last cook result JSON (contains groups + node_stats). Read by Graph Editor info panel.</summary>
+        /// <summary>Last cook result JSON (node_stats / node_groups / node_attrs). Read by Graph Editor info panel.</summary>
         [NonSerialized] public string LastCookResultJson;
 #endif
 

@@ -258,7 +258,7 @@ void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
 }
 
 /// Collect per-node mesh statistics (Houdini-style geometry info).
-/// Returns a JSON array: [{"node_id", "node_type", "point_count", "face_count", "triangle_count"}, ...]
+/// Returns a JSON array of node_stats entries with counts + bbox.
 nlohmann::json build_node_stats(
     const NodeOutputMap& outputs,
     const std::unordered_map<std::string, const GraphNode*>& node_by_id)
@@ -270,22 +270,70 @@ nlohmann::json build_node_stats(
 
         int point_count = 0;
         int face_count = 0;
+        int vertex_count = 0;
         int triangle_count = 0;
+        bool has_bbox = false;
+        data::PcgVec3 bmin{};
+        data::PcgVec3 bmax{};
 
         if (const auto* geom = collection.primary_geometry()) {
             point_count = static_cast<int>(geom->points().size());
             face_count = static_cast<int>(geom->faces().size());
+            vertex_count = geom->corner_count();
             for (const auto& face : geom->faces()) {
                 if (face.size() >= 3)
                     triangle_count += static_cast<int>(face.size()) - 2;
             }
+            if (!geom->points().empty()) {
+                has_bbox = true;
+                bmin = geom->points()[0];
+                bmax = geom->points()[0];
+                for (const auto& p : geom->points()) {
+                    bmin.x = std::min(bmin.x, p.x);
+                    bmin.y = std::min(bmin.y, p.y);
+                    bmin.z = std::min(bmin.z, p.z);
+                    bmax.x = std::max(bmax.x, p.x);
+                    bmax.y = std::max(bmax.y, p.y);
+                    bmax.z = std::max(bmax.z, p.z);
+                }
+            }
         } else if (const auto* mesh = collection.primary_mesh()) {
             point_count = static_cast<int>(mesh->vertices().size());
+            vertex_count = point_count;
             triangle_count = static_cast<int>(mesh->triangles().size()) / 3;
+            face_count = triangle_count;
+            if (!mesh->vertices().empty()) {
+                has_bbox = true;
+                const auto& v0 = mesh->vertices()[0];
+                bmin = {v0.x, v0.y, v0.z};
+                bmax = bmin;
+                for (const auto& v : mesh->vertices()) {
+                    bmin.x = std::min(bmin.x, v.x);
+                    bmin.y = std::min(bmin.y, v.y);
+                    bmin.z = std::min(bmin.z, v.z);
+                    bmax.x = std::max(bmax.x, v.x);
+                    bmax.y = std::max(bmax.y, v.y);
+                    bmax.z = std::max(bmax.z, v.z);
+                }
+            }
         } else if (const auto* heightfield = collection.primary_heightfield()) {
             point_count = static_cast<int>(heightfield->sample_count());
         } else if (const auto pts = collection.find_points_shared("out")) {
             point_count = static_cast<int>(pts->points().size());
+            if (!pts->points().empty()) {
+                has_bbox = true;
+                const auto& p0 = pts->points()[0];
+                bmin = {p0.x, p0.y, p0.z};
+                bmax = bmin;
+                for (const auto& p : pts->points()) {
+                    bmin.x = std::min(bmin.x, p.x);
+                    bmin.y = std::min(bmin.y, p.y);
+                    bmin.z = std::min(bmin.z, p.z);
+                    bmax.x = std::max(bmax.x, p.x);
+                    bmax.y = std::max(bmax.y, p.y);
+                    bmax.z = std::max(bmax.z, p.z);
+                }
+            }
         } else {
             for (const auto& item : collection.items()) {
                 if (item.points) {
@@ -295,15 +343,97 @@ nlohmann::json build_node_stats(
             }
         }
 
-        stats.push_back({
+        nlohmann::json entry = {
             {"node_id", node_id},
             {"node_type", node_type},
             {"point_count", point_count},
             {"face_count", face_count},
+            {"vertex_count", vertex_count},
             {"triangle_count", triangle_count},
-        });
+            {"has_bbox", has_bbox},
+        };
+        if (has_bbox) {
+            entry["bbox_min_x"] = bmin.x;
+            entry["bbox_min_y"] = bmin.y;
+            entry["bbox_min_z"] = bmin.z;
+            entry["bbox_max_x"] = bmax.x;
+            entry["bbox_max_y"] = bmax.y;
+            entry["bbox_max_z"] = bmax.z;
+        }
+        stats.push_back(std::move(entry));
     }
     return stats;
+}
+
+const char* attribute_type_name(data::AttributeType type)
+{
+    switch (type) {
+    case data::AttributeType::Int:
+        return "int";
+    case data::AttributeType::String:
+        return "string";
+    case data::AttributeType::Float:
+    default:
+        return "float";
+    }
+}
+
+const char* attribute_owner_name(data::AttributeOwner owner)
+{
+    switch (owner) {
+    case data::AttributeOwner::Point:
+        return "point";
+    case data::AttributeOwner::Vertex:
+        return "vertex";
+    case data::AttributeOwner::Primitive:
+        return "primitive";
+    case data::AttributeOwner::Detail:
+        return "detail";
+    }
+    return "point";
+}
+
+/// Flat attribute summaries for Unity JsonUtility:
+/// [{"node_id","owner","name","type","tuple_size"}, ...]
+nlohmann::json build_per_node_attributes(const NodeOutputMap& outputs)
+{
+    auto result = nlohmann::json::array();
+    auto push_attr = [&](const std::string& node_id,
+                         const char* owner,
+                         const std::string& name,
+                         const char* type,
+                         int tuple_size) {
+        result.push_back({
+            {"node_id", node_id},
+            {"owner", owner},
+            {"name", name},
+            {"type", type},
+            {"tuple_size", tuple_size},
+        });
+    };
+
+    for (const auto& [node_id, collection] : outputs) {
+        if (const auto* geom = collection.primary_geometry()) {
+            bool has_p = false;
+            for (data::AttributeOwner owner :
+                 {data::AttributeOwner::Point, data::AttributeOwner::Vertex,
+                  data::AttributeOwner::Primitive, data::AttributeOwner::Detail}) {
+                for (const auto& name : geom->attributes().names(owner)) {
+                    const auto* attr = geom->attributes().find(owner, name);
+                    if (!attr)
+                        continue;
+                    if (owner == data::AttributeOwner::Point && name == "P")
+                        has_p = true;
+                    push_attr(node_id, attribute_owner_name(owner), name,
+                              attribute_type_name(attr->schema().type),
+                              attr->schema().tuple_size);
+                }
+            }
+            if (!geom->points().empty() && !has_p)
+                push_attr(node_id, "point", "P", "float", 3);
+        }
+    }
+    return result;
 }
 
 /// Builds a flat array of per-node group stats: [{"node_id", "name", "domain", "count", "members", "edgeEndpoints"}, ...]
@@ -835,6 +965,7 @@ PcgResultCode execute_graph(const Graph& graph,
 
     auto node_stats = build_node_stats(outputs, node_by_id);
     auto per_node_groups = build_per_node_groups(outputs);
+    auto per_node_attrs = build_per_node_attributes(outputs);
 
     const GraphNode* sink = nullptr;
     const GraphNode* fallback_sink = nullptr;
@@ -933,6 +1064,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         return PCG_OK;
     }
 
@@ -943,6 +1075,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         return PCG_OK;
     }
 
@@ -953,6 +1086,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.mesh = data::PcgMeshData{};
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         return PCG_OK;
     }
 
@@ -965,6 +1099,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         out_result.json["geometry_export"] = "sink_geometry";
         if (!out_result.mesh.metadata().raw().empty())
             out_result.json["mesh_metadata"] = out_result.mesh.metadata().raw();
@@ -980,6 +1115,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = build_group_stats(*geometry);
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         out_result.json["geometry_export"] = "sink_geometry";
         if (!out_result.mesh.metadata().raw().empty())
             out_result.json["mesh_metadata"] = out_result.mesh.metadata().raw();
@@ -1022,6 +1158,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         if (!mesh->metadata().raw().empty())
             out_result.json["mesh_metadata"] = mesh->metadata().raw();
         try_salvage_upstream_geometry();
@@ -1034,6 +1171,7 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json = nlohmann::json::object();
         out_result.json["node_stats"] = node_stats;
         out_result.json["node_groups"] = per_node_groups;
+        out_result.json["node_attrs"] = per_node_attrs;
         if (!mesh->metadata().raw().empty())
             out_result.json["mesh_metadata"] = mesh->metadata().raw();
         try_salvage_upstream_geometry();
@@ -1045,6 +1183,7 @@ PcgResultCode execute_graph(const Graph& graph,
     out_result.mesh = data::PcgMeshData{};
     out_result.json["node_stats"] = node_stats;
     out_result.json["node_groups"] = per_node_groups;
+    out_result.json["node_attrs"] = per_node_attrs;
     return PCG_OK;
 }
 

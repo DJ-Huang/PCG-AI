@@ -35,7 +35,13 @@
       "id": "keep_built",
       "type": "Blast",
       "position": { "x": 840, "y": 800 },
-      "data": {"entity": "primitives", "group": "", "expression": "@numFloors > 0", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Keep Built Lots"}
+      "data": {"entity": "primitives", "group": "", "expression": "@park == 0", "parameters": "{}", "deleteNonSelected": true, "removeUnusedPoints": true, "__nodeTitle": "Keep Non-Park Lots"}
+    },
+    {
+      "id": "floors_attrs",
+      "type": "AttributeWrangle",
+      "position": { "x": 840, "y": 840 },
+      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "Assign Floors"}
     },
     {
       "id": "foreach_begin",
@@ -323,7 +329,7 @@
       "id": "floors_wrangle",
       "type": "AttributeWrangle",
       "position": { "x": 840, "y": 720 },
-      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7 && @bucket < 9) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "park_group"}
+      "data": {"runOver": "primitives", "expression": "@park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "__nodeTitle": "park_group"}
     }
   ],
   "edges": [
@@ -332,7 +338,8 @@
     {"id": "e2", "source": "shrink_blocks", "target": "lots", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e3", "source": "lots", "target": "shrink_lots", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e5", "source": "floors_wrangle", "target": "keep_built", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e6", "source": "keep_built", "target": "foreach_begin", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e5b", "source": "keep_built", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e6", "source": "floors_attrs", "target": "foreach_begin", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e7", "source": "foreach_begin", "target": "ex_lot", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e18", "source": "switch_fe", "target": "foreach_end", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e19", "source": "foreach_end", "target": "mat_walls", "sourceHandle": "out", "targetHandle": "in"},
