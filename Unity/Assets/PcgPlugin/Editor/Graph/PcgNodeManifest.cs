@@ -57,6 +57,12 @@ namespace DJTechEditor.PCG.Graph
         public string visibleWhenEquals;
         public List<string> visibleWhenOneOf;
         public List<ManifestVisibleWhenClause> visibleWhenAny;
+        /// <summary>Houdini-style: keep row visible but grayed unless driver matches.</summary>
+        public string enabledWhenProperty;
+        public string enabledWhenEquals;
+        /// <summary>Render this string/number field on the same row as a boolean toggle.</summary>
+        public string companionField;
+        public bool indent;
         public bool multiline;
         public int lines = 1;
     }
@@ -67,6 +73,8 @@ namespace DJTechEditor.PCG.Graph
         public string label;
         public bool foldout = true;
         public bool defaultExpanded = true;
+        /// <summary>When foldout is false, still draw a separator header with label.</summary>
+        public bool header;
     }
 
     public class ManifestNodeDef
@@ -393,6 +401,16 @@ namespace DJTechEditor.PCG.Graph
                             }
                         }
 
+                        if (propObj.TryGetValue("enabledWhen", out var enabledObj) &&
+                            enabledObj is Dictionary<string, object> enabledDict)
+                        {
+                            propDef.enabledWhenProperty = GetString(enabledDict, "property");
+                            propDef.enabledWhenEquals = GetString(enabledDict, "equals", "true");
+                        }
+                        propDef.companionField = GetString(propObj, "companionField");
+                        propDef.indent = propObj.TryGetValue("indent", out var indentVal)
+                            && Convert.ToBoolean(indentVal, CultureInfo.InvariantCulture);
+
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)
                         {
@@ -427,6 +445,8 @@ namespace DJTechEditor.PCG.Graph
                                   || Convert.ToBoolean(foldoutVal, CultureInfo.InvariantCulture),
                         defaultExpanded = !sectionDict.TryGetValue("defaultExpanded", out var expandedVal)
                                           || Convert.ToBoolean(expandedVal, CultureInfo.InvariantCulture),
+                        header = sectionDict.TryGetValue("header", out var headerVal)
+                                 && Convert.ToBoolean(headerVal, CultureInfo.InvariantCulture),
                     };
                     if (!string.IsNullOrEmpty(section.id))
                         def.inspectorSections.Add(section);

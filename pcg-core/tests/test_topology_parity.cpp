@@ -3,6 +3,7 @@
 #include "data/pcg_attribute_table.hpp"
 #include "data/pcg_geometry.hpp"
 #include "elements/topology_parity_algorithms.hpp"
+#include "geometry/spline_geometry.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -453,6 +454,54 @@ int main()
         outside.keep_outside = true;
         const auto outer = carve_spline_data(input, outside);
         expect(outer.splines().size() == 2, "Carve keep outside yields two edge segments");
+    }
+
+    {
+        using pcg::internal::elements::ResampleOptions;
+        using pcg::internal::geometry::PolylineResampleOptions;
+        using pcg::internal::geometry::resample_polyline_houdini;
+
+        std::vector<pcg::internal::geometry::Vec3> line{{0.0, 0.0, 0.0},
+                                                          {40.0, 0.0, 0.0}};
+        PolylineResampleOptions opts;
+        opts.use_max_segments = true;
+        opts.max_segments = 2;
+        opts.even_last_segment_same_length = true;
+        const auto result = resample_polyline_houdini(line, opts);
+        expect(result.points.size() == 3, "Resample max segments=2 yields 3 points");
+        if (result.points.size() == 3) {
+            expect(std::abs(result.points[1].x - 20.0) < 1e-6,
+                   "Resample middle point at half length");
+        }
+
+        pcg::internal::data::PcgGeometry curve;
+        curve.points_mut() = {{0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, {30.0, 0.0, 0.0}};
+        curve.faces_mut().push_back({0, 1, 2});
+        ResampleOptions geom_opts;
+        geom_opts.use_max_segments = true;
+        geom_opts.max_segments = 2;
+        const auto geometry = pcg::internal::elements::resample_geometry(curve, geom_opts);
+        expect(geometry.faces().size() == 1, "Resample geometry keeps one curve");
+        expect(geometry.faces()[0].size() == 3, "Resample geometry curve has 3 points");
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"line","type":"CreateSpline","data":{"startX":0,"startY":0,"startZ":0,"endX":40,"endY":0,"endZ":0}},
+            {"id":"resample","type":"Resample","data":{"useMaxSegments":true,"maxSegments":2}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"line","target":"resample","sourceHandle":"out","targetHandle":"in"},
+            {"source":"resample","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr, "Resample graph outputs geometry");
+        if (result.source_geometry)
+            expect(result.source_geometry->faces().size() >= 1, "Resample graph has curve face");
     }
 
     std::printf("failures=%d\n", failures);

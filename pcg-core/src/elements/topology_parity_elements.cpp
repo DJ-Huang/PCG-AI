@@ -268,6 +268,86 @@ public:
     }
 };
 
+ResampleOptions load_resample_options(const PcgContext& ctx)
+{
+    ResampleOptions options;
+    if (!ctx.node)
+        return options;
+    const auto& data = ctx.node->data;
+    options.group = data.value("group", std::string());
+    options.maintain_primitive_order = data.value("maintainPrimitiveOrder", false);
+    options.level_of_detail = data.value("levelOfDetail", 1);
+    options.resample_by_polygon_edge = data.value("resampleByPolygonEdge", false);
+    options.method = data.value("method", std::string("evenLength"));
+    options.measure = data.value("measure", std::string("arc"));
+    options.use_max_segment_length = data.value("useMaxSegmentLength", false);
+    options.max_segment_length = data.value("maxSegmentLength", 0.1);
+    options.use_max_segments = data.value("useMaxSegments", true);
+    options.max_segments = data.value("maxSegments", 2);
+    options.allow_attribute_override = data.value("allowAttributeOverride", true);
+    options.even_last_segment_same_length = data.value("evenLastSegmentSameLength", true);
+    options.maintain_last_vertex = data.value("maintainLastVertex", false);
+    options.randomize_first_segment_length = data.value("randomizeFirstSegmentLength", false);
+    options.create_only_points = data.value("createOnlyPoints", false);
+    options.treat_polygons_as = data.value("treatPolygonsAs", std::string("straight"));
+    options.output_as_subdivision_curves = data.value("outputAsSubdivisionCurves", false);
+    options.write_distance_attr = data.value("writeDistanceAttr", false);
+    options.distance_attribute = data.value("distanceAttribute", std::string("ptdist"));
+    options.write_tangent_attr = data.value("writeTangentAttr", false);
+    options.tangent_attribute = data.value("tangentAttribute", std::string("tangentu"));
+    options.write_curve_u_attr = data.value("writeCurveUAttr", false);
+    options.curve_u_attribute = data.value("curveUAttribute", std::string("curveu"));
+    options.write_curve_num_attr = data.value("writeCurveNumAttr", false);
+    options.curve_num_attribute = data.value("curveNumAttribute", std::string("curvenum"));
+    options.graph_seed = ctx.graph_seed;
+    return options;
+}
+
+data::PcgGeometry splines_to_curve_geometry(const data::PcgSplineData& splines)
+{
+    data::PcgGeometry geometry;
+    for (const auto& spline : splines.splines()) {
+        if (spline.points.size() < 2)
+            continue;
+        std::vector<int> face;
+        face.reserve(spline.points.size() + 1);
+        for (const auto& p : spline.points) {
+            const int index = static_cast<int>(geometry.points().size());
+            geometry.points_mut().push_back({p.x, p.y, p.z});
+            face.push_back(index);
+        }
+        if (spline.closed && !face.empty())
+            face.push_back(face.front());
+        geometry.faces_mut().push_back(std::move(face));
+    }
+    return geometry;
+}
+
+class ResampleElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "Resample"; }
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        ResampleOptions options = load_resample_options(ctx);
+        if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
+            emit_geometry(ctx, resample_geometry(*geometry, options));
+            return PCG_OK;
+        }
+        if (const data::PcgSplineData* splines = ctx.inputs.find_splines("in")) {
+            if (splines->splines().empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, "Resample missing curve input");
+            emit_geometry(ctx, resample_geometry(splines_to_curve_geometry(*splines), options));
+            return PCG_OK;
+        }
+        if (ctx.inputs.find_mesh("in") != nullptr) {
+            const auto geometry = get_geometry_input(ctx, "in", "Resample missing geometry input");
+            emit_geometry(ctx, resample_geometry(geometry, options));
+            return PCG_OK;
+        }
+        return fail_ctx(ctx, PCG_ERR_EXECUTION, "Resample missing geometry input");
+    }
+};
+
 class CarveElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "Carve"; }
@@ -419,6 +499,7 @@ void register_topology_parity_elements(
     map.emplace("Connectivity", std::make_unique<ConnectivityElement>());
     map.emplace("Assemble", std::make_unique<AssembleElement>());
     map.emplace("SortGeometry", std::make_unique<SortGeometryElement>());
+    map.emplace("Resample", std::make_unique<ResampleElement>());
     map.emplace("Carve", std::make_unique<CarveElement>());
     map.emplace("CarveSpline", std::make_unique<CarveElement>());
     map.emplace("FindShortestPath", std::make_unique<FindShortestPathElement>());

@@ -26,9 +26,27 @@ struct CreateSplineOptions {
 };
 
 struct ResampleSplineOptions {
+    // Legacy fields (still supported).
     std::string mode = "spacing";
     double spacing = 1.0;
     int point_count = 32;
+
+    // Houdini Resample parity.
+    bool use_max_segment_length = false;
+    double max_segment_length = 0.1;
+    bool use_max_segments = false;
+    int max_segments = 2;
+    std::string measure = "arc";
+    bool even_last_segment_same_length = true;
+    bool maintain_last_vertex = false;
+    bool write_distance_attr = false;
+    std::string distance_attribute = "ptdist";
+    bool write_tangent_attr = false;
+    std::string tangent_attribute = "tangentu";
+    bool write_curve_u_attr = false;
+    std::string curve_u_attribute = "curveu";
+    bool write_curve_num_attr = false;
+    std::string curve_num_attribute = "curvenum";
 };
 
 struct SampleAlongSplineOptions {

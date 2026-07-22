@@ -118,6 +118,28 @@ def validate_inspector_layout(manifest):
                     if "equals" not in visible:
                         errors.append(f"{node_type}.{key}: visibleWhen missing equals")
 
+            enabled = prop.get("enabledWhen")
+            if enabled is not None:
+                if not isinstance(enabled, dict):
+                    errors.append(f"{node_type}.{key}: enabledWhen must be object")
+                else:
+                    driver = enabled.get("property")
+                    if not driver:
+                        errors.append(f"{node_type}.{key}: enabledWhen missing property")
+                    elif driver not in props:
+                        errors.append(
+                            f"{node_type}.{key}: enabledWhen property '{driver}' not found"
+                        )
+
+            companion = prop.get("companionField")
+            if companion is not None:
+                if not isinstance(companion, str) or companion == "":
+                    errors.append(f"{node_type}.{key}: companionField must be non-empty string")
+                elif companion not in props:
+                    errors.append(
+                        f"{node_type}.{key}: companionField '{companion}' not found"
+                    )
+
         for section, items in orders_by_section.items():
             seen = {}
             for key, order in items:

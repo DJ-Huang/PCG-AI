@@ -4135,6 +4135,277 @@
       }
     },
     {
+      "type": "Resample",
+      "displayName": "Resample",
+      "category": "Spline",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Curves",
+          "pinType": "Any"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "Any"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "main",
+          "label": "Main",
+          "foldout": false
+        },
+        {
+          "id": "attributes",
+          "label": "Attribute Generation",
+          "foldout": false,
+          "header": true
+        }
+      ],
+      "properties": {
+        "group": {
+          "type": "groupSelect",
+          "displayName": "Group",
+          "default": "",
+          "groupDomain": "face",
+          "order": 0
+        },
+        "maintainPrimitiveOrder": {
+          "type": "boolean",
+          "displayName": "Maintain Primitive Order",
+          "default": false,
+          "section": "main",
+          "order": 10
+        },
+        "levelOfDetail": {
+          "type": "integer",
+          "displayName": "Level of Detail",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 10,
+          "section": "main",
+          "order": 20
+        },
+        "resampleByPolygonEdge": {
+          "type": "boolean",
+          "displayName": "Resample by Polygon Edge",
+          "default": false,
+          "section": "main",
+          "order": 30
+        },
+        "method": {
+          "type": "enum",
+          "displayName": "Method",
+          "default": "evenLength",
+          "section": "main",
+          "order": 40,
+          "options": [
+            {
+              "value": "evenLength",
+              "label": "Even Length Segments"
+            },
+            {
+              "value": "evenX",
+              "label": "Even X Segments"
+            },
+            {
+              "value": "evenY",
+              "label": "Even Y Segments"
+            },
+            {
+              "value": "evenZ",
+              "label": "Even Z Segments"
+            }
+          ]
+        },
+        "measure": {
+          "type": "enum",
+          "displayName": "Measure",
+          "default": "arc",
+          "section": "main",
+          "order": 50,
+          "options": [
+            {
+              "value": "arc",
+              "label": "Along Arc"
+            },
+            {
+              "value": "chord",
+              "label": "Along Chord"
+            }
+          ]
+        },
+        "useMaxSegmentLength": {
+          "type": "boolean",
+          "displayName": "Maximum Segment Length",
+          "default": false,
+          "section": "main",
+          "order": 60
+        },
+        "maxSegmentLength": {
+          "type": "number",
+          "displayName": "Length",
+          "default": 0.1,
+          "minimum": 0.0001,
+          "maximum": 10.0,
+          "section": "main",
+          "order": 70,
+          "indent": true,
+          "enabledWhen": {
+            "property": "useMaxSegmentLength",
+            "equals": "true"
+          }
+        },
+        "useMaxSegments": {
+          "type": "boolean",
+          "displayName": "Maximum Segments",
+          "default": true,
+          "section": "main",
+          "order": 80
+        },
+        "maxSegments": {
+          "type": "integer",
+          "displayName": "Segments",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 64,
+          "section": "main",
+          "order": 90,
+          "indent": true,
+          "enabledWhen": {
+            "property": "useMaxSegments",
+            "equals": "true"
+          }
+        },
+        "allowAttributeOverride": {
+          "type": "boolean",
+          "displayName": "Allow Primitive Attributes to Override Parameters",
+          "default": true,
+          "section": "main",
+          "order": 100
+        },
+        "evenLastSegmentSameLength": {
+          "type": "boolean",
+          "displayName": "Even Last Segment Same Length",
+          "default": true,
+          "section": "main",
+          "order": 110
+        },
+        "maintainLastVertex": {
+          "type": "boolean",
+          "displayName": "Maintain Last Vertex",
+          "default": false,
+          "section": "main",
+          "order": 120
+        },
+        "randomizeFirstSegmentLength": {
+          "type": "boolean",
+          "displayName": "Randomize First Segment Length",
+          "default": false,
+          "section": "main",
+          "order": 130
+        },
+        "createOnlyPoints": {
+          "type": "boolean",
+          "displayName": "Create Only Points",
+          "default": false,
+          "section": "main",
+          "order": 140
+        },
+        "treatPolygonsAs": {
+          "type": "enum",
+          "displayName": "Treat Polygons As",
+          "default": "straight",
+          "section": "main",
+          "order": 150,
+          "options": [
+            {
+              "value": "straight",
+              "label": "Straight Edges"
+            },
+            {
+              "value": "subdivision",
+              "label": "Subdivision Curves"
+            },
+            {
+              "value": "interpolating",
+              "label": "Interpolating Curves"
+            }
+          ]
+        },
+        "outputAsSubdivisionCurves": {
+          "type": "boolean",
+          "displayName": "Output as Polygon Curves to be Subdivided Later",
+          "default": false,
+          "section": "main",
+          "order": 160
+        },
+        "writeDistanceAttr": {
+          "type": "boolean",
+          "displayName": "Distance Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 0,
+          "companionField": "distanceAttribute"
+        },
+        "distanceAttribute": {
+          "type": "string",
+          "displayName": "Distance Attribute Name",
+          "default": "ptdist",
+          "section": "attributes",
+          "order": 10
+        },
+        "writeTangentAttr": {
+          "type": "boolean",
+          "displayName": "Tangent Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 20,
+          "companionField": "tangentAttribute"
+        },
+        "tangentAttribute": {
+          "type": "string",
+          "displayName": "Tangent Attribute Name",
+          "default": "tangentu",
+          "section": "attributes",
+          "order": 30
+        },
+        "writeCurveUAttr": {
+          "type": "boolean",
+          "displayName": "Curve U Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 40,
+          "companionField": "curveUAttribute"
+        },
+        "curveUAttribute": {
+          "type": "string",
+          "displayName": "Curve U Attribute Name",
+          "default": "curveu",
+          "section": "attributes",
+          "order": 50
+        },
+        "writeCurveNumAttr": {
+          "type": "boolean",
+          "displayName": "Curve Number Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 60,
+          "companionField": "curveNumAttribute"
+        },
+        "curveNumAttribute": {
+          "type": "string",
+          "displayName": "Curve Number Attribute Name",
+          "default": "curvenum",
+          "section": "attributes",
+          "order": 70
+        }
+      }
+    },
+    {
       "type": "ResampleSpline",
       "displayName": "Resample Spline",
       "category": "Spline",
@@ -4152,34 +4423,32 @@
           "pinType": "SpatialSpline"
         }
       ],
+      "inspectorSections": [
+        {
+          "id": "main",
+          "label": "Main",
+          "foldout": false
+        },
+        {
+          "id": "attributes",
+          "label": "Attribute Generation",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "legacy",
+          "label": "Legacy",
+          "foldout": true,
+          "defaultExpanded": false
+        }
+      ],
       "properties": {
-        "mode": {
-          "type": "enum",
-          "default": "spacing",
-          "options": [
-            {
-              "value": "spacing",
-              "label": "Spacing"
-            },
-            {
-              "value": "count",
-              "label": "Count"
-            }
-          ]
-        },
-        "spacing": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.01
-        },
-        "pointCount": {
-          "type": "integer",
-          "default": 32,
-          "minimum": 2
-        },
         "edgeMode": {
           "type": "enum",
+          "displayName": "Edge Mode",
           "default": "unshared",
+          "section": "main",
+          "order": 0,
           "options": [
             {
               "value": "unshared",
@@ -4197,9 +4466,175 @@
         },
         "edgeGroup": {
           "type": "groupSelect",
+          "displayName": "Edge Group",
           "default": "",
           "groupDomain": "edge",
-          "displayName": "Edge Group"
+          "section": "main",
+          "order": 10
+        },
+        "method": {
+          "type": "enum",
+          "displayName": "Method",
+          "default": "evenLength",
+          "section": "main",
+          "order": 20,
+          "options": [
+            {
+              "value": "evenLength",
+              "label": "Even Length Segments"
+            }
+          ]
+        },
+        "measure": {
+          "type": "enum",
+          "displayName": "Measure",
+          "default": "arc",
+          "section": "main",
+          "order": 30,
+          "options": [
+            {
+              "value": "arc",
+              "label": "Along Arc"
+            },
+            {
+              "value": "chord",
+              "label": "Along Chord"
+            }
+          ]
+        },
+        "useMaxSegmentLength": {
+          "type": "boolean",
+          "displayName": "Maximum Segment Length",
+          "default": false,
+          "section": "main",
+          "order": 40
+        },
+        "maxSegmentLength": {
+          "type": "number",
+          "displayName": "Length",
+          "default": 1.0,
+          "minimum": 0.01,
+          "maximum": 100.0,
+          "section": "main",
+          "order": 50,
+          "indent": true,
+          "enabledWhen": {
+            "property": "useMaxSegmentLength",
+            "equals": "true"
+          }
+        },
+        "useMaxSegments": {
+          "type": "boolean",
+          "displayName": "Maximum Segments",
+          "default": false,
+          "section": "main",
+          "order": 60
+        },
+        "maxSegments": {
+          "type": "integer",
+          "displayName": "Segments",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 256,
+          "section": "main",
+          "order": 70,
+          "indent": true,
+          "enabledWhen": {
+            "property": "useMaxSegments",
+            "equals": "true"
+          }
+        },
+        "evenLastSegmentSameLength": {
+          "type": "boolean",
+          "displayName": "Even Last Segment Same Length",
+          "default": true,
+          "section": "main",
+          "order": 80
+        },
+        "maintainLastVertex": {
+          "type": "boolean",
+          "displayName": "Maintain Last Vertex",
+          "default": false,
+          "section": "main",
+          "order": 90
+        },
+        "writeCurveUAttr": {
+          "type": "boolean",
+          "displayName": "Curve U Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 0,
+          "companionField": "curveUAttribute"
+        },
+        "curveUAttribute": {
+          "type": "string",
+          "displayName": "Curve U Attribute Name",
+          "default": "curveu",
+          "section": "attributes",
+          "order": 10
+        },
+        "writeDistanceAttr": {
+          "type": "boolean",
+          "displayName": "Distance Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 20,
+          "companionField": "distanceAttribute"
+        },
+        "distanceAttribute": {
+          "type": "string",
+          "displayName": "Distance Attribute Name",
+          "default": "ptdist",
+          "section": "attributes",
+          "order": 30
+        },
+        "writeCurveNumAttr": {
+          "type": "boolean",
+          "displayName": "Curve Number Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 40,
+          "companionField": "curveNumAttribute"
+        },
+        "curveNumAttribute": {
+          "type": "string",
+          "displayName": "Curve Number Attribute Name",
+          "default": "curvenum",
+          "section": "attributes",
+          "order": 50
+        },
+        "mode": {
+          "type": "enum",
+          "displayName": "Legacy Mode",
+          "default": "spacing",
+          "section": "legacy",
+          "order": 0,
+          "options": [
+            {
+              "value": "spacing",
+              "label": "Spacing"
+            },
+            {
+              "value": "count",
+              "label": "Count"
+            }
+          ]
+        },
+        "spacing": {
+          "type": "number",
+          "displayName": "Legacy Spacing",
+          "default": 1.0,
+          "minimum": 0.01,
+          "section": "legacy",
+          "order": 10
+        },
+        "pointCount": {
+          "type": "integer",
+          "displayName": "Legacy Point Count",
+          "default": 32,
+          "minimum": 2,
+          "section": "legacy",
+          "order": 20
         }
       }
     },

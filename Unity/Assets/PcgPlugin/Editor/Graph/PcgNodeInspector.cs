@@ -404,13 +404,18 @@ namespace DJTechEditor.PCG.Graph
                 .ThenBy(p => p.key)
                 .ToList();
 
+            var companionTargets = new HashSet<string>(
+                props
+                    .Where(p => !string.IsNullOrEmpty(p.prop.companionField))
+                    .Select(p => p.prop.companionField));
+
             // Sticky top: properties without a section (e.g. Houdini-style Group).
             var topProps = props.Where(p => string.IsNullOrEmpty(p.prop.section)).ToList();
             foreach (var (key, prop) in topProps)
             {
-                if (!IsPropertyVisible(node, prop))
+                if (companionTargets.Contains(key) || !IsPropertyVisible(node, prop))
                     continue;
-                m_Body.Add(CreatePropertyRow(node, key, prop, rebuildOnChange: IsVisibilityDriver(def, key)));
+                m_Body.Add(CreatePropertyRow(node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
             }
 
             if (topProps.Any(p => p.prop.type is "groupSelect" or "groupMultiSelect"))
@@ -428,7 +433,9 @@ namespace DJTechEditor.PCG.Graph
             foreach (var section in def.inspectorSections)
             {
                 var sectionProps = props
-                    .Where(p => p.prop.section == section.id && IsPropertyVisible(node, p.prop))
+                    .Where(p => p.prop.section == section.id
+                                && !companionTargets.Contains(p.key)
+                                && IsPropertyVisible(node, p.prop))
                     .ToList();
                 if (sectionProps.Count == 0)
                     continue;
@@ -450,15 +457,20 @@ namespace DJTechEditor.PCG.Graph
                     m_Body.Add(foldout);
                     container = foldout;
                 }
+                else if (section.header && !string.IsNullOrEmpty(section.label))
+                {
+                    AddSectionHeader(section.label);
+                }
 
                 foreach (var (key, prop) in sectionProps)
-                    container.Add(CreatePropertyRow(node, key, prop, rebuildOnChange: IsVisibilityDriver(def, key)));
+                    container.Add(CreatePropertyRow(node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
             }
         }
 
         private static bool IsVisibilityDriver(ManifestNodeDef def, string key) =>
             def.properties.Values.Any(p =>
                 (!string.IsNullOrEmpty(p.visibleWhenProperty) && p.visibleWhenProperty == key) ||
+                (!string.IsNullOrEmpty(p.enabledWhenProperty) && p.enabledWhenProperty == key) ||
                 (p.visibleWhenAny != null &&
                  p.visibleWhenAny.Any(c => c.property == key)));
 
@@ -549,20 +561,19 @@ namespace DJTechEditor.PCG.Graph
 
         /// <summary>
         /// Two-row layout matching other nodes: header (label + promote + bind), then full-width value.
-        /// Sectioned Inspectors also use this path so sliders/enums are not crushed beside decorate controls.
+        /// Booleans use a compact Houdini-style checkbox row (label on the toggle).
         /// </summary>
         private VisualElement CreatePropertyRow(
-            PcgManifestNodeView node, string key, ManifestPropertyDef prop, bool rebuildOnChange = false)
-        {
-            var container = new VisualElement
-            {
-                style =
-                {
-                    marginBottom = 8,
-                    flexShrink = 0,
-                },
-            };
+            PcgManifestNodeView node, string key, ManifestPropertyDef prop, bool rebuildOnChange = false) =>
+            CreatePropertyRow(node, key, prop, null, rebuildOnChange);
 
+        private VisualElement CreatePropertyRow(
+            PcgManifestNodeView node,
+            string key,
+            ManifestPropertyDef prop,
+            ManifestNodeDef def,
+            bool rebuildOnChange = false)
+        {
             Action<object> setValueOverride = null;
             if (rebuildOnChange)
             {
@@ -572,6 +583,19 @@ namespace DJTechEditor.PCG.Graph
                     ScheduleInspectorRebuild(node);
                 };
             }
+
+            if (prop.type == "boolean")
+                return CreateHoudiniToggleRow(node, key, prop, def, setValueOverride);
+
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginBottom = 6,
+                    flexShrink = 0,
+                    marginLeft = prop.indent ? 16 : 0,
+                },
+            };
 
             // Row 1: label + promote button + bind dropdown
             var headerRow = new VisualElement
@@ -641,7 +665,138 @@ namespace DJTechEditor.PCG.Graph
             // Row 2: value or bound label (full width — not crushed beside + / bind)
             var currentBindingForValue = m_Blackboard.FindBinding(node.NodeId, key);
             container.Add(CreateValueField(key, prop, node, currentBindingForValue, setValueOverride));
+            ApplyEnabledWhen(container, node, prop);
             return container;
+        }
+
+        /// <summary>
+        /// Houdini-style: ☐ Label  [optional companion field]  [+] [bind]
+        /// </summary>
+        private VisualElement CreateHoudiniToggleRow(
+            PcgManifestNodeView node,
+            string key,
+            ManifestPropertyDef prop,
+            ManifestNodeDef def,
+            Action<object> setValueOverride)
+        {
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginBottom = 4,
+                    flexShrink = 0,
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    marginLeft = prop.indent ? 16 : 0,
+                },
+            };
+
+            var currentVal = node.CollectData().GetRaw(key);
+            var toggled = currentVal switch
+            {
+                bool bv => bv,
+                string s => string.Equals(s, "true", StringComparison.OrdinalIgnoreCase),
+                _ => false,
+            };
+
+            Action<object> apply = v =>
+            {
+                if (setValueOverride != null)
+                    setValueOverride(v);
+                else
+                    node.SetPropertyValue(key, v);
+            };
+
+            var toggle = new Toggle
+            {
+                text = PcgGroupResolution.PropertyDisplayLabel(key, prop),
+                value = toggled,
+            };
+            toggle.style.flexGrow = 1;
+            toggle.style.flexShrink = 1;
+            toggle.style.minWidth = 0;
+            toggle.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Change Property", () => apply(evt.newValue));
+                NotifyGraphChanged();
+                if (setValueOverride == null &&
+                    def != null &&
+                    IsVisibilityDriver(def, key))
+                    ScheduleInspectorRebuild(node);
+                else if (!string.IsNullOrEmpty(prop.companionField) &&
+                         container.childCount > 1)
+                {
+                    // Companion sits right after the toggle.
+                    container[1].SetEnabled(evt.newValue);
+                }
+            });
+            container.Add(toggle);
+
+            if (def != null &&
+                !string.IsNullOrEmpty(prop.companionField) &&
+                def.properties.TryGetValue(prop.companionField, out var companionProp))
+            {
+                var companionBinding = m_Blackboard.FindBinding(node.NodeId, prop.companionField);
+                var companionField = CreateValueField(
+                    prop.companionField, companionProp, node, companionBinding, null);
+                companionField.style.flexGrow = 1;
+                companionField.style.flexShrink = 1;
+                companionField.style.minWidth = 80;
+                companionField.style.marginLeft = 6;
+                companionField.style.marginTop = 0;
+                companionField.SetEnabled(toggled);
+                toggle.RegisterValueChangedCallback(evt => companionField.SetEnabled(evt.newValue));
+                container.Add(companionField);
+            }
+
+            var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
+            {
+                text = "+",
+                tooltip = "Promote to parameter",
+            };
+            promoteBtn.style.width = 22;
+            promoteBtn.style.flexShrink = 0;
+            promoteBtn.style.marginLeft = 4;
+            container.Add(promoteBtn);
+
+            var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
+            var bindPopup = new PopupField<string>(bindOptions, currentIdx);
+            bindPopup.style.width = 72;
+            bindPopup.style.flexShrink = 0;
+            bindPopup.style.marginLeft = 2;
+            bindPopup.RegisterValueChangedCallback(evt =>
+            {
+                var idx = bindOptions.IndexOf(evt.newValue);
+                var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
+                var currentBinding = m_Blackboard.FindBinding(node.NodeId, key);
+                var currentId = currentBinding?.id ?? "";
+                if (paramId == currentId)
+                    return;
+
+                m_GraphView.WithUndo("Bind Parameter", () =>
+                {
+                    if (string.IsNullOrEmpty(paramId))
+                        m_Blackboard.ClearBindingForNode(node.NodeId, key);
+                    else
+                        m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                });
+                ScheduleInspectorRebuild(node);
+            });
+            container.Add(bindPopup);
+
+            ApplyEnabledWhen(container, node, prop);
+            return container;
+        }
+
+        private static void ApplyEnabledWhen(
+            VisualElement row, PcgManifestNodeView node, ManifestPropertyDef prop)
+        {
+            if (string.IsNullOrEmpty(prop.enabledWhenProperty))
+                return;
+
+            var enabled = MatchesVisibleClause(
+                node, prop.enabledWhenProperty, prop.enabledWhenEquals, null);
+            row.SetEnabled(enabled);
         }
 
         private VisualElement CreateValueField(

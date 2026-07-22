@@ -4,6 +4,7 @@
 #include "elements/vehicle_modeling_algorithms.hpp"
 #include "data/pcg_geometry.hpp"
 #include "geometry/group_table.hpp"
+#include "geometry/spline_geometry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1317,6 +1318,206 @@ data::PcgGeometry tree_simple_leaf_geometry(const data::PcgPointData& points,
         output.faces_mut().push_back({base + 2, base + 6, base + 7, base + 3});
         output.faces_mut().push_back({base + 3, base + 7, base + 4, base + 0});
     }
+    return output;
+}
+
+geometry::PolylineResampleOptions polyline_opts_for_face(const data::PcgGeometry& input,
+                                                         size_t face_index,
+                                                         const ResampleOptions& options)
+{
+    geometry::PolylineResampleOptions polyline_opts;
+    polyline_opts.use_max_segments = options.use_max_segments;
+    polyline_opts.max_segments = options.max_segments;
+    polyline_opts.use_max_segment_length = options.use_max_segment_length;
+    polyline_opts.max_segment_length = options.max_segment_length;
+    polyline_opts.measure = options.measure;
+    polyline_opts.even_last_segment_same_length = options.even_last_segment_same_length;
+    polyline_opts.maintain_last_vertex = options.maintain_last_vertex;
+
+    if (!options.allow_attribute_override)
+        return polyline_opts;
+
+    auto read_prim_scalar = [&](const std::string& name, double& out) -> bool {
+        const data::AttributeArray* attr =
+            input.attributes().find(data::AttributeOwner::Primitive, name);
+        if (!attr || face_index >= attr->size())
+            return false;
+        if (attr->schema().type == data::AttributeType::Float) {
+            out = attr->float_values()[face_index];
+            return true;
+        }
+        if (attr->schema().type == data::AttributeType::Int) {
+            out = static_cast<double>(attr->int_values()[face_index]);
+            return true;
+        }
+        return false;
+    };
+
+    double segment_length = 0.0;
+    if (read_prim_scalar("segment_length", segment_length) && segment_length > 0.0) {
+        polyline_opts.use_max_segment_length = true;
+        polyline_opts.use_max_segments = false;
+        polyline_opts.max_segment_length = segment_length;
+    }
+    double num_segments = 0.0;
+    if (read_prim_scalar("num_segments", num_segments) && num_segments > 0.0) {
+        polyline_opts.use_max_segments = true;
+        polyline_opts.use_max_segment_length = false;
+        polyline_opts.max_segments = static_cast<int>(num_segments);
+    }
+    return polyline_opts;
+}
+
+int append_point(data::PcgGeometry& output, const data::PcgVec3& point)
+{
+    const int index = static_cast<int>(output.points().size());
+    output.points_mut().push_back(point);
+    return index;
+}
+
+void write_resample_point_attrs(data::PcgGeometry& output,
+                                int point_index,
+                                const geometry::PolylineResampleResult& resampled,
+                                size_t sample_index,
+                                int curve_number,
+                                const ResampleOptions& options)
+{
+    if (point_index < 0 || static_cast<size_t>(point_index) >= output.points().size())
+        return;
+
+    auto write_scalar = [&](const std::string& name, double value) {
+        if (name.empty())
+            return;
+        data::AttributeArray* attr = output.attributes().find(data::AttributeOwner::Point, name);
+        if (!attr) {
+            attr = &output.attributes().create_float(data::AttributeOwner::Point, name, 1);
+            attr->resize(output.points().size());
+        } else if (attr->size() < output.points().size()) {
+            attr->resize(output.points().size());
+        }
+        attr->float_values_mut()[static_cast<size_t>(point_index)] = value;
+    };
+
+    if (options.write_curve_u_attr && sample_index < resampled.curve_u.size())
+        write_scalar(options.curve_u_attribute, resampled.curve_u[sample_index]);
+    if (options.write_distance_attr && sample_index < resampled.half_edge_lengths.size())
+        write_scalar(options.distance_attribute, resampled.half_edge_lengths[sample_index]);
+    if (options.write_curve_num_attr)
+        write_scalar(options.curve_num_attribute, static_cast<double>(curve_number));
+
+    if (options.write_tangent_attr && sample_index < resampled.tangents.size()) {
+        data::AttributeArray* attr =
+            output.attributes().find(data::AttributeOwner::Point, options.tangent_attribute);
+        if (!attr) {
+            attr = &output.attributes().create_float(data::AttributeOwner::Point,
+                                                     options.tangent_attribute, 3);
+            attr->resize(output.points().size());
+        } else if (attr->size() < output.points().size()) {
+            attr->resize(output.points().size());
+        }
+        auto& values = attr->float_values_mut();
+        const auto& t = resampled.tangents[sample_index];
+        values[static_cast<size_t>(point_index) * 3 + 0] = t.x;
+        values[static_cast<size_t>(point_index) * 3 + 1] = t.y;
+        values[static_cast<size_t>(point_index) * 3 + 2] = t.z;
+    }
+}
+
+data::PcgGeometry resample_geometry(const data::PcgGeometry& input, const ResampleOptions& options)
+{
+    data::PcgGeometry output;
+    if (input.faces().empty())
+        return input;
+
+    std::unordered_set<geometry::GroupId> selected;
+    if (options.group.empty()) {
+        for (size_t i = 0; i < input.faces().size(); ++i)
+            selected.insert(static_cast<geometry::GroupId>(i));
+    } else {
+        selected = input.groups().eval(geometry::GroupDomain::Face, options.group);
+    }
+
+    std::unordered_map<int, int> point_remap;
+    auto remap_point = [&](int source_index) {
+        if (source_index < 0 || static_cast<size_t>(source_index) >= input.points().size())
+            return -1;
+        const auto found = point_remap.find(source_index);
+        if (found != point_remap.end())
+            return found->second;
+        const int mapped = append_point(output, input.points()[static_cast<size_t>(source_index)]);
+        point_remap.emplace(source_index, mapped);
+        return mapped;
+    };
+
+    int curve_counter = 0;
+    for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+        const auto& face = input.faces()[fi];
+        const bool resample_face =
+            selected.count(static_cast<geometry::GroupId>(fi)) > 0 && face.size() >= 2;
+
+        if (!resample_face) {
+            std::vector<int> remapped;
+            remapped.reserve(face.size());
+            for (int pi : face) {
+                const int mapped = remap_point(pi);
+                if (mapped >= 0)
+                    remapped.push_back(mapped);
+            }
+            if (remapped.size() >= 2)
+                output.faces_mut().push_back(std::move(remapped));
+            continue;
+        }
+
+        std::vector<geometry::Vec3> polyline;
+        polyline.reserve(face.size());
+        for (int pi : face) {
+            if (pi < 0 || static_cast<size_t>(pi) >= input.points().size())
+                continue;
+            const auto& p = input.points()[static_cast<size_t>(pi)];
+            polyline.push_back({p.x, p.y, p.z});
+        }
+        if (polyline.size() < 2)
+            continue;
+
+        const bool closed =
+            face.size() >= 3 && face.front() == face.back() &&
+            geometry::length(geometry::sub(polyline.front(), polyline.back())) <= kEps;
+        if (closed && polyline.size() >= 2)
+            polyline.pop_back();
+
+        const geometry::PolylineResampleOptions polyline_opts =
+            polyline_opts_for_face(input, fi, options);
+        const geometry::PolylineResampleResult resampled =
+            geometry::resample_polyline_houdini(polyline, polyline_opts);
+
+        if (resampled.points.empty())
+            continue;
+
+        if (options.create_only_points) {
+            for (size_t si = 0; si < resampled.points.size(); ++si) {
+                const auto& p = resampled.points[si];
+                const int pi = append_point(output, {p.x, p.y, p.z});
+                write_resample_point_attrs(output, pi, resampled, si, curve_counter, options);
+            }
+        } else {
+            std::vector<int> remapped;
+            remapped.reserve(resampled.points.size() + 1);
+            for (size_t si = 0; si < resampled.points.size(); ++si) {
+                const auto& p = resampled.points[si];
+                const int pi = append_point(output, {p.x, p.y, p.z});
+                write_resample_point_attrs(output, pi, resampled, si, curve_counter, options);
+                remapped.push_back(pi);
+            }
+            if (closed && !remapped.empty())
+                remapped.push_back(remapped.front());
+            if (remapped.size() >= 2)
+                output.faces_mut().push_back(std::move(remapped));
+        }
+        ++curve_counter;
+    }
+
+    output.groups() = input.groups();
+    output.detail() = input.detail();
     return output;
 }
 

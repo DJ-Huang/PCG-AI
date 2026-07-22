@@ -229,6 +229,231 @@ std::vector<Vec3> resample_polyline_by_count(const std::vector<Vec3>& polyline, 
     return out;
 }
 
+namespace {
+
+std::vector<double> build_cumulative_lengths(const std::vector<Vec3>& polyline)
+{
+    std::vector<double> cumulative;
+    cumulative.reserve(polyline.size());
+    cumulative.push_back(0.0);
+    for (size_t i = 1; i < polyline.size(); ++i)
+        cumulative.push_back(cumulative.back() + length(sub(polyline[i], polyline[i - 1])));
+    return cumulative;
+}
+
+Vec3 sample_polyline_at_arc_distance(const std::vector<Vec3>& polyline,
+                                     const std::vector<double>& cumulative,
+                                     double distance,
+                                     double* out_u,
+                                     Vec3* out_tangent)
+{
+    const double total = cumulative.empty() ? 0.0 : cumulative.back();
+    if (polyline.empty())
+        return {};
+    if (total <= kEpsilon || distance <= 0.0) {
+        if (out_u)
+            *out_u = 0.0;
+        if (out_tangent && polyline.size() >= 2)
+            *out_tangent = normalize(sub(polyline[1], polyline[0]));
+        return polyline.front();
+    }
+    if (distance >= total) {
+        if (out_u)
+            *out_u = 1.0;
+        if (out_tangent && polyline.size() >= 2)
+            *out_tangent = normalize(sub(polyline.back(), polyline[polyline.size() - 2]));
+        return polyline.back();
+    }
+
+    const auto upper = std::lower_bound(cumulative.begin(), cumulative.end(), distance);
+    if (upper == cumulative.begin()) {
+        if (out_u)
+            *out_u = 0.0;
+        if (out_tangent && polyline.size() >= 2)
+            *out_tangent = normalize(sub(polyline[1], polyline[0]));
+        return polyline.front();
+    }
+
+    const size_t idx = static_cast<size_t>(upper - cumulative.begin());
+    const double seg_start = cumulative[idx - 1];
+    const double seg_len = cumulative[idx] - seg_start;
+    const double local_t = seg_len <= kEpsilon ? 0.0 : (distance - seg_start) / seg_len;
+    const Vec3 pos =
+        add(polyline[idx - 1], scale(sub(polyline[idx], polyline[idx - 1]), local_t));
+    if (out_u)
+        *out_u = distance / total;
+    if (out_tangent)
+        *out_tangent = normalize(sub(polyline[idx], polyline[idx - 1]));
+    return pos;
+}
+
+PolylineResampleResult resample_polyline_by_chord_length(const std::vector<Vec3>& polyline,
+                                                         double max_segment_length,
+                                                         bool even_last_segment_same_length,
+                                                         bool maintain_last_vertex)
+{
+    PolylineResampleResult result;
+    if (polyline.size() < 2)
+        return result;
+
+    const double total = polyline_length(polyline);
+    const std::vector<double> cumulative = build_cumulative_lengths(polyline);
+    const double max_len = std::max(kEpsilon, max_segment_length);
+
+    int num_segments = 1;
+    double target_len = total;
+    if (even_last_segment_same_length) {
+        num_segments = std::max(1, static_cast<int>(std::ceil(total / max_len)));
+        target_len = total / static_cast<double>(num_segments);
+    }
+
+    auto append_sample = [&](double arc_distance) {
+        double curve_u = 0.0;
+        Vec3 tangent{};
+        const Vec3 pos =
+            sample_polyline_at_arc_distance(polyline, cumulative, arc_distance, &curve_u, &tangent);
+        result.points.push_back(pos);
+        result.curve_u.push_back(curve_u);
+        result.tangents.push_back(tangent);
+    };
+
+    append_sample(0.0);
+    if (even_last_segment_same_length) {
+        for (int seg = 1; seg < num_segments; ++seg)
+            append_sample(target_len * static_cast<double>(seg));
+        append_sample(total);
+    } else {
+        double arc = 0.0;
+        while (arc + max_len < total - kEpsilon) {
+            arc += max_len;
+            append_sample(arc);
+        }
+        if (maintain_last_vertex || length(sub(result.points.back(), polyline.back())) > kEpsilon)
+            append_sample(total);
+    }
+
+    return result;
+}
+
+void finalize_polyline_resample_result(PolylineResampleResult& result)
+{
+    if (result.points.empty())
+        return;
+
+    result.half_edge_lengths.assign(result.points.size(), 0.0);
+    for (size_t i = 0; i + 1 < result.points.size(); ++i) {
+        const double seg_len = length(sub(result.points[i + 1], result.points[i]));
+        result.half_edge_lengths[i] += seg_len * 0.5;
+        result.half_edge_lengths[i + 1] += seg_len * 0.5;
+    }
+}
+
+} // namespace
+
+PolylineResampleResult resample_polyline_houdini(const std::vector<Vec3>& polyline,
+                                                 const PolylineResampleOptions& options)
+{
+    PolylineResampleResult result;
+    if (polyline.empty())
+        return result;
+    if (polyline.size() == 1) {
+        result.points = polyline;
+        result.curve_u = {0.0};
+        result.tangents = {{0.0, 0.0, 1.0}};
+        finalize_polyline_resample_result(result);
+        return result;
+    }
+
+    const double total = polyline_length(polyline);
+    if (total <= kEpsilon) {
+        result.points = {polyline.front()};
+        result.curve_u = {0.0};
+        result.tangents = {{0.0, 0.0, 1.0}};
+        finalize_polyline_resample_result(result);
+        return result;
+    }
+
+    const bool use_segments = options.use_max_segments;
+    const bool use_length = options.use_max_segment_length;
+    if (!use_segments && !use_length) {
+        result.points = polyline;
+        const std::vector<double> cumulative = build_cumulative_lengths(polyline);
+        for (size_t i = 0; i < polyline.size(); ++i) {
+            result.curve_u.push_back(cumulative[i] / total);
+            if (i + 1 < polyline.size())
+                result.tangents.push_back(normalize(sub(polyline[i + 1], polyline[i])));
+            else
+                result.tangents.push_back(normalize(sub(polyline[i], polyline[i - 1])));
+        }
+        finalize_polyline_resample_result(result);
+        return result;
+    }
+
+    if (options.measure == "chord" && use_length && !use_segments) {
+        result = resample_polyline_by_chord_length(polyline, options.max_segment_length,
+                                                   options.even_last_segment_same_length,
+                                                   options.maintain_last_vertex);
+        finalize_polyline_resample_result(result);
+        return result;
+    }
+
+    int num_segments = 1;
+    if (use_segments)
+        num_segments = std::max(1, options.max_segments);
+    else {
+        const double max_len = std::max(kEpsilon, options.max_segment_length);
+        if (options.even_last_segment_same_length)
+            num_segments = std::max(1, static_cast<int>(std::ceil(total / max_len)));
+        else
+            num_segments = std::max(1, static_cast<int>(std::floor(total / max_len)));
+    }
+
+    double segment_arc = total / static_cast<double>(num_segments);
+    if (use_length && !use_segments && !options.even_last_segment_same_length)
+        segment_arc = std::max(kEpsilon, options.max_segment_length);
+
+    const std::vector<double> cumulative = build_cumulative_lengths(polyline);
+    for (int seg = 0; seg <= num_segments; ++seg) {
+        double arc = segment_arc * static_cast<double>(seg);
+        if (seg == num_segments)
+            arc = total;
+        double curve_u = 0.0;
+        Vec3 tangent{};
+        const Vec3 pos = sample_polyline_at_arc_distance(polyline, cumulative, arc, &curve_u, &tangent);
+        if (!result.points.empty() &&
+            length(sub(pos, result.points.back())) <= kEpsilon)
+            continue;
+        result.points.push_back(pos);
+        result.curve_u.push_back(curve_u);
+        result.tangents.push_back(tangent);
+    }
+
+    if (options.maintain_last_vertex &&
+        length(sub(result.points.back(), polyline.back())) > kEpsilon) {
+        double curve_u = 1.0;
+        Vec3 tangent{};
+        const Vec3 pos =
+            sample_polyline_at_arc_distance(polyline, cumulative, total, &curve_u, &tangent);
+        result.points.push_back(pos);
+        result.curve_u.push_back(curve_u);
+        result.tangents.push_back(tangent);
+    } else if (!options.maintain_last_vertex && use_length && !use_segments &&
+               !options.even_last_segment_same_length) {
+        // Drop endpoint when the last segment would be shorter (Houdini default).
+        if (result.points.size() >= 2 &&
+            length(sub(result.points.back(), polyline.back())) > kEpsilon &&
+            length(sub(result.points.back(), result.points[result.points.size() - 2])) <
+                segment_arc * 0.5) {
+            result.points.pop_back();
+            result.curve_u.pop_back();
+            result.tangents.pop_back();
+        }
+    }
+
+    finalize_polyline_resample_result(result);
+    return result;
+}
+
 std::vector<Frame3> build_frames(const std::vector<Vec3>& polyline, const Vec3& up_hint)
 {
     std::vector<Frame3> frames;

@@ -121,6 +121,35 @@ struct TreeSimpleLeafOptions {
     double scale_max = 1.3;
 };
 
+struct ResampleOptions {
+    std::string group;
+    bool maintain_primitive_order = false;
+    int level_of_detail = 1;
+    bool resample_by_polygon_edge = false;
+    std::string method = "evenLength"; // evenLength | evenX | evenY | evenZ
+    std::string measure = "arc";       // arc | chord
+    bool use_max_segment_length = false;
+    double max_segment_length = 0.1;
+    bool use_max_segments = true;
+    int max_segments = 2;
+    bool allow_attribute_override = true;
+    bool even_last_segment_same_length = true;
+    bool maintain_last_vertex = false;
+    bool randomize_first_segment_length = false;
+    bool create_only_points = false;
+    std::string treat_polygons_as = "straight"; // straight | subdivision | interpolating
+    bool output_as_subdivision_curves = false;
+    bool write_distance_attr = false;
+    std::string distance_attribute = "ptdist";
+    bool write_tangent_attr = false;
+    std::string tangent_attribute = "tangentu";
+    bool write_curve_u_attr = false;
+    std::string curve_u_attribute = "curveu";
+    bool write_curve_num_attr = false;
+    std::string curve_num_attribute = "curvenum";
+    int graph_seed = 0;
+};
+
 void set_detail_int(data::PcgGeometry& geometry, const std::string& name, int64_t value);
 void set_detail_float(data::PcgGeometry& geometry, const std::string& name, double value);
 int read_iterations_attribute(const data::PcgGeometry& geometry, const std::string& name, int fallback);
@@ -150,6 +179,8 @@ data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                                       const CarveSplineOptions& options);
 data::PcgSplineData find_shortest_path_on_mesh(const data::PcgGeometry& input,
                                                const FindShortestPathOptions& options);
+data::PcgGeometry resample_geometry(const data::PcgGeometry& input,
+                                    const ResampleOptions& options);
 data::PcgGeometry tree_simple_leaf_geometry(const data::PcgPointData& points,
                                             const TreeSimpleLeafOptions& options);
 

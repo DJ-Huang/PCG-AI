@@ -116,6 +116,28 @@ public:
         opts.mode = ctx.node->data.value("mode", std::string("spacing"));
         opts.spacing = ctx.node->data.value("spacing", 1.0);
         opts.point_count = ctx.node->data.value("pointCount", 32);
+        opts.use_max_segment_length = ctx.node->data.value("useMaxSegmentLength", false);
+        opts.max_segment_length = ctx.node->data.value("maxSegmentLength", 0.1);
+        opts.use_max_segments = ctx.node->data.value("useMaxSegments", false);
+        opts.max_segments = ctx.node->data.value("maxSegments", 2);
+        opts.measure = ctx.node->data.value("measure", std::string("arc"));
+        opts.even_last_segment_same_length =
+            ctx.node->data.value("evenLastSegmentSameLength", true);
+        opts.maintain_last_vertex = ctx.node->data.value("maintainLastVertex", false);
+        opts.write_distance_attr = ctx.node->data.value("writeDistanceAttr", false);
+        opts.distance_attribute = ctx.node->data.value("distanceAttribute", std::string("ptdist"));
+        opts.write_tangent_attr = ctx.node->data.value("writeTangentAttr", false);
+        opts.tangent_attribute = ctx.node->data.value("tangentAttribute", std::string("tangentu"));
+        opts.write_curve_u_attr = ctx.node->data.value("writeCurveUAttr", false);
+        opts.curve_u_attribute = ctx.node->data.value("curveUAttribute", std::string("curveu"));
+        opts.write_curve_num_attr = ctx.node->data.value("writeCurveNumAttr", false);
+        opts.curve_num_attribute =
+            ctx.node->data.value("curveNumAttribute", std::string("curvenum"));
+        if (!ctx.node->data.contains("useMaxSegments") &&
+            !ctx.node->data.contains("useMaxSegmentLength")) {
+            opts.use_max_segments = false;
+            opts.use_max_segment_length = false;
+        }
 
         emit_splines(ctx, resample_spline_data(input, opts));
         return PCG_OK;
