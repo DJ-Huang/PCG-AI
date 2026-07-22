@@ -14,6 +14,8 @@
 #include "elements/building_elements.hpp"
 #include "elements/heightfield_elements.hpp"
 #include "elements/assembly_elements.hpp"
+#include "elements/facade_foundation_elements.hpp"
+#include "elements/topology_parity_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -148,8 +150,10 @@ public:
         if (const data::PcgTaggedData* in_item = ctx.inputs.find("in");
             in_item && in_item->points) {
             ctx.outputs.add_points_shared_with_meta("out", in_item->points, in_item->payload);
-            if (auto spawn_mesh = ctx.inputs.find_mesh_shared("spawnMesh"))
-                ctx.outputs.add_mesh_shared("spawnMesh", spawn_mesh);
+            for (const auto& item : ctx.inputs.items()) {
+                if (item.tag == "spawnMesh" && item.mesh)
+                    ctx.outputs.add_mesh_shared("spawnMesh", item.mesh);
+            }
             return PCG_OK;
         }
 
@@ -201,6 +205,8 @@ void register_builtin_elements()
     register_building_elements(map);
     register_heightfield_elements(map);
     register_assembly_elements(map);
+    register_facade_foundation_elements(map);
+    register_topology_parity_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

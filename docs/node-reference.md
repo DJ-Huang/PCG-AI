@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **89 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **101 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -62,6 +62,7 @@
 - [Spawner 类别](#spawner-类别)
   - [PlaceInScene](#placeinscene)
   - [StaticMeshSpawner](#staticmeshspawner)
+  - [MergeSpawnPoints](#mergespawnpoints)
 - [Spline 类别](#spline-类别)
   - [CreateSpline](#createspline)
   - [CreateBezierSpline](#createbezierspline)
@@ -72,6 +73,7 @@
   - [CrossSectionProfile](#crosssectionprofile)
   - [InstanceAlongSpline](#instancealongspline)
   - [CreateSpiralSpline](#createspiralspline)
+  - [CreateArcSpline](#createarcspline)
 - [Structural 类别](#structural-类别)
   - [ConvexHull](#convexhull)
   - [ConnectNearest](#connectnearest)
@@ -80,6 +82,7 @@
   - [Voronoi](#voronoi)
   - [AStarPathfinding](#astarpathfinding)
 - [Mesh 类别](#mesh-类别)
+  - [CreateGridMesh](#creategridmesh)
   - [CreateBoxMesh](#createboxmesh)
   - [SubdivideMesh](#subdividemesh)
   - [BevelMesh](#bevelmesh)
@@ -89,6 +92,7 @@
   - [MirrorMesh](#mirrormesh)
   - [FuseMesh](#fusemesh)
   - [PolyExtrude](#polyextrude)
+  - [LotSubdivision](#lotsubdivision)
   - [CopyMesh](#copymesh)
   - [ShellMesh](#shellmesh)
   - [ImportMesh](#importmesh)
@@ -124,6 +128,13 @@
   - [Test](#test)
 
 ---
+  - [ForEachBegin](#foreachbegin)
+  - [ForEachEnd](#foreachend)
+  - [PrimitiveTransform](#primitivetransform)
+  - [ConvertLine](#convertline)
+  - [ExtractCentroid](#extractcentroid)
+  - [GroupTransfer](#grouptransfer)
+  - [Clip](#clip)
 
 ## Pin 数据类型
 
@@ -714,7 +725,7 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 **类别**：Generation
 
-**功能**：在输入网格表面均匀采样生成点云。支持法线偏移和松散度控制。
+**功能**：在输入网格表面均匀采样生成点云。支持法线偏移、松散度、face group 过滤与边缘避让（对齐 Houdini Scatter Group + Distance From Border 硬阈值）。
 
 **输入 Pin**：
 
@@ -736,14 +747,18 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 | `seed` | integer | 0 | — | 随机种子 |
 | `normalOffset` | number | 0.0 | — | 沿法线方向的偏移量 |
 | `looseness` | number | 0.0 | ≥ 0 | 松散度。0 = 严格在表面上，>0 = 点在表面附近随机分布 |
+| `faceGroup` | groupSelect | `""` | face | 只在指定 face group 上采样（Houdini Scatter Group）。空 = 全部面 |
+| `excludeGroups` | groupMultiSelect | `""` | face | 从采样池排除的 face group 列表 |
+| `edgeMargin` | number | 0.0 | ≥ 0 | 拒绝距采样面组边界 < margin 的点（Houdini Distance From Border 硬阈值） |
 
 **执行逻辑**：
-1. 读取输入网格的三角形列表
-2. 按面积加权随机选择三角形面
+1. 优先读取 `PcgGeometry`（保留 face group）；仅有 triangle soup 时回退 mesh 路径
+2. 按 `faceGroup` / `excludeGroups` 过滤可采样面，再 fan 三角化并按面积加权采样
 3. 在选中三角形内生成均匀分布的随机点（重心坐标采样）
-4. 若 `normalOffset` ≠ 0，沿该点法线方向偏移
-5. 若 `looseness` > 0，在表面附近添加随机扰动
-6. 输出 `SpatialPoint` 类型点云
+4. 若 `edgeMargin` > 0，拒绝距采样面组边界（组内出现一次的边）过近的点并重试
+5. 若 `normalOffset` ≠ 0，沿该点法线方向偏移
+6. 若 `looseness` > 0，在表面附近添加随机扰动
+7. 输出 `SpatialPoint` 类型点云
 
 **用法示例**：
 
@@ -752,11 +767,18 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
   "id": "sms2",
   "type": "SampleMeshSurface",
   "position": { "x": 300, "y": 0 },
-  "data": { "count": 500, "seed": 42, "normalOffset": 0.5, "looseness": 0.3 }
+  "data": {
+    "count": 500,
+    "seed": 42,
+    "normalOffset": 0.5,
+    "looseness": 0.3,
+    "faceGroup": "extrude_top",
+    "edgeMargin": 1.1
+  }
 }
 ```
 
-> 典型连接：`GetMeshData → SampleMeshSurface → PlaceInScene`，在网格表面散布物体。
+> 典型连接：`PolyExtrude(topGroup=extrude_top) → SampleMeshSurface(faceGroup=extrude_top, edgeMargin>0) → CopyMeshToPoints`。
 
 ---
 
@@ -1275,6 +1297,41 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 ---
 
+### MergeSpawnPoints
+
+**类别**：Spawner
+
+**功能**：合并多路 `StaticMeshSpawner` 输出。按输入顺序拼接 Points，并为每一路保留独立的 `spawnMesh` 原型（一种 building → 一批 GPU instance）。Unity 侧按 `spawnProtoCounts` 切片后，对每个原型分别做 multi-submesh `RenderMeshIndirect`。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `in` | Spawn Streams | `SpatialPoint`（variadic） | 每路来自 `StaticMeshSpawner.out`，并携带对应 `spawnMesh` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Instances | `SpatialPoint` |
+
+**属性**：无
+
+**执行逻辑**：
+1. 按输入顺序收集 Points 与同序 `spawnMesh`
+2. 拼接 Points，sidecar 写入 `spawnProtoCounts`
+3. 输出全部 `spawnMesh`（多原型）
+
+**典型连接**：
+
+```text
+blast_tall  → StaticMeshSpawner(tall)  ─┐
+blast_med   → StaticMeshSpawner(med)   ─┼→ MergeSpawnPoints → Output
+blast_short → StaticMeshSpawner(short) ─┘
+```
+
+---
+
 ## Spline 类别
 
 样条（Spline）类别节点负责创建、编辑和消费样条数据，是桥梁、道路等线性结构生成的核心。
@@ -1720,6 +1777,24 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 ---
 
+### CreateArcSpline
+
+生成圆弧样条（对齐 Houdini Circle SOP 的 arc 模式），用于拱窗剖面、拱门线脚等。
+
+| 属性 | 类型 | 默认值 | 范围 | 说明 |
+|------|------|--------|------|------|
+| radius | number | 1.0 | > 0 | 圆弧半径 |
+| startAngle | number | 0.0 | | 起始角（度） |
+| endAngle | number | 180.0 | | 结束角（度） |
+| segments | integer | 16 | 1–256 | 弧段数；采样点数 = segments + 1 |
+| axis | enum | z | x/y/z | 圆弧所在平面的法线轴（与 `CreateSpiralSpline.axis` 对齐） |
+
+**输出**：`out: SpatialSpline`（polyline，closed=false）。圆弧位于垂直于 `axis` 的平面上，圆心在原点。
+
+> 典型连接：`CreateArcSpline → SweepAlongSpline(rectangle) → TransformMesh`（拱门线脚）；或作为拱窗 Boolean cutter 的剖面轮廓。
+
+---
+
 ## Structural 类别
 
 ### ConvexHull
@@ -1995,6 +2070,55 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 ---
 
 ## Mesh 类别
+
+### CreateGridMesh
+
+**类别**：Mesh
+
+**功能**：创建 Houdini Grid 风格的平面网格。在指定平面上以 `rows × cols` 个 quad 铺满 `sizeX × sizeY` 区域，居中于原点。支持合并上游输入网格。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `in` | Mesh | `SpatialMesh` | 可选。上游网格会与新 grid 合并 |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Mesh | `SpatialMesh` |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `sizeX` | number | 10.0 | ≥ 0 | 平面第一轴总尺寸 |
+| `sizeY` | number | 10.0 | ≥ 0 | 平面第二轴总尺寸 |
+| `rows` | integer | 10 | 1 ~ 512 | 行方向 quad 数量 |
+| `cols` | integer | 10 | 1 ~ 512 | 列方向 quad 数量 |
+| `plane` | enum | `xz` | `xz` / `xy` / `yz` | 平面朝向；`xz` 为地面（法线 +Y） |
+
+**执行逻辑**：
+1. 校验尺寸 ≥ 0，`rows`/`cols` ≥ 1
+2. 在选定平面上生成 `(rows+1) × (cols+1)` 顶点与 `rows × cols` 个 quad face
+3. 若有上游输入网格，合并（前缀 `in_`）
+4. 输出 `SpatialMesh`（保留 polygon 拓扑）
+
+**用法示例**：
+
+```json
+{
+  "id": "ground",
+  "type": "CreateGridMesh",
+  "position": { "x": 0, "y": 0 },
+  "data": { "sizeX": 48.0, "sizeY": 48.0, "rows": 1, "cols": 1, "plane": "xz" }
+}
+```
+
+> 典型连接：`CreateGridMesh → LotSubdivision → PolyExtrude`（地块划分）；`rows=1, cols=1` 等价于单 quad 地面，替代 thin `CreateBoxMesh`。
+
+---
 
 ### CreateBoxMesh
 
@@ -2325,6 +2449,40 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 | `sideGroup` | `extrude_side` | 新 side face group 名 |
 
 生成元素从来源 face/corner/point 继承 attributes、UV 和材质；Position role 属性跟随新 point 位移。输出同时维护动态 top/side groups 与 `unshared`。
+
+### LotSubdivision
+
+**类别**：Mesh
+
+**功能**：对齐 SideFX Labs Lot Subdivision——迭代将 polygon 面切成更小的 lot 面，控制最小尺寸、迭代次数与不规则度。输出保留 n-gon 拓扑（`emit_geometry`），并带 primitive `lotid` 与 face group `lots`，可直接接 `PolyExtrude` / 散布链路。
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `minSize` | `1.0` | 面平面 AABB **短边**低于此值不再切分（扁平 Box 侧面不会被误切） |
+| `iterations` | `3` | 切分轮数；矩形上约得到 `2^iterations` 个 lot（受 `minSize` 截断） |
+| `irregularity` | `0.5` | `0` 为中点切分，越大切点越偏，lot 尺寸越不均匀 |
+| `seed` | `0` | 随机种子（与 `graph_seed` 异或） |
+| `alignment` | `longestEdge` | `longestEdge` 沿最长边垂直切开；`boundingBox` 按世界平面 AABB 长轴切开 |
+
+**输入 Pin**：`in: SpatialMesh`（polygon faces）  
+**输出 Pin**：`out: SpatialMesh`（lot faces）  
+**输出组**：`lots`（face，全部 lot）
+
+```json
+{
+  "id": "lots",
+  "type": "LotSubdivision",
+  "data": {
+    "minSize": 2.0,
+    "iterations": 3,
+    "irregularity": 0.35,
+    "seed": 1,
+    "alignment": "boundingBox"
+  }
+}
+```
+
+> 典型连接：`CreateGridMesh / 平面 polygon → LotSubdivision → PolyExtrude → Output`（地块挤出）；或 `LotSubdivision →` 面中心点/`CopyMeshToPoints` 散布建筑。示例：`examples/lot-extrude-demo.pcg`、`examples/lot-city-demo.pcg`。
 
 ### CopyMesh
 
@@ -2825,6 +2983,8 @@ CreateSpline(profile) ──┘
 | `rotationX/Y/Z`（或 `rx/ry/rz`） | number | XYZ 欧拉角，单位为度 |
 | `orient` | `[x,y,z,w]` / `{x,y,z,w}` | 四元数；存在时优先于 frame 属性 |
 | `nx/ny/nz` + `tx/ty/tz` | number | 与 `SampleAlongSpline` 一致的 normal/tangent frame |
+| `Cd` | `[r,g,b]` / `{r,g,b[,a]}` | 每副本顶点色；有原型色时 RGB 相乘并保留原型 alpha，无原型色时填充 |
+| `material` | string | 覆盖该副本全部面的材质名 |
 
 原型以自身局部原点为放置基准，不自动居中。每个副本先 scale，再应用欧拉旋转与 `orient`/frame，最后平移到点坐标。
 
@@ -2834,7 +2994,7 @@ CreateSpline(profile) ──┘
 
 **类别**：Transform
 
-**功能**：以 `graph_seed + seed` 为确定性随机源，随机偏移点位置，并写入供 `CopyMeshToPoints` 消费的旋转与统一缩放属性。
+**功能**：以 `graph_seed + seed` 为确定性随机源，随机偏移点位置，并写入供 `CopyMeshToPoints` 消费的旋转、统一缩放、颜色（`Cd`）与材质名属性。
 
 **输入/输出 Pin**：`in` → `out`，均为 `SpatialPoint`。
 
@@ -2844,6 +3004,9 @@ CreateSpline(profile) ──┘
 | `translateX/Y/Z` | 0 | 各轴对称随机幅度 `[-value,+value]`，直接修改点坐标 |
 | `rotateX/Y/Z` | 0 | 各轴对称欧拉角幅度，写入 `rotationX/Y/Z` |
 | `scaleMin/scaleMax` | 1 / 1 | 统一缩放范围，写入 `scale`；上下限反置时自动交换 |
+| `colorMinR/G/B` | 1 / 1 / 1 | 颜色下界；与 Max 全为 1 时不写 `Cd` |
+| `colorMaxR/G/B` | 1 / 1 / 1 | 颜色上界；写入 `Cd = [r,g,b]` |
+| `materialNames` | `""` | 逗号分隔材质名列表；非空时随机写入 `material` |
 
 相同 graph seed、节点 seed 和输入点序列必定得到相同结果。
 
@@ -2937,7 +3100,19 @@ CreatePointGrid → AttributeRandomize → CopyMeshToPoints(points) → Output
 CreateBoxMesh ───────────────────────→ CopyMeshToPoints(prototype)
 ```
 
-规整立面可将 `AttributeRandomize` 幅度保持为 0；错位塔可设置水平平移、Y 轴旋转与 scale 范围。可选部件使用 `Switch` 在多路 Geometry 中选通，再进入后续 Merge。
+规整立面可将 `AttributeRandomize` 幅度保持为 0；错位塔可设置水平平移、Y 轴旋转与 scale 范围。可选部件使用 `Switch` 在多路 Geometry 中选通，再进入后续 Merge。设置 `colorMin/Max` 可让每栋建筑获得不同立面色；窗户分支可先接 `VertexColor(emission>0)` 再 Merge。
+
+### 建筑立面：已有节点即可实现的能力
+
+以下能力**不需要新节点**，用现有节点组合即可（Houdini 对标）：
+
+| 效果 | 推荐链路 |
+|------|----------|
+| 消防梯 zigzag | `CreatePoints` → `AttributeWrangle`(`@P.x` 交替 + `@rotationY`) → `CopyMeshToPoints` |
+| 栏杆 | `CreateSpline` → `SweepAlongSpline`(圆截面扶手) + `SampleAlongSpline` → `CopyMeshToPoints`(栏杆柱) |
+| 台阶 / stoop | `CreatePoints` → `AttributeWrangle`(`@P.y/@P.z` 递进) → `CopyMeshToPoints`(台阶 box) |
+| 多立面分组 | 串联多个 `FaceGroupByNormal`（不同 direction + outputGroup） |
+| Boolean 多 cutter | `MergeMesh` 所有 cutter → `BooleanMesh`(A=wall, B=merged, subtract) |
 
 ### 1. 基础点生成流水线
 
@@ -3129,7 +3304,7 @@ CreateSpline ──(profile)──┘
 
 ### VertexColor
 
-为 mesh 的每个顶点写入统一的 RGBA 颜色。
+为 mesh 的每个顶点写入统一的 RGBA 颜色；可选 emission 模式用于夜间窗户发光（alpha 作 emission mask）。
 
 | 属性 | 类型 | 默认值 | 范围 | 说明 |
 |------|------|--------|------|------|
@@ -3137,8 +3312,10 @@ CreateSpline ──(profile)──┘
 | g | number | 1.0 | [0, 1] | 绿色通道 |
 | b | number | 1.0 | [0, 1] | 蓝色通道 |
 | a | number | 1.0 | [0, 1] | Alpha 通道（不会丢失） |
+| emission | number | 0.0 | [0, 1] | >0 时启用发光：RGB 改为 emissionColor，alpha 写为 emission |
+| emissionColorR/G/B | number | 1 / 1 / 1 | [0, 1] | 发光颜色 |
 
-**执行逻辑**：读取输入 mesh，为所有顶点设置相同的颜色值，输出 mesh。
+**执行逻辑**：读取输入 geometry/mesh，为所有顶点设置相同颜色。`emission > 0` 时覆盖为发光色 + alpha mask。
 
 **范围限制**：本期仅支持 solid RGBA（统一颜色）。不支持按 face group 着色。应放在最后一个拓扑修改节点之后。
 
@@ -3239,6 +3416,8 @@ CopyAttributes(tag, values=tree/rock)
 | `spiral-staircase.pcg` | 螺旋楼梯（InstanceAlongSpline + Sweep） |
 | `stone-arch-bridge.pcg` | 石拱桥（BooleanMesh + BevelMesh） |
 | `village-demo.pcg` | 村落场景（点生成 + 地形 + 实例放置） |
+| `lot-extrude-demo.pcg` | Labs Lot Subdivision：平面 → 切 lot → PolyExtrude |
+| `lot-city-demo.pcg` | Lot 城市场景：地块挤出 + 建筑散布 + 道路 Sweep（分件 Bevel 再 Merge） |
 
 ### Test
 
@@ -3253,3 +3432,69 @@ CopyAttributes(tag, values=tree/rock)
 | `test-project-texture.pcg` | `ImageTexture → ProjectTexture + CreateCylinderMesh → Output` | texture descriptor repeat 读取、planar UV 投射 |
 
 > **验证步骤**：在 Unity Editor 中打开 PCG Graph Editor → File → Open .pcg → Cook → 检查 Scene View mesh、Console 无报错。`test-color-uv-material.pcg` 可通过 mesh.colors / mesh.uv 长度验证属性传递。
+
+### ForEachBegin
+
+**类别**：Flow
+
+Houdini `block_begin` 子集：按 primitive / piece 属性 / count 迭代，输出当前件。执行器识别 Begin→End 区域并循环 cook。
+
+**输入**
+
+| id | label | pinType |
+|----|-------|---------|
+| in | Geometry | SpatialMesh |
+
+**输出**
+
+| id | label | pinType |
+|----|-------|---------|
+| out | Piece | SpatialMesh |
+
+**属性**：`method`（primitive|piece|count）、`pieceAttribute`、`iterations`
+
+### ForEachEnd
+
+**类别**：Flow
+
+Houdini `block_end` 子集：收集 Begin 区域结果。`gatherMethod=merge` 合并各次输出；`feedback` 将结果回喂下一轮（count 叠层）。
+
+### PrimitiveTransform
+
+**类别**：Mesh
+
+Houdini `primitive` SOP 子集：绕各面质心均匀缩放（默认 0.85），独立复制顶点，用于 lot inset。
+
+### ConvertLine
+
+**类别**：Spline
+
+Houdini `convertline`：面边 → 折线。`mode=unshared|all|group`。开窗链：`ConvertLine` → `ResampleSpline` → `CopyMeshToPoints` → `BooleanMesh`。
+
+### ExtractCentroid
+
+**类别**：Attribute
+
+Houdini `extractcentroid` 子集：输出每面质心点（或整体点云质心）。
+
+### GroupTransfer
+
+**类别**：Geometry
+
+Houdini `grouptransfer`：按最近邻把 source 的 Primitive / Point / Edge 命名 group 传到 target。
+
+| 参数 | 说明 |
+|------|------|
+| Primitive / Point / Edge Groups | 开关 + 源 group 选择（空 = `*`） |
+| * Group Prefix | 目标 group 名前缀 |
+| Group Name Conflict | `Skip Group` / `Overwrite` / `Add Suffix` |
+| Enable Distance Threshold + Distance Threshold | 最近邻距离上限 |
+| Create Groups Even If Empty | 传空组时是否仍创建 |
+
+兼容旧属性：`groupName` + `domain` + `distance`（单组 overwrite）。
+
+### Clip
+
+**类别**：Mesh
+
+Houdini `clip` 子集：平面剖切，保留法线正侧（或负侧）整面。

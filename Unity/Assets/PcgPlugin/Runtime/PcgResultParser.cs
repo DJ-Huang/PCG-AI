@@ -75,8 +75,10 @@ namespace DJTechRuntime.PCG
         public Vector3 Position;
         public Vector3 Normal;
         public bool HasNormal;
-        public float Scale;
+        public Vector3 Scale;
         public bool HasScale;
+        public Quaternion Rotation;
+        public bool HasRotation;
     }
 
     /// <summary>
@@ -347,6 +349,195 @@ namespace DJTechRuntime.PCG
             }
         }
 
+        public sealed class PcgSpawnPrototype
+        {
+            public Mesh Mesh;
+            public string[] MaterialNames = Array.Empty<string>();
+            public int PointCount = -1;
+        }
+
+        /// <summary>
+        /// Parses single PCGM spawn mesh or PCMS multi-prototype pack.
+        /// </summary>
+        public static bool TryParseSpawnMeshBinary(
+            byte[] data,
+            out List<PcgSpawnPrototype> prototypes,
+            out string error)
+        {
+            prototypes = new List<PcgSpawnPrototype>();
+            error = null;
+            if (data == null || data.Length < 4)
+            {
+                error = "Spawn mesh binary payload is too small.";
+                return false;
+            }
+
+            var magic = BitConverter.ToUInt32(data, 0);
+            if (magic == PcgNative.MeshBinaryMagic)
+            {
+                if (!TryParseMeshBinary(data, out var mesh, out var names, out error))
+                    return false;
+                prototypes.Add(new PcgSpawnPrototype
+                {
+                    Mesh = mesh,
+                    MaterialNames = names ?? Array.Empty<string>(),
+                    PointCount = -1
+                });
+                return true;
+            }
+
+            if (magic != PcgNative.MultiSpawnMagic)
+            {
+                error = $"Invalid spawn mesh magic: 0x{magic:X8}";
+                return false;
+            }
+
+            if (data.Length < 12)
+            {
+                error = "Multi-spawn pack header too small.";
+                return false;
+            }
+
+            var version = BitConverter.ToUInt32(data, 4);
+            var count = BitConverter.ToInt32(data, 8);
+            if (version != 1u || count <= 0)
+            {
+                error = $"Unsupported multi-spawn pack (version={version}, count={count}).";
+                return false;
+            }
+
+            int header;
+            try
+            {
+                checked { header = 12 + count * 8; }
+            }
+            catch (OverflowException)
+            {
+                error = "Multi-spawn pack header size overflow.";
+                return false;
+            }
+
+            if (header < 12 || data.Length < header)
+            {
+                error = "Multi-spawn pack truncated header.";
+                return false;
+            }
+
+            var pointCounts = new int[count];
+            var meshSizes = new int[count];
+            for (var i = 0; i < count; i++)
+                pointCounts[i] = BitConverter.ToInt32(data, 12 + i * 4);
+            var sizeOffset = 12 + count * 4;
+            for (var i = 0; i < count; i++)
+            {
+                meshSizes[i] = BitConverter.ToInt32(data, sizeOffset + i * 4);
+                if (meshSizes[i] < 0)
+                {
+                    error = $"Multi-spawn pack has negative mesh size at prototype {i}.";
+                    return false;
+                }
+            }
+
+            var offset = header;
+            try
+            {
+                for (var i = 0; i < count; i++)
+                {
+                    int end;
+                    try
+                    {
+                        checked { end = offset + meshSizes[i]; }
+                    }
+                    catch (OverflowException)
+                    {
+                        error = $"Multi-spawn pack size overflow at prototype {i}.";
+                        DestroySpawnPrototypes(prototypes);
+                        prototypes.Clear();
+                        return false;
+                    }
+
+                    if (end > data.Length)
+                    {
+                        error = $"Multi-spawn pack truncated at prototype {i}.";
+                        DestroySpawnPrototypes(prototypes);
+                        prototypes.Clear();
+                        return false;
+                    }
+
+                    if (meshSizes[i] == 0)
+                    {
+                        error = $"Multi-spawn pack empty mesh at prototype {i}.";
+                        DestroySpawnPrototypes(prototypes);
+                        prototypes.Clear();
+                        return false;
+                    }
+
+                    byte[] slice;
+                    try
+                    {
+                        slice = new byte[meshSizes[i]];
+                    }
+                    catch (OverflowException)
+                    {
+                        error = $"Multi-spawn pack allocation overflow at prototype {i}.";
+                        DestroySpawnPrototypes(prototypes);
+                        prototypes.Clear();
+                        return false;
+                    }
+                    catch (OutOfMemoryException)
+                    {
+                        error = $"Multi-spawn pack allocation failed at prototype {i}.";
+                        DestroySpawnPrototypes(prototypes);
+                        prototypes.Clear();
+                        return false;
+                    }
+
+                    Buffer.BlockCopy(data, offset, slice, 0, meshSizes[i]);
+                    if (!TryParseMeshBinary(slice, out var mesh, out var names, out error))
+                    {
+                        DestroySpawnPrototypes(prototypes);
+                        prototypes.Clear();
+                        return false;
+                    }
+
+                    prototypes.Add(new PcgSpawnPrototype
+                    {
+                        Mesh = mesh,
+                        MaterialNames = names ?? Array.Empty<string>(),
+                        PointCount = pointCounts[i]
+                    });
+                    offset = end;
+                }
+            }
+            catch (Exception ex)
+            {
+                DestroySpawnPrototypes(prototypes);
+                prototypes.Clear();
+                error = ex.Message;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void DestroySpawnPrototypes(List<PcgSpawnPrototype> prototypes)
+        {
+            if (prototypes == null)
+                return;
+            for (var i = 0; i < prototypes.Count; i++)
+            {
+                var mesh = prototypes[i]?.Mesh;
+                if (mesh == null)
+                    continue;
+#if UNITY_EDITOR
+                if (!UnityEditor.EditorUtility.IsPersistent(mesh))
+                    UnityEngine.Object.DestroyImmediate(mesh);
+#else
+                UnityEngine.Object.Destroy(mesh);
+#endif
+            }
+        }
+
         public static unsafe bool TryParsePointBinary(byte[] data, out List<PcgScatterPoint> points, out string error)
         {
             points = new List<PcgScatterPoint>();
@@ -369,8 +560,24 @@ namespace DJTechRuntime.PCG
                         return false;
                     }
 
+                    var version = *(uint*)(ptr + 4);
+                    if (version != 1u && version != 2u)
+                    {
+                        error = $"Unsupported point binary version: {version}";
+                        return false;
+                    }
+
                     var pointCount = *(int*)(ptr + 8);
+                    if (pointCount < 0)
+                    {
+                        error = $"Invalid point count: {pointCount}";
+                        return false;
+                    }
+
                     var flags = (PcgPointAttrFlags)(*(uint*)(ptr + 12));
+                    var scaleStride = flags.HasFlag(PcgPointAttrFlags.Scale)
+                        ? (version == 1u ? 4 : 12)
+                        : 0;
                     var required = PcgNative.PointBinaryHeaderSize + pointCount * 12;
                     if (flags.HasFlag(PcgPointAttrFlags.Normal))
                         required += pointCount * 12;
@@ -378,8 +585,7 @@ namespace DJTechRuntime.PCG
                         required += pointCount * 8;
                     if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
                         required += pointCount * 4;
-                    if (flags.HasFlag(PcgPointAttrFlags.Scale))
-                        required += pointCount * 4;
+                    required += pointCount * scaleStride;
                     if (flags.HasFlag(PcgPointAttrFlags.Rotation))
                         required += pointCount * 16;
 
@@ -400,8 +606,10 @@ namespace DJTechRuntime.PCG
                             Position = new Vector3(src[baseIndex], src[baseIndex + 1], src[baseIndex + 2]),
                             Normal = Vector3.up,
                             HasNormal = false,
-                            Scale = 1f,
-                            HasScale = false
+                            Scale = Vector3.one,
+                            HasScale = false,
+                            Rotation = Quaternion.identity,
+                            HasRotation = false
                         };
                     }
 
@@ -428,17 +636,53 @@ namespace DJTechRuntime.PCG
                     if (flags.HasFlag(PcgPointAttrFlags.Scale))
                     {
                         var scales = (float*)(ptr + offset);
-                        for (var i = 0; i < pointCount; i++)
+                        if (version == 1u)
                         {
-                            parsed[i].Scale = scales[i];
-                            parsed[i].HasScale = true;
+                            for (var i = 0; i < pointCount; i++)
+                            {
+                                var s = scales[i];
+                                parsed[i].Scale = new Vector3(s, s, s);
+                                parsed[i].HasScale = true;
+                            }
+                            offset += pointCount * 4;
                         }
-
-                        offset += pointCount * 4;
+                        else
+                        {
+                            for (var i = 0; i < pointCount; i++)
+                            {
+                                var baseIndex = i * 3;
+                                parsed[i].Scale = new Vector3(
+                                    scales[baseIndex],
+                                    scales[baseIndex + 1],
+                                    scales[baseIndex + 2]);
+                                parsed[i].HasScale = true;
+                            }
+                            offset += pointCount * 12;
+                        }
                     }
 
                     if (flags.HasFlag(PcgPointAttrFlags.Rotation))
+                    {
+                        var rotations = (float*)(ptr + offset);
+                        for (var i = 0; i < pointCount; i++)
+                        {
+                            var baseIndex = i * 4;
+                            var rotation = new Quaternion(
+                                rotations[baseIndex],
+                                rotations[baseIndex + 1],
+                                rotations[baseIndex + 2],
+                                rotations[baseIndex + 3]);
+                            var magSq = rotation.x * rotation.x + rotation.y * rotation.y +
+                                        rotation.z * rotation.z + rotation.w * rotation.w;
+                            if (magSq > 1e-8f)
+                            {
+                                parsed[i].Rotation = rotation.normalized;
+                                parsed[i].HasRotation = true;
+                            }
+                        }
+
                         offset += pointCount * 16;
+                    }
 
                     points = new List<PcgScatterPoint>(pointCount);
                     for (var i = 0; i < pointCount; i++)
@@ -607,8 +851,10 @@ namespace DJTechRuntime.PCG
                     Position = point,
                     Normal = Vector3.up,
                     HasNormal = false,
-                    Scale = 1f,
-                    HasScale = false
+                    Scale = Vector3.one,
+                    HasScale = false,
+                    Rotation = Quaternion.identity,
+                    HasRotation = false
                 });
             }
 

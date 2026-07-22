@@ -43,7 +43,20 @@
         "includeUnshared": false,
         "fromFaceGroup": "",
         "fromEdgeGroup": "",
-        "__nodeTitle": ""
+        "__nodeTitle": "",
+        "initialMerge": "replace",
+        "baseGroup": "",
+        "enableBounding": false,
+        "enableNormals": false,
+        "enableRandom": false,
+        "directionX": 0.0,
+        "directionY": 1.0,
+        "directionZ": 0.0,
+        "spreadAngle": 30.0,
+        "randomChance": 1.0,
+        "randomSeed": 0,
+        "enableBaseGroup": false,
+        "enableEdges": true
       }
     },
     {

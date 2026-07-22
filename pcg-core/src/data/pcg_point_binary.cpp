@@ -4,10 +4,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <cstring>
 
 namespace pcg::internal::data {
 namespace {
+
+constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
 
 void write_u32(uint8_t* dst, uint32_t value)
 {
@@ -17,6 +20,129 @@ void write_u32(uint8_t* dst, uint32_t value)
 bool has_attr_num(const nlohmann::json& attributes, const char* key)
 {
     return attributes.is_object() && attributes.contains(key) && attributes[key].is_number();
+}
+
+bool has_scale_attr(const nlohmann::json& attributes)
+{
+    if (has_attr_num(attributes, "scaleX") || has_attr_num(attributes, "scaleY") ||
+        has_attr_num(attributes, "scaleZ"))
+        return true;
+    return has_attr_num(attributes, "scale");
+}
+
+void read_point_scale_xyz(const nlohmann::json& attributes, float& sx, float& sy, float& sz)
+{
+    sx = sy = sz = 1.0f;
+    if (has_attr_num(attributes, "scale")) {
+        const float s = static_cast<float>(attributes.value("scale", 1.0));
+        sx = sy = sz = s;
+    }
+    if (has_attr_num(attributes, "scaleX"))
+        sx *= static_cast<float>(attributes.value("scaleX", 1.0));
+    if (has_attr_num(attributes, "scaleY"))
+        sy *= static_cast<float>(attributes.value("scaleY", 1.0));
+    if (has_attr_num(attributes, "scaleZ"))
+        sz *= static_cast<float>(attributes.value("scaleZ", 1.0));
+}
+
+bool read_orient_quaternion(const nlohmann::json& attributes,
+                            float& qx,
+                            float& qy,
+                            float& qz,
+                            float& qw)
+{
+    const auto it = attributes.find("orient");
+    if (it == attributes.end())
+        return false;
+
+    if (it->is_array() && it->size() >= 4 && (*it)[0].is_number() && (*it)[1].is_number() &&
+        (*it)[2].is_number() && (*it)[3].is_number()) {
+        qx = static_cast<float>((*it)[0].get<double>());
+        qy = static_cast<float>((*it)[1].get<double>());
+        qz = static_cast<float>((*it)[2].get<double>());
+        qw = static_cast<float>((*it)[3].get<double>());
+        return true;
+    }
+
+    if (it->is_object()) {
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        double w = 1.0;
+        if (!it->contains("x") || !(*it)["x"].is_number() || !it->contains("y") ||
+            !(*it)["y"].is_number() || !it->contains("z") || !(*it)["z"].is_number() ||
+            !it->contains("w") || !(*it)["w"].is_number())
+            return false;
+        x = (*it)["x"].get<double>();
+        y = (*it)["y"].get<double>();
+        z = (*it)["z"].get<double>();
+        w = (*it)["w"].get<double>();
+        qx = static_cast<float>(x);
+        qy = static_cast<float>(y);
+        qz = static_cast<float>(z);
+        qw = static_cast<float>(w);
+        return true;
+    }
+
+    return false;
+}
+
+bool has_rotation_attr(const nlohmann::json& attributes)
+{
+    float qx = 0.0f;
+    float qy = 0.0f;
+    float qz = 0.0f;
+    float qw = 1.0f;
+    if (read_orient_quaternion(attributes, qx, qy, qz, qw))
+        return true;
+    return has_attr_num(attributes, "rotationY") || has_attr_num(attributes, "ry") ||
+           has_attr_num(attributes, "rotationX") || has_attr_num(attributes, "rx") ||
+           has_attr_num(attributes, "rotationZ") || has_attr_num(attributes, "rz");
+}
+
+bool read_point_rotation_quaternion(const nlohmann::json& attributes,
+                                    float& qx,
+                                    float& qy,
+                                    float& qz,
+                                    float& qw)
+{
+    if (read_orient_quaternion(attributes, qx, qy, qz, qw))
+        return true;
+
+    double rx_deg = 0.0;
+    double ry_deg = 0.0;
+    double rz_deg = 0.0;
+    if (has_attr_num(attributes, "rotationX"))
+        rx_deg = attributes.value("rotationX", 0.0);
+    else if (has_attr_num(attributes, "rx"))
+        rx_deg = attributes.value("rx", 0.0);
+    if (has_attr_num(attributes, "rotationY"))
+        ry_deg = attributes.value("rotationY", 0.0);
+    else if (has_attr_num(attributes, "ry"))
+        ry_deg = attributes.value("ry", 0.0);
+    if (has_attr_num(attributes, "rotationZ"))
+        rz_deg = attributes.value("rotationZ", 0.0);
+    else if (has_attr_num(attributes, "rz"))
+        rz_deg = attributes.value("rz", 0.0);
+
+    // Match CopyMeshToPoints / Unity Euler order (XYZ intrinsic ≈ ZXY extrinsic for
+    // yaw-dominant building facing). Prefer pure Y when only yaw is authored.
+    const double hx = rx_deg * kDegToRad * 0.5;
+    const double hy = ry_deg * kDegToRad * 0.5;
+    const double hz = rz_deg * kDegToRad * 0.5;
+    const double cx = std::cos(hx);
+    const double sx = std::sin(hx);
+    const double cy = std::cos(hy);
+    const double sy = std::sin(hy);
+    const double cz = std::cos(hz);
+    const double sz = std::sin(hz);
+
+    // Quaternion from intrinsic XYZ Euler (same composition as rotate_euler X then Y then Z).
+    qx = static_cast<float>(sx * cy * cz + cx * sy * sz);
+    qy = static_cast<float>(cx * sy * cz - sx * cy * sz);
+    qz = static_cast<float>(cx * cy * sz - sx * sy * cz);
+    qw = static_cast<float>(cx * cy * cz + sx * sy * sz);
+    return true;
 }
 
 } // namespace
@@ -31,13 +157,15 @@ uint32_t detect_point_attr_flags(const PcgPointData& points)
     bool has_uv = true;
     bool has_tri = true;
     bool has_scale = true;
+    bool has_rotation = true;
     for (const auto& point : points.points()) {
         const auto& attributes = point.attributes;
         has_normals = has_normals && has_attr_num(attributes, "nx") && has_attr_num(attributes, "ny") &&
                       has_attr_num(attributes, "nz");
         has_uv = has_uv && has_attr_num(attributes, "u") && has_attr_num(attributes, "v");
         has_tri = has_tri && has_attr_num(attributes, "triIndex");
-        has_scale = has_scale && has_attr_num(attributes, "scale");
+        has_scale = has_scale && has_scale_attr(attributes);
+        has_rotation = has_rotation && has_rotation_attr(attributes);
     }
 
     if (has_normals)
@@ -48,6 +176,8 @@ uint32_t detect_point_attr_flags(const PcgPointData& points)
         flags |= PCG_POINT_ATTR_TRI_INDEX;
     if (has_scale)
         flags |= PCG_POINT_ATTR_SCALE;
+    if (has_rotation)
+        flags |= PCG_POINT_ATTR_ROTATION;
     return flags;
 }
 
@@ -124,10 +254,26 @@ bool write_point_binary(const PcgPointData& points, void* buffer, int buffer_siz
 
     if (flags & PCG_POINT_ATTR_SCALE) {
         for (const auto& point : points.points()) {
-            const auto& attributes = point.attributes;
-            const float scale = static_cast<float>(attributes.value("scale", 1.0));
-            std::memcpy(bytes + offset, &scale, sizeof(scale));
-            offset += static_cast<int>(sizeof(scale));
+            float sx = 1.0f;
+            float sy = 1.0f;
+            float sz = 1.0f;
+            read_point_scale_xyz(point.attributes, sx, sy, sz);
+            const float s[3] = {sx, sy, sz};
+            std::memcpy(bytes + offset, s, sizeof(s));
+            offset += static_cast<int>(sizeof(s));
+        }
+    }
+
+    if (flags & PCG_POINT_ATTR_ROTATION) {
+        for (const auto& point : points.points()) {
+            float qx = 0.0f;
+            float qy = 0.0f;
+            float qz = 0.0f;
+            float qw = 1.0f;
+            read_point_rotation_quaternion(point.attributes, qx, qy, qz, qw);
+            const float q[4] = {qx, qy, qz, qw};
+            std::memcpy(bytes + offset, q, sizeof(q));
+            offset += static_cast<int>(sizeof(q));
         }
     }
 

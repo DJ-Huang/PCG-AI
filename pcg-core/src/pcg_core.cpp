@@ -206,23 +206,54 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
 
             bool wrote_spawn_mesh_binary = false;
             if (out_mesh_buf && out_mesh_buf_size > 0) {
-                const auto& spawn_mesh = result.spawn_mesh;
-                if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3) {
-                    if (!pcg::internal::data::write_mesh_binary(
-                            spawn_mesh, out_mesh_buf, out_mesh_buf_size)) {
-                        const int required = pcg::internal::data::mesh_binary_size(spawn_mesh);
+                const bool multi =
+                    result.spawn_meshes.size() > 1 &&
+                    result.spawn_meshes.size() == result.spawn_point_counts.size();
+                if (multi) {
+                    if (!pcg::internal::data::write_multi_spawn_binary(
+                            result.spawn_meshes,
+                            result.spawn_point_counts,
+                            out_mesh_buf,
+                            out_mesh_buf_size)) {
+                        const int required = pcg::internal::data::multi_spawn_binary_size(
+                            result.spawn_meshes, result.spawn_point_counts);
                         char message[256];
                         std::snprintf(message, sizeof(message),
-                                      "Spawn mesh binary buffer too small (need %d bytes, got %d)",
+                                      "Multi-spawn mesh binary buffer too small (need %d bytes, got %d)",
                                       required, out_mesh_buf_size);
                         pcg::internal::write_error(err_buf, err_buf_size, message);
                         return PCG_ERR_EXECUTION;
                     }
+                    int total_verts = 0;
+                    int total_indices = 0;
+                    for (const auto& mesh : result.spawn_meshes) {
+                        total_verts += static_cast<int>(mesh.vertices().size());
+                        total_indices += static_cast<int>(mesh.triangles().size());
+                    }
                     if (out_vertex_count)
-                        *out_vertex_count = static_cast<int>(spawn_mesh.vertices().size());
+                        *out_vertex_count = total_verts;
                     if (out_index_count)
-                        *out_index_count = static_cast<int>(spawn_mesh.triangles().size());
+                        *out_index_count = total_indices;
                     wrote_spawn_mesh_binary = true;
+                } else {
+                    const auto& spawn_mesh = result.spawn_mesh;
+                    if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3) {
+                        if (!pcg::internal::data::write_mesh_binary(
+                                spawn_mesh, out_mesh_buf, out_mesh_buf_size)) {
+                            const int required = pcg::internal::data::mesh_binary_size(spawn_mesh);
+                            char message[256];
+                            std::snprintf(message, sizeof(message),
+                                          "Spawn mesh binary buffer too small (need %d bytes, got %d)",
+                                          required, out_mesh_buf_size);
+                            pcg::internal::write_error(err_buf, err_buf_size, message);
+                            return PCG_ERR_EXECUTION;
+                        }
+                        if (out_vertex_count)
+                            *out_vertex_count = static_cast<int>(spawn_mesh.vertices().size());
+                        if (out_index_count)
+                            *out_index_count = static_cast<int>(spawn_mesh.triangles().size());
+                        wrote_spawn_mesh_binary = true;
+                    }
                 }
             }
 
@@ -375,23 +406,54 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
 
         bool wrote_spawn_mesh_binary = false;
         if (out_mesh_buf && out_mesh_buf_size > 0) {
-            const auto& spawn_mesh = result.spawn_mesh;
-            if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3) {
-                if (!pcg::internal::data::write_mesh_binary(
-                        spawn_mesh, out_mesh_buf, out_mesh_buf_size)) {
-                    const int required = pcg::internal::data::mesh_binary_size(spawn_mesh);
+            const bool multi =
+                result.spawn_meshes.size() > 1 &&
+                result.spawn_meshes.size() == result.spawn_point_counts.size();
+            if (multi) {
+                if (!pcg::internal::data::write_multi_spawn_binary(
+                        result.spawn_meshes,
+                        result.spawn_point_counts,
+                        out_mesh_buf,
+                        out_mesh_buf_size)) {
+                    const int required = pcg::internal::data::multi_spawn_binary_size(
+                        result.spawn_meshes, result.spawn_point_counts);
                     char message[256];
                     std::snprintf(message, sizeof(message),
-                                  "Spawn mesh binary buffer too small (need %d bytes, got %d)",
+                                  "Multi-spawn mesh binary buffer too small (need %d bytes, got %d)",
                                   required, out_mesh_buf_size);
                     pcg::internal::write_error(err_buf, err_buf_size, message);
                     return PCG_ERR_EXECUTION;
                 }
+                int total_verts = 0;
+                int total_indices = 0;
+                for (const auto& mesh : result.spawn_meshes) {
+                    total_verts += static_cast<int>(mesh.vertices().size());
+                    total_indices += static_cast<int>(mesh.triangles().size());
+                }
                 if (out_vertex_count)
-                    *out_vertex_count = static_cast<int>(spawn_mesh.vertices().size());
+                    *out_vertex_count = total_verts;
                 if (out_index_count)
-                    *out_index_count = static_cast<int>(spawn_mesh.triangles().size());
+                    *out_index_count = total_indices;
                 wrote_spawn_mesh_binary = true;
+            } else {
+                const auto& spawn_mesh = result.spawn_mesh;
+                if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3) {
+                    if (!pcg::internal::data::write_mesh_binary(
+                            spawn_mesh, out_mesh_buf, out_mesh_buf_size)) {
+                        const int required = pcg::internal::data::mesh_binary_size(spawn_mesh);
+                        char message[256];
+                        std::snprintf(message, sizeof(message),
+                                      "Spawn mesh binary buffer too small (need %d bytes, got %d)",
+                                      required, out_mesh_buf_size);
+                        pcg::internal::write_error(err_buf, err_buf_size, message);
+                        return PCG_ERR_EXECUTION;
+                    }
+                    if (out_vertex_count)
+                        *out_vertex_count = static_cast<int>(spawn_mesh.vertices().size());
+                    if (out_index_count)
+                        *out_index_count = static_cast<int>(spawn_mesh.triangles().size());
+                    wrote_spawn_mesh_binary = true;
+                }
             }
         }
 
@@ -1306,7 +1368,7 @@ PcgResultCode pcg_point_binary_size_for_counts(int point_count,
     if (attr_flags & PCG_POINT_ATTR_TRI_INDEX)
         size += point_count * static_cast<int>(sizeof(uint32_t));
     if (attr_flags & PCG_POINT_ATTR_SCALE)
-        size += point_count * static_cast<int>(sizeof(float));
+        size += point_count * 3 * static_cast<int>(sizeof(float));
     if (attr_flags & PCG_POINT_ATTR_ROTATION)
         size += point_count * 4 * static_cast<int>(sizeof(float));
 

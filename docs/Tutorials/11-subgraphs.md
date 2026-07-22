@@ -63,6 +63,17 @@ Subgraph 定义内联保存于根 `subgraphs` 数组，主图节点通过 `data.
 
 接口映射规则很直接：`SubgraphInput` 的**输出** handle 必须等于某个 `inputs[].id`；`SubgraphOutput` 的**输入** handle 必须等于某个 `outputs[].id`。主图中 `Subgraph` 节点的 target/source handle 分别使用对应的输入/输出端口 id。
 
+- Subgraph 可以是内联定义（保存在同一 `.pcg` 的 `subgraphs[]` 中），也可以是联动的外部 `.pcgsubgraph` 资产（graph version `3.0` 的 `SubgraphAsset` 节点）。
+- 内联 Subgraph：复制 `.pcg` 即可携带实现。
+- 联动 Subgraph Asset：源资产保存并导入后，所有实例跟随更新；进入 Cook / Player 前会在 Unity Host 侧 resolve + flatten 为自包含 v2 JSON。
+
+## 联动 Subgraph Asset（Unity）
+
+1. **Assets → Create → PCG → Subgraph Asset**，或在 Graph Editor 中对选区使用 **Create Subgraph Asset from Selection**。
+2. 从 Project Browser 把 `.pcgsubgraph` 拖入任意 `.pcg`（或另一 `.pcgsubgraph`）画布，生成带接口快照的 `SubgraphAsset` 节点。
+3. 双击该节点打开源资产；源接口非破坏变更会自动同步，破坏性变更保留 ghost port 并阻止 Cook。
+4. Player / 构建只读取 importer 烘焙后的 flat `GraphJson`；原始 StreamingAssets v3 会被拒绝。
+
 ## 运行时行为与限制
 
 解析器会递归展开定义，并把内部节点 id 加上实例路径前缀，例如 `move_instance/transform`。随后把主图边界连线重接到这些展开节点，因此下游执行器看到的仍是普通节点和普通边。
@@ -70,13 +81,14 @@ Subgraph 定义内联保存于根 `subgraphs` 数组，主图节点通过 `data.
 - 定义不存在、接口端口不存在，或接口节点与声明端口不匹配时，图校验会失败。
 - 递归引用（A 引用 B，B 又直接或间接引用 A）会被拒绝，避免无限展开。
 - `SubgraphInput` 与 `SubgraphOutput` 仅能作为定义内部的接口节点；它们不是可在根图单独执行的业务节点。
-- Subgraph 是内联定义，不会生成外部资源文件；这保证复制 `.pcg` 即可携带其实现。
+- 内联 Subgraph 不会生成外部资源文件；联动 `.pcgsubgraph` 则是独立资产，需通过 GUID 引用。
 
 ## 验证入口
 
 - C++ 行为测试：[pcg-core/tests/test_subgraph.cpp](../../pcg-core/tests/test_subgraph.cpp)，覆盖输入/输出映射、实际 Mesh 执行和递归引用拒绝。
 - 解析与展开：[pcg-core/src/graph_parser.cpp](../../pcg-core/src/graph_parser.cpp)。
+- Unity Host resolve/flatten：[Unity/Assets/PcgPlugin/Runtime/PcgExternalSubgraphResolver.cs](../../Unity/Assets/PcgPlugin/Runtime/PcgExternalSubgraphResolver.cs)、[PcgGraphFlattener.cs](../../Unity/Assets/PcgPlugin/Runtime/PcgGraphFlattener.cs)。
 - Unity 编辑器打包和导航：[Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphView.cs](../../Unity/Assets/PcgPlugin/Editor/Graph/PcgGraphView.cs)。
-- JSON 契约：[schema/graph-schema.json](../../schema/graph-schema.json)。
+- JSON 契约：[schema/graph-schema.json](../../schema/graph-schema.json)、[schema/graph-schema-v3.json](../../schema/graph-schema-v3.json)、[schema/subgraph-schema.json](../../schema/subgraph-schema.json)。
 
 建议的人工验收：先对一段图执行一次并记录输出，再将其中至少两个节点打包成 Subgraph，确认生成的接口端口、双击进入/面包屑返回，以及重新执行后的结果都符合预期。

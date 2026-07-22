@@ -1,25 +1,32 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
-using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG.Graph
 {
     /// <summary>
     /// Read-only floating Node Info panel (Houdini-style).
-    /// Shows: node type/category, output groups, upstream groups, properties with current values.
+    /// Shows geometry counts, bounding box, attributes and groups from the last cook —
+    /// not node Inspector property values.
     /// </summary>
     public sealed class PcgNodeInfoPanel : VisualElement
     {
+        private static readonly Color PointColor = new(0.35f, 0.85f, 0.45f);
+        private static readonly Color PrimColor = new(0.95f, 0.65f, 0.25f);
+        private static readonly Color VertexColor = new(0.85f, 0.4f, 0.85f);
+        private static readonly Color PolyColor = new(0.4f, 0.7f, 0.95f);
+
         private readonly PcgGraphView m_GraphView;
+        private PcgGraphNodeBase m_AnchorNode;
 
         public PcgNodeInfoPanel(PcgGraphView graphView)
         {
             m_GraphView = graphView;
             style.position = Position.Absolute;
-            style.width = 280;
+            style.width = 300;
+            style.maxHeight = 480;
             style.backgroundColor = new Color(0.1f, 0.1f, 0.18f, 0.97f);
             style.borderTopLeftRadius = 8;
             style.borderTopRightRadius = 8;
@@ -34,142 +41,114 @@ namespace DJTechEditor.PCG.Graph
             style.borderBottomColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
             style.borderLeftColor = new Color(0.3f, 0.3f, 0.5f, 0.8f);
             style.display = DisplayStyle.None;
-            pickingMode = PickingMode.Position; // capture clicks for close button
+            pickingMode = PickingMode.Position;
         }
 
         public void Show(PcgGraphNodeBase node)
         {
             Clear();
 
-            if (node is not PcgManifestNodeView mnode)
+            var displayName = node.GetDisplayTitle();
+            var typeName = node.NodeType;
+            var category = "";
+            Color? categoryColor = null;
+            if (node is PcgManifestNodeView mnode)
             {
-                // Non-manifest node: minimal info
-                Add(MakeHeader(node.GetDisplayTitle(), node.NodeType, ""));
-                Add(MakeSection("Type", new[]
+                displayName = mnode.NodeDef.displayName ?? mnode.NodeDef.type;
+                typeName = mnode.NodeDef.type;
+                category = mnode.NodeDef.category ?? "";
+                categoryColor = PcgNodeManifest.GetCategoryColor(category);
+            }
+
+            Add(MakeHeader(displayName, typeName, category, categoryColor));
+
+            var scroll = new ScrollView(ScrollViewMode.Vertical)
+            {
+                style =
                 {
-                    ("Node Type", node.NodeType),
-                }));
-                WireCloseButton();
-                style.display = DisplayStyle.Flex;
-                PositionNear(node);
-                return;
-            }
+                    flexGrow = 1,
+                    maxHeight = 420,
+                },
+            };
+            Add(scroll);
 
-            var def = mnode.NodeDef;
-            var data = mnode.NodeData;
-
-            // Header
-            var categoryColor = PcgNodeManifest.GetCategoryColor(def.category);
-            Add(MakeHeader(def.displayName ?? def.type, def.type, def.category, categoryColor));
-
-            // Output Groups
-            var outputGroups = CollectOutputGroups(def, data);
-            if (outputGroups.Count > 0)
+            if (m_GraphView == null ||
+                !m_GraphView.TryGetNodeMeshStats(node.NodeId, out var stats))
             {
-                var rows = outputGroups.Select(g =>
-                    (g.name, $"{g.domain}{(g.condition != null ? "  [if " + g.condition + "]" : "")}"));
-                Add(MakeSection($"Output Groups ({outputGroups.Count})", rows));
+                scroll.Add(MakeHint("No cook data yet — run the graph to see geometry info."));
             }
-
-            // Upstream Groups
-            var inspector = m_GraphView.Inspector;
-            if (inspector != null)
+            else
             {
-                var upstream = inspector.ResolveUpstreamGroups(node.NodeId);
-                if (upstream.Count > 0)
-                {
-                    var rows = upstream.Select(g =>
-                        ($"{g.name} ({g.domain})", g.sourceNodeType));
-                    Add(MakeSection($"Upstream Groups ({upstream.Count})", rows));
-                }
-            }
+                scroll.Add(MakeCountSection(stats));
+                if (stats.hasBBox)
+                    scroll.Add(MakeBBoxSection(stats));
 
-            // Properties
-            var propRows = new List<(string, string)>();
-            foreach (var kv in def.properties)
-            {
-                var key = kv.Key;
-                var prop = kv.Value;
-                var rawVal = data.GetRaw(key);
-                string valStr = rawVal == null ? "—" :
-                    prop.type == "boolean" ? (rawVal is bool b && b ? "true" : "false") :
-                    rawVal.ToString();
-                propRows.Add((key, valStr));
-            }
-            if (propRows.Count > 0)
-                Add(MakeSection($"Properties ({propRows.Count})", propRows));
+                if (!m_GraphView.TryGetNodeAttrs(node.NodeId, out var attrs) || attrs == null)
+                    attrs = new List<NodeAttrEntry>();
+                AddAttrSection(scroll, "Point Attrs", attrs, "point");
+                AddAttrSection(scroll, "Vertex Attrs", attrs, "vertex");
+                AddAttrSection(scroll, "Prim Attrs", attrs, "primitive");
+                AddAttrSection(scroll, "Detail Attrs", attrs, "detail");
 
-            // Geometry stats (Houdini-style)
-            if (m_GraphView != null && m_GraphView.TryGetNodeMeshStats(node.NodeId, out var stats))
-            {
-                var geoRows = new List<(string, string)>
-                {
-                    ("Points", stats.pointCount.ToString("N0")),
-                    ("Faces", stats.faceCount.ToString("N0")),
-                    ("Triangles", stats.triangleCount.ToString("N0")),
-                };
-                Add(MakeSection("Geometry", geoRows));
+                if (!m_GraphView.TryGetNodeGroups(node.NodeId, out var groups) || groups == null)
+                    groups = new List<NodeGroupEntry>();
+                AddGroupSection(scroll, "Point Groups", groups, "point");
+                AddGroupSection(scroll, "Prim Groups", groups, "face");
+                AddGroupSection(scroll, "Edge Groups", groups, "edge");
+                AddGroupSection(scroll, "Vertex Groups", groups, "vertex");
             }
-
-            // Pins
-            var pinRows = new List<(string, string)>();
-            foreach (var pin in def.inputs)
-                pinRows.Add(("→ " + pin.label, pin.pinType));
-            foreach (var pin in def.outputs)
-                pinRows.Add(("← " + pin.label, pin.pinType));
-            if (pinRows.Count > 0)
-                Add(MakeSection("Pins", pinRows));
 
             WireCloseButton();
+            if (m_AnchorNode != null)
+                m_AnchorNode.UnregisterCallback<GeometryChangedEvent>(OnAnchorGeometryChanged);
+            m_AnchorNode = node;
+            m_AnchorNode.RegisterCallback<GeometryChangedEvent>(OnAnchorGeometryChanged);
             style.display = DisplayStyle.Flex;
             PositionNear(node);
+            schedule.Execute(() => PositionNear(node));
         }
 
         public void Hide()
         {
+            if (m_AnchorNode != null)
+            {
+                m_AnchorNode.UnregisterCallback<GeometryChangedEvent>(OnAnchorGeometryChanged);
+                m_AnchorNode = null;
+            }
             style.display = DisplayStyle.None;
+        }
+
+        private void OnAnchorGeometryChanged(GeometryChangedEvent _)
+        {
+            if (m_AnchorNode != null && style.display == DisplayStyle.Flex)
+                PositionNear(m_AnchorNode);
         }
 
         private void WireCloseButton()
         {
             var closeBtn = this.Q<Button>("info-close-btn");
             if (closeBtn != null)
-            {
                 closeBtn.clicked += Hide;
-            }
         }
 
         private void PositionNear(PcgGraphNodeBase node)
         {
+            // Same graph-space coordinates as radial menu overlays in contentViewContainer.
             var rect = node.GetPosition();
-            const float panelWidth = 280f;
+            const float panelWidth = 300f;
             const float gap = 14f;
 
-            // Default: left side of the node
             var left = rect.x - panelWidth - gap;
             var top = rect.y;
-
-            // If panel would go off left edge, fall back to right side
             if (left < 0)
                 left = rect.x + rect.width + gap;
-
-            // Clamp vertical position
-            var graphView = m_GraphView;
-            if (graphView != null)
-            {
-                var gvRect = graphView.contentRect;
-                var estHeight = 40 + childCount * 80;
-                if (top + estHeight > gvRect.height)
-                    top = Mathf.Max(0, gvRect.height - estHeight);
-            }
 
             style.left = left;
             style.top = top;
         }
 
-        // ── Builders ──────────────────────────────────────
-
-        private static VisualElement MakeHeader(string displayName, string typeName, string category, Color? color = null)
+        private static VisualElement MakeHeader(
+            string displayName, string typeName, string category, Color? color = null)
         {
             var container = new VisualElement();
             var bgColor = color ?? new Color(0.35f, 0.35f, 0.45f);
@@ -185,7 +164,7 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
 
-            var titleBar = new Label(displayName)
+            headerRow.Add(new Label(displayName)
             {
                 style =
                 {
@@ -198,10 +177,9 @@ namespace DJTechEditor.PCG.Graph
                     paddingRight = 4,
                     flexGrow = 1,
                 },
-            };
-            headerRow.Add(titleBar);
+            });
 
-            var closeBtn = new Button(() => { }) { text = "×" };
+            var closeBtn = new Button { text = "×", name = "info-close-btn", tooltip = "Close" };
             closeBtn.style.fontSize = 14;
             closeBtn.style.color = new Color(0.7f, 0.7f, 0.75f);
             closeBtn.style.backgroundColor = new Color(0, 0, 0, 0);
@@ -214,14 +192,10 @@ namespace DJTechEditor.PCG.Graph
             closeBtn.style.paddingLeft = 6;
             closeBtn.style.paddingRight = 6;
             closeBtn.style.flexShrink = 0;
-            closeBtn.tooltip = "Close";
-            // Close button will be wired by Show() via event propagation
-            closeBtn.name = "info-close-btn";
             headerRow.Add(closeBtn);
-
             container.Add(headerRow);
 
-            var subLabel = new Label($"{typeName}{(string.IsNullOrEmpty(category) ? "" : " · " + category)}")
+            container.Add(new Label($"{typeName}{(string.IsNullOrEmpty(category) ? "" : " · " + category)}")
             {
                 style =
                 {
@@ -234,13 +208,86 @@ namespace DJTechEditor.PCG.Graph
                     borderBottomWidth = 1,
                     borderBottomColor = new Color(0.2f, 0.2f, 0.3f, 0.5f),
                 },
-            };
-            container.Add(subLabel);
-
+            });
             return container;
         }
 
-        private static VisualElement MakeSection(string title, IEnumerable<(string key, string value)> rows)
+        private static VisualElement MakeHint(string text)
+        {
+            return new Label(text)
+            {
+                style =
+                {
+                    fontSize = 10,
+                    color = new Color(0.55f, 0.55f, 0.6f),
+                    whiteSpace = WhiteSpace.Normal,
+                    paddingLeft = 10,
+                    paddingRight = 10,
+                    paddingTop = 10,
+                    paddingBottom = 10,
+                },
+            };
+        }
+
+        private static VisualElement MakeCountSection(PcgNodeMeshStats stats)
+        {
+            var container = MakeSectionContainer("Geometry");
+            container.Add(MakeColoredCountRow("Points", stats.pointCount, PointColor));
+            container.Add(MakeColoredCountRow("Primitives", stats.faceCount, PrimColor));
+            container.Add(MakeColoredCountRow("Vertices", stats.vertexCount, VertexColor));
+            container.Add(MakeColoredCountRow("Polygons", stats.faceCount, PolyColor));
+            if (stats.triangleCount > 0 && stats.triangleCount != stats.faceCount)
+                container.Add(MakeColoredCountRow("Triangles", stats.triangleCount, PolyColor));
+            return container;
+        }
+
+        private static VisualElement MakeBBoxSection(PcgNodeMeshStats stats)
+        {
+            var min = stats.bboxMin;
+            var max = stats.bboxMax;
+            var size = max - min;
+            var center = (min + max) * 0.5f;
+            var container = MakeSectionContainer("Bounding Box");
+            container.Add(MakeKvRow("Center", FormatVec3(center)));
+            container.Add(MakeKvRow("Min", FormatVec3(min)));
+            container.Add(MakeKvRow("Max", FormatVec3(max)));
+            container.Add(MakeKvRow("Size", FormatVec3(size)));
+            return container;
+        }
+
+        private static void AddAttrSection(
+            VisualElement parent, string title, List<NodeAttrEntry> attrs, string owner)
+        {
+            var filtered = attrs
+                .Where(a => string.Equals(a.owner, owner, System.StringComparison.OrdinalIgnoreCase))
+                .OrderBy(a => a.name)
+                .ToList();
+            if (filtered.Count == 0)
+                return;
+
+            var container = MakeSectionContainer(title);
+            foreach (var attr in filtered)
+                container.Add(MakeKvRow(attr.name, FormatAttrType(attr)));
+            parent.Add(container);
+        }
+
+        private static void AddGroupSection(
+            VisualElement parent, string title, List<NodeGroupEntry> groups, string domain)
+        {
+            var filtered = groups
+                .Where(g => string.Equals(g.domain, domain, System.StringComparison.OrdinalIgnoreCase))
+                .OrderBy(g => g.name)
+                .ToList();
+            if (filtered.Count == 0)
+                return;
+
+            var container = MakeSectionContainer(title);
+            foreach (var g in filtered)
+                container.Add(MakeKvRow(g.name, g.count.ToString("N0", CultureInfo.InvariantCulture)));
+            parent.Add(container);
+        }
+
+        private static VisualElement MakeSectionContainer(string title)
         {
             var container = new VisualElement
             {
@@ -254,8 +301,7 @@ namespace DJTechEditor.PCG.Graph
                     borderBottomColor = new Color(0.17f, 0.17f, 0.24f, 0.5f),
                 },
             };
-
-            var titleLabel = new Label(title)
+            container.Add(new Label(title.ToUpperInvariant())
             {
                 style =
                 {
@@ -264,100 +310,83 @@ namespace DJTechEditor.PCG.Graph
                     unityTextAlign = TextAnchor.UpperLeft,
                     marginBottom = 4,
                 },
-            };
-            // Uppercase via text
-            titleLabel.text = title.ToUpperInvariant();
-            container.Add(titleLabel);
-
-            foreach (var (key, value) in rows)
-            {
-                var row = new VisualElement
-                {
-                    style =
-                    {
-                        flexDirection = FlexDirection.Row,
-                        marginBottom = 1,
-                    },
-                };
-                var keyLabel = new Label(key)
-                {
-                    style =
-                    {
-                        fontSize = 10,
-                        color = new Color(0.65f, 0.7f, 0.8f),
-                        flexShrink = 0,
-                        flexGrow = 1,
-                    },
-                };
-                var valLabel = new Label(value)
-                {
-                    style =
-                    {
-                        fontSize = 10,
-                        color = new Color(0.85f, 0.85f, 0.85f),
-                        unityTextAlign = TextAnchor.MiddleRight,
-                    },
-                };
-                row.Add(keyLabel);
-                row.Add(valLabel);
-                container.Add(row);
-            }
-
+            });
             return container;
         }
 
-        // ── Group collection ───────────────────────────────
-
-        private static List<(string name, string domain, string condition)> CollectOutputGroups(
-            ManifestNodeDef def, PcgNodeData data)
+        private static VisualElement MakeColoredCountRow(string key, int value, Color valueColor)
         {
-            var result = new List<(string, string, string)>();
-
-            foreach (var og in def.outputGroups)
+            var row = MakeRowShell();
+            row.Add(MakeKeyLabel(key));
+            row.Add(new Label(value.ToString("N0", CultureInfo.InvariantCulture))
             {
-                string condition = null;
-                if (!string.IsNullOrEmpty(og.condition))
+                style =
                 {
-                    var condVal = data.GetRaw(og.condition);
-                    if (condVal is bool b && !b)
-                    {
-                        condition = og.condition;
-                        // Still list it, but marked as conditional/inactive
-                    }
-                    else
-                    {
-                        // condition met
-                    }
-                }
+                    fontSize = 11,
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    color = valueColor,
+                    unityTextAlign = TextAnchor.MiddleRight,
+                },
+            });
+            return row;
+        }
 
-                string name = og.name;
-                if (og.dynamic)
-                {
-                    var val = data.GetRaw(og.name)?.ToString();
-                    if (string.IsNullOrWhiteSpace(val))
-                        continue;
-                    name = val;
-                }
-
-                result.Add((name, og.domain, condition));
-            }
-
-            // Also check properties with isGroupOutput (dynamic groups without manifest outputGroups)
-            if (def.outputGroups.Count == 0)
+        private static VisualElement MakeKvRow(string key, string value)
+        {
+            var row = MakeRowShell();
+            row.Add(MakeKeyLabel(key));
+            row.Add(new Label(value)
             {
-                foreach (var kv in def.properties)
+                style =
                 {
-                    if (!kv.Value.isGroupOutput)
-                        continue;
-                    var groupName = data.GetRaw(kv.Key)?.ToString();
-                    if (string.IsNullOrWhiteSpace(groupName))
-                        continue;
-                    var domain = kv.Value.groupDomain ?? "edge";
-                    result.Add((groupName, domain, null));
-                }
-            }
+                    fontSize = 10,
+                    color = new Color(0.85f, 0.85f, 0.85f),
+                    unityTextAlign = TextAnchor.MiddleRight,
+                    whiteSpace = WhiteSpace.Normal,
+                    maxWidth = 170,
+                },
+            });
+            return row;
+        }
 
-            return result;
+        private static VisualElement MakeRowShell() =>
+            new()
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    marginBottom = 1,
+                    alignItems = Align.Center,
+                },
+            };
+
+        private static Label MakeKeyLabel(string key) =>
+            new(key)
+            {
+                style =
+                {
+                    fontSize = 10,
+                    color = new Color(0.65f, 0.7f, 0.8f),
+                    flexShrink = 0,
+                    flexGrow = 1,
+                },
+            };
+
+        private static string FormatVec3(Vector3 v) =>
+            string.Format(CultureInfo.InvariantCulture, "({0:0.###}, {1:0.###}, {2:0.###})",
+                v.x, v.y, v.z);
+
+        private static string FormatAttrType(NodeAttrEntry attr)
+        {
+            var type = (attr.type ?? "float").ToLowerInvariant();
+            var suffix = type switch
+            {
+                "int" => "int",
+                "string" => "str",
+                _ => "flt",
+            };
+            var tuple = Mathf.Max(1, attr.tuple_size);
+            return tuple == 1 ? $"1{suffix}" : $"{tuple}{suffix}";
         }
     }
 }

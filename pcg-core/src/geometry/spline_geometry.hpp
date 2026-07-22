@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 namespace pcg::internal::geometry {
@@ -38,6 +39,27 @@ std::vector<Vec3> resample_polyline_by_spacing(const std::vector<Vec3>& polyline
 
 /** Resample to a fixed point count along arc length. */
 std::vector<Vec3> resample_polyline_by_count(const std::vector<Vec3>& polyline, int point_count);
+
+/** Houdini Resample SOP parity for polygon curves. */
+struct PolylineResampleOptions {
+    bool use_max_segment_length = false;
+    double max_segment_length = 0.1;
+    bool use_max_segments = true;
+    int max_segments = 2;
+    std::string measure = "arc"; // arc | chord
+    bool even_last_segment_same_length = true;
+    bool maintain_last_vertex = false;
+};
+
+struct PolylineResampleResult {
+    std::vector<Vec3> points;
+    std::vector<double> curve_u;
+    std::vector<Vec3> tangents;
+    std::vector<double> half_edge_lengths;
+};
+
+PolylineResampleResult resample_polyline_houdini(const std::vector<Vec3>& polyline,
+                                                 const PolylineResampleOptions& options);
 
 double polyline_length(const std::vector<Vec3>& polyline);
 

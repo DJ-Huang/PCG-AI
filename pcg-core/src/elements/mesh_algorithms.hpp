@@ -57,6 +57,11 @@ data::PcgMeshData create_box_mesh(double width, double height, double depth);
 /// Box as 8 shared corners + 6 quads (canonical Geometry; triangulate only at Sink).
 data::PcgGeometry create_box_geometry(double width, double height, double depth);
 
+/// Houdini Grid–style plane: rows×cols quads on XY / XZ / YZ, centered at origin.
+data::PcgGeometry create_grid_geometry(double size_x, double size_y,
+                                       int rows, int cols,
+                                       const std::string& plane = "xz");
+
 data::PcgMeshData create_cylinder_mesh(double radius, double height,
                                        int radial_segments, int height_segments,
                                        bool cap_top, bool cap_bottom);

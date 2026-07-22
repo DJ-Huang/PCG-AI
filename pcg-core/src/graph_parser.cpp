@@ -309,7 +309,7 @@ PcgResultCode validate_graph_structure(const Graph& graph,
                                        char* err_buf,
                                        int err_buf_size)
 {
-    if (graph.version != "1.0" && graph.version != "2.0")
+    if (graph.version != "1.0" && graph.version != "2.0" && graph.version != "3.0")
         return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON, "Unsupported graph version");
 
     if (graph.nodes.empty())
@@ -389,8 +389,12 @@ PcgResultCode validate_graph_structure(const Graph& graph,
         if (!elements::pin_types_compatible(source_pin->second.type, target_pin->second.type))
             return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
                         "Edge pin types are incompatible");
-        if ((!edge.source_pin_type.empty() && edge.source_pin_type != source_pin->second.type) ||
-            (!edge.target_pin_type.empty() && edge.target_pin_type != target_pin->second.type))
+        if ((!edge.source_pin_type.empty() &&
+             elements::normalize_pin_type(edge.source_pin_type) !=
+                 elements::normalize_pin_type(source_pin->second.type)) ||
+            (!edge.target_pin_type.empty() &&
+             elements::normalize_pin_type(edge.target_pin_type) !=
+                 elements::normalize_pin_type(target_pin->second.type)))
             return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON,
                         "Edge pin type metadata does not match node manifest");
         if (!edge_signatures.emplace(edge.source, edge.source_handle,

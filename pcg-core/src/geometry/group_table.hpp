@@ -27,9 +27,12 @@ std::array<int, 2> edge_group_points(GroupId id);
 class GroupTable {
 public:
     bool contains(GroupDomain domain, const std::string& name, GroupId id) const;
+    bool has_group(GroupDomain domain, const std::string& name) const;
     void add(GroupDomain domain, const std::string& name, GroupId id);
     void remove(GroupDomain domain, const std::string& name, GroupId id);
     void clear_group(GroupDomain domain, const std::string& name);
+    /// Ensure a named group exists even when empty (Houdini create-even-if-empty).
+    void ensure_group(GroupDomain domain, const std::string& name);
 
     const std::unordered_set<GroupId>& members(GroupDomain domain, const std::string& name) const;
     std::vector<std::string> group_names(GroupDomain domain) const;

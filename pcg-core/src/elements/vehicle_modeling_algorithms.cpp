@@ -408,18 +408,28 @@ data::PcgGeometry poly_extrude_geometry(const data::PcgGeometry& input,
     }
     if (selected.empty()) return input;
 
+    // When a face group is set and keepOriginal is false, emit only the extruded
+    // shell (selected tops → sides + new top). Unselected faces are dropped so
+    // footprint buildings do not carry leftover pad sides/bottoms into Merge.
+    const bool keep_unselected =
+        options.face_group.empty() || options.keep_original;
+
     std::vector<int> source_corner_offsets(input.faces().size(), 0);
     int corner_cursor = 0;
     for (size_t i = 0; i < input.faces().size(); ++i) {
         source_corner_offsets[i] = corner_cursor;
         corner_cursor += static_cast<int>(input.faces()[i].size());
-        if (selected.count(static_cast<geometry::GroupId>(i)) == 0 || options.keep_original) {
-            output.faces_mut().push_back(input.faces()[i]);
-            topology_remap.primitives.push_back(static_cast<int>(i));
-            for (size_t corner = 0; corner < input.faces()[i].size(); ++corner)
-                topology_remap.vertices.push_back(source_corner_offsets[i] +
-                                                  static_cast<int>(corner));
-        }
+        const bool is_selected =
+            selected.count(static_cast<geometry::GroupId>(i)) > 0;
+        const bool keep_face =
+            (is_selected && options.keep_original) || (!is_selected && keep_unselected);
+        if (!keep_face)
+            continue;
+        output.faces_mut().push_back(input.faces()[i]);
+        topology_remap.primitives.push_back(static_cast<int>(i));
+        for (size_t corner = 0; corner < input.faces()[i].size(); ++corner)
+            topology_remap.vertices.push_back(source_corner_offsets[i] +
+                                              static_cast<int>(corner));
     }
 
     std::vector<std::pair<size_t, size_t>> generated_face_ranges;
@@ -430,6 +440,22 @@ data::PcgGeometry poly_extrude_geometry(const data::PcgGeometry& input,
         if (base.size() < 3) continue;
         const auto center = face_center(input, base);
         const auto normal = face_normal(input, base);
+        double distance = options.distance;
+        if (!options.distance_attribute.empty()) {
+            if (const data::AttributeArray* attr = input.attributes().find(
+                    data::AttributeOwner::Primitive, options.distance_attribute)) {
+                if (attr->schema().type == data::AttributeType::Float &&
+                    attr->schema().tuple_size >= 1 &&
+                    static_cast<size_t>(selected_index) < attr->size()) {
+                    distance = attr->float_values()[static_cast<size_t>(selected_index) *
+                                                    static_cast<size_t>(attr->schema().tuple_size)];
+                } else if (attr->schema().type == data::AttributeType::Int &&
+                           static_cast<size_t>(selected_index) < attr->size()) {
+                    distance = static_cast<double>(
+                        attr->int_values()[static_cast<size_t>(selected_index)]);
+                }
+            }
+        }
         double average_radius = 0.0;
         for (int index : base) average_radius += length(sub(input.points()[static_cast<size_t>(index)], center));
         average_radius /= static_cast<double>(base.size());
@@ -439,7 +465,7 @@ data::PcgGeometry poly_extrude_geometry(const data::PcgGeometry& input,
         std::vector<int> top;
         for (int index : base) {
             auto p = add(center, scale(sub(input.points()[static_cast<size_t>(index)], center), inset_scale));
-            p = add(p, scale(normal, options.distance));
+            p = add(p, scale(normal, distance));
             top.push_back(static_cast<int>(output.points().size()));
             output.points_mut().push_back(p);
             topology_remap.points.push_back(index);

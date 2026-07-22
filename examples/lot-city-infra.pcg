@@ -1,0 +1,646 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "ground",
+      "type": "CreateGridMesh",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "data": {
+        "sizeX": 48,
+        "sizeY": 48,
+        "rows": 1,
+        "cols": 1,
+        "plane": "xz",
+        "__nodeTitle": "City Ground"
+      }
+    },
+    {
+      "id": "lots",
+      "type": "LotSubdivision",
+      "position": {
+        "x": 840,
+        "y": 160
+      },
+      "data": {
+        "minSize": 6.5,
+        "iterations": 8,
+        "irregularity": 0.3611111,
+        "seed": 11,
+        "alignment": "boundingBox",
+        "__nodeTitle": "Lot Subdivision"
+      }
+    },
+    {
+      "id": "sg_roads",
+      "type": "Subgraph",
+      "position": {
+        "x": 1480,
+        "y": 320
+      },
+      "data": {
+        "subgraphId": "city_roads",
+        "__nodeTitle": "City Roads"
+      }
+    },
+    {
+      "id": "sg_pads",
+      "type": "Subgraph",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {
+        "subgraphId": "city_pads",
+        "__nodeTitle": "City Pads"
+      }
+    },
+    {
+      "id": "merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 840,
+        "y": 640
+      },
+      "data": {
+        "__nodeTitle": "Infra Merge"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 840,
+        "y": 800
+      },
+      "data": {
+        "label": "Lot City Infra",
+        "__nodeTitle": "Infra Out"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_ground_lots",
+      "source": "ground",
+      "target": "lots",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_roads_pads",
+      "source": "sg_roads",
+      "target": "sg_pads",
+      "sourceHandle": "mesh",
+      "targetHandle": "roads"
+    },
+    {
+      "id": "e_pads_merge",
+      "source": "sg_pads",
+      "target": "merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_roads_merge",
+      "source": "sg_roads",
+      "target": "merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_merge_out",
+      "source": "merge",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_lots_pads",
+      "source": "lots",
+      "target": "sg_pads",
+      "sourceHandle": "out",
+      "targetHandle": "lots"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "p_min_size",
+      "name": "minSize",
+      "type": "number",
+      "default": 6.5,
+      "exposed": true,
+      "targetNode": "lots",
+      "targetProperty": "minSize",
+      "hasRange": true,
+      "min": 4,
+      "max": 16
+    },
+    {
+      "id": "p_iterations",
+      "name": "iterations",
+      "type": "integer",
+      "default": 8,
+      "exposed": true,
+      "targetNode": "lots",
+      "targetProperty": "iterations",
+      "hasRange": true,
+      "min": 0,
+      "max": 8
+    },
+    {
+      "id": "p_irregularity",
+      "name": "irregularity",
+      "type": "number",
+      "default": 0.3611111,
+      "exposed": true,
+      "targetNode": "lots",
+      "targetProperty": "irregularity",
+      "hasRange": true,
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "subgraphs": [
+    {
+      "id": "city_roads",
+      "name": "City Roads",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "road_a",
+          "type": "CreateSpline",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "startX": 0,
+            "startY": 0,
+            "startZ": 0,
+            "endX": 40,
+            "endY": 0,
+            "endZ": 0,
+            "controlPoints": "[{\"x\":-22,\"y\":0.20,\"z\":-8},{\"x\":22,\"y\":0.20,\"z\":-8}]",
+            "editPlane": "xz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Road A Path"
+          }
+        },
+        {
+          "id": "road_b",
+          "type": "CreateSpline",
+          "position": {
+            "x": 520,
+            "y": 0
+          },
+          "data": {
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "startX": 0,
+            "startY": 0,
+            "startZ": 0,
+            "endX": 40,
+            "endY": 0,
+            "endZ": 0,
+            "controlPoints": "[{\"x\":6,\"y\":0.20,\"z\":-22},{\"x\":6,\"y\":0.20,\"z\":22}]",
+            "editPlane": "xz",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Road B Path"
+          }
+        },
+        {
+          "id": "road_sweep_a",
+          "type": "SweepAlongSpline",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "surfaceShape": "rectangle",
+            "profileWidth": 3.2,
+            "profileHeight": 0.12,
+            "radius": 1,
+            "columns": 16,
+            "sampleSpacing": 1,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0,
+            "twist": 0,
+            "profileRoll": 0,
+            "scaleStart": 1,
+            "scaleEnd": 1,
+            "profilePlane": "xy",
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "Road Sweep A"
+          }
+        },
+        {
+          "id": "road_sweep_b",
+          "type": "SweepAlongSpline",
+          "position": {
+            "x": 520,
+            "y": 160
+          },
+          "data": {
+            "surfaceShape": "rectangle",
+            "profileWidth": 3.2,
+            "profileHeight": 0.12,
+            "radius": 1,
+            "columns": 16,
+            "sampleSpacing": 1,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0,
+            "twist": 0,
+            "profileRoll": 0,
+            "scaleStart": 1,
+            "scaleEnd": 1,
+            "profilePlane": "xy",
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "Road Sweep B"
+          }
+        },
+        {
+          "id": "road_bevel_a",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "edgeGroup": "",
+            "offsetType": "offset",
+            "amount": 0.03,
+            "segments": 1,
+            "limitMethod": "angle",
+            "angleLimit": 30,
+            "profile": 0.5,
+            "miterOuter": "sharp",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": false,
+            "excludeGroups": "cap_start,cap_end",
+            "__nodeTitle": "Road Bevel A"
+          }
+        },
+        {
+          "id": "road_bevel_b",
+          "type": "BevelMesh",
+          "position": {
+            "x": 520,
+            "y": 320
+          },
+          "data": {
+            "edgeGroup": "",
+            "offsetType": "offset",
+            "amount": 0.03,
+            "segments": 1,
+            "limitMethod": "angle",
+            "angleLimit": 30,
+            "profile": 0.5,
+            "miterOuter": "sharp",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": false,
+            "excludeGroups": "cap_start,cap_end",
+            "__nodeTitle": "Road Bevel B"
+          }
+        },
+        {
+          "id": "merge_roads",
+          "type": "MergeMesh",
+          "position": {
+            "x": 360,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Merge Roads"
+          }
+        },
+        {
+          "id": "mat_roads",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 360,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "materialName": "road",
+            "__nodeTitle": "Mat Roads"
+          }
+        },
+        {
+          "id": "roads_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 360,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Roads Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_ra_sw",
+          "source": "road_a",
+          "target": "road_sweep_a",
+          "sourceHandle": "out",
+          "targetHandle": "backbone"
+        },
+        {
+          "id": "e_rb_sw",
+          "source": "road_b",
+          "target": "road_sweep_b",
+          "sourceHandle": "out",
+          "targetHandle": "backbone"
+        },
+        {
+          "id": "e_swa_bv",
+          "source": "road_sweep_a",
+          "target": "road_bevel_a",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swb_bv",
+          "source": "road_sweep_b",
+          "target": "road_bevel_b",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bva_m",
+          "source": "road_bevel_a",
+          "target": "merge_roads",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bvb_m",
+          "source": "road_bevel_b",
+          "target": "merge_roads",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_m_mat",
+          "source": "merge_roads",
+          "target": "mat_roads",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_mat_out",
+          "source": "mat_roads",
+          "target": "roads_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    },
+    {
+      "id": "city_pads",
+      "name": "City Pads",
+      "inputs": [
+        {
+          "id": "lots",
+          "name": "Lots",
+          "pinType": "SpatialMesh"
+        },
+        {
+          "id": "roads",
+          "name": "Roads",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "in_lots",
+          "type": "SubgraphInput",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Lots In"
+          }
+        },
+        {
+          "id": "in_roads",
+          "type": "SubgraphInput",
+          "position": {
+            "x": 520,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Roads In"
+          }
+        },
+        {
+          "id": "pads",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "faceGroup": "",
+            "distance": 0.18,
+            "inset": 0.08,
+            "keepOriginal": false,
+            "topGroup": "extrude_top",
+            "sideGroup": "extrude_side",
+            "__nodeTitle": "Extrude Pads"
+          }
+        },
+        {
+          "id": "pad_rim",
+          "type": "GroupCreate",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "outputGroup": "pad_rim",
+            "domain": "edge",
+            "mode": "angle",
+            "minEdgeAngle": 30,
+            "includeUnshared": false,
+            "fromFaceGroup": "extrude_top",
+            "fromEdgeGroup": "",
+            "__nodeTitle": "Pad Rim Edges",
+            "initialMerge": "replace",
+            "baseGroup": "",
+            "enableBounding": false,
+            "enableNormals": false,
+            "enableRandom": false,
+            "directionX": 0.0,
+            "directionY": 1.0,
+            "directionZ": 0.0,
+            "spreadAngle": 30.0,
+            "randomChance": 1.0,
+            "randomSeed": 0,
+            "enableBaseGroup": false,
+            "enableEdges": true
+          }
+        },
+        {
+          "id": "pad_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200,
+            "y": 480
+          },
+          "data": {
+            "edgeGroup": "pad_rim",
+            "offsetType": "offset",
+            "amount": 0.04,
+            "segments": 2,
+            "limitMethod": "none",
+            "angleLimit": 30,
+            "profile": 0.5,
+            "miterOuter": "sharp",
+            "miterInner": "sharp",
+            "vmeshMethod": "adj",
+            "clampOverlap": true,
+            "method": "edge",
+            "excludeUnshared": true,
+            "excludeGroups": "",
+            "__nodeTitle": "Pad Bevel"
+          }
+        },
+        {
+          "id": "pad_bool",
+          "type": "BooleanMesh",
+          "position": {
+            "x": 360,
+            "y": 640
+          },
+          "data": {
+            "operation": "subtract",
+            "treatAAs": "solid",
+            "treatBAs": "surface",
+            "useSelf": false,
+            "detriangulate": "all",
+            "weldEpsilon": 0.0001,
+            "triangleBudget": 500000,
+            "__nodeTitle": "Pad Cut Roads"
+          }
+        },
+        {
+          "id": "mat_pad",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 360,
+            "y": 800
+          },
+          "data": {
+            "group": "",
+            "materialName": "lot_pad",
+            "__nodeTitle": "Mat Lot Pads"
+          }
+        },
+        {
+          "id": "pads_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 360,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "Pads Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_in_pads",
+          "source": "in_lots",
+          "target": "pads",
+          "sourceHandle": "lots",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_pads_rim",
+          "source": "pads",
+          "target": "pad_rim",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rim_bv",
+          "source": "pad_rim",
+          "target": "pad_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bv_bool",
+          "source": "pad_bevel",
+          "target": "pad_bool",
+          "sourceHandle": "out",
+          "targetHandle": "a"
+        },
+        {
+          "id": "e_rd_bool",
+          "source": "in_roads",
+          "target": "pad_bool",
+          "sourceHandle": "roads",
+          "targetHandle": "b"
+        },
+        {
+          "id": "e_bool_mat",
+          "source": "pad_bool",
+          "target": "mat_pad",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_mat_out",
+          "source": "mat_pad",
+          "target": "pads_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    }
+  ]
+}

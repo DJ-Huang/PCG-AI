@@ -30,6 +30,13 @@ namespace DJTechRuntime.PCG
 
             string json = File.ReadAllText(path);
 
+            if (PcgExecutionDocumentBuilder.ContainsExternalOrAuthoringV3(json, out var reason))
+            {
+                Debug.LogError(
+                    $"[PCG] StreamingAssets graph is not Player-ready. Bake it in the Editor first. {reason}");
+                return false;
+            }
+
             if (m_ParameterOverrides != null && m_ParameterOverrides.Count > 0)
                 json = PcgParameterApplicator.ApplyOverrides(json, m_ParameterOverrides);
 

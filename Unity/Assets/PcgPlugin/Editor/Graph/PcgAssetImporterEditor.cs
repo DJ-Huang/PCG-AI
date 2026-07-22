@@ -16,7 +16,22 @@ namespace DJTechEditor.PCG.Graph
             }
 
             EditorGUILayout.Space();
+            ApplyRevertGUI();
+        }
+    }
 
+    [CustomEditor(typeof(PcgSubgraphAssetImporter))]
+    public sealed class PcgSubgraphAssetImporterEditor : ScriptedImporterEditor
+    {
+        public override void OnInspectorGUI()
+        {
+            if (GUILayout.Button("Open in Graph Editor"))
+            {
+                var path = AssetDatabase.GetAssetPath(((ScriptedImporter)target));
+                PcgGraphEditorWindow.ShowGraphEditWindow(path);
+            }
+
+            EditorGUILayout.Space();
             ApplyRevertGUI();
         }
     }

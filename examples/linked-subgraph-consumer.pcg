@@ -1,0 +1,40 @@
+{
+  "version": "3.0",
+  "nodes": [
+    {
+      "id": "linked_box",
+      "type": "SubgraphAsset",
+      "position": { "x": 200, "y": 160 },
+      "data": {
+        "assetGuid": "c0ffee00c0ffee00c0ffee00c0ffee00",
+        "__nodeTitle": "Linked Box"
+      },
+      "subgraphInterface": {
+        "name": "Linked Box",
+        "inputs": [],
+        "outputs": [
+          { "id": "mesh", "name": "Mesh", "pinType": "SpatialMesh" }
+        ]
+      }
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": { "x": 200, "y": 360 },
+      "data": { "__nodeTitle": "Output" }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "linked_box",
+      "target": "output",
+      "sourceHandle": "mesh",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    }
+  ],
+  "parameters": [],
+  "subgraphs": []
+}

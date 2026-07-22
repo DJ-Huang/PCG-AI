@@ -8,6 +8,7 @@
 #include "geometry/group_table.hpp"
 
 #include <array>
+#include <unordered_set>
 #include <vector>
 
 namespace pcg::internal::data {
@@ -153,5 +154,15 @@ void maintain_unshared_edge_group(PcgGeometry& geometry, const std::string& name
 
 /// Concatenate geometries; group names are unioned with optional prefix on the right operand.
 PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const std::string& b_prefix = "");
+
+/// Extract a subset of faces into a new geometry (points remapped; attrs/groups
+/// propagated). Face indices outside [0, faces) are ignored.
+PcgGeometry extract_faces(const PcgGeometry& geometry,
+                          const std::unordered_set<int>& face_indices);
+
+/// Split a geometry into independent bevel shells. Uses primitive int attributes
+/// (e.g. lotid) when present; otherwise edge-connected face components. Boundary
+/// vertices/edges between clusters are duplicated so bevel cannot couple shells.
+std::vector<PcgGeometry> partition_geometry_bevel_shells(const PcgGeometry& geometry);
 
 } // namespace pcg::internal::data

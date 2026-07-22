@@ -2,6 +2,7 @@
 
 #include "data/pcg_geometry.hpp"
 #include "elements/element_utils.hpp"
+#include "geometry/spline_geometry.hpp"
 #include "geometry/sweep_geometry.hpp"
 
 #include <cmath>
@@ -171,25 +172,89 @@ data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& o
     return out;
 }
 
-data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options)
+data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options)
 {
     data::PcgSplineData out;
-    for (const auto& spline : input.splines()) {
+
+    if (options.radius <= 0.0 || options.segments < 1)
+        return out;
+
+    int axis = -1;
+    if (options.axis == "x" || options.axis == "X") axis = 0;
+    else if (options.axis == "y" || options.axis == "Y") axis = 1;
+    else if (options.axis == "z" || options.axis == "Z") axis = 2;
+    else return out;
+
+    constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+    const int sample_count = options.segments + 1;
+    const double start_rad = options.start_angle_deg * kDegToRad;
+    const double end_rad = options.end_angle_deg * kDegToRad;
+    const double span = end_rad - start_rad;
+
+    data::PcgSpline spline;
+    spline.closed = false;
+    spline.points.reserve(static_cast<size_t>(sample_count));
+
+    for (int i = 0; i < sample_count; ++i) {
+        const double t = static_cast<double>(i) / static_cast<double>(options.segments);
+        const double angle = start_rad + span * t;
+        const double c = options.radius * std::cos(angle);
+        const double s = options.radius * std::sin(angle);
+
+        data::PcgSplinePoint p{};
+        // Arc lies in the plane perpendicular to axis (Houdini Circle SOP arc mode).
+        if (axis == 0)      { p = {0.0, c, s}; }
+        else if (axis == 1) { p = {c, 0.0, s}; }
+        else                { p = {c, s, 0.0}; }
+        spline.points.push_back(p);
+    }
+
+    out.add_spline(std::move(spline));
+    return out;
+}
+
+data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options)
+{
+    geometry::PolylineResampleOptions polyline_opts;
+    if (options.use_max_segments || options.use_max_segment_length) {
+        polyline_opts.use_max_segments = options.use_max_segments;
+        polyline_opts.max_segments = options.max_segments;
+        polyline_opts.use_max_segment_length = options.use_max_segment_length;
+        polyline_opts.max_segment_length = options.max_segment_length;
+        polyline_opts.measure = options.measure;
+        polyline_opts.even_last_segment_same_length = options.even_last_segment_same_length;
+        polyline_opts.maintain_last_vertex = options.maintain_last_vertex;
+    } else if (options.mode == "count") {
+        polyline_opts.use_max_segments = true;
+        polyline_opts.max_segments = std::max(1, options.point_count - 1);
+    } else {
+        polyline_opts.use_max_segment_length = true;
+        polyline_opts.max_segment_length = std::max(0.01, options.spacing);
+        polyline_opts.even_last_segment_same_length = false;
+    }
+
+    data::PcgSplineData out;
+    for (size_t curve_index = 0; curve_index < input.splines().size(); ++curve_index) {
+        const auto& spline = input.splines()[curve_index];
         std::vector<geometry::Vec3> polyline;
         polyline.reserve(spline.points.size());
         for (const auto& p : spline.points)
             polyline.push_back(to_vec3(p));
 
-        std::vector<geometry::Vec3> resampled;
-        if (options.mode == "count")
-            resampled = geometry::resample_polyline_by_count(polyline, std::max(2, options.point_count));
-        else
-            resampled = geometry::resample_polyline_by_spacing(polyline, std::max(0.01, options.spacing));
+        const geometry::PolylineResampleResult resampled =
+            geometry::resample_polyline_houdini(polyline, polyline_opts);
 
         data::PcgSpline next;
         next.closed = spline.closed;
-        for (const auto& p : resampled)
+        for (const auto& p : resampled.points)
             next.points.push_back(data::PcgSplinePoint{p.x, p.y, p.z});
+
+        if (options.write_curve_u_attr && !resampled.curve_u.empty())
+            next.attributes[options.curve_u_attribute] = resampled.curve_u;
+        if (options.write_distance_attr && !resampled.half_edge_lengths.empty())
+            next.attributes[options.distance_attribute] = resampled.half_edge_lengths;
+        if (options.write_curve_num_attr)
+            next.attributes[options.curve_num_attribute] = static_cast<int>(curve_index);
         out.add_spline(std::move(next));
     }
     return out;

@@ -1,0 +1,1430 @@
+{
+  "version": "1.0",
+  "name": "Tall Flat-Roof Building",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "mesh",
+      "name": "Mesh",
+      "pinType": "SpatialMesh"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "tf_body_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -440,
+        "y": 0
+      },
+      "data": {
+        "width": 3.4,
+        "height": 10.8,
+        "depth": 3.4,
+        "__nodeTitle": "Tall Body"
+      }
+    },
+    {
+      "id": "tf_body_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -440,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.05,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Body Bevel"
+      }
+    },
+    {
+      "id": "tf_body_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -440,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Tall Body Mat"
+      }
+    },
+    {
+      "id": "tf_body_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -440,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Body Place"
+      }
+    },
+    {
+      "id": "tf_plinth_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -120,
+        "y": 0
+      },
+      "data": {
+        "width": 3.6,
+        "height": 0.45,
+        "depth": 3.6,
+        "__nodeTitle": "Tall Plinth"
+      }
+    },
+    {
+      "id": "tf_plinth_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -120,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Plinth Bevel"
+      }
+    },
+    {
+      "id": "tf_plinth_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -120,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Tall Plinth Mat"
+      }
+    },
+    {
+      "id": "tf_plinth_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -120,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -5.2,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Plinth Place"
+      }
+    },
+    {
+      "id": "tf_band_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 3.55,
+        "height": 0.12,
+        "depth": 0.12,
+        "__nodeTitle": "Tall Band"
+      }
+    },
+    {
+      "id": "tf_band_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Band Bevel"
+      }
+    },
+    {
+      "id": "tf_band_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Tall Band Mat"
+      }
+    },
+    {
+      "id": "tf_band_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -2.5,
+        "translateZ": 1.72,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Band Place"
+      }
+    },
+    {
+      "id": "tf_band_y",
+      "type": "CopyMesh",
+      "position": {
+        "x": 200,
+        "y": 640
+      },
+      "data": {
+        "mode": "linear",
+        "count": 3,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 2.4,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Tall Band Rows"
+      }
+    },
+    {
+      "id": "tf_cornice_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "width": 3.7,
+        "height": 0.35,
+        "depth": 3.7,
+        "__nodeTitle": "Tall Cornice"
+      }
+    },
+    {
+      "id": "tf_cornice_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 520,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Cornice Bevel"
+      }
+    },
+    {
+      "id": "tf_cornice_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 520,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Tall Cornice Mat"
+      }
+    },
+    {
+      "id": "tf_cornice_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 520,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 5.5,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Cornice Place"
+      }
+    },
+    {
+      "id": "tf_para_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 840,
+        "y": 0
+      },
+      "data": {
+        "width": 3.5,
+        "height": 0.55,
+        "depth": 0.18,
+        "__nodeTitle": "Tall Parapet F"
+      }
+    },
+    {
+      "id": "tf_para_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 840,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Parapet F Bevel"
+      }
+    },
+    {
+      "id": "tf_para_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 840,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Tall Parapet F Mat"
+      }
+    },
+    {
+      "id": "tf_para_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 840,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 5.95,
+        "translateZ": 1.65,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Parapet F Place"
+      }
+    },
+    {
+      "id": "tf_parab_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 840,
+        "y": 800
+      },
+      "data": {
+        "width": 3.5,
+        "height": 0.55,
+        "depth": 0.18,
+        "__nodeTitle": "Tall Parapet B"
+      }
+    },
+    {
+      "id": "tf_parab_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 840,
+        "y": 960
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Parapet B Bevel"
+      }
+    },
+    {
+      "id": "tf_parab_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 840,
+        "y": 1120
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Tall Parapet B Mat"
+      }
+    },
+    {
+      "id": "tf_parab_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 840,
+        "y": 1280
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 5.95,
+        "translateZ": -1.65,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Parapet B Place"
+      }
+    },
+    {
+      "id": "tf_frame",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1160,
+        "y": 0
+      },
+      "data": {
+        "width": 0.95,
+        "height": 1.4,
+        "depth": 0.12,
+        "__nodeTitle": "Tall Win Frame"
+      }
+    },
+    {
+      "id": "tf_frame_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1160,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Frame Bevel"
+      }
+    },
+    {
+      "id": "tf_frame_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1160,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Tall Frame Mat"
+      }
+    },
+    {
+      "id": "tf_pane",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1480,
+        "y": 0
+      },
+      "data": {
+        "width": 0.72,
+        "height": 1.12,
+        "depth": 0.05,
+        "__nodeTitle": "Tall Win Pane"
+      }
+    },
+    {
+      "id": "tf_pane_vc",
+      "type": "VertexColor",
+      "position": {
+        "x": 1480,
+        "y": 160
+      },
+      "data": {
+        "r": 0.2,
+        "g": 0.15,
+        "b": 0.08,
+        "a": 1.0,
+        "emission": 0.9,
+        "emissionColorR": 1.0,
+        "emissionColorG": 0.82,
+        "emissionColorB": 0.4,
+        "__nodeTitle": "Tall Pane Glow"
+      }
+    },
+    {
+      "id": "tf_pane_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1480,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "window_glow",
+        "__nodeTitle": "Tall Pane Mat"
+      }
+    },
+    {
+      "id": "tf_pane_inset",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1480,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0.04,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Pane Inset"
+      }
+    },
+    {
+      "id": "tf_win_unit",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1320,
+        "y": 640
+      },
+      "data": {
+        "__nodeTitle": "Tall Win Unit"
+      }
+    },
+    {
+      "id": "tf_win_y",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1320,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 4,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 2.35,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Tall Win Rows"
+      }
+    },
+    {
+      "id": "tf_win_x",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1320,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 2.35,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Tall Win Cols"
+      }
+    },
+    {
+      "id": "tf_win_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1320,
+        "y": 1120
+      },
+      "data": {
+        "translateX": -1.175,
+        "translateY": -3.6,
+        "translateZ": 1.72,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Win Place"
+      }
+    },
+    {
+      "id": "tf_quoin_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "width": 0.32,
+        "height": 0.42,
+        "depth": 0.32,
+        "__nodeTitle": "Tall Quoin"
+      }
+    },
+    {
+      "id": "tf_quoin_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1800,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Quoin Bevel"
+      }
+    },
+    {
+      "id": "tf_quoin_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1800,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Tall Quoin Mat"
+      }
+    },
+    {
+      "id": "tf_quoin_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1800,
+        "y": 480
+      },
+      "data": {
+        "translateX": -1.7,
+        "translateY": -4.6,
+        "translateZ": -1.7,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Quoin Place"
+      }
+    },
+    {
+      "id": "tf_quoin_y",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1800,
+        "y": 640
+      },
+      "data": {
+        "mode": "linear",
+        "count": 5,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 2.1,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Tall Quoin Rows"
+      }
+    },
+    {
+      "id": "tf_quoin_x",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1800,
+        "y": 800
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 3.4,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Tall Quoin X"
+      }
+    },
+    {
+      "id": "tf_quoin_z",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1800,
+        "y": 960
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "z",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 3.4,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0,
+        "__nodeTitle": "Tall Quoin Z"
+      }
+    },
+    {
+      "id": "tf_door",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2120,
+        "y": 0
+      },
+      "data": {
+        "width": 1.0,
+        "height": 2.2,
+        "depth": 0.1,
+        "__nodeTitle": "Tall Door"
+      }
+    },
+    {
+      "id": "tf_door_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 2120,
+        "y": 160
+      },
+      "data": {
+        "edgeGroup": "",
+        "offsetType": "offset",
+        "amount": 0.03,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 30,
+        "profile": 0.5,
+        "miterOuter": "sharp",
+        "miterInner": "sharp",
+        "vmeshMethod": "adj",
+        "clampOverlap": true,
+        "method": "edge",
+        "excludeUnshared": false,
+        "excludeGroups": "cap_start,cap_end",
+        "__nodeTitle": "Tall Door Bevel"
+      }
+    },
+    {
+      "id": "tf_door_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2120,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Tall Door Mat"
+      }
+    },
+    {
+      "id": "tf_door_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2120,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -4.3,
+        "translateZ": 1.72,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Door Place"
+      }
+    },
+    {
+      "id": "tf_arch",
+      "type": "CreateArcSpline",
+      "position": {
+        "x": 2440,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.55,
+        "startAngle": 0,
+        "endAngle": 180,
+        "segments": 14,
+        "axis": "z",
+        "__nodeTitle": "Tall Door Arc"
+      }
+    },
+    {
+      "id": "tf_arch_sw",
+      "type": "SweepAlongSpline",
+      "position": {
+        "x": 2440,
+        "y": 160
+      },
+      "data": {
+        "surfaceShape": "rectangle",
+        "profileWidth": 0.12,
+        "profileHeight": 0.1,
+        "radius": 1,
+        "columns": 12,
+        "sampleSpacing": 0.08,
+        "capStart": true,
+        "capEnd": true,
+        "upX": 0,
+        "upY": 1,
+        "upZ": 0,
+        "twist": 0,
+        "profileRoll": 0,
+        "scaleStart": 1,
+        "scaleEnd": 1,
+        "profilePlane": "xy",
+        "shadeMode": "auto",
+        "cuspAngle": 30,
+        "__nodeTitle": "Tall Arch Sweep"
+      }
+    },
+    {
+      "id": "tf_arch_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2440,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Tall Arch Mat"
+      }
+    },
+    {
+      "id": "tf_arch_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2440,
+        "y": 480
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": -3.15,
+        "translateZ": 1.75,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Arch Place"
+      }
+    },
+    {
+      "id": "tf_chim",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 2760,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.18,
+        "height": 1.0,
+        "radialSegments": 8,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Tall Chimney"
+      }
+    },
+    {
+      "id": "tf_chim_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2760,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "materialName": "brick",
+        "__nodeTitle": "Tall Chimney Mat"
+      }
+    },
+    {
+      "id": "tf_chim_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2760,
+        "y": 320
+      },
+      "data": {
+        "translateX": 0.7,
+        "translateY": 6.2,
+        "translateZ": 0.6,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Chimney Place"
+      }
+    },
+    {
+      "id": "tf_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 400,
+        "y": 1440
+      },
+      "data": {
+        "__nodeTitle": "Tall Merge"
+      }
+    },
+    {
+      "id": "tf_lift",
+      "type": "TransformMesh",
+      "position": {
+        "x": 400,
+        "y": 1600
+      },
+      "data": {
+        "translateX": 0,
+        "translateY": 5.4,
+        "translateZ": 0,
+        "rotationX": 0,
+        "rotationY": 0,
+        "rotationZ": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "scaleZ": 1,
+        "__nodeTitle": "Tall Lift"
+      }
+    },
+    {
+      "id": "tf_out",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 400,
+        "y": 1760
+      },
+      "data": {
+        "__nodeTitle": "Tall Out"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_tf_body_bv",
+      "source": "tf_body_box",
+      "target": "tf_body_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_body_mat",
+      "source": "tf_body_bevel",
+      "target": "tf_body_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_body_xf",
+      "source": "tf_body_mat",
+      "target": "tf_body_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_plinth_bv",
+      "source": "tf_plinth_box",
+      "target": "tf_plinth_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_plinth_mat",
+      "source": "tf_plinth_bevel",
+      "target": "tf_plinth_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_plinth_xf",
+      "source": "tf_plinth_mat",
+      "target": "tf_plinth_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_band_bv",
+      "source": "tf_band_box",
+      "target": "tf_band_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_band_mat",
+      "source": "tf_band_bevel",
+      "target": "tf_band_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_band_xf",
+      "source": "tf_band_mat",
+      "target": "tf_band_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_band_y",
+      "source": "tf_band_xf",
+      "target": "tf_band_y",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_cornice_bv",
+      "source": "tf_cornice_box",
+      "target": "tf_cornice_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_cornice_mat",
+      "source": "tf_cornice_bevel",
+      "target": "tf_cornice_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_cornice_xf",
+      "source": "tf_cornice_mat",
+      "target": "tf_cornice_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_para_bv",
+      "source": "tf_para_box",
+      "target": "tf_para_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_para_mat",
+      "source": "tf_para_bevel",
+      "target": "tf_para_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_para_xf",
+      "source": "tf_para_mat",
+      "target": "tf_para_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_parab_bv",
+      "source": "tf_parab_box",
+      "target": "tf_parab_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_parab_mat",
+      "source": "tf_parab_bevel",
+      "target": "tf_parab_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_parab_xf",
+      "source": "tf_parab_mat",
+      "target": "tf_parab_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_fr_bv",
+      "source": "tf_frame",
+      "target": "tf_frame_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_fr_mat",
+      "source": "tf_frame_bv",
+      "target": "tf_frame_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_pn_vc",
+      "source": "tf_pane",
+      "target": "tf_pane_vc",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_pn_mat",
+      "source": "tf_pane_vc",
+      "target": "tf_pane_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_pn_in",
+      "source": "tf_pane_mat",
+      "target": "tf_pane_inset",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_fr_unit",
+      "source": "tf_frame_mat",
+      "target": "tf_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_pn_unit",
+      "source": "tf_pane_inset",
+      "target": "tf_win_unit",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_win_y",
+      "source": "tf_win_unit",
+      "target": "tf_win_y",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_win_x",
+      "source": "tf_win_y",
+      "target": "tf_win_x",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_win_xf",
+      "source": "tf_win_x",
+      "target": "tf_win_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_quoin_bv",
+      "source": "tf_quoin_box",
+      "target": "tf_quoin_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_quoin_mat",
+      "source": "tf_quoin_bevel",
+      "target": "tf_quoin_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_quoin_xf",
+      "source": "tf_quoin_mat",
+      "target": "tf_quoin_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_qy",
+      "source": "tf_quoin_xf",
+      "target": "tf_quoin_y",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_qx",
+      "source": "tf_quoin_y",
+      "target": "tf_quoin_x",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_qz",
+      "source": "tf_quoin_x",
+      "target": "tf_quoin_z",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_d_bv",
+      "source": "tf_door",
+      "target": "tf_door_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_d_mat",
+      "source": "tf_door_bv",
+      "target": "tf_door_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_d_xf",
+      "source": "tf_door_mat",
+      "target": "tf_door_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_arch_sw",
+      "source": "tf_arch",
+      "target": "tf_arch_sw",
+      "sourceHandle": "out",
+      "targetHandle": "backbone"
+    },
+    {
+      "id": "e_tf_arch_mat",
+      "source": "tf_arch_sw",
+      "target": "tf_arch_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_arch_xf",
+      "source": "tf_arch_mat",
+      "target": "tf_arch_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_chim_mat",
+      "source": "tf_chim",
+      "target": "tf_chim_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_chim_xf",
+      "source": "tf_chim_mat",
+      "target": "tf_chim_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m0",
+      "source": "tf_body_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m1",
+      "source": "tf_plinth_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m2",
+      "source": "tf_band_y",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m3",
+      "source": "tf_cornice_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m4",
+      "source": "tf_para_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m5",
+      "source": "tf_parab_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m6",
+      "source": "tf_win_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m7",
+      "source": "tf_quoin_z",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m8",
+      "source": "tf_door_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m9",
+      "source": "tf_arch_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_m10",
+      "source": "tf_chim_xf",
+      "target": "tf_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_lift",
+      "source": "tf_merge",
+      "target": "tf_lift",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_tf_out",
+      "source": "tf_lift",
+      "target": "tf_out",
+      "sourceHandle": "out",
+      "targetHandle": "mesh"
+    }
+  ],
+  "subgraphs": []
+}

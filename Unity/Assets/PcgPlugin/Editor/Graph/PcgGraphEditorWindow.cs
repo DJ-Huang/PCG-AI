@@ -15,6 +15,11 @@ namespace DJTechEditor.PCG.Graph
         private const string MenuPath = "PCG/Graph Editor";
         private const string IconPath = "Assets/PcgPlugin/Editor/Icons/pcg-icon-16.png";
         private const string PcgExtension = "pcg";
+        private const string SubgraphExtension = "pcgsubgraph";
+
+        private bool m_SubgraphAssetMode;
+
+        public bool IsSubgraphAssetMode => m_SubgraphAssetMode;
 
         /// <summary>Asset GUID of the open .pcg file (Shader Graph: m_Selected).</summary>
         [SerializeField]
@@ -22,6 +27,7 @@ namespace DJTechEditor.PCG.Graph
 
         private PcgGraphView m_GraphView;
         private PcgGraphBlackboard m_Blackboard;
+        private PcgSubgraphInterfacePanel m_InterfacePanel;
         private PcgNodeInspector m_Inspector;
         private Button m_BlackboardToggle;
         private Button m_InspectorToggle;
@@ -253,7 +259,8 @@ namespace DJTechEditor.PCG.Graph
             if (string.IsNullOrEmpty(guid))
                 return false;
 
-            if (!assetPath.EndsWith("." + PcgExtension, System.StringComparison.OrdinalIgnoreCase))
+            if (!assetPath.EndsWith("." + PcgExtension, System.StringComparison.OrdinalIgnoreCase) &&
+                !assetPath.EndsWith("." + SubgraphExtension, System.StringComparison.OrdinalIgnoreCase))
                 return false;
 
             foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
@@ -291,8 +298,12 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             var extension = Path.GetExtension(assetPath);
-            if (string.IsNullOrEmpty(extension) ||
-                !extension.Substring(1).Equals(PcgExtension, System.StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrEmpty(extension))
+                return;
+            var ext = extension.Substring(1);
+            var isGraph = ext.Equals(PcgExtension, System.StringComparison.OrdinalIgnoreCase);
+            var isSubgraphAsset = ext.Equals(SubgraphExtension, System.StringComparison.OrdinalIgnoreCase);
+            if (!isGraph && !isSubgraphAsset)
                 return;
 
             m_Selected = assetGuid;
@@ -385,6 +396,11 @@ namespace DJTechEditor.PCG.Graph
             toolbar.Add(MakeButton("New", NewGraph));
             toolbar.Add(MakeButton("Save", SaveGraph));
             toolbar.Add(MakeButton("Save As…", SaveAsGraph));
+            toolbar.Add(MakeButton("Show in Project", LocateInProject));
+
+            m_ClearPreviewButton = MakeButton("Clear Preview", () => ClearNodePreview());
+            m_ClearPreviewButton.style.display = DisplayStyle.None;
+            toolbar.Add(m_ClearPreviewButton);
 
             m_SubgraphBackButton = MakeButton("‹ Root", () => m_GraphView?.ExitSubgraph());
             m_SubgraphBackButton.style.display = DisplayStyle.None;
@@ -400,22 +416,6 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
             toolbar.Add(m_SubgraphBreadcrumb);
-
-            m_PreviewStatusLabel = new Label
-            {
-                style =
-                {
-                    marginRight = 8,
-                    unityTextAlign = TextAnchor.MiddleLeft,
-                    color = new Color(0.55f, 0.85f, 1f),
-                    display = DisplayStyle.None,
-                },
-            };
-            toolbar.Add(m_PreviewStatusLabel);
-
-            m_ClearPreviewButton = MakeButton("Clear Preview", () => ClearNodePreview());
-            m_ClearPreviewButton.style.display = DisplayStyle.None;
-            toolbar.Add(m_ClearPreviewButton);
 
             var spacer = new VisualElement { style = { flexGrow = 1 } };
             toolbar.Add(spacer);
@@ -437,8 +437,6 @@ namespace DJTechEditor.PCG.Graph
 
             m_InspectorToggle = MakeButton("Inspector", ToggleInspector);
             toolbar.Add(m_InspectorToggle);
-
-            toolbar.Add(MakeButton("Show in Project", LocateInProject));
 
             rootVisualElement.Add(toolbar);
         }
@@ -488,16 +486,63 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView.Blackboard = m_Blackboard;
             m_Blackboard.style.display = DisplayStyle.None;
 
+            m_InterfacePanel = new PcgSubgraphInterfacePanel(m_GraphView);
+            m_InterfacePanel.style.display = DisplayStyle.None;
+
             m_Inspector = new PcgNodeInspector(m_GraphView, m_Blackboard);
             m_GraphView.Inspector = m_Inspector;
 
-            m_Blackboard.OnParametersChanged += () => m_Inspector.OnSelectionChanged();
+            m_Blackboard.OnParametersChanged += () =>
+            {
+                m_Inspector.OnSelectionChanged();
+                m_GraphView.NotifyDocumentChanged();
+            };
+
+            var graphHost = new VisualElement
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    position = Position.Relative,
+                },
+            };
+            graphHost.Add(m_GraphView);
+
+            // Status tip over the graph (not toolbar) so long preview names don't steal chrome space.
+            m_PreviewStatusLabel = new Label
+            {
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    position = Position.Absolute,
+                    left = 8,
+                    bottom = 8,
+                    maxWidth = Length.Percent(70),
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                    color = new Color(0.55f, 0.85f, 1f),
+                    display = DisplayStyle.None,
+                    whiteSpace = WhiteSpace.Normal,
+                    // Soft backdrop so text stays readable over dense graphs.
+                    backgroundColor = new Color(0.08f, 0.1f, 0.14f, 0.72f),
+                    paddingLeft = 8,
+                    paddingRight = 8,
+                    paddingTop = 3,
+                    paddingBottom = 3,
+                    borderTopLeftRadius = 4,
+                    borderTopRightRadius = 4,
+                    borderBottomLeftRadius = 4,
+                    borderBottomRightRadius = 4,
+                },
+            };
+            graphHost.Add(m_PreviewStatusLabel);
 
             contentRow.Add(m_Blackboard);
-            contentRow.Add(m_GraphView);
+            contentRow.Add(m_InterfacePanel);
+            contentRow.Add(graphHost);
             contentRow.Add(m_Inspector);
 
             rootVisualElement.Add(contentRow);
+            RefreshPreviewToolbar();
         }
 
         private void RefreshSubgraphBreadcrumb()
@@ -516,6 +561,7 @@ namespace DJTechEditor.PCG.Graph
         {
             DisposeFileWatcher();
             ClearNodePreview(silent: true);
+            ExitSubgraphAssetModeUi();
             m_GraphView.LoadDocument(PcgGraphDefaults.CreatePipeline());
             m_Selected = null;
             m_CurrentFilePath = null;
@@ -526,6 +572,15 @@ namespace DJTechEditor.PCG.Graph
             RefreshScatterDisplayField();
         }
 
+        private void ExitSubgraphAssetModeUi()
+        {
+            m_SubgraphAssetMode = false;
+            if (m_Blackboard != null)
+                m_Blackboard.style.display = DisplayStyle.None;
+            if (m_InterfacePanel != null)
+                m_InterfacePanel.style.display = DisplayStyle.None;
+        }
+
         private void NewGraph()
         {
             if (!EditorUtility.DisplayDialog("New Graph", "Replace the current graph with the default pipeline?", "New", "Cancel"))
@@ -534,20 +589,56 @@ namespace DJTechEditor.PCG.Graph
             LoadDefaultGraph();
         }
 
+        public void ReconcileExternalSubgraphAssets(HashSet<string> changedGuids)
+        {
+            if (!HasLoadedGraph)
+                return;
+            m_GraphView?.ReconcileExternalNodes(changedGuids);
+        }
+
         private bool ImportFromPath(string path)
         {
             PcgNodeManifest.Reload();
 
             var json = File.ReadAllText(path);
-            if (!PcgGraphSerializer.TryFromJson(json, out var doc, out var error))
+            var isSubgraphAsset = path.EndsWith("." + SubgraphExtension, StringComparison.OrdinalIgnoreCase);
+            m_SubgraphAssetMode = isSubgraphAsset;
+
+            if (isSubgraphAsset)
             {
-                SetStatus($"Import failed: {error}");
-                Debug.LogError($"[PCG] Graph import failed: {error}");
-                return false;
+                if (!PcgSubgraphAssetSerializer.TryFromJson(json, out var assetDoc, out var assetError))
+                {
+                    SetStatus($"Import failed: {assetError}");
+                    Debug.LogError($"[PCG] Subgraph asset import failed: {assetError}");
+                    return false;
+                }
+
+                var definition = assetDoc.ToRootDefinition("__asset_root__");
+                var wrapper = new PcgGraphDocument
+                {
+                    version = "3.0",
+                    nodes = definition.nodes,
+                    edges = definition.edges,
+                    subgraphs = assetDoc.subgraphs ?? new List<PcgSubgraphDefinition>(),
+                };
+                // Keep interface ports on a synthetic definition for Input/Output nodes.
+                wrapper.subgraphs.Insert(0, definition);
+                ClearNodePreview(silent: true);
+                m_GraphView.LoadSubgraphAssetDocument(wrapper, definition, assetDoc.name);
+            }
+            else
+            {
+                if (!PcgGraphSerializer.TryFromJson(json, out var doc, out var error))
+                {
+                    SetStatus($"Import failed: {error}");
+                    Debug.LogError($"[PCG] Graph import failed: {error}");
+                    return false;
+                }
+
+                ClearNodePreview(silent: true);
+                m_GraphView.LoadDocument(doc);
             }
 
-            ClearNodePreview(silent: true);
-            m_GraphView.LoadDocument(doc);
             m_CurrentFilePath = Path.GetFullPath(path);
             SetupFileWatcher(m_CurrentFilePath);
 
@@ -562,6 +653,17 @@ namespace DJTechEditor.PCG.Graph
             UpdateTitle();
             SetStatus($"Imported: {path}");
             RefreshScatterDisplayField();
+            if (m_Blackboard != null)
+                m_Blackboard.style.display = m_SubgraphAssetMode ? DisplayStyle.None : DisplayStyle.Flex;
+            if (m_InterfacePanel != null)
+            {
+                m_InterfacePanel.style.display = m_SubgraphAssetMode ? DisplayStyle.Flex : DisplayStyle.None;
+                if (m_SubgraphAssetMode)
+                {
+                    var definition = m_GraphView?.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
+                    m_InterfacePanel.Bind(definition);
+                }
+            }
             return true;
         }
 
@@ -573,8 +675,30 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            var doc = m_GraphView.ExportDocument();
-            var json = PcgGraphSerializer.ToJson(doc);
+            string json;
+            if (m_SubgraphAssetMode)
+            {
+                if (!m_GraphView.TryExportSubgraphAssetDocument(out var assetDoc, out var exportError))
+                {
+                    SetStatus($"Save failed: {exportError}");
+                    Debug.LogError($"[PCG] Subgraph asset save failed: {exportError}");
+                    return;
+                }
+                json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+            }
+            else
+            {
+                if (!m_GraphView.TryFlushExternalNavigationAssets(out var flushError))
+                {
+                    SetStatus($"Save failed: {flushError}");
+                    Debug.LogError($"[PCG] Failed to flush linked SubgraphAsset edits: {flushError}");
+                    return;
+                }
+
+                var doc = m_GraphView.ExportDocumentForAuthoringSave();
+                json = PcgGraphSerializer.ToJson(doc);
+            }
+
             _lastSelfSaveUtc = DateTime.UtcNow;
             File.WriteAllText(m_CurrentFilePath, json);
             AssetDatabase.Refresh();
@@ -583,14 +707,45 @@ namespace DJTechEditor.PCG.Graph
 
         private void SaveAsGraph()
         {
-            var doc = m_GraphView.ExportDocument();
-            var json = PcgGraphSerializer.ToJson(doc);
+            string json;
+            string defaultName;
+            string extension;
+            string panelTitle;
+
+            if (m_SubgraphAssetMode)
+            {
+                if (!m_GraphView.TryExportSubgraphAssetDocument(out var assetDoc, out var exportError))
+                {
+                    SetStatus($"Save As failed: {exportError}");
+                    Debug.LogError($"[PCG] Subgraph asset Save As failed: {exportError}");
+                    return;
+                }
+                json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+                defaultName = "subgraph.pcgsubgraph";
+                extension = SubgraphExtension;
+                panelTitle = "Save Subgraph Asset As";
+            }
+            else
+            {
+                if (!m_GraphView.TryFlushExternalNavigationAssets(out var flushError))
+                {
+                    SetStatus($"Save As failed: {flushError}");
+                    Debug.LogError($"[PCG] Failed to flush linked SubgraphAsset edits: {flushError}");
+                    return;
+                }
+
+                var doc = m_GraphView.ExportDocumentForAuthoringSave();
+                json = PcgGraphSerializer.ToJson(doc);
+                defaultName = "graph.pcg";
+                extension = PcgExtension;
+                panelTitle = "Save Graph As";
+            }
 
             var path = EditorUtility.SaveFilePanel(
-                "Save Graph As",
+                panelTitle,
                 PcgGraphRunner.DefaultSchemaDir,
-                "graph.pcg",
-                PcgExtension);
+                defaultName,
+                extension);
 
             if (string.IsNullOrEmpty(path))
                 return;

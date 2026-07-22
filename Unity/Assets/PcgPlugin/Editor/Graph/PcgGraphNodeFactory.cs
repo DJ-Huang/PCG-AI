@@ -33,7 +33,8 @@ namespace DJTechEditor.PCG.Graph
             Vector2 position,
             PcgNodeData data = null,
             PcgSubgraphDefinition interfaceDefinition = null,
-            System.Func<string, PcgSubgraphDefinition> subgraphLookup = null)
+            System.Func<string, PcgSubgraphDefinition> subgraphLookup = null,
+            PcgSubgraphInterfaceSnapshot externalSnapshot = null)
         {
             if (type == "Subgraph")
             {
@@ -45,6 +46,18 @@ namespace DJTechEditor.PCG.Graph
                 subgraphNode.Initialize(id, position);
                 subgraphNode.ApplyData(data);
                 return subgraphNode;
+            }
+
+            if (type == PcgStructuralNodeTypes.SubgraphAsset)
+            {
+                var snapshot = externalSnapshot
+                    ?? (interfaceDefinition != null
+                        ? PcgSubgraphInterfaceSnapshot.FromDefinition(interfaceDefinition)
+                        : new PcgSubgraphInterfaceSnapshot());
+                var external = new PcgExternalSubgraphNodeView(snapshot);
+                external.Initialize(id, position);
+                external.ApplyData(data);
+                return external;
             }
 
             if (type == "SubgraphInput" || type == "SubgraphOutput")

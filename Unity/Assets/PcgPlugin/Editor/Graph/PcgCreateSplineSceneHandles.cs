@@ -64,27 +64,17 @@ namespace DJTechEditor.PCG.Graph
         private static PcgPolygonPreviewData s_WirePreviewCache;
         private static int[] s_WireEdgePairs; // flat: [a0, b0, a1, b1, ...]
 
-        // Blender-style screen-space thick wire: expand edges → camera-facing quads, 1× DrawMeshNow.
-        // Width is pixels (EditorPrefs); not N× DrawAAPolyLine (that was the V58 stall).
-        private const string WireWidthPrefsKey = "Pcg.PolygonWire.WidthPx";
-        private const float WireWidthPxDefault = 3f;
-        private static readonly Color s_WireColor = new(0f, 0.75f, 0.85f, 0.85f);
+        // Hairline quads (1× DrawMeshNow) + fragment AA — matches Blender overlay_antialiasing
+        // without post-pass. Geometry half-width _HalfPx; visible core stays ~1 screen px.
+        private const float WireHalfPx = 1f;
+        private static readonly Color s_WireColor = new(0f, 0f, 0f, 1f);
         private static Mesh s_WireMesh;
         private static Material s_WireMaterial;
         private static Vector3[] s_WireVerts;
-        private static Color[] s_WireColors;
+        private static Vector2[] s_WireEdgeCoords;
         private static int[] s_WireTris;
         private static int s_WireBuiltEdgeCount;
         private static int s_WireUploadedEdgeCount;
-        private static PcgPolygonPreviewData s_WireMeshPreviewCache;
-        private static Matrix4x4 s_WireLastLocalToWorld;
-        private static Vector3 s_WireLastCameraPosition;
-        private static Quaternion s_WireLastCameraRotation;
-        private static bool s_WireLastOrthographic;
-        private static float s_WireLastProjectionSize;
-        private static int s_WireLastPixelHeight;
-        private static float s_WireLastWidthPx;
-        private static bool s_WireMeshStateValid;
 
         private enum OthersDisplayMode
         {
@@ -256,6 +246,7 @@ namespace DJTechEditor.PCG.Graph
             Selection.selectionChanged -= OnSelectionChanged;
             SceneView.duringSceneGui += OnSceneGui;
             Selection.selectionChanged += OnSelectionChanged;
+
         }
 
         private static void OnSelectionChanged()
@@ -483,8 +474,6 @@ namespace DJTechEditor.PCG.Graph
             s_WireEdgePairs = null;
             s_WireBuiltEdgeCount = 0;
             s_WireUploadedEdgeCount = 0;
-            s_WireMeshPreviewCache = null;
-            s_WireMeshStateValid = false;
             s_SelectedPointByNode.Clear();
             s_SelectedGroupName = null;
             s_SelectedGroupSource = null;
@@ -1747,29 +1736,69 @@ namespace DJTechEditor.PCG.Graph
             _ => "unknown",
         };
 
+        private const string GroupViewerNoneLabel = "None";
+
         /// <summary>
-        /// Popup defaults to index 0 visually, but selection state stays null until the user
-        /// changes the popup. Sync state so Scene View highlighting matches the displayed group.
+        /// Build popup labels with a leading None entry so the inactive side can show
+        /// None instead of falsely looking like the first group is selected.
         /// </summary>
-        private static void EnsureDefaultGroupSelection(
-            List<PcgNodeInspector.AvailableGroup> outputGroups,
-            List<PcgNodeInspector.AvailableGroup> inputGroups)
+        private static string[] BuildGroupPopupLabels(
+            List<PcgNodeInspector.AvailableGroup> groups,
+            System.Func<string, NodeGroupEntry> findStats)
         {
-            if (!string.IsNullOrEmpty(s_SelectedGroupName))
-                return;
-
-            if (outputGroups.Count > 0)
+            var labels = new string[groups.Count + 1];
+            labels[0] = GroupViewerNoneLabel;
+            for (var i = 0; i < groups.Count; ++i)
             {
-                s_SelectedGroupName = outputGroups[0].name;
-                s_SelectedGroupSource = "output";
+                var name = groups[i].name;
+                var stats = findStats(name);
+                labels[i + 1] = stats != null ? $"{name} ({stats.count})" : $"{name} (—)";
+            }
+
+            return labels;
+        }
+
+        /// <summary>
+        /// Active side → selected group index + 1 (None at 0). Inactive / cleared → 0 (None).
+        /// </summary>
+        private static int GroupPopupIndex(
+            string expectedSource,
+            List<PcgNodeInspector.AvailableGroup> groups)
+        {
+            if (s_SelectedGroupSource != expectedSource || string.IsNullOrEmpty(s_SelectedGroupName))
+                return 0;
+
+            var idx = groups.FindIndex(g => g.name == s_SelectedGroupName);
+            return idx >= 0 ? idx + 1 : 0;
+        }
+
+        private static void ApplyGroupPopupSelection(
+            int newIdx,
+            string source,
+            List<PcgNodeInspector.AvailableGroup> groups,
+            PcgGroupVisualizer visualizer)
+        {
+            if (newIdx <= 0)
+            {
+                if (s_SelectedGroupSource == source)
+                {
+                    s_SelectedGroupName = null;
+                    s_SelectedGroupSource = null;
+                    visualizer?.ClearHighlight();
+                    SceneView.RepaintAll();
+                }
+
                 return;
             }
 
-            if (inputGroups.Count > 0)
-            {
-                s_SelectedGroupName = inputGroups[0].name;
-                s_SelectedGroupSource = "input";
-            }
+            var groupIdx = newIdx - 1;
+            if (groupIdx < 0 || groupIdx >= groups.Count)
+                return;
+
+            var group = groups[groupIdx];
+            s_SelectedGroupName = group.name;
+            s_SelectedGroupSource = source;
+            SceneView.RepaintAll();
         }
 
         private static void ParseGroupsFromJson(string json, List<GroupInfo> output)
@@ -1864,17 +1893,23 @@ namespace DJTechEditor.PCG.Graph
                 gv?.ClearHighlight();
             }
 
-            EnsureDefaultGroupSelection(outputFiltered, inputGroups);
+            // Default is None on both sides — never auto-pick the first group
+            // (that made Output look selected while debugging Input).
 
             // Compute dynamic height
             bool hasOutput = outputFiltered.Count > 0;
             bool hasInput = inputGroups.Count > 0;
             bool hasGroups = hasOutput || hasInput;
-            float height = hasGroups ? 58f : 40f;
+            float height = hasGroups ? 74f : 40f;
 
-            // Check if selected group has member data for highlighting
-            bool canHighlight = !string.IsNullOrEmpty(s_SelectedGroupName) &&
-                FindGroupStats(s_SelectedGroupName, s_SelectedGroupSource == "output") != null;
+            // Check if selected group can be drawn (packed polygons preferred).
+            var selectedStats = string.IsNullOrEmpty(s_SelectedGroupName)
+                ? null
+                : FindGroupStats(s_SelectedGroupName, s_SelectedGroupSource == "output");
+            bool canHighlight = selectedStats != null && (
+                (selectedStats.facePolygons != null && selectedStats.facePolygons.Length >= 4) ||
+                (selectedStats.edgeEndpoints != null && selectedStats.edgeEndpoints.Length >= 6) ||
+                (selectedStats.members != null && selectedStats.members.Length > 0));
             if (!canHighlight && hasGroups && !string.IsNullOrEmpty(s_SelectedGroupName))
                 height += 16f;
 
@@ -1901,25 +1936,12 @@ namespace DJTechEditor.PCG.Graph
                     {
                         GUILayout.BeginVertical();
                         GUILayout.Label("Output:", EditorStyles.miniLabel);
-                        var labels = outputFiltered.Select(g =>
-                        {
-                            var stats = FindGroupStats(g.name, true);
-                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
-                        }).ToArray();
-                        var currentIdx = s_SelectedGroupSource == "output"
-                            ? outputFiltered.FindIndex(g => g.name == s_SelectedGroupName)
-                            : -1;
-                        if (currentIdx < 0)
-                            currentIdx = 0;
+                        var labels = BuildGroupPopupLabels(outputFiltered, name => FindGroupStats(name, true));
+                        var currentIdx = GroupPopupIndex("output", outputFiltered);
                         EditorGUI.BeginChangeCheck();
                         var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
-                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < outputFiltered.Count)
-                        {
-                            var group = outputFiltered[newIdx];
-                            s_SelectedGroupName = group.name;
-                            s_SelectedGroupSource = "output";
-                            SceneView.RepaintAll();
-                        }
+                        if (EditorGUI.EndChangeCheck())
+                            ApplyGroupPopupSelection(newIdx, "output", outputFiltered, gv);
                         GUILayout.EndVertical();
                     }
 
@@ -1927,33 +1949,29 @@ namespace DJTechEditor.PCG.Graph
                     {
                         GUILayout.BeginVertical();
                         GUILayout.Label("Input:", EditorStyles.miniLabel);
-                        var labels = inputGroups.Select(g =>
-                        {
-                            var stats = FindGroupStats(g.name, false);
-                            return stats != null ? $"{g.name} ({stats.count})" : $"{g.name} (—)";
-                        }).ToArray();
-                        var currentIdx = s_SelectedGroupSource == "input"
-                            ? inputGroups.FindIndex(g => g.name == s_SelectedGroupName)
-                            : -1;
-                        if (currentIdx < 0)
-                            currentIdx = 0;
+                        var labels = BuildGroupPopupLabels(inputGroups, name => FindGroupStats(name, false));
+                        var currentIdx = GroupPopupIndex("input", inputGroups);
                         EditorGUI.BeginChangeCheck();
                         var newIdx = EditorGUILayout.Popup(currentIdx, labels, EditorStyles.popup);
-                        if (EditorGUI.EndChangeCheck() && newIdx >= 0 && newIdx < inputGroups.Count)
-                        {
-                            var group = inputGroups[newIdx];
-                            s_SelectedGroupName = group.name;
-                            s_SelectedGroupSource = "input";
-                            SceneView.RepaintAll();
-                        }
+                        if (EditorGUI.EndChangeCheck())
+                            ApplyGroupPopupSelection(newIdx, "input", inputGroups, gv);
                         GUILayout.EndVertical();
                     }
 
                     GUILayout.EndHorizontal();
 
-                    if (!canHighlight && !string.IsNullOrEmpty(s_SelectedGroupName))
+                    if (string.IsNullOrEmpty(s_SelectedGroupName))
+                    {
+                        GUILayout.Label("Highlighting: None — pick Output or Input", EditorStyles.miniLabel);
+                    }
+                    else if (!canHighlight)
                     {
                         GUILayout.Label("Group has no member data in cook result.", EditorStyles.miniLabel);
+                    }
+                    else
+                    {
+                        var side = s_SelectedGroupSource == "input" ? "Input" : "Output";
+                        GUILayout.Label($"Highlighting: {side} · {s_SelectedGroupName}", EditorStyles.miniLabel);
                     }
                 }
                 else
@@ -1974,8 +1992,7 @@ namespace DJTechEditor.PCG.Graph
             if (Event.current.type != EventType.Repaint)
                 return;
 
-            var cam = sceneView != null ? sceneView.camera : null;
-            if (cam == null)
+            if (sceneView == null || sceneView.camera == null)
                 return;
 
             var anchor = FindPreviewAnchor(window);
@@ -2006,8 +2023,7 @@ namespace DJTechEditor.PCG.Graph
 
             if (!EnsureWireDrawResources())
             {
-                // Shader missing: fall back to 1px batched DrawLines (still 1 draw call).
-                DrawPolygonWireOverlayThinFallback(anchor, preview.Points);
+                DrawPolygonWireOverlayHairlineFallback(anchor, preview.Points);
                 return;
             }
 
@@ -2016,82 +2032,32 @@ namespace DJTechEditor.PCG.Graph
             var indexCount = edgeCount * 6;
             EnsureWireBuffers(edgeCount, vertCount, indexCount);
 
-            var widthPx = EditorPrefs.GetFloat(WireWidthPrefsKey, WireWidthPxDefault);
-            if (widthPx < 0.5f)
-                widthPx = 0.5f;
+            var drawCam = Camera.current != null ? Camera.current : sceneView.camera;
+            ExpandEdgesToScreenQuads(preview.Points, anchor.localToWorldMatrix, drawCam, edgeCount);
 
-            var localToWorld = anchor.localToWorldMatrix;
-            if (NeedsWireMeshRebuild(preview, localToWorld, cam, widthPx))
+            if (s_WireUploadedEdgeCount != edgeCount)
             {
-                ExpandEdgesToCameraFacingQuads(
-                    preview.Points,
-                    localToWorld,
-                    cam,
-                    widthPx,
-                    edgeCount);
-
-                if (s_WireUploadedEdgeCount != edgeCount)
-                {
-                    s_WireMesh.Clear(false);
-                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-                    s_WireMesh.SetColors(s_WireColors, 0, vertCount);
-                    s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
-                    s_WireUploadedEdgeCount = edgeCount;
-                }
-                else
-                {
-                    // Camera-facing vertices change while indices/colors do not.
-                    s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-                }
-
-                RememberWireMeshState(preview, localToWorld, cam, widthPx);
+                s_WireMesh.Clear(false);
+                s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                s_WireMesh.SetUVs(1, s_WireEdgeCoords, 0, vertCount);
+                s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+                s_WireUploadedEdgeCount = edgeCount;
+            }
+            else
+            {
+                s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
             }
 
             s_WireMaterial.SetPass(0);
             Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
         }
 
-        private static bool NeedsWireMeshRebuild(
-            PcgPolygonPreviewData preview,
-            Matrix4x4 localToWorld,
-            Camera cam,
-            float widthPx)
+        private static void DrawPolygonWireOverlayHairlineFallback(Transform anchor, Vector3[] points)
         {
-            if (!s_WireMeshStateValid || !ReferenceEquals(preview, s_WireMeshPreviewCache))
-                return true;
-
-            var projectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
-            return localToWorld != s_WireLastLocalToWorld ||
-                   cam.transform.position != s_WireLastCameraPosition ||
-                   cam.transform.rotation != s_WireLastCameraRotation ||
-                   cam.orthographic != s_WireLastOrthographic ||
-                   !Mathf.Approximately(projectionSize, s_WireLastProjectionSize) ||
-                   cam.pixelHeight != s_WireLastPixelHeight ||
-                   !Mathf.Approximately(widthPx, s_WireLastWidthPx);
-        }
-
-        private static void RememberWireMeshState(
-            PcgPolygonPreviewData preview,
-            Matrix4x4 localToWorld,
-            Camera cam,
-            float widthPx)
-        {
-            s_WireMeshPreviewCache = preview;
-            s_WireLastLocalToWorld = localToWorld;
-            s_WireLastCameraPosition = cam.transform.position;
-            s_WireLastCameraRotation = cam.transform.rotation;
-            s_WireLastOrthographic = cam.orthographic;
-            s_WireLastProjectionSize = cam.orthographic ? cam.orthographicSize : cam.fieldOfView;
-            s_WireLastPixelHeight = cam.pixelHeight;
-            s_WireLastWidthPx = widthPx;
-            s_WireMeshStateValid = true;
-        }
-
-        private static void DrawPolygonWireOverlayThinFallback(Transform anchor, Vector3[] points)
-        {
-            var linePoints = new Vector3[s_WireEdgePairs.Length];
+            var count = s_WireEdgePairs.Length;
+            var linePoints = new Vector3[count];
             var l2w = anchor.localToWorldMatrix;
-            for (var i = 0; i < s_WireEdgePairs.Length; i++)
+            for (var i = 0; i < count; i++)
                 linePoints[i] = l2w.MultiplyPoint(points[s_WireEdgePairs[i]]);
 
             var prevColor = Handles.color;
@@ -2116,28 +2082,21 @@ namespace DJTechEditor.PCG.Graph
                 s_WireMesh = new Mesh { name = "PcgPolygonWireOverlay", hideFlags = HideFlags.HideAndDontSave };
                 s_WireMesh.MarkDynamic();
                 s_WireUploadedEdgeCount = 0;
-                s_WireMeshStateValid = false;
             }
 
-            if (s_WireMaterial == null)
+            if (s_WireMaterial != null)
+                return true;
+
+            var shader = Shader.Find("Hidden/PcgPolygonWireOverlay");
+            if (shader == null)
+                return false;
+
+            s_WireMaterial = new Material(shader)
             {
-                var shader = Shader.Find("Hidden/Internal-Colored");
-                if (shader == null)
-                    return false;
-
-                s_WireMaterial = new Material(shader)
-                {
-                    name = "PcgPolygonWireOverlay",
-                    hideFlags = HideFlags.HideAndDontSave,
-                };
-                s_WireMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                s_WireMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                s_WireMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
-                s_WireMaterial.SetInt("_ZWrite", 0);
-                // LessEqual: respect depth so back edges are occluded by the Lit mesh.
-                s_WireMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.LessEqual);
-            }
-
+                name = "PcgPolygonWireOverlay",
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            s_WireMaterial.SetFloat("_HalfPx", WireHalfPx);
             return true;
         }
 
@@ -2146,7 +2105,7 @@ namespace DJTechEditor.PCG.Graph
             if (s_WireVerts == null || s_WireVerts.Length < vertCount)
             {
                 s_WireVerts = new Vector3[vertCount];
-                s_WireColors = new Color[vertCount];
+                s_WireEdgeCoords = new Vector2[vertCount];
                 s_WireBuiltEdgeCount = 0;
             }
 
@@ -2156,17 +2115,16 @@ namespace DJTechEditor.PCG.Graph
                 s_WireBuiltEdgeCount = 0;
             }
 
-            // Indices and colors are deterministic from edgeCount — fill once per size.
             if (s_WireBuiltEdgeCount == edgeCount)
                 return;
 
             for (var e = 0; e < edgeCount; e++)
             {
                 var vi = e * 4;
-                s_WireColors[vi] = s_WireColor;
-                s_WireColors[vi + 1] = s_WireColor;
-                s_WireColors[vi + 2] = s_WireColor;
-                s_WireColors[vi + 3] = s_WireColor;
+                s_WireEdgeCoords[vi] = new Vector2(WireHalfPx, 0f);
+                s_WireEdgeCoords[vi + 1] = new Vector2(-WireHalfPx, 0f);
+                s_WireEdgeCoords[vi + 2] = new Vector2(WireHalfPx, 0f);
+                s_WireEdgeCoords[vi + 3] = new Vector2(-WireHalfPx, 0f);
 
                 var ti = e * 6;
                 s_WireTris[ti] = vi;
@@ -2181,77 +2139,74 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Expand each unique edge into a camera-facing screen-space quad (Blender polyline style).
-        /// Half-width = widthPx * world-units-per-pixel at the edge midpoint.
+        /// Screen-pixel quads with per-vertex edgeCoord for fragment AA (Blender edit-mesh edge model).
         /// </summary>
-        private static void ExpandEdgesToCameraFacingQuads(
+        private static void ExpandEdgesToScreenQuads(
             Vector3[] points,
             Matrix4x4 l2w,
             Camera cam,
-            float widthPx,
             int edgeCount)
         {
             var camPos = cam.transform.position;
-            var camFwd = cam.transform.forward;
-            var camUp = cam.transform.up;
-            var camRight = cam.transform.right;
-            var pixelHeight = Mathf.Max(1f, cam.pixelHeight);
-            var ortho = cam.orthographic;
-            var orthoWorldPerPixel = ortho ? (2f * cam.orthographicSize / pixelHeight) : 0f;
-            var tanHalfFov = ortho
-                ? 0f
-                : Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            var halfPx = WireHalfPx;
 
             for (var e = 0; e < edgeCount; e++)
             {
                 var a = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2]]);
                 var b = l2w.MultiplyPoint(points[s_WireEdgePairs[e * 2 + 1]]);
-                var mid = (a + b) * 0.5f;
-                var dir = b - a;
-                var lenSq = dir.sqrMagnitude;
-                if (lenSq < 1e-12f)
+
+                const float depthBiasRatio = 0.0005f;
+                a += (camPos - a) * depthBiasRatio;
+                b += (camPos - b) * depthBiasRatio;
+
+                var vi = e * 4;
+                if ((b - a).sqrMagnitude < 1e-12f)
                 {
-                    var vi0 = e * 4;
-                    s_WireVerts[vi0] = a;
-                    s_WireVerts[vi0 + 1] = a;
-                    s_WireVerts[vi0 + 2] = a;
-                    s_WireVerts[vi0 + 3] = a;
+                    s_WireVerts[vi] = a;
+                    s_WireVerts[vi + 1] = a;
+                    s_WireVerts[vi + 2] = a;
+                    s_WireVerts[vi + 3] = a;
                     continue;
                 }
 
-                dir *= 1f / Mathf.Sqrt(lenSq);
-
-                var toCam = camPos - mid;
-                var perp = Vector3.Cross(dir, toCam);
-                if (perp.sqrMagnitude < 1e-10f)
+                var screenA = cam.WorldToScreenPoint(a);
+                var screenB = cam.WorldToScreenPoint(b);
+                if (screenA.z < 0f || screenB.z < 0f)
                 {
-                    perp = Vector3.Cross(dir, camUp);
-                    if (perp.sqrMagnitude < 1e-10f)
-                        perp = Vector3.Cross(dir, camRight);
+                    s_WireVerts[vi] = a;
+                    s_WireVerts[vi + 1] = a;
+                    s_WireVerts[vi + 2] = b;
+                    s_WireVerts[vi + 3] = b;
+                    continue;
                 }
 
-                perp.Normalize();
-
-                float worldPerPixel;
-                if (ortho)
+                var dir2d = new Vector2(screenB.x - screenA.x, screenB.y - screenA.y);
+                var lenSq2d = dir2d.sqrMagnitude;
+                if (lenSq2d < 1e-6f)
                 {
-                    worldPerPixel = orthoWorldPerPixel;
-                }
-                else
-                {
-                    var dist = Vector3.Dot(mid - camPos, camFwd);
-                    if (dist < 0.01f)
-                        dist = 0.01f;
-                    worldPerPixel = dist * tanHalfFov * 2f / pixelHeight;
+                    s_WireVerts[vi] = a;
+                    s_WireVerts[vi + 1] = a;
+                    s_WireVerts[vi + 2] = b;
+                    s_WireVerts[vi + 3] = b;
+                    continue;
                 }
 
-                var half = perp * (widthPx * 0.5f * worldPerPixel);
-                var vi = e * 4;
-                s_WireVerts[vi] = a + half;
-                s_WireVerts[vi + 1] = a - half;
-                s_WireVerts[vi + 2] = b + half;
-                s_WireVerts[vi + 3] = b - half;
+                dir2d *= 1f / Mathf.Sqrt(lenSq2d);
+                var offset = new Vector2(-dir2d.y, dir2d.x) * halfPx;
+
+                s_WireVerts[vi] = ScreenPointOffsetToWorld(screenA, offset, cam);
+                s_WireVerts[vi + 1] = ScreenPointOffsetToWorld(screenA, -offset, cam);
+                s_WireVerts[vi + 2] = ScreenPointOffsetToWorld(screenB, offset, cam);
+                s_WireVerts[vi + 3] = ScreenPointOffsetToWorld(screenB, -offset, cam);
             }
+        }
+
+        private static Vector3 ScreenPointOffsetToWorld(Vector3 screen, Vector2 screenOffset, Camera cam)
+        {
+            var p = screen;
+            p.x += screenOffset.x;
+            p.y += screenOffset.y;
+            return cam.ScreenToWorldPoint(p);
         }
 
         /// <summary>
@@ -2292,6 +2247,39 @@ namespace DJTechEditor.PCG.Graph
             }
 
             return pairs.Count > 0 ? pairs.ToArray() : null;
+        }
+
+        private static void DrawFacePolygonsHighlight(Matrix4x4 localToWorld, float[] packed)
+        {
+            var cursor = 0;
+            while (cursor < packed.Length)
+            {
+                var vertCount = Mathf.RoundToInt(packed[cursor++]);
+                if (vertCount < 3)
+                    break;
+
+                var floatsNeeded = vertCount * 3;
+                if (cursor + floatsNeeded > packed.Length)
+                    break;
+
+                var world = new Vector3[vertCount];
+                for (var i = 0; i < vertCount; ++i)
+                {
+                    world[i] = localToWorld.MultiplyPoint(new Vector3(
+                        packed[cursor], packed[cursor + 1], packed[cursor + 2]));
+                    cursor += 3;
+                }
+
+                Handles.color = new Color(1f, 0.85f, 0f, 0.35f);
+                Handles.DrawAAConvexPolygon(world);
+                Handles.color = new Color(1f, 0.85f, 0f, 0.95f);
+                // Close the ring for the outline.
+                var outline = new Vector3[vertCount + 1];
+                for (var i = 0; i < vertCount; ++i)
+                    outline[i] = world[i];
+                outline[vertCount] = world[0];
+                Handles.DrawAAPolyLine(3f, outline);
+            }
         }
 
         private static void DrawNodeGroupHighlight(SceneView sceneView, PcgGraphEditorWindow window)
@@ -2339,9 +2327,11 @@ namespace DJTechEditor.PCG.Graph
             if (group == null)
                 return;
 
-            // Edge groups can render via edgeEndpoints without members
+            // Face groups can render via facePolygons without depending on MeshFilter.
             bool hasEdgeEndpoints = group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6;
-            if (!hasEdgeEndpoints && (group.members == null || group.members.Length == 0))
+            bool hasFacePolygons = group.facePolygons != null && group.facePolygons.Length >= 4;
+            if (!hasEdgeEndpoints && !hasFacePolygons &&
+                (group.members == null || group.members.Length == 0))
                 return;
 
             if (ctx.Domain == SceneEditDomain.Edge)
@@ -2364,47 +2354,62 @@ namespace DJTechEditor.PCG.Graph
             }
             else if (ctx.Domain == SceneEditDomain.Face)
             {
-                var mf = anchor.GetComponent<MeshFilter>();
-                if (mf == null || mf.sharedMesh == null)
-                    return;
-                var mesh = mf.sharedMesh;
-                var vertices = mesh.vertices;
-                var triangles = mesh.triangles;
+                var prevZTest = Handles.zTest;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
 
-                // Filled translucent triangles
-                Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
-                foreach (var faceIdx in group.members)
+                // Prefer packed polygons from the source node — MeshFilter is usually the
+                // final merge and must not be indexed with intermediate-node face/tri ids.
+                if (group.facePolygons != null && group.facePolygons.Length >= 4)
                 {
-                    int baseIdx = (int)faceIdx * 3;
-                    if (triangles == null || baseIdx + 2 >= triangles.Length)
-                        continue;
-                    int v0 = triangles[baseIdx];
-                    int v1 = triangles[baseIdx + 1];
-                    int v2 = triangles[baseIdx + 2];
-                    if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
-                        continue;
-                    var p0 = l2w.MultiplyPoint(vertices[v0]);
-                    var p1 = l2w.MultiplyPoint(vertices[v1]);
-                    var p2 = l2w.MultiplyPoint(vertices[v2]);
-                    Handles.DrawAAConvexPolygon(p0, p1, p2);
+                    DrawFacePolygonsHighlight(l2w, group.facePolygons);
                 }
-                // Bright edges on top
-                Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
-                foreach (var faceIdx in group.members)
+                else
                 {
-                    int baseIdx = (int)faceIdx * 3;
-                    if (triangles == null || baseIdx + 2 >= triangles.Length)
-                        continue;
-                    int v0 = triangles[baseIdx];
-                    int v1 = triangles[baseIdx + 1];
-                    int v2 = triangles[baseIdx + 2];
-                    if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
-                        continue;
-                    var p0 = l2w.MultiplyPoint(vertices[v0]);
-                    var p1 = l2w.MultiplyPoint(vertices[v1]);
-                    var p2 = l2w.MultiplyPoint(vertices[v2]);
-                    Handles.DrawAAPolyLine(2f, p0, p1, p2, p0);
+                    var mf = anchor.GetComponent<MeshFilter>();
+                    if (mf == null || mf.sharedMesh == null)
+                    {
+                        Handles.zTest = prevZTest;
+                        return;
+                    }
+                    var mesh = mf.sharedMesh;
+                    var vertices = mesh.vertices;
+                    var triangles = mesh.triangles;
+
+                    Handles.color = new Color(1f, 0.85f, 0f, 0.4f);
+                    foreach (var faceIdx in group.members)
+                    {
+                        int baseIdx = (int)faceIdx * 3;
+                        if (triangles == null || baseIdx + 2 >= triangles.Length)
+                            continue;
+                        int v0 = triangles[baseIdx];
+                        int v1 = triangles[baseIdx + 1];
+                        int v2 = triangles[baseIdx + 2];
+                        if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
+                            continue;
+                        var p0 = l2w.MultiplyPoint(vertices[v0]);
+                        var p1 = l2w.MultiplyPoint(vertices[v1]);
+                        var p2 = l2w.MultiplyPoint(vertices[v2]);
+                        Handles.DrawAAConvexPolygon(p0, p1, p2);
+                    }
+                    Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
+                    foreach (var faceIdx in group.members)
+                    {
+                        int baseIdx = (int)faceIdx * 3;
+                        if (triangles == null || baseIdx + 2 >= triangles.Length)
+                            continue;
+                        int v0 = triangles[baseIdx];
+                        int v1 = triangles[baseIdx + 1];
+                        int v2 = triangles[baseIdx + 2];
+                        if (v0 >= vertices.Length || v1 >= vertices.Length || v2 >= vertices.Length)
+                            continue;
+                        var p0 = l2w.MultiplyPoint(vertices[v0]);
+                        var p1 = l2w.MultiplyPoint(vertices[v1]);
+                        var p2 = l2w.MultiplyPoint(vertices[v2]);
+                        Handles.DrawAAPolyLine(2f, p0, p1, p2, p0);
+                    }
                 }
+
+                Handles.zTest = prevZTest;
             }
             else if (ctx.Domain == SceneEditDomain.Vertex)
             {

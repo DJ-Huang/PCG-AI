@@ -7,14 +7,36 @@
 
 namespace pcg::internal::elements {
 
+/// Houdini Group Create–aligned options: sticky identity + Enable-gated filters.
 struct GroupCreateOptions {
     std::string output_group = "bevel_edges";
     std::string domain = "edge";
+    /// replace | union | intersect | subtract against an existing group of the same name.
+    std::string initial_merge = "replace";
+
+    bool enable_base_group = false;
+    std::vector<std::string> base_groups;
+
+    bool enable_bounding = false;
+
+    bool enable_normals = false;
+    double direction_x = 0.0;
+    double direction_y = 1.0;
+    double direction_z = 0.0;
+    double spread_angle_deg = 30.0;
+
+    /// Default true so C++ callers that only set mode/angle keep prior bevel behavior.
+    bool enable_edges = true;
+    /// angle | unshared | all — used when enable_edges (edge domain).
     std::string mode = "angle";
     double min_edge_angle_deg = 30.0;
     bool include_unshared = false;
     std::vector<std::string> from_face_groups;
     std::vector<std::string> from_edge_groups;
+
+    bool enable_random = false;
+    double random_chance = 1.0;
+    int random_seed = 0;
 };
 
 struct GroupCombineOptions {
@@ -32,7 +54,9 @@ struct FaceGroupByNormalOptions {
     double spread_angle_deg = 30.0;
 };
 
-data::PcgGeometry group_create(const data::PcgGeometry& input, const GroupCreateOptions& options);
+data::PcgGeometry group_create(const data::PcgGeometry& input,
+                               const GroupCreateOptions& options,
+                               const data::PcgGeometry* bounding = nullptr);
 data::PcgGeometry group_combine(const data::PcgGeometry& input, const GroupCombineOptions& options);
 data::PcgGeometry face_group_by_normal(const data::PcgGeometry& input,
                                        const FaceGroupByNormalOptions& options);

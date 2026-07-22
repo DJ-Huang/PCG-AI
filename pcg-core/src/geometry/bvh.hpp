@@ -19,6 +19,7 @@ struct AABB {
     void expand(const Vec3& v);
     void expand(const AABB& other);
     bool overlaps(const AABB& other) const;
+    bool contains(const Vec3& v) const;
     Vec3 center() const;
 };
 

@@ -43,9 +43,19 @@ const NodeContract* find_node_contract(const std::string& node_type)
     return found == contracts().end() ? nullptr : &found->second;
 }
 
+std::string normalize_pin_type(const std::string& type)
+{
+    if (type == "Spline")
+        return "SpatialSpline";
+    return type;
+}
+
 bool pin_types_compatible(const std::string& source, const std::string& target)
 {
-    return source == target || source == "Any" || target == "Any";
+    const std::string normalized_source = normalize_pin_type(source);
+    const std::string normalized_target = normalize_pin_type(target);
+    return normalized_source == normalized_target || normalized_source == "Any" ||
+           normalized_target == "Any";
 }
 
 } // namespace pcg::internal::elements

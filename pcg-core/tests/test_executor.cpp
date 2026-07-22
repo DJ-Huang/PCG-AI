@@ -124,6 +124,24 @@ int main()
     expect_code(pcg_validate_graph(typed_v2_graph, err, sizeof(err)), PCG_OK,
                 "typed v2 graph validate");
 
+    const char* convertline_carve_graph = R"({
+      "version":"1.0",
+      "nodes":[
+        {"id":"grid","type":"CreateGridMesh","data":{"sizeX":2.0,"sizeY":2.0,"rows":1,"cols":1}},
+        {"id":"lines","type":"ConvertLine","data":{"mode":"all"}},
+        {"id":"carve","type":"Carve","data":{"uStart":0.0,"uEnd":1.0}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"source":"grid","target":"lines","sourceHandle":"out","targetHandle":"in"},
+        {"source":"lines","target":"carve","sourceHandle":"out","targetHandle":"in",
+         "sourcePinType":"SpatialSpline","targetPinType":"Spline"},
+        {"source":"carve","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    expect_code(pcg_validate_graph(convertline_carve_graph, err, sizeof(err)), PCG_OK,
+                "ConvertLine to Carve pin validate");
+
     const char* invalid_handle_graph = R"({
       "version":"1.0",
       "nodes":[{"id":"a","type":"SpawnPoints","data":{}},{"id":"b","type":"PlaceInScene","data":{}}],

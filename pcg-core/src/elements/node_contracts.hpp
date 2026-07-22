@@ -16,6 +16,7 @@ struct NodeContract {
 };
 
 const NodeContract* find_node_contract(const std::string& node_type);
+std::string normalize_pin_type(const std::string& type);
 bool pin_types_compatible(const std::string& source, const std::string& target);
 
 } // namespace pcg::internal::elements

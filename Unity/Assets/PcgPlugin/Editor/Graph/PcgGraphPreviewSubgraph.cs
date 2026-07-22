@@ -157,13 +157,7 @@ namespace DJTechEditor.PCG.Graph
                 if (!included.Contains(node.id))
                     continue;
 
-                subgraph.nodes.Add(new PcgGraphNodeRecord
-                {
-                    id = node.id,
-                    type = node.type,
-                    position = node.position,
-                    data = node.data?.Clone() ?? new PcgNodeData(),
-                });
+                subgraph.nodes.Add(node.Clone());
             }
 
             foreach (var edge in source.edges)
@@ -233,6 +227,13 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
 
+            if (targetNode.type == PcgStructuralNodeTypes.SubgraphAsset)
+            {
+                var outputs = targetNode.subgraphInterface?.outputs;
+                if (outputs != null && outputs.Count > 0 && !string.IsNullOrEmpty(outputs[0].id))
+                    return outputs[0].id;
+            }
+
             return "out";
         }
 
@@ -297,6 +298,7 @@ namespace DJTechEditor.PCG.Graph
                     type = node.type,
                     position = node.position,
                     data = node.data?.Clone() ?? new PcgNodeData(),
+                    subgraphInterface = node.subgraphInterface?.Clone(),
                 });
             }
 
@@ -452,13 +454,9 @@ namespace DJTechEditor.PCG.Graph
                 return list;
             foreach (var node in source)
             {
-                list.Add(new PcgGraphNodeRecord
-                {
-                    id = node.id,
-                    type = node.type,
-                    position = node.position,
-                    data = node.data?.Clone() ?? new PcgNodeData(),
-                });
+                if (node == null)
+                    continue;
+                list.Add(node.Clone());
             }
 
             return list;

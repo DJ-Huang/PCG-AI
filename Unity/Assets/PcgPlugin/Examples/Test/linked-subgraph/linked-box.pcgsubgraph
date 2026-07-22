@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "name": "Linked Box",
+  "inputs": [],
+  "outputs": [
+    { "id": "mesh", "name": "Mesh", "pinType": "SpatialMesh" }
+  ],
+  "nodes": [
+    {
+      "id": "box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 120, "y": 180 },
+      "data": { "__nodeTitle": "Box" }
+    },
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": { "x": 120, "y": 360 },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "box",
+      "target": "subgraph_output",
+      "sourceHandle": "out",
+      "targetHandle": "mesh",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    }
+  ],
+  "subgraphs": []
+}

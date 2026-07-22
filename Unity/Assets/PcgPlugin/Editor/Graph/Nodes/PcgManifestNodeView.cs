@@ -93,29 +93,9 @@ namespace DJTechEditor.PCG.Graph
 
         private void UpdateGroupTooltip()
         {
-            var groups = new List<string>();
-            foreach (var og in _def.outputGroups)
-            {
-                if (!string.IsNullOrEmpty(og.condition))
-                {
-                    var condVal = _data.GetRaw(og.condition);
-                    if (condVal is bool b && !b)
-                        continue;
-                }
-
-                string name = og.name;
-                if (og.dynamic)
-                {
-                    var val = _data.GetRaw(og.name)?.ToString();
-                    if (string.IsNullOrWhiteSpace(val))
-                        continue;
-                    name = val;
-                }
-                groups.Add($"{name} ({og.domain})");
-            }
-
+            var groups = PcgGroupResolution.ResolveOutputGroups(_def, _data);
             tooltip = groups.Count > 0
-                ? $"{_def.displayName} — outputs: {string.Join(", ", groups)}"
+                ? $"{_def.displayName} — Output: {string.Join(", ", groups.Select(g => $"{g.name} ({g.domain})"))}"
                 : _def.displayName;
         }
 
@@ -146,28 +126,11 @@ namespace DJTechEditor.PCG.Graph
             if (_groupBadgeLabel == null)
                 return;
 
-            var count = 0;
-            foreach (var og in _def.outputGroups)
-            {
-                if (!string.IsNullOrEmpty(og.condition))
-                {
-                    var condVal = _data.GetRaw(og.condition);
-                    if (condVal is bool b && !b)
-                        continue;
-                }
-
-                if (og.dynamic)
-                {
-                    var val = _data.GetRaw(og.name)?.ToString();
-                    if (string.IsNullOrWhiteSpace(val))
-                        continue;
-                }
-                ++count;
-            }
-
+            var count = PcgGroupResolution.ResolveOutputGroups(_def, _data).Count;
             if (count > 0)
             {
-                _groupBadgeLabel.text = $"🔗 {count} group{(count != 1 ? "s" : "")}";
+                _groupBadgeLabel.text = $"🔗 {count} out";
+                _groupBadgeLabel.tooltip = "Declared Output Groups";
                 _groupBadgeLabel.style.display = DisplayStyle.Flex;
             }
             else

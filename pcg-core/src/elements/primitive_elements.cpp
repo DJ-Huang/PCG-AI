@@ -490,7 +490,7 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing node");
 
         auto input_points = ctx.inputs.find_points_shared("in");
-        if (!input_points || input_points->points().empty())
+        if (!input_points)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "StaticMeshSpawner missing points input");
 
         auto points = std::make_shared<data::PcgPointData>(*input_points);
@@ -504,7 +504,22 @@ public:
                 point.attributes["prefab"] = prefab;
             if (!mesh.empty())
                 point.attributes["mesh"] = mesh;
-            point.attributes["scale"] = scale;
+            // Preserve per-point scale / scaleX|Y|Z (e.g. lot-fit) and multiply by node scale.
+            const bool has_axis = point.attributes.contains("scaleX") ||
+                                  point.attributes.contains("scaleY") ||
+                                  point.attributes.contains("scaleZ");
+            if (has_axis) {
+                const double sx = point.attributes.value("scaleX", 1.0);
+                const double sy = point.attributes.value("scaleY", 1.0);
+                const double sz = point.attributes.value("scaleZ", 1.0);
+                point.attributes["scaleX"] = sx * scale;
+                point.attributes["scaleY"] = sy * scale;
+                point.attributes["scaleZ"] = sz * scale;
+                point.attributes.erase("scale");
+            } else {
+                const double existing = point.attributes.value("scale", 1.0);
+                point.attributes["scale"] = existing * scale;
+            }
         }
 
         nlohmann::json sidecar{
@@ -517,13 +532,79 @@ public:
 
         if (auto prototype = ctx.inputs.find_mesh_shared("mesh")) {
             emit_mesh_shared(ctx, "spawnMesh", prototype);
-        } else if (const nlohmann::json* mesh_json = ctx.inputs.find_json("mesh")) {
-            data::PcgMeshData spawn_mesh = parse_mesh_input(*mesh_json);
+        } else if (ctx.inputs.find_mesh("mesh") ||
+                   ctx.inputs.find_geometry("mesh") ||
+                   ctx.inputs.find_json("mesh")) {
+            // CreateBoxMesh / Boolean / AssignMaterial emit Geometry; convert like get_mesh_input.
+            data::PcgMeshData spawn_mesh =
+                get_mesh_input(ctx, "mesh", "StaticMeshSpawner mesh");
             if (!spawn_mesh.vertices().empty() && spawn_mesh.triangles().size() >= 3)
                 ctx.outputs.add_mesh("spawnMesh", std::move(spawn_mesh));
         }
 
         emit_points_shared_with_meta(ctx, std::move(points), std::move(sidecar));
+        return PCG_OK;
+    }
+};
+
+/// Merge multiple StaticMeshSpawner streams: concatenated points + one spawnMesh per input.
+class MergeSpawnPointsElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "MergeSpawnPoints"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeSpawnPoints missing node");
+
+        std::vector<std::shared_ptr<const data::PcgPointData>> point_groups;
+        std::vector<std::shared_ptr<const data::PcgMeshData>> spawn_meshes;
+        for (const auto& item : ctx.inputs.items()) {
+            if (item.points)
+                point_groups.push_back(item.points);
+            if (item.tag == "spawnMesh" && item.mesh)
+                spawn_meshes.push_back(item.mesh);
+        }
+
+        if (point_groups.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MergeSpawnPoints missing points inputs");
+        if (spawn_meshes.size() != point_groups.size()) {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "MergeSpawnPoints requires one spawnMesh per points input");
+        }
+
+        data::PcgPointData merged;
+        nlohmann::json counts = nlohmann::json::array();
+        for (size_t i = 0; i < point_groups.size(); ++i) {
+            const auto& group = *point_groups[i];
+            counts.push_back(static_cast<int>(group.points().size()));
+            for (const auto& point : group.points())
+                merged.points_mut().push_back(point);
+        }
+
+        if (merged.points().empty()) {
+            // All streams empty after filtering — still legal (zero instances).
+            nlohmann::json sidecar{
+                {"status", "ok"},
+                {"spawnProtoCounts", counts},
+                {"pointCount", 0},
+            };
+            emit_points_shared_with_meta(
+                ctx, std::make_shared<data::PcgPointData>(std::move(merged)), std::move(sidecar));
+            for (const auto& spawn : spawn_meshes)
+                emit_mesh_shared(ctx, "spawnMesh", spawn);
+            return PCG_OK;
+        }
+
+        nlohmann::json sidecar{
+            {"status", "ok"},
+            {"spawnProtoCounts", std::move(counts)},
+            {"pointCount", merged.points().size()},
+        };
+        emit_points_shared_with_meta(
+            ctx, std::make_shared<data::PcgPointData>(std::move(merged)), std::move(sidecar));
+        for (const auto& spawn : spawn_meshes)
+            emit_mesh_shared(ctx, "spawnMesh", spawn);
         return PCG_OK;
     }
 };
@@ -545,6 +626,7 @@ void register_phase41_elements(std::unordered_map<std::string, std::unique_ptr<I
     map.emplace("GetTerrainData", std::make_unique<GetTerrainDataElement>());
     map.emplace("SampleSurface", std::make_unique<SampleSurfaceElement>());
     map.emplace("StaticMeshSpawner", std::make_unique<StaticMeshSpawnerElement>());
+    map.emplace("MergeSpawnPoints", std::make_unique<MergeSpawnPointsElement>());
 }
 
 } // namespace pcg::internal::elements

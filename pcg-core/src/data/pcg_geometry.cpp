@@ -10,6 +10,7 @@
 #include <exception>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace pcg::internal::data {
 
@@ -1127,6 +1128,163 @@ PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const s
     }
 
     return merged;
+}
+
+namespace {
+
+const AttributeArray* primitive_int_cluster_attribute(const PcgGeometry& geometry)
+{
+    const size_t face_count = geometry.faces().size();
+    if (const AttributeArray* lotid =
+            geometry.attributes().find(AttributeOwner::Primitive, "lotid")) {
+        if (lotid->schema().type == AttributeType::Int &&
+            lotid->schema().tuple_size == 1 &&
+            lotid->size() == face_count)
+            return lotid;
+    }
+
+    const AttributeArray* best = nullptr;
+    size_t best_unique = 1;
+    for (const std::string& name : geometry.attributes().names(AttributeOwner::Primitive)) {
+        const AttributeArray* attribute =
+            geometry.attributes().find(AttributeOwner::Primitive, name);
+        if (!attribute || attribute->schema().type != AttributeType::Int ||
+            attribute->schema().tuple_size != 1 ||
+            attribute->size() != face_count)
+            continue;
+        std::unordered_set<int64_t> unique;
+        for (int64_t value : attribute->int_values())
+            unique.insert(value);
+        if (unique.size() > best_unique) {
+            best_unique = unique.size();
+            best = attribute;
+        }
+    }
+    return best_unique > 1 ? best : nullptr;
+}
+
+std::vector<int> face_connected_component_ids(const PcgGeometry& geometry)
+{
+    const int face_count = static_cast<int>(geometry.faces().size());
+    std::vector<int> component(face_count, -1);
+    std::unordered_map<int64_t, std::vector<int>> edge_faces;
+    for (int fi = 0; fi < face_count; ++fi) {
+        const auto& face = geometry.faces()[static_cast<size_t>(fi)];
+        for (size_t corner = 0; corner < face.size(); ++corner) {
+            const int a = face[corner];
+            const int b = face[(corner + 1) % face.size()];
+            if (a < 0 || b < 0)
+                continue;
+            edge_faces[geometry::edge_key(a, b)].push_back(fi);
+        }
+    }
+
+    int next_component = 0;
+    for (int seed = 0; seed < face_count; ++seed) {
+        if (component[static_cast<size_t>(seed)] >= 0)
+            continue;
+        std::vector<int> stack = {seed};
+        component[static_cast<size_t>(seed)] = next_component;
+        while (!stack.empty()) {
+            const int fi = stack.back();
+            stack.pop_back();
+            const auto& face = geometry.faces()[static_cast<size_t>(fi)];
+            for (size_t corner = 0; corner < face.size(); ++corner) {
+                const int a = face[corner];
+                const int b = face[(corner + 1) % face.size()];
+                if (a < 0 || b < 0)
+                    continue;
+                for (int neighbor : edge_faces[geometry::edge_key(a, b)]) {
+                    if (neighbor == fi || component[static_cast<size_t>(neighbor)] >= 0)
+                        continue;
+                    component[static_cast<size_t>(neighbor)] = next_component;
+                    stack.push_back(neighbor);
+                }
+            }
+        }
+        ++next_component;
+    }
+    return component;
+}
+
+} // namespace
+
+PcgGeometry extract_faces(const PcgGeometry& geometry,
+                          const std::unordered_set<int>& face_indices)
+{
+    PcgGeometry output;
+    if (face_indices.empty())
+        return output;
+
+    std::unordered_map<int, int> point_map;
+    GeometryElementRemap remap;
+    std::vector<int> old_face_indices;
+    old_face_indices.reserve(face_indices.size());
+    for (int fi : face_indices) {
+        if (fi < 0 || static_cast<size_t>(fi) >= geometry.faces().size())
+            continue;
+        old_face_indices.push_back(fi);
+    }
+    std::sort(old_face_indices.begin(), old_face_indices.end());
+    old_face_indices.erase(std::unique(old_face_indices.begin(), old_face_indices.end()),
+                           old_face_indices.end());
+    if (old_face_indices.empty())
+        return output;
+
+    for (int fi : old_face_indices) {
+        const auto& source_face = geometry.faces()[static_cast<size_t>(fi)];
+        std::vector<int> face;
+        face.reserve(source_face.size());
+        for (int point : source_face) {
+            auto it = point_map.find(point);
+            int mapped = -1;
+            if (it == point_map.end()) {
+                mapped = static_cast<int>(output.points().size());
+                point_map.emplace(point, mapped);
+                output.points_mut().push_back(geometry.points()[static_cast<size_t>(point)]);
+                remap.points.push_back(point);
+            } else {
+                mapped = it->second;
+            }
+            face.push_back(mapped);
+            remap.vertices.push_back(-1);
+        }
+        remap.primitives.push_back(fi);
+        output.faces_mut().push_back(std::move(face));
+    }
+
+    propagate_geometry_data(geometry, output, remap);
+    maintain_unshared_edge_group(output);
+    return output;
+}
+
+std::vector<PcgGeometry> partition_geometry_bevel_shells(const PcgGeometry& geometry)
+{
+    const int face_count = static_cast<int>(geometry.faces().size());
+    if (face_count == 0)
+        return {};
+
+    std::vector<int> cluster_ids(face_count, 0);
+    if (const AttributeArray* cluster_attr = primitive_int_cluster_attribute(geometry)) {
+        const auto& values = cluster_attr->int_values();
+        for (int fi = 0; fi < face_count; ++fi)
+            cluster_ids[static_cast<size_t>(fi)] = static_cast<int>(values[static_cast<size_t>(fi)]);
+    } else {
+        cluster_ids = face_connected_component_ids(geometry);
+    }
+
+    std::unordered_map<int, std::unordered_set<int>> clusters;
+    for (int fi = 0; fi < face_count; ++fi)
+        clusters[cluster_ids[static_cast<size_t>(fi)]].insert(fi);
+
+    if (clusters.size() <= 1)
+        return {geometry};
+
+    std::vector<PcgGeometry> shells;
+    shells.reserve(clusters.size());
+    for (const auto& entry : clusters)
+        shells.push_back(extract_faces(geometry, entry.second));
+    return shells;
 }
 
 } // namespace pcg::internal::data

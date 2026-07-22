@@ -42,10 +42,14 @@ namespace DJTechEditor.PCG.Graph
         {
             var sourcePin = source is PcgSubgraphNodeView sourceSubgraph
                 ? sourceSubgraph.GetOutputPinType(sourceHandle)
-                : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
+                : source is PcgExternalSubgraphNodeView sourceExternal
+                    ? sourceExternal.GetOutputPinType(sourceHandle)
+                    : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
             var targetPin = target is PcgSubgraphNodeView targetSubgraph
                 ? targetSubgraph.GetInputPinType(targetHandle)
-                : PcgNodeManifest.GetInputPinType(target.NodeType, targetHandle);
+                : target is PcgExternalSubgraphNodeView targetExternal
+                    ? targetExternal.GetInputPinType(targetHandle)
+                    : PcgNodeManifest.GetInputPinType(target.NodeType, targetHandle);
             return sourcePin == "Any" || targetPin == "Any" || sourcePin == targetPin;
         }
 

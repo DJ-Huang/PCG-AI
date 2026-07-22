@@ -2,6 +2,7 @@
 
 #include "elements/building_algorithms.hpp"
 #include "elements/element_utils.hpp"
+#include "elements/expression.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -61,6 +62,13 @@ public:
         options.rotate_z_deg = ctx.node->data.value("rotateZ", 0.0);
         options.scale_min = ctx.node->data.value("scaleMin", 1.0);
         options.scale_max = ctx.node->data.value("scaleMax", 1.0);
+        options.color_min_r = ctx.node->data.value("colorMinR", 1.0);
+        options.color_min_g = ctx.node->data.value("colorMinG", 1.0);
+        options.color_min_b = ctx.node->data.value("colorMinB", 1.0);
+        options.color_max_r = ctx.node->data.value("colorMaxR", 1.0);
+        options.color_max_g = ctx.node->data.value("colorMaxG", 1.0);
+        options.color_max_b = ctx.node->data.value("colorMaxB", 1.0);
+        options.material_names = parse_name_list(ctx.node->data, "materialNames");
 
         const data::PcgPointData input =
             get_points_input(ctx, "in", "AttributeRandomize missing points input");
@@ -78,7 +86,24 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Switch missing node");
 
-        const int index = std::clamp(ctx.node->data.value("index", 0), 0, 3);
+        int index = ctx.node->data.value("index", 0);
+        const std::string index_expression =
+            ctx.node->data.value("indexExpression", std::string());
+        if (!index_expression.empty()) {
+            expression::Program program;
+            std::string error;
+            if (!expression::Program::compile_expression(index_expression, program, error))
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                ("Switch indexExpression parse error: " + error).c_str());
+            expression::EvalContext eval;
+            eval.parameters["index"] = static_cast<double>(index);
+            double value = 0.0;
+            if (!program.evaluate(eval, value, error))
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                ("Switch indexExpression error: " + error).c_str());
+            index = static_cast<int>(value);
+        }
+        index = std::clamp(index, 0, 3);
         const std::string pin = "in" + std::to_string(index);
         const data::PcgTaggedData* selected = ctx.inputs.find(pin);
         if (!selected)

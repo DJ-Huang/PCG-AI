@@ -230,7 +230,7 @@ PcgResultCode pcg_execute_graph_v4(...)
 #define PCG_MESH_BINARY_HEADER_SIZE 20
 
 #define PCG_POINT_BINARY_MAGIC 0x50544750u   /* 'PGTP' little-endian */
-#define PCG_POINT_BINARY_VERSION 1u
+#define PCG_POINT_BINARY_VERSION 2u
 #define PCG_POINT_BINARY_HEADER_SIZE 16
 ```
 

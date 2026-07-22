@@ -23,6 +23,13 @@ namespace DJTechEditor.PCG.Graph
         public string label;
     }
 
+    public class ManifestVisibleWhenClause
+    {
+        public string property;
+        public string equals;
+        public List<string> oneOf;
+    }
+
     public class ManifestOutputGroupDef
     {
         public string name;
@@ -48,6 +55,14 @@ namespace DJTechEditor.PCG.Graph
         public bool hasOrder;
         public string visibleWhenProperty;
         public string visibleWhenEquals;
+        public List<string> visibleWhenOneOf;
+        public List<ManifestVisibleWhenClause> visibleWhenAny;
+        /// <summary>Houdini-style: keep row visible but grayed unless driver matches.</summary>
+        public string enabledWhenProperty;
+        public string enabledWhenEquals;
+        /// <summary>Render this string/number field on the same row as a boolean toggle.</summary>
+        public string companionField;
+        public bool indent;
         public bool multiline;
         public int lines = 1;
     }
@@ -58,6 +73,8 @@ namespace DJTechEditor.PCG.Graph
         public string label;
         public bool foldout = true;
         public bool defaultExpanded = true;
+        /// <summary>When foldout is false, still draw a separator header with label.</summary>
+        public bool header;
     }
 
     public class ManifestNodeDef
@@ -142,28 +159,35 @@ namespace DJTechEditor.PCG.Graph
 
         public static bool CanConnect(string sourceType, string targetType, string sourceHandle, string targetHandle)
         {
-            var sourcePin = GetOutputPinType(sourceType, sourceHandle);
-            var targetPin = GetInputPinType(targetType, targetHandle);
+            var sourcePin = NormalizePinType(GetOutputPinType(sourceType, sourceHandle));
+            var targetPin = NormalizePinType(GetInputPinType(targetType, targetHandle));
             return sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any";
+        }
+
+        static string NormalizePinType(string pinType)
+        {
+            return pinType == "Spline" ? "SpatialSpline" : pinType;
         }
 
         /// <summary>True if nodeType has an input pin matching the given pinType.</summary>
         public static bool HasCompatibleInputPin(string nodeType, string pinType)
         {
+            pinType = NormalizePinType(pinType);
             if (!TryGet(nodeType, out var def))
-                return GetInputPinType(nodeType) == pinType;
+                return NormalizePinType(GetInputPinType(nodeType)) == pinType;
             foreach (var input in def.inputs)
-                if (input.pinType == pinType || input.pinType == "Any") return true;
+                if (NormalizePinType(input.pinType) == pinType || input.pinType == "Any") return true;
             return false;
         }
 
         /// <summary>True if nodeType has an output pin matching the given pinType.</summary>
         public static bool HasCompatibleOutputPin(string nodeType, string pinType)
         {
+            pinType = NormalizePinType(pinType);
             if (!TryGet(nodeType, out var def))
-                return GetOutputPinType(nodeType) == pinType;
+                return NormalizePinType(GetOutputPinType(nodeType)) == pinType;
             foreach (var output in def.outputs)
-                if (output.pinType == pinType || output.pinType == "Any") return true;
+                if (NormalizePinType(output.pinType) == pinType || output.pinType == "Any") return true;
             return false;
         }
 
@@ -336,7 +360,56 @@ namespace DJTechEditor.PCG.Graph
                         {
                             propDef.visibleWhenProperty = GetString(visibleDict, "property");
                             propDef.visibleWhenEquals = GetString(visibleDict, "equals");
+                            if (visibleDict.TryGetValue("oneOf", out var oneOfObj) &&
+                                oneOfObj is List<object> oneOfList)
+                            {
+                                propDef.visibleWhenOneOf = new List<string>();
+                                foreach (var item in oneOfList)
+                                {
+                                    if (item == null)
+                                        continue;
+                                    propDef.visibleWhenOneOf.Add(item.ToString());
+                                }
+                            }
+                            if (visibleDict.TryGetValue("any", out var anyObj) &&
+                                anyObj is List<object> anyList)
+                            {
+                                propDef.visibleWhenAny = new List<ManifestVisibleWhenClause>();
+                                foreach (var item in anyList)
+                                {
+                                    if (item is not Dictionary<string, object> clauseDict)
+                                        continue;
+                                    var clause = new ManifestVisibleWhenClause
+                                    {
+                                        property = GetString(clauseDict, "property"),
+                                        equals = GetString(clauseDict, "equals"),
+                                    };
+                                    if (clauseDict.TryGetValue("oneOf", out var clauseOneOfObj) &&
+                                        clauseOneOfObj is List<object> clauseOneOfList)
+                                    {
+                                        clause.oneOf = new List<string>();
+                                        foreach (var one in clauseOneOfList)
+                                        {
+                                            if (one == null)
+                                                continue;
+                                            clause.oneOf.Add(one.ToString());
+                                        }
+                                    }
+                                    if (!string.IsNullOrEmpty(clause.property))
+                                        propDef.visibleWhenAny.Add(clause);
+                                }
+                            }
                         }
+
+                        if (propObj.TryGetValue("enabledWhen", out var enabledObj) &&
+                            enabledObj is Dictionary<string, object> enabledDict)
+                        {
+                            propDef.enabledWhenProperty = GetString(enabledDict, "property");
+                            propDef.enabledWhenEquals = GetString(enabledDict, "equals", "true");
+                        }
+                        propDef.companionField = GetString(propObj, "companionField");
+                        propDef.indent = propObj.TryGetValue("indent", out var indentVal)
+                            && Convert.ToBoolean(indentVal, CultureInfo.InvariantCulture);
 
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)
@@ -372,6 +445,8 @@ namespace DJTechEditor.PCG.Graph
                                   || Convert.ToBoolean(foldoutVal, CultureInfo.InvariantCulture),
                         defaultExpanded = !sectionDict.TryGetValue("defaultExpanded", out var expandedVal)
                                           || Convert.ToBoolean(expandedVal, CultureInfo.InvariantCulture),
+                        header = sectionDict.TryGetValue("header", out var headerVal)
+                                 && Convert.ToBoolean(headerVal, CultureInfo.InvariantCulture),
                     };
                     if (!string.IsNullOrEmpty(section.id))
                         def.inspectorSections.Add(section);

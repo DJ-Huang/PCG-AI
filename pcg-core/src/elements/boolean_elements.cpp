@@ -1,15 +1,45 @@
 #include "elements/boolean_elements.hpp"
 #include "elements/element_utils.hpp"
 #include "elements/pcg_element.hpp"
+#include "elements/topology_parity_algorithms.hpp"
 #include "geometry/boolean_output.hpp"
+#include "geometry/arrangement.hpp"
 
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace pcg::internal::elements {
 
 using namespace ::pcg::internal::geometry;
+
+namespace {
+
+// Boolean rebuilds topology and drops AttributeTable. Lot-city SwitchIf flags
+// (hasBalcony / hasFireEscape / roofType / numFloors) live on detail or prim0 —
+// promote them onto the result so downstream SwitchIf still resolves.
+void preserve_control_attributes(const data::PcgGeometry& source, data::PcgGeometry& dest)
+{
+    auto promote_number = [&](data::AttributeOwner owner, const std::string& name) {
+        if (dest.attributes().find(data::AttributeOwner::Detail, name) != nullptr)
+            return;
+        const data::AttributeArray* attr = source.attributes().find(owner, name);
+        if (!attr || attr->size() == 0)
+            return;
+        if (attr->schema().type == data::AttributeType::Int)
+            set_detail_int(dest, name, attr->int_values()[0]);
+        else if (attr->schema().type == data::AttributeType::Float)
+            set_detail_float(dest, name, attr->float_values()[0]);
+    };
+
+    for (const auto& name : source.attributes().names(data::AttributeOwner::Detail))
+        promote_number(data::AttributeOwner::Detail, name);
+    for (const auto& name : source.attributes().names(data::AttributeOwner::Primitive))
+        promote_number(data::AttributeOwner::Primitive, name);
+}
+
+} // namespace
 
 // ── boolean_geometry implementation ────────────────────────
 
@@ -21,7 +51,36 @@ data::PcgGeometry boolean_geometry(const data::PcgGeometry& a,
     if (result.error != BooleanErrorType::Ok)
         return {};
 
-    return finalize_boolean_output(result, opts.detriangulate);
+    // Best-effort: rematerialize user face groups onto boolean triangles using
+    // face_origins. Detriangulation may still drop them; callers should rebuild
+    // critical groups with GroupCreate when needed (PCG Block AI Core discipline).
+    if (result.face_origins.size() == result.geometry.faces().size()) {
+        auto rematerialize = [&](const data::PcgGeometry& source, int source_index) {
+            for (const auto& name :
+                 source.groups().group_names(geometry::GroupDomain::Face)) {
+                if (name == BooleanGroups::A_INSIDE_B || name == BooleanGroups::A_OUTSIDE_B ||
+                    name == BooleanGroups::B_INSIDE_A || name == BooleanGroups::B_OUTSIDE_A)
+                    continue;
+                const auto members =
+                    source.groups().members(geometry::GroupDomain::Face, name);
+                std::unordered_set<geometry::GroupId> member_set(members.begin(), members.end());
+                for (size_t fi = 0; fi < result.face_origins.size(); ++fi) {
+                    const auto& origin = result.face_origins[fi];
+                    if (origin.source != source_index || origin.original_face < 0)
+                        continue;
+                    if (member_set.count(origin.original_face) > 0)
+                        result.geometry.groups().add(geometry::GroupDomain::Face, name,
+                                                     static_cast<geometry::GroupId>(fi));
+                }
+            }
+        };
+        rematerialize(a, 0);
+        rematerialize(b, 1);
+    }
+
+    data::PcgGeometry output = finalize_boolean_output(result, opts.detriangulate);
+    preserve_control_attributes(a, output);
+    return output;
 }
 
 namespace {
