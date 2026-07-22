@@ -1013,24 +1013,177 @@ data::PcgGeometry sort_geometry(const data::PcgGeometry& input,
     return output;
 }
 
+std::vector<double> spline_vertex_u(const data::PcgSpline& spline, bool arc_length_u)
+{
+    const size_t n = spline.points.size();
+    std::vector<double> vertex_u(n, 0.0);
+    if (n < 2)
+        return vertex_u;
+
+    if (arc_length_u) {
+        double total = 0.0;
+        for (size_t i = 1; i < n; ++i) {
+            const auto& a = spline.points[i];
+            const auto& b = spline.points[i - 1];
+            const double dx = a.x - b.x;
+            const double dy = a.y - b.y;
+            const double dz = a.z - b.z;
+            total += std::sqrt(dx * dx + dy * dy + dz * dz);
+            vertex_u[i] = total;
+        }
+        if (total > kEps) {
+            for (double& u : vertex_u)
+                u /= total;
+        } else {
+            const double denom = static_cast<double>(n - 1);
+            for (size_t i = 0; i < n; ++i)
+                vertex_u[i] = static_cast<double>(i) / denom;
+        }
+    } else {
+        const double denom = static_cast<double>(n - 1);
+        for (size_t i = 0; i < n; ++i)
+            vertex_u[i] = static_cast<double>(i) / denom;
+    }
+    return vertex_u;
+}
+
+data::PcgSplinePoint evaluate_spline_at_u(const data::PcgSpline& spline,
+                                          const std::vector<double>& vertex_u,
+                                          double u)
+{
+    u = std::clamp(u, 0.0, 1.0);
+    if (spline.points.empty())
+        return {};
+    if (spline.points.size() == 1 || u <= vertex_u.front() + kEps)
+        return spline.points.front();
+    if (u >= vertex_u.back() - kEps)
+        return spline.points.back();
+
+    for (size_t i = 0; i + 1 < vertex_u.size(); ++i) {
+        if (u < vertex_u[i + 1] - kEps || i + 2 == vertex_u.size()) {
+            const double span = vertex_u[i + 1] - vertex_u[i];
+            const double t = span <= kEps ? 0.0 : (u - vertex_u[i]) / span;
+            const auto& a = spline.points[i];
+            const auto& b = spline.points[i + 1];
+            return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
+        }
+    }
+    return spline.points.back();
+}
+
+bool same_spline_point(const data::PcgSplinePoint& a, const data::PcgSplinePoint& b)
+{
+    return std::abs(a.x - b.x) <= kEps && std::abs(a.y - b.y) <= kEps &&
+           std::abs(a.z - b.z) <= kEps;
+}
+
+std::vector<data::PcgSplinePoint> build_carved_segment(const data::PcgSpline& spline,
+                                                       const std::vector<double>& vertex_u,
+                                                       double u_from,
+                                                       double u_to)
+{
+    if (u_to < u_from)
+        std::swap(u_from, u_to);
+    if (u_to - u_from <= kEps)
+        return {};
+
+    std::vector<data::PcgSplinePoint> segment;
+    segment.push_back(evaluate_spline_at_u(spline, vertex_u, u_from));
+    for (size_t i = 0; i < spline.points.size(); ++i) {
+        const double u = vertex_u[i];
+        if (u > u_from + kEps && u < u_to - kEps)
+            segment.push_back(spline.points[i]);
+    }
+    const auto end = evaluate_spline_at_u(spline, vertex_u, u_to);
+    if (!same_spline_point(end, segment.back()))
+        segment.push_back(end);
+    return segment.size() >= 2 ? segment : std::vector<data::PcgSplinePoint>{};
+}
+
+void append_carved_spline(data::PcgSplineData& output,
+                          const data::PcgSpline& source,
+                          std::vector<data::PcgSplinePoint> points)
+{
+    if (points.size() < 2)
+        return;
+    data::PcgSpline carved;
+    carved.closed = false;
+    carved.attributes = source.attributes;
+    carved.points = std::move(points);
+    output.add_spline(std::move(carved));
+}
+
 data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                                       const CarveSplineOptions& options)
 {
     data::PcgSplineData output;
-    const double u0 = std::clamp(std::min(options.u_start, options.u_end), 0.0, 1.0);
-    const double u1 = std::clamp(std::max(options.u_start, options.u_end), 0.0, 1.0);
+    const double u_min_raw = options.use_first_u ? std::clamp(options.u_start, 0.0, 1.0) : 0.0;
+    const double u_max_raw =
+        options.use_second_u ? std::clamp(options.u_end, 0.0, 1.0) : 1.0;
+    const double u0 = std::min(u_min_raw, u_max_raw);
+    const double u1 = std::max(u_min_raw, u_max_raw);
+    const bool keep_inside = options.keep_inside;
+    const bool keep_outside = options.keep_outside;
+    if (!keep_inside && !keep_outside)
+        return output;
+
+    const bool breakpoints = options.location != "divisions";
+
     for (const auto& spline : input.splines()) {
         if (spline.points.size() < 2)
             continue;
+
+        const std::vector<double> vertex_u =
+            spline_vertex_u(spline, options.arc_length_u);
         const size_t n = spline.points.size();
-        const size_t i0 = static_cast<size_t>(std::floor(u0 * static_cast<double>(n - 1)));
-        const size_t i1 = static_cast<size_t>(std::ceil(u1 * static_cast<double>(n - 1)));
-        data::PcgSpline carved = spline;
-        carved.points.clear();
-        for (size_t i = i0; i <= i1 && i < n; ++i)
-            carved.points.push_back(spline.points[i]);
-        if (carved.points.size() >= 2)
-            output.add_spline(std::move(carved));
+
+        std::vector<double> cuts;
+        if (breakpoints) {
+            if (options.use_first_u)
+                cuts.push_back(u_min_raw);
+            if (options.use_second_u)
+                cuts.push_back(u_max_raw);
+            if (options.cut_at_all_internal_u_breakpoints) {
+                for (size_t i = 1; i + 1 < n; ++i) {
+                    const double u = vertex_u[i];
+                    if (u > u0 + kEps && u < u1 - kEps)
+                        cuts.push_back(u);
+                }
+            }
+        } else {
+            if (options.use_first_u)
+                cuts.push_back(u_min_raw);
+            if (options.use_second_u)
+                cuts.push_back(u_max_raw);
+            const int divisions = std::max(1, options.u_divisions);
+            for (int d = 1; d < divisions; ++d)
+                cuts.push_back(u0 + (u1 - u0) * static_cast<double>(d) /
+                                          static_cast<double>(divisions));
+        }
+
+        cuts.push_back(0.0);
+        cuts.push_back(1.0);
+        std::sort(cuts.begin(), cuts.end());
+        cuts.erase(std::unique(cuts.begin(), cuts.end(),
+                               [](double a, double b) { return std::abs(a - b) <= kEps; }),
+                   cuts.end());
+
+        auto segment_kept = [&](double a, double b) {
+            const double lo = std::min(a, b);
+            const double hi = std::max(a, b);
+            const bool fully_inside = lo >= u0 - kEps && hi <= u1 + kEps;
+            const bool fully_outside = hi <= u0 + kEps || lo >= u1 - kEps;
+            return (keep_inside && fully_inside) || (keep_outside && fully_outside);
+        };
+
+        for (size_t i = 0; i + 1 < cuts.size(); ++i) {
+            const double seg_u0 = cuts[i];
+            const double seg_u1 = cuts[i + 1];
+            if (!segment_kept(seg_u0, seg_u1))
+                continue;
+            append_carved_spline(output, spline,
+                                 build_carved_segment(spline, vertex_u, seg_u0, seg_u1));
+        }
     }
     return output;
 }

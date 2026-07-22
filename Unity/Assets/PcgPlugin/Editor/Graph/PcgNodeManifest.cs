@@ -151,28 +151,35 @@ namespace DJTechEditor.PCG.Graph
 
         public static bool CanConnect(string sourceType, string targetType, string sourceHandle, string targetHandle)
         {
-            var sourcePin = GetOutputPinType(sourceType, sourceHandle);
-            var targetPin = GetInputPinType(targetType, targetHandle);
+            var sourcePin = NormalizePinType(GetOutputPinType(sourceType, sourceHandle));
+            var targetPin = NormalizePinType(GetInputPinType(targetType, targetHandle));
             return sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any";
+        }
+
+        static string NormalizePinType(string pinType)
+        {
+            return pinType == "Spline" ? "SpatialSpline" : pinType;
         }
 
         /// <summary>True if nodeType has an input pin matching the given pinType.</summary>
         public static bool HasCompatibleInputPin(string nodeType, string pinType)
         {
+            pinType = NormalizePinType(pinType);
             if (!TryGet(nodeType, out var def))
-                return GetInputPinType(nodeType) == pinType;
+                return NormalizePinType(GetInputPinType(nodeType)) == pinType;
             foreach (var input in def.inputs)
-                if (input.pinType == pinType || input.pinType == "Any") return true;
+                if (NormalizePinType(input.pinType) == pinType || input.pinType == "Any") return true;
             return false;
         }
 
         /// <summary>True if nodeType has an output pin matching the given pinType.</summary>
         public static bool HasCompatibleOutputPin(string nodeType, string pinType)
         {
+            pinType = NormalizePinType(pinType);
             if (!TryGet(nodeType, out var def))
-                return GetOutputPinType(nodeType) == pinType;
+                return NormalizePinType(GetOutputPinType(nodeType)) == pinType;
             foreach (var output in def.outputs)
-                if (output.pinType == pinType || output.pinType == "Any") return true;
+                if (NormalizePinType(output.pinType) == pinType || output.pinType == "Any") return true;
             return false;
         }
 

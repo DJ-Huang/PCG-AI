@@ -388,6 +388,73 @@ int main()
         }
     }
 
+    {
+        using pcg::internal::data::PcgSpline;
+        using pcg::internal::data::PcgSplineData;
+        using pcg::internal::data::PcgSplinePoint;
+        using pcg::internal::elements::CarveSplineOptions;
+        using pcg::internal::elements::carve_spline_data;
+
+        PcgSplineData input;
+        PcgSpline spline;
+        spline.points = {
+            PcgSplinePoint{0.0, 0.0, 0.0},
+            PcgSplinePoint{10.0, 0.0, 0.0},
+            PcgSplinePoint{30.0, 0.0, 0.0},
+            PcgSplinePoint{40.0, 0.0, 0.0},
+        };
+        input.add_spline(spline);
+
+        CarveSplineOptions breakpoints;
+        breakpoints.u_start = 0.0;
+        breakpoints.u_end = 1.0;
+        breakpoints.location = "breakpoints";
+        breakpoints.cut_at_all_internal_u_breakpoints = true;
+        breakpoints.keep_inside = true;
+        breakpoints.keep_outside = false;
+        const auto split = carve_spline_data(input, breakpoints);
+        expect(split.splines().size() == 3, "Carve breakpoints splits internal edges");
+        if (split.splines().size() == 3) {
+            expect(split.splines()[0].points.size() == 2 &&
+                       split.splines()[0].points[0].x == 0.0 &&
+                       split.splines()[0].points[1].x == 10.0,
+                   "Carve first edge spans 0-10");
+            expect(split.splines()[1].points.size() == 2 &&
+                       split.splines()[1].points[0].x == 10.0 &&
+                       split.splines()[1].points[1].x == 30.0,
+                   "Carve middle edge spans 10-30");
+            expect(split.splines()[2].points.size() == 2 &&
+                       split.splines()[2].points[0].x == 30.0 &&
+                       split.splines()[2].points[1].x == 40.0,
+                   "Carve last edge spans 30-40");
+        }
+
+        CarveSplineOptions slice;
+        slice.u_start = 0.25;
+        slice.u_end = 0.75;
+        slice.location = "breakpoints";
+        slice.cut_at_all_internal_u_breakpoints = false;
+        slice.keep_inside = true;
+        const auto mid = carve_spline_data(input, slice);
+        expect(mid.splines().size() == 1, "Carve slice without breakpoints yields one spline");
+        if (!mid.splines().empty()) {
+            expect(mid.splines()[0].points.size() == 2 &&
+                       mid.splines()[0].points[0].x == 10.0 &&
+                       mid.splines()[0].points[1].x == 30.0,
+                   "Carve arc-length U=0.25..0.75 trims to 10-30");
+        }
+
+        CarveSplineOptions outside;
+        outside.u_start = 0.25;
+        outside.u_end = 0.75;
+        outside.location = "breakpoints";
+        outside.cut_at_all_internal_u_breakpoints = false;
+        outside.keep_inside = false;
+        outside.keep_outside = true;
+        const auto outer = carve_spline_data(input, outside);
+        expect(outer.splines().size() == 2, "Carve keep outside yields two edge segments");
+    }
+
     std::printf("failures=%d\n", failures);
     return failures == 0 ? 0 : 1;
 }

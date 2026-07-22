@@ -93,6 +93,16 @@ struct SortGeometryOptions {
 struct CarveSplineOptions {
     double u_start = 0.0;
     double u_end = 1.0;
+    bool use_first_u = true;
+    bool use_second_u = true;
+    /** Houdini: Carve Curves by Relative Arc Length */
+    bool arc_length_u = true;
+    /** "breakpoints" | "divisions" */
+    std::string location = "breakpoints";
+    bool cut_at_all_internal_u_breakpoints = true;
+    int u_divisions = 1;
+    bool keep_inside = true;
+    bool keep_outside = false;
 };
 
 struct FindShortestPathOptions {

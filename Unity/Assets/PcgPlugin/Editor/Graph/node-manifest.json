@@ -6846,7 +6846,7 @@
         {
           "id": "in",
           "label": "Spline",
-          "pinType": "Spline"
+          "pinType": "SpatialSpline"
         }
       ],
       "outputs": [
@@ -7440,35 +7440,110 @@
       }
     },
     {
-      "type": "CarveSpline",
-      "displayName": "Carve Spline",
+      "type": "Carve",
+      "displayName": "Carve",
       "category": "Spline",
       "inputs": [
         {
           "id": "in",
           "label": "Spline",
-          "pinType": "Spline"
+          "pinType": "SpatialSpline"
         }
       ],
       "outputs": [
         {
           "id": "out",
           "label": "Spline",
-          "pinType": "Spline"
+          "pinType": "SpatialSpline"
         }
       ],
       "properties": {
+        "useFirstU": {
+          "type": "boolean",
+          "displayName": "First U",
+          "default": true,
+          "order": 0
+        },
         "uStart": {
           "type": "number",
+          "displayName": "First U Value",
           "default": 0.0,
           "minimum": 0.0,
-          "maximum": 1.0
+          "maximum": 1.0,
+          "visibleWhen": {
+            "useFirstU": true
+          },
+          "order": 10
+        },
+        "useSecondU": {
+          "type": "boolean",
+          "displayName": "Second U",
+          "default": true,
+          "order": 20
         },
         "uEnd": {
           "type": "number",
+          "displayName": "Second U Value",
           "default": 1.0,
           "minimum": 0.0,
-          "maximum": 1.0
+          "maximum": 1.0,
+          "visibleWhen": {
+            "useSecondU": true
+          },
+          "order": 30
+        },
+        "arcLengthU": {
+          "type": "boolean",
+          "displayName": "Carve Curves by Relative Arc Length",
+          "default": true,
+          "order": 40
+        },
+        "location": {
+          "type": "enum",
+          "displayName": "Location",
+          "default": "breakpoints",
+          "options": [
+            {
+              "value": "breakpoints",
+              "label": "Breakpoints"
+            },
+            {
+              "value": "divisions",
+              "label": "Divisions"
+            }
+          ],
+          "order": 50
+        },
+        "cutAtAllInternalUBreakpoints": {
+          "type": "boolean",
+          "displayName": "Cut At All Internal U Breakpoints",
+          "default": true,
+          "visibleWhen": {
+            "location": "breakpoints"
+          },
+          "order": 60
+        },
+        "uDivisions": {
+          "type": "integer",
+          "displayName": "U Divisions",
+          "default": 1,
+          "minimum": 1,
+          "visibleWhen": {
+            "location": "divisions"
+          },
+          "order": 70
+        },
+        "keepInside": {
+          "type": "boolean",
+          "displayName": "Keep Inside",
+          "default": true,
+          "order": 80
+        },
+        "keepOutside": {
+          "type": "boolean",
+          "displayName": "Keep Outside",
+          "default": false,
+          "order": 90
         }
       }
     },
@@ -7487,7 +7562,7 @@
         {
           "id": "out",
           "label": "Spline",
-          "pinType": "Spline"
+          "pinType": "SpatialSpline"
         }
       ],
       "properties": {

@@ -268,15 +268,24 @@ public:
     }
 };
 
-class CarveSplineElement final : public IPcgElement {
+class CarveElement final : public IPcgElement {
 public:
-    const char* type_name() const override { return "CarveSpline"; }
+    const char* type_name() const override { return "Carve"; }
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        const auto input = get_splines_input(ctx, "in", "CarveSpline missing spline input");
+        const auto input = get_splines_input(ctx, "in", "Carve missing spline input");
         CarveSplineOptions options;
         options.u_start = ctx.node->data.value("uStart", 0.0);
         options.u_end = ctx.node->data.value("uEnd", 1.0);
+        options.use_first_u = ctx.node->data.value("useFirstU", true);
+        options.use_second_u = ctx.node->data.value("useSecondU", true);
+        options.arc_length_u = ctx.node->data.value("arcLengthU", true);
+        options.location = ctx.node->data.value("location", std::string("breakpoints"));
+        options.cut_at_all_internal_u_breakpoints =
+            ctx.node->data.value("cutAtAllInternalUBreakpoints", true);
+        options.u_divisions = ctx.node->data.value("uDivisions", 1);
+        options.keep_inside = ctx.node->data.value("keepInside", true);
+        options.keep_outside = ctx.node->data.value("keepOutside", false);
         emit_splines(ctx, carve_spline_data(input, options));
         return PCG_OK;
     }
@@ -410,7 +419,8 @@ void register_topology_parity_elements(
     map.emplace("Connectivity", std::make_unique<ConnectivityElement>());
     map.emplace("Assemble", std::make_unique<AssembleElement>());
     map.emplace("SortGeometry", std::make_unique<SortGeometryElement>());
-    map.emplace("CarveSpline", std::make_unique<CarveSplineElement>());
+    map.emplace("Carve", std::make_unique<CarveElement>());
+    map.emplace("CarveSpline", std::make_unique<CarveElement>());
     map.emplace("FindShortestPath", std::make_unique<FindShortestPathElement>());
     map.emplace("TreeSimpleLeaf", std::make_unique<TreeSimpleLeafElement>());
     map.emplace("SwitchIf", std::make_unique<SwitchIfElement>());

@@ -320,12 +320,6 @@
       "data": {"scale": 0.85, "faceGroup": "lots", "__nodeTitle": "Shrink Lots 0.85"}
     },
     {
-      "id": "n102",
-      "type": "LotSubdivision",
-      "position": { "x": 840, "y": 746 },
-      "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
-    },
-    {
       "id": "floors_attrs",
       "type": "AttributeWrangle",
       "position": { "x": 840, "y": 827 },
@@ -336,6 +330,24 @@
       "type": "PrimitiveTransform",
       "position": { "x": 840, "y": 319.5 },
       "data": {"scale": 0.75, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
+    },
+    {
+      "id": "n102",
+      "type": "LotSubdivision",
+      "position": { "x": 840, "y": 725 },
+      "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
+    },
+    {
+      "id": "n103",
+      "type": "ConvertLine",
+      "position": { "x": 952, "y": 776 },
+      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n104",
+      "type": "Carve",
+      "position": { "x": 1065.5, "y": 817.5 },
+      "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -402,7 +414,8 @@
     {"id": "e9413", "source": "shrink_blocks", "target": "n101", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111206", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e111936", "source": "n102", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
