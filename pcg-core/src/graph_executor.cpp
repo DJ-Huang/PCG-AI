@@ -257,6 +257,47 @@ void gather_inputs(const std::vector<const GraphEdge*>& incoming_edges,
     code = PCG_OK;
 }
 
+void accumulate_spline_stats(const data::PcgSplineData& splines,
+                             int& point_count,
+                             int& face_count,
+                             int& vertex_count,
+                             bool& has_bbox,
+                             data::PcgVec3& bmin,
+                             data::PcgVec3& bmax)
+{
+    face_count = static_cast<int>(splines.splines().size());
+    vertex_count = 0;
+    for (const auto& spline : splines.splines()) {
+        vertex_count += static_cast<int>(spline.points.size());
+        for (const auto& p : spline.points) {
+            ++point_count;
+            if (!has_bbox) {
+                has_bbox = true;
+                bmin = {p.x, p.y, p.z};
+                bmax = bmin;
+            } else {
+                bmin.x = std::min(bmin.x, p.x);
+                bmin.y = std::min(bmin.y, p.y);
+                bmin.z = std::min(bmin.z, p.z);
+                bmax.x = std::max(bmax.x, p.x);
+                bmax.y = std::max(bmax.y, p.y);
+                bmax.z = std::max(bmax.z, p.z);
+            }
+        }
+    }
+}
+
+const data::PcgSplineData* find_primary_splines(const data::PcgDataCollection& collection)
+{
+    if (const data::PcgSplineData* splines = collection.find_splines("out"))
+        return splines;
+    for (const auto& item : collection.items()) {
+        if (item.splines)
+            return &*item.splines;
+    }
+    return nullptr;
+}
+
 /// Collect per-node mesh statistics (Houdini-style geometry info).
 /// Returns a JSON array of node_stats entries with counts + bbox.
 nlohmann::json build_node_stats(
@@ -334,6 +375,9 @@ nlohmann::json build_node_stats(
                     bmax.z = std::max(bmax.z, p.z);
                 }
             }
+        } else if (const data::PcgSplineData* splines = find_primary_splines(collection)) {
+            accumulate_spline_stats(*splines, point_count, face_count, vertex_count,
+                                    has_bbox, bmin, bmax);
         } else {
             for (const auto& item : collection.items()) {
                 if (item.points) {
@@ -430,6 +474,12 @@ nlohmann::json build_per_node_attributes(const NodeOutputMap& outputs)
                 }
             }
             if (!geom->points().empty() && !has_p)
+                push_attr(node_id, "point", "P", "float", 3);
+        } else if (const data::PcgSplineData* splines = find_primary_splines(collection)) {
+            int point_count = 0;
+            for (const auto& spline : splines->splines())
+                point_count += static_cast<int>(spline.points.size());
+            if (point_count > 0)
                 push_attr(node_id, "point", "P", "float", 3);
         }
     }

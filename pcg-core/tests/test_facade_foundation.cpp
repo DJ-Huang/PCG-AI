@@ -173,6 +173,20 @@ int main()
         const PcgResultCode execute_code = pcg::internal::execute_graph(
             graph_obj, 42, result, error, sizeof(error));
         expect(execute_code == PCG_OK, error[0] == '\0' ? "ConvertLine chain cooks" : error);
+        if (execute_code == PCG_OK) {
+            bool found_lines = false;
+            for (const auto& entry : result.json["node_stats"]) {
+                if (entry.value("node_id", std::string()) != "lines")
+                    continue;
+                found_lines = true;
+                expect(entry.value("point_count", 0) > 0, "ConvertLine node_stats point_count > 0");
+                expect(entry.value("face_count", 0) > 0, "ConvertLine node_stats face_count > 0");
+                expect(entry.value("vertex_count", 0) > 0, "ConvertLine node_stats vertex_count > 0");
+                expect(entry.value("has_bbox", false), "ConvertLine node_stats has_bbox");
+                break;
+            }
+            expect(found_lines, "ConvertLine node_stats entry present");
+        }
     }
 
     {
