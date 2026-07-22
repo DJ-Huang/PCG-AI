@@ -133,15 +133,6 @@ namespace DJTechEditor.PCG.Graph
 
         private void RebuildPorts(PcgSubgraphInterfaceSnapshot snapshot, IEnumerable<string> ghostHandles)
         {
-            inputContainer.Clear();
-            outputContainer.Clear();
-            m_Inputs.Clear();
-            m_Outputs.Clear();
-            BuildPortList(snapshot, ghostHandles);
-        }
-
-        private void BuildPortList(PcgSubgraphInterfaceSnapshot snapshot, IEnumerable<string> ghostHandles)
-        {
             var ghosts = new HashSet<string>(StringComparer.Ordinal);
             if (ghostHandles != null)
             {
@@ -152,30 +143,90 @@ namespace DJTechEditor.PCG.Graph
                 }
             }
 
-            foreach (var pin in snapshot.inputs ?? Enumerable.Empty<PcgSubgraphPort>())
-            {
-                if (pin == null || string.IsNullOrEmpty(pin.id))
-                    continue;
-                var port = InstantiatePort(Direction.Input, pin.id, pin.name, pin.pinType);
-                if (ghosts.Contains(pin.id))
-                    MarkGhost(port);
-                inputContainer.Add(port);
-                m_Inputs[pin.id] = port;
-            }
-
-            foreach (var pin in snapshot.outputs ?? Enumerable.Empty<PcgSubgraphPort>())
-            {
-                if (pin == null || string.IsNullOrEmpty(pin.id))
-                    continue;
-                var port = InstantiatePort(Direction.Output, pin.id, pin.name, pin.pinType);
-                if (ghosts.Contains(pin.id))
-                    MarkGhost(port);
-                outputContainer.Add(port);
-                m_Outputs[pin.id] = port;
-            }
+            ReconcilePortMap(
+                m_Inputs,
+                inputContainer,
+                snapshot?.inputs,
+                Direction.Input,
+                ghosts);
+            ReconcilePortMap(
+                m_Outputs,
+                outputContainer,
+                snapshot?.outputs,
+                Direction.Output,
+                ghosts);
 
             expanded = true;
             RefreshExpandedState();
+        }
+
+        private void ReconcilePortMap(
+            Dictionary<string, Port> ports,
+            VisualElement container,
+            IEnumerable<PcgSubgraphPort> desiredPins,
+            Direction direction,
+            HashSet<string> ghosts)
+        {
+            var desired = new Dictionary<string, PcgSubgraphPort>(StringComparer.Ordinal);
+            foreach (var pin in desiredPins ?? Enumerable.Empty<PcgSubgraphPort>())
+            {
+                if (pin == null || string.IsNullOrEmpty(pin.id))
+                    continue;
+                desired[pin.id] = pin;
+            }
+
+            foreach (var existingId in ports.Keys.ToList())
+            {
+                if (desired.ContainsKey(existingId))
+                    continue;
+                var port = ports[existingId];
+                DisconnectPortEdges(port);
+                container.Remove(port);
+                ports.Remove(existingId);
+            }
+
+            foreach (var pair in desired)
+            {
+                var pin = pair.Value;
+                var pinType = string.IsNullOrEmpty(pin.pinType) ? "Any" : pin.pinType;
+                if (ports.TryGetValue(pin.id, out var existing))
+                {
+                    // Keep the same Port instance so GraphView edges stay attached.
+                    existing.tooltip = $"{(string.IsNullOrEmpty(pin.name) ? pin.id : pin.name)} ({pinType})";
+                    if (ghosts.Contains(pin.id))
+                        MarkGhost(existing);
+                    else
+                        StyleHoudiniPin(existing, direction, pinType);
+                    continue;
+                }
+
+                var port = InstantiatePort(direction, pin.id, pin.name, pin.pinType);
+                if (ghosts.Contains(pin.id))
+                    MarkGhost(port);
+                container.Add(port);
+                ports[pin.id] = port;
+            }
+        }
+
+        private static void DisconnectPortEdges(Port port)
+        {
+            if (port == null)
+                return;
+            var connections = port.connections?.ToList();
+            if (connections == null)
+                return;
+            foreach (var edge in connections)
+            {
+                if (edge?.input != null && edge?.output != null)
+                    edge.output.Disconnect(edge);
+                edge?.input?.Disconnect(edge);
+                edge?.RemoveFromHierarchy();
+            }
+        }
+
+        private void BuildPortList(PcgSubgraphInterfaceSnapshot snapshot, IEnumerable<string> ghostHandles)
+        {
+            RebuildPorts(snapshot, ghostHandles);
         }
 
         private Port InstantiatePort(Direction direction, string handle, string displayName, string pinType)

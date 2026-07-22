@@ -76,7 +76,7 @@ typedef enum {
  * optional payload blocks are appended when flags are set.
  */
 #define PCG_POINT_BINARY_MAGIC 0x50544750u /* 'PGTP' little-endian */
-#define PCG_POINT_BINARY_VERSION 1u
+#define PCG_POINT_BINARY_VERSION 2u
 #define PCG_POINT_BINARY_HEADER_SIZE 16
 
 /* HeightField binary transports grid metadata and all named layers. */
@@ -89,7 +89,7 @@ typedef enum {
     PCG_POINT_ATTR_NORMAL = 1 << 0,  /* float32 nx,ny,nz */
     PCG_POINT_ATTR_UV = 1 << 1,      /* float32 u,v */
     PCG_POINT_ATTR_TRI_INDEX = 1 << 2, /* uint32 triIndex */
-    PCG_POINT_ATTR_SCALE = 1 << 3,   /* float32 scaleX, scaleY, scaleZ */
+    PCG_POINT_ATTR_SCALE = 1 << 3,   /* v1: float32 scalar; v2+: float32 scaleX,Y,Z */
     PCG_POINT_ATTR_ROTATION = 1 << 4 /* float32 quaternion xyzw */
 } PcgPointAttrFlags;
 

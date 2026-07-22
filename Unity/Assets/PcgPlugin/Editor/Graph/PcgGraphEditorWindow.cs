@@ -492,7 +492,11 @@ namespace DJTechEditor.PCG.Graph
             m_Inspector = new PcgNodeInspector(m_GraphView, m_Blackboard);
             m_GraphView.Inspector = m_Inspector;
 
-            m_Blackboard.OnParametersChanged += () => m_Inspector.OnSelectionChanged();
+            m_Blackboard.OnParametersChanged += () =>
+            {
+                m_Inspector.OnSelectionChanged();
+                m_GraphView.NotifyDocumentChanged();
+            };
 
             var graphHost = new VisualElement
             {
@@ -557,6 +561,7 @@ namespace DJTechEditor.PCG.Graph
         {
             DisposeFileWatcher();
             ClearNodePreview(silent: true);
+            ExitSubgraphAssetModeUi();
             m_GraphView.LoadDocument(PcgGraphDefaults.CreatePipeline());
             m_Selected = null;
             m_CurrentFilePath = null;
@@ -565,6 +570,15 @@ namespace DJTechEditor.PCG.Graph
             UpdateTitle();
             SetStatus("Ready — default 3-node pipeline loaded.");
             RefreshScatterDisplayField();
+        }
+
+        private void ExitSubgraphAssetModeUi()
+        {
+            m_SubgraphAssetMode = false;
+            if (m_Blackboard != null)
+                m_Blackboard.style.display = DisplayStyle.None;
+            if (m_InterfacePanel != null)
+                m_InterfacePanel.style.display = DisplayStyle.None;
         }
 
         private void NewGraph()
@@ -693,21 +707,45 @@ namespace DJTechEditor.PCG.Graph
 
         private void SaveAsGraph()
         {
-            if (!m_GraphView.TryFlushExternalNavigationAssets(out var flushError))
+            string json;
+            string defaultName;
+            string extension;
+            string panelTitle;
+
+            if (m_SubgraphAssetMode)
             {
-                SetStatus($"Save As failed: {flushError}");
-                Debug.LogError($"[PCG] Failed to flush linked SubgraphAsset edits: {flushError}");
-                return;
+                if (!m_GraphView.TryExportSubgraphAssetDocument(out var assetDoc, out var exportError))
+                {
+                    SetStatus($"Save As failed: {exportError}");
+                    Debug.LogError($"[PCG] Subgraph asset Save As failed: {exportError}");
+                    return;
+                }
+                json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+                defaultName = "subgraph.pcgsubgraph";
+                extension = SubgraphExtension;
+                panelTitle = "Save Subgraph Asset As";
+            }
+            else
+            {
+                if (!m_GraphView.TryFlushExternalNavigationAssets(out var flushError))
+                {
+                    SetStatus($"Save As failed: {flushError}");
+                    Debug.LogError($"[PCG] Failed to flush linked SubgraphAsset edits: {flushError}");
+                    return;
+                }
+
+                var doc = m_GraphView.ExportDocumentForAuthoringSave();
+                json = PcgGraphSerializer.ToJson(doc);
+                defaultName = "graph.pcg";
+                extension = PcgExtension;
+                panelTitle = "Save Graph As";
             }
 
-            var doc = m_GraphView.ExportDocumentForAuthoringSave();
-            var json = PcgGraphSerializer.ToJson(doc);
-
             var path = EditorUtility.SaveFilePanel(
-                "Save Graph As",
+                panelTitle,
                 PcgGraphRunner.DefaultSchemaDir,
-                "graph.pcg",
-                PcgExtension);
+                defaultName,
+                extension);
 
             if (string.IsNullOrEmpty(path))
                 return;

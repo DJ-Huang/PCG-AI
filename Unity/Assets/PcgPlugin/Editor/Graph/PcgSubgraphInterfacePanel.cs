@@ -71,15 +71,21 @@ namespace DJTechEditor.PCG.Graph
             var nameField = new TextField { value = port.name, style = { flexGrow = 1, minWidth = 60 } };
             nameField.RegisterValueChangedCallback(evt =>
             {
-                port.name = evt.newValue;
-                m_GraphView?.NotifyInterfaceChanged();
+                m_GraphView?.WithUndo("Rename Interface Port", () =>
+                {
+                    port.name = evt.newValue;
+                    m_GraphView.NotifyInterfaceChanged();
+                });
             });
             var typeField = new PopupField<string>(PinTypes.ToList(),
                 Mathf.Max(0, Array.IndexOf(PinTypes, port.pinType)));
             typeField.RegisterValueChangedCallback(evt =>
             {
-                port.pinType = evt.newValue;
-                m_GraphView?.NotifyInterfaceChanged();
+                m_GraphView?.WithUndo("Retype Interface Port", () =>
+                {
+                    port.pinType = evt.newValue;
+                    m_GraphView.NotifyInterfaceChanged();
+                });
             });
             var idLabel = new Label(port.id) { style = { width = 70, overflow = Overflow.Hidden } };
             idLabel.tooltip = "Port id (stable, read-only)";
@@ -95,18 +101,21 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_Definition == null)
                 return;
-            var port = new PcgSubgraphPort
+            m_GraphView?.WithUndo(inputs ? "Add Interface Input" : "Add Interface Output", () =>
             {
-                id = Guid.NewGuid().ToString("N"),
-                name = inputs ? $"in_{m_Definition.inputs.Count + 1}" : $"out_{m_Definition.outputs.Count + 1}",
-                pinType = "Any",
-            };
-            if (inputs)
-                m_Definition.inputs.Add(port);
-            else
-                m_Definition.outputs.Add(port);
-            Rebuild();
-            m_GraphView?.NotifyInterfaceChanged();
+                var port = new PcgSubgraphPort
+                {
+                    id = Guid.NewGuid().ToString("N"),
+                    name = inputs ? $"in_{m_Definition.inputs.Count + 1}" : $"out_{m_Definition.outputs.Count + 1}",
+                    pinType = "Any",
+                };
+                if (inputs)
+                    m_Definition.inputs.Add(port);
+                else
+                    m_Definition.outputs.Add(port);
+                Rebuild();
+                m_GraphView?.NotifyInterfaceChanged();
+            });
         }
 
         private void RemovePort(PcgSubgraphPort port, bool inputs)
@@ -118,12 +127,15 @@ namespace DJTechEditor.PCG.Graph
                     $"Delete port '{port.name}' ({port.id})? Connected edges may become invalid.",
                     "Delete", "Cancel"))
                 return;
-            if (inputs)
-                m_Definition.inputs.Remove(port);
-            else
-                m_Definition.outputs.Remove(port);
-            Rebuild();
-            m_GraphView?.NotifyInterfaceChanged();
+            m_GraphView?.WithUndo("Remove Interface Port", () =>
+            {
+                if (inputs)
+                    m_Definition.inputs.Remove(port);
+                else
+                    m_Definition.outputs.Remove(port);
+                Rebuild();
+                m_GraphView?.NotifyInterfaceChanged();
+            });
         }
     }
 }

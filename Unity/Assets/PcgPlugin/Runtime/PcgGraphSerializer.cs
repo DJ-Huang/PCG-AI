@@ -273,7 +273,7 @@ namespace DJTechRuntime.PCG
                 var guid = record.data.GetRaw("assetGuid")?.ToString() ?? "";
                 if (!PcgAssetGuidUtility.IsValid(guid))
                 {
-                    error = $"Node '{record.id}' SubgraphAsset.assetGuid must be 32 hex characters.";
+                    error = $"Node '{record.id}' SubgraphAsset.assetGuid is empty or invalid.";
                     return false;
                 }
 

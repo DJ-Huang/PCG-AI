@@ -58,6 +58,43 @@ def load_manifest():
         return json.load(f)
 
 
+def validate_visible_clause(node_type, key, clause, props, errors, label):
+    """Validate one visibleWhen clause: property + (equals or oneOf)."""
+    if not isinstance(clause, dict):
+        errors.append(f"{node_type}.{key}: {label} must be object")
+        return
+    driver = clause.get("property")
+    if not driver:
+        errors.append(f"{node_type}.{key}: {label} missing property")
+    elif driver not in props:
+        errors.append(
+            f"{node_type}.{key}: {label} property '{driver}' not found"
+        )
+    has_equals = "equals" in clause
+    one_of = clause.get("oneOf")
+    has_one_of = isinstance(one_of, list) and len(one_of) > 0
+    if not has_equals and not has_one_of:
+        errors.append(
+            f"{node_type}.{key}: {label} requires equals or non-empty oneOf"
+        )
+
+
+def validate_visible_when(node_type, key, visible, props, errors):
+    """Match Unity PcgNodeManifest: classic property/equals/oneOf or any[]."""
+    any_clauses = visible.get("any")
+    if any_clauses is not None:
+        if not isinstance(any_clauses, list) or len(any_clauses) == 0:
+            errors.append(f"{node_type}.{key}: visibleWhen.any must be non-empty list")
+            return
+        for i, clause in enumerate(any_clauses):
+            validate_visible_clause(
+                node_type, key, clause, props, errors, f"visibleWhen.any[{i}]"
+            )
+        return
+
+    validate_visible_clause(node_type, key, visible, props, errors, "visibleWhen")
+
+
 def validate_inspector_layout(manifest):
     """Validate optional inspectorSections / property layout metadata."""
     errors = []
@@ -108,15 +145,7 @@ def validate_inspector_layout(manifest):
                 if not isinstance(visible, dict):
                     errors.append(f"{node_type}.{key}: visibleWhen must be object")
                 else:
-                    driver = visible.get("property")
-                    if not driver:
-                        errors.append(f"{node_type}.{key}: visibleWhen missing property")
-                    elif driver not in props:
-                        errors.append(
-                            f"{node_type}.{key}: visibleWhen property '{driver}' not found"
-                        )
-                    if "equals" not in visible:
-                        errors.append(f"{node_type}.{key}: visibleWhen missing equals")
+                    validate_visible_when(node_type, key, visible, props, errors)
 
             enabled = prop.get("enabledWhen")
             if enabled is not None:

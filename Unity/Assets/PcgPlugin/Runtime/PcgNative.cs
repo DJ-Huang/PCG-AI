@@ -1070,6 +1070,11 @@ namespace DJTechRuntime.PCG
             }
             else if (executeKind == PcgExecuteKind.Points)
             {
+                // Prefer header version from the native payload so v1 scalar-scale
+                // buffers (e.g. older plugins) still copy the correct byte length.
+                var version = pointsBuf != null && pointsBuf.Length >= PointBinaryHeaderSize
+                    ? BitConverter.ToUInt32(pointsBuf, 4)
+                    : 2u;
                 var required = PointBinaryHeaderSize + pointCount * 12;
                 var flags = (PcgPointAttrFlags)pointAttrFlags;
                 if (flags.HasFlag(PcgPointAttrFlags.Normal))
@@ -1079,7 +1084,7 @@ namespace DJTechRuntime.PCG
                 if (flags.HasFlag(PcgPointAttrFlags.TriIndex))
                     required += pointCount * 4;
                 if (flags.HasFlag(PcgPointAttrFlags.Scale))
-                    required += pointCount * 12;
+                    required += pointCount * (version <= 1u ? 4 : 12);
                 if (flags.HasFlag(PcgPointAttrFlags.Rotation))
                     required += pointCount * 16;
 

@@ -85,15 +85,25 @@ namespace DJTechEditor.PCG
             if (m_GraphParameters == null)
                 return;
 
+            var previous = new Dictionary<string, (float f, int i, bool b, string s)>();
+            for (var i = 0; i < overridesProp.arraySize; i++)
+            {
+                var element = overridesProp.GetArrayElementAtIndex(i);
+                var id = element.FindPropertyRelative("parameterId").stringValue;
+                if (string.IsNullOrEmpty(id) || previous.ContainsKey(id))
+                    continue;
+                previous[id] = (
+                    element.FindPropertyRelative("floatValue").floatValue,
+                    element.FindPropertyRelative("intValue").intValue,
+                    element.FindPropertyRelative("boolValue").boolValue,
+                    element.FindPropertyRelative("stringValue").stringValue);
+            }
+
             var needed = m_GraphParameters.Count;
             while (overridesProp.arraySize < needed)
-            {
                 overridesProp.InsertArrayElementAtIndex(overridesProp.arraySize);
-            }
             while (overridesProp.arraySize > needed)
-            {
                 overridesProp.DeleteArrayElementAtIndex(overridesProp.arraySize - 1);
-            }
 
             for (var i = 0; i < m_GraphParameters.Count; i++)
             {
@@ -103,18 +113,25 @@ namespace DJTechEditor.PCG
                 var nameProp = element.FindPropertyRelative("name");
                 var typeProp = element.FindPropertyRelative("type");
 
-                if (idProp.stringValue != param.id)
+                idProp.stringValue = param.id;
+                nameProp.stringValue = param.name;
+                typeProp.stringValue = param.type;
+
+                var fProp = element.FindPropertyRelative("floatValue");
+                var iProp = element.FindPropertyRelative("intValue");
+                var bProp = element.FindPropertyRelative("boolValue");
+                var sProp = element.FindPropertyRelative("stringValue");
+
+                if (previous.TryGetValue(param.id, out var kept))
                 {
-                    idProp.stringValue = param.id;
-                    nameProp.stringValue = param.name;
-                    typeProp.stringValue = param.type;
-
+                    fProp.floatValue = kept.f;
+                    iProp.intValue = kept.i;
+                    bProp.boolValue = kept.b;
+                    sProp.stringValue = kept.s;
+                }
+                else
+                {
                     var overrideVal = PcgParameterOverride.FromParameter(param);
-                    var fProp = element.FindPropertyRelative("floatValue");
-                    var iProp = element.FindPropertyRelative("intValue");
-                    var bProp = element.FindPropertyRelative("boolValue");
-                    var sProp = element.FindPropertyRelative("stringValue");
-
                     fProp.floatValue = overrideVal.floatValue;
                     iProp.intValue = overrideVal.intValue;
                     bProp.boolValue = overrideVal.boolValue;

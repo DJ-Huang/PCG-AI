@@ -501,7 +501,6 @@ void register_topology_parity_elements(
     map.emplace("SortGeometry", std::make_unique<SortGeometryElement>());
     map.emplace("Resample", std::make_unique<ResampleElement>());
     map.emplace("Carve", std::make_unique<CarveElement>());
-    map.emplace("CarveSpline", std::make_unique<CarveElement>());
     map.emplace("FindShortestPath", std::make_unique<FindShortestPathElement>());
     map.emplace("TreeSimpleLeaf", std::make_unique<TreeSimpleLeafElement>());
     map.emplace("SwitchIf", std::make_unique<SwitchIfElement>());

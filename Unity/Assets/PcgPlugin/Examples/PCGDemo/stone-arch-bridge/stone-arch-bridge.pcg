@@ -576,7 +576,7 @@
       "type": "number",
       "default": 0.15,
       "exposed": true,
-      "targetNode": "arch_bevel",
+      "targetNode": "n103/arch_bevel",
       "targetProperty": "amount",
       "hasRange": true,
       "min": 0.02,

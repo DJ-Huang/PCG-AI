@@ -41,6 +41,8 @@ namespace DJTechEditor.PCG.Graph
 
             // Pure file loader first to build closure without importer re-entry.
             var fileLoader = CreateFileGuidLoader(out var guidToPath);
+            var directDeps = CollectDirectExternalGuids(doc);
+
             if (!PcgExecutionDocumentBuilder.TryBuildJson(
                     doc,
                     fileLoader,
@@ -49,21 +51,55 @@ namespace DJTechEditor.PCG.Graph
                     out var bakeError,
                     pretty: false))
             {
-                asset.SetImportResult("", false, bakeError, Array.Empty<string>());
+                RegisterDependencyPaths(ctx, directDeps, guidToPath);
+                asset.SetImportResult("", false, bakeError, directDeps);
                 AddMain(ctx, asset);
                 Debug.LogError($"[PCG] Failed to bake {ctx.assetPath}: {bakeError}", asset);
                 return;
             }
 
             var deps = resolveResult?.DependencyGuids ?? new List<string>();
-            foreach (var guid in deps)
-            {
-                if (guidToPath.TryGetValue(guid, out var path) && !string.IsNullOrEmpty(path))
-                    ctx.DependsOnSourceAsset(path);
-            }
+            RegisterDependencyPaths(ctx, deps, guidToPath);
 
             asset.SetImportResult(bakedJson, true, "", deps);
             AddMain(ctx, asset);
+        }
+
+        private static void RegisterDependencyPaths(
+            AssetImportContext ctx,
+            IEnumerable<string> guids,
+            Dictionary<string, string> guidToPath)
+        {
+            if (guids == null)
+                return;
+            foreach (var guid in guids)
+            {
+                if (string.IsNullOrEmpty(guid))
+                    continue;
+                var path = guidToPath != null && guidToPath.TryGetValue(guid, out var mapped)
+                    ? mapped
+                    : AssetDatabase.GUIDToAssetPath(guid);
+                if (!string.IsNullOrEmpty(path))
+                    ctx.DependsOnSourceAsset(path);
+            }
+        }
+
+        private static List<string> CollectDirectExternalGuids(PcgGraphDocument doc)
+        {
+            var result = new List<string>();
+            if (doc?.nodes == null)
+                return result;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var node in doc.nodes)
+            {
+                if (node == null || node.type != PcgStructuralNodeTypes.SubgraphAsset)
+                    continue;
+                var guid = PcgAssetGuidUtility.Canonicalize(node.data?.GetRaw("assetGuid")?.ToString());
+                if (!PcgAssetGuidUtility.IsValid(guid) || !seen.Add(guid))
+                    continue;
+                result.Add(guid);
+            }
+            return result;
         }
 
         private static void AddMain(AssetImportContext ctx, PcgGraphAsset asset)

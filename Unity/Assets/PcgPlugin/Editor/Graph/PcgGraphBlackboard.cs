@@ -443,6 +443,8 @@ namespace DJTechEditor.PCG.Graph
                     OnParametersChanged?.Invoke();
                 },
                 label: "Default",
+                onDragBegin: () => m_GraphView?.BeginDrag("Change Default"),
+                onDragEnd: () => m_GraphView?.EndDrag(),
                 onFieldCommit: newValue =>
                 {
                     var text = isInteger

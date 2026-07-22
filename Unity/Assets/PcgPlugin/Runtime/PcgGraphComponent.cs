@@ -592,24 +592,10 @@ namespace DJTechRuntime.PCG
                 if (string.IsNullOrEmpty(param.targetNode) || string.IsNullOrEmpty(param.targetProperty))
                     continue;
 
-                var node = FindNode(doc, param.targetNode);
+                var node = PcgParameterTargetResolver.FindNode(doc, param.targetNode);
                 if (node != null)
                     node.data.SetRaw(param.targetProperty, ov.GetValue());
             }
-        }
-
-        private static PcgGraphNodeRecord FindNode(PcgGraphDocument doc, string nodeId)
-        {
-            if (string.IsNullOrEmpty(nodeId))
-                return null;
-
-            foreach (var node in doc.nodes)
-            {
-                if (node.id == nodeId)
-                    return node;
-            }
-
-            return null;
         }
 
         public bool Run() => Run(skipDocumentRefresh: false);
@@ -1420,13 +1406,61 @@ namespace DJTechRuntime.PCG
             {
                 ClearGpuInstancingOnly();
                 ClearScatterCpuCache();
-                var first = prototypes[0].Mesh != null ? prototypes[0].Mesh : ResolveScatterPointMesh();
-                if (!PcgInstanceList.TryBuild(points, first, scatterPointScale, out var mergedList))
+
+                var combines = new List<CombineInstance>();
+                var totalVertsEstimate = 0;
+                var mergedPointOffset = 0;
+                try
                 {
-                    ClearScatterDisplay();
-                    return;
+                    for (var i = 0; i < prototypes.Count; i++)
+                    {
+                        var proto = prototypes[i];
+                        var count = proto.PointCount;
+                        if (count < 0)
+                            count = points.Count - mergedPointOffset;
+                        if (count <= 0 || mergedPointOffset >= points.Count)
+                            continue;
+                        if (mergedPointOffset + count > points.Count)
+                            count = points.Count - mergedPointOffset;
+
+                        var slice = points.GetRange(mergedPointOffset, count);
+                        mergedPointOffset += count;
+                        if (proto.Mesh == null)
+                            continue;
+                        if (!PcgInstanceList.TryBuild(slice, proto.Mesh, scatterPointScale, out var instanceList))
+                            continue;
+
+                        totalVertsEstimate += instanceList.Count * proto.Mesh.vertexCount;
+                        for (var j = 0; j < instanceList.Count; j++)
+                        {
+                            combines.Add(new CombineInstance
+                            {
+                                mesh = proto.Mesh,
+                                transform = instanceList.LocalMatrices[j]
+                            });
+                        }
+                    }
+
+                    if (combines.Count == 0)
+                    {
+                        ClearScatterDisplay();
+                        return;
+                    }
+
+                    var mesh = new Mesh { name = "PCG Scatter Points Mesh" };
+                    if (totalVertsEstimate > 65535)
+                        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                    mesh.CombineMeshes(combines.ToArray(), true, true, false);
+                    mesh.RecalculateBounds();
+                    mesh.RecalculateNormals();
+                    mesh.RecalculateTangents();
+                    ApplyMesh(mesh);
                 }
-                ApplyMesh(BuildScatterMesh(mergedList));
+                finally
+                {
+                    if (!reuseOwnedMeshes)
+                        DestroyTemporarySpawnPrototypes(prototypes);
+                }
                 return;
             }
 
@@ -1911,6 +1945,28 @@ namespace DJTechRuntime.PCG
 #endif
             }
             m_OwnedSpawnPrototypeMeshes.Clear();
+        }
+
+        private void DestroyTemporarySpawnPrototypes(List<PcgResultParser.PcgSpawnPrototype> prototypes)
+        {
+            if (prototypes == null)
+                return;
+            var sharedPointMesh = ResolveScatterPointMesh();
+            for (var i = 0; i < prototypes.Count; i++)
+            {
+                var mesh = prototypes[i]?.Mesh;
+                if (mesh == null)
+                    continue;
+                if (mesh == scatterPointMesh || mesh == sharedPointMesh)
+                    continue;
+#if UNITY_EDITOR
+                if (UnityEditor.EditorUtility.IsPersistent(mesh))
+                    continue;
+                DestroyImmediate(mesh);
+#else
+                Destroy(mesh);
+#endif
+            }
         }
     }
 }

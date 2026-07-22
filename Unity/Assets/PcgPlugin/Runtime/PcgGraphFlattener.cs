@@ -236,9 +236,12 @@ namespace DJTechRuntime.PCG
                     foreach (var target in targets)
                     {
                         edgeCounter++;
+                        var baseId = string.IsNullOrEmpty(edge.id) ? "edge" : edge.id;
+                        // Fan-out/fan-in expands one authoring edge into many endpoints;
+                        // keep ids unique with a stable counter suffix.
                         output.Edges.Add(new PcgGraphEdgeRecord
                         {
-                            id = prefix + (string.IsNullOrEmpty(edge.id) ? "edge" + edgeCounter : edge.id),
+                            id = prefix + baseId + "__" + edgeCounter,
                             source = source.Node,
                             target = target.Node,
                             sourceHandle = source.Handle,

@@ -246,7 +246,7 @@
       },
       "data": {
         "__nodeTitle": "Tall Flat-Roof",
-        "assetGuid": "763260a9ec7574a6a9144b9c628ccd35"
+        "assetGuid": "CHwctyytAnJUFjI+XmNd9wVMRA8JKqKbiVnfEzHPRV9xKvg685tT3U6aVB2G"
       },
       "subgraphInterface": {
         "name": "Tall Flat-Roof Building",
@@ -269,7 +269,7 @@
       },
       "data": {
         "__nodeTitle": "Medium Pitched",
-        "assetGuid": "413e2346c53a541c096707b7c06341bf"
+        "assetGuid": "C3sc4CiuV311vN/1UKP/MyedD7ELSKlpj5JDVqHo1bqBZu4nsnlUdNbY6W7c"
       },
       "subgraphInterface": {
         "name": "Medium Pitched-Roof Building",
@@ -292,7 +292,7 @@
       },
       "data": {
         "__nodeTitle": "Short Flat-Roof",
-        "assetGuid": "0b9f4d95394564f3d887f6bf5678403d"
+        "assetGuid": "DygW4y75Wn6cItx77i7OmF5lYEsUrKoOmmVgdpdMr8LvPBRYMEJEc5BQIr/W"
       },
       "subgraphInterface": {
         "name": "Short Flat-Roof Building",
@@ -408,7 +408,7 @@
       },
       "data": {
         "__nodeTitle": "Tall Flat Wide",
-        "assetGuid": "9d0ee8ab6f32a48c79b1bc1497564914"
+        "assetGuid": "Bi4f4H+lAim/25ufGygRvvNmUjFFwILBlWfb2wCLTOfv57DMB/M8t1NeALTj"
       },
       "subgraphInterface": {
         "name": "Tall Flat-Roof Wide Building",
@@ -431,7 +431,7 @@
       },
       "data": {
         "__nodeTitle": "Medium Pitched Wide",
-        "assetGuid": "748f06f5aa84f4286a0ab7ebca09144e"
+        "assetGuid": "CH4X4yqrBX5syHWyaZ7kigFDMV7XB/qZutxlfuXRnoKUx1dmVs9f8lgJd7Ch"
       },
       "subgraphInterface": {
         "name": "Medium Pitched-Roof Wide Building",
@@ -454,7 +454,7 @@
       },
       "data": {
         "__nodeTitle": "Short Flat Wide",
-        "assetGuid": "c2f84366be1f34d3d99492f9c1de22ca"
+        "assetGuid": "XHhJvS6uVX1WSF3O3zvPs6TchlAv5pqZh1wp00xc/Hh56gjb7T5guJuH1nL7"
       },
       "subgraphInterface": {
         "name": "Short Flat-Roof Wide Building",

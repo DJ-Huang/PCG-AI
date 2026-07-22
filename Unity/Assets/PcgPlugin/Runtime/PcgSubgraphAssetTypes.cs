@@ -110,22 +110,36 @@ namespace DJTechRuntime.PCG
 
     public static class PcgAssetGuidUtility
     {
+        /// <summary>
+        /// Normalize AssetDatabase GUIDs for stable comparison.
+        /// Classic Unity 32-hex GUIDs (optional hyphens) become lowercase hex without hyphens.
+        /// Opaque engine GUIDs (e.g. Tuanjie long form) are preserved as AssetDatabase returns them.
+        /// </summary>
         public static string Canonicalize(string guid)
         {
             if (string.IsNullOrWhiteSpace(guid))
                 return "";
-            return guid.Trim().Replace("-", "").ToLowerInvariant();
+            var trimmed = guid.Trim();
+            var noHyphen = trimmed.Replace("-", "");
+            if (IsClassicUnityHex(noHyphen))
+                return noHyphen.ToLowerInvariant();
+            return trimmed;
         }
 
         public static bool IsValid(string guid)
         {
             var canonical = Canonicalize(guid);
-            if (canonical.Length != 32)
+            if (string.IsNullOrEmpty(canonical))
+                return false;
+            if (IsClassicUnityHex(canonical))
+                return true;
+
+            // Opaque AssetDatabase GUID contract: non-empty, no whitespace, bounded length.
+            if (canonical.Length < 8 || canonical.Length > 128)
                 return false;
             foreach (var c in canonical)
             {
-                var isHex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-                if (!isHex)
+                if (char.IsWhiteSpace(c))
                     return false;
             }
             return true;
@@ -135,12 +149,27 @@ namespace DJTechRuntime.PCG
         {
             var canonical = Canonicalize(guid);
             if (!IsValid(canonical))
-                throw new ArgumentException("assetGuid must be 32 hex characters.", nameof(guid));
+                throw new ArgumentException("assetGuid is empty or invalid.", nameof(guid));
             using var sha = System.Security.Cryptography.SHA256.Create();
-            var bytes = System.Text.Encoding.ASCII.GetBytes(canonical);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(canonical);
             var hash = sha.ComputeHash(bytes);
             var hex = BitConverter.ToString(hash, 0, 8).Replace("-", "").ToLowerInvariant();
             return "__ext_" + hex;
+        }
+
+        private static bool IsClassicUnityHex(string value)
+        {
+            if (value == null || value.Length != 32)
+                return false;
+            foreach (var c in value)
+            {
+                var isHex = (c >= '0' && c <= '9') ||
+                            (c >= 'a' && c <= 'f') ||
+                            (c >= 'A' && c <= 'F');
+                if (!isHex)
+                    return false;
+            }
+            return true;
         }
     }
 }

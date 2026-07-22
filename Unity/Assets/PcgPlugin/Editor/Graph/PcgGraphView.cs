@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -80,6 +82,8 @@ namespace DJTechEditor.PCG.Graph
         private readonly List<string> m_SubgraphParentInstances = new();
         /// <summary>Root external nav definition id → asset GUID (session cache for drill-in / flush).</summary>
         private readonly Dictionary<string, string> m_ExternalNavRootGuidByDefId = new(StringComparer.Ordinal);
+        private readonly HashSet<string> m_DirtyExternalNavDefIds = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> m_ExternalNavLoadedContentHashByDefId = new(StringComparer.Ordinal);
 
         public static event Action<PcgGraphEditorWindow> GraphDocumentChanged;
         public event Action<string> SubgraphNavigationChanged;
@@ -752,6 +756,21 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_SuppressUndo) return;
             EnsureUndoState().SetGraphJson(PcgGraphSerializer.ToJson(ExportDocument(), pretty: false));
+            MarkExternalNavDirtyIfEditing();
+        }
+
+        private void MarkExternalNavDirtyIfEditing()
+        {
+            var rootId = FindExternalNavigationRootId(m_CurrentSubgraphId);
+            if (!string.IsNullOrEmpty(rootId))
+                m_DirtyExternalNavDefIds.Add(rootId);
+        }
+
+        private static string HashUtf8Content(string content)
+        {
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(content ?? ""));
+            return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
         }
 
         /// <summary>Convenience wrapper: record, apply, commit in one call.</summary>
@@ -791,6 +810,7 @@ namespace DJTechEditor.PCG.Graph
             }
             m_PendingSnapshot = null;
             m_PendingAction = null;
+            MarkExternalNavDirtyIfEditing();
             NotifyDocumentChanged();
         }
 
@@ -1412,6 +1432,8 @@ namespace DJTechEditor.PCG.Graph
             m_SubgraphParents.Clear();
             m_SubgraphParentInstances.Clear();
             m_ExternalNavRootGuidByDefId.Clear();
+            m_DirtyExternalNavDefIds.Clear();
+            m_ExternalNavLoadedContentHashByDefId.Clear();
             LoadScope(m_RootDocument.nodes, m_RootDocument.edges, m_RootDocument.parameters, null, clearUndo);
             SubgraphNavigationChanged?.Invoke(null);
         }
@@ -1427,6 +1449,8 @@ namespace DJTechEditor.PCG.Graph
             m_SubgraphParents.Clear();
             m_SubgraphParentInstances.Clear();
             m_ExternalNavRootGuidByDefId.Clear();
+            m_DirtyExternalNavDefIds.Clear();
+            m_ExternalNavLoadedContentHashByDefId.Clear();
             if (rootDefinition != null)
                 rootDefinition.name = assetName ?? rootDefinition.name;
             LoadScope(
@@ -1587,20 +1611,26 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Writes linked <c>.pcgsubgraph</c> files for any SubgraphAsset definitions entered this session.
+        /// Writes linked <c>.pcgsubgraph</c> files that were edited in this window.
         /// Call before saving the consumer graph so in-window edits persist to the asset.
+        /// Skips assets that were only navigated into (not dirtied) to avoid clobbering
+        /// newer disk saves from other windows.
         /// </summary>
         public bool TryFlushExternalNavigationAssets(out string error)
         {
             error = null;
             SaveVisibleScope();
-            if (m_ExternalNavRootGuidByDefId.Count == 0)
+            if (m_DirtyExternalNavDefIds.Count == 0)
                 return true;
 
-            foreach (var pair in m_ExternalNavRootGuidByDefId.ToList())
+            foreach (var definitionId in m_DirtyExternalNavDefIds.ToList())
             {
-                var definitionId = pair.Key;
-                var guid = pair.Value;
+                if (!m_ExternalNavRootGuidByDefId.TryGetValue(definitionId, out var guid))
+                {
+                    m_DirtyExternalNavDefIds.Remove(definitionId);
+                    continue;
+                }
+
                 if (!TryBuildAssetDocumentFromExternalNav(definitionId, out var assetDoc, out var buildError))
                 {
                     error = buildError;
@@ -1616,7 +1646,23 @@ namespace DJTechEditor.PCG.Graph
 
                 var projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
                 var fullPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(projectRoot, path));
-                System.IO.File.WriteAllText(fullPath, PcgSubgraphAssetSerializer.ToJson(assetDoc));
+                if (System.IO.File.Exists(fullPath))
+                {
+                    var diskHash = HashUtf8Content(System.IO.File.ReadAllText(fullPath));
+                    if (m_ExternalNavLoadedContentHashByDefId.TryGetValue(definitionId, out var loadedHash) &&
+                        !string.Equals(diskHash, loadedHash, StringComparison.Ordinal))
+                    {
+                        error =
+                            $"SubgraphAsset '{path}' changed on disk since it was loaded in this window. " +
+                            "Reload the asset (or discard local edits) before saving to avoid overwriting.";
+                        return false;
+                    }
+                }
+
+                var json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+                System.IO.File.WriteAllText(fullPath, json);
+                m_ExternalNavLoadedContentHashByDefId[definitionId] = HashUtf8Content(json);
+                m_DirtyExternalNavDefIds.Remove(definitionId);
             }
 
             return true;
@@ -2163,6 +2209,8 @@ namespace DJTechEditor.PCG.Graph
             }
 
             UpsertExternalNavigationDefinitions(guid, definitionId, assetDoc);
+            m_ExternalNavLoadedContentHashByDefId[definitionId] = HashUtf8Content(asset.SourceJson);
+            m_DirtyExternalNavDefIds.Remove(definitionId);
             return true;
         }
 

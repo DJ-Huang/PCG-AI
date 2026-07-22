@@ -34,7 +34,7 @@ namespace DJTechRuntime.PCG
                 if (!byId.TryGetValue(param.id, out var overrideVal))
                     continue;
 
-                var targetNode = FindNode(doc, param.targetNode);
+                var targetNode = PcgParameterTargetResolver.FindNode(doc, param.targetNode);
                 if (targetNode == null)
                     continue;
 
@@ -42,20 +42,6 @@ namespace DJTechRuntime.PCG
             }
 
             return PcgGraphSerializer.ToJson(doc, pretty: false);
-        }
-
-        private static PcgGraphNodeRecord FindNode(PcgGraphDocument doc, string nodeId)
-        {
-            if (string.IsNullOrEmpty(nodeId))
-                return null;
-
-            foreach (var node in doc.nodes)
-            {
-                if (node.id == nodeId)
-                    return node;
-            }
-
-            return null;
         }
     }
 }
