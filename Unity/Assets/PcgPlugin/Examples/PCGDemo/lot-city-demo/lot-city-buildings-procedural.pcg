@@ -415,7 +415,8 @@
     {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111206", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e111936", "source": "n102", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e111936", "source": "n102", "target": "n103", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e114122", "source": "n103", "target": "n104", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

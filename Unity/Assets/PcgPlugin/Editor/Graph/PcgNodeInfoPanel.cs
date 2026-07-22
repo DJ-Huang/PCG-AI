@@ -19,6 +19,7 @@ namespace DJTechEditor.PCG.Graph
         private static readonly Color PolyColor = new(0.4f, 0.7f, 0.95f);
 
         private readonly PcgGraphView m_GraphView;
+        private PcgGraphNodeBase m_AnchorNode;
 
         public PcgNodeInfoPanel(PcgGraphView graphView)
         {
@@ -98,13 +99,29 @@ namespace DJTechEditor.PCG.Graph
             }
 
             WireCloseButton();
+            if (m_AnchorNode != null)
+                m_AnchorNode.UnregisterCallback<GeometryChangedEvent>(OnAnchorGeometryChanged);
+            m_AnchorNode = node;
+            m_AnchorNode.RegisterCallback<GeometryChangedEvent>(OnAnchorGeometryChanged);
             style.display = DisplayStyle.Flex;
             PositionNear(node);
+            schedule.Execute(() => PositionNear(node));
         }
 
         public void Hide()
         {
+            if (m_AnchorNode != null)
+            {
+                m_AnchorNode.UnregisterCallback<GeometryChangedEvent>(OnAnchorGeometryChanged);
+                m_AnchorNode = null;
+            }
             style.display = DisplayStyle.None;
+        }
+
+        private void OnAnchorGeometryChanged(GeometryChangedEvent _)
+        {
+            if (m_AnchorNode != null && style.display == DisplayStyle.Flex)
+                PositionNear(m_AnchorNode);
         }
 
         private void WireCloseButton()
@@ -116,6 +133,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void PositionNear(PcgGraphNodeBase node)
         {
+            // Same graph-space coordinates as radial menu overlays in contentViewContainer.
             var rect = node.GetPosition();
             const float panelWidth = 300f;
             const float gap = 14f;
@@ -124,14 +142,6 @@ namespace DJTechEditor.PCG.Graph
             var top = rect.y;
             if (left < 0)
                 left = rect.x + rect.width + gap;
-
-            if (m_GraphView != null)
-            {
-                var gvRect = m_GraphView.contentRect;
-                var estHeight = 40 + childCount * 80;
-                if (top + estHeight > gvRect.height)
-                    top = Mathf.Max(0, gvRect.height - estHeight);
-            }
 
             style.left = left;
             style.top = top;
