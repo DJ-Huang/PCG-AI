@@ -88,6 +88,7 @@ namespace DJTechEditor.PCG.Graph
         private static readonly SceneEditDomain[] s_GroupDomains = { SceneEditDomain.Vertex, SceneEditDomain.Edge, SceneEditDomain.Face };
 
         private PcgSceneEditContext m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+        private bool m_DuplicateInProgress;
 
         public PcgSceneEditContext SceneEditContext => m_SceneEditContext;
 
@@ -263,6 +264,7 @@ namespace DJTechEditor.PCG.Graph
 
             RegisterCallback<MouseMoveEvent>(OnMouseMove);
             RegisterCallback<KeyDownEvent>(OnKeyDown);
+            RegisterCallback<KeyDownEvent>(OnDuplicateKeyDown, TrickleDown.TrickleDown);
             RegisterCallback<PointerDownEvent>(OnPointerDown, TrickleDown.TrickleDown);
             RegisterCallback<PointerUpEvent>(OnPointerUp);
             RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
@@ -349,6 +351,24 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
+        private void OnDuplicateKeyDown(KeyDownEvent evt)
+        {
+            if (evt.keyCode != KeyCode.D || !(evt.ctrlKey || evt.commandKey))
+                return;
+
+            if (evt.target is TextField ||
+                (evt.target as VisualElement)?.GetFirstAncestorOfType<TextField>() != null)
+            {
+                return;
+            }
+
+            if (!CanDuplicateSelectedNodes())
+                return;
+
+            DuplicateSelectedNodes();
+            evt.StopPropagation();
+        }
+
         public override void BuildContextualMenu(ContextualMenuPopulateEvent evt)
         {
             base.BuildContextualMenu(evt);
@@ -362,6 +382,13 @@ namespace DJTechEditor.PCG.Graph
                     evt.menu.AppendAction(
                         "Rename",
                         _ => nodeView.RequestRename());
+
+                    evt.menu.AppendAction(
+                        "Duplicate",
+                        _ => DuplicateSelectedNodes(),
+                        CanDuplicateSelectedNodes()
+                            ? DropdownMenuAction.Status.Normal
+                            : DropdownMenuAction.Status.Disabled);
 
                     evt.menu.AppendAction(
                         "Preview in Scene",
@@ -1179,6 +1206,113 @@ namespace DJTechEditor.PCG.Graph
         public override EventPropagation DeleteSelection()
         {
             return base.DeleteSelection();
+        }
+
+        private bool CanDuplicateSelectedNodes() =>
+            selection.OfType<PcgGraphNodeBase>()
+                .Any(node => node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput");
+
+        private void DuplicateSelectedNodes()
+        {
+            if (m_DuplicateInProgress)
+                return;
+
+            var selectedViews = selection.OfType<PcgGraphNodeBase>()
+                .Where(node => node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput")
+                .ToList();
+            if (selectedViews.Count == 0)
+                return;
+
+            m_DuplicateInProgress = true;
+            try
+            {
+                RecordUndo("Duplicate");
+                m_SuppressUndo = true;
+
+                var selectedIds = new HashSet<string>(selectedViews.Select(node => node.NodeId));
+                var idMap = new Dictionary<string, string>();
+                var newViews = new Dictionary<string, PcgGraphNodeBase>();
+                const float offset = 40f;
+                var interfaceDefinition = FindSubgraph(m_CurrentSubgraphId);
+
+                foreach (var view in selectedViews)
+                {
+                    var rect = view.GetPosition();
+                    var record = new PcgGraphNodeRecord
+                    {
+                        id = view.NodeId,
+                        type = view.NodeType,
+                        position = PcgGraphPosition.FromVector2(rect.position),
+                        data = view.CollectData(),
+                    };
+                    if (view is PcgExternalSubgraphNodeView external)
+                        record.subgraphInterface = external.CollectInterfaceSnapshot();
+
+                    var clone = record.Clone();
+                    clone.id = PcgGraphNodeFactory.NextNodeId();
+                    clone.position = PcgGraphPosition.FromVector2(record.position.ToVector2() + new Vector2(offset, offset));
+                    idMap[view.NodeId] = clone.id;
+
+                    var newView = PcgGraphNodeFactory.Create(
+                        clone.type,
+                        clone.id,
+                        clone.position.ToVector2(),
+                        clone.data,
+                        interfaceDefinition,
+                        FindSubgraph,
+                        clone.subgraphInterface);
+                    AttachSubgraphNavigation(newView);
+                    newView.SetPosition(new Rect(clone.position.ToVector2(), rect.size));
+                    AddElement(newView);
+                    newViews[clone.id] = newView;
+                }
+
+                foreach (var edge in edges.ToList())
+                {
+                    if (edge.output?.node is not PcgGraphNodeBase source ||
+                        edge.input?.node is not PcgGraphNodeBase target)
+                    {
+                        continue;
+                    }
+
+                    if (!selectedIds.Contains(source.NodeId) || !selectedIds.Contains(target.NodeId))
+                        continue;
+
+                    if (!idMap.TryGetValue(source.NodeId, out var newSourceId) ||
+                        !idMap.TryGetValue(target.NodeId, out var newTargetId) ||
+                        !newViews.TryGetValue(newSourceId, out var newSource) ||
+                        !newViews.TryGetValue(newTargetId, out var newTarget))
+                    {
+                        continue;
+                    }
+
+                    var sourceHandle = edge.output.userData as string ?? edge.output.portName;
+                    var targetHandle = edge.input.userData as string ?? edge.input.portName;
+                    var output = newSource.FindOutputPort(sourceHandle ?? "out");
+                    var input = newTarget.FindInputPort(targetHandle ?? "in");
+                    if (output == null || input == null)
+                        continue;
+
+                    var newEdge = output.ConnectTo(input);
+                    newEdge.userData = $"e{++m_EdgeCounter}";
+                    AddElement(newEdge);
+                }
+
+                ClearSelection();
+                foreach (var view in newViews.Values)
+                {
+                    AddToSelection(view);
+                    view.BringToFront();
+                }
+
+                m_SuppressUndo = false;
+                CommitState();
+                NotifyDocumentChanged();
+            }
+            finally
+            {
+                m_DuplicateInProgress = false;
+            }
         }
 
         // ─── Port drag → filtered search → create + connect ─────────

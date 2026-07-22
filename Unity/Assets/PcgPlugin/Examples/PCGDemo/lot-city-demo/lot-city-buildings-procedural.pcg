@@ -14,12 +14,6 @@
       "data": {"minSize": 0.1, "iterations": 4, "irregularity": 0.35, "seed": 2, "alignment": "longestEdge", "__nodeTitle": "City Blocks iter=3"}
     },
     {
-      "id": "shrink_blocks",
-      "type": "PrimitiveTransform",
-      "position": { "x": 840, "y": 320 },
-      "data": {"scale": 0.75, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
-    },
-    {
       "id": "sg_roads",
       "type": "Subgraph",
       "position": { "x": 1480, "y": 4560 },
@@ -30,12 +24,6 @@
       "type": "Subgraph",
       "position": { "x": 200, "y": 4560 },
       "data": {"subgraphId": "city_pads", "__nodeTitle": "City Pads"}
-    },
-    {
-      "id": "floors_attrs",
-      "type": "AttributeWrangle",
-      "position": { "x": 840, "y": 840 },
-      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "Assign Floors"}
     },
     {
       "id": "foreach_begin",
@@ -308,34 +296,46 @@
       "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "boundingBox", "__nodeTitle": "Building Lots iter=2"}
     },
     {
-      "id": "shrink_lots",
-      "type": "PrimitiveTransform",
-      "position": { "x": 703, "y": 612 },
-      "data": {"scale": 0.85, "faceGroup": "lots", "__nodeTitle": "Shrink Lots 0.85"}
-    },
-    {
       "id": "n101",
       "type": "SortGeometry",
-      "position": { "x": 847.5, "y": 569 },
+      "position": { "x": 848.5, "y": 521 },
       "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "proximity", "primitiveSeed": 0, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
     },
     {
       "id": "floors_wrangle",
       "type": "AttributeWrangle",
-      "position": { "x": 840, "y": 694.5 },
+      "position": { "x": 848.5, "y": 597.5 },
       "data": {"runOver": "primitives", "expression": "@group.park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "__nodeTitle": "park_group"}
     },
     {
       "id": "keep_built",
       "type": "Split",
-      "position": { "x": 840, "y": 756.5 },
+      "position": { "x": 848.5, "y": 659.5 },
       "data": {"entity": "primitives", "group": "park", "expression": "", "parameters": "{}", "invertSelection": true, "removeUnusedPoints": true, "__nodeTitle": "split4"}
+    },
+    {
+      "id": "shrink_lots",
+      "type": "PrimitiveTransform",
+      "position": { "x": 549, "y": 586 },
+      "data": {"scale": 0.85, "faceGroup": "lots", "__nodeTitle": "Shrink Lots 0.85"}
     },
     {
       "id": "n102",
       "type": "LotSubdivision",
-      "position": { "x": 954.5, "y": 795 },
-      "data": {"minSize": 1, "iterations": 3, "irregularity": 0.5, "seed": 0, "alignment": "longestEdge", "__nodeTitle": ""}
+      "position": { "x": 840, "y": 746 },
+      "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
+    },
+    {
+      "id": "floors_attrs",
+      "type": "AttributeWrangle",
+      "position": { "x": 840, "y": 827 },
+      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "Assign Floors"}
+    },
+    {
+      "id": "shrink_blocks",
+      "type": "PrimitiveTransform",
+      "position": { "x": 840, "y": 319.5 },
+      "data": {"scale": 0.75, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
     }
   ],
   "edges": [
@@ -344,7 +344,6 @@
     {"id": "e2", "source": "shrink_blocks", "target": "lots", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e3", "source": "lots", "target": "shrink_lots", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e5", "source": "floors_wrangle", "target": "keep_built", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e5b", "source": "keep_built", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e6", "source": "floors_attrs", "target": "foreach_begin", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e7", "source": "foreach_begin", "target": "ex_lot", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e18", "source": "switch_fe", "target": "foreach_end", "sourceHandle": "out", "targetHandle": "in"},
@@ -402,7 +401,8 @@
     {"id": "e_femerge_sw", "source": "fe_merge", "target": "switch_fe", "sourceHandle": "out", "targetHandle": "true"},
     {"id": "e9413", "source": "shrink_blocks", "target": "n101", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e10110", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e111206", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
