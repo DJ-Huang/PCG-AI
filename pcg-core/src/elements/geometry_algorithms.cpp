@@ -18,7 +18,9 @@ geometry::GroupDomain parse_domain(const std::string& domain)
 {
     if (domain == "point")
         return geometry::GroupDomain::Point;
-    if (domain == "face" || domain == "prim")
+    if (domain == "vertex")
+        return geometry::GroupDomain::Vertex;
+    if (domain == "face" || domain == "prim" || domain == "primitive")
         return geometry::GroupDomain::Face;
     return geometry::GroupDomain::Edge;
 }
@@ -473,6 +475,733 @@ data::PcgGeometry face_group_by_normal(const data::PcgGeometry& input,
             result.groups().add(geometry::GroupDomain::Face, options.output_group,
                                 static_cast<int>(face_index));
     }
+
+    return result;
+}
+
+namespace {
+
+bool face_all_points_in(const data::PcgGeometry& input,
+                        size_t face_index,
+                        const std::unordered_set<geometry::GroupId>& points)
+{
+    const auto& face = input.faces()[face_index];
+    if (face.empty())
+        return false;
+    for (int pi : face) {
+        if (points.count(static_cast<geometry::GroupId>(pi)) == 0)
+            return false;
+    }
+    return true;
+}
+
+bool face_any_point_in(const data::PcgGeometry& input,
+                       size_t face_index,
+                       const std::unordered_set<geometry::GroupId>& points)
+{
+    const auto& face = input.faces()[face_index];
+    for (int pi : face) {
+        if (points.count(static_cast<geometry::GroupId>(pi)) != 0)
+            return true;
+    }
+    return false;
+}
+
+bool face_shares_edge_in_points(const data::PcgGeometry& input,
+                                size_t face_index,
+                                const std::unordered_set<geometry::GroupId>& points)
+{
+    const auto& face = input.faces()[face_index];
+    const size_t n = face.size();
+    if (n < 2)
+        return false;
+    for (size_t i = 0; i < n; ++i) {
+        const int a = face[i];
+        const int b = face[(i + 1) % n];
+        if (points.count(static_cast<geometry::GroupId>(a)) != 0
+            && points.count(static_cast<geometry::GroupId>(b)) != 0)
+            return true;
+    }
+    return false;
+}
+
+bool face_all_edges_in(const data::PcgGeometry& input,
+                       size_t face_index,
+                       const std::unordered_set<geometry::GroupId>& edges)
+{
+    const auto& face = input.faces()[face_index];
+    const size_t n = face.size();
+    if (n < 2)
+        return false;
+    for (size_t i = 0; i < n; ++i) {
+        const geometry::GroupId key =
+            geometry::edge_group_id(face[i], face[(i + 1) % n]);
+        if (edges.count(key) == 0)
+            return false;
+    }
+    return true;
+}
+
+bool face_any_edge_in(const data::PcgGeometry& input,
+                      size_t face_index,
+                      const std::unordered_set<geometry::GroupId>& edges)
+{
+    const auto& face = input.faces()[face_index];
+    const size_t n = face.size();
+    if (n < 2)
+        return false;
+    for (size_t i = 0; i < n; ++i) {
+        const geometry::GroupId key =
+            geometry::edge_group_id(face[i], face[(i + 1) % n]);
+        if (edges.count(key) != 0)
+            return true;
+    }
+    return false;
+}
+
+std::unordered_set<geometry::GroupId> points_of_faces(
+    const data::PcgGeometry& input, const std::unordered_set<geometry::GroupId>& faces)
+{
+    std::unordered_set<geometry::GroupId> points;
+    for (geometry::GroupId fid : faces) {
+        if (fid < 0 || static_cast<size_t>(fid) >= input.faces().size())
+            continue;
+        for (int pi : input.faces()[static_cast<size_t>(fid)])
+            points.insert(static_cast<geometry::GroupId>(pi));
+    }
+    return points;
+}
+
+std::unordered_set<geometry::GroupId> points_of_edges(
+    const std::unordered_set<geometry::GroupId>& edges)
+{
+    std::unordered_set<geometry::GroupId> points;
+    for (geometry::GroupId eid : edges) {
+        const auto ends = geometry::edge_group_points(eid);
+        points.insert(static_cast<geometry::GroupId>(ends[0]));
+        points.insert(static_cast<geometry::GroupId>(ends[1]));
+    }
+    return points;
+}
+
+struct CornerIndex {
+    int face = -1;
+    int local = -1;
+    int global = -1;
+    int point = -1;
+};
+
+std::vector<CornerIndex> build_corners(const data::PcgGeometry& input)
+{
+    std::vector<CornerIndex> corners;
+    corners.reserve(static_cast<size_t>(std::max(0, input.corner_count())));
+    int global = 0;
+    for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+        const auto& face = input.faces()[fi];
+        for (size_t li = 0; li < face.size(); ++li) {
+            CornerIndex c;
+            c.face = static_cast<int>(fi);
+            c.local = static_cast<int>(li);
+            c.global = global++;
+            c.point = face[li];
+            corners.push_back(c);
+        }
+    }
+    return corners;
+}
+
+std::unordered_set<geometry::GroupId> corners_of_points(
+    const std::vector<CornerIndex>& corners,
+    const std::unordered_set<geometry::GroupId>& points)
+{
+    std::unordered_set<geometry::GroupId> out;
+    for (const auto& c : corners) {
+        if (points.count(static_cast<geometry::GroupId>(c.point)) != 0)
+            out.insert(static_cast<geometry::GroupId>(c.global));
+    }
+    return out;
+}
+
+std::unordered_set<geometry::GroupId> points_of_corners(
+    const std::vector<CornerIndex>& corners,
+    const std::unordered_set<geometry::GroupId>& verts)
+{
+    std::unordered_set<geometry::GroupId> out;
+    for (geometry::GroupId vid : verts) {
+        if (vid < 0 || static_cast<size_t>(vid) >= corners.size())
+            continue;
+        out.insert(static_cast<geometry::GroupId>(corners[static_cast<size_t>(vid)].point));
+    }
+    return out;
+}
+
+bool edge_zero_length(const data::PcgGeometry& input, geometry::GroupId edge_id)
+{
+    const auto ends = geometry::edge_group_points(edge_id);
+    if (ends[0] == ends[1])
+        return true;
+    if (ends[0] < 0 || ends[1] < 0
+        || static_cast<size_t>(ends[0]) >= input.points().size()
+        || static_cast<size_t>(ends[1]) >= input.points().size())
+        return true;
+    const auto& a = input.points()[static_cast<size_t>(ends[0])];
+    const auto& b = input.points()[static_cast<size_t>(ends[1])];
+    const double dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+    return dx * dx + dy * dy + dz * dz <= 1e-24;
+}
+
+bool attribute_values_differ(const data::AttributeArray& attr,
+                             size_t index_a,
+                             size_t index_b,
+                             double tolerance)
+{
+    const int tuple = std::max(1, attr.schema().tuple_size);
+    if (attr.schema().type == data::AttributeType::Int) {
+        const auto& values = attr.int_values();
+        const size_t base_a = index_a * static_cast<size_t>(tuple);
+        const size_t base_b = index_b * static_cast<size_t>(tuple);
+        if (base_a + static_cast<size_t>(tuple) > values.size()
+            || base_b + static_cast<size_t>(tuple) > values.size())
+            return false;
+        for (int i = 0; i < tuple; ++i) {
+            if (values[base_a + static_cast<size_t>(i)] != values[base_b + static_cast<size_t>(i)])
+                return true;
+        }
+        return false;
+    }
+    if (attr.schema().type == data::AttributeType::Float) {
+        const auto& values = attr.float_values();
+        const size_t base_a = index_a * static_cast<size_t>(tuple);
+        const size_t base_b = index_b * static_cast<size_t>(tuple);
+        if (base_a + static_cast<size_t>(tuple) > values.size()
+            || base_b + static_cast<size_t>(tuple) > values.size())
+            return false;
+        for (int i = 0; i < tuple; ++i) {
+            if (std::abs(values[base_a + static_cast<size_t>(i)]
+                         - values[base_b + static_cast<size_t>(i)])
+                > tolerance)
+                return true;
+        }
+        return false;
+    }
+    if (attr.schema().type == data::AttributeType::String) {
+        const auto& values = attr.string_values();
+        const size_t base_a = index_a * static_cast<size_t>(tuple);
+        const size_t base_b = index_b * static_cast<size_t>(tuple);
+        if (base_a + static_cast<size_t>(tuple) > values.size()
+            || base_b + static_cast<size_t>(tuple) > values.size())
+            return false;
+        for (int i = 0; i < tuple; ++i) {
+            if (values[base_a + static_cast<size_t>(i)] != values[base_b + static_cast<size_t>(i)])
+                return true;
+        }
+    }
+    return false;
+}
+
+std::unordered_set<geometry::GroupId> connectivity_boundary_edges(
+    const data::PcgGeometry& input,
+    const GroupPromoteOptions& options,
+    const geometry::BMesh& bmesh)
+{
+    std::unordered_set<geometry::GroupId> out;
+    if (!options.use_connectivity_attribute || options.connectivity_attribute.empty())
+        return out;
+
+    const std::string& name = options.connectivity_attribute;
+    const double tol = std::max(0.0, options.connectivity_attribute_tolerance);
+
+    // Built-in corner UVs when requesting "uv".
+    if ((name == "uv" || name == "UV") && input.has_corner_uvs()) {
+        const auto corners = build_corners(input);
+        std::unordered_map<geometry::GroupId, std::vector<int>> edge_corners;
+        for (const auto& c : corners) {
+            const auto& face = input.faces()[static_cast<size_t>(c.face)];
+            const int next_point = face[(static_cast<size_t>(c.local) + 1) % face.size()];
+            const geometry::GroupId eid = geometry::edge_group_id(c.point, next_point);
+            edge_corners[eid].push_back(c.global);
+        }
+        for (const auto& entry : edge_corners) {
+            if (entry.second.size() < 2)
+                continue;
+            for (size_t i = 0; i + 1 < entry.second.size(); ++i) {
+                const size_t a = static_cast<size_t>(entry.second[i]);
+                const size_t b = static_cast<size_t>(entry.second[i + 1]);
+                if (a >= input.corner_uvs().size() || b >= input.corner_uvs().size())
+                    continue;
+                const auto& ua = input.corner_uvs()[a];
+                const auto& ub = input.corner_uvs()[b];
+                if (std::abs(ua.u - ub.u) > tol || std::abs(ua.v - ub.v) > tol) {
+                    out.insert(entry.first);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    const data::AttributeArray* point_attr =
+        input.attributes().find(data::AttributeOwner::Point, name);
+    const data::AttributeArray* vertex_attr =
+        input.attributes().find(data::AttributeOwner::Vertex, name);
+    const data::AttributeArray* prim_attr =
+        input.attributes().find(data::AttributeOwner::Primitive, name);
+
+    if (prim_attr != nullptr) {
+        for (const auto& entry : bmesh.edges) {
+            const auto& edge = entry.second;
+            if (edge.face0 < 0 || edge.face1 < 0)
+                continue;
+            if (attribute_values_differ(*prim_attr,
+                                        static_cast<size_t>(edge.face0),
+                                        static_cast<size_t>(edge.face1),
+                                        tol))
+                out.insert(entry.first);
+        }
+        return out;
+    }
+
+    if (point_attr != nullptr) {
+        for (const auto& entry : bmesh.edges) {
+            const auto ends = geometry::edge_group_points(entry.first);
+            // Point-attribute connectivity: boundary separates differing connected regions.
+            // An edge is a seam when endpoints differ (simple discontinuity proxy).
+            if (attribute_values_differ(*point_attr,
+                                        static_cast<size_t>(ends[0]),
+                                        static_cast<size_t>(ends[1]),
+                                        tol))
+                out.insert(entry.first);
+        }
+        return out;
+    }
+
+    if (vertex_attr != nullptr) {
+        const auto corners = build_corners(input);
+        std::unordered_map<geometry::GroupId, std::vector<int>> edge_corners;
+        for (const auto& c : corners) {
+            const auto& face = input.faces()[static_cast<size_t>(c.face)];
+            const int next_point = face[(static_cast<size_t>(c.local) + 1) % face.size()];
+            const geometry::GroupId eid = geometry::edge_group_id(c.point, next_point);
+            edge_corners[eid].push_back(c.global);
+        }
+        for (const auto& entry : edge_corners) {
+            if (entry.second.size() < 2)
+                continue;
+            for (size_t i = 0; i + 1 < entry.second.size(); ++i) {
+                if (attribute_values_differ(*vertex_attr,
+                                            static_cast<size_t>(entry.second[i]),
+                                            static_cast<size_t>(entry.second[i + 1]),
+                                            tol)) {
+                    out.insert(entry.first);
+                    break;
+                }
+            }
+        }
+    }
+
+    return out;
+}
+
+std::unordered_set<geometry::GroupId> promote_members(const data::PcgGeometry& input,
+                                                     const GroupPromoteOptions& options,
+                                                     geometry::GroupDomain from,
+                                                     geometry::GroupDomain to,
+                                                     const std::unordered_set<geometry::GroupId>& source)
+{
+    std::unordered_set<geometry::GroupId> out;
+    if (source.empty())
+        return out;
+
+    if (from == to) {
+        out = source;
+        return out;
+    }
+
+    const geometry::BMesh bmesh = geometry::bmesh_from_geometry(input);
+    const auto corners = build_corners(input);
+
+    if (from == geometry::GroupDomain::Point && to == geometry::GroupDomain::Edge) {
+        for (const auto& entry : bmesh.edges) {
+            const auto ends = geometry::edge_group_points(entry.first);
+            const bool a = source.count(static_cast<geometry::GroupId>(ends[0])) != 0;
+            const bool b = source.count(static_cast<geometry::GroupId>(ends[1])) != 0;
+            if (options.include_only_entirely_contained ? (a && b) : (a || b))
+                out.insert(entry.first);
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Point && to == geometry::GroupDomain::Face) {
+        for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+            bool keep = false;
+            if (options.include_only_primitives_sharing_edge)
+                keep = face_shares_edge_in_points(input, fi, source);
+            else if (options.include_only_entirely_contained)
+                keep = face_all_points_in(input, fi, source);
+            else
+                keep = face_any_point_in(input, fi, source);
+            if (keep)
+                out.insert(static_cast<geometry::GroupId>(fi));
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Point && to == geometry::GroupDomain::Vertex)
+        return corners_of_points(corners, source);
+
+    if (from == geometry::GroupDomain::Edge && to == geometry::GroupDomain::Point)
+        return points_of_edges(source);
+
+    if (from == geometry::GroupDomain::Edge && to == geometry::GroupDomain::Face) {
+        for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+            bool keep = false;
+            if (options.include_only_primitives_sharing_edge
+                || !options.include_only_entirely_contained)
+                keep = face_any_edge_in(input, fi, source);
+            else
+                keep = face_all_edges_in(input, fi, source);
+            if (keep)
+                out.insert(static_cast<geometry::GroupId>(fi));
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Edge && to == geometry::GroupDomain::Vertex) {
+        // Entirely contained: only the beginning corner of each half-edge in the group.
+        for (const auto& c : corners) {
+            const auto& face = input.faces()[static_cast<size_t>(c.face)];
+            const int next_point = face[(static_cast<size_t>(c.local) + 1) % face.size()];
+            const geometry::GroupId eid = geometry::edge_group_id(c.point, next_point);
+            if (source.count(eid) == 0)
+                continue;
+            if (options.include_only_entirely_contained) {
+                out.insert(static_cast<geometry::GroupId>(c.global));
+            } else {
+                out.insert(static_cast<geometry::GroupId>(c.global));
+                const int next_local = (c.local + 1) % static_cast<int>(face.size());
+                // Approximate opposite endpoint corner on same face.
+                int cursor = 0;
+                for (size_t fi = 0; fi < static_cast<size_t>(c.face); ++fi)
+                    cursor += static_cast<int>(input.faces()[fi].size());
+                out.insert(static_cast<geometry::GroupId>(cursor + next_local));
+            }
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Face && to == geometry::GroupDomain::Point)
+        return points_of_faces(input, source);
+
+    if (from == geometry::GroupDomain::Face && to == geometry::GroupDomain::Edge) {
+        if (options.include_only_entirely_contained) {
+            for (const auto& entry : bmesh.edges) {
+                const geometry::BMeshEdge& edge = entry.second;
+                const bool f0_ok =
+                    edge.face0 < 0
+                    || source.count(static_cast<geometry::GroupId>(edge.face0)) != 0;
+                const bool f1_ok =
+                    edge.face1 < 0
+                    || source.count(static_cast<geometry::GroupId>(edge.face1)) != 0;
+                const bool touches =
+                    (edge.face0 >= 0
+                     && source.count(static_cast<geometry::GroupId>(edge.face0)) != 0)
+                    || (edge.face1 >= 0
+                        && source.count(static_cast<geometry::GroupId>(edge.face1)) != 0);
+                if (touches && f0_ok && f1_ok)
+                    out.insert(entry.first);
+            }
+        } else {
+            for (const auto& entry : bmesh.edges) {
+                const geometry::BMeshEdge& edge = entry.second;
+                if ((edge.face0 >= 0
+                     && source.count(static_cast<geometry::GroupId>(edge.face0)) != 0)
+                    || (edge.face1 >= 0
+                        && source.count(static_cast<geometry::GroupId>(edge.face1)) != 0))
+                    out.insert(entry.first);
+            }
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Face && to == geometry::GroupDomain::Vertex) {
+        for (const auto& c : corners) {
+            if (source.count(static_cast<geometry::GroupId>(c.face)) != 0)
+                out.insert(static_cast<geometry::GroupId>(c.global));
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Vertex && to == geometry::GroupDomain::Point)
+        return points_of_corners(corners, source);
+
+    if (from == geometry::GroupDomain::Vertex && to == geometry::GroupDomain::Edge) {
+        const auto points = points_of_corners(corners, source);
+        for (const auto& entry : bmesh.edges) {
+            const auto ends = geometry::edge_group_points(entry.first);
+            const bool a = points.count(static_cast<geometry::GroupId>(ends[0])) != 0;
+            const bool b = points.count(static_cast<geometry::GroupId>(ends[1])) != 0;
+            if (options.include_only_entirely_contained ? (a && b) : (a || b))
+                out.insert(entry.first);
+        }
+        return out;
+    }
+
+    if (from == geometry::GroupDomain::Vertex && to == geometry::GroupDomain::Face) {
+        const auto points = points_of_corners(corners, source);
+        for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+            bool keep = false;
+            if (options.include_only_primitives_sharing_edge)
+                keep = face_shares_edge_in_points(input, fi, points);
+            else if (options.include_only_entirely_contained)
+                keep = face_all_points_in(input, fi, points);
+            else
+                keep = face_any_point_in(input, fi, points);
+            if (keep)
+                out.insert(static_cast<geometry::GroupId>(fi));
+        }
+        return out;
+    }
+
+    return out;
+}
+
+std::unordered_set<geometry::GroupId> filter_boundary(const data::PcgGeometry& input,
+                                                      const GroupPromoteOptions& options,
+                                                      geometry::GroupDomain to,
+                                                      const std::unordered_set<geometry::GroupId>& members)
+{
+    if (members.empty())
+        return {};
+
+    const geometry::BMesh bmesh = geometry::bmesh_from_geometry(input);
+    const bool include_unshared_edges = options.include_unshared_edges;
+    // Curve-vs-polygon unshared distinction is not modeled yet; keep the Houdini toggle for UI parity.
+    (void)options.include_all_unshared_curve_edges;
+    std::unordered_set<geometry::GroupId> out;
+
+    if (to == geometry::GroupDomain::Edge) {
+        std::unordered_set<geometry::GroupId> interior_faces;
+        for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+            if (face_all_edges_in(input, fi, members)
+                || face_any_edge_in(input, fi, members))
+                interior_faces.insert(static_cast<geometry::GroupId>(fi));
+        }
+
+        for (geometry::GroupId eid : members) {
+            const auto it = bmesh.edges.find(eid);
+            if (it == bmesh.edges.end())
+                continue;
+            const geometry::BMeshEdge& edge = it->second;
+            const bool in0 =
+                edge.face0 >= 0
+                && interior_faces.count(static_cast<geometry::GroupId>(edge.face0)) != 0;
+            const bool in1 =
+                edge.face1 >= 0
+                && interior_faces.count(static_cast<geometry::GroupId>(edge.face1)) != 0;
+            if (edge.face1 < 0) {
+                if (include_unshared_edges && in0)
+                    out.insert(eid);
+                continue;
+            }
+            if (in0 != in1)
+                out.insert(eid);
+        }
+
+        for (geometry::GroupId eid : connectivity_boundary_edges(input, options, bmesh)) {
+            if (members.count(eid) != 0)
+                out.insert(eid);
+        }
+        return out;
+    }
+
+    if (to == geometry::GroupDomain::Face) {
+        std::unordered_set<geometry::GroupId> attr_boundary_edges =
+            connectivity_boundary_edges(input, options, bmesh);
+        for (geometry::GroupId fid : members) {
+            if (fid < 0 || static_cast<size_t>(fid) >= input.faces().size())
+                continue;
+            const auto& face = input.faces()[static_cast<size_t>(fid)];
+            const size_t n = face.size();
+            bool on_boundary = false;
+            bool shares_attr_boundary_point = false;
+            for (size_t i = 0; i < n; ++i) {
+                const geometry::GroupId key =
+                    geometry::edge_group_id(face[i], face[(i + 1) % n]);
+                if (attr_boundary_edges.count(key) != 0) {
+                    on_boundary = true;
+                    break;
+                }
+                if (options.include_all_primitives_sharing_attribute_boundary_points) {
+                    for (geometry::GroupId ae : attr_boundary_edges) {
+                        const auto ends = geometry::edge_group_points(ae);
+                        if (face[i] == ends[0] || face[i] == ends[1]) {
+                            shares_attr_boundary_point = true;
+                            break;
+                        }
+                    }
+                }
+                const auto it = bmesh.edges.find(key);
+                if (it == bmesh.edges.end())
+                    continue;
+                const geometry::BMeshEdge& edge = it->second;
+                if (edge.face1 < 0) {
+                    if (include_unshared_edges) {
+                        on_boundary = true;
+                        break;
+                    }
+                    continue;
+                }
+                const int other = edge.face0 == static_cast<int>(fid) ? edge.face1 : edge.face0;
+                if (members.count(static_cast<geometry::GroupId>(other)) == 0) {
+                    on_boundary = true;
+                    break;
+                }
+            }
+            if (on_boundary
+                || (options.include_all_primitives_sharing_attribute_boundary_points
+                    && shares_attr_boundary_point))
+                out.insert(fid);
+        }
+        return out;
+    }
+
+    if (to == geometry::GroupDomain::Point || to == geometry::GroupDomain::Vertex) {
+        std::unordered_set<geometry::GroupId> point_members = members;
+        if (to == geometry::GroupDomain::Vertex)
+            point_members = points_of_corners(build_corners(input), members);
+
+        std::unordered_set<geometry::GroupId> boundary_points;
+        for (const auto& entry : bmesh.edges) {
+            const auto ends = geometry::edge_group_points(entry.first);
+            const bool a = point_members.count(static_cast<geometry::GroupId>(ends[0])) != 0;
+            const bool b = point_members.count(static_cast<geometry::GroupId>(ends[1])) != 0;
+            if (a == b)
+                continue;
+            if (entry.second.face1 < 0 && !include_unshared_edges)
+                continue;
+            if (a)
+                boundary_points.insert(static_cast<geometry::GroupId>(ends[0]));
+            if (b)
+                boundary_points.insert(static_cast<geometry::GroupId>(ends[1]));
+        }
+        for (geometry::GroupId eid : connectivity_boundary_edges(input, options, bmesh)) {
+            const auto ends = geometry::edge_group_points(eid);
+            if (point_members.count(static_cast<geometry::GroupId>(ends[0])) != 0)
+                boundary_points.insert(static_cast<geometry::GroupId>(ends[0]));
+            if (point_members.count(static_cast<geometry::GroupId>(ends[1])) != 0)
+                boundary_points.insert(static_cast<geometry::GroupId>(ends[1]));
+        }
+
+        if (to == geometry::GroupDomain::Point)
+            return boundary_points;
+        return corners_of_points(build_corners(input), boundary_points);
+    }
+
+    return members;
+}
+
+void remove_degenerate_bridges(const data::PcgGeometry& input,
+                               geometry::GroupDomain to,
+                               std::unordered_set<geometry::GroupId>& members)
+{
+    if (to == geometry::GroupDomain::Edge) {
+        for (auto it = members.begin(); it != members.end();) {
+            if (edge_zero_length(input, *it))
+                it = members.erase(it);
+            else
+                ++it;
+        }
+        return;
+    }
+    if (to == geometry::GroupDomain::Point) {
+        // Drop points that only appear as coincident endpoints of zero-length edges.
+        const geometry::BMesh bmesh = geometry::bmesh_from_geometry(input);
+        for (auto it = members.begin(); it != members.end();) {
+            bool keep = false;
+            for (const auto& entry : bmesh.edges) {
+                const auto ends = geometry::edge_group_points(entry.first);
+                if (ends[0] != static_cast<int>(*it) && ends[1] != static_cast<int>(*it))
+                    continue;
+                if (!edge_zero_length(input, entry.first)) {
+                    keep = true;
+                    break;
+                }
+            }
+            if (!keep)
+                it = members.erase(it);
+            else
+                ++it;
+        }
+    }
+}
+
+void write_integer_attribute(data::PcgGeometry& geometry,
+                             geometry::GroupDomain domain,
+                             const std::string& name,
+                             const std::unordered_set<geometry::GroupId>& members)
+{
+    data::AttributeOwner owner = data::AttributeOwner::Point;
+    size_t count = geometry.points().size();
+    if (domain == geometry::GroupDomain::Face) {
+        owner = data::AttributeOwner::Primitive;
+        count = geometry.faces().size();
+    } else if (domain == geometry::GroupDomain::Vertex) {
+        owner = data::AttributeOwner::Vertex;
+        count = static_cast<size_t>(std::max(0, geometry.corner_count()));
+    } else if (domain != geometry::GroupDomain::Point) {
+        return;
+    }
+
+    auto& attr = geometry.attributes().create_int(owner, name, 1, {0});
+    attr.resize(count);
+    auto& values = attr.int_values_mut();
+    for (size_t i = 0; i < values.size(); ++i)
+        values[i] = 0;
+    for (geometry::GroupId id : members) {
+        if (id < 0 || static_cast<size_t>(id) >= values.size())
+            continue;
+        values[static_cast<size_t>(id)] = 1;
+    }
+}
+
+} // namespace
+
+data::PcgGeometry group_promote(const data::PcgGeometry& input, const GroupPromoteOptions& options)
+{
+    data::PcgGeometry result = input;
+    if (options.group_name.empty())
+        return result;
+
+    const geometry::GroupDomain from = parse_domain(options.from_domain);
+    const geometry::GroupDomain to = parse_domain(options.to_domain);
+    const std::string dest_name =
+        options.new_name.empty() ? options.group_name : options.new_name;
+
+    const auto source = input.groups().members(from, options.group_name);
+    std::unordered_set<geometry::GroupId> promoted =
+        promote_members(input, options, from, to, source);
+
+    if (options.include_only_on_boundary)
+        promoted = filter_boundary(input, options, to, promoted);
+
+    if (options.remove_degenerate_bridges)
+        remove_degenerate_bridges(input, to, promoted);
+
+    const bool same_slot = (from == to && dest_name == options.group_name);
+    result.groups().clear_group(to, dest_name);
+
+    if (options.output_as_integer_attribute
+        && (to == geometry::GroupDomain::Point || to == geometry::GroupDomain::Face
+            || to == geometry::GroupDomain::Vertex)) {
+        write_integer_attribute(result, to, dest_name, promoted);
+        // Houdini deletes the group after writing the attribute.
+    } else {
+        for (geometry::GroupId id : promoted)
+            result.groups().add(to, dest_name, id);
+    }
+
+    if (!options.keep_original_group && !same_slot)
+        result.groups().clear_group(from, options.group_name);
 
     return result;
 }

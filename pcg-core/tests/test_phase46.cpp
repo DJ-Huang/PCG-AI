@@ -198,6 +198,44 @@ int main()
         std::printf("PASS: GroupCreate normals filter\n");
     }
 
+    {
+        // Points → Edges with entirely-contained (Houdini Group Promote default for streetFacing).
+        PcgGeometry geo = create_box_geometry(2.0, 2.0, 2.0);
+        // Top face of unit-ish box: take four top corners (y max). create_box is centered.
+        double max_y = geo.points()[0].y;
+        for (const auto& p : geo.points())
+            max_y = std::max(max_y, p.y);
+        for (size_t i = 0; i < geo.points().size(); ++i) {
+            if (geo.points()[i].y >= max_y - 1e-9)
+                geo.groups().add(GroupDomain::Point, "streetFacingPoints",
+                                 static_cast<GroupId>(i));
+        }
+        GroupPromoteOptions promote_opts;
+        promote_opts.from_domain = "point";
+        promote_opts.to_domain = "edge";
+        promote_opts.group_name = "streetFacingPoints";
+        promote_opts.new_name = "streetFacingEdges";
+        promote_opts.keep_original_group = false;
+        promote_opts.include_only_entirely_contained = true;
+        const PcgGeometry promoted = group_promote(geo, promote_opts);
+        const auto edges = promoted.groups().members(GroupDomain::Edge, "streetFacingEdges");
+        if (edges.size() != 4)
+            fail("GroupPromote points→edges entirely-contained should yield 4 top edges");
+        if (promoted.groups().has_group(GroupDomain::Point, "streetFacingPoints"))
+            fail("GroupPromote should drop original point group when keepOriginal=false");
+        // Any-endpoint mode should include more than the rim (vertical edges touch top points).
+        GroupPromoteOptions any_opts = promote_opts;
+        any_opts.include_only_entirely_contained = false;
+        any_opts.keep_original_group = true;
+        PcgGeometry geo2 = geo;
+        const PcgGeometry any_promoted = group_promote(geo2, any_opts);
+        const auto any_edges = any_promoted.groups().members(GroupDomain::Edge, "streetFacingEdges");
+        if (any_edges.size() <= edges.size())
+            fail("GroupPromote any-endpoint should select more edges than entirely-contained");
+        std::printf("PASS: GroupPromote points→edges (%zu entirely, %zu any)\n", edges.size(),
+                    any_edges.size());
+    }
+
     bevel::BevelEdgeSelection edge_sel;
     edge_sel.exclude_unshared = true;
     const PcgMeshData beveled =

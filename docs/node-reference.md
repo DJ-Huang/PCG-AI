@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **101 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **119 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -105,6 +105,7 @@
 - [Geometry 类别](#geometry-类别)
   - [GroupCreate](#groupcreate)
   - [GroupCombine](#groupcombine)
+  - [GroupPromote](#grouppromote)
   - [FaceGroupByNormal](#facegroupbynormal)
 - [Texture 类别](#texture-类别)
   - [ImageTexture](#imagetexture)
@@ -2707,7 +2708,7 @@ Group 是 PCG 几何管线的核心概念，参考 Houdini 的 Group SOP + PolyB
 
 - **生产者节点**（如 `SweepAlongSpline`）在 manifest 中声明 `outputGroups`，在执行时将几何元素（边/面/点）归入命名组
 - **消费者节点**（如 `BevelMesh`）通过 `edgeGroup` / `excludeGroups` 参数按组名选择操作范围
-- **GroupCreate / GroupCombine** 是中间过滤节点，按规则从上游已有组中筛选或组合，生成新组供下游使用
+- **GroupCreate / GroupCombine / GroupPromote** 是中间过滤节点：按规则筛选、组合，或在 Point/Edge/Face 域之间提升组，供下游使用
 
 #### 支持的域
 
@@ -2894,6 +2895,82 @@ CreateSpline(profile) ──┘
 ```
 
 > 典型用途：将多个 GroupCreate 的输出合并为一个组，或用 subtract 排除某些边（如从 `profile_corner` 中减去 `cap_start` 的边）。
+
+### GroupPromote
+
+**类别**：Geometry
+
+**功能**：在 Point / Edge / Face（Primitives）组之间转换，对齐 Houdini [Group Promote SOP](https://www.sidefx.com/docs/houdini/nodes/sop/grouppromote.html)。典型用途：把朝街点组 `streetFacingPoints` 提升为边组 `streetFacingEdges`（两端点都在源组内才入选）。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Geometry | `SpatialMesh` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Geometry | `SpatialMesh` |
+
+**输出组**：
+
+| 组名 | 域 | 说明 |
+|------|-----|------|
+| `newName`（空则用 `groupName`） | 同 `to` | 提升后的目标域组 |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `numberOfPromotions` | integer | `1` | 提升规则数量（当前单条规则；预留多规则） |
+| `convertFrom` | enum | `"point"` | Points / Vertices / Primitives / Edges |
+| `to` | enum | `"edge"` | Points / Vertices / Primitives / Edges |
+| `groupName` | groupSelect | `""` | 源组名 |
+| `newName` | string | `""` | 新组名；空 = 沿用源名 |
+| `keepOriginalGroup` | boolean | `false` | 是否保留源组 |
+| `includeOnlyOnBoundary` | boolean | `false` | 先转换再只保留边界元素 |
+| `includeUnsharedEdges` | boolean | `true` | 仅 Boundary：边界是否含 unshared 边 |
+| `includeAllUnsharedCurveEdges` | boolean | `true` | 仅 Boundary+Unshared：是否含曲线 unshared 边 |
+| `useConnectivityAttribute` | boolean | `false` | 仅 Boundary：用属性不连续当边界 |
+| `connectivityAttribute` | string | `"uv"` | Connectivity Attribute 名 |
+| `connectivityAttributeTolerance` | number | `0.0001` | 浮点属性容差 |
+| `includeAllPrimitivesSharingAttributeBoundaryPoints` | boolean | `false` | 仅 Boundary 且 To=Primitives |
+| `includeOnlyEntirelyContained` | boolean | `true` | 非 Boundary 且 To∈{Edges,Primitives,Vertices} |
+| `includeOnlyPrimitivesSharingEdge` | boolean | `false` | 非 Boundary 且 To=Primitives |
+| `removeDegenerateBridges` | boolean | `false` | To∈{Points,Edges,Vertices}：去掉退化桥接 |
+| `outputAsIntegerAttribute` | boolean | `false` | To∈{Points,Primitives,Vertices}：写成 0/1 属性并删除组 |
+
+灰显规则与 [Houdini Group Promote](https://www.sidefx.com/docs/houdini/nodes/sop/grouppromote.html) 一致。
+
+**执行逻辑（Points → Edges, entirely contained）**：
+
+```
+枚举网格所有无向边 (a,b)
+  ↓
+仅当 a、b 均属于 groupName 点组 → 加入 newName 边组
+  ↓
+keepOriginalGroup=false → 删除源点组
+```
+
+**用法示例**：
+
+```json
+{
+  "id": "grouppromote1",
+  "type": "GroupPromote",
+  "data": {
+    "convertFrom": "point",
+    "to": "edge",
+    "groupName": "streetFacingPoints",
+    "newName": "streetFacingEdges",
+    "keepOriginalGroup": false,
+    "includeOnlyEntirelyContained": true,
+    "includeOnlyOnBoundary": false
+  }
+}
+```
 
 ### FaceGroupByNormal
 

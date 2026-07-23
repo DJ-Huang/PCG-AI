@@ -134,6 +134,53 @@ public:
     }
 };
 
+class GroupPromoteElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "GroupPromote"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupPromote missing node");
+
+        const data::PcgGeometry input =
+            get_geometry_input(ctx, "in", "GroupPromote missing geometry input");
+        if (input.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupPromote missing geometry input");
+
+        GroupPromoteOptions opts;
+        opts.from_domain = ctx.node->data.value("convertFrom", std::string("point"));
+        opts.to_domain = ctx.node->data.value("to", std::string("edge"));
+        opts.group_name = ctx.node->data.value("groupName", std::string(""));
+        opts.new_name = ctx.node->data.value("newName", std::string(""));
+        opts.keep_original_group = ctx.node->data.value("keepOriginalGroup", false);
+        opts.include_only_on_boundary = ctx.node->data.value("includeOnlyOnBoundary", false);
+        opts.include_unshared_edges = ctx.node->data.value("includeUnsharedEdges", true);
+        opts.include_all_unshared_curve_edges =
+            ctx.node->data.value("includeAllUnsharedCurveEdges", true);
+        opts.use_connectivity_attribute =
+            ctx.node->data.value("useConnectivityAttribute", false);
+        opts.connectivity_attribute =
+            ctx.node->data.value("connectivityAttribute", std::string("uv"));
+        opts.connectivity_attribute_tolerance =
+            ctx.node->data.value("connectivityAttributeTolerance", 0.0001);
+        opts.include_all_primitives_sharing_attribute_boundary_points =
+            ctx.node->data.value("includeAllPrimitivesSharingAttributeBoundaryPoints", false);
+        opts.include_only_entirely_contained =
+            ctx.node->data.value("includeOnlyEntirelyContained", true);
+        opts.include_only_primitives_sharing_edge =
+            ctx.node->data.value("includeOnlyPrimitivesSharingEdge", false);
+        opts.remove_degenerate_bridges = ctx.node->data.value("removeDegenerateBridges", false);
+        opts.output_as_integer_attribute = ctx.node->data.value("outputAsIntegerAttribute", false);
+
+        if (opts.group_name.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupPromote requires groupName");
+
+        emit_geometry(ctx, group_promote(input, opts));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
@@ -141,6 +188,7 @@ void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<
     map.emplace("GroupCreate", std::make_unique<GroupCreateElement>());
     map.emplace("GroupCombine", std::make_unique<GroupCombineElement>());
     map.emplace("FaceGroupByNormal", std::make_unique<FaceGroupByNormalElement>());
+    map.emplace("GroupPromote", std::make_unique<GroupPromoteElement>());
 }
 
 } // namespace pcg::internal::elements

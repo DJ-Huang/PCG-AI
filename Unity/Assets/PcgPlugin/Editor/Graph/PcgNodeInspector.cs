@@ -37,13 +37,19 @@ namespace DJTechEditor.PCG.Graph
 
         private void BuildUI()
         {
-            style.width = 280;
-            style.minWidth = 240;
+            // Wider panel; long labels wrap (Houdini-style) instead of horizontal scroll.
+            style.width = 400;
+            style.minWidth = 340;
             style.borderLeftWidth = 1;
             style.borderLeftColor = new Color(0.15f, 0.15f, 0.15f);
             style.backgroundColor = new Color(0.22f, 0.22f, 0.22f);
             style.flexDirection = FlexDirection.Column;
             style.flexShrink = 0;
+            style.flexGrow = 0;
+            // Content-sized height (not stretch-to-parent); clamp to window so tall forms still scroll.
+            style.alignSelf = Align.FlexStart;
+            style.height = StyleKeyword.Auto;
+            style.maxHeight = Length.Percent(100);
 
             var header = new Label("Inspector")
             {
@@ -66,6 +72,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     flexGrow = 1,
                     flexShrink = 1,
+                    minHeight = 0,
                     paddingLeft = 6,
                     paddingRight = 8,
                     paddingBottom = 6,
@@ -206,6 +213,7 @@ namespace DJTechEditor.PCG.Graph
                                 color = new Color(0.55f, 0.85f, 1f),
                                 fontSize = 10,
                                 marginBottom = 6,
+                                width = Length.Percent(100),
                                 whiteSpace = WhiteSpace.Normal,
                             },
                         });
@@ -472,7 +480,9 @@ namespace DJTechEditor.PCG.Graph
                 (!string.IsNullOrEmpty(p.visibleWhenProperty) && p.visibleWhenProperty == key) ||
                 (!string.IsNullOrEmpty(p.enabledWhenProperty) && p.enabledWhenProperty == key) ||
                 (p.visibleWhenAny != null &&
-                 p.visibleWhenAny.Any(c => c.property == key)));
+                 p.visibleWhenAny.Any(c => c.property == key)) ||
+                (p.enabledWhenAll != null &&
+                 p.enabledWhenAll.Any(c => c.property == key)));
 
         private static bool IsPropertyVisible(PcgManifestNodeView node, ManifestPropertyDef prop)
         {
@@ -593,17 +603,20 @@ namespace DJTechEditor.PCG.Graph
                 {
                     marginBottom = 6,
                     flexShrink = 0,
+                    width = Length.Percent(100),
                     marginLeft = prop.indent ? 16 : 0,
                 },
             };
 
-            // Row 1: label + promote button + bind dropdown
+            // Row 1: wrapping label + promote/bind (Houdini: label wraps, actions stay top-right)
             var headerRow = new VisualElement
             {
                 style =
                 {
                     flexDirection = FlexDirection.Row,
-                    alignItems = Align.Center,
+                    alignItems = Align.FlexStart,
+                    flexWrap = Wrap.Wrap,
+                    width = Length.Percent(100),
                 },
             };
 
@@ -613,12 +626,25 @@ namespace DJTechEditor.PCG.Graph
                 {
                     flexGrow = 1,
                     flexShrink = 1,
-                    overflow = Overflow.Hidden,
+                    minWidth = 80,
+                    whiteSpace = WhiteSpace.Normal,
                     color = new Color(0.8f, 0.8f, 0.8f),
                     unityFontStyleAndWeight = FontStyle.Bold,
+                    paddingTop = 2,
+                    paddingRight = 4,
                 },
             };
             headerRow.Add(label);
+
+            var actions = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexShrink = 0,
+                    alignItems = Align.Center,
+                },
+            };
 
             // Promote-to-parameter button
             var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
@@ -628,7 +654,7 @@ namespace DJTechEditor.PCG.Graph
             };
             promoteBtn.style.width = 22;
             promoteBtn.style.flexShrink = 0;
-            headerRow.Add(promoteBtn);
+            actions.Add(promoteBtn);
 
             // Bind dropdown
             var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
@@ -659,7 +685,8 @@ namespace DJTechEditor.PCG.Graph
                 var binding = m_Blackboard.FindBinding(node.NodeId, key);
                 container.Add(CreateValueField(key, prop, node, binding, setValueOverride));
             });
-            headerRow.Add(bindPopup);
+            actions.Add(bindPopup);
+            headerRow.Add(actions);
             container.Add(headerRow);
 
             // Row 2: value or bound label (full width — not crushed beside + / bind)
@@ -670,7 +697,8 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Houdini-style: ☐ Label  [optional companion field]  [+] [bind]
+        /// Houdini-style: ☐ wrapping label … [optional companion below]  [+] [bind]
+        /// Long labels wrap within the row; promote/bind stay top-right (or wrap under if needed).
         /// </summary>
         private VisualElement CreateHoudiniToggleRow(
             PcgManifestNodeView node,
@@ -685,8 +713,8 @@ namespace DJTechEditor.PCG.Graph
                 {
                     marginBottom = 4,
                     flexShrink = 0,
-                    flexDirection = FlexDirection.Row,
-                    alignItems = Align.Center,
+                    flexDirection = FlexDirection.Column,
+                    width = Length.Percent(100),
                     marginLeft = prop.indent ? 16 : 0,
                 },
             };
@@ -707,14 +735,56 @@ namespace DJTechEditor.PCG.Graph
                     node.SetPropertyValue(key, v);
             };
 
-            var toggle = new Toggle
+            var topRow = new VisualElement
             {
-                text = PcgGroupResolution.PropertyDisplayLabel(key, prop),
-                value = toggled,
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.FlexStart,
+                    flexWrap = Wrap.Wrap,
+                    width = Length.Percent(100),
+                },
             };
-            toggle.style.flexGrow = 1;
-            toggle.style.flexShrink = 1;
-            toggle.style.minWidth = 0;
+
+            // Split checkbox + label so the label can wrap (Toggle's built-in text does not).
+            var toggleBlock = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.FlexStart,
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    minWidth = 120,
+                },
+            };
+
+            var toggle = new Toggle { value = toggled };
+            toggle.label = string.Empty;
+            toggle.AddToClassList(BaseField<bool>.noLabelVariantUssClassName);
+            toggle.style.flexShrink = 0;
+            toggle.style.marginTop = 1;
+            toggle.style.marginRight = 4;
+
+            var toggleLabel = new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    minWidth = 60,
+                    whiteSpace = WhiteSpace.Normal,
+                    color = new Color(0.85f, 0.85f, 0.85f),
+                    paddingTop = 2,
+                },
+            };
+            toggleLabel.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (!toggle.enabledSelf)
+                    return;
+                toggle.value = !toggle.value;
+            });
+
             toggle.RegisterValueChangedCallback(evt =>
             {
                 m_GraphView.WithUndo("Change Property", () => apply(evt.newValue));
@@ -723,31 +793,22 @@ namespace DJTechEditor.PCG.Graph
                     def != null &&
                     IsVisibilityDriver(def, key))
                     ScheduleInspectorRebuild(node);
-                else if (!string.IsNullOrEmpty(prop.companionField) &&
-                         container.childCount > 1)
-                {
-                    // Companion sits right after the toggle.
-                    container[1].SetEnabled(evt.newValue);
-                }
             });
-            container.Add(toggle);
 
-            if (def != null &&
-                !string.IsNullOrEmpty(prop.companionField) &&
-                def.properties.TryGetValue(prop.companionField, out var companionProp))
+            toggleBlock.Add(toggle);
+            toggleBlock.Add(toggleLabel);
+            topRow.Add(toggleBlock);
+
+            var actions = new VisualElement
             {
-                var companionBinding = m_Blackboard.FindBinding(node.NodeId, prop.companionField);
-                var companionField = CreateValueField(
-                    prop.companionField, companionProp, node, companionBinding, null);
-                companionField.style.flexGrow = 1;
-                companionField.style.flexShrink = 1;
-                companionField.style.minWidth = 80;
-                companionField.style.marginLeft = 6;
-                companionField.style.marginTop = 0;
-                companionField.SetEnabled(toggled);
-                toggle.RegisterValueChangedCallback(evt => companionField.SetEnabled(evt.newValue));
-                container.Add(companionField);
-            }
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexShrink = 0,
+                    alignItems = Align.Center,
+                    marginLeft = 4,
+                },
+            };
 
             var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
             {
@@ -756,8 +817,7 @@ namespace DJTechEditor.PCG.Graph
             };
             promoteBtn.style.width = 22;
             promoteBtn.style.flexShrink = 0;
-            promoteBtn.style.marginLeft = 4;
-            container.Add(promoteBtn);
+            actions.Add(promoteBtn);
 
             var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
             var bindPopup = new PopupField<string>(bindOptions, currentIdx);
@@ -782,7 +842,24 @@ namespace DJTechEditor.PCG.Graph
                 });
                 ScheduleInspectorRebuild(node);
             });
-            container.Add(bindPopup);
+            actions.Add(bindPopup);
+            topRow.Add(actions);
+            container.Add(topRow);
+
+            if (def != null &&
+                !string.IsNullOrEmpty(prop.companionField) &&
+                def.properties.TryGetValue(prop.companionField, out var companionProp))
+            {
+                var companionBinding = m_Blackboard.FindBinding(node.NodeId, prop.companionField);
+                var companionField = CreateValueField(
+                    prop.companionField, companionProp, node, companionBinding, null);
+                companionField.style.width = Length.Percent(100);
+                companionField.style.marginLeft = 22;
+                companionField.style.marginTop = 2;
+                companionField.SetEnabled(toggled);
+                toggle.RegisterValueChangedCallback(evt => companionField.SetEnabled(evt.newValue));
+                container.Add(companionField);
+            }
 
             ApplyEnabledWhen(container, node, prop);
             return container;
@@ -791,11 +868,27 @@ namespace DJTechEditor.PCG.Graph
         private static void ApplyEnabledWhen(
             VisualElement row, PcgManifestNodeView node, ManifestPropertyDef prop)
         {
-            if (string.IsNullOrEmpty(prop.enabledWhenProperty))
+            if (string.IsNullOrEmpty(prop.enabledWhenProperty) &&
+                (prop.enabledWhenAll == null || prop.enabledWhenAll.Count == 0))
                 return;
 
-            var enabled = MatchesVisibleClause(
-                node, prop.enabledWhenProperty, prop.enabledWhenEquals, null);
+            var enabled = true;
+            if (!string.IsNullOrEmpty(prop.enabledWhenProperty))
+            {
+                enabled = MatchesVisibleClause(
+                    node, prop.enabledWhenProperty, prop.enabledWhenEquals, prop.enabledWhenOneOf);
+            }
+            if (enabled && prop.enabledWhenAll != null)
+            {
+                foreach (var clause in prop.enabledWhenAll)
+                {
+                    if (!MatchesVisibleClause(node, clause.property, clause.equals, clause.oneOf))
+                    {
+                        enabled = false;
+                        break;
+                    }
+                }
+            }
             row.SetEnabled(enabled);
         }
 

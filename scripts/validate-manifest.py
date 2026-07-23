@@ -152,13 +152,9 @@ def validate_inspector_layout(manifest):
                 if not isinstance(enabled, dict):
                     errors.append(f"{node_type}.{key}: enabledWhen must be object")
                 else:
-                    driver = enabled.get("property")
-                    if not driver:
-                        errors.append(f"{node_type}.{key}: enabledWhen missing property")
-                    elif driver not in props:
-                        errors.append(
-                            f"{node_type}.{key}: enabledWhen property '{driver}' not found"
-                        )
+                    validate_visible_clause(
+                        node_type, key, enabled, props, errors, "enabledWhen"
+                    )
 
             companion = prop.get("companionField")
             if companion is not None:

@@ -3857,6 +3857,275 @@
       }
     },
     {
+      "type": "GroupPromote",
+      "displayName": "Group Promote",
+      "category": "Geometry",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputGroups": [
+        {
+          "name": "newName",
+          "domain": "edge",
+          "label": "New Group",
+          "dynamic": true
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "promote",
+          "label": "Number of Promotions",
+          "foldout": false,
+          "header": true
+        }
+      ],
+      "properties": {
+        "numberOfPromotions": {
+          "type": "integer",
+          "displayName": "Number of Promotions",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 16,
+          "section": "promote",
+          "order": 0
+        },
+        "convertFrom": {
+          "type": "enum",
+          "displayName": "Convert From",
+          "default": "point",
+          "section": "promote",
+          "order": 10,
+          "options": [
+            {
+              "value": "point",
+              "label": "Points"
+            },
+            {
+              "value": "vertex",
+              "label": "Vertices"
+            },
+            {
+              "value": "face",
+              "label": "Primitives"
+            },
+            {
+              "value": "edge",
+              "label": "Edges"
+            }
+          ]
+        },
+        "to": {
+          "type": "enum",
+          "displayName": "To",
+          "default": "edge",
+          "section": "promote",
+          "order": 11,
+          "options": [
+            {
+              "value": "point",
+              "label": "Points"
+            },
+            {
+              "value": "vertex",
+              "label": "Vertices"
+            },
+            {
+              "value": "face",
+              "label": "Primitives"
+            },
+            {
+              "value": "edge",
+              "label": "Edges"
+            }
+          ]
+        },
+        "groupName": {
+          "type": "groupSelect",
+          "displayName": "Group Name",
+          "default": "",
+          "groupDomain": "point",
+          "section": "promote",
+          "order": 12
+        },
+        "newName": {
+          "type": "string",
+          "displayName": "New Name",
+          "default": "",
+          "section": "promote",
+          "order": 13,
+          "isGroupOutput": true,
+          "groupDomain": "edge"
+        },
+        "keepOriginalGroup": {
+          "type": "boolean",
+          "displayName": "Keep Original Group",
+          "default": false,
+          "section": "promote",
+          "order": 20
+        },
+        "includeOnlyOnBoundary": {
+          "type": "boolean",
+          "displayName": "Include Only Elements on the Boundary",
+          "default": false,
+          "section": "promote",
+          "order": 21
+        },
+        "includeUnsharedEdges": {
+          "type": "boolean",
+          "displayName": "Include Unshared Edges",
+          "default": true,
+          "section": "promote",
+          "order": 22,
+          "indent": true,
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "true"
+          }
+        },
+        "includeAllUnsharedCurveEdges": {
+          "type": "boolean",
+          "displayName": "Include All Unshared Curve Edges",
+          "default": true,
+          "section": "promote",
+          "order": 23,
+          "indent": true,
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "true",
+            "all": [
+              {
+                "property": "includeUnsharedEdges",
+                "equals": "true"
+              }
+            ]
+          }
+        },
+        "useConnectivityAttribute": {
+          "type": "boolean",
+          "displayName": "Connectivity Attribute",
+          "default": false,
+          "section": "promote",
+          "order": 24,
+          "companionField": "connectivityAttribute",
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "true"
+          }
+        },
+        "connectivityAttribute": {
+          "type": "string",
+          "displayName": "Connectivity Attribute",
+          "default": "uv",
+          "section": "promote",
+          "order": 25
+        },
+        "connectivityAttributeTolerance": {
+          "type": "number",
+          "displayName": "Connectivity Attribute Tolerance",
+          "default": 0.0001,
+          "minimum": 0,
+          "section": "promote",
+          "order": 26,
+          "indent": true,
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "true",
+            "all": [
+              {
+                "property": "useConnectivityAttribute",
+                "equals": "true"
+              }
+            ]
+          }
+        },
+        "includeAllPrimitivesSharingAttributeBoundaryPoints": {
+          "type": "boolean",
+          "displayName": "Include All Primitives Sharing Attribute Boundary Points",
+          "default": false,
+          "section": "promote",
+          "order": 27,
+          "indent": true,
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "true",
+            "all": [
+              {
+                "property": "to",
+                "equals": "face"
+              }
+            ]
+          }
+        },
+        "includeOnlyEntirelyContained": {
+          "type": "boolean",
+          "displayName": "Include Only Elements Entirely Contained in Original Group",
+          "default": true,
+          "section": "promote",
+          "order": 28,
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "false",
+            "all": [
+              {
+                "property": "to",
+                "oneOf": ["edge", "face", "vertex"]
+              }
+            ]
+          }
+        },
+        "includeOnlyPrimitivesSharingEdge": {
+          "type": "boolean",
+          "displayName": "Include Only Primitives Sharing an Edge with Original Group",
+          "default": false,
+          "section": "promote",
+          "order": 29,
+          "enabledWhen": {
+            "property": "includeOnlyOnBoundary",
+            "equals": "false",
+            "all": [
+              {
+                "property": "to",
+                "equals": "face"
+              }
+            ]
+          }
+        },
+        "removeDegenerateBridges": {
+          "type": "boolean",
+          "displayName": "Remove Degenerate Bridges",
+          "default": false,
+          "section": "promote",
+          "order": 30,
+          "enabledWhen": {
+            "property": "to",
+            "oneOf": ["point", "edge", "vertex"]
+          }
+        },
+        "outputAsIntegerAttribute": {
+          "type": "boolean",
+          "displayName": "Output as Integer Attribute",
+          "default": false,
+          "section": "promote",
+          "order": 31,
+          "enabledWhen": {
+            "property": "to",
+            "oneOf": ["point", "face", "vertex"]
+          }
+        }
+      }
+    },
+    {
       "type": "FaceGroupByNormal",
       "displayName": "Face Group by Normal",
       "category": "Geometry",

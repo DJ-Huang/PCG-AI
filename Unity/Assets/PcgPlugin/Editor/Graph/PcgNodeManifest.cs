@@ -60,6 +60,9 @@ namespace DJTechEditor.PCG.Graph
         /// <summary>Houdini-style: keep row visible but grayed unless driver matches.</summary>
         public string enabledWhenProperty;
         public string enabledWhenEquals;
+        public List<string> enabledWhenOneOf;
+        /// <summary>Optional extra AND clauses (same shape as a single enabledWhen).</summary>
+        public List<ManifestVisibleWhenClause> enabledWhenAll;
         /// <summary>Render this string/number field on the same row as a boolean toggle.</summary>
         public string companionField;
         public bool indent;
@@ -406,6 +409,45 @@ namespace DJTechEditor.PCG.Graph
                         {
                             propDef.enabledWhenProperty = GetString(enabledDict, "property");
                             propDef.enabledWhenEquals = GetString(enabledDict, "equals", "true");
+                            if (enabledDict.TryGetValue("oneOf", out var enabledOneOfObj) &&
+                                enabledOneOfObj is List<object> enabledOneOfList)
+                            {
+                                propDef.enabledWhenOneOf = new List<string>();
+                                foreach (var one in enabledOneOfList)
+                                {
+                                    if (one == null)
+                                        continue;
+                                    propDef.enabledWhenOneOf.Add(one.ToString());
+                                }
+                            }
+                            if (enabledDict.TryGetValue("all", out var enabledAllObj) &&
+                                enabledAllObj is List<object> enabledAllList)
+                            {
+                                propDef.enabledWhenAll = new List<ManifestVisibleWhenClause>();
+                                foreach (var clauseObj in enabledAllList)
+                                {
+                                    if (clauseObj is not Dictionary<string, object> clauseDict)
+                                        continue;
+                                    var clause = new ManifestVisibleWhenClause
+                                    {
+                                        property = GetString(clauseDict, "property"),
+                                        equals = GetString(clauseDict, "equals", "true"),
+                                    };
+                                    if (clauseDict.TryGetValue("oneOf", out var clauseOneOfObj) &&
+                                        clauseOneOfObj is List<object> clauseOneOfList)
+                                    {
+                                        clause.oneOf = new List<string>();
+                                        foreach (var one in clauseOneOfList)
+                                        {
+                                            if (one == null)
+                                                continue;
+                                            clause.oneOf.Add(one.ToString());
+                                        }
+                                    }
+                                    if (!string.IsNullOrEmpty(clause.property))
+                                        propDef.enabledWhenAll.Add(clause);
+                                }
+                            }
                         }
                         propDef.companionField = GetString(propObj, "companionField");
                         propDef.indent = propObj.TryGetValue("indent", out var indentVal)
