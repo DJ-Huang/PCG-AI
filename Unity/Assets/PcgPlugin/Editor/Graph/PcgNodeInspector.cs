@@ -206,7 +206,7 @@ namespace DJTechEditor.PCG.Graph
                     if (ctx.IsComponentMode && ctx.Domain != SceneEditDomain.None &&
                         ctx.Domain != SceneEditDomain.SplineControlPoint)
                     {
-                        m_Body.Add(new Label($"Group viewer: {ctx.Domain} — pick Output/Input groups in Scene View overlay")
+                        m_Body.Add(new Label($"Group viewer — right Group List; hover any domain to preview")
                         {
                             style =
                             {
@@ -220,7 +220,7 @@ namespace DJTechEditor.PCG.Graph
                     }
                     else
                     {
-                        m_Body.Add(new Label("Enter PCG Mode, then use V/E/F to highlight Output/Input groups")
+                        m_Body.Add(new Label("Enter PCG Mode, then open Group List on the right Scene View strip")
                         {
                             style =
                             {
