@@ -332,12 +332,6 @@
       "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
     },
     {
-      "id": "n105",
-      "type": "Resample",
-      "position": { "x": 1023, "y": 420.5 },
-      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": true, "maxSegmentLength": 0.1, "useMaxSegments": false, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
-    },
-    {
       "id": "shrink_blocks",
       "type": "PrimitiveTransform",
       "position": { "x": 840, "y": 318.5 },
@@ -384,6 +378,12 @@
       "type": "GroupPromote",
       "position": { "x": 1263, "y": 1118 },
       "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n105",
+      "type": "Resample",
+      "position": { "x": 1023, "y": 420.5 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": true, "maxSegmentLength": 0.3, "useMaxSegments": false, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
     }
   ],
   "edges": [

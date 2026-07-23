@@ -86,6 +86,12 @@ namespace DJTechEditor.PCG.Graph
         private static OthersDisplayMode s_OthersDisplay = OthersDisplayMode.ShowAll;
         private static readonly Dictionary<Renderer, bool> s_HiddenRenderers = new();
 
+        // Houdini-style marker display — independent of Vertex/Edge/Face Group View.
+        private const string PrefDisplayPoints = "Pcg.Display.Points";
+        private const string PrefDisplayEdges = "Pcg.Display.Edges";
+        private static bool s_DisplayPoints = EditorPrefs.GetBool(PrefDisplayPoints, false);
+        private static bool s_DisplayEdges = EditorPrefs.GetBool(PrefDisplayEdges, true);
+
         // --- Procedurally generated toolbar icons ---
         private static Texture2D IconObjectNormal => s_IconObjectNormal ??= MakeIcon(new(0.7f, 0.7f, 0.7f), DrawObjectIcon);
         private static Texture2D IconObjectActive => s_IconObjectActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawObjectIcon);
@@ -98,12 +104,19 @@ namespace DJTechEditor.PCG.Graph
         private static Texture2D IconFaceNormal => s_IconFaceNormal ??= MakeIcon(new(0.5f, 0.5f, 0.5f), DrawFaceIcon);
         private static Texture2D IconFaceActive => s_IconFaceActive ??= MakeIcon(new(0.4f, 0.6f, 0.9f), DrawFaceIcon);
         private static Texture2D IconExit => s_IconExit ??= MakeIcon(new(0.85f, 0.5f, 0.4f), DrawExitIcon);
+        // Display markers — Points = Houdini blue; Edges keep orange so toggles stay distinct
+        private static Texture2D IconDisplayPointsOff => s_IconDisplayPointsOff ??= MakeIcon(new(0.55f, 0.55f, 0.55f), DrawVertexIcon);
+        private static Texture2D IconDisplayPointsOn => s_IconDisplayPointsOn ??= MakeIcon(new(0.25f, 0.55f, 1f), DrawVertexIcon);
+        private static Texture2D IconDisplayEdgesOff => s_IconDisplayEdgesOff ??= MakeIcon(new(0.55f, 0.55f, 0.55f), DrawEdgeIcon);
+        private static Texture2D IconDisplayEdgesOn => s_IconDisplayEdgesOn ??= MakeIcon(new(1f, 0.65f, 0.12f), DrawEdgeIcon);
 
         private static Texture2D s_IconObjectNormal, s_IconObjectActive;
         private static Texture2D s_IconSplineNormal, s_IconSplineActive;
         private static Texture2D s_IconVertexNormal, s_IconEdgeNormal, s_IconFaceNormal;
         private static Texture2D s_IconVertexActive, s_IconEdgeActive, s_IconFaceActive;
         private static Texture2D s_IconExit;
+        private static Texture2D s_IconDisplayPointsOff, s_IconDisplayPointsOn;
+        private static Texture2D s_IconDisplayEdgesOff, s_IconDisplayEdgesOn;
 
         // --- Group viewer state ---
         private static string s_SelectedGroupName;
@@ -939,8 +952,10 @@ namespace DJTechEditor.PCG.Graph
             if (showVertex) buttonCount++;
             if (showEdge) buttonCount++;
             if (showFace) buttonCount++;
-            // + popup + exit
-            float toolbarWidth = buttonCount * (btnWidth + 2f) + spacing + popupWidth + spacing + exitWidth + 6f;
+            // + Display Points/Edges (always) + popup + exit
+            const int displayButtonCount = 2;
+            float toolbarWidth = (buttonCount + displayButtonCount) * (btnWidth + 2f)
+                + spacing * 2f + popupWidth + spacing + exitWidth + 6f;
 
             Handles.BeginGUI();
             try
@@ -1003,6 +1018,29 @@ namespace DJTechEditor.PCG.Graph
 
             GUILayout.Space(spacing);
 
+            // Display markers — Houdini-style, independent of Group View selection
+            var pointsBg = new Color(0.3f, 0.5f, 0.95f);
+            var edgesBg = new Color(0.85f, 0.55f, 0.15f);
+            if (IconToolbarButton(IconDisplayPointsOn, IconDisplayPointsOff,
+                    "Display Points — show all geometry points (independent of groups)",
+                    s_DisplayPoints, pointsBg))
+            {
+                s_DisplayPoints = !s_DisplayPoints;
+                EditorPrefs.SetBool(PrefDisplayPoints, s_DisplayPoints);
+                sceneView.Repaint();
+            }
+
+            if (IconToolbarButton(IconDisplayEdgesOn, IconDisplayEdgesOff,
+                    "Display Edges — show polygon/curve edges (independent of groups)",
+                    s_DisplayEdges, edgesBg))
+            {
+                s_DisplayEdges = !s_DisplayEdges;
+                EditorPrefs.SetBool(PrefDisplayEdges, s_DisplayEdges);
+                sceneView.Repaint();
+            }
+
+            GUILayout.Space(spacing);
+
                 // Display mode popup — short label
                 var oldDisplay = s_OthersDisplay;
                 s_OthersDisplay = (OthersDisplayMode)EditorGUILayout.EnumPopup(
@@ -1035,11 +1073,17 @@ namespace DJTechEditor.PCG.Graph
 
         private static bool IconToolbarButton(Texture2D activeIcon, Texture2D normalIcon, string tooltip, bool active)
         {
+            return IconToolbarButton(activeIcon, normalIcon, tooltip, active, new Color(0.4f, 0.6f, 0.9f));
+        }
+
+        private static bool IconToolbarButton(
+            Texture2D activeIcon, Texture2D normalIcon, string tooltip, bool active, Color activeBackground)
+        {
             var icon = active ? activeIcon : normalIcon;
             var content = new GUIContent(icon, tooltip);
             var oldBg = GUI.backgroundColor;
             if (active)
-                GUI.backgroundColor = new Color(0.4f, 0.6f, 0.9f);
+                GUI.backgroundColor = activeBackground;
             var clicked = GUILayout.Button(content, EditorStyles.toolbarButton, GUILayout.Width(24f), GUILayout.Height(20f));
             GUI.backgroundColor = oldBg;
             return clicked;
@@ -1055,7 +1099,7 @@ namespace DJTechEditor.PCG.Graph
             try
             {
                 const float width = 300f;
-                const float height = 52f;
+                const float height = 68f;
                 var area = new Rect(
                     (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
@@ -1068,6 +1112,10 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.Space(4f);
                 GUILayout.Label($"Mode: {ctx.Level}" + (ctx.Domain != SceneEditDomain.None ? $" / {ctx.Domain}" : ""), EditorStyles.boldLabel);
                 GUILayout.Label($"Selected: {selText}", EditorStyles.miniLabel);
+                var markers = (s_DisplayPoints ? "Pts " : "") + (s_DisplayEdges ? "Edges" : "");
+                if (string.IsNullOrEmpty(markers))
+                    markers = "off";
+                GUILayout.Label($"Display: {markers.Trim()}", EditorStyles.miniLabel);
                 GUILayout.EndArea();
             }
             finally
@@ -1987,12 +2035,19 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
+        // Houdini viewport point markers (default display points ≈ blue).
+        private static readonly Color s_PrimPointColor = new(0.25f, 0.55f, 1f, 1f);
+
         private static void DrawPolygonWireOverlay(SceneView sceneView, PcgGraphEditorWindow window)
         {
             if (Event.current.type != EventType.Repaint)
                 return;
 
             if (sceneView == null || sceneView.camera == null)
+                return;
+
+            // Nothing to draw when both Houdini-style marker toggles are off.
+            if (!s_DisplayEdges && !s_DisplayPoints)
                 return;
 
             var anchor = FindPreviewAnchor(window);
@@ -2006,8 +2061,13 @@ namespace DJTechEditor.PCG.Graph
             // Only n-gon geometry_binary. Never draw MeshFilter triangles here — that shows
             // fan diagonals and looks like "preview forced triangulation".
             var preview = component.PolygonPreview;
-            if (preview == null || preview.FaceCount <= 0 ||
+            if (preview == null ||
                 preview.Points == null || preview.FaceOffsets == null || preview.FaceIndices == null)
+                return;
+
+            var hasPoints = preview.Points.Length > 0;
+            var hasFaces = preview.FaceCount > 0;
+            if (!hasPoints)
                 return;
 
             // Rebuild unique edge list only when preview data changes (new cook),
@@ -2015,41 +2075,70 @@ namespace DJTechEditor.PCG.Graph
             if (!ReferenceEquals(preview, s_WirePreviewCache))
             {
                 s_WirePreviewCache = preview;
-                s_WireEdgePairs = BuildUniqueEdgePairs(preview);
+                s_WireEdgePairs = hasFaces ? BuildUniqueEdgePairs(preview) : null;
             }
 
-            if (s_WireEdgePairs == null || s_WireEdgePairs.Length < 2)
-                return;
-
-            if (!EnsureWireDrawResources())
+            if (s_DisplayEdges && s_WireEdgePairs != null && s_WireEdgePairs.Length >= 2)
             {
-                DrawPolygonWireOverlayHairlineFallback(anchor, preview.Points);
-                return;
+                if (!EnsureWireDrawResources())
+                {
+                    DrawPolygonWireOverlayHairlineFallback(anchor, preview.Points);
+                }
+                else
+                {
+                    var edgeCount = s_WireEdgePairs.Length / 2;
+                    var vertCount = edgeCount * 4;
+                    var indexCount = edgeCount * 6;
+                    EnsureWireBuffers(edgeCount, vertCount, indexCount);
+
+                    var drawCam = Camera.current != null ? Camera.current : sceneView.camera;
+                    ExpandEdgesToScreenQuads(preview.Points, anchor.localToWorldMatrix, drawCam, edgeCount);
+
+                    if (s_WireUploadedEdgeCount != edgeCount)
+                    {
+                        s_WireMesh.Clear(false);
+                        s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                        s_WireMesh.SetUVs(1, s_WireEdgeCoords, 0, vertCount);
+                        s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
+                        s_WireUploadedEdgeCount = edgeCount;
+                    }
+                    else
+                    {
+                        s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                    }
+
+                    s_WireMaterial.SetPass(0);
+                    Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
+                }
             }
 
-            var edgeCount = s_WireEdgePairs.Length / 2;
-            var vertCount = edgeCount * 4;
-            var indexCount = edgeCount * 6;
-            EnsureWireBuffers(edgeCount, vertCount, indexCount);
+            // Display Points: all geometry points (solid polygons, curves, point clouds).
+            // Independent of Group View highlight.
+            if (s_DisplayPoints)
+                DrawPolygonPreviewPoints(anchor, preview.Points);
+        }
 
-            var drawCam = Camera.current != null ? Camera.current : sceneView.camera;
-            ExpandEdgesToScreenQuads(preview.Points, anchor.localToWorldMatrix, drawCam, edgeCount);
-
-            if (s_WireUploadedEdgeCount != edgeCount)
+        private static void DrawPolygonPreviewPoints(Transform anchor, Vector3[] points)
+        {
+            var l2w = anchor.localToWorldMatrix;
+            var prevColor = Handles.color;
+            var prevZTest = Handles.zTest;
+            try
             {
-                s_WireMesh.Clear(false);
-                s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
-                s_WireMesh.SetUVs(1, s_WireEdgeCoords, 0, vertCount);
-                s_WireMesh.SetTriangles(s_WireTris, 0, indexCount, 0, false);
-                s_WireUploadedEdgeCount = edgeCount;
+                Handles.color = s_PrimPointColor;
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
+                for (var i = 0; i < points.Length; i++)
+                {
+                    var world = l2w.MultiplyPoint(points[i]);
+                    var size = HandleUtility.GetHandleSize(world) * 0.045f;
+                    Handles.SphereHandleCap(0, world, Quaternion.identity, size, EventType.Repaint);
+                }
             }
-            else
+            finally
             {
-                s_WireMesh.SetVertices(s_WireVerts, 0, vertCount);
+                Handles.color = prevColor;
+                Handles.zTest = prevZTest;
             }
-
-            s_WireMaterial.SetPass(0);
-            Graphics.DrawMeshNow(s_WireMesh, Matrix4x4.identity);
         }
 
         private static void DrawPolygonWireOverlayHairlineFallback(Transform anchor, Vector3[] points)
@@ -2212,6 +2301,9 @@ namespace DJTechEditor.PCG.Graph
         /// <summary>
         /// Extracts unique undirected edges from polygon preview data as flat
         /// index pairs: [a0, b0, a1, b1, ...]. Called only when preview changes.
+        /// Point prims (1 vert) contribute no edges; lines/open curves use consecutive
+        /// segments only; solid n-gons also wrap last→first; closed curves encode
+        /// first==last so consecutive pairs already close the ring.
         /// </summary>
         private static int[] BuildUniqueEdgePairs(PcgPolygonPreviewData preview)
         {
@@ -2221,29 +2313,36 @@ namespace DJTechEditor.PCG.Graph
             var drawn = new HashSet<ulong>();
             var pairs = new List<int>(offsets.Length * 4);
 
+            void AddEdge(int a, int b)
+            {
+                if (a == b || a < 0 || b < 0 || a >= pointCount || b >= pointCount)
+                    return;
+
+                var lo = a < b ? a : b;
+                var hi = a < b ? b : a;
+                var key = ((ulong)(uint)lo << 32) | (uint)hi;
+                if (!drawn.Add(key))
+                    return;
+
+                pairs.Add(lo);
+                pairs.Add(hi);
+            }
+
             for (var fi = 0; fi < preview.FaceCount; fi++)
             {
                 var start = offsets[fi];
                 var end = fi + 1 < preview.FaceCount ? offsets[fi + 1] : indices.Length;
-                if (end - start < 3 || start < 0 || end > indices.Length)
+                var count = end - start;
+                if (count < 2 || start < 0 || end > indices.Length)
                     continue;
 
-                for (var i = start; i < end; i++)
-                {
-                    var a = indices[i];
-                    var b = indices[i + 1 < end ? i + 1 : start];
-                    if (a == b || a < 0 || b < 0 || a >= pointCount || b >= pointCount)
-                        continue;
+                for (var i = start; i + 1 < end; i++)
+                    AddEdge(indices[i], indices[i + 1]);
 
-                    var lo = a < b ? a : b;
-                    var hi = a < b ? b : a;
-                    var key = ((ulong)(uint)lo << 32) | (uint)hi;
-                    if (!drawn.Add(key))
-                        continue;
-
-                    pairs.Add(lo);
-                    pairs.Add(hi);
-                }
+                // Solid polygon rings need last→first. Open polylines and closed curves
+                // (first==last already in indices) must not add an extra wrap edge.
+                if (PcgPolygonPreviewData.IsSolidPolygonFace(preview.Points, indices, start, end))
+                    AddEdge(indices[end - 1], indices[start]);
             }
 
             return pairs.Count > 0 ? pairs.ToArray() : null;
