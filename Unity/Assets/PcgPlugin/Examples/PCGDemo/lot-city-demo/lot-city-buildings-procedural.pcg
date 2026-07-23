@@ -383,7 +383,7 @@
       "id": "n108",
       "type": "GroupTransfer",
       "position": { "x": 1268.5, "y": 1128.5 },
-      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 6, "createEmptyGroups": true, "__nodeTitle": ""}
+      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "streetFacingPoints", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "overwrite", "enableDistanceThreshold": true, "distanceThreshold": 1.5, "createEmptyGroups": true, "__nodeTitle": ""}
     }
   ],
   "edges": [

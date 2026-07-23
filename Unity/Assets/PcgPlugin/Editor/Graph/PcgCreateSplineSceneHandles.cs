@@ -1968,6 +1968,44 @@ namespace DJTechEditor.PCG.Graph
             if (graphView != null && graphView.TryGetNodeGroups(node.NodeId, out var perNodeGroups))
                 nodeGroups = perNodeGroups;
 
+            // Nodes like GroupTransfer have no manifest outputGroups — surface cook-time
+            // groups so Distance Threshold / membership changes are visible and selectable.
+            if (nodeGroups != null)
+            {
+                var seenCook = new HashSet<string>();
+                foreach (var g in outputGroups)
+                    seenCook.Add($"{g.name}:{g.domain}");
+                foreach (var g in nodeGroups)
+                {
+                    if (string.IsNullOrEmpty(g.name))
+                        continue;
+                    var domain = string.IsNullOrEmpty(g.domain) ? "edge" : g.domain;
+                    if (!seenCook.Add($"{g.name}:{domain}"))
+                        continue;
+                    outputGroups.Add(new PcgNodeInspector.AvailableGroup
+                    {
+                        name = g.name,
+                        domain = domain,
+                        sourceNodeId = node.NodeId,
+                        sourceNodeType = node.NodeType,
+                        label = g.name,
+                    });
+                }
+            }
+
+            // Prefer this node's cook/declared output over same-named upstream groups
+            // (otherwise GroupTransfer distance tweaks look like "no effect" when the
+            // list only highlights the source GroupCreate membership).
+            if (outputGroups.Count > 0 && inputGroups.Count > 0)
+            {
+                var outputKeys = new HashSet<string>();
+                foreach (var g in outputGroups)
+                    outputKeys.Add($"{g.name}:{g.domain}");
+                inputGroups = inputGroups
+                    .Where(g => !outputKeys.Contains($"{g.name}:{g.domain}"))
+                    .ToList();
+            }
+
             List<NodeGroupEntry> inputNodeGroups = null;
             if (inspector != null && inputGroups.Count > 0)
             {
@@ -2576,7 +2614,8 @@ namespace DJTechEditor.PCG.Graph
             // Face groups can render via facePolygons without depending on MeshFilter.
             bool hasEdgeEndpoints = group.edgeEndpoints != null && group.edgeEndpoints.Length >= 6;
             bool hasFacePolygons = group.facePolygons != null && group.facePolygons.Length >= 4;
-            if (!hasEdgeEndpoints && !hasFacePolygons &&
+            bool hasPointPositions = group.pointPositions != null && group.pointPositions.Length >= 3;
+            if (!hasEdgeEndpoints && !hasFacePolygons && !hasPointPositions &&
                 (group.members == null || group.members.Length == 0))
                 return;
 
@@ -2660,30 +2699,46 @@ namespace DJTechEditor.PCG.Graph
             else if (domain == SceneEditDomain.Vertex)
             {
                 Handles.color = s_GroupPointColor;
-                foreach (var ptIdx in group.members)
+                // Prefer packed positions from the source node — PolygonPreview / MeshFilter
+                // usually belong to the final merge and must not be indexed with this node's ids.
+                if (group.pointPositions != null && group.pointPositions.Length >= 3)
                 {
-                    if (ptIdx < 0)
-                        continue;
-                    // Prefer polygon preview points (source geometry) over MeshFilter verts.
-                    var component = anchor.GetComponent<PcgGraphComponent>();
-                    var preview = component != null ? component.PolygonPreview : null;
-                    if (preview?.Points != null && ptIdx < preview.Points.Length)
+                    for (int i = 0; i + 2 < group.pointPositions.Length; i += 3)
                     {
-                        var p = l2w.MultiplyPoint(preview.Points[(int)ptIdx]);
+                        var p = l2w.MultiplyPoint(new Vector3(
+                            group.pointPositions[i],
+                            group.pointPositions[i + 1],
+                            group.pointPositions[i + 2]));
                         Handles.SphereHandleCap(0, p, Quaternion.identity,
                             GetPreviewPointSize(p), EventType.Repaint);
-                        continue;
                     }
+                }
+                else
+                {
+                    foreach (var ptIdx in group.members)
+                    {
+                        if (ptIdx < 0)
+                            continue;
+                        var component = anchor.GetComponent<PcgGraphComponent>();
+                        var preview = component != null ? component.PolygonPreview : null;
+                        if (preview?.Points != null && ptIdx < preview.Points.Length)
+                        {
+                            var p = l2w.MultiplyPoint(preview.Points[(int)ptIdx]);
+                            Handles.SphereHandleCap(0, p, Quaternion.identity,
+                                GetPreviewPointSize(p), EventType.Repaint);
+                            continue;
+                        }
 
-                    var mf = anchor.GetComponent<MeshFilter>();
-                    if (mf == null || mf.sharedMesh == null)
-                        break;
-                    var vertices = mf.sharedMesh.vertices;
-                    if (ptIdx >= vertices.Length)
-                        continue;
-                    var wp = l2w.MultiplyPoint(vertices[(int)ptIdx]);
-                    Handles.SphereHandleCap(0, wp, Quaternion.identity,
-                        GetPreviewPointSize(wp), EventType.Repaint);
+                        var mf = anchor.GetComponent<MeshFilter>();
+                        if (mf == null || mf.sharedMesh == null)
+                            break;
+                        var vertices = mf.sharedMesh.vertices;
+                        if (ptIdx >= vertices.Length)
+                            continue;
+                        var wp = l2w.MultiplyPoint(vertices[(int)ptIdx]);
+                        Handles.SphereHandleCap(0, wp, Quaternion.identity,
+                            GetPreviewPointSize(wp), EventType.Repaint);
+                    }
                 }
             }
         }

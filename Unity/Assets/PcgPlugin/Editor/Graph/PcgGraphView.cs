@@ -2446,5 +2446,11 @@ namespace DJTechEditor.PCG.Graph
         /// when MeshFilter is the final merge, not this node's mesh.
         /// </summary>
         public float[] facePolygons;
+        /// <summary>
+        /// Packed point XYZ from the source node geometry: [x,y,z, ...] —
+        /// used for Scene View highlight so point groups do not index the
+        /// final MeshFilter / PolygonPreview.
+        /// </summary>
+        public float[] pointPositions;
     }
 }

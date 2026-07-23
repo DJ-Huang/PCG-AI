@@ -55,6 +55,7 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
             auto memberArray = nlohmann::json::array();
             auto edgeEndpoints = nlohmann::json::array();
             auto facePolygons = nlohmann::json::array();
+            auto pointPositions = nlohmann::json::array();
             int face_count = 0;
             for (geometry::GroupId id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
@@ -91,6 +92,16 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                 } else {
                     memberArray.push_back(id);
                 }
+                if (d == static_cast<int>(geometry::GroupDomain::Point) ||
+                    d == static_cast<int>(geometry::GroupDomain::Vertex)) {
+                    // Packed XYZ for Scene View — do not index final MeshFilter / preview.
+                    if (id >= 0 && id < static_cast<geometry::GroupId>(points.size())) {
+                        const auto& p = points[static_cast<size_t>(id)];
+                        pointPositions.push_back(p.x);
+                        pointPositions.push_back(p.y);
+                        pointPositions.push_back(p.z);
+                    }
+                }
                 if (d == static_cast<int>(geometry::GroupDomain::Edge)) {
                     const auto endpoints = geometry::edge_group_points(id);
                     const int a = endpoints[0];
@@ -120,6 +131,10 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                 entry["edgeEndpoints"] = std::move(edgeEndpoints);
             if (d == static_cast<int>(geometry::GroupDomain::Face) && !facePolygons.empty())
                 entry["facePolygons"] = std::move(facePolygons);
+            if ((d == static_cast<int>(geometry::GroupDomain::Point) ||
+                 d == static_cast<int>(geometry::GroupDomain::Vertex)) &&
+                !pointPositions.empty())
+                entry["pointPositions"] = std::move(pointPositions);
             groups.push_back(std::move(entry));
         }
     }

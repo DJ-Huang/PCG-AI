@@ -312,6 +312,67 @@ int main()
         }
     }
 
+    {
+        // Distance threshold must change transferred point-group membership:
+        // outer-ring source vs dense target grid (Houdini proximity filter).
+        const auto run_xfer = [](double threshold) {
+            char thr[64];
+            std::snprintf(thr, sizeof(thr), "%.8g", threshold);
+            const std::string graph =
+                std::string(R"JSON({
+              "version":"1.0",
+              "nodes":[
+                {"id":"src","type":"CreateGridMesh","data":{"sizeX":10.0,"sizeY":10.0,"rows":1,"cols":1,"plane":"xz"}},
+                {"id":"outline","type":"ConvertLine","data":{"mode":"unshared","edgeGroup":""}},
+                {"id":"rs","type":"Resample","data":{
+                  "useMaxSegmentLength":true,"maxSegmentLength":0.5,"useMaxSegments":false,
+                  "method":"evenLength","measure":"arc","treatPolygonsAs":"straight","levelOfDetail":1
+                }},
+                {"id":"tag","type":"GroupCreate","data":{
+                  "outputGroup":"ring","domain":"point","initialMerge":"replace",
+                  "enableBaseGroup":true,"baseGroup":"",
+                  "enableBounding":false,"enableNormals":false,"enableEdges":false,"enableRandom":false
+                }},
+                {"id":"tgt","type":"CreateGridMesh","data":{"sizeX":10.0,"sizeY":10.0,"rows":4,"cols":4,"plane":"xz"}},
+                {"id":"xfer","type":"GroupTransfer","data":{
+                  "transferPrimitiveGroups":false,"transferPointGroups":true,"pointGroups":"ring",
+                  "transferEdgeGroups":false,"groupNameConflict":"overwrite",
+                  "enableDistanceThreshold":true,"distanceThreshold":)JSON") +
+                thr +
+                R"JSON(,"createEmptyGroups":true}},
+                {"id":"out","type":"Output","data":{}}
+              ],
+              "edges":[
+                {"source":"src","target":"outline","sourceHandle":"out","targetHandle":"in"},
+                {"source":"outline","target":"rs","sourceHandle":"out","targetHandle":"in"},
+                {"source":"rs","target":"tag","sourceHandle":"out","targetHandle":"in"},
+                {"source":"tgt","target":"xfer","sourceHandle":"out","targetHandle":"target"},
+                {"source":"tag","target":"xfer","sourceHandle":"out","targetHandle":"source"},
+                {"source":"xfer","target":"out","sourceHandle":"out","targetHandle":"in"}
+              ]
+            })JSON";
+            return execute(graph);
+        };
+
+        const auto tight = run_xfer(0.25);
+        const auto loose = run_xfer(6.0);
+        expect(tight.source_geometry != nullptr && loose.source_geometry != nullptr,
+               "GroupTransfer distance probe keeps geometry");
+        if (tight.source_geometry && loose.source_geometry) {
+            const auto tight_n = tight.source_geometry->groups()
+                                     .members(pcg::internal::geometry::GroupDomain::Point, "ring")
+                                     .size();
+            const auto loose_n = loose.source_geometry->groups()
+                                     .members(pcg::internal::geometry::GroupDomain::Point, "ring")
+                                     .size();
+            std::printf("  distance probe members: tight(0.25)=%zu loose(6)=%zu\n", tight_n,
+                        loose_n);
+            expect(tight_n < loose_n,
+                   "GroupTransfer distanceThreshold filters point membership");
+            expect(loose_n > 0, "loose threshold still transfers some points");
+        }
+    }
+
     std::printf("failures=%d\n", failures);
     return failures == 0 ? 0 : 1;
 }
