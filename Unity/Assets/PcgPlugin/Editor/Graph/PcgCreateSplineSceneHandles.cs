@@ -2172,6 +2172,15 @@ namespace DJTechEditor.PCG.Graph
         // Houdini viewport point markers (default display points ≈ blue).
         private static readonly Color s_PrimPointColor = new(0.25f, 0.55f, 1f, 1f);
 
+        /// <summary>
+        /// Shared screen-space scale for Display Points and Group point highlights.
+        /// Multiplied by <see cref="HandleUtility.GetHandleSize"/>.
+        /// </summary>
+        private const float PreviewPointHandleScale = 0.07f;
+
+        private static float GetPreviewPointSize(Vector3 worldPosition) =>
+            HandleUtility.GetHandleSize(worldPosition) * PreviewPointHandleScale;
+
         private static void DrawPolygonWireOverlay(SceneView sceneView, PcgGraphEditorWindow window)
         {
             if (Event.current.type != EventType.Repaint)
@@ -2264,8 +2273,8 @@ namespace DJTechEditor.PCG.Graph
                 for (var i = 0; i < points.Length; i++)
                 {
                     var world = l2w.MultiplyPoint(points[i]);
-                    var size = HandleUtility.GetHandleSize(world) * 0.045f;
-                    Handles.SphereHandleCap(0, world, Quaternion.identity, size, EventType.Repaint);
+                    Handles.SphereHandleCap(0, world, Quaternion.identity,
+                        GetPreviewPointSize(world), EventType.Repaint);
                 }
             }
             finally
@@ -2661,7 +2670,8 @@ namespace DJTechEditor.PCG.Graph
                     if (preview?.Points != null && ptIdx < preview.Points.Length)
                     {
                         var p = l2w.MultiplyPoint(preview.Points[(int)ptIdx]);
-                        Handles.SphereHandleCap(0, p, Quaternion.identity, 0.02f, EventType.Repaint);
+                        Handles.SphereHandleCap(0, p, Quaternion.identity,
+                            GetPreviewPointSize(p), EventType.Repaint);
                         continue;
                     }
 
@@ -2672,7 +2682,8 @@ namespace DJTechEditor.PCG.Graph
                     if (ptIdx >= vertices.Length)
                         continue;
                     var wp = l2w.MultiplyPoint(vertices[(int)ptIdx]);
-                    Handles.SphereHandleCap(0, wp, Quaternion.identity, 0.02f, EventType.Repaint);
+                    Handles.SphereHandleCap(0, wp, Quaternion.identity,
+                        GetPreviewPointSize(wp), EventType.Repaint);
                 }
             }
         }

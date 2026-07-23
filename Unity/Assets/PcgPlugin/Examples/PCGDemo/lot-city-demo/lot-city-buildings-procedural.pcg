@@ -314,22 +314,10 @@
       "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 0.1, "useMaxSegments": true, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
     },
     {
-      "id": "n108",
-      "type": "GroupTransfer",
-      "position": { "x": 1263, "y": 1055.5 },
-      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 0.4, "createEmptyGroups": true, "__nodeTitle": ""}
-    },
-    {
       "id": "n111",
       "type": "PrimitiveTransform",
       "position": { "x": 1054, "y": 804 },
       "data": {"scale": 0.84, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
-    },
-    {
-      "id": "n110",
-      "type": "GroupPromote",
-      "position": { "x": 1263, "y": 1118 },
-      "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
     },
     {
       "id": "n104",
@@ -342,12 +330,6 @@
       "type": "ConvertLine",
       "position": { "x": 1054, "y": 891.5 },
       "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
-    },
-    {
-      "id": "n106",
-      "type": "GroupCreate",
-      "position": { "x": 1324.5, "y": 880 },
-      "data": {"outputGroup": "streetFacingPoints", "domain": "point", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
     },
     {
       "id": "n105",
@@ -384,6 +366,24 @@
       "type": "LotSubdivision",
       "position": { "x": 840, "y": 725 },
       "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
+    },
+    {
+      "id": "n108",
+      "type": "GroupTransfer",
+      "position": { "x": 1263, "y": 1082.5 },
+      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 0.4, "createEmptyGroups": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n110",
+      "type": "GroupPromote",
+      "position": { "x": 1263, "y": 1145 },
+      "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n106",
+      "type": "GroupCreate",
+      "position": { "x": 1334, "y": 933 },
+      "data": {"outputGroup": "streetFacingPoints", "domain": "point", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
     }
   ],
   "edges": [
