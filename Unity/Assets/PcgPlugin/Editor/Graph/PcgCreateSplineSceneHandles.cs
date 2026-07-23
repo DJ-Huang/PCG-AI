@@ -1980,7 +1980,10 @@ namespace DJTechEditor.PCG.Graph
             {
                 var list = fromOutput ? nodeGroups : inputNodeGroups;
                 if (list == null) return null;
-                return list.FirstOrDefault(g => g.name == name && g.domain == domain);
+                var exact = list.FirstOrDefault(g => g.name == name && g.domain == domain);
+                if (exact != null) return exact;
+                // Cook domain is authoritative when declaration lagged (e.g. static "edge").
+                return list.FirstOrDefault(g => g.name == name);
             }
 
             var allGroups = outputGroups.Concat(inputGroups).ToList();
@@ -2017,10 +2020,11 @@ namespace DJTechEditor.PCG.Graph
                     if (!GroupNameMatchesFilter(g.name, s_GroupListFilter))
                         continue;
                     var stats = FindGroupStats(g.name, g.domain, fromOutput);
-                    rows.Add((g.name, g.domain, source, stats?.count,
+                    var domain = !string.IsNullOrEmpty(stats?.domain) ? stats.domain : g.domain;
+                    rows.Add((g.name, domain, source, stats?.count,
                         s_SelectedGroupName == g.name &&
                         s_SelectedGroupSource == source &&
-                        s_SelectedGroupDomain == g.domain));
+                        s_SelectedGroupDomain == domain));
                 }
             }
             AddRows(outputGroups, "output", true);

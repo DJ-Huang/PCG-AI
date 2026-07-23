@@ -9,6 +9,8 @@ namespace DJTechEditor.PCG.Graph
     /// dynamic entries use outputGroups[].name as the property key whose value is the group name
     /// (same as GroupCreate). Legacy manifests that put the default group string in
     /// outputGroups[].name are recovered via isGroupOutput default matching.
+    /// Domain: when the node has a <c>domain</c> property (GroupCreate / GroupCombine / …),
+    /// use its runtime value — do not trust a static outputGroups[].domain default of "edge".
     /// </summary>
     public static class PcgGroupResolution
     {
@@ -54,13 +56,14 @@ namespace DJTechEditor.PCG.Graph
                     }
                 }
 
-                if (!seen.Add($"{groupName}:{og.domain}"))
+                var domain = ResolveDomain(def, data, og.domain);
+                if (!seen.Add($"{groupName}:{domain}"))
                     continue;
 
                 result.Add(new DeclaredOutputGroup
                 {
                     name = groupName,
-                    domain = og.domain,
+                    domain = domain,
                     label = string.IsNullOrEmpty(og.label) ? groupName : og.label,
                     isDynamic = isDynamic,
                     propertyKey = propertyKey,
@@ -76,7 +79,7 @@ namespace DJTechEditor.PCG.Graph
                 if (string.IsNullOrWhiteSpace(groupName))
                     continue;
 
-                var domain = string.IsNullOrEmpty(prop.groupDomain) ? "edge" : prop.groupDomain;
+                var domain = ResolveDomain(def, data, prop.groupDomain);
                 if (!seen.Add($"{groupName}:{domain}"))
                     continue;
 
@@ -92,6 +95,36 @@ namespace DJTechEditor.PCG.Graph
 
             return result;
         }
+
+        /// <summary>
+        /// Prefer the node's runtime <c>domain</c> property (Points/Edges/Primitives)
+        /// over a static manifest default — GroupCreate writes groupType into that field.
+        /// </summary>
+        internal static string ResolveDomain(
+            ManifestNodeDef def, PcgNodeData data, string declaredOrPropDomain)
+        {
+            if (def?.properties != null && def.properties.ContainsKey("domain"))
+            {
+                var fromData = data?.GetRaw("domain")?.ToString();
+                if (IsValidGroupDomain(fromData))
+                    return fromData;
+
+                if (def.properties.TryGetValue("domain", out var domainProp))
+                {
+                    var fromDefault = domainProp.defaultValue?.ToString();
+                    if (IsValidGroupDomain(fromDefault))
+                        return fromDefault;
+                }
+            }
+
+            if (IsValidGroupDomain(declaredOrPropDomain))
+                return declaredOrPropDomain;
+
+            return "edge";
+        }
+
+        private static bool IsValidGroupDomain(string domain) =>
+            domain == "point" || domain == "edge" || domain == "face";
 
         public static string PropertyDisplayLabel(string key, ManifestPropertyDef prop)
         {
