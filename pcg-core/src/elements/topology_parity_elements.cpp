@@ -306,6 +306,8 @@ ResampleOptions load_resample_options(const PcgContext& ctx)
 data::PcgGeometry splines_to_curve_geometry(const data::PcgSplineData& splines)
 {
     data::PcgGeometry geometry;
+    std::vector<int64_t> closed_flags;
+    closed_flags.reserve(splines.splines().size());
     for (const auto& spline : splines.splines()) {
         if (spline.points.size() < 2)
             continue;
@@ -318,7 +320,14 @@ data::PcgGeometry splines_to_curve_geometry(const data::PcgSplineData& splines)
         }
         if (spline.closed && !face.empty())
             face.push_back(face.front());
+        closed_flags.push_back(spline.closed ? 1 : 0);
         geometry.faces_mut().push_back(std::move(face));
+    }
+    if (!closed_flags.empty()) {
+        auto& closed_attr =
+            geometry.attributes().create_int(data::AttributeOwner::Primitive, "closed", 1);
+        closed_attr.resize(closed_flags.size());
+        closed_attr.int_values_mut() = std::move(closed_flags);
     }
     return geometry;
 }

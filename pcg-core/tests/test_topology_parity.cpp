@@ -477,12 +477,66 @@ int main()
         pcg::internal::data::PcgGeometry curve;
         curve.points_mut() = {{0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}, {30.0, 0.0, 0.0}};
         curve.faces_mut().push_back({0, 1, 2});
+        auto& open_attr =
+            curve.attributes().create_int(pcg::internal::data::AttributeOwner::Primitive,
+                                          "closed", 1);
+        open_attr.resize(1);
+        open_attr.int_values_mut()[0] = 0;
         ResampleOptions geom_opts;
         geom_opts.use_max_segments = true;
         geom_opts.max_segments = 2;
         const auto geometry = pcg::internal::elements::resample_geometry(curve, geom_opts);
         expect(geometry.faces().size() == 1, "Resample geometry keeps one curve");
         expect(geometry.faces()[0].size() == 3, "Resample geometry curve has 3 points");
+    }
+
+    {
+        using pcg::internal::data::AttributeOwner;
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::elements::ResampleOptions;
+        using pcg::internal::elements::resample_geometry;
+
+        // Mesh quad (no duplicated first point) must resample the closing edge too.
+        PcgGeometry quad;
+        quad.points_mut() = {
+            {0.0, 0.0, 0.0},
+            {4.0, 0.0, 0.0},
+            {4.0, 0.0, 2.0},
+            {0.0, 0.0, 2.0},
+        };
+        quad.faces_mut().push_back({0, 1, 2, 3});
+
+        ResampleOptions by_length;
+        by_length.use_max_segments = false;
+        by_length.use_max_segment_length = true;
+        by_length.max_segment_length = 1.0;
+        by_length.even_last_segment_same_length = true;
+        by_length.resample_by_polygon_edge = false;
+        const auto whole = resample_geometry(quad, by_length);
+        expect(whole.faces().size() == 1, "Closed quad resample keeps one face");
+        expect(whole.faces()[0].size() >= 8,
+               "Closed quad whole-perimeter includes all four edges");
+
+        by_length.resample_by_polygon_edge = true;
+        const auto by_edge = resample_geometry(quad, by_length);
+        expect(by_edge.faces().size() == 1, "By-edge closed quad keeps one face");
+        // Each side length 4 or 2 with max 1.0 → at least 4+2+4+2 = 12 segments → 12 verts
+        // (corners shared). Expect no bare side: vertex count matches full ring.
+        expect(by_edge.faces()[0].size() >= 12,
+               "Resample by polygon edge covers all four sides");
+
+        // Count points near the bottom edge (y=0,z=0,x in (0,4)) — must have intermediates.
+        int bottom_mids = 0;
+        int top_mids = 0;
+        for (int pi : by_edge.faces()[0]) {
+            const auto& p = by_edge.points()[static_cast<size_t>(pi)];
+            if (std::abs(p.z) < 1e-6 && std::abs(p.y) < 1e-6 && p.x > 0.1 && p.x < 3.9)
+                ++bottom_mids;
+            if (std::abs(p.z - 2.0) < 1e-6 && std::abs(p.y) < 1e-6 && p.x > 0.1 && p.x < 3.9)
+                ++top_mids;
+        }
+        expect(bottom_mids >= 3 && top_mids >= 3,
+               "Opposite equal-length edges both get intermediate points");
     }
 
     {

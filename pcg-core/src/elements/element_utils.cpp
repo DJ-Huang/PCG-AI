@@ -4,6 +4,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <limits>
 
 namespace pcg::internal::elements {
 namespace {
@@ -250,6 +252,58 @@ void emit_mesh_shared(PcgContext& ctx,
 uint32_t mix_seed(int a, int b)
 {
     return static_cast<uint32_t>(a) ^ static_cast<uint32_t>(b * 2654435761);
+}
+
+int normalize_seed_number(double seed)
+{
+    if (!std::isfinite(seed))
+        return 0;
+
+    const double truncated = std::trunc(seed);
+    if (seed == truncated &&
+        truncated >= static_cast<double>(std::numeric_limits<int>::lowest()) &&
+        truncated <= static_cast<double>(std::numeric_limits<int>::max())) {
+        return static_cast<int>(truncated);
+    }
+
+    // SplitMix64-style mix of IEEE bits so nearby floats diverge.
+    static_assert(sizeof(double) == sizeof(std::uint64_t), "unexpected double size");
+    std::uint64_t bits = 0;
+    std::memcpy(&bits, &seed, sizeof(bits));
+    bits ^= bits >> 30;
+    bits *= 0xbf58476d1ce4e5b9ULL;
+    bits ^= bits >> 27;
+    bits *= 0x94d049bb133111ebULL;
+    bits ^= bits >> 31;
+    return static_cast<int>(static_cast<std::uint32_t>(bits));
+}
+
+double read_seed_param_number(const nlohmann::json& data, const char* key, double default_value)
+{
+    if (key == nullptr || !data.is_object() || !data.contains(key) || data[key].is_null())
+        return default_value;
+
+    const auto& value = data.at(key);
+    // Accept both integer and float JSON numbers without truncating 2.3 → 2.
+    if (value.is_number())
+        return value.get<double>();
+    return default_value;
+}
+
+int read_seed_param(const nlohmann::json& data, const char* key, int default_value)
+{
+    if (key == nullptr || !data.is_object() || !data.contains(key) || data[key].is_null())
+        return default_value;
+    return normalize_seed_number(read_seed_param_number(data, key, static_cast<double>(default_value)));
+}
+
+uint32_t rng_state_from_seed(double node_seed, int graph_seed)
+{
+    const int mixed = normalize_seed_number(node_seed) ^ graph_seed;
+    uint32_t state = static_cast<uint32_t>(mixed) * 747796405u + 2891336453u;
+    if (state == 0)
+        state = 0xA5A5A5A5u;
+    return state;
 }
 
 uint32_t next_rand(uint32_t& state)

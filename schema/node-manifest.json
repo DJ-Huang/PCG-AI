@@ -5889,7 +5889,8 @@
           "maximum": 1
         },
         "seed": {
-          "type": "integer",
+          "type": "number",
+          "displayName": "Random Seed",
           "default": 0
         },
         "alignment": {

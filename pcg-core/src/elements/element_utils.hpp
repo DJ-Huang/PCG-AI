@@ -60,6 +60,24 @@ uint32_t next_rand(uint32_t& state);
 double simple_noise(double x, double z, int seed);
 double perlin_noise_3d(double x, double y, double z, int seed);
 
+/// Houdini-style seed: whole numbers keep integer identity (2.0 → 2); fractional
+/// values are hashed so 2.3 ≠ 2. Shared entry point for nodes that promote seed
+/// from manifest `integer` to `number`.
+int normalize_seed_number(double seed);
+
+/// Read JSON seed that may be integer or number, preserving the float domain.
+/// Missing/null → default_value. Prefer this over `data.value("seed", 0)` — the
+/// latter truncates floats like 2.3 → 2 (nlohmann get<int>).
+double read_seed_param_number(const nlohmann::json& data,
+                              const char* key,
+                              double default_value = 0.0);
+
+/// Read JSON seed as normalized int (whole floats keep identity; fractionals hash).
+int read_seed_param(const nlohmann::json& data, const char* key, int default_value = 0);
+
+/// Mix Houdini-style float node seed with graph seed into LCG state.
+uint32_t rng_state_from_seed(double node_seed, int graph_seed = 0);
+
 std::vector<std::string> parse_name_list(const nlohmann::json& data, const char* key);
 
 } // namespace pcg::internal::elements

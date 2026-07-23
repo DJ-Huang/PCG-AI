@@ -1423,6 +1423,71 @@ void write_resample_point_attrs(data::PcgGeometry& output,
     }
 }
 
+bool near_vec3(const geometry::Vec3& a, const geometry::Vec3& b)
+{
+    return geometry::length(geometry::sub(a, b)) <= kEps;
+}
+
+// Mesh faces are implicitly closed (same as smooth_mesh % size). Open polygon curves from
+// splines_to_curve_geometry write prim "closed"=0; closed curves write 1 and may duplicate
+// the first point at the end.
+bool face_is_closed_for_resample(const data::PcgGeometry& input,
+                                 size_t face_index,
+                                 const std::vector<int>& face)
+{
+    const data::AttributeArray* attr =
+        input.attributes().find(data::AttributeOwner::Primitive, "closed");
+    if (attr && face_index < attr->size()) {
+        if (attr->schema().type == data::AttributeType::Int)
+            return attr->int_values()[face_index] != 0;
+        if (attr->schema().type == data::AttributeType::Float)
+            return attr->float_values()[face_index] != 0.0;
+    }
+    if (face.size() >= 2 && face.front() == face.back())
+        return true;
+    // Default: mesh n-gons are closed; 2-point segments stay open.
+    return face.size() >= 3;
+}
+
+geometry::PolylineResampleResult resample_ring_by_polygon_edge(
+    const std::vector<geometry::Vec3>& ring,
+    bool closed,
+    const geometry::PolylineResampleOptions& polyline_opts)
+{
+    geometry::PolylineResampleResult merged;
+    if (ring.size() < 2)
+        return merged;
+
+    const size_t edge_count = closed ? ring.size() : ring.size() - 1;
+    for (size_t e = 0; e < edge_count; ++e) {
+        const geometry::Vec3& a = ring[e];
+        const geometry::Vec3& b = ring[closed ? (e + 1) % ring.size() : (e + 1)];
+        const geometry::PolylineResampleResult edge =
+            geometry::resample_polyline_houdini({a, b}, polyline_opts);
+        if (edge.points.empty())
+            continue;
+        const size_t start = (e == 0 || merged.points.empty()) ? 0 : 1;
+        for (size_t i = start; i < edge.points.size(); ++i) {
+            if (!merged.points.empty() && near_vec3(edge.points[i], merged.points.back()))
+                continue;
+            merged.points.push_back(edge.points[i]);
+            if (i < edge.curve_u.size())
+                merged.curve_u.push_back(edge.curve_u[i]);
+            if (i < edge.tangents.size())
+                merged.tangents.push_back(edge.tangents[i]);
+        }
+    }
+    if (closed && merged.points.size() >= 2 &&
+        near_vec3(merged.points.back(), merged.points.front())) {
+        merged.points.pop_back();
+        if (!merged.curve_u.empty())
+            merged.curve_u.pop_back();
+        if (!merged.tangents.empty())
+            merged.tangents.pop_back();
+    }
+    return merged;
+}
+
 data::PcgGeometry resample_geometry(const data::PcgGeometry& input, const ResampleOptions& options)
 {
     data::PcgGeometry output;
@@ -1479,16 +1544,33 @@ data::PcgGeometry resample_geometry(const data::PcgGeometry& input, const Resamp
         if (polyline.size() < 2)
             continue;
 
-        const bool closed =
-            face.size() >= 3 && face.front() == face.back() &&
-            geometry::length(geometry::sub(polyline.front(), polyline.back())) <= kEps;
-        if (closed && polyline.size() >= 2)
+        const bool explicit_curve_closed =
+            face.size() >= 2 && face.front() == face.back() &&
+            near_vec3(polyline.front(), polyline.back());
+        if (explicit_curve_closed && polyline.size() >= 2)
             polyline.pop_back();
 
+        const bool closed = face_is_closed_for_resample(input, fi, face);
         const geometry::PolylineResampleOptions polyline_opts =
             polyline_opts_for_face(input, fi, options);
-        const geometry::PolylineResampleResult resampled =
-            geometry::resample_polyline_houdini(polyline, polyline_opts);
+
+        geometry::PolylineResampleResult resampled;
+        if (options.resample_by_polygon_edge) {
+            resampled = resample_ring_by_polygon_edge(polyline, closed, polyline_opts);
+        } else {
+            std::vector<geometry::Vec3> path = polyline;
+            if (closed && path.size() >= 2)
+                path.push_back(path.front());
+            resampled = geometry::resample_polyline_houdini(path, polyline_opts);
+            if (closed && resampled.points.size() >= 2 &&
+                near_vec3(resampled.points.back(), resampled.points.front())) {
+                resampled.points.pop_back();
+                if (!resampled.curve_u.empty())
+                    resampled.curve_u.pop_back();
+                if (!resampled.tangents.empty())
+                    resampled.tangents.pop_back();
+            }
+        }
 
         if (resampled.points.empty())
             continue;
@@ -1508,7 +1590,8 @@ data::PcgGeometry resample_geometry(const data::PcgGeometry& input, const Resamp
                 write_resample_point_attrs(output, pi, resampled, si, curve_counter, options);
                 remapped.push_back(pi);
             }
-            if (closed && !remapped.empty())
+            // Keep explicit closed-curve convention (duplicate first at end).
+            if (explicit_curve_closed && !remapped.empty())
                 remapped.push_back(remapped.front());
             if (remapped.size() >= 2)
                 output.faces_mut().push_back(std::move(remapped));

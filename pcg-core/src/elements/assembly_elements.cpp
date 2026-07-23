@@ -143,9 +143,10 @@ public:
         options.min_size = ctx.node->data.value("minSize", 1.0);
         options.iterations = ctx.node->data.value("iterations", 3);
         options.irregularity = ctx.node->data.value("irregularity", 0.5);
-        options.seed = ctx.node->data.value("seed", 0);
+        // Must use read_seed_param_number — data.value("seed", 0) truncates 2.3 → 2.
+        options.seed = read_seed_param_number(ctx.node->data, "seed", 0.0);
+        options.graph_seed = ctx.graph_seed;
         options.alignment = ctx.node->data.value("alignment", "longestEdge");
-        options.seed ^= static_cast<int>(ctx.graph_seed);
 
         if (!std::isfinite(options.min_size) || options.min_size < 0.0)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision minSize must be >= 0");

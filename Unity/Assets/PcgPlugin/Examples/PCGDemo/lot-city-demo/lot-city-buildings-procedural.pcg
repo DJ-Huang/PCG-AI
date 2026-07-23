@@ -8,12 +8,6 @@
       "data": {"sizeX": 48, "sizeY": 48, "rows": 1, "cols": 1, "plane": "xz", "__nodeTitle": "City Ground"}
     },
     {
-      "id": "blocks",
-      "type": "LotSubdivision",
-      "position": { "x": 840, "y": 160 },
-      "data": {"minSize": 0.1, "iterations": 4, "irregularity": 0.35, "seed": 2, "alignment": "longestEdge", "__nodeTitle": "City Blocks iter=3"}
-    },
-    {
       "id": "sg_roads",
       "type": "Subgraph",
       "position": { "x": 1480, "y": 4560 },
@@ -308,34 +302,10 @@
       "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "Assign Floors"}
     },
     {
-      "id": "n107",
-      "type": "Resample",
-      "position": { "x": 1167.5, "y": 994.5 },
-      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 0.1, "useMaxSegments": true, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
-    },
-    {
       "id": "n111",
       "type": "PrimitiveTransform",
       "position": { "x": 1054, "y": 804 },
       "data": {"scale": 0.84, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
-    },
-    {
-      "id": "n104",
-      "type": "Carve",
-      "position": { "x": 1167.5, "y": 933 },
-      "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
-    },
-    {
-      "id": "n103",
-      "type": "ConvertLine",
-      "position": { "x": 1054, "y": 891.5 },
-      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
-    },
-    {
-      "id": "n105",
-      "type": "Resample",
-      "position": { "x": 1023, "y": 420.5 },
-      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": true, "maxSegmentLength": 0.3, "useMaxSegments": false, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
     },
     {
       "id": "shrink_blocks",
@@ -368,22 +338,52 @@
       "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
     },
     {
-      "id": "n108",
-      "type": "GroupTransfer",
-      "position": { "x": 1263, "y": 1082.5 },
-      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 0.4, "createEmptyGroups": true, "__nodeTitle": ""}
+      "id": "blocks",
+      "type": "LotSubdivision",
+      "position": { "x": 840, "y": 160 },
+      "data": {"minSize": 0.1, "iterations": 4, "irregularity": 0.35, "seed": 2.3, "alignment": "longestEdge", "__nodeTitle": "City Blocks iter=3"}
     },
     {
       "id": "n110",
       "type": "GroupPromote",
-      "position": { "x": 1263, "y": 1145 },
+      "position": { "x": 1268.5, "y": 1190 },
       "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n104",
+      "type": "Carve",
+      "position": { "x": 1173, "y": 978 },
+      "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n107",
+      "type": "Resample",
+      "position": { "x": 1173, "y": 1039.5 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 0.1, "useMaxSegments": true, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
+    },
+    {
+      "id": "n103",
+      "type": "ConvertLine",
+      "position": { "x": 1054, "y": 891.5 },
+      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n105",
+      "type": "Resample",
+      "position": { "x": 1330, "y": 804 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": true, "maxSegmentLength": 0.3, "useMaxSegments": false, "maxSegments": 10, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": "Resample Outer Ring"}
     },
     {
       "id": "n106",
       "type": "GroupCreate",
-      "position": { "x": 1334, "y": 933 },
+      "position": { "x": 1339.5, "y": 978 },
       "data": {"outputGroup": "streetFacingPoints", "domain": "point", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "n108",
+      "type": "GroupTransfer",
+      "position": { "x": 1268.5, "y": 1128.5 },
+      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 6, "createEmptyGroups": true, "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -452,17 +452,17 @@
     {"id": "e111206", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e114122", "source": "n103", "target": "n104", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e139346", "source": "shrink_blocks", "target": "n105", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e139347", "source": "n105", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e139348", "source": "n104", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e139349", "source": "n107", "target": "n108", "sourceHandle": "out", "targetHandle": "target"},
     {"id": "e139350", "source": "n106", "target": "n108", "sourceHandle": "out", "targetHandle": "source"},
     {"id": "e143004", "source": "n108", "target": "n110", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111936", "source": "n102", "target": "n111", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e157598", "source": "n111", "target": "n103", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e157598", "source": "n111", "target": "n103", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_ground_outline", "source": "shrink_blocks", "target": "n105", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
-    {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 3, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
+    {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
     {"id": "p_lot_iter", "name": "lotIterations", "type": "integer", "default": 2, "exposed": true, "targetNode": "lots", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 6},
     {"id": "p_lot_min", "name": "lotMinSize", "type": "number", "default": 2, "exposed": true, "targetNode": "lots", "targetProperty": "minSize", "hasRange": true, "min": 0.5, "max": 8},
     {"id": "p_block_shrink", "name": "blockShrink", "type": "number", "default": 0.75, "exposed": true, "targetNode": "shrink_blocks", "targetProperty": "scale", "hasRange": true, "min": 0.5, "max": 1},
