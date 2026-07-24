@@ -6052,12 +6052,12 @@
       "inputs": [
         {
           "id": "source",
-          "label": "Source",
+          "label": "Source Geometry",
           "pinType": "SpatialMesh"
         },
         {
           "id": "reference",
-          "label": "Reference (optional)",
+          "label": "Destination Size",
           "pinType": "SpatialMesh"
         }
       ],
@@ -6068,69 +6068,259 @@
           "pinType": "SpatialMesh"
         }
       ],
+      "inspectorSections": [
+        {
+          "id": "target",
+          "label": "Target",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "matching",
+          "label": "Matching",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "transform",
+          "label": "Transform",
+          "foldout": false,
+          "header": true
+        }
+      ],
       "properties": {
-        "scaleToFit": {
+        "group": {
+          "type": "groupSelect",
+          "default": "",
+          "displayName": "Group",
+          "order": 0
+        },
+        "groupType": {
+          "type": "enum",
+          "default": "guess",
+          "displayName": "Group Type",
+          "order": 1,
+          "options": [
+            {
+              "value": "guess",
+              "label": "Guess from Group"
+            },
+            {
+              "value": "points",
+              "label": "Points"
+            },
+            {
+              "value": "primitives",
+              "label": "Primitives"
+            },
+            {
+              "value": "edges",
+              "label": "Edges"
+            }
+          ]
+        },
+        "justifyWith": {
+          "type": "enum",
+          "default": "inputIfWired",
+          "displayName": "Justify With",
+          "order": 2,
+          "options": [
+            {
+              "value": "inputIfWired",
+              "label": "Input If Wired"
+            },
+            {
+              "value": "locationAndSize",
+              "label": "Location and Size"
+            },
+            {
+              "value": "secondInput",
+              "label": "Second Input"
+            },
+            {
+              "value": "originAndUnitSize",
+              "label": "Origin and Unit Size"
+            }
+          ]
+        },
+        "useGroupsForBounds": {
           "type": "boolean",
-          "default": true
+          "default": false,
+          "displayName": "Use Groups to Determine Justification Bounds",
+          "order": 3
         },
-        "uniformScale": {
+        "sourceGroup": {
+          "type": "groupSelect",
+          "default": "",
+          "displayName": "Source Group",
+          "order": 4,
+          "indent": true,
+          "visibleWhen": {
+            "property": "useGroupsForBounds",
+            "equals": "true"
+          }
+        },
+        "sourceGroupType": {
+          "type": "enum",
+          "default": "guess",
+          "displayName": "Source Group Type",
+          "order": 5,
+          "indent": true,
+          "visibleWhen": {
+            "property": "useGroupsForBounds",
+            "equals": "true"
+          },
+          "options": [
+            {
+              "value": "guess",
+              "label": "Guess from Group"
+            },
+            {
+              "value": "points",
+              "label": "Points"
+            },
+            {
+              "value": "primitives",
+              "label": "Primitives"
+            },
+            {
+              "value": "edges",
+              "label": "Edges"
+            }
+          ]
+        },
+        "targetGroup": {
+          "type": "groupSelect",
+          "default": "",
+          "displayName": "Target Group",
+          "order": 6,
+          "indent": true,
+          "visibleWhen": {
+            "property": "useGroupsForBounds",
+            "equals": "true"
+          }
+        },
+        "targetGroupType": {
+          "type": "enum",
+          "default": "guess",
+          "displayName": "Target Group Type",
+          "order": 7,
+          "indent": true,
+          "visibleWhen": {
+            "property": "useGroupsForBounds",
+            "equals": "true"
+          },
+          "options": [
+            {
+              "value": "guess",
+              "label": "Guess from Group"
+            },
+            {
+              "value": "points",
+              "label": "Points"
+            },
+            {
+              "value": "primitives",
+              "label": "Primitives"
+            },
+            {
+              "value": "edges",
+              "label": "Edges"
+            }
+          ]
+        },
+        "targetPositionX": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Target Position X",
+          "section": "target",
+          "order": 10,
+          "visibleWhen": {
+            "property": "justifyWith",
+            "oneOf": ["inputIfWired", "locationAndSize"]
+          }
+        },
+        "targetPositionY": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Target Position Y",
+          "section": "target",
+          "order": 11,
+          "visibleWhen": {
+            "property": "justifyWith",
+            "oneOf": ["inputIfWired", "locationAndSize"]
+          }
+        },
+        "targetPositionZ": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Target Position Z",
+          "section": "target",
+          "order": 12,
+          "visibleWhen": {
+            "property": "justifyWith",
+            "oneOf": ["inputIfWired", "locationAndSize"]
+          }
+        },
+        "targetSizeX": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.0,
+          "displayName": "Target Size X",
+          "section": "target",
+          "order": 20,
+          "visibleWhen": {
+            "property": "justifyWith",
+            "oneOf": ["inputIfWired", "locationAndSize"]
+          }
+        },
+        "targetSizeY": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.0,
+          "displayName": "Target Size Y",
+          "section": "target",
+          "order": 21,
+          "visibleWhen": {
+            "property": "justifyWith",
+            "oneOf": ["inputIfWired", "locationAndSize"]
+          }
+        },
+        "targetSizeZ": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.0,
+          "displayName": "Target Size Z",
+          "section": "target",
+          "order": 22,
+          "visibleWhen": {
+            "property": "justifyWith",
+            "oneOf": ["inputIfWired", "locationAndSize"]
+          }
+        },
+        "translate": {
           "type": "boolean",
-          "default": false
+          "default": true,
+          "displayName": "Translate",
+          "section": "matching",
+          "order": 10
         },
-        "uniformScaleMode": {
-          "type": "enum",
-          "default": "fit",
-          "options": [
-            {
-              "value": "fit",
-              "label": "Fit Inside"
-            },
-            {
-              "value": "fill",
-              "label": "Fill Bounds"
-            }
-          ]
-        },
-        "sourceJustifyX": {
+        "justifyX": {
           "type": "enum",
           "default": "center",
+          "displayName": "Justify X",
+          "section": "matching",
+          "order": 20,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          },
           "options": [
             {
-              "value": "min",
-              "label": "Min"
+              "value": "none",
+              "label": "None"
             },
-            {
-              "value": "center",
-              "label": "Center"
-            },
-            {
-              "value": "max",
-              "label": "Max"
-            }
-          ]
-        },
-        "sourceJustifyY": {
-          "type": "enum",
-          "default": "center",
-          "options": [
-            {
-              "value": "min",
-              "label": "Min"
-            },
-            {
-              "value": "center",
-              "label": "Center"
-            },
-            {
-              "value": "max",
-              "label": "Max"
-            }
-          ]
-        },
-        "sourceJustifyZ": {
-          "type": "enum",
-          "default": "center",
-          "options": [
             {
               "value": "min",
               "label": "Min"
@@ -6147,8 +6337,62 @@
         },
         "targetJustifyX": {
           "type": "enum",
-          "default": "center",
+          "default": "same",
+          "displayName": "to",
+          "section": "matching",
+          "order": 21,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          },
           "options": [
+            {
+              "value": "same",
+              "label": "Same"
+            },
+            {
+              "value": "min",
+              "label": "Min"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "max",
+              "label": "Max"
+            }
+          ]
+        },
+        "offsetX": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Offset by",
+          "section": "matching",
+          "order": 22,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          }
+        },
+        "justifyY": {
+          "type": "enum",
+          "default": "center",
+          "displayName": "Justify Y",
+          "section": "matching",
+          "order": 30,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          },
+          "options": [
+            {
+              "value": "none",
+              "label": "None"
+            },
             {
               "value": "min",
               "label": "Min"
@@ -6165,8 +6409,62 @@
         },
         "targetJustifyY": {
           "type": "enum",
-          "default": "center",
+          "default": "same",
+          "displayName": "to",
+          "section": "matching",
+          "order": 31,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          },
           "options": [
+            {
+              "value": "same",
+              "label": "Same"
+            },
+            {
+              "value": "min",
+              "label": "Min"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "max",
+              "label": "Max"
+            }
+          ]
+        },
+        "offsetY": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Offset by",
+          "section": "matching",
+          "order": 32,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          }
+        },
+        "justifyZ": {
+          "type": "enum",
+          "default": "center",
+          "displayName": "Justify Z",
+          "section": "matching",
+          "order": 40,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          },
+          "options": [
+            {
+              "value": "none",
+              "label": "None"
+            },
             {
               "value": "min",
               "label": "Min"
@@ -6183,8 +6481,20 @@
         },
         "targetJustifyZ": {
           "type": "enum",
-          "default": "center",
+          "default": "same",
+          "displayName": "to",
+          "section": "matching",
+          "order": 41,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          },
           "options": [
+            {
+              "value": "same",
+              "label": "Same"
+            },
             {
               "value": "min",
               "label": "Min"
@@ -6199,32 +6509,155 @@
             }
           ]
         },
-        "targetCenterX": {
+        "offsetZ": {
           "type": "number",
-          "default": 0.0
+          "default": 0.0,
+          "displayName": "Offset by",
+          "section": "matching",
+          "order": 42,
+          "indent": true,
+          "enabledWhen": {
+            "property": "translate",
+            "equals": "true"
+          }
         },
-        "targetCenterY": {
-          "type": "number",
-          "default": 0.0
+        "scaleToFit": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Scale to Fit",
+          "section": "matching",
+          "order": 50
         },
-        "targetCenterZ": {
-          "type": "number",
-          "default": 0.0
+        "uniformScale": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Uniform Scale",
+          "section": "matching",
+          "order": 60,
+          "enabledWhen": {
+            "property": "scaleToFit",
+            "equals": "true"
+          }
         },
-        "targetSizeX": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.0
+        "scaleAxis": {
+          "type": "enum",
+          "default": "bestFit",
+          "displayName": "Scale Axis",
+          "section": "matching",
+          "order": 70,
+          "indent": true,
+          "enabledWhen": {
+            "property": "scaleToFit",
+            "equals": "true",
+            "all": [
+              {
+                "property": "uniformScale",
+                "equals": "true"
+              }
+            ]
+          },
+          "options": [
+            {
+              "value": "x",
+              "label": "X"
+            },
+            {
+              "value": "y",
+              "label": "Y"
+            },
+            {
+              "value": "z",
+              "label": "Z"
+            },
+            {
+              "value": "bestFit",
+              "label": "Best Fit"
+            }
+          ]
         },
-        "targetSizeY": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.0
+        "scaleX": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Scale X",
+          "section": "matching",
+          "order": 71,
+          "indent": true,
+          "enabledWhen": {
+            "property": "scaleToFit",
+            "equals": "true",
+            "all": [
+              {
+                "property": "uniformScale",
+                "equals": "false"
+              }
+            ]
+          }
         },
-        "targetSizeZ": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.0
+        "scaleY": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Scale Y",
+          "section": "matching",
+          "order": 72,
+          "indent": true,
+          "enabledWhen": {
+            "property": "scaleToFit",
+            "equals": "true",
+            "all": [
+              {
+                "property": "uniformScale",
+                "equals": "false"
+              }
+            ]
+          }
+        },
+        "scaleZ": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Scale Z",
+          "section": "matching",
+          "order": 73,
+          "indent": true,
+          "enabledWhen": {
+            "property": "scaleToFit",
+            "equals": "true",
+            "all": [
+              {
+                "property": "uniformScale",
+                "equals": "false"
+              }
+            ]
+          }
+        },
+        "restoreTransform": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Restore Transform",
+          "section": "transform",
+          "order": 10,
+          "companionField": "restoreAttribute"
+        },
+        "restoreAttribute": {
+          "type": "string",
+          "default": "xform",
+          "displayName": "Restore Attribute",
+          "section": "transform",
+          "order": 11
+        },
+        "stashTransform": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Stash Transform",
+          "section": "transform",
+          "order": 20,
+          "companionField": "stashAttribute"
+        },
+        "stashAttribute": {
+          "type": "string",
+          "default": "xform",
+          "displayName": "Stash Attribute",
+          "section": "transform",
+          "order": 21
         }
       }
     },

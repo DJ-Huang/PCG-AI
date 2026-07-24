@@ -18,17 +18,34 @@ bool import_geometry_file(const std::filesystem::path& path,
                           std::string& error);
 
 struct MatchSizeOptions {
+    std::string justify_with = "inputIfWired";
+    std::string group;
+    std::string group_type = "guess";
+    bool use_groups_for_bounds = false;
+    std::string source_group;
+    std::string source_group_type = "guess";
+    std::string target_group;
+    std::string target_group_type = "guess";
+    bool translate = true;
     bool scale_to_fit = true;
-    bool uniform_scale = false;
-    std::string uniform_scale_mode = "fit";
-    std::string source_justify_x = "center";
-    std::string source_justify_y = "center";
-    std::string source_justify_z = "center";
-    std::string target_justify_x = "center";
-    std::string target_justify_y = "center";
-    std::string target_justify_z = "center";
-    data::PcgVec3 target_center{0.0, 0.0, 0.0};
+    bool uniform_scale = true;
+    std::string scale_axis = "bestFit";
+    bool scale_x = true;
+    bool scale_y = true;
+    bool scale_z = true;
+    std::string justify_x = "center";
+    std::string justify_y = "center";
+    std::string justify_z = "center";
+    std::string target_justify_x = "same";
+    std::string target_justify_y = "same";
+    std::string target_justify_z = "same";
+    data::PcgVec3 offset{0.0, 0.0, 0.0};
+    data::PcgVec3 target_position{0.0, 0.0, 0.0};
     data::PcgVec3 target_size{1.0, 1.0, 1.0};
+    bool restore_transform = false;
+    std::string restore_attribute = "xform";
+    bool stash_transform = true;
+    std::string stash_attribute = "xform";
 };
 
 bool match_size_geometry(const data::PcgGeometry& source,

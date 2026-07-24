@@ -1,6 +1,7 @@
 #include "elements/assembly_algorithms.hpp"
 
 #include "data/pcg_attribute_table.hpp"
+#include "geometry/group_table.hpp"
 
 #include <assimp/Importer.hpp>
 #include <assimp/config.h>
@@ -12,7 +13,9 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace pcg::internal::elements {
 namespace {
@@ -222,24 +225,255 @@ double justify_value(const std::string& value)
     return 0.5;
 }
 
+std::string resolve_target_justify(const std::string& source_justify,
+                                   const std::string& target_justify)
+{
+    if (target_justify == "same") {
+        if (source_justify == "none")
+            return "center";
+        return source_justify;
+    }
+    return target_justify;
+}
+
 data::PcgVec3 bounds_size(const Bounds& bounds)
 {
     return subtract(bounds.maximum, bounds.minimum);
 }
 
-data::PcgVec3 bounds_anchor(const Bounds& bounds,
-                            const std::array<std::string, 3>& justify)
+data::PcgVec3 bounds_anchor_axis(const Bounds& bounds,
+                                 const std::array<std::string, 3>& justify)
 {
     const auto size = bounds_size(bounds);
-    return {bounds.minimum.x + size.x * justify_value(justify[0]),
-            bounds.minimum.y + size.y * justify_value(justify[1]),
-            bounds.minimum.z + size.z * justify_value(justify[2])};
+    data::PcgVec3 anchor{};
+    for (int axis = 0; axis < 3; ++axis) {
+        const std::string& mode = justify[static_cast<size_t>(axis)];
+        const double t = mode == "none" ? 0.5 : justify_value(mode);
+        const double min_v = axis == 0 ? bounds.minimum.x
+            : axis == 1 ? bounds.minimum.y : bounds.minimum.z;
+        const double size_v = axis == 0 ? size.x : axis == 1 ? size.y : size.z;
+        const double value = min_v + size_v * t;
+        if (axis == 0) anchor.x = value;
+        else if (axis == 1) anchor.y = value;
+        else anchor.z = value;
+    }
+    return anchor;
 }
 
-data::PcgVec3 apply_scale(const data::PcgVec3& value,
-                          const data::PcgVec3& scale)
+geometry::GroupDomain resolve_group_domain(const data::PcgGeometry& geometry,
+                                           const std::string& group,
+                                           const std::string& group_type)
 {
-    return {value.x * scale.x, value.y * scale.y, value.z * scale.z};
+    if (group_type == "points")
+        return geometry::GroupDomain::Point;
+    if (group_type == "primitives")
+        return geometry::GroupDomain::Face;
+    if (group_type == "edges")
+        return geometry::GroupDomain::Edge;
+    if (geometry.groups().has_group(geometry::GroupDomain::Point, group))
+        return geometry::GroupDomain::Point;
+    if (geometry.groups().has_group(geometry::GroupDomain::Face, group))
+        return geometry::GroupDomain::Face;
+    if (geometry.groups().has_group(geometry::GroupDomain::Edge, group))
+        return geometry::GroupDomain::Edge;
+    return geometry::GroupDomain::Point;
+}
+
+std::unordered_set<int> collect_point_indices(const data::PcgGeometry& geometry,
+                                              const std::string& group,
+                                              const std::string& group_type)
+{
+    std::unordered_set<int> selected;
+    if (group.empty()) {
+        for (size_t i = 0; i < geometry.points().size(); ++i)
+            selected.insert(static_cast<int>(i));
+        return selected;
+    }
+
+    const auto domain = resolve_group_domain(geometry, group, group_type);
+    const auto members = geometry.groups().eval(domain, group);
+    if (domain == geometry::GroupDomain::Point) {
+        for (geometry::GroupId id : members)
+            selected.insert(static_cast<int>(id));
+        return selected;
+    }
+    if (domain == geometry::GroupDomain::Face) {
+        for (geometry::GroupId id : members) {
+            if (id < 0 || static_cast<size_t>(id) >= geometry.faces().size())
+                continue;
+            for (int point : geometry.faces()[static_cast<size_t>(id)])
+                selected.insert(point);
+        }
+        return selected;
+    }
+    for (geometry::GroupId id : members) {
+        const auto ends = geometry::edge_group_points(id);
+        selected.insert(ends[0]);
+        selected.insert(ends[1]);
+    }
+    return selected;
+}
+
+std::vector<data::PcgVec3> points_for_bounds(const data::PcgGeometry& geometry,
+                                             const std::string& group,
+                                             const std::string& group_type,
+                                             bool use_group)
+{
+    if (!use_group || group.empty())
+        return geometry.points();
+    const auto indices = collect_point_indices(geometry, group, group_type);
+    std::vector<data::PcgVec3> points;
+    points.reserve(indices.size());
+    for (int index : indices) {
+        if (index < 0 || static_cast<size_t>(index) >= geometry.points().size())
+            continue;
+        points.push_back(geometry.points()[static_cast<size_t>(index)]);
+    }
+    return points;
+}
+
+Bounds bounds_from_position_size(const data::PcgVec3& position,
+                                 const data::PcgVec3& size,
+                                 const std::array<std::string, 3>& target_justify)
+{
+    Bounds bounds;
+    bounds.valid = true;
+    for (int axis = 0; axis < 3; ++axis) {
+        const std::string mode = target_justify[static_cast<size_t>(axis)] == "none"
+            ? "center"
+            : target_justify[static_cast<size_t>(axis)];
+        const double pos = axis == 0 ? position.x : axis == 1 ? position.y : position.z;
+        const double extent = axis == 0 ? size.x : axis == 1 ? size.y : size.z;
+        double minimum = 0.0;
+        double maximum = 0.0;
+        if (mode == "min") {
+            minimum = pos;
+            maximum = pos + extent;
+        } else if (mode == "max") {
+            maximum = pos;
+            minimum = pos - extent;
+        } else {
+            minimum = pos - extent * 0.5;
+            maximum = pos + extent * 0.5;
+        }
+        if (axis == 0) {
+            bounds.minimum.x = minimum;
+            bounds.maximum.x = maximum;
+        } else if (axis == 1) {
+            bounds.minimum.y = minimum;
+            bounds.maximum.y = maximum;
+        } else {
+            bounds.minimum.z = minimum;
+            bounds.maximum.z = maximum;
+        }
+    }
+    return bounds;
+}
+
+bool read_detail_matrix(const data::PcgGeometry& geometry,
+                        const std::string& name,
+                        data::GeometryAffineTransform& transform,
+                        std::string& error)
+{
+    if (name.empty()) {
+        error = "MatchSize restore attribute name is empty";
+        return false;
+    }
+    const auto* attribute =
+        geometry.attributes().find(data::AttributeOwner::Detail, name);
+    if (!attribute || attribute->schema().type != data::AttributeType::Float ||
+        attribute->float_values().size() < 16) {
+        error = "MatchSize restore attribute '" + name + "' is missing or invalid";
+        return false;
+    }
+    const auto& values = attribute->float_values();
+    transform.linear = {
+        values[0], values[1], values[2],
+        values[4], values[5], values[6],
+        values[8], values[9], values[10],
+    };
+    transform.translation = {values[3], values[7], values[11]};
+    return true;
+}
+
+data::GeometryAffineTransform invert_affine(const data::GeometryAffineTransform& transform,
+                                            bool& ok,
+                                            std::string& error)
+{
+    ok = false;
+    const auto& m = transform.linear;
+    const double det =
+        m[0] * (m[4] * m[8] - m[5] * m[7]) -
+        m[1] * (m[3] * m[8] - m[5] * m[6]) +
+        m[2] * (m[3] * m[7] - m[4] * m[6]);
+    if (std::abs(det) <= kEpsilon) {
+        error = "MatchSize restore transform is not invertible";
+        return {};
+    }
+    const double inv_det = 1.0 / det;
+    data::GeometryAffineTransform inverse;
+    inverse.linear = {
+        (m[4] * m[8] - m[5] * m[7]) * inv_det,
+        (m[2] * m[7] - m[1] * m[8]) * inv_det,
+        (m[1] * m[5] - m[2] * m[4]) * inv_det,
+        (m[5] * m[6] - m[3] * m[8]) * inv_det,
+        (m[0] * m[8] - m[2] * m[6]) * inv_det,
+        (m[2] * m[3] - m[0] * m[5]) * inv_det,
+        (m[3] * m[7] - m[4] * m[6]) * inv_det,
+        (m[1] * m[6] - m[0] * m[7]) * inv_det,
+        (m[0] * m[4] - m[1] * m[3]) * inv_det,
+    };
+    inverse.translation = data::transform_vector(
+        inverse, {-transform.translation.x, -transform.translation.y,
+                  -transform.translation.z});
+    ok = true;
+    return inverse;
+}
+
+void apply_affine_to_selected(data::PcgGeometry& geometry,
+                              const data::GeometryAffineTransform& affine,
+                              const std::unordered_set<int>* selected_points)
+{
+    for (size_t i = 0; i < geometry.points().size(); ++i) {
+        if (selected_points &&
+            selected_points->count(static_cast<int>(i)) == 0)
+            continue;
+        geometry.points_mut()[i] =
+            data::transform_position(affine, geometry.points()[i]);
+    }
+
+    if (!selected_points) {
+        data::transform_geometry_attributes(geometry, affine);
+        return;
+    }
+
+    for (const auto& name : geometry.attributes().names(data::AttributeOwner::Point)) {
+        auto* attribute = geometry.attributes().find(data::AttributeOwner::Point, name);
+        if (!attribute || attribute->schema().type != data::AttributeType::Float ||
+            attribute->schema().tuple_size < 3)
+            continue;
+        const auto role = attribute->schema().transform_role;
+        if (role != data::AttributeTransformRole::Position &&
+            role != data::AttributeTransformRole::Vector &&
+            role != data::AttributeTransformRole::Normal)
+            continue;
+        auto& values = attribute->float_values_mut();
+        const size_t width = static_cast<size_t>(attribute->schema().tuple_size);
+        for (int index : *selected_points) {
+            if (index < 0 || static_cast<size_t>(index) >= attribute->size())
+                continue;
+            const size_t offset = static_cast<size_t>(index) * width;
+            const data::PcgVec3 value{values[offset], values[offset + 1], values[offset + 2]};
+            const data::PcgVec3 result = role == data::AttributeTransformRole::Position
+                ? data::transform_position(affine, value)
+                : role == data::AttributeTransformRole::Normal
+                    ? data::transform_normal(affine, value)
+                    : data::transform_vector(affine, value);
+            values[offset] = result.x;
+            values[offset + 1] = result.y;
+            values[offset + 2] = result.z;
+        }
+    }
 }
 
 struct BendFrame {
@@ -404,17 +638,80 @@ bool match_size_geometry(const data::PcgGeometry& source,
                          data::PcgGeometry& output,
                          std::string& error)
 {
-    const Bounds source_bounds = bounds_of(source.points());
+    output = source;
+
+    if (options.restore_transform) {
+        data::GeometryAffineTransform stored;
+        if (!read_detail_matrix(output, options.restore_attribute, stored, error))
+            return false;
+        bool ok = false;
+        const auto inverse = invert_affine(stored, ok, error);
+        if (!ok)
+            return false;
+        apply_affine_to_selected(output, inverse, nullptr);
+    }
+
+    const auto transform_points = collect_point_indices(
+        output, options.group, options.group_type);
+    if (transform_points.empty()) {
+        error = "MatchSize group selected no points";
+        return false;
+    }
+
+    const bool use_source_group =
+        options.use_groups_for_bounds && !options.source_group.empty();
+    const auto source_bound_points = points_for_bounds(
+        output,
+        use_source_group ? options.source_group : std::string{},
+        use_source_group ? options.source_group_type : options.group_type,
+        use_source_group);
+    const Bounds source_bounds = bounds_of(source_bound_points);
     if (!source_bounds.valid) {
         error = "MatchSize source has no points";
         return false;
     }
+
+    const std::array<std::string, 3> source_justify{
+        options.justify_x, options.justify_y, options.justify_z};
+    const std::array<std::string, 3> target_justify{
+        resolve_target_justify(options.justify_x, options.target_justify_x),
+        resolve_target_justify(options.justify_y, options.target_justify_y),
+        resolve_target_justify(options.justify_z, options.target_justify_z)};
+
+    const bool reference_available = reference != nullptr;
+    bool use_reference = false;
+    if (options.justify_with == "secondInput") {
+        use_reference = true;
+    } else if (options.justify_with == "inputIfWired") {
+        use_reference = reference_available;
+    } else if (options.justify_with == "originAndUnitSize") {
+        use_reference = false;
+    } else {
+        use_reference = false; // locationAndSize
+    }
+
     Bounds target_bounds;
-    if (reference) {
-        target_bounds = bounds_of(reference->points());
-        if (!target_bounds.valid) {
-            error = "MatchSize reference has no points";
-            return false;
+    if (options.justify_with == "originAndUnitSize") {
+        target_bounds = bounds_from_position_size(
+            {0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}, {"center", "center", "center"});
+    } else if (use_reference) {
+        if (!reference_available) {
+            target_bounds.valid = true;
+            target_bounds.minimum = {0.0, 0.0, 0.0};
+            target_bounds.maximum = {0.0, 0.0, 0.0};
+        } else {
+            const bool use_target_group =
+                options.use_groups_for_bounds && !options.target_group.empty();
+            const auto target_bound_points = points_for_bounds(
+                *reference,
+                use_target_group ? options.target_group : std::string{},
+                use_target_group ? options.target_group_type : options.group_type,
+                use_target_group);
+            target_bounds = bounds_of(target_bound_points);
+            if (!target_bounds.valid) {
+                error = "MatchSize reference has no points";
+                return false;
+            }
         }
     } else {
         if (options.target_size.x < 0.0 || options.target_size.y < 0.0 ||
@@ -422,9 +719,8 @@ bool match_size_geometry(const data::PcgGeometry& source,
             error = "MatchSize target size must be non-negative";
             return false;
         }
-        target_bounds.valid = true;
-        target_bounds.minimum = subtract(options.target_center, multiply(options.target_size, 0.5));
-        target_bounds.maximum = add(options.target_center, multiply(options.target_size, 0.5));
+        target_bounds = bounds_from_position_size(
+            options.target_position, options.target_size, target_justify);
     }
 
     const auto source_size = bounds_size(source_bounds);
@@ -436,47 +732,81 @@ bool match_size_geometry(const data::PcgGeometry& source,
         std::array<double, 3> ratios{1.0, 1.0, 1.0};
         std::vector<double> valid_ratios;
         for (int axis = 0; axis < 3; ++axis) {
-            if (std::abs(source_axes[axis]) > kEpsilon) {
-                ratios[axis] = target_axes[axis] / source_axes[axis];
-                valid_ratios.push_back(ratios[axis]);
+            if (std::abs(source_axes[static_cast<size_t>(axis)]) > kEpsilon) {
+                ratios[static_cast<size_t>(axis)] =
+                    target_axes[static_cast<size_t>(axis)] /
+                    source_axes[static_cast<size_t>(axis)];
+                valid_ratios.push_back(ratios[static_cast<size_t>(axis)]);
             }
         }
-        scale = {ratios[0], ratios[1], ratios[2]};
-        if (options.uniform_scale && !valid_ratios.empty()) {
-            const double uniform = options.uniform_scale_mode == "fill"
-                ? *std::max_element(valid_ratios.begin(), valid_ratios.end())
-                : *std::min_element(valid_ratios.begin(), valid_ratios.end());
+
+        if (options.uniform_scale) {
+            double uniform = 1.0;
+            if (options.scale_axis == "x") {
+                uniform = ratios[0];
+            } else if (options.scale_axis == "y") {
+                uniform = ratios[1];
+            } else if (options.scale_axis == "z") {
+                uniform = ratios[2];
+            } else if (options.scale_axis == "fill" && !valid_ratios.empty()) {
+                uniform = *std::max_element(valid_ratios.begin(), valid_ratios.end());
+            } else if (!valid_ratios.empty()) {
+                // bestFit (and legacy "fit")
+                uniform = *std::min_element(valid_ratios.begin(), valid_ratios.end());
+            }
             scale = {uniform, uniform, uniform};
+        } else {
+            scale = {
+                options.scale_x ? ratios[0] : 1.0,
+                options.scale_y ? ratios[1] : 1.0,
+                options.scale_z ? ratios[2] : 1.0,
+            };
         }
     }
 
-    const auto source_anchor = bounds_anchor(
-        source_bounds, {options.source_justify_x, options.source_justify_y,
-                        options.source_justify_z});
-    const auto target_anchor = bounds_anchor(
-        target_bounds, {options.target_justify_x, options.target_justify_y,
-                        options.target_justify_z});
-    const auto translation = subtract(target_anchor, apply_scale(source_anchor, scale));
+    const auto source_anchor = bounds_anchor_axis(source_bounds, source_justify);
+    const auto target_anchor = bounds_anchor_axis(target_bounds, target_justify);
+    data::PcgVec3 translation{};
+    for (int axis = 0; axis < 3; ++axis) {
+        const double src = axis == 0 ? source_anchor.x
+            : axis == 1 ? source_anchor.y : source_anchor.z;
+        const double tgt = axis == 0 ? target_anchor.x
+            : axis == 1 ? target_anchor.y : target_anchor.z;
+        const double off = axis == 0 ? options.offset.x
+            : axis == 1 ? options.offset.y : options.offset.z;
+        const double s = axis == 0 ? scale.x : axis == 1 ? scale.y : scale.z;
+        const std::string& mode = source_justify[static_cast<size_t>(axis)];
+        const bool move = options.translate && mode != "none";
+        const double value = move ? (tgt + off - s * src) : (src - s * src);
+        if (axis == 0) translation.x = value;
+        else if (axis == 1) translation.y = value;
+        else translation.z = value;
+    }
 
-    output = source;
-    for (auto& point : output.points_mut())
-        point = add(apply_scale(point, scale), translation);
     data::GeometryAffineTransform affine;
     affine.linear = {scale.x, 0.0, 0.0,
                      0.0, scale.y, 0.0,
                      0.0, 0.0, scale.z};
     affine.translation = translation;
-    data::transform_geometry_attributes(output, affine);
-    output.attributes().erase(data::AttributeOwner::Detail, "pcg_match_xform");
-    auto& matrix = output.attributes().create_float(
-        data::AttributeOwner::Detail, "pcg_match_xform", 16,
-        std::vector<double>(16, 0.0), data::AttributeTransformRole::Matrix);
-    matrix.float_values_mut() = {
-        scale.x, 0.0, 0.0, translation.x,
-        0.0, scale.y, 0.0, translation.y,
-        0.0, 0.0, scale.z, translation.z,
-        0.0, 0.0, 0.0, 1.0,
-    };
+
+    const bool transform_all =
+        options.group.empty() &&
+        transform_points.size() == output.points().size();
+    apply_affine_to_selected(
+        output, affine, transform_all ? nullptr : &transform_points);
+
+    if (options.stash_transform && !options.stash_attribute.empty()) {
+        output.attributes().erase(data::AttributeOwner::Detail, options.stash_attribute);
+        auto& matrix = output.attributes().create_float(
+            data::AttributeOwner::Detail, options.stash_attribute, 16,
+            std::vector<double>(16, 0.0), data::AttributeTransformRole::Matrix);
+        matrix.float_values_mut() = {
+            scale.x, 0.0, 0.0, translation.x,
+            0.0, scale.y, 0.0, translation.y,
+            0.0, 0.0, scale.z, translation.z,
+            0.0, 0.0, 0.0, 1.0,
+        };
+    }
     return true;
 }
 

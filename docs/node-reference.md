@@ -2540,23 +2540,33 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 ### MatchSize
 
-**功能**：对 source 做纯 affine bbox 匹配，覆盖 Houdini Match Size 常用子集；不改变 points/faces 拓扑、groups、材质或非变换属性。
+**功能**：Houdini Match Size 对齐的 bbox 匹配：Translate / Justify / Offset、Scale to Fit、Uniform Scale + Scale Axis、Restore/Stash Transform。不改变 points/faces 拓扑、groups、材质或非变换属性。
 
-**输入 Pin**：`source`（必需 `SpatialMesh`）、`reference`（可选 `SpatialMesh`）。连接 reference 时使用其 bbox；否则使用 `targetCenter*` / `targetSize*`。
+**输入 Pin**：`source`（必需 `SpatialMesh`）、`reference`（可选 `SpatialMesh`，标签 Destination Size）。
 
 **输出 Pin**：`out`（`SpatialMesh`）
 
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
-| `scaleToFit` | true | 是否把 source bbox 缩放到目标 bbox |
-| `uniformScale` | false | 使用统一缩放，避免改变比例 |
-| `uniformScaleMode` | `fit` | `fit` 取最小有效轴比例；`fill` 取最大比例 |
-| `sourceJustifyX/Y/Z` | `center` | source anchor：`min` / `center` / `max` |
-| `targetJustifyX/Y/Z` | `center` | target anchor：`min` / `center` / `max` |
-| `targetCenterX/Y/Z` | 0 | 无 reference 时的目标中心 |
+| `group` / `groupType` | `""` / `guess` | 仅变换子集；空 group 变换全部 |
+| `justifyWith` | `inputIfWired` | `inputIfWired` / `locationAndSize` / `secondInput` / `originAndUnitSize` |
+| `useGroupsForBounds` | false | 用 `sourceGroup` / `targetGroup` 计算 justification bbox |
+| `targetPositionX/Y/Z` | 0 | 无 reference 时的目标锚点（Min/Max 时表示边，Center 时表示中心） |
 | `targetSizeX/Y/Z` | 1 | 无 reference 时的目标尺寸；必须非负 |
+| `translate` | true | 是否平移对齐 |
+| `justifyX/Y/Z` | `center` | source：`none` / `min` / `center` / `max` |
+| `targetJustifyX/Y/Z` | `same` | target：`same` / `min` / `center` / `max` |
+| `offsetX/Y/Z` | 0 | 各轴额外偏移 |
+| `scaleToFit` | true | 是否缩放到目标 bbox |
+| `uniformScale` | true | 等比缩放 |
+| `scaleAxis` | `bestFit` | 等比时轴策略：`x` / `y` / `z` / `bestFit` |
+| `scaleX/Y/Z` | true | 非等比时各轴是否缩放 |
+| `restoreTransform` / `restoreAttribute` | false / `xform` | 先应用 detail 矩阵的逆变换 |
+| `stashTransform` / `stashAttribute` | true / `xform` | 把本次 4×4 写入 detail float16 |
 
-输出 Detail owner 上会写入 float16 `pcg_match_xform`（row-major 4×4），供调试或后续装配读取。退化 source 轴保持 scale=1；其余有效轴仍参与 fit/fill。
+兼容旧图：`targetCenter*`、`sourceJustify*`、`uniformScaleMode`（`fit`→`bestFit`，`fill` 仍取最大轴比）。
+
+> 通用装配：`ImportMesh → MatchSize → CopyMeshToPoints`；需要下垂/弧形时在复制前接 `BendMesh`。沿线 chain 继续使用 `InstanceAlongSpline`，或 `ResampleSpline → CopyMeshToPoints`，不增加重复的专用节点。
 
 ### BendMesh
 
@@ -2576,8 +2586,6 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `maskAttribute` | `bendmask` | 输出 point float mask；空字符串可关闭 |
 
 捕获区之前保持不动；区间内按恒定曲率弯曲；区间之后沿末端切线刚性延伸。带 `Position` / `Vector` / `Normal` transform role 的 float3+ 属性会使用各 owner 的位置同步变换。
-
-> 通用装配：`ImportMesh → MatchSize → CopyMeshToPoints`；需要下垂/弧形时在复制前接 `BendMesh`。沿线 chain 继续使用 `InstanceAlongSpline`，或 `ResampleSpline → CopyMeshToPoints`，不增加重复的专用节点。
 
 ---
 

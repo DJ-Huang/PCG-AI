@@ -344,12 +344,6 @@
       "data": {"minSize": 0.1, "iterations": 4, "irregularity": 0.35, "seed": 2.3, "alignment": "longestEdge", "__nodeTitle": "City Blocks iter=3"}
     },
     {
-      "id": "n110",
-      "type": "GroupPromote",
-      "position": { "x": 1268.5, "y": 1190 },
-      "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
-    },
-    {
       "id": "n104",
       "type": "Carve",
       "position": { "x": 1173, "y": 978 },
@@ -360,12 +354,6 @@
       "type": "Resample",
       "position": { "x": 1173, "y": 1039.5 },
       "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 0.1, "useMaxSegments": true, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
-    },
-    {
-      "id": "n103",
-      "type": "ConvertLine",
-      "position": { "x": 1054, "y": 891.5 },
-      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
     },
     {
       "id": "n105",
@@ -384,6 +372,42 @@
       "type": "GroupTransfer",
       "position": { "x": 1268.5, "y": 1128.5 },
       "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "streetFacingPoints", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "overwrite", "enableDistanceThreshold": true, "distanceThreshold": 1.5, "createEmptyGroups": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n110",
+      "type": "GroupPromote",
+      "position": { "x": 1268.5, "y": 1189 },
+      "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n103",
+      "type": "ConvertLine",
+      "position": { "x": 1173, "y": 902 },
+      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n112",
+      "type": "GroupTransfer",
+      "position": { "x": 1063, "y": 1272 },
+      "data": {"transferPrimitiveGroups": true, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": true, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 10, "createEmptyGroups": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n113",
+      "type": "SortGeometry",
+      "position": { "x": 1063, "y": 1356.5 },
+      "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "random", "primitiveSeed": 3, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n115",
+      "type": "MatchSize",
+      "position": { "x": 1063, "y": 1522.5 },
+      "data": {"justifyWith": "inputIfWired", "translate": true, "scaleToFit": true, "uniformScale": false, "scaleX": true, "scaleY": true, "scaleZ": true, "justifyX": "center", "justifyY": "center", "justifyZ": "center", "targetJustifyX": "center", "targetJustifyY": "center", "targetJustifyZ": "center", "offsetX": 0, "offsetY": 0, "offsetZ": 0, "targetPositionX": 0, "targetPositionY": 0, "targetPositionZ": 0, "targetSizeX": 1, "targetSizeY": 1, "targetSizeZ": 1, "stashTransform": true, "stashAttribute": "xform", "restoreTransform": false, "restoreAttribute": "xform", "__nodeTitle": ""}
+    },
+    {
+      "id": "n114",
+      "type": "ForEachBegin",
+      "position": { "x": 1063, "y": 1429.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -459,7 +483,12 @@
     {"id": "e143004", "source": "n108", "target": "n110", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e111936", "source": "n102", "target": "n111", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e157598", "source": "n111", "target": "n103", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_ground_outline", "source": "shrink_blocks", "target": "n105", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e_ground_outline", "source": "shrink_blocks", "target": "n105", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e598847", "source": "n110", "target": "n112", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e598848", "source": "n111", "target": "n112", "sourceHandle": "out", "targetHandle": "target"},
+    {"id": "e598849", "source": "n112", "target": "n113", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e598850", "source": "n113", "target": "n114", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e598851", "source": "n114", "target": "n115", "sourceHandle": "out", "targetHandle": "source"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

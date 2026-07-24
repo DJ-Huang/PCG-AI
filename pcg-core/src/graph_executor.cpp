@@ -542,12 +542,27 @@ nlohmann::json build_heightfield_summary(const data::PcgHeightField& heightfield
     };
 }
 
+// Must match Unity PcgGraphPreviewSubgraph.PreviewSinkNodeId. Upstream-only
+// preview cooks include ForEachBegin but truncate ForEachEnd; open regions are
+// allowed only for that preview sink and cook the first iteration/piece.
+constexpr const char* kPreviewSinkNodeId = "__pcg_preview_sink__";
+
 struct ForEachRegion {
     std::string begin_id;
-    std::string end_id;
+    std::string end_id; // empty => open preview region (no matching End in graph)
+    bool first_iteration_only = false;
     std::vector<std::string> body_order;
     std::unordered_set<std::string> body_nodes;
 };
+
+bool graph_has_preview_sink(const Graph& graph)
+{
+    for (const auto& node : graph.nodes) {
+        if (node.id == kPreviewSinkNodeId)
+            return true;
+    }
+    return false;
+}
 
 std::vector<std::string> reachable_from(
     const std::string& start,
@@ -613,7 +628,7 @@ bool discover_foreach_regions(
         pairs.emplace_back(begin_stack.back(), id);
         begin_stack.pop_back();
     }
-    if (!begin_stack.empty()) {
+    if (!begin_stack.empty() && !graph_has_preview_sink(graph)) {
         code = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION,
                     "ForEachBegin has no matching ForEachEnd");
         return false;
@@ -636,6 +651,31 @@ bool discover_foreach_regions(
                 region.body_nodes.insert(id);
                 region.body_order.push_back(id);
             }
+        }
+        regions.push_back(std::move(region));
+    }
+
+    // Open ForEach regions: Editor node preview truncates End. Cook first
+    // iteration/piece only; leave Output sinks for the main topo pass.
+    for (const auto& begin_id : begin_stack) {
+        const auto from_begin = reachable_from(begin_id, adjacency);
+        ForEachRegion region;
+        region.begin_id = begin_id;
+        region.first_iteration_only = true;
+        for (const auto& id : topo_order) {
+            if (id == begin_id)
+                continue;
+            const auto node_it = node_by_id.find(id);
+            if (node_it == node_by_id.end())
+                continue;
+            if (node_it->second->type == "Output")
+                continue;
+            const bool from_begin_hit =
+                std::find(from_begin.begin(), from_begin.end(), id) != from_begin.end();
+            if (!from_begin_hit)
+                continue;
+            region.body_nodes.insert(id);
+            region.body_order.push_back(id);
         }
         regions.push_back(std::move(region));
     }
@@ -763,7 +803,15 @@ PcgResultCode cook_foreach_region(
 {
     static const std::vector<const GraphEdge*> kNoIncomingEdges;
     const GraphNode* begin_node = node_by_id.at(region.begin_id);
-    const GraphNode* end_node = node_by_id.at(region.end_id);
+    const GraphNode* end_node = nullptr;
+    if (!region.end_id.empty()) {
+        const auto end_it = node_by_id.find(region.end_id);
+        if (end_it == node_by_id.end())
+            return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION,
+                        "ForEachEnd node missing from graph");
+        end_node = end_it->second;
+    }
+    const bool first_iteration_only = region.first_iteration_only || end_node == nullptr;
 
     const auto begin_incoming_it = incoming_by_node.find(region.begin_id);
     const auto& begin_incoming = begin_incoming_it != incoming_by_node.end()
@@ -794,8 +842,9 @@ PcgResultCode cook_foreach_region(
         begin_node->data.value("iterationsAttribute", std::string());
     const int iterations = elements::read_iterations_attribute(
         *seed_geometry, iterations_attribute, configured_iterations);
-    const std::string gather_method =
-        end_node->data.value("gatherMethod", std::string("merge"));
+    const std::string gather_method = end_node
+        ? end_node->data.value("gatherMethod", std::string("merge"))
+        : std::string("merge");
 
     auto inject_loop_metadata = [](data::PcgGeometry& geometry,
                                    int iteration,
@@ -813,7 +862,8 @@ PcgResultCode cook_foreach_region(
                 continue;
             if (region.body_nodes.count(other.begin_id) == 0)
                 continue;
-            if (other.body_nodes.count(body_id) > 0 || other.end_id == body_id)
+            if (other.body_nodes.count(body_id) > 0 ||
+                (!other.end_id.empty() && other.end_id == body_id))
                 return true;
         }
         return false;
@@ -852,6 +902,11 @@ PcgResultCode cook_foreach_region(
                 return rc;
         }
 
+        if (end_node == nullptr) {
+            end_geometry = piece;
+            return PCG_OK;
+        }
+
         const auto end_incoming_it = incoming_by_node.find(region.end_id);
         const auto& end_incoming = end_incoming_it != incoming_by_node.end()
             ? end_incoming_it->second : kNoIncomingEdges;
@@ -874,21 +929,31 @@ PcgResultCode cook_foreach_region(
 
     data::PcgGeometry accumulated;
     if (method == "count") {
-        if (iterations <= 0) {
-            data::PcgDataCollection end_out;
-            end_out.add_geometry("out", data::PcgGeometry{});
-            outputs[region.end_id] = std::move(end_out);
-            output_hashes[region.end_id] = compute_output_hash(outputs[region.end_id]);
+        const int loop_count = first_iteration_only ? std::min(1, iterations) : iterations;
+        if (loop_count <= 0) {
+            if (end_node != nullptr) {
+                data::PcgDataCollection end_out;
+                end_out.add_geometry("out", data::PcgGeometry{});
+                outputs[region.end_id] = std::move(end_out);
+                output_hashes[region.end_id] = compute_output_hash(outputs[region.end_id]);
+            } else {
+                data::PcgDataCollection begin_out;
+                begin_out.add_geometry("out", data::PcgGeometry{});
+                outputs[region.begin_id] = std::move(begin_out);
+                output_hashes[region.begin_id] = compute_output_hash(outputs[region.begin_id]);
+            }
             return PCG_OK;
         }
         data::PcgGeometry current = *seed_geometry;
-        for (int i = 0; i < iterations; ++i) {
+        for (int i = 0; i < loop_count; ++i) {
             data::PcgGeometry piece = current;
             inject_loop_metadata(piece, i, iterations, i);
             data::PcgGeometry end_geometry;
             const PcgResultCode rc = cook_body_once(piece, end_geometry);
             if (rc != PCG_OK)
                 return rc;
+            if (first_iteration_only)
+                return PCG_OK;
             if (gather_method == "feedback") {
                 current = end_geometry;
                 accumulated = end_geometry;
@@ -900,6 +965,26 @@ PcgResultCode cook_foreach_region(
     } else {
         const auto pieces = elements::foreach_pieces(*seed_geometry, method, piece_attribute);
         const int num_pieces = static_cast<int>(pieces.size());
+        if (pieces.empty()) {
+            if (end_node != nullptr) {
+                data::PcgDataCollection end_out;
+                end_out.add_geometry("out", data::PcgGeometry{});
+                outputs[region.end_id] = std::move(end_out);
+                output_hashes[region.end_id] = compute_output_hash(outputs[region.end_id]);
+            } else {
+                data::PcgDataCollection begin_out;
+                begin_out.add_geometry("out", data::PcgGeometry{});
+                outputs[region.begin_id] = std::move(begin_out);
+                output_hashes[region.begin_id] = compute_output_hash(outputs[region.begin_id]);
+            }
+            return PCG_OK;
+        }
+        if (first_iteration_only) {
+            data::PcgGeometry piece = pieces.front();
+            inject_loop_metadata(piece, 0, num_pieces, 0);
+            data::PcgGeometry end_geometry;
+            return cook_body_once(piece, end_geometry);
+        }
         int piece_index = 0;
         for (const auto& piece_in : pieces) {
             data::PcgGeometry piece = piece_in;
@@ -912,6 +997,9 @@ PcgResultCode cook_foreach_region(
             ++piece_index;
         }
     }
+
+    if (end_node == nullptr)
+        return PCG_OK;
 
     data::PcgDataCollection end_out;
     end_out.add_geometry("out", std::move(accumulated));
@@ -982,7 +1070,8 @@ PcgResultCode execute_graph(const Graph& graph,
     for (const auto& region : foreach_regions) {
         foreach_by_begin[region.begin_id] = &region;
         foreach_managed.insert(region.begin_id);
-        foreach_managed.insert(region.end_id);
+        if (!region.end_id.empty())
+            foreach_managed.insert(region.end_id);
         for (const auto& body_id : region.body_nodes)
             foreach_managed.insert(body_id);
     }

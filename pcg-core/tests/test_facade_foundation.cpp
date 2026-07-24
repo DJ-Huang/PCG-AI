@@ -373,6 +373,94 @@ int main()
         }
     }
 
+    {
+        // Mimics Unity node-preview upstream cook: ForEachBegin without End, sink id
+        // matches PcgGraphPreviewSubgraph.PreviewSinkNodeId.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+            {"id":"begin","type":"ForEachBegin","data":{"method":"primitive"}},
+            {"id":"prim","type":"PrimitiveTransform","data":{"scale":0.5}},
+            {"id":"__pcg_preview_sink__","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"begin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"begin","target":"prim","sourceHandle":"out","targetHandle":"in"},
+            {"source":"prim","target":"__pcg_preview_sink__","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr,
+               "preview open ForEach cooks first primitive piece");
+        if (result.source_geometry)
+            expect(result.source_geometry->faces().size() == 1,
+                   "preview open ForEach uses first iteration only");
+    }
+
+    {
+        // Nested open outer + closed inner, mimicking lot-city floor ring under lot ForEach.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+            {"id":"obegin","type":"ForEachBegin","data":{"method":"primitive"}},
+            {"id":"prim","type":"PrimitiveTransform","data":{"scale":0.8}},
+            {"id":"ibegin","type":"ForEachBegin","data":{"method":"count","iterations":3}},
+            {"id":"xform","type":"TransformMesh","data":{"translateY":1.0}},
+            {"id":"iend","type":"ForEachEnd","data":{"gatherMethod":"feedback"}},
+            {"id":"__pcg_preview_sink__","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"obegin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"obegin","target":"prim","sourceHandle":"out","targetHandle":"in"},
+            {"source":"prim","target":"ibegin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"ibegin","target":"xform","sourceHandle":"out","targetHandle":"in"},
+            {"source":"xform","target":"iend","sourceHandle":"out","targetHandle":"in"},
+            {"source":"iend","target":"__pcg_preview_sink__","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr,
+               "nested preview open outer ForEach cooks");
+        if (result.source_geometry) {
+            expect(result.source_geometry->faces().size() == 1,
+                   "nested preview open outer still uses first outer piece");
+            double max_y = -1e9;
+            for (const auto& p : result.source_geometry->points())
+                max_y = std::max(max_y, p.y);
+            expect(max_y > 2.5, "inner count feedback still runs fully under open outer");
+        }
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+            {"id":"begin","type":"ForEachBegin","data":{"method":"primitive"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"begin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"begin","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        char error[2048] = {};
+        pcg::internal::Graph graph_obj;
+        const PcgResultCode parse_code =
+            pcg::internal::parse_graph(graph.c_str(), graph_obj, error, sizeof(error));
+        expect(parse_code == PCG_OK, "unmatched ForEachBegin graph parses");
+        GraphExecutionResult result;
+        const PcgResultCode execute_code = pcg::internal::execute_graph(
+            graph_obj, 42, result, error, sizeof(error));
+        expect(execute_code != PCG_OK,
+               "unmatched ForEachBegin without preview sink still fails");
+        expect(std::string(error).find("ForEachBegin has no matching ForEachEnd") !=
+                   std::string::npos,
+               "unmatched ForEachBegin reports pairing error");
+    }
+
     std::printf("failures=%d\n", failures);
     return failures == 0 ? 0 : 1;
 }

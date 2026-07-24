@@ -103,18 +103,60 @@ public:
 
         data::PcgGeometry reference_storage;
         const auto* reference = optional_geometry_input(ctx, "reference", reference_storage);
+        const auto& data = ctx.node->data;
         MatchSizeOptions options;
-        options.scale_to_fit = ctx.node->data.value("scaleToFit", true);
-        options.uniform_scale = ctx.node->data.value("uniformScale", false);
-        options.uniform_scale_mode = ctx.node->data.value("uniformScaleMode", "fit");
-        options.source_justify_x = ctx.node->data.value("sourceJustifyX", "center");
-        options.source_justify_y = ctx.node->data.value("sourceJustifyY", "center");
-        options.source_justify_z = ctx.node->data.value("sourceJustifyZ", "center");
-        options.target_justify_x = ctx.node->data.value("targetJustifyX", "center");
-        options.target_justify_y = ctx.node->data.value("targetJustifyY", "center");
-        options.target_justify_z = ctx.node->data.value("targetJustifyZ", "center");
-        options.target_center = read_vector(ctx.node->data, "targetCenter", {0.0, 0.0, 0.0});
-        options.target_size = read_vector(ctx.node->data, "targetSize", {1.0, 1.0, 1.0});
+        options.justify_with = data.value("justifyWith", "inputIfWired");
+        options.group = data.value("group", "");
+        options.group_type = data.value("groupType", "guess");
+        options.use_groups_for_bounds = data.value("useGroupsForBounds", false);
+        options.source_group = data.value("sourceGroup", "");
+        options.source_group_type = data.value("sourceGroupType", "guess");
+        options.target_group = data.value("targetGroup", "");
+        options.target_group_type = data.value("targetGroupType", "guess");
+        options.translate = data.value("translate", true);
+        options.scale_to_fit = data.value("scaleToFit", true);
+        options.uniform_scale = data.value("uniformScale", true);
+        if (data.contains("scaleAxis")) {
+            options.scale_axis = data.value("scaleAxis", "bestFit");
+        } else {
+            const auto legacy_mode = data.value("uniformScaleMode", "fit");
+            if (legacy_mode == "fill")
+                options.scale_axis = "fill";
+            else
+                options.scale_axis = "bestFit";
+        }
+        options.scale_x = data.value("scaleX", true);
+        options.scale_y = data.value("scaleY", true);
+        options.scale_z = data.value("scaleZ", true);
+        options.justify_x = data.contains("justifyX")
+            ? data.value("justifyX", "center")
+            : data.value("sourceJustifyX", "center");
+        options.justify_y = data.contains("justifyY")
+            ? data.value("justifyY", "center")
+            : data.value("sourceJustifyY", "center");
+        options.justify_z = data.contains("justifyZ")
+            ? data.value("justifyZ", "center")
+            : data.value("sourceJustifyZ", "center");
+        const bool legacy_justify =
+            !data.contains("justifyX") && data.contains("sourceJustifyX");
+        options.target_justify_x =
+            data.value("targetJustifyX", legacy_justify ? "center" : "same");
+        options.target_justify_y =
+            data.value("targetJustifyY", legacy_justify ? "center" : "same");
+        options.target_justify_z =
+            data.value("targetJustifyZ", legacy_justify ? "center" : "same");
+        options.offset = read_vector(data, "offset", {0.0, 0.0, 0.0});
+        if (data.contains("targetPositionX") || data.contains("targetPositionY") ||
+            data.contains("targetPositionZ")) {
+            options.target_position = read_vector(data, "targetPosition", {0.0, 0.0, 0.0});
+        } else {
+            options.target_position = read_vector(data, "targetCenter", {0.0, 0.0, 0.0});
+        }
+        options.target_size = read_vector(data, "targetSize", {1.0, 1.0, 1.0});
+        options.restore_transform = data.value("restoreTransform", false);
+        options.restore_attribute = data.value("restoreAttribute", "xform");
+        options.stash_transform = data.value("stashTransform", true);
+        options.stash_attribute = data.value("stashAttribute", "xform");
 
         data::PcgGeometry output;
         std::string error;
