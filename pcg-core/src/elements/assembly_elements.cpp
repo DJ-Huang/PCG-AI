@@ -12,15 +12,6 @@
 namespace pcg::internal::elements {
 namespace {
 
-data::PcgVec3 read_vector(const nlohmann::json& value,
-                          const char* prefix,
-                          data::PcgVec3 fallback)
-{
-    return {value.value(std::string(prefix) + "X", fallback.x),
-            value.value(std::string(prefix) + "Y", fallback.y),
-            value.value(std::string(prefix) + "Z", fallback.z)};
-}
-
 const data::PcgGeometry* optional_geometry_input(PcgContext& ctx,
                                                  const char* pin,
                                                  data::PcgGeometry& storage)
@@ -145,14 +136,13 @@ public:
             data.value("targetJustifyY", legacy_justify ? "center" : "same");
         options.target_justify_z =
             data.value("targetJustifyZ", legacy_justify ? "center" : "same");
-        options.offset = read_vector(data, "offset", {0.0, 0.0, 0.0});
-        if (data.contains("targetPositionX") || data.contains("targetPositionY") ||
-            data.contains("targetPositionZ")) {
-            options.target_position = read_vector(data, "targetPosition", {0.0, 0.0, 0.0});
+        options.offset = read_vector_param(data, "offset", {0.0, 0.0, 0.0});
+        if (data.contains("targetPosition") || data.contains("targetPositionX")) {
+            options.target_position = read_vector_param(data, "targetPosition", {0.0, 0.0, 0.0});
         } else {
-            options.target_position = read_vector(data, "targetCenter", {0.0, 0.0, 0.0});
+            options.target_position = read_vector_param(data, "targetCenter", {0.0, 0.0, 0.0});
         }
-        options.target_size = read_vector(data, "targetSize", {1.0, 1.0, 1.0});
+        options.target_size = read_vector_param(data, "targetSize", {1.0, 1.0, 1.0});
         options.restore_transform = data.value("restoreTransform", false);
         options.restore_attribute = data.value("restoreAttribute", "xform");
         options.stash_transform = data.value("stashTransform", true);
@@ -218,9 +208,9 @@ public:
         data::PcgGeometry rest_storage;
         const auto* rest = optional_geometry_input(ctx, "rest", rest_storage);
         BendMeshOptions options;
-        options.capture_origin = read_vector(ctx.node->data, "captureOrigin", {0.0, 0.0, 0.0});
-        options.capture_direction = read_vector(ctx.node->data, "captureDirection", {0.0, 1.0, 0.0});
-        options.up_direction = read_vector(ctx.node->data, "upDirection", {1.0, 0.0, 0.0});
+        options.capture_origin = read_vector_param(ctx.node->data, "captureOrigin", {0.0, 0.0, 0.0});
+        options.capture_direction = read_vector_param(ctx.node->data, "captureDirection", {0.0, 1.0, 0.0});
+        options.up_direction = read_vector_param(ctx.node->data, "upDirection", {1.0, 0.0, 0.0});
         options.capture_length = ctx.node->data.value("captureLength", 1.0);
         options.angle_degrees = ctx.node->data.value("angle", 0.0);
         options.mask_attribute = ctx.node->data.value("maskAttribute", "bendmask");

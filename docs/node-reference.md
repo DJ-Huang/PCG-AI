@@ -2551,12 +2551,12 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `group` / `groupType` | `""` / `guess` | 仅变换子集；空 group 变换全部 |
 | `justifyWith` | `inputIfWired` | `inputIfWired` / `locationAndSize` / `secondInput` / `originAndUnitSize` |
 | `useGroupsForBounds` | false | 用 `sourceGroup` / `targetGroup` 计算 justification bbox |
-| `targetPositionX/Y/Z` | 0 | 无 reference 时的目标锚点（Min/Max 时表示边，Center 时表示中心） |
-| `targetSizeX/Y/Z` | 1 | 无 reference 时的目标尺寸；必须非负 |
+| `targetPosition` | `[0,0,0]` | 无 reference 时的目标锚点（Min/Max 时表示边，Center 时表示中心） |
+| `targetSize` | `[1,1,1]` | 无 reference 时的目标尺寸；各分量必须非负 |
 | `translate` | true | 是否平移对齐 |
 | `justifyX/Y/Z` | `center` | source：`none` / `min` / `center` / `max` |
 | `targetJustifyX/Y/Z` | `same` | target：`same` / `min` / `center` / `max` |
-| `offsetX/Y/Z` | 0 | 各轴额外偏移 |
+| `offset` | `[0,0,0]`（或 `offsetX/Y/Z`） | 各轴额外偏移 |
 | `scaleToFit` | true | 是否缩放到目标 bbox |
 | `uniformScale` | true | 等比缩放 |
 | `scaleAxis` | `bestFit` | 等比时轴策略：`x` / `y` / `z` / `bestFit` |

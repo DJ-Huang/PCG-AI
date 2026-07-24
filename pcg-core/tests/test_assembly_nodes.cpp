@@ -226,8 +226,8 @@ void test_match_size()
             {{"id", "box"}, {"type", "CreateBoxMesh"},
              {"data", {{"width", 2.0}, {"height", 2.0}, {"depth", 2.0}}}},
             {{"id", "match"}, {"type", "MatchSize"},
-             {"data", {{"targetSizeX", 4.0}, {"targetSizeY", 6.0},
-                       {"targetSizeZ", 8.0}, {"uniformScale", false}}}},
+             {"data", {{"targetSize", nlohmann::json::array({4.0, 6.0, 8.0})},
+                       {"uniformScale", false}}}},
             {{"id", "output"}, {"type", "Output"}, {"data", nlohmann::json::object()}},
         })},
         {"edges", nlohmann::json::array({

@@ -80,4 +80,8 @@ uint32_t rng_state_from_seed(double node_seed, int graph_seed = 0);
 
 std::vector<std::string> parse_name_list(const nlohmann::json& data, const char* key);
 
+data::PcgVec3 read_vector_param(const nlohmann::json& data,
+                                const char* key,
+                                const data::PcgVec3& fallback = {0.0, 0.0, 0.0});
+
 } // namespace pcg::internal::elements

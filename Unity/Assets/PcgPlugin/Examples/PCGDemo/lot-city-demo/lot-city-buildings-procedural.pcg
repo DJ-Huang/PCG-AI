@@ -398,16 +398,16 @@
       "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "random", "primitiveSeed": 3, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
     },
     {
-      "id": "n115",
-      "type": "MatchSize",
-      "position": { "x": 1063, "y": 1522.5 },
-      "data": {"justifyWith": "inputIfWired", "translate": true, "scaleToFit": true, "uniformScale": false, "scaleX": true, "scaleY": true, "scaleZ": true, "justifyX": "center", "justifyY": "center", "justifyZ": "center", "targetJustifyX": "center", "targetJustifyY": "center", "targetJustifyZ": "center", "offsetX": 0, "offsetY": 0, "offsetZ": 0, "targetPositionX": 0, "targetPositionY": 0, "targetPositionZ": 0, "targetSizeX": 1, "targetSizeY": 1, "targetSizeZ": 1, "stashTransform": true, "stashAttribute": "xform", "restoreTransform": false, "restoreAttribute": "xform", "__nodeTitle": ""}
-    },
-    {
       "id": "n114",
       "type": "ForEachBegin",
       "position": { "x": 1063, "y": 1429.5 },
       "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n115",
+      "type": "MatchSize",
+      "position": { "x": 1063, "y": 1520 },
+      "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "center", "targetJustifyX": "same", "offsetX": 0, "justifyY": "center", "targetJustifyY": "same", "offsetY": 0, "justifyZ": "center", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": true, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
     }
   ],
   "edges": [

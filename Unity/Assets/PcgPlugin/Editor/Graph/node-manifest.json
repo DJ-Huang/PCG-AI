@@ -6229,10 +6229,10 @@
             }
           ]
         },
-        "targetPositionX": {
-          "type": "number",
-          "default": 0.0,
-          "displayName": "Target Position X",
+        "targetPosition": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Target Position",
           "section": "target",
           "order": 10,
           "visibleWhen": {
@@ -6240,59 +6240,13 @@
             "oneOf": ["inputIfWired", "locationAndSize"]
           }
         },
-        "targetPositionY": {
-          "type": "number",
-          "default": 0.0,
-          "displayName": "Target Position Y",
-          "section": "target",
-          "order": 11,
-          "visibleWhen": {
-            "property": "justifyWith",
-            "oneOf": ["inputIfWired", "locationAndSize"]
-          }
-        },
-        "targetPositionZ": {
-          "type": "number",
-          "default": 0.0,
-          "displayName": "Target Position Z",
-          "section": "target",
-          "order": 12,
-          "visibleWhen": {
-            "property": "justifyWith",
-            "oneOf": ["inputIfWired", "locationAndSize"]
-          }
-        },
-        "targetSizeX": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.0,
-          "displayName": "Target Size X",
+        "targetSize": {
+          "type": "vector3",
+          "default": [1, 1, 1],
+          "minimum": 0,
+          "displayName": "Target Size",
           "section": "target",
           "order": 20,
-          "visibleWhen": {
-            "property": "justifyWith",
-            "oneOf": ["inputIfWired", "locationAndSize"]
-          }
-        },
-        "targetSizeY": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.0,
-          "displayName": "Target Size Y",
-          "section": "target",
-          "order": 21,
-          "visibleWhen": {
-            "property": "justifyWith",
-            "oneOf": ["inputIfWired", "locationAndSize"]
-          }
-        },
-        "targetSizeZ": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.0,
-          "displayName": "Target Size Z",
-          "section": "target",
-          "order": 22,
           "visibleWhen": {
             "property": "justifyWith",
             "oneOf": ["inputIfWired", "locationAndSize"]
@@ -6311,6 +6265,8 @@
           "displayName": "Justify X",
           "section": "matching",
           "order": 20,
+          "rowGroup": "justifyXRow",
+          "rowOrder": 0,
           "indent": true,
           "enabledWhen": {
             "property": "translate",
@@ -6338,10 +6294,11 @@
         "targetJustifyX": {
           "type": "enum",
           "default": "same",
-          "displayName": "to",
           "section": "matching",
           "order": 21,
-          "indent": true,
+          "rowGroup": "justifyXRow",
+          "rowOrder": 1,
+          "rowPrefix": "to",
           "enabledWhen": {
             "property": "translate",
             "equals": "true"
@@ -6368,10 +6325,11 @@
         "offsetX": {
           "type": "number",
           "default": 0.0,
-          "displayName": "Offset by",
           "section": "matching",
           "order": 22,
-          "indent": true,
+          "rowGroup": "justifyXRow",
+          "rowOrder": 2,
+          "rowPrefix": "Offset by",
           "enabledWhen": {
             "property": "translate",
             "equals": "true"
@@ -6383,6 +6341,8 @@
           "displayName": "Justify Y",
           "section": "matching",
           "order": 30,
+          "rowGroup": "justifyYRow",
+          "rowOrder": 0,
           "indent": true,
           "enabledWhen": {
             "property": "translate",
@@ -6410,10 +6370,11 @@
         "targetJustifyY": {
           "type": "enum",
           "default": "same",
-          "displayName": "to",
           "section": "matching",
           "order": 31,
-          "indent": true,
+          "rowGroup": "justifyYRow",
+          "rowOrder": 1,
+          "rowPrefix": "to",
           "enabledWhen": {
             "property": "translate",
             "equals": "true"
@@ -6440,10 +6401,11 @@
         "offsetY": {
           "type": "number",
           "default": 0.0,
-          "displayName": "Offset by",
           "section": "matching",
           "order": 32,
-          "indent": true,
+          "rowGroup": "justifyYRow",
+          "rowOrder": 2,
+          "rowPrefix": "Offset by",
           "enabledWhen": {
             "property": "translate",
             "equals": "true"
@@ -6455,6 +6417,8 @@
           "displayName": "Justify Z",
           "section": "matching",
           "order": 40,
+          "rowGroup": "justifyZRow",
+          "rowOrder": 0,
           "indent": true,
           "enabledWhen": {
             "property": "translate",
@@ -6482,10 +6446,11 @@
         "targetJustifyZ": {
           "type": "enum",
           "default": "same",
-          "displayName": "to",
           "section": "matching",
           "order": 41,
-          "indent": true,
+          "rowGroup": "justifyZRow",
+          "rowOrder": 1,
+          "rowPrefix": "to",
           "enabledWhen": {
             "property": "translate",
             "equals": "true"
@@ -6512,10 +6477,11 @@
         "offsetZ": {
           "type": "number",
           "default": 0.0,
-          "displayName": "Offset by",
           "section": "matching",
           "order": 42,
-          "indent": true,
+          "rowGroup": "justifyZRow",
+          "rowOrder": 2,
+          "rowPrefix": "Offset by",
           "enabledWhen": {
             "property": "translate",
             "equals": "true"
@@ -6581,6 +6547,8 @@
           "displayName": "Scale X",
           "section": "matching",
           "order": 71,
+          "rowGroup": "scaleAxesRow",
+          "rowOrder": 0,
           "indent": true,
           "enabledWhen": {
             "property": "scaleToFit",
@@ -6599,7 +6567,9 @@
           "displayName": "Scale Y",
           "section": "matching",
           "order": 72,
-          "indent": true,
+          "rowGroup": "scaleAxesRow",
+          "rowOrder": 1,
+          "rowPrefix": "Y",
           "enabledWhen": {
             "property": "scaleToFit",
             "equals": "true",
@@ -6617,7 +6587,9 @@
           "displayName": "Scale Z",
           "section": "matching",
           "order": 73,
-          "indent": true,
+          "rowGroup": "scaleAxesRow",
+          "rowOrder": 2,
+          "rowPrefix": "Z",
           "enabledWhen": {
             "property": "scaleToFit",
             "equals": "true",

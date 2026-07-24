@@ -384,8 +384,18 @@ namespace DJTechRuntime.PCG
 
         private static void MergeData(string type, PcgNodeData data, Dictionary<string, object> dict)
         {
+            var manifestProps = ManifestLookup?.Invoke(type);
             foreach (var (key, value) in dict)
+            {
+                if (manifestProps != null &&
+                    manifestProps.TryGetValue(key, out var propInfo) &&
+                    propInfo.type == "vector3")
+                {
+                    data.SetRaw(key, PcgVector3Property.NormalizeStored(value));
+                    continue;
+                }
                 data.SetRaw(key, value);
+            }
         }
 
         private static void AppendNode(StringBuilder sb, PcgGraphNodeRecord node, bool pretty, string indent, bool writeInterface)
@@ -498,6 +508,9 @@ namespace DJTechRuntime.PCG
                     break;
                 case "texture2d":
                     sb.Append(JsonString(value?.ToString() ?? ""));
+                    break;
+                case "vector3":
+                    PcgVector3Property.AppendJson(sb, value);
                     break;
                 default:
                     sb.Append(JsonString(value?.ToString() ?? ""));

@@ -470,9 +470,285 @@ namespace DJTechEditor.PCG.Graph
                     AddSectionHeader(section.label);
                 }
 
-                foreach (var (key, prop) in sectionProps)
-                    container.Add(CreatePropertyRow(node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
+                foreach (var item in BuildSectionPropertyItems(node, def, sectionProps, companionTargets))
+                {
+                    if (item.isGroup)
+                        container.Add(CreateGroupedPropertyRow(node, def, item.members, rebuildOnChange: item.rebuildOnChange));
+                    else
+                        container.Add(CreatePropertyRow(node, item.key, item.prop, def, rebuildOnChange: item.rebuildOnChange));
+                }
             }
+        }
+
+        private struct SectionPropertyItem
+        {
+            public bool isGroup;
+            public string key;
+            public ManifestPropertyDef prop;
+            public List<(string key, ManifestPropertyDef prop)> members;
+            public bool rebuildOnChange;
+        }
+
+        private IEnumerable<SectionPropertyItem> BuildSectionPropertyItems(
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            List<(string key, ManifestPropertyDef prop)> sectionProps,
+            HashSet<string> companionTargets)
+        {
+            var emittedRowGroups = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var (key, prop) in sectionProps)
+            {
+                if (companionTargets.Contains(key) || !IsPropertyVisible(node, prop))
+                    continue;
+
+                if (!string.IsNullOrEmpty(prop.rowGroup))
+                {
+                    if (emittedRowGroups.Contains(prop.rowGroup))
+                        continue;
+
+                    var members = sectionProps
+                        .Where(p => p.prop.rowGroup == prop.rowGroup &&
+                                    !companionTargets.Contains(p.key) &&
+                                    IsPropertyVisible(node, p.prop))
+                        .OrderBy(p => p.prop.hasRowOrder ? p.prop.rowOrder : int.MaxValue)
+                        .ThenBy(p => p.key)
+                        .ToList();
+                    if (members.Count == 0)
+                        continue;
+
+                    emittedRowGroups.Add(prop.rowGroup);
+                    var rebuild = members.Any(m => IsVisibilityDriver(def, m.key));
+                    yield return new SectionPropertyItem
+                    {
+                        isGroup = true,
+                        members = members,
+                        rebuildOnChange = rebuild,
+                    };
+                    continue;
+                }
+
+                yield return new SectionPropertyItem
+                {
+                    isGroup = false,
+                    key = key,
+                    prop = prop,
+                    rebuildOnChange = IsVisibilityDriver(def, key),
+                };
+            }
+        }
+
+        private VisualElement CreateGroupedPropertyRow(
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            List<(string key, ManifestPropertyDef prop)> members,
+            bool rebuildOnChange)
+        {
+            var lead = members[0];
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginBottom = 4,
+                    flexShrink = 0,
+                    width = Length.Percent(100),
+                    marginLeft = lead.prop.indent ? 16 : 0,
+                },
+            };
+
+            var row = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    flexWrap = Wrap.Wrap,
+                    width = Length.Percent(100),
+                },
+            };
+
+            var leadLabelAdded = false;
+            foreach (var (key, prop) in members)
+            {
+                if (!leadLabelAdded && string.IsNullOrEmpty(prop.rowPrefix))
+                {
+                    row.Add(new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
+                    {
+                        style =
+                        {
+                            minWidth = 56,
+                            marginRight = 4,
+                            color = new Color(0.8f, 0.8f, 0.8f),
+                            fontSize = 10,
+                        },
+                    });
+                    leadLabelAdded = true;
+                }
+                else if (!string.IsNullOrEmpty(prop.rowPrefix))
+                {
+                    row.Add(new Label(prop.rowPrefix)
+                    {
+                        style =
+                        {
+                            marginLeft = 4,
+                            marginRight = 4,
+                            color = new Color(0.65f, 0.65f, 0.65f),
+                            fontSize = 10,
+                        },
+                    });
+                }
+
+                Action<object> setValueOverride = null;
+                if (rebuildOnChange)
+                {
+                    setValueOverride = v =>
+                    {
+                        node.SetPropertyValue(key, v);
+                        ScheduleInspectorRebuild(node);
+                    };
+                }
+
+                var binding = m_Blackboard.FindBinding(node.NodeId, key);
+                var field = CreateCompactValueField(key, prop, node, binding, setValueOverride);
+                ApplyEnabledWhen(field, node, prop);
+                row.Add(field);
+            }
+
+            container.Add(row);
+            return container;
+        }
+
+        private VisualElement CreateCompactValueField(
+            string key,
+            ManifestPropertyDef prop,
+            PcgManifestNodeView node,
+            PcgGraphParameter binding,
+            Action<object> setValueOverride = null)
+        {
+            var wrapper = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    flexShrink = 0,
+                    marginRight = 2,
+                },
+            };
+
+            if (binding != null)
+            {
+                wrapper.Add(new Label($"→{binding.name}")
+                {
+                    style = { color = new Color(0.4f, 0.7f, 1.0f), fontSize = 9, marginRight = 2 },
+                });
+                return wrapper;
+            }
+
+            var currentVal = node.CollectData().GetRaw(key);
+            Action<object> apply = v =>
+            {
+                if (setValueOverride != null)
+                    setValueOverride(v);
+                else
+                    node.SetPropertyValue(key, v);
+            };
+
+            VisualElement field = prop.type switch
+            {
+                "integer" => MakeCompactIntField(currentVal, v => apply(v)),
+                "number" => MakeCompactFloatField(key, prop, currentVal, v => apply(v)),
+                "boolean" => MakeCompactToggleField(currentVal, v => apply(v)),
+                "enum" => MakeCompactEnumField(prop, currentVal, v => apply(v)),
+                _ => CreateValueField(key, prop, node, null, setValueOverride),
+            };
+            wrapper.Add(field);
+            return wrapper;
+        }
+
+        private IntegerField MakeCompactIntField(object val, Action<int> onSet)
+        {
+            var field = new IntegerField
+            {
+                value = Convert.ToInt32(val ?? 0, CultureInfo.InvariantCulture),
+            };
+            PcgInspectorWidgets.ConfigureCompactNumericField(field);
+            field.style.width = 44;
+            field.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
+            return field;
+        }
+
+        private VisualElement MakeCompactFloatField(
+            string key, ManifestPropertyDef prop, object val, Action<float> onSet)
+        {
+            if (prop.hasRange)
+            {
+                var current = Convert.ToSingle(val ?? prop.minimum, CultureInfo.InvariantCulture);
+                var slider = PcgInspectorWidgets.CreateSliderRow(
+                    false,
+                    prop.minimum,
+                    prop.maximum,
+                    current,
+                    onSet,
+                    onDragBegin: () => m_GraphView.BeginDrag("Change Property"),
+                    onDragEnd: () =>
+                    {
+                        m_GraphView.EndDrag();
+                        NotifyGraphChanged();
+                    },
+                    onFieldCommit: v => m_GraphView.WithUndo("Change Property", () => onSet(v)));
+                slider.style.flexGrow = 1;
+                slider.style.minWidth = 120;
+                slider.style.maxWidth = 180;
+                return slider;
+            }
+
+            var field = new FloatField
+            {
+                value = Convert.ToSingle(val ?? 0f, CultureInfo.InvariantCulture),
+            };
+            PcgInspectorWidgets.ConfigureCompactNumericField(field);
+            field.style.width = 52;
+            field.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
+            return field;
+        }
+
+        private Toggle MakeCompactToggleField(object val, Action<bool> onSet)
+        {
+            var b = val switch
+            {
+                bool bv => bv,
+                string s => string.Equals(s, "true", StringComparison.OrdinalIgnoreCase),
+                _ => false,
+            };
+            var field = new Toggle { value = b };
+            field.label = string.Empty;
+            field.AddToClassList(BaseField<bool>.noLabelVariantUssClassName);
+            field.style.marginRight = 2;
+            field.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
+            return field;
+        }
+
+        private VisualElement MakeCompactEnumField(
+            ManifestPropertyDef prop, object val, Action<string> onSet)
+        {
+            var field = MakeEnumField(string.Empty, prop, val, onSet);
+            field.style.width = 72;
+            field.style.minWidth = 72;
+            field.style.maxWidth = 96;
+            field.style.flexShrink = 0;
+            return field;
         }
 
         private static bool IsVisibilityDriver(ManifestNodeDef def, string key) =>
@@ -997,6 +1273,7 @@ namespace DJTechEditor.PCG.Graph
                 "number" => MakeFloatField(key, currentVal, v => apply(v)),
                 "boolean" => MakeToggleField(key, currentVal, v => apply(v)),
                 "enum" => MakeEnumField(key, prop, currentVal, v => apply(v)),
+                "vector3" => MakeVector3Field(key, currentVal, v => apply(v)),
                 "texture2d" => MakeTextureField(key, currentVal, v => apply(v)),
                 "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => apply(v)),
                 "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => apply(v)),
@@ -1265,6 +1542,33 @@ namespace DJTechEditor.PCG.Graph
                 NotifyGraphChanged();
             });
             return field;
+        }
+
+        private VisualElement MakeVector3Field(string key, object val, Action<object> onSet)
+        {
+            var current = PcgVector3Property.ParseOrDefault(val ?? propDefaultVector(key), Vector3.zero);
+            return PcgInspectorWidgets.CreateVector3Row(
+                current,
+                next =>
+                {
+                    onSet(PcgVector3Property.Format(next));
+                    NotifyGraphChanged();
+                },
+                next =>
+                {
+                    m_GraphView.WithUndo("Change Property", () =>
+                        onSet(PcgVector3Property.Format(next)));
+                    NotifyGraphChanged();
+                });
+        }
+
+        private Vector3 propDefaultVector(string key)
+        {
+            if (m_CurrentNode is not PcgManifestNodeView manifestNode ||
+                !PcgNodeManifest.TryGet(manifestNode.NodeType, out var def) ||
+                !def.properties.TryGetValue(key, out var prop))
+                return Vector3.zero;
+            return PcgVector3Property.ParseOrDefault(prop.defaultValue, Vector3.zero);
         }
 
         private Toggle MakeToggleField(string key, object val, Action<bool> onSet)

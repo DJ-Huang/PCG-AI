@@ -116,7 +116,7 @@ namespace DJTechEditor.PCG.Graph
             ConfigureInputArea(slider, Slider.inputUssClassName);
         }
 
-        private static void ConfigureCompactNumericField<T>(BaseField<T> field)
+        public static void ConfigureCompactNumericField<T>(BaseField<T> field)
         {
             field.label = string.Empty;
             field.AddToClassList(BaseField<T>.noLabelVariantUssClassName);
@@ -146,5 +146,74 @@ namespace DJTechEditor.PCG.Graph
 
         public static string FormatFloat(float value) =>
             value.ToString(CultureInfo.InvariantCulture);
+
+        public static VisualElement CreateVector3Row(
+            Vector3 value,
+            Action<Vector3> onChange,
+            Action<Vector3> onFieldCommit = null)
+        {
+            onFieldCommit ??= onChange;
+            var container = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    width = Length.Percent(100),
+                },
+            };
+
+            var xField = new FloatField { value = value.x };
+            var yField = new FloatField { value = value.y };
+            var zField = new FloatField { value = value.z };
+
+            Vector3 Read() => new(xField.value, yField.value, zField.value);
+
+            void Commit() => onChange(Read());
+            void CommitWithUndo() => onFieldCommit(Read());
+
+            container.Add(CreateAxisField("X", xField, Commit, CommitWithUndo));
+            container.Add(CreateAxisField("Y", yField, Commit, CommitWithUndo));
+            container.Add(CreateAxisField("Z", zField, Commit, CommitWithUndo));
+            return container;
+        }
+
+        private static VisualElement CreateAxisField(
+            string axis,
+            FloatField field,
+            Action onChange,
+            Action onCommit)
+        {
+            var row = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    minWidth = 72,
+                    marginRight = 4,
+                },
+            };
+            row.Add(new Label(axis)
+            {
+                style =
+                {
+                    width = 12,
+                    minWidth = 12,
+                    color = new Color(0.65f, 0.65f, 0.65f),
+                    fontSize = 10,
+                    unityTextAlign = TextAnchor.MiddleLeft,
+                },
+            });
+            ConfigureCompactNumericField(field);
+            field.style.width = Length.Percent(100);
+            field.style.minWidth = 48;
+            field.RegisterValueChangedCallback(_ => onChange());
+            field.RegisterCallback<FocusOutEvent>(_ => onCommit());
+            row.Add(field);
+            return row;
+        }
     }
 }

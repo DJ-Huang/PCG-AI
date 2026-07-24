@@ -347,4 +347,26 @@ std::vector<std::string> parse_name_list(const nlohmann::json& data, const char*
     return names;
 }
 
+data::PcgVec3 read_vector_param(const nlohmann::json& data,
+                                const char* key,
+                                const data::PcgVec3& fallback)
+{
+    if (data.contains(key)) {
+        const auto& value = data[key];
+        if (value.is_array() && value.size() >= 3 && value[0].is_number() &&
+            value[1].is_number() && value[2].is_number()) {
+            return {value[0].get<double>(), value[1].get<double>(), value[2].get<double>()};
+        }
+        if (value.is_object()) {
+            return {value.value("x", fallback.x),
+                    value.value("y", fallback.y),
+                    value.value("z", fallback.z)};
+        }
+    }
+    const std::string prefix(key);
+    return {data.value(prefix + "X", fallback.x),
+            data.value(prefix + "Y", fallback.y),
+            data.value(prefix + "Z", fallback.z)};
+}
+
 } // namespace pcg::internal::elements
