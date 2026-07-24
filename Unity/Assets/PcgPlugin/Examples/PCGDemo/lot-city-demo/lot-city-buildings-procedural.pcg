@@ -140,12 +140,6 @@
       "data": {"__nodeTitle": "City Merge"}
     },
     {
-      "id": "out",
-      "type": "Output",
-      "position": { "x": 840, "y": 4880 },
-      "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
-    },
-    {
       "id": "top_face",
       "type": "Blast",
       "position": { "x": 520, "y": 1200 },
@@ -404,6 +398,18 @@
       "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 1063, "y": 1660 },
+      "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
+    },
+    {
+      "id": "n116",
+      "type": "ForEachEnd",
+      "position": { "x": 1049.5, "y": 1596.5 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
+    },
+    {
       "id": "n115",
       "type": "MatchSize",
       "position": { "x": 1063, "y": 1520 },
@@ -424,7 +430,6 @@
     {"id": "e21", "source": "fg_roof", "target": "mat_roof", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e22", "source": "mat_roof", "target": "lift_bldgs", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e23", "source": "lift_bldgs", "target": "merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e24", "source": "merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_lots_pads", "source": "lots", "target": "sg_pads", "sourceHandle": "out", "targetHandle": "lots"},
     {"id": "e_roads_pads", "source": "sg_roads", "target": "sg_pads", "sourceHandle": "mesh", "targetHandle": "roads"},
     {"id": "e_box_wincopy", "source": "win_box", "target": "win_copy", "sourceHandle": "out", "targetHandle": "prototype"},
@@ -488,7 +493,9 @@
     {"id": "e598848", "source": "n111", "target": "n112", "sourceHandle": "out", "targetHandle": "target"},
     {"id": "e598849", "source": "n112", "target": "n113", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e598850", "source": "n113", "target": "n114", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e598851", "source": "n114", "target": "n115", "sourceHandle": "out", "targetHandle": "source"}
+    {"id": "e598851", "source": "n114", "target": "n115", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e609307", "source": "n115", "target": "n116", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e609308", "source": "n116", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

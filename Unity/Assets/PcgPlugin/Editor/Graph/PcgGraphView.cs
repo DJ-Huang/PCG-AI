@@ -855,6 +855,30 @@ namespace DJTechEditor.PCG.Graph
                 GetSubgraphInstanceChain());
         }
 
+        /// <summary>
+        /// Houdini-style: selecting Match Size should preview that node's cooked output,
+        /// not leave Scene View showing upstream geometry while only the target box moves.
+        /// </summary>
+        internal void EnsureMatchSizeScenePreview()
+        {
+            var selected = selection.OfType<PcgManifestNodeView>()
+                .FirstOrDefault(node => node.NodeType == "MatchSize");
+            if (selected == null || m_HostWindow is not PcgGraphEditorWindow window)
+                return;
+
+            var scope = CurrentSubgraphId ?? string.Empty;
+            if (window.PreviewNodeId == selected.NodeId &&
+                string.Equals(window.PreviewScopeSubgraphId ?? string.Empty, scope,
+                    System.StringComparison.Ordinal))
+                return;
+
+            window.SetPreviewNode(
+                selected.NodeId,
+                selected.GetDisplayTitle(),
+                CurrentSubgraphId,
+                GetSubgraphInstanceChain());
+        }
+
         public void RefreshNodePreviewVisuals()
         {
             var previewNodeId = m_HostWindow is PcgGraphEditorWindow window ? window.PreviewNodeId : null;
@@ -883,6 +907,10 @@ namespace DJTechEditor.PCG.Graph
                         SceneEditDomain.SplineControlPoint,
                         selected.NodeId,
                         s_SplineDomains);
+                }
+                else if (manifestNode.NodeType == "MatchSize")
+                {
+                    m_SceneEditContext = PcgSceneEditContext.ObjectMode;
                 }
                 else if (manifestNode.NodeType == "GroupCreate" || manifestNode.NodeType == "GroupCombine")
                 {
@@ -1204,6 +1232,7 @@ namespace DJTechEditor.PCG.Graph
             base.AddToSelection(selectable);
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
+            EnsureMatchSizeScenePreview();
             m_Inspector?.OnSelectionChanged();
         }
 

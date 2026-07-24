@@ -478,7 +478,10 @@ namespace DJTechEditor.PCG.Graph
             // Object/None. If a node (e.g. GroupCreate) was already selected,
             // the toolbar activates the correct domain on entry.
             if (window != null && window.GraphView != null)
+            {
                 window.GraphView.RefreshSceneEditContext();
+                window.GraphView.EnsureMatchSizeScenePreview();
+            }
 
             s_OthersDisplay = OthersDisplayMode.HideOthers;
 
