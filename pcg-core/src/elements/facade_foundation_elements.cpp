@@ -70,10 +70,25 @@ public:
     {
         const auto input = get_geometry_input(ctx, "in", "ConvertLine missing mesh input");
         ConvertLineOptions options;
-        options.edge_group = ctx.node->data.value("edgeGroup", std::string());
-        options.mode = ctx.node->data.value("mode", std::string("unshared"));
-        if (!options.edge_group.empty() && options.mode == "unshared")
+        options.edge_group = ctx.node->data.value(
+            "group", ctx.node->data.value("edgeGroup", std::string()));
+        if (ctx.node->data.contains("mode"))
+            options.mode = ctx.node->data.value("mode", std::string("unshared"));
+        else if (!options.edge_group.empty())
             options.mode = "group";
+        else
+            options.mode = "all";
+        options.connect_path = ctx.node->data.value("connectPath", true);
+        options.max_distance = ctx.node->data.value("maxDistance", 1e-4);
+        options.connect_only_to_other_end_points =
+            ctx.node->data.value("connectOnlyToOtherEndPoints", false);
+        options.keep_group_order = ctx.node->data.value("keepGroupOrder", false);
+        options.make_isolated_loops_closed =
+            ctx.node->data.value("makeIsolatedLoopsClosed", false);
+        options.remove_unused_points = ctx.node->data.value("removeUnusedPoints", true);
+        options.compute_length = ctx.node->data.value("computeLength", false);
+        options.length_attribute =
+            ctx.node->data.value("lengthAttribute", std::string("restlength"));
         auto splines = convert_line_geometry(input, options);
         if (splines.splines().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConvertLine produced no lines");

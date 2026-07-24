@@ -3554,7 +3554,22 @@ Houdini `primitive` SOP 子集：绕各面质心均匀缩放（默认 0.85），
 
 **类别**：Spline
 
-Houdini `convertline`：面边 → 折线。`mode=unshared|all|group`。开窗链：`ConvertLine` → `ResampleSpline` → `CopyMeshToPoints` → `BooleanMesh`。
+Houdini `convertline`：将面边转为折线/线段。
+
+| 参数 | Houdini 对应 | 说明 |
+|------|--------------|------|
+| `group` | **Group** | 要转换的 edge group；空 = 全部边 |
+| `connectPath` | **Connect Path** | 将端点连成连续折线（默认开） |
+| `maxDistance` | **Max Distance** | Connect Path 端点合并距离 |
+| `connectOnlyToOtherEndPoints` | **Connect Only To Other End Points** | 仅端点互连 |
+| `keepGroupOrder` | **Keep Group Order** | 按 group 顺序排列（预留） |
+| `makeIsolatedLoopsClosed` | **Make Isolated Loops Closed** | 孤立闭环标记为 closed |
+| `removeUnusedPoints` | **Remove Unused Points** | 移除未引用点（默认开） |
+| `computeLength` + `lengthAttribute` | **Compute Length** | 写入段长属性（默认 `restlength`） |
+
+兼容旧图：`mode=unshared|all|group` 与 `edgeGroup` 仍可读。
+
+开窗链：`ConvertLine` → `ResampleSpline` → `CopyMeshToPoints` → `BooleanMesh`。
 
 ### ExtractCentroid
 

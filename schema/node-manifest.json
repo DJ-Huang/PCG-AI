@@ -7929,28 +7929,81 @@
         }
       ],
       "properties": {
-        "mode": {
-          "type": "enum",
-          "default": "unshared",
-          "options": [
-            {
-              "value": "unshared",
-              "label": "Unshared Edges"
-            },
-            {
-              "value": "all",
-              "label": "All Edges"
-            },
-            {
-              "value": "group",
-              "label": "Edge Group"
-            }
-          ]
-        },
-        "edgeGroup": {
+        "group": {
           "type": "groupSelect",
+          "displayName": "Group",
           "default": "",
-          "groupDomain": "edge"
+          "groupDomain": "edge",
+          "section": "main",
+          "order": 0
+        },
+        "connectPath": {
+          "type": "boolean",
+          "displayName": "Connect Path",
+          "default": true,
+          "section": "main",
+          "order": 10
+        },
+        "maxDistance": {
+          "type": "number",
+          "displayName": "Max Distance",
+          "default": 0.0001,
+          "minimum": 0.0,
+          "section": "main",
+          "order": 11,
+          "indent": true,
+          "enabledWhen": {
+            "property": "connectPath",
+            "equals": "true"
+          }
+        },
+        "connectOnlyToOtherEndPoints": {
+          "type": "boolean",
+          "displayName": "Connect Only To Other End Points",
+          "default": false,
+          "section": "main",
+          "order": 12,
+          "indent": true,
+          "enabledWhen": {
+            "property": "connectPath",
+            "equals": "true"
+          }
+        },
+        "keepGroupOrder": {
+          "type": "boolean",
+          "displayName": "Keep Group Order",
+          "default": false,
+          "section": "main",
+          "order": 13
+        },
+        "makeIsolatedLoopsClosed": {
+          "type": "boolean",
+          "displayName": "Make Isolated Loops Closed",
+          "default": false,
+          "section": "main",
+          "order": 20
+        },
+        "removeUnusedPoints": {
+          "type": "boolean",
+          "displayName": "Remove Unused Points",
+          "default": true,
+          "section": "main",
+          "order": 30
+        },
+        "computeLength": {
+          "type": "boolean",
+          "displayName": "Compute Length",
+          "default": false,
+          "section": "main",
+          "order": 40,
+          "companionField": "lengthAttribute"
+        },
+        "lengthAttribute": {
+          "type": "string",
+          "displayName": "Length Attribute",
+          "default": "restlength",
+          "section": "main",
+          "order": 41
         }
       }
     },

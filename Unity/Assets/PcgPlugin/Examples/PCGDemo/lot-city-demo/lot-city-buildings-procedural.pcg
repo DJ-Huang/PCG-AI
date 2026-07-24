@@ -173,7 +173,7 @@
       "id": "ring_lines",
       "type": "ConvertLine",
       "position": { "x": 520, "y": 2000 },
-      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": "Ring Edges"}
+      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "mode": "unshared", "edgeGroup": "", "__nodeTitle": "Ring Edges"}
     },
     {
       "id": "win_pts",
@@ -377,7 +377,7 @@
       "id": "n103",
       "type": "ConvertLine",
       "position": { "x": 1173, "y": 902 },
-      "data": {"mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
+      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
     },
     {
       "id": "n112",
@@ -416,12 +416,6 @@
       "data": {"runOver": "detail", "expression": "@pct = chramp(\"remapPct\", rand(@iteration * 12));\nv@brickCd = vector(chramp(\"brick\", @pct));\nv@paint1Cd = vector(chramp(\"paint1\", @pct));\nv@paint2Cd = vector(chramp(\"paint2\", @pct));\nv@stoneCd = vector(chramp(\"stone\", @pct));\nv@wallCd = vector(chramp(\"wall\", @pct));", "parameters": "{}", "ramps": "{\"remapPct\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.0,0.0,0.0]},{\"t\":0.65,\"color\":[0.25,0.25,0.25]},{\"t\":1.0,\"color\":[1.0,1.0,1.0]}]},\"brick\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.12,0.06,0.04]},{\"t\":0.17,\"color\":[0.22,0.10,0.06]},{\"t\":0.33,\"color\":[0.35,0.14,0.08]},{\"t\":0.5,\"color\":[0.48,0.18,0.10]},{\"t\":0.67,\"color\":[0.55,0.22,0.12]},{\"t\":0.83,\"color\":[0.60,0.24,0.13]},{\"t\":1.0,\"color\":[0.65,0.26,0.14]}]},\"paint1\":{\"interpolation\":\"constant\",\"keys\":[{\"t\":0.0,\"color\":[0.10,0.09,0.08]},{\"t\":0.07,\"color\":[0.18,0.15,0.12]},{\"t\":0.13,\"color\":[0.25,0.22,0.18]},{\"t\":0.20,\"color\":[0.32,0.28,0.22]},{\"t\":0.27,\"color\":[0.20,0.24,0.22]},{\"t\":0.33,\"color\":[0.15,0.22,0.20]},{\"t\":0.40,\"color\":[0.18,0.26,0.24]},{\"t\":0.47,\"color\":[0.22,0.30,0.22]},{\"t\":0.53,\"color\":[0.35,0.32,0.18]},{\"t\":0.60,\"color\":[0.42,0.36,0.20]},{\"t\":0.67,\"color\":[0.30,0.26,0.16]},{\"t\":0.73,\"color\":[0.24,0.22,0.14]},{\"t\":0.80,\"color\":[0.20,0.20,0.18]},{\"t\":0.87,\"color\":[0.26,0.24,0.16]},{\"t\":0.93,\"color\":[0.30,0.28,0.14]},{\"t\":1.0,\"color\":[0.247,0.427,0.270]}]},\"paint2\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.45,0.44,0.42]},{\"t\":0.08,\"color\":[0.38,0.37,0.35]},{\"t\":0.15,\"color\":[0.32,0.31,0.30]},{\"t\":0.23,\"color\":[0.28,0.30,0.28]},{\"t\":0.31,\"color\":[0.25,0.28,0.26]},{\"t\":0.38,\"color\":[0.35,0.32,0.26]},{\"t\":0.46,\"color\":[0.48,0.36,0.22]},{\"t\":0.54,\"color\":[0.52,0.38,0.24]},{\"t\":0.62,\"color\":[0.40,0.30,0.20]},{\"t\":0.69,\"color\":[0.30,0.22,0.16]},{\"t\":0.77,\"color\":[0.22,0.18,0.14]},{\"t\":0.85,\"color\":[0.15,0.12,0.10]},{\"t\":1.0,\"color\":[0.043,0.080,0.031]}]},\"stone\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.72,0.70,0.66]},{\"t\":0.25,\"color\":[0.62,0.58,0.52]},{\"t\":0.5,\"color\":[0.52,0.46,0.40]},{\"t\":0.75,\"color\":[0.42,0.36,0.30]},{\"t\":1.0,\"color\":[0.35,0.30,0.26]}]},\"wall\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.55,0.52,0.48]},{\"t\":0.33,\"color\":[0.62,0.58,0.52]},{\"t\":0.67,\"color\":[0.48,0.44,0.40]},{\"t\":1.0,\"color\":[0.40,0.36,0.32]}]}}", "__nodeTitle": "palette"}
     },
     {
-      "id": "n120",
-      "type": "AttributeWrangle",
-      "position": { "x": 1256.5, "y": 1740 },
-      "data": {"runOver": "detail", "expression": "@randVal = rand(@iteration);\n@numFloors = (@randVal < 0.2) * 3 + (@randVal >= 0.2 && @randVal < 0.7) * 2 + (@randVal >= 0.7 && @randVal < 0.9) * 1;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "number_of_floors"}
-    },
-    {
       "id": "n116",
       "type": "ForEachEnd",
       "position": { "x": 1256.5, "y": 1864 },
@@ -432,6 +426,18 @@
       "type": "Output",
       "position": { "x": 1256.5, "y": 1936 },
       "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
+    },
+    {
+      "id": "n120",
+      "type": "AttributeWrangle",
+      "position": { "x": 1256.5, "y": 1782 },
+      "data": {"runOver": "detail", "expression": "@randVal = rand(@iteration);\n@numFloors = (@randVal < 0.2) * 3 + (@randVal >= 0.2 && @randVal < 0.7) * 2 + (@randVal >= 0.7 && @randVal < 0.9) * 1;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "number_of_floors"}
+    },
+    {
+      "id": "n122",
+      "type": "ConvertLine",
+      "position": { "x": 1438.5, "y": 1733 },
+      "data": {"group": "streetFacingEdges", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -516,7 +522,8 @@
     {"id": "e609308", "source": "n116", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e614575", "source": "n115", "target": "n118", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e620880", "source": "n118", "target": "n119", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e620881", "source": "n119", "target": "n120", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e620881", "source": "n119", "target": "n120", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e625679", "source": "n119", "target": "n122", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

@@ -1,6 +1,7 @@
 #include "graph_executor.hpp"
 #include "graph_parser.hpp"
 #include "data/pcg_attribute_table.hpp"
+#include "elements/facade_foundation_algorithms.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -187,6 +188,38 @@ int main()
             }
             expect(found_lines, "ConvertLine node_stats entry present");
         }
+    }
+
+    {
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::elements::ConvertLineOptions;
+        using pcg::internal::elements::convert_line_geometry;
+
+        PcgGeometry grid;
+        grid.points_mut() = {
+            {0.0, 0.0, 0.0}, {4.0, 0.0, 0.0}, {4.0, 0.0, 4.0}, {0.0, 0.0, 4.0}};
+        grid.faces_mut() = {{0, 1, 2, 3}};
+
+        ConvertLineOptions opts;
+        opts.mode = "all";
+        opts.connect_path = true;
+        opts.compute_length = true;
+        opts.length_attribute = "restlength";
+        const auto splines = convert_line_geometry(grid, opts);
+        expect(splines.splines().size() == 1,
+               "ConvertLine connect path chains square boundary into one polyline");
+        if (!splines.splines().empty()) {
+            const auto& spline = splines.splines().front();
+            expect(spline.points.size() >= 4, "ConvertLine connected polyline has corners");
+            expect(spline.attributes.contains("restlength"),
+                   "ConvertLine compute length writes attribute");
+        }
+
+        ConvertLineOptions legacy;
+        legacy.mode = "unshared";
+        const auto legacy_splines = convert_line_geometry(grid, legacy);
+        expect(legacy_splines.splines().size() == 1,
+               "legacy mode=unshared still filters to boundary loop");
     }
 
     {
