@@ -104,6 +104,7 @@ set(PCG_CORE_SOURCES
     src/elements/element_registry.cpp
     src/elements/node_contracts.cpp
     src/elements/element_utils.cpp
+    src/elements/color_ramp.cpp
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
     src/elements/primitive_elements.cpp

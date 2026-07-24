@@ -274,5 +274,50 @@ int main()
     expect(std::strstr(error, "parse error") != nullptr,
            "invalid Wrangle expression reports parse context");
 
+    const char* palette_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+        {"id":"palette","type":"AttributeWrangle","data":{
+          "runOver":"detail",
+          "expression":"int buildingIter = chi(\"buildingIter\"); float pct = rand(buildingIter * 12); pct = chramp(\"remapPct\", pct); v@brickCd = vector(chramp(\"brick\", pct)); v@paint1Cd = vector(chramp(\"paint1\", pct));",
+          "parameters":"{\"buildingIter\":3}",
+          "ramps":"{\"remapPct\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0,\"color\":[0.0,0.0,0.0]},{\"t\":1,\"color\":[1.0,1.0,1.0]}]},\"brick\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0,\"color\":[0.2,0.1,0.05]},{\"t\":1,\"color\":[0.6,0.3,0.1]}]},\"paint1\":{\"interpolation\":\"constant\",\"keys\":[{\"t\":0,\"color\":[0.1,0.2,0.3]},{\"t\":0.5,\"color\":[0.4,0.5,0.6]},{\"t\":1,\"color\":[0.7,0.8,0.9]}]}}"
+        }},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"id":"e1","source":"box","target":"palette"},
+        {"id":"e2","source":"palette","target":"out"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode palette_code = pcg_execute_graph_v2(
+        palette_graph, 42, &kind, json_buffer.data(), static_cast<int>(json_buffer.size()),
+        mesh_buffer.data(), static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(palette_code == PCG_OK, "palette wrangle graph executes");
+    if (palette_code == PCG_OK) {
+        const json palette = json::parse(json_buffer.data());
+        bool found_brick = false;
+        bool found_paint = false;
+        if (palette.contains("node_attrs") && palette["node_attrs"].is_array()) {
+            for (const auto& attr : palette["node_attrs"]) {
+                if (attr.value("node_id", std::string()) != "palette")
+                    continue;
+                if (attr.value("name", std::string()) == "brickCd" &&
+                    attr.value("owner", std::string()) == "detail" &&
+                    attr.value("tuple_size", 0) == 3)
+                    found_brick = true;
+                if (attr.value("name", std::string()) == "paint1Cd" &&
+                    attr.value("owner", std::string()) == "detail" &&
+                    attr.value("tuple_size", 0) == 3)
+                    found_paint = true;
+            }
+        }
+        expect(found_brick, "palette writes brickCd detail vector attribute");
+        expect(found_paint, "palette writes paint1Cd detail vector attribute");
+    }
+
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

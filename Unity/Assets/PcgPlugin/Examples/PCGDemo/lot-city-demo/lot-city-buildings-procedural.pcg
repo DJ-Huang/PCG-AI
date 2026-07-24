@@ -161,7 +161,7 @@
       "id": "ring_drop",
       "type": "AttributeWrangle",
       "position": { "x": 520, "y": 1680 },
-      "data": {"runOver": "points", "expression": "@P.y = (@iteration + 0.55) * chf(\"floorH\");", "parameters": "{\"floorH\": 2.8}", "__nodeTitle": "Place Ring Height"}
+      "data": {"runOver": "points", "expression": "@P.y = (@iteration + 0.55) * chf(\"floorH\");", "parameters": "{\"floorH\": 2.8}", "ramps": "{}", "__nodeTitle": "Place Ring Height"}
     },
     {
       "id": "floor_end",
@@ -191,13 +191,13 @@
       "id": "win_push",
       "type": "AttributeWrangle",
       "position": { "x": 200, "y": 2320 },
-      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.06; @P.z += @nz * 0.06;", "parameters": "{}", "__nodeTitle": "Orient+Push Window (N=out)"}
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.06; @P.z += @nz * 0.06;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "Orient+Push Window (N=out)"}
     },
     {
       "id": "door_push",
       "type": "AttributeWrangle",
       "position": { "x": 520, "y": 2320 },
-      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.08; @P.z += @nz * 0.08;", "parameters": "{}", "__nodeTitle": "Orient+Push Door (N=out)"}
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.08; @P.z += @nz * 0.08;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "Orient+Push Door (N=out)"}
     },
     {
       "id": "rebuild_top",
@@ -215,7 +215,7 @@
       "id": "balc_push",
       "type": "AttributeWrangle",
       "position": { "x": 200, "y": 3280 },
-      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.6; @P.z += @nz * 0.6;", "parameters": "{}", "__nodeTitle": "Orient+Push Balcony (N=out)"}
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.6; @P.z += @nz * 0.6;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "Orient+Push Balcony (N=out)"}
     },
     {
       "id": "balc_keep",
@@ -251,7 +251,7 @@
       "id": "fe_push",
       "type": "AttributeWrangle",
       "position": { "x": 1160, "y": 3280 },
-      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.55; @P.z += @nz * 0.55;", "parameters": "{}", "__nodeTitle": "Orient+Push FE (N=out)"}
+      "data": {"runOver": "points", "expression": "@nx = @tz; @ny = 0; @nz = -@tx; @P.x += @nx * 0.55; @P.z += @nz * 0.55;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "Orient+Push FE (N=out)"}
     },
     {
       "id": "fe_keep",
@@ -293,7 +293,7 @@
       "id": "floors_attrs",
       "type": "AttributeWrangle",
       "position": { "x": 840, "y": 827 },
-      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "__nodeTitle": "Assign Floors"}
+      "data": {"runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "ramps": "{}", "__nodeTitle": "Assign Floors"}
     },
     {
       "id": "n111",
@@ -317,7 +317,7 @@
       "id": "floors_wrangle",
       "type": "AttributeWrangle",
       "position": { "x": 848.5, "y": 597.5 },
-      "data": {"runOver": "primitives", "expression": "@group.park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "__nodeTitle": "park_group"}
+      "data": {"runOver": "primitives", "expression": "@group.park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "ramps": "{}", "__nodeTitle": "park_group"}
     },
     {
       "id": "keep_built",
@@ -398,18 +398,6 @@
       "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
-      "id": "out",
-      "type": "Output",
-      "position": { "x": 1063, "y": 1660 },
-      "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
-    },
-    {
-      "id": "n116",
-      "type": "ForEachEnd",
-      "position": { "x": 1049.5, "y": 1596.5 },
-      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
-    },
-    {
       "id": "n115",
       "type": "MatchSize",
       "position": { "x": 1056.5, "y": 1490.5 },
@@ -418,8 +406,32 @@
     {
       "id": "n118",
       "type": "TransformMesh",
-      "position": { "x": 1137.5, "y": 1543.5 },
+      "position": { "x": 1212.5, "y": 1573.5 },
       "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 2, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "attributes": "*", "recomputePointNormals": false, "recomputeAffectedNormals": true, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": ""}
+    },
+    {
+      "id": "n119",
+      "type": "AttributeWrangle",
+      "position": { "x": 1256.5, "y": 1660 },
+      "data": {"runOver": "detail", "expression": "@pct = chramp(\"remapPct\", rand(@iteration * 12));\nv@brickCd = vector(chramp(\"brick\", @pct));\nv@paint1Cd = vector(chramp(\"paint1\", @pct));\nv@paint2Cd = vector(chramp(\"paint2\", @pct));\nv@stoneCd = vector(chramp(\"stone\", @pct));\nv@wallCd = vector(chramp(\"wall\", @pct));", "parameters": "{}", "ramps": "{\"remapPct\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.0,0.0,0.0]},{\"t\":0.65,\"color\":[0.25,0.25,0.25]},{\"t\":1.0,\"color\":[1.0,1.0,1.0]}]},\"brick\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.12,0.06,0.04]},{\"t\":0.17,\"color\":[0.22,0.10,0.06]},{\"t\":0.33,\"color\":[0.35,0.14,0.08]},{\"t\":0.5,\"color\":[0.48,0.18,0.10]},{\"t\":0.67,\"color\":[0.55,0.22,0.12]},{\"t\":0.83,\"color\":[0.60,0.24,0.13]},{\"t\":1.0,\"color\":[0.65,0.26,0.14]}]},\"paint1\":{\"interpolation\":\"constant\",\"keys\":[{\"t\":0.0,\"color\":[0.10,0.09,0.08]},{\"t\":0.07,\"color\":[0.18,0.15,0.12]},{\"t\":0.13,\"color\":[0.25,0.22,0.18]},{\"t\":0.20,\"color\":[0.32,0.28,0.22]},{\"t\":0.27,\"color\":[0.20,0.24,0.22]},{\"t\":0.33,\"color\":[0.15,0.22,0.20]},{\"t\":0.40,\"color\":[0.18,0.26,0.24]},{\"t\":0.47,\"color\":[0.22,0.30,0.22]},{\"t\":0.53,\"color\":[0.35,0.32,0.18]},{\"t\":0.60,\"color\":[0.42,0.36,0.20]},{\"t\":0.67,\"color\":[0.30,0.26,0.16]},{\"t\":0.73,\"color\":[0.24,0.22,0.14]},{\"t\":0.80,\"color\":[0.20,0.20,0.18]},{\"t\":0.87,\"color\":[0.26,0.24,0.16]},{\"t\":0.93,\"color\":[0.30,0.28,0.14]},{\"t\":1.0,\"color\":[0.247,0.427,0.270]}]},\"paint2\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.45,0.44,0.42]},{\"t\":0.08,\"color\":[0.38,0.37,0.35]},{\"t\":0.15,\"color\":[0.32,0.31,0.30]},{\"t\":0.23,\"color\":[0.28,0.30,0.28]},{\"t\":0.31,\"color\":[0.25,0.28,0.26]},{\"t\":0.38,\"color\":[0.35,0.32,0.26]},{\"t\":0.46,\"color\":[0.48,0.36,0.22]},{\"t\":0.54,\"color\":[0.52,0.38,0.24]},{\"t\":0.62,\"color\":[0.40,0.30,0.20]},{\"t\":0.69,\"color\":[0.30,0.22,0.16]},{\"t\":0.77,\"color\":[0.22,0.18,0.14]},{\"t\":0.85,\"color\":[0.15,0.12,0.10]},{\"t\":1.0,\"color\":[0.043,0.080,0.031]}]},\"stone\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.72,0.70,0.66]},{\"t\":0.25,\"color\":[0.62,0.58,0.52]},{\"t\":0.5,\"color\":[0.52,0.46,0.40]},{\"t\":0.75,\"color\":[0.42,0.36,0.30]},{\"t\":1.0,\"color\":[0.35,0.30,0.26]}]},\"wall\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.55,0.52,0.48]},{\"t\":0.33,\"color\":[0.62,0.58,0.52]},{\"t\":0.67,\"color\":[0.48,0.44,0.40]},{\"t\":1.0,\"color\":[0.40,0.36,0.32]}]}}", "__nodeTitle": "palette"}
+    },
+    {
+      "id": "n120",
+      "type": "AttributeWrangle",
+      "position": { "x": 1256.5, "y": 1740 },
+      "data": {"runOver": "detail", "expression": "@randVal = rand(@iteration);\n@numFloors = (@randVal < 0.2) * 3 + (@randVal >= 0.2 && @randVal < 0.7) * 2 + (@randVal >= 0.7 && @randVal < 0.9) * 1;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "number_of_floors"}
+    },
+    {
+      "id": "n116",
+      "type": "ForEachEnd",
+      "position": { "x": 1256.5, "y": 1864 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 1256.5, "y": 1936 },
+      "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
     }
   ],
   "edges": [
@@ -500,9 +512,11 @@
     {"id": "e598849", "source": "n112", "target": "n113", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e598850", "source": "n113", "target": "n114", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e598851", "source": "n114", "target": "n115", "sourceHandle": "out", "targetHandle": "source"},
-    {"id": "e609307", "source": "n115", "target": "n116", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e609307", "source": "n120", "target": "n116", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e609308", "source": "n116", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e614575", "source": "n115", "target": "n118", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e614575", "source": "n115", "target": "n118", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e620880", "source": "n118", "target": "n119", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e620881", "source": "n119", "target": "n120", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

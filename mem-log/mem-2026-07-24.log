@@ -1,0 +1,27 @@
+[2026-07-24T08:54:43.129Z] MemoryForge: attached 5 listener(s)
+[2026-07-24T08:54:43.130Z] InitialReadForge: armed one-shot BeforeSend after NewSessionStart
+[2026-07-24T08:54:43.130Z] LiveUpdateForge: session reset, allowLiveUpdate = false
+[2026-07-24T08:54:44.451Z] MemoryForge: attached 5 listener(s)
+[2026-07-24T08:54:44.451Z] InitialReadForge: armed one-shot BeforeSend after NewSessionStart
+[2026-07-24T08:54:44.451Z] LiveUpdateForge: session reset, allowLiveUpdate = false
+[2026-07-24T08:54:50.991Z] MemoryForge: attached 5 listener(s)
+[2026-07-24T08:54:50.991Z] InitialReadForge: armed one-shot BeforeSend after NewSessionStart
+[2026-07-24T08:54:50.991Z] LiveUpdateForge: session reset, allowLiveUpdate = false
+[2026-07-24T08:54:50.991Z] MemoryForge: detached all listeners
+[2026-07-24T08:54:50.991Z] ResumeDiffForge: no read_memory in history, backfilling forge
+[2026-07-24T08:54:51.011Z] recordForgedToolExchange: toolName=read_memory callId=resume-forge-read-memory-backfill
+[2026-07-24T08:54:51.012Z] recordForgedToolExchange: recordMessage + recordToolCalls persisted
+[2026-07-24T08:54:51.012Z] injectForgedHistory: role=user preview=""
+[2026-07-24T08:54:51.012Z] injectForgedHistory: recordMessage persisted
+[2026-07-24T08:54:51.012Z] ResumeDiffForge: backfilled read_memory and baseline for 2 raw + 1 provider file(s)
+[2026-07-24T08:54:51.012Z] LiveUpdateForge: session reset, allowLiveUpdate = false
+[2026-07-24T08:54:51.012Z] NudgeForge: ResumeComplete — restoring count from history
+[2026-07-24T08:54:51.012Z] restoreNudgeCountFromHistory: no reset point found, count=0
+[2026-07-24T08:54:51.018Z] LiveUpdateForge: allowLiveUpdate = true (first real BeforeSend)
+[2026-07-24T08:54:51.018Z] InitialReadForge.onBeforeSend: SKIP (fr=false syn=false hasRead=true)
+[2026-07-24T08:54:57.026Z] LiveUpdateForge: EndTurn fallback flush
+[2026-07-24T08:54:57.026Z] onEndTurn: naturalStop=false toolCalls=0 nudgeMsg=no
+[2026-07-24T08:55:09.571Z] LiveUpdateForge: AfterToolExec flush
+[2026-07-24T08:55:09.575Z] InitialReadForge.onBeforeSend: SKIP (fr=true syn=false hasRead=true)
+[2026-07-24T08:55:20.787Z] LiveUpdateForge: EndTurn fallback flush
+[2026-07-24T08:55:20.787Z] onEndTurn: naturalStop=true toolCalls=1 nudgeMsg=no

@@ -1,5 +1,6 @@
 #include "elements/attribute_elements.hpp"
 
+#include "elements/color_ramp.hpp"
 #include "elements/element_utils.hpp"
 #include "elements/expression.hpp"
 #include "data/pcg_attribute_table.hpp"
@@ -20,6 +21,11 @@ namespace {
 
 using expression::EvalContext;
 using expression::Program;
+
+struct WrangleEnvironment {
+    std::unordered_map<std::string, double> parameters;
+    ColorRampMap ramps;
+};
 
 struct ElementVariables {
     double* x = nullptr;
@@ -141,6 +147,63 @@ bool write_table_attribute(ElementVariables& variables, const std::string& key, 
     return false;
 }
 
+bool read_table_vector(ElementVariables& variables,
+                       const std::string& key,
+                       std::array<double, 3>& value)
+{
+    if (!variables.attribute_table)
+        return false;
+    auto try_read = [&](data::AttributeOwner owner, size_t index) -> bool {
+        const data::AttributeArray* attr = variables.attribute_table->find(owner, key);
+        if (!attr || attr->schema().type != data::AttributeType::Float ||
+            attr->schema().tuple_size < 3 || index >= attr->size())
+            return false;
+        const size_t offset = index * 3;
+        if (offset + 2 >= attr->float_values().size())
+            return false;
+        value = {attr->float_values()[offset], attr->float_values()[offset + 1],
+                 attr->float_values()[offset + 2]};
+        return true;
+    };
+    if (try_read(variables.attribute_owner, variables.attribute_index))
+        return true;
+    if (variables.attribute_owner != data::AttributeOwner::Detail)
+        return try_read(data::AttributeOwner::Detail, 0);
+    return false;
+}
+
+bool write_table_vector(ElementVariables& variables,
+                        const std::string& key,
+                        const std::array<double, 3>& value)
+{
+    if (!variables.attribute_table)
+        return false;
+    data::AttributeArray* attr =
+        variables.attribute_table->find(variables.attribute_owner, key);
+    if (!attr) {
+        attr = &variables.attribute_table->create_float(variables.attribute_owner, key, 3,
+                                                        {0.0, 0.0, 0.0});
+        const size_t count = variables.attribute_owner == data::AttributeOwner::Detail
+            ? 1
+            : (variables.attribute_owner == data::AttributeOwner::Primitive
+                   ? static_cast<size_t>(std::max(1, variables.primitive_count))
+                   : static_cast<size_t>(std::max(1, variables.point_count)));
+        attr->resize(count);
+    }
+    if (attr->schema().type != data::AttributeType::Float || attr->schema().tuple_size < 3)
+        return false;
+    const size_t offset = variables.attribute_index * 3;
+    if (offset + 2 >= attr->float_values_mut().size())
+        attr->resize(variables.attribute_index + 1);
+    if (offset + 2 < attr->float_values_mut().size()) {
+        attr->float_values_mut()[offset] = value[0];
+        attr->float_values_mut()[offset + 1] = value[1];
+        attr->float_values_mut()[offset + 2] = value[2];
+        return true;
+    }
+    return false;
+}
+
 std::unordered_map<std::string, double> parse_parameters(const nlohmann::json& data,
                                                          std::string& error)
 {
@@ -184,6 +247,17 @@ std::unordered_map<std::string, double> parse_parameters(const nlohmann::json& d
     return result;
 }
 
+WrangleEnvironment build_wrangle_environment(const nlohmann::json& data, std::string& error)
+{
+    WrangleEnvironment environment;
+    environment.parameters = parse_parameters(data, error);
+    if (!error.empty())
+        return {};
+    if (!parse_color_ramps(data, environment.ramps, error))
+        return {};
+    return environment;
+}
+
 bool json_number(const nlohmann::json& value, double& out)
 {
     if (value.is_number()) {
@@ -198,10 +272,12 @@ bool json_number(const nlohmann::json& value, double& out)
 }
 
 EvalContext make_context(ElementVariables& variables,
-                         const std::unordered_map<std::string, double>& parameters)
+                         const std::unordered_map<std::string, double>& parameters,
+                         const ColorRampMap& ramps)
 {
     EvalContext context;
     context.parameters = parameters;
+    context.ramps = ramps;
     context.read_variable = [&variables](const std::string& name, double& value) {
         if (name == "@P.x" && variables.x) value = *variables.x;
         else if (name == "@P.y" && variables.y) value = *variables.y;
@@ -243,6 +319,17 @@ EvalContext make_context(ElementVariables& variables,
         }
         return true;
     };
+    context.read_vector = [&variables](const std::string& name, std::array<double, 3>& value) {
+        if (name.size() <= 1 || name.front() != '@')
+            return false;
+        return read_table_vector(variables, name.substr(1), value);
+    };
+    context.write_vector = [&variables](const std::string& name,
+                                        const std::array<double, 3>& value) {
+        if (name.size() <= 1 || name.front() != '@')
+            return false;
+        return write_table_vector(variables, name.substr(1), value);
+    };
     return context;
 }
 
@@ -277,7 +364,7 @@ double indexed_curve_u(size_t index, size_t count)
 
 bool evaluate_selection(const Program* program,
                         ElementVariables& variables,
-                        const std::unordered_map<std::string, double>& parameters,
+                        const WrangleEnvironment& environment,
                         bool& selected,
                         std::string& error)
 {
@@ -285,7 +372,7 @@ bool evaluate_selection(const Program* program,
         selected = true;
         return true;
     }
-    EvalContext context = make_context(variables, parameters);
+    EvalContext context = make_context(variables, environment.parameters, environment.ramps);
     double value = 0.0;
     if (!program->evaluate(context, value, error))
         return false;
@@ -295,7 +382,7 @@ bool evaluate_selection(const Program* program,
 
 bool apply_wrangle_points(data::PcgPointData& points,
                           const Program& program,
-                          const std::unordered_map<std::string, double>& parameters,
+                          const WrangleEnvironment& environment,
                           std::string& error)
 {
     const int count = static_cast<int>(points.points().size());
@@ -306,7 +393,7 @@ bool apply_wrangle_points(data::PcgPointData& points,
             json_number(point.attributes["curveu"], curve_u);
         ElementVariables variables{&point.x, &point.y, &point.z, &point.attributes,
                                    curve_u, index, count, 0, 0};
-        EvalContext context = make_context(variables, parameters);
+        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
         if (!program.execute(context, error)) {
             error = "point " + std::to_string(index) + ": " + error;
             return false;
@@ -317,7 +404,7 @@ bool apply_wrangle_points(data::PcgPointData& points,
 
 bool apply_wrangle_splines(data::PcgSplineData& splines,
                            const Program& program,
-                           const std::unordered_map<std::string, double>& parameters,
+                           const WrangleEnvironment& environment,
                            std::string& error)
 {
     for (size_t spline_index = 0; spline_index < splines.splines().size(); ++spline_index) {
@@ -330,7 +417,7 @@ bool apply_wrangle_splines(data::PcgSplineData& splines,
                                        curve_u[static_cast<size_t>(index)], index, count,
                                        static_cast<int>(spline_index),
                                        static_cast<int>(splines.splines().size())};
-            EvalContext context = make_context(variables, parameters);
+            EvalContext context = make_context(variables, environment.parameters, environment.ramps);
             if (!program.execute(context, error)) {
                 error = "spline " + std::to_string(spline_index) + " point " +
                         std::to_string(index) + ": " + error;
@@ -343,7 +430,7 @@ bool apply_wrangle_splines(data::PcgSplineData& splines,
 
 bool apply_wrangle_geometry(data::PcgGeometry& geometry,
                             const Program& program,
-                            const std::unordered_map<std::string, double>& parameters,
+                            const WrangleEnvironment& environment,
                             std::string& error)
 {
     const int count = static_cast<int>(geometry.points().size());
@@ -355,7 +442,7 @@ bool apply_wrangle_geometry(data::PcgGeometry& geometry,
                                    &geometry.attributes(), data::AttributeOwner::Point,
                                    static_cast<size_t>(index)};
         variables.geometry = &geometry;
-        EvalContext context = make_context(variables, parameters);
+        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
         if (!program.execute(context, error)) {
             error = "geometry point " + std::to_string(index) + ": " + error;
             return false;
@@ -366,7 +453,7 @@ bool apply_wrangle_geometry(data::PcgGeometry& geometry,
 
 bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
                                        const Program& program,
-                                       const std::unordered_map<std::string, double>& parameters,
+                                       const WrangleEnvironment& environment,
                                        std::string& error)
 {
     const int prim_count = static_cast<int>(geometry.faces().size());
@@ -392,7 +479,7 @@ bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
                                    &geometry.attributes(), data::AttributeOwner::Primitive,
                                    static_cast<size_t>(prim)};
         variables.geometry = &geometry;
-        EvalContext context = make_context(variables, parameters);
+        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
         if (!program.execute(context, error)) {
             error = "geometry prim " + std::to_string(prim) + ": " + error;
             return false;
@@ -414,14 +501,14 @@ bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
 
 bool apply_wrangle_geometry_detail(data::PcgGeometry& geometry,
                                    const Program& program,
-                                   const std::unordered_map<std::string, double>& parameters,
+                                   const WrangleEnvironment& environment,
                                    std::string& error)
 {
     ElementVariables variables{nullptr, nullptr, nullptr, nullptr,
                                0.0, 0, static_cast<int>(geometry.points().size()),
                                0, static_cast<int>(geometry.faces().size()),
                                &geometry.attributes(), data::AttributeOwner::Detail, 0};
-    EvalContext context = make_context(variables, parameters);
+    EvalContext context = make_context(variables, environment.parameters, environment.ramps);
     if (!program.execute(context, error)) {
         error = std::string("geometry detail: ") + error;
         return false;
@@ -444,7 +531,7 @@ data::PcgMeshData mesh_without_stale_normals(const data::PcgMeshData& source)
 
 bool apply_wrangle_mesh(data::PcgMeshData& mesh,
                         const Program& program,
-                        const std::unordered_map<std::string, double>& parameters,
+                        const WrangleEnvironment& environment,
                         std::string& error)
 {
     const int count = static_cast<int>(mesh.vertices().size());
@@ -454,7 +541,7 @@ bool apply_wrangle_mesh(data::PcgMeshData& mesh,
                                    indexed_curve_u(static_cast<size_t>(index), mesh.vertices().size()),
                                    index, count, 0,
                                    static_cast<int>(mesh.triangles().size() / 3)};
-        EvalContext context = make_context(variables, parameters);
+        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
         if (!program.execute(context, error)) {
             error = "mesh point " + std::to_string(index) + ": " + error;
             return false;
@@ -478,7 +565,7 @@ bool point_group_selected(const nlohmann::json& attributes, const std::string& g
 data::PcgPointData blast_points(const data::PcgPointData& source,
                                 const std::string& group,
                                 const Program* program,
-                                const std::unordered_map<std::string, double>& parameters,
+                                const WrangleEnvironment& environment,
                                 bool delete_non_selected,
                                 std::string& error)
 {
@@ -495,7 +582,7 @@ data::PcgPointData blast_points(const data::PcgPointData& source,
         if (attrs.contains("curveu")) json_number(attrs["curveu"], curve_u);
         ElementVariables variables{&x, &y, &z, &attrs, curve_u, index, count, 0, 0};
         bool expression_selected = true;
-        if (!evaluate_selection(program, variables, parameters, expression_selected, error)) {
+        if (!evaluate_selection(program, variables, environment, expression_selected, error)) {
             error = "point " + std::to_string(index) + ": " + error;
             return {};
         }
@@ -526,7 +613,7 @@ void append_spline_run(data::PcgSplineData& output,
 data::PcgSplineData blast_splines(const data::PcgSplineData& source,
                                   const std::string& group,
                                   const Program* program,
-                                  const std::unordered_map<std::string, double>& parameters,
+                                  const WrangleEnvironment& environment,
                                   bool delete_non_selected,
                                   std::string& error)
 {
@@ -546,7 +633,7 @@ data::PcgSplineData blast_splines(const data::PcgSplineData& source,
                                        static_cast<int>(spline_index),
                                        static_cast<int>(source.splines().size())};
             bool expression_selected = true;
-            if (!evaluate_selection(program, variables, parameters, expression_selected, error)) {
+            if (!evaluate_selection(program, variables, environment, expression_selected, error)) {
                 error = "spline " + std::to_string(spline_index) + " point " +
                         std::to_string(index) + ": " + error;
                 return {};
@@ -720,7 +807,7 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
                                  const std::string& entity,
                                  const std::string& group,
                                  const Program* program,
-                                 const std::unordered_map<std::string, double>& parameters,
+                                 const WrangleEnvironment& environment,
                                  bool delete_non_selected,
                                  bool remove_unused_points,
                                  std::string& error)
@@ -754,7 +841,7 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
                                        data::AttributeOwner::Primitive,
                                        face_index};
             bool expression_selected = true;
-            if (!evaluate_selection(program, variables, parameters, expression_selected, error)) {
+            if (!evaluate_selection(program, variables, environment, expression_selected, error)) {
                 error = "primitive " + std::to_string(face_index) + ": " + error;
                 return {};
             }
@@ -780,7 +867,7 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
                                        data::AttributeOwner::Point,
                                        point_index};
             bool expression_selected = true;
-            if (!evaluate_selection(program, variables, parameters, expression_selected, error)) {
+            if (!evaluate_selection(program, variables, environment, expression_selected, error)) {
                 error = "geometry point " + std::to_string(point_index) + ": " + error;
                 return {};
             }
@@ -827,7 +914,7 @@ public:
         if (!Program::compile_statements(source, program, error))
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             ("AttributeWrangle parse error: " + error).c_str());
-        const auto parameters = parse_parameters(ctx.node->data, error);
+        const auto environment = build_wrangle_environment(ctx.node->data, error);
         if (!error.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             ("AttributeWrangle " + error).c_str());
@@ -841,7 +928,7 @@ public:
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 "AttributeWrangle Point input only supports runOver=points");
             data::PcgPointData output = *input->points;
-            if (!apply_wrangle_points(output, program, parameters, error))
+            if (!apply_wrangle_points(output, program, environment, error))
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 ("AttributeWrangle " + error).c_str());
             emit_points(ctx, std::move(output));
@@ -852,7 +939,7 @@ public:
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 "AttributeWrangle Spline input only supports runOver=points");
             data::PcgSplineData output = *input->splines;
-            if (!apply_wrangle_splines(output, program, parameters, error))
+            if (!apply_wrangle_splines(output, program, environment, error))
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 ("AttributeWrangle " + error).c_str());
             emit_splines(ctx, std::move(output));
@@ -862,11 +949,11 @@ public:
             data::PcgGeometry output = *input->geometry;
             bool ok = false;
             if (run_over == "primitives")
-                ok = apply_wrangle_geometry_primitives(output, program, parameters, error);
+                ok = apply_wrangle_geometry_primitives(output, program, environment, error);
             else if (run_over == "detail")
-                ok = apply_wrangle_geometry_detail(output, program, parameters, error);
+                ok = apply_wrangle_geometry_detail(output, program, environment, error);
             else
-                ok = apply_wrangle_geometry(output, program, parameters, error);
+                ok = apply_wrangle_geometry(output, program, environment, error);
             if (!ok)
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 ("AttributeWrangle " + error).c_str());
@@ -878,7 +965,7 @@ public:
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 "AttributeWrangle Mesh input only supports runOver=points");
             data::PcgMeshData output = mesh_without_stale_normals(*input->mesh);
-            if (!apply_wrangle_mesh(output, program, parameters, error))
+            if (!apply_wrangle_mesh(output, program, environment, error))
                 return fail_ctx(ctx, PCG_ERR_EXECUTION,
                                 ("AttributeWrangle " + error).c_str());
             emit_mesh(ctx, std::move(output));
@@ -919,12 +1006,12 @@ public:
         if (group.empty() && !program_ptr)
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             "Blast requires a group or selection expression");
-        const auto parameters = parse_parameters(ctx.node->data, error);
+        const auto environment = build_wrangle_environment(ctx.node->data, error);
         if (!error.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Blast " + error).c_str());
 
         if (input->points) {
-            auto output = blast_points(*input->points, group, program_ptr, parameters,
+            auto output = blast_points(*input->points, group, program_ptr, environment,
                                        delete_non_selected, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Blast " + error).c_str());
@@ -932,7 +1019,7 @@ public:
             return PCG_OK;
         }
         if (input->splines) {
-            auto output = blast_splines(*input->splines, group, program_ptr, parameters,
+            auto output = blast_splines(*input->splines, group, program_ptr, environment,
                                         delete_non_selected, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Blast " + error).c_str());
@@ -940,7 +1027,7 @@ public:
             return PCG_OK;
         }
         if (input->geometry) {
-            auto output = blast_geometry(*input->geometry, entity, group, program_ptr, parameters,
+            auto output = blast_geometry(*input->geometry, entity, group, program_ptr, environment,
                                          delete_non_selected, remove_unused_points, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Blast " + error).c_str());
@@ -982,18 +1069,18 @@ public:
         if (group.empty() && !program_ptr)
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             "Split requires a group or selection expression");
-        const auto parameters = parse_parameters(ctx.node->data, error);
+        const auto environment = build_wrangle_environment(ctx.node->data, error);
         if (!error.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
 
         // Houdini Split: first output = selection (after Invert), second = complement.
         // deleteNonSelected=true keeps selection; false deletes selection (keeps complement).
         if (input->points) {
-            auto selected = blast_points(*input->points, group, program_ptr, parameters,
+            auto selected = blast_points(*input->points, group, program_ptr, environment,
                                          true, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
-            auto remainder = blast_points(*input->points, group, program_ptr, parameters,
+            auto remainder = blast_points(*input->points, group, program_ptr, environment,
                                           false, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
@@ -1004,11 +1091,11 @@ public:
             return PCG_OK;
         }
         if (input->splines) {
-            auto selected = blast_splines(*input->splines, group, program_ptr, parameters,
+            auto selected = blast_splines(*input->splines, group, program_ptr, environment,
                                           true, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
-            auto remainder = blast_splines(*input->splines, group, program_ptr, parameters,
+            auto remainder = blast_splines(*input->splines, group, program_ptr, environment,
                                            false, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
@@ -1020,11 +1107,11 @@ public:
         }
         if (input->geometry) {
             auto selected = blast_geometry(*input->geometry, entity, group, program_ptr,
-                                           parameters, true, remove_unused_points, error);
+                                           environment, true, remove_unused_points, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
             auto remainder = blast_geometry(*input->geometry, entity, group, program_ptr,
-                                            parameters, false, remove_unused_points, error);
+                                            environment, false, remove_unused_points, error);
             if (!error.empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
             if (invert_selection)

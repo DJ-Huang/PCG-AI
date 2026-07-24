@@ -356,6 +356,13 @@
           "default": "{\"sag\": 3.0}",
           "multiline": true,
           "lines": 3
+        },
+        "ramps": {
+          "type": "string",
+          "displayName": "Color Ramps (JSON)",
+          "default": "{}",
+          "multiline": true,
+          "lines": 6
         }
       }
     },
