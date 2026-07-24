@@ -334,6 +334,16 @@ namespace DJTechRuntime.PCG
             return index < 0 ? null : rawValues[index];
         }
 
+        public bool RemoveRaw(string key)
+        {
+            var index = rawKeys.IndexOf(key);
+            if (index < 0)
+                return false;
+            rawKeys.RemoveAt(index);
+            rawValues.RemoveAt(index);
+            return true;
+        }
+
         public IEnumerable<(string key, object value)> EnumerateRaw()
         {
             for (var i = 0; i < rawKeys.Count; i++)

@@ -83,6 +83,79 @@ namespace DJTechRuntime.PCG
             return TryParse(raw, out var value) ? value : fallback;
         }
 
+        /// <summary>
+        /// Reads a vector3 property from node data, matching pcg-core <c>read_vector_param</c>.
+        /// When legacy <c>{key}X/Y/Z</c> components exist, they win over a canonical value that
+        /// still equals the manifest default (avoids default vector emission shadowing legacy data).
+        /// </summary>
+        public static Vector3 ResolveFromNodeData(PcgNodeData data, string key, Vector3 fallback)
+        {
+            if (data == null)
+                return fallback;
+
+            var legacy = ReadLegacyVector(data, key, fallback, out var hasLegacy);
+            if (!TryParse(data.GetRaw(key), out var parsed))
+                return hasLegacy ? legacy : fallback;
+
+            if (!hasLegacy || !Approximately(parsed, fallback) || !Approximately(parsed, legacy))
+                return parsed;
+
+            return legacy;
+        }
+
+        public static void ClearLegacyAxes(PcgNodeData data, string key)
+        {
+            if (data == null)
+                return;
+            data.RemoveRaw(key + "X");
+            data.RemoveRaw(key + "Y");
+            data.RemoveRaw(key + "Z");
+        }
+
+        private static Vector3 ReadLegacyVector(
+            PcgNodeData data, string key, Vector3 fallback, out bool hasLegacy)
+        {
+            hasLegacy = false;
+            var x = ReadAxis(data, key + "X", float.NaN);
+            var y = ReadAxis(data, key + "Y", float.NaN);
+            var z = ReadAxis(data, key + "Z", float.NaN);
+            if (!float.IsNaN(x))
+                hasLegacy = true;
+            if (!float.IsNaN(y))
+                hasLegacy = true;
+            if (!float.IsNaN(z))
+                hasLegacy = true;
+            return new Vector3(
+                float.IsNaN(x) ? fallback.x : x,
+                float.IsNaN(y) ? fallback.y : y,
+                float.IsNaN(z) ? fallback.z : z);
+        }
+
+        private static bool Approximately(Vector3 a, Vector3 b, float epsilon = 1e-5f) =>
+            Mathf.Abs(a.x - b.x) < epsilon &&
+            Mathf.Abs(a.y - b.y) < epsilon &&
+            Mathf.Abs(a.z - b.z) < epsilon;
+
+        private static float ReadAxis(PcgNodeData data, string axisKey, float fallback)
+        {
+            var raw = data.GetRaw(axisKey);
+            if (raw == null)
+                return fallback;
+            if (raw is float f)
+                return f;
+            if (raw is double d)
+                return (float)d;
+            if (raw is int i)
+                return i;
+            return float.TryParse(
+                raw.ToString(),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var parsed)
+                ? parsed
+                : fallback;
+        }
+
         public static void AppendJson(StringBuilder sb, object raw)
         {
             var value = ParseOrDefault(raw, Vector3.zero);

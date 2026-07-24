@@ -477,6 +477,9 @@ namespace DJTechEditor.PCG.Graph
                     else
                         container.Add(CreatePropertyRow(node, item.key, item.prop, def, rebuildOnChange: item.rebuildOnChange));
                 }
+
+                if (node.NodeType == "TransformMesh" && section.id == "preTransform")
+                    container.Add(CreateMoveCentroidButton(node));
             }
         }
 
@@ -1288,7 +1291,7 @@ namespace DJTechEditor.PCG.Graph
                 "number" => MakeFloatField(key, currentVal, v => apply(v)),
                 "boolean" => MakeToggleField(key, currentVal, v => apply(v)),
                 "enum" => MakeEnumField(key, prop, currentVal, v => apply(v)),
-                "vector3" => MakeVector3Field(key, currentVal, v => apply(v)),
+                "vector3" => MakeVector3Field(node, key, v => apply(v)),
                 "texture2d" => MakeTextureField(key, currentVal, v => apply(v)),
                 "groupSelect" => MakeGroupSelectField(key, prop, currentVal, node, v => apply(v)),
                 "groupMultiSelect" => MakeGroupMultiSelectField(key, prop, currentVal, node, v => apply(v)),
@@ -1438,6 +1441,65 @@ namespace DJTechEditor.PCG.Graph
 
         private void NotifyGraphChanged() => m_GraphView?.NotifyDocumentChanged();
 
+        private VisualElement CreateMoveCentroidButton(PcgManifestNodeView node)
+        {
+            var button = new Button(() =>
+            {
+                if (!TryGetTransformMeshCentroid(node, out var centroid))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Move Centroid to Origin",
+                        "Cook or preview this Transform Mesh node first so its geometry bounds are available.",
+                        "OK");
+                    return;
+                }
+
+                m_GraphView.WithUndo("Move Centroid to Origin", () =>
+                {
+                    var current = PcgVector3Property.ResolveFromNodeData(
+                        node.CollectData(), "translate", Vector3.zero);
+                    var next = current - centroid;
+                    node.SetPropertyValue("translate", PcgVector3Property.Format(next));
+                });
+                NotifyGraphChanged();
+                ShowNode(node);
+            })
+            {
+                text = "Move Centroid to Origin",
+                tooltip = "Adjust Translate so the cooked geometry centroid moves to the origin.",
+            };
+            button.style.height = 24;
+            button.style.marginTop = 6;
+            button.style.marginBottom = 4;
+            return button;
+        }
+
+        private bool TryGetTransformMeshCentroid(PcgManifestNodeView node, out Vector3 centroid)
+        {
+            centroid = Vector3.zero;
+            if (m_GraphView?.HostWindow is not PcgGraphEditorWindow window)
+                return false;
+
+            var component = Selection.activeGameObject != null
+                ? Selection.activeGameObject.GetComponent<PcgGraphComponent>()
+                : null;
+            if (component == null)
+                return false;
+
+            if (!string.Equals(window.PreviewNodeId, node.NodeId, StringComparison.Ordinal))
+                return false;
+
+            var preview = component.PolygonPreview;
+            if (preview?.Points == null || preview.Points.Length == 0)
+                return false;
+
+            var sum = Vector3.zero;
+            foreach (var point in preview.Points)
+                sum += point;
+            centroid = sum / preview.Points.Length;
+            return true;
+        }
+
         private VisualElement CreateFbxExportActions(PcgManifestNodeView node)
         {
             var container = new VisualElement
@@ -1559,9 +1621,12 @@ namespace DJTechEditor.PCG.Graph
             return field;
         }
 
-        private VisualElement MakeVector3Field(string key, object val, Action<object> onSet)
+        private VisualElement MakeVector3Field(PcgManifestNodeView node, string key, Action<object> onSet)
         {
-            var current = PcgVector3Property.ParseOrDefault(val ?? propDefaultVector(key), Vector3.zero);
+            var current = PcgVector3Property.ResolveFromNodeData(
+                node.CollectData(),
+                key,
+                propDefaultVector(key));
             return PcgInspectorWidgets.CreateVector3Row(
                 current,
                 next =>

@@ -210,6 +210,13 @@ namespace DJTechEditor.PCG.Graph
             ConfigureCompactNumericField(field);
             field.style.width = Length.Percent(100);
             field.style.minWidth = 48;
+            field.style.borderBottomWidth = 2;
+            field.style.borderBottomColor = axis switch
+            {
+                "X" => new Color(0.82f, 0.32f, 0.32f),
+                "Y" => new Color(0.38f, 0.78f, 0.38f),
+                _ => new Color(0.38f, 0.55f, 0.9f),
+            };
             field.RegisterValueChangedCallback(_ => onChange());
             field.RegisterCallback<FocusOutEvent>(_ => onCommit());
             row.Add(field);

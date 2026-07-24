@@ -5530,45 +5530,270 @@
           "pinType": "SpatialMesh"
         }
       ],
+      "inspectorSections": [
+        {
+          "id": "transform",
+          "label": "Transform",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "pivot",
+          "label": "Pivot Transform",
+          "foldout": true,
+          "defaultExpanded": false
+        },
+        {
+          "id": "preTransform",
+          "label": "Pre-Transform",
+          "foldout": true,
+          "defaultExpanded": false
+        },
+        {
+          "id": "attributes",
+          "label": "Attributes",
+          "foldout": false,
+          "header": true
+        }
+      ],
       "properties": {
-        "translateX": {
-          "type": "number",
-          "default": 0
+        "group": {
+          "type": "groupSelect",
+          "default": "",
+          "displayName": "Group",
+          "section": "transform",
+          "order": 0
         },
-        "translateY": {
-          "type": "number",
-          "default": 0
+        "groupType": {
+          "type": "enum",
+          "default": "guess",
+          "displayName": "Group Type",
+          "section": "transform",
+          "order": 1,
+          "options": [
+            { "value": "guess", "label": "Guess from Group" },
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "edges", "label": "Edges" }
+          ]
         },
-        "translateZ": {
-          "type": "number",
-          "default": 0
+        "transformOrder": {
+          "type": "enum",
+          "default": "srt",
+          "displayName": "Transform Order",
+          "section": "transform",
+          "order": 2,
+          "rowGroup": "transformOrderRow",
+          "rowOrder": 0,
+          "options": [
+            { "value": "srt", "label": "Scale Rot Trans" },
+            { "value": "str", "label": "Scale Trans Rot" },
+            { "value": "rst", "label": "Rot Scale Trans" },
+            { "value": "rts", "label": "Rot Trans Scale" },
+            { "value": "tsr", "label": "Trans Scale Rot" },
+            { "value": "trs", "label": "Trans Rot Scale" }
+          ]
         },
-        "rotationX": {
-          "type": "number",
-          "default": 0
+        "rotateOrder": {
+          "type": "enum",
+          "default": "xyz",
+          "displayName": "Rotate Order",
+          "section": "transform",
+          "order": 3,
+          "rowGroup": "transformOrderRow",
+          "rowOrder": 1,
+          "options": [
+            { "value": "xyz", "label": "Rx Ry Rz" },
+            { "value": "xzy", "label": "Rx Rz Ry" },
+            { "value": "yxz", "label": "Ry Rx Rz" },
+            { "value": "yzx", "label": "Ry Rz Rx" },
+            { "value": "zxy", "label": "Rz Rx Ry" },
+            { "value": "zyx", "label": "Rz Ry Rx" }
+          ]
         },
-        "rotationY": {
-          "type": "number",
-          "default": 0
+        "translate": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Translate",
+          "section": "transform",
+          "order": 10
         },
-        "rotationZ": {
-          "type": "number",
-          "default": 0
+        "rotation": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Rotate",
+          "section": "transform",
+          "order": 20
         },
-        "scaleX": {
+        "scale": {
+          "type": "vector3",
+          "default": [1, 1, 1],
+          "minimum": 0.001,
+          "displayName": "Scale",
+          "section": "transform",
+          "order": 30
+        },
+        "shear": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Shear",
+          "section": "transform",
+          "order": 40
+        },
+        "uniformScale": {
           "type": "number",
           "default": 1.0,
-          "minimum": 0.001
+          "minimum": 0.001,
+          "displayName": "Uniform Scale",
+          "section": "transform",
+          "order": 50
         },
-        "scaleY": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.001
+        "pivotTranslate": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Pivot Translate",
+          "section": "pivot",
+          "order": 10
         },
-        "scaleZ": {
-          "type": "number",
-          "default": 1.0,
-          "minimum": 0.001
+        "pivotRotate": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Pivot Rotate",
+          "section": "pivot",
+          "order": 20
+        },
+        "preTransformOrder": {
+          "type": "enum",
+          "default": "srt",
+          "displayName": "Pre-Transform Order",
+          "section": "preTransform",
+          "order": 0,
+          "rowGroup": "preTransformOrderRow",
+          "rowOrder": 0,
+          "options": [
+            { "value": "srt", "label": "Scale Rot Trans" },
+            { "value": "str", "label": "Scale Trans Rot" },
+            { "value": "rst", "label": "Rot Scale Trans" },
+            { "value": "rts", "label": "Rot Trans Scale" },
+            { "value": "tsr", "label": "Trans Scale Rot" },
+            { "value": "trs", "label": "Trans Rot Scale" }
+          ]
+        },
+        "preRotateOrder": {
+          "type": "enum",
+          "default": "xyz",
+          "displayName": "Pre-Rotate Order",
+          "section": "preTransform",
+          "order": 1,
+          "rowGroup": "preTransformOrderRow",
+          "rowOrder": 1,
+          "options": [
+            { "value": "xyz", "label": "Rx Ry Rz" },
+            { "value": "xzy", "label": "Rx Rz Ry" },
+            { "value": "yxz", "label": "Ry Rx Rz" },
+            { "value": "yzx", "label": "Ry Rz Rx" },
+            { "value": "zxy", "label": "Rz Rx Ry" },
+            { "value": "zyx", "label": "Rz Ry Rx" }
+          ]
+        },
+        "preTranslate": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Pre-Translate",
+          "section": "preTransform",
+          "order": 10
+        },
+        "preRotate": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Pre-Rotate",
+          "section": "preTransform",
+          "order": 20
+        },
+        "preScale": {
+          "type": "vector3",
+          "default": [1, 1, 1],
+          "minimum": 0.001,
+          "displayName": "Pre-Scale",
+          "section": "preTransform",
+          "order": 30
+        },
+        "preShear": {
+          "type": "vector3",
+          "default": [0, 0, 0],
+          "displayName": "Pre-Shear",
+          "section": "preTransform",
+          "order": 40
+        },
+        "attributes": {
+          "type": "string",
+          "default": "*",
+          "displayName": "Attributes",
+          "section": "attributes",
+          "order": 10
+        },
+        "recomputePointNormals": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Recompute Point Normals",
+          "section": "attributes",
+          "order": 20
+        },
+        "recomputeAffectedNormals": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Recompute Affected Normals",
+          "section": "attributes",
+          "order": 30
+        },
+        "preserveNormalLength": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Preserve Normal Length",
+          "section": "attributes",
+          "order": 40
+        },
+        "invertTransform": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Invert Transformation",
+          "section": "attributes",
+          "order": 50
+        },
+        "outputTransform": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Output Attribute",
+          "section": "attributes",
+          "order": 60
+        },
+        "outputAttribute": {
+          "type": "string",
+          "default": "xform",
+          "displayName": "Attribute Name",
+          "section": "attributes",
+          "order": 70,
+          "indent": true,
+          "enabledWhen": {
+            "property": "outputTransform",
+            "equals": "true"
+          }
+        },
+        "outputMultiplyOrder": {
+          "type": "enum",
+          "default": "post",
+          "displayName": "Multiply Order",
+          "section": "attributes",
+          "order": 80,
+          "indent": true,
+          "enabledWhen": {
+            "property": "outputTransform",
+            "equals": "true"
+          },
+          "options": [
+            { "value": "post", "label": "Post-Multiply" },
+            { "value": "pre", "label": "Pre-Multiply" }
+          ]
         }
       }
     },

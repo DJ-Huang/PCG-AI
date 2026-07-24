@@ -60,18 +60,12 @@ namespace DJTechEditor.PCG.Graph
                 {
                     spec.HasTransform = true;
                     spec.TransformNodeId = cursor.id;
-                    spec.LocalPosition = new Vector3(
-                        ReadFloat(cursor.data, "translateX", 0f),
-                        ReadFloat(cursor.data, "translateY", 0f),
-                        ReadFloat(cursor.data, "translateZ", 0f));
-                    spec.LocalEuler = new Vector3(
-                        ReadFloat(cursor.data, "rotationX", 0f),
-                        ReadFloat(cursor.data, "rotationY", 0f),
-                        ReadFloat(cursor.data, "rotationZ", 0f));
-                    spec.LocalScale = new Vector3(
-                        ReadFloat(cursor.data, "scaleX", 1f),
-                        ReadFloat(cursor.data, "scaleY", 1f),
-                        ReadFloat(cursor.data, "scaleZ", 1f));
+                    spec.LocalPosition = PcgVector3Property.ResolveFromNodeData(
+                        cursor.data, "translate", Vector3.zero);
+                    spec.LocalEuler = PcgVector3Property.ResolveFromNodeData(
+                        cursor.data, "rotation", Vector3.zero);
+                    spec.LocalScale = PcgVector3Property.ResolveFromNodeData(
+                        cursor.data, "scale", Vector3.one);
                     spec.Title = ReadTitle(cursor, spec.Title);
 
                     var boxId = FindUpstream(doc, cursor.id, "in");

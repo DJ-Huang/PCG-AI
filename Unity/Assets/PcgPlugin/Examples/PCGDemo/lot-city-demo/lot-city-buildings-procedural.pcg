@@ -131,7 +131,7 @@
       "id": "lift_bldgs",
       "type": "TransformMesh",
       "position": { "x": 840, "y": 4560 },
-      "data": {"translateX": 0, "translateY": 0.18, "translateZ": 0, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Lift Onto Pads"}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "attributes": "*", "recomputePointNormals": false, "recomputeAffectedNormals": true, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": "Lift Onto Pads"}
     },
     {
       "id": "merge",
@@ -412,8 +412,14 @@
     {
       "id": "n115",
       "type": "MatchSize",
-      "position": { "x": 1063, "y": 1520 },
+      "position": { "x": 1056.5, "y": 1490.5 },
       "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "center", "targetJustifyX": "same", "offsetX": 0, "justifyY": "center", "targetJustifyY": "same", "offsetY": 0, "justifyZ": "center", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": true, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
+    },
+    {
+      "id": "n118",
+      "type": "TransformMesh",
+      "position": { "x": 1137.5, "y": 1543.5 },
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 2, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "attributes": "*", "recomputePointNormals": false, "recomputeAffectedNormals": true, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -495,7 +501,8 @@
     {"id": "e598850", "source": "n113", "target": "n114", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e598851", "source": "n114", "target": "n115", "sourceHandle": "out", "targetHandle": "source"},
     {"id": "e609307", "source": "n115", "target": "n116", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e609308", "source": "n116", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e609308", "source": "n116", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e614575", "source": "n115", "target": "n118", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

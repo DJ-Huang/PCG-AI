@@ -375,27 +375,50 @@ data::PcgVec3 read_vector_param(const nlohmann::json& data,
                                 const char* key,
                                 const data::PcgVec3& fallback)
 {
+    const std::string prefix(key);
+    const auto legacy_x = data.value(prefix + "X", std::numeric_limits<double>::quiet_NaN());
+    const auto legacy_y = data.value(prefix + "Y", std::numeric_limits<double>::quiet_NaN());
+    const auto legacy_z = data.value(prefix + "Z", std::numeric_limits<double>::quiet_NaN());
+    const bool has_legacy = std::isfinite(legacy_x) || std::isfinite(legacy_y) ||
+                            std::isfinite(legacy_z);
+    const data::PcgVec3 legacy{
+        std::isfinite(legacy_x) ? legacy_x : fallback.x,
+        std::isfinite(legacy_y) ? legacy_y : fallback.y,
+        std::isfinite(legacy_z) ? legacy_z : fallback.z,
+    };
+
+    auto near_vec = [](const data::PcgVec3& a, const data::PcgVec3& b) {
+        return std::abs(a.x - b.x) <= 1.0e-9 && std::abs(a.y - b.y) <= 1.0e-9 &&
+               std::abs(a.z - b.z) <= 1.0e-9;
+    };
+
     if (data.contains(key)) {
         const auto& value = data[key];
+        data::PcgVec3 parsed = fallback;
+        bool parsed_ok = false;
         if (value.is_array() && value.size() >= 3 && value[0].is_number() &&
             value[1].is_number() && value[2].is_number()) {
-            return {value[0].get<double>(), value[1].get<double>(), value[2].get<double>()};
+            parsed = {value[0].get<double>(), value[1].get<double>(), value[2].get<double>()};
+            parsed_ok = true;
+        } else if (value.is_object()) {
+            parsed = {value.value("x", fallback.x),
+                      value.value("y", fallback.y),
+                      value.value("z", fallback.z)};
+            parsed_ok = true;
+        } else if (value.is_string()) {
+            parsed_ok = try_parse_vector_string(value.get<std::string>(), parsed);
         }
-        if (value.is_object()) {
-            return {value.value("x", fallback.x),
-                    value.value("y", fallback.y),
-                    value.value("z", fallback.z)};
-        }
-        if (value.is_string()) {
-            data::PcgVec3 parsed{};
-            if (try_parse_vector_string(value.get<std::string>(), parsed))
+
+        if (parsed_ok) {
+            if (!has_legacy || !near_vec(parsed, fallback) || !near_vec(parsed, legacy))
                 return parsed;
+            return legacy;
         }
     }
-    const std::string prefix(key);
-    return {data.value(prefix + "X", fallback.x),
-            data.value(prefix + "Y", fallback.y),
-            data.value(prefix + "Z", fallback.z)};
+
+    if (has_legacy)
+        return legacy;
+    return fallback;
 }
 
 } // namespace pcg::internal::elements

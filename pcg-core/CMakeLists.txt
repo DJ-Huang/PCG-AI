@@ -113,6 +113,7 @@ set(PCG_CORE_SOURCES
     src/elements/structural_algorithms.cpp
     src/elements/structural_elements.cpp
     src/elements/spline_algorithms.cpp
+    src/elements/transform_algorithms.cpp
     src/elements/spline_elements.cpp
     src/elements/spline_mesh_elements.cpp
     src/elements/material_algorithms.cpp
