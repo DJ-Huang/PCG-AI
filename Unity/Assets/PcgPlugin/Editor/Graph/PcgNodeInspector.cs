@@ -421,7 +421,7 @@ namespace DJTechEditor.PCG.Graph
             var topProps = props.Where(p => string.IsNullOrEmpty(p.prop.section)).ToList();
             foreach (var (key, prop) in topProps)
             {
-                if (companionTargets.Contains(key) || !IsPropertyVisible(node, prop))
+                if (companionTargets.Contains(key) || !IsPropertyVisible(node, key, prop))
                     continue;
                 m_Body.Add(CreatePropertyRow(node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
             }
@@ -443,7 +443,7 @@ namespace DJTechEditor.PCG.Graph
                 var sectionProps = props
                     .Where(p => p.prop.section == section.id
                                 && !companionTargets.Contains(p.key)
-                                && IsPropertyVisible(node, p.prop))
+                                && IsPropertyVisible(node, p.key, p.prop))
                     .ToList();
                 if (sectionProps.Count == 0)
                     continue;
@@ -498,7 +498,7 @@ namespace DJTechEditor.PCG.Graph
             var emittedRowGroups = new HashSet<string>(StringComparer.Ordinal);
             foreach (var (key, prop) in sectionProps)
             {
-                if (companionTargets.Contains(key) || !IsPropertyVisible(node, prop))
+                if (companionTargets.Contains(key) || !IsPropertyVisible(node, key, prop))
                     continue;
 
                 if (!string.IsNullOrEmpty(prop.rowGroup))
@@ -509,7 +509,7 @@ namespace DJTechEditor.PCG.Graph
                     var members = sectionProps
                         .Where(p => p.prop.rowGroup == prop.rowGroup &&
                                     !companionTargets.Contains(p.key) &&
-                                    IsPropertyVisible(node, p.prop))
+                                    IsPropertyVisible(node, p.key, p.prop))
                         .OrderBy(p => p.prop.hasRowOrder ? p.prop.rowOrder : int.MaxValue)
                         .ThenBy(p => p.key)
                         .ToList();
@@ -760,8 +760,23 @@ namespace DJTechEditor.PCG.Graph
                 (p.enabledWhenAll != null &&
                  p.enabledWhenAll.Any(c => c.property == key)));
 
-        private static bool IsPropertyVisible(PcgManifestNodeView node, ManifestPropertyDef prop)
+        private static bool IsPropertyVisible(PcgManifestNodeView node, string key, ManifestPropertyDef prop)
         {
+            if (node.NodeType == "MatchSize" &&
+                (key == "targetPosition" || key == "targetSize"))
+            {
+                var justifyWith = NormalizeVisibleValue(node.CollectData().GetRaw("justifyWith"));
+                if (string.IsNullOrEmpty(justifyWith))
+                    justifyWith = "inputIfWired";
+                if (justifyWith == "locationAndSize")
+                    return true;
+                if (justifyWith != "inputIfWired")
+                    return false;
+
+                var referencePort = node.GetInputPort("reference");
+                return referencePort == null || !referencePort.connected;
+            }
+
             if (prop.visibleWhenAny != null && prop.visibleWhenAny.Count > 0)
             {
                 foreach (var clause in prop.visibleWhenAny)

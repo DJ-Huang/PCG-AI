@@ -2405,6 +2405,7 @@ namespace DJTechEditor.PCG.Graph
                     {
                         CommitState();
                         m_PendingCommit = false;
+                        RefreshInspector();
                     });
                 }
             }

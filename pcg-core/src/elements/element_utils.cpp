@@ -347,6 +347,30 @@ std::vector<std::string> parse_name_list(const nlohmann::json& data, const char*
     return names;
 }
 
+bool try_parse_vector_string(const std::string& text, data::PcgVec3& out)
+{
+    if (text.size() < 5 || text.front() != '[' || text.back() != ']')
+        return false;
+
+    const auto body = text.substr(1, text.size() - 2);
+    const auto comma1 = body.find(',');
+    const auto comma2 = body.find(',', comma1 == std::string::npos ? 0 : comma1 + 1);
+    if (comma1 == std::string::npos || comma2 == std::string::npos)
+        return false;
+
+    try {
+        const double x = std::stod(body.substr(0, comma1));
+        const double y = std::stod(body.substr(comma1 + 1, comma2 - comma1 - 1));
+        const double z = std::stod(body.substr(comma2 + 1));
+        if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+            return false;
+        out = {x, y, z};
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 data::PcgVec3 read_vector_param(const nlohmann::json& data,
                                 const char* key,
                                 const data::PcgVec3& fallback)
@@ -361,6 +385,11 @@ data::PcgVec3 read_vector_param(const nlohmann::json& data,
             return {value.value("x", fallback.x),
                     value.value("y", fallback.y),
                     value.value("z", fallback.z)};
+        }
+        if (value.is_string()) {
+            data::PcgVec3 parsed{};
+            if (try_parse_vector_string(value.get<std::string>(), parsed))
+                return parsed;
         }
     }
     const std::string prefix(key);

@@ -58,7 +58,7 @@ namespace DJTechEditor.PCG.Graph
 
             if (useReference)
             {
-                if (TryBoundsFromPreview(component, previewNodeId, node.id, referenceSourceId, out bounds))
+                if (TryBoundsFromPreview(component, previewNodeId, referenceSourceId, out bounds))
                     return true;
 
                 if (!referenceWired)
@@ -94,20 +94,20 @@ namespace DJTechEditor.PCG.Graph
         private static bool TryBoundsFromPreview(
             PcgGraphComponent component,
             string previewNodeId,
-            string matchSizeNodeId,
             string referenceSourceId,
             out MinMaxBounds bounds)
         {
             bounds = default;
-            if (component == null)
+            if (component == null || string.IsNullOrEmpty(referenceSourceId))
+                return false;
+
+            // Target bounds come from the reference source geometry, never from the
+            // MatchSize cooked output (that reflects the result, not the target volume).
+            if (previewNodeId != referenceSourceId)
                 return false;
 
             var preview = component.PolygonPreview;
             if (preview?.Points == null || preview.Points.Length == 0)
-                return false;
-
-            if (previewNodeId != matchSizeNodeId &&
-                previewNodeId != referenceSourceId)
                 return false;
 
             return TryBoundsFromPoints(preview.Points, out bounds);

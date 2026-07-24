@@ -240,6 +240,29 @@ void test_match_size()
     expect(near(graph_extent.x, 4.0) && near(graph_extent.y, 6.0) &&
                near(graph_extent.z, 8.0),
            "MatchSize graph result");
+
+    const auto string_graph = nlohmann::json{
+        {"version", "1.0"},
+        {"nodes", nlohmann::json::array({
+            {{"id", "box"}, {"type", "CreateBoxMesh"},
+             {"data", {{"width", 2.0}, {"height", 2.0}, {"depth", 2.0}}}},
+            {{"id", "match"}, {"type", "MatchSize"},
+             {"data", {{"justifyWith", "locationAndSize"},
+                       {"targetPosition", "[0.0,0.0,0.0]"},
+                       {"targetSize", "[4.0,6.0,8.0]"},
+                       {"uniformScale", false}}}},
+            {{"id", "output"}, {"type", "Output"}, {"data", nlohmann::json::object()}},
+        })},
+        {"edges", nlohmann::json::array({
+            {{"source", "box"}, {"target", "match"}, {"targetHandle", "source"}},
+            {{"source", "match"}, {"target", "output"}},
+        })},
+    };
+    const auto string_graph_result = execute_geometry_graph(string_graph);
+    const auto string_extent = size_of(string_graph_result);
+    expect(near(string_extent.x, 4.0) && near(string_extent.y, 6.0) &&
+               near(string_extent.z, 8.0),
+           "MatchSize graph string vector params");
 }
 
 void test_bend_mesh()
