@@ -21,7 +21,7 @@ namespace DJTechEditor.PCG.Graph
         private static readonly string[] PinTypes =
         {
             "Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface",
-            "SpatialMesh", "Texture", "HeightField",
+            "SpatialMesh", "SpatialGeometry", "Texture", "HeightField",
         };
 
         public PcgSubgraphInterfacePanel(PcgGraphView graphView)

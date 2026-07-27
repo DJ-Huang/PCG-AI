@@ -496,6 +496,44 @@ nlohmann::json build_per_node_attributes(const NodeOutputMap& outputs)
                 point_count += static_cast<int>(spline.points.size());
             if (point_count > 0)
                 push_attr(node_id, "point", "P", "float", 3);
+
+            for (const auto& [name, value] : splines->metadata().raw().items()) {
+                const char* type = "float";
+                int tuple_size = 1;
+                if (value.is_array()) {
+                    type = "float";
+                    tuple_size = static_cast<int>(value.size());
+                } else if (value.is_string()) {
+                    type = "string";
+                } else if (value.is_boolean() || value.is_number_integer()) {
+                    type = "int";
+                }
+                push_attr(node_id, "detail", name, type, tuple_size);
+            }
+
+            if (!splines->splines().empty()) {
+                std::unordered_set<std::string> spline_attr_names;
+                for (const auto& spline : splines->splines()) {
+                    if (!spline.attributes.is_object())
+                        continue;
+                    for (const auto& [name, value] : spline.attributes.items())
+                        spline_attr_names.insert(name);
+                }
+                for (const auto& name : spline_attr_names) {
+                    const auto& value = splines->splines().front().attributes.at(name);
+                    const char* type = "float";
+                    int tuple_size = 1;
+                    if (value.is_array()) {
+                        type = "float";
+                        tuple_size = static_cast<int>(value.size());
+                    } else if (value.is_string()) {
+                        type = "string";
+                    } else if (value.is_boolean() || value.is_number_integer()) {
+                        type = "int";
+                    }
+                    push_attr(node_id, "primitive", name, type, tuple_size);
+                }
+            }
         }
     }
     return result;

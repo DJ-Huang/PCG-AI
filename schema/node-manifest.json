@@ -8311,34 +8311,89 @@
     },
     {
       "type": "MeasureMesh",
-      "displayName": "Measure Mesh",
+      "displayName": "Measure",
       "category": "Mesh",
       "inputs": [
         {
           "id": "in",
-          "label": "Mesh",
-          "pinType": "SpatialMesh"
+          "label": "Geometry",
+          "pinType": "Any"
         }
       ],
       "outputs": [
         {
           "id": "out",
-          "label": "Mesh",
-          "pinType": "SpatialMesh"
+          "label": "Geometry",
+          "pinType": "Any"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "measurement",
+          "label": "Measurement",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "visualizedRange",
+          "label": "Visualized Range",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "colorMapping",
+          "label": "Color Mapping",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "output",
+          "label": "Output",
+          "foldout": false,
+          "header": true
         }
       ],
       "properties": {
+        "group": {
+          "type": "groupSelect",
+          "displayName": "Group",
+          "default": "",
+          "order": 0
+        },
+        "elementType": {
+          "type": "enum",
+          "displayName": "Element Type",
+          "default": "primitives",
+          "order": 1,
+          "options": [
+            {
+              "value": "points",
+              "label": "Points"
+            },
+            {
+              "value": "primitives",
+              "label": "Primitives"
+            }
+          ]
+        },
         "measure": {
           "type": "enum",
+          "displayName": "Measure",
           "default": "perimeter",
+          "section": "measurement",
+          "order": 10,
           "options": [
             {
               "value": "perimeter",
-              "label": "Perimeter"
+              "label": "Perimeter / Length"
             },
             {
               "value": "area",
               "label": "Area"
+            },
+            {
+              "value": "volume",
+              "label": "Volume"
             },
             {
               "value": "size",
@@ -8346,17 +8401,267 @@
             },
             {
               "value": "volume_approx",
-              "label": "Volume Approx"
+              "label": "Volume Approx (BBox)"
             }
           ]
         },
-        "attributeName": {
-          "type": "string",
-          "default": "length"
+        "accumulate": {
+          "type": "enum",
+          "displayName": "Accumulate",
+          "default": "perElement",
+          "section": "measurement",
+          "order": 11,
+          "options": [
+            {
+              "value": "perElement",
+              "label": "Per Element"
+            },
+            {
+              "value": "perPiece",
+              "label": "Per Piece"
+            },
+            {
+              "value": "throughout",
+              "label": "Throughout"
+            }
+          ]
         },
         "pieceAttribute": {
           "type": "string",
-          "default": ""
+          "displayName": "Piece Attribute",
+          "default": "class",
+          "section": "measurement",
+          "order": 12,
+          "indent": true,
+          "enabledWhen": {
+            "property": "accumulate",
+            "equals": "perPiece"
+          }
+        },
+        "refineToConnected": {
+          "type": "boolean",
+          "displayName": "Refine To Connected Manifold Pieces",
+          "default": true,
+          "section": "measurement",
+          "order": 13,
+          "indent": true,
+          "enabledWhen": {
+            "property": "accumulate",
+            "equals": "perPiece"
+          }
+        },
+        "usePositionAttribute": {
+          "type": "boolean",
+          "displayName": "Position Attribute",
+          "default": false,
+          "section": "measurement",
+          "order": 14,
+          "companionField": "positionAttribute"
+        },
+        "positionAttribute": {
+          "type": "string",
+          "displayName": "Position Attribute",
+          "default": "P",
+          "section": "measurement",
+          "order": 15
+        },
+        "useMinimum": {
+          "type": "boolean",
+          "displayName": "Minimum",
+          "default": false,
+          "section": "visualizedRange",
+          "order": 20,
+          "companionField": "minimum"
+        },
+        "minimum": {
+          "type": "number",
+          "displayName": "Minimum",
+          "default": -1.0,
+          "section": "visualizedRange",
+          "order": 21
+        },
+        "useMaximum": {
+          "type": "boolean",
+          "displayName": "Maximum",
+          "default": false,
+          "section": "visualizedRange",
+          "order": 22,
+          "companionField": "maximum"
+        },
+        "maximum": {
+          "type": "number",
+          "displayName": "Maximum",
+          "default": 1.0,
+          "section": "visualizedRange",
+          "order": 23
+        },
+        "useWidth": {
+          "type": "boolean",
+          "displayName": "Width",
+          "default": true,
+          "section": "visualizedRange",
+          "order": 24,
+          "companionField": "width"
+        },
+        "width": {
+          "type": "number",
+          "displayName": "Width",
+          "default": 6.0,
+          "minimum": 0.0,
+          "section": "visualizedRange",
+          "order": 25
+        },
+        "widthScale": {
+          "type": "enum",
+          "displayName": "Width Scale",
+          "default": "mad",
+          "section": "visualizedRange",
+          "order": 26,
+          "indent": true,
+          "enabledWhen": {
+            "property": "useWidth",
+            "equals": "true"
+          },
+          "options": [
+            {
+              "value": "unit",
+              "label": "x 1.0"
+            },
+            {
+              "value": "sd",
+              "label": "x SD"
+            },
+            {
+              "value": "mad",
+              "label": "x MAD"
+            }
+          ]
+        },
+        "centerType": {
+          "type": "enum",
+          "displayName": "Center",
+          "default": "median",
+          "section": "visualizedRange",
+          "order": 27,
+          "options": [
+            {
+              "value": "fixed",
+              "label": "Fixed"
+            },
+            {
+              "value": "mean",
+              "label": "Mean"
+            },
+            {
+              "value": "median",
+              "label": "Median"
+            }
+          ]
+        },
+        "centerFixed": {
+          "type": "number",
+          "displayName": "Center Value",
+          "default": 0.0,
+          "section": "visualizedRange",
+          "order": 28,
+          "indent": true,
+          "enabledWhen": {
+            "property": "centerType",
+            "equals": "fixed"
+          }
+        },
+        "colorRamp": {
+          "type": "string",
+          "displayName": "Color Ramp (JSON)",
+          "default": "{\"interpolation\":\"linear\",\"keys\":[{\"t\":0,\"color\":[0,0,1]},{\"t\":0.5,\"color\":[1,1,1]},{\"t\":1,\"color\":[1,0,0]}]}",
+          "multiline": true,
+          "lines": 4,
+          "section": "colorMapping",
+          "order": 30
+        },
+        "vectorScale": {
+          "type": "number",
+          "displayName": "Vector Scale",
+          "default": 1.0,
+          "minimum": 0.0,
+          "section": "colorMapping",
+          "order": 31
+        },
+        "attributeName": {
+          "type": "string",
+          "displayName": "Attribute Name",
+          "default": "length",
+          "section": "output",
+          "order": 40
+        },
+        "useTotalAttribute": {
+          "type": "boolean",
+          "displayName": "Total Attribute Name",
+          "default": false,
+          "section": "output",
+          "order": 41,
+          "companionField": "totalAttributeName"
+        },
+        "totalAttributeName": {
+          "type": "string",
+          "displayName": "Total Attribute Name",
+          "default": "totalperimeter",
+          "section": "output",
+          "order": 42
+        },
+        "useRangeGroup": {
+          "type": "boolean",
+          "displayName": "Range Group",
+          "default": false,
+          "section": "output",
+          "order": 43,
+          "companionField": "rangeGroup"
+        },
+        "rangeGroup": {
+          "type": "string",
+          "displayName": "Range Group",
+          "default": "inrange",
+          "section": "output",
+          "order": 44,
+          "isGroupOutput": true
+        },
+        "bakeVisualizedRange": {
+          "type": "boolean",
+          "displayName": "Bake Visualized Range Into Output",
+          "default": false,
+          "section": "output",
+          "order": 45
+        },
+        "useRemapRange": {
+          "type": "boolean",
+          "displayName": "Remap Range",
+          "default": false,
+          "section": "output",
+          "order": 46,
+          "enabledWhen": {
+            "property": "bakeVisualizedRange",
+            "equals": "true"
+          },
+          "companionField": "remapMin"
+        },
+        "remapMin": {
+          "type": "number",
+          "displayName": "Remap Min",
+          "default": 0.0,
+          "section": "output",
+          "order": 47
+        },
+        "remapMax": {
+          "type": "number",
+          "displayName": "Remap Max",
+          "default": 1.0,
+          "section": "output",
+          "order": 48,
+          "indent": true,
+          "enabledWhen": {
+            "property": "useRemapRange",
+            "equals": "true"
+          }
         }
       }
     },
@@ -8699,19 +9004,19 @@
     {
       "type": "SortGeometry",
       "displayName": "Sort Geometry",
-      "category": "Mesh",
+      "category": "Geometry",
       "inputs": [
         {
           "id": "in",
-          "label": "Mesh",
-          "pinType": "SpatialMesh"
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
         }
       ],
       "outputs": [
         {
           "id": "out",
-          "label": "Mesh",
-          "pinType": "SpatialMesh"
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
         }
       ],
       "inspectorSections": [

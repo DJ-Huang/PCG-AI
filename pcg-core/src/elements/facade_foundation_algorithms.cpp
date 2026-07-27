@@ -1,5 +1,6 @@
 #include "elements/facade_foundation_algorithms.hpp"
 
+#include "data/pcg_attribute_table.hpp"
 #include "geometry/bmesh.hpp"
 #include "geometry/group_table.hpp"
 
@@ -126,7 +127,97 @@ namespace {
 struct ConvertEdge {
     int a = -1;
     int b = -1;
+    int source_face = -1;
 };
+
+nlohmann::json attribute_element_to_json(const data::AttributeArray& attr, size_t index)
+{
+    if (index >= attr.size())
+        return nullptr;
+
+    const int tuple = std::max(1, attr.schema().tuple_size);
+    const size_t offset = index * static_cast<size_t>(tuple);
+
+    if (attr.schema().type == data::AttributeType::String) {
+        if (tuple == 1) {
+            if (offset >= attr.string_values().size())
+                return nullptr;
+            return attr.string_values()[offset];
+        }
+        nlohmann::json values = nlohmann::json::array();
+        for (int comp = 0; comp < tuple; ++comp) {
+            const size_t slot = offset + static_cast<size_t>(comp);
+            if (slot >= attr.string_values().size())
+                return nullptr;
+            values.push_back(attr.string_values()[slot]);
+        }
+        return values;
+    }
+
+    if (attr.schema().type == data::AttributeType::Int) {
+        if (tuple == 1) {
+            if (offset >= attr.int_values().size())
+                return nullptr;
+            return attr.int_values()[offset];
+        }
+        nlohmann::json values = nlohmann::json::array();
+        for (int comp = 0; comp < tuple; ++comp) {
+            const size_t slot = offset + static_cast<size_t>(comp);
+            if (slot >= attr.int_values().size())
+                return nullptr;
+            values.push_back(attr.int_values()[slot]);
+        }
+        return values;
+    }
+
+    if (tuple == 1) {
+        if (offset >= attr.float_values().size())
+            return nullptr;
+        return attr.float_values()[offset];
+    }
+    nlohmann::json values = nlohmann::json::array();
+    for (int comp = 0; comp < tuple; ++comp) {
+        const size_t slot = offset + static_cast<size_t>(comp);
+        if (slot >= attr.float_values().size())
+            return nullptr;
+        values.push_back(attr.float_values()[slot]);
+    }
+    return values;
+}
+
+void copy_detail_attributes_to_metadata(const data::PcgGeometry& input,
+                                        data::PcgSplineData& output)
+{
+    for (const auto& name : input.attributes().names(data::AttributeOwner::Detail)) {
+        const data::AttributeArray* attr =
+            input.attributes().find(data::AttributeOwner::Detail, name);
+        if (!attr || attr->size() == 0)
+            continue;
+        const nlohmann::json value = attribute_element_to_json(*attr, 0);
+        if (!value.is_null())
+            output.metadata().set(name, value);
+    }
+}
+
+void copy_primitive_attributes_to_json(const data::PcgGeometry& input,
+                                       int face_index,
+                                       nlohmann::json& destination)
+{
+    if (face_index < 0 || static_cast<size_t>(face_index) >= input.faces().size())
+        return;
+
+    const size_t prim_index = static_cast<size_t>(face_index);
+    for (const auto& name : input.attributes().names(data::AttributeOwner::Primitive)) {
+        const data::AttributeArray* attr =
+            input.attributes().find(data::AttributeOwner::Primitive, name);
+        if (!attr || prim_index >= attr->size())
+            continue;
+        const nlohmann::json value = attribute_element_to_json(*attr, prim_index);
+        if (!value.is_null())
+            destination[name] = value;
+    }
+    destination["primnum"] = face_index;
+}
 
 double point_distance_sq(const data::PcgVec3& a, const data::PcgVec3& b)
 {
@@ -199,7 +290,9 @@ std::vector<ConvertEdge> collect_convert_edges(const data::PcgGeometry& input,
 {
     std::unordered_map<int64_t, int> edge_face_count;
     std::unordered_map<int64_t, std::pair<int, int>> edge_endpoints;
-    for (const auto& face : input.faces()) {
+    std::unordered_map<int64_t, int> edge_source_face;
+    for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+        const auto& face = input.faces()[fi];
         if (face.size() < 2)
             continue;
         for (size_t i = 0; i < face.size(); ++i) {
@@ -210,6 +303,7 @@ std::vector<ConvertEdge> collect_convert_edges(const data::PcgGeometry& input,
             const int64_t key = geometry::edge_group_id(a, b);
             ++edge_face_count[key];
             edge_endpoints.emplace(key, std::make_pair(std::min(a, b), std::max(a, b)));
+            edge_source_face.emplace(key, static_cast<int>(fi));
         }
     }
 
@@ -236,7 +330,9 @@ std::vector<ConvertEdge> collect_convert_edges(const data::PcgGeometry& input,
         if (static_cast<size_t>(a_idx) >= input.points().size() ||
             static_cast<size_t>(b_idx) >= input.points().size())
             continue;
-        edges.push_back({a_idx, b_idx});
+        const auto face_it = edge_source_face.find(key);
+        const int source_face = face_it == edge_source_face.end() ? -1 : face_it->second;
+        edges.push_back({a_idx, b_idx, source_face});
     }
     return edges;
 }
@@ -320,6 +416,7 @@ void emit_segment_spline(data::PcgSplineData& output,
     spline.points.push_back(to_spline_point(b));
     if (options.compute_length)
         set_spline_length_attr(spline, options.length_attribute, segment_length(a, b));
+    copy_primitive_attributes_to_json(input, edge.source_face, spline.attributes);
     output.splines_mut().push_back(std::move(spline));
 }
 
@@ -366,7 +463,7 @@ void emit_connected_splines(data::PcgSplineData& output,
         }
     };
 
-    const auto emit_path = [&](const std::vector<int>& path) {
+    const auto emit_path = [&](const std::vector<int>& path, int source_face) {
         if (path.size() < 2)
             return;
 
@@ -391,6 +488,7 @@ void emit_connected_splines(data::PcgSplineData& output,
 
         if (options.compute_length)
             set_spline_length_attr(spline, options.length_attribute, total_length);
+        copy_primitive_attributes_to_json(input, source_face, spline.attributes);
         output.splines_mut().push_back(std::move(spline));
     };
 
@@ -402,7 +500,7 @@ void emit_connected_splines(data::PcgSplineData& output,
         std::vector<int> path{edge.a, edge.b};
         extend_path(path, edge.a, edge.b, false);
         extend_path(path, edge.b, edge.a, true);
-        emit_path(path);
+        emit_path(path, edge.source_face);
     }
 }
 
@@ -424,6 +522,8 @@ data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
     else
         for (const auto& edge : edges)
             emit_segment_spline(output, input, edge, options);
+
+    copy_detail_attributes_to_metadata(input, output);
 
     (void)options.remove_unused_points;
     (void)options.keep_group_order;

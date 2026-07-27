@@ -223,6 +223,71 @@ int main()
     }
 
     {
+        using pcg::internal::data::AttributeOwner;
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::elements::ConvertLineOptions;
+        using pcg::internal::elements::convert_line_geometry;
+
+        PcgGeometry grid;
+        grid.points_mut() = {
+            {0.0, 0.0, 0.0}, {4.0, 0.0, 0.0}, {4.0, 0.0, 4.0}, {0.0, 0.0, 4.0}};
+        grid.faces_mut() = {{0, 1, 2, 3}};
+
+        auto& detail = grid.attributes().create_int(AttributeOwner::Detail, "numFloors", 1);
+        detail.resize(1);
+        detail.int_values_mut()[0] = 3;
+
+        auto& piece = grid.attributes().create_int(AttributeOwner::Primitive, "piece", 1);
+        piece.resize(1);
+        piece.int_values_mut()[0] = 7;
+
+        ConvertLineOptions opts;
+        opts.mode = "all";
+        opts.connect_path = true;
+        const auto splines = convert_line_geometry(grid, opts);
+        expect(splines.splines().size() == 1, "ConvertLine attribute propagation emits spline");
+        expect(splines.metadata().has("numFloors"), "ConvertLine copies detail attributes to metadata");
+        if (splines.metadata().has("numFloors"))
+            expect(splines.metadata().get("numFloors").get<int64_t>() == 3,
+                   "ConvertLine detail value preserved");
+        if (!splines.splines().empty()) {
+            const auto& attrs = splines.splines().front().attributes;
+            expect(attrs.contains("piece") && attrs["piece"].get<int64_t>() == 7,
+                   "ConvertLine copies primitive attributes to spline");
+            expect(attrs.contains("primnum") && attrs["primnum"].get<int>() == 0,
+                   "ConvertLine writes primnum from source face");
+        }
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":2.0,"height":2.0,"depth":2.0}},
+            {"id":"wr","type":"AttributeWrangle","data":{"runOver":"detail","expression":"@numFloors = 2;"}},
+            {"id":"lines","type":"ConvertLine","data":{"mode":"all"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"wr","sourceHandle":"out","targetHandle":"in"},
+            {"source":"wr","target":"lines","sourceHandle":"out","targetHandle":"in"},
+            {"source":"lines","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.json.contains("node_attrs"), "ConvertLine graph reports node_attrs");
+        bool lines_has_detail = false;
+        if (result.json.contains("node_attrs") && result.json["node_attrs"].is_array()) {
+            for (const auto& attr : result.json["node_attrs"]) {
+                if (attr.value("node_id", "") == "lines" && attr.value("owner", "") == "detail" &&
+                    attr.value("name", "") == "numFloors")
+                    lines_has_detail = true;
+            }
+        }
+        expect(lines_has_detail, "ConvertLine graph keeps detail attrs visible on spline output");
+    }
+
+    {
         const std::string graph = R"({
           "version":"1.0",
           "nodes":[

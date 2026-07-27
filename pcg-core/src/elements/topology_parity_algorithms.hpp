@@ -10,9 +10,39 @@
 namespace pcg::internal::elements {
 
 struct MeasureMeshOptions {
-    std::string measure = "perimeter"; // perimeter | area | size | volume_approx
+    std::string group;
+    std::string element_type = "primitives"; // points | primitives
+    /// perimeter | area | volume | size | volume_approx (legacy aliases kept)
+    std::string measure = "perimeter";
+    /// perElement | perPiece | throughout
+    std::string accumulate = "perElement";
+    std::string piece_attribute;
+    bool refine_to_connected = true;
+
+    bool use_position_attribute = false;
+    std::string position_attribute = "P";
+
+    bool use_minimum = false;
+    double minimum = -1.0;
+    bool use_maximum = false;
+    double maximum = 1.0;
+    bool use_width = true;
+    double width = 6.0;
+    /// unit | sd | mad  (Houdini: x 1.0 / x SD / x MAD)
+    std::string width_scale = "mad";
+    /// fixed | mean | median
+    std::string center_type = "median";
+    double center_fixed = 0.0;
+
     std::string attribute_name = "length";
-    std::string piece_attribute; // optional: per-piece via Connectivity class
+    bool use_total_attribute = false;
+    std::string total_attribute_name = "totalperimeter";
+    bool use_range_group = false;
+    std::string range_group = "inrange";
+    bool bake_visualized_range = false;
+    bool use_remap_range = false;
+    double remap_min = 0.0;
+    double remap_max = 1.0;
 };
 
 struct BoundMeshOptions {
@@ -156,6 +186,10 @@ int read_iterations_attribute(const data::PcgGeometry& geometry, const std::stri
 
 data::PcgGeometry measure_mesh_geometry(const data::PcgGeometry& input,
                                         const MeasureMeshOptions& options);
+
+/// Measure polyline / curve length (and related scalars) on ConvertLine-style spline payloads.
+data::PcgSplineData measure_spline_data(const data::PcgSplineData& input,
+                                        const MeasureMeshOptions& options);
 data::PcgGeometry bound_mesh_geometry(const data::PcgGeometry& input,
                                       const BoundMeshOptions& options);
 data::PcgGeometry compute_normals_geometry(const data::PcgGeometry& input,
@@ -174,7 +208,11 @@ data::PcgGeometry connectivity_geometry(const data::PcgGeometry& input,
 data::PcgGeometry assemble_geometry(const data::PcgGeometry& input,
                                     const AssembleOptions& options);
 data::PcgGeometry sort_geometry(const data::PcgGeometry& input,
-                                const SortGeometryOptions& options);
+                                const SortGeometryOptions& options,
+                                std::string* error_out = nullptr);
+data::PcgSplineData sort_spline_data(const data::PcgSplineData& input,
+                                     const SortGeometryOptions& options,
+                                     std::string* error_out = nullptr);
 data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                                       const CarveSplineOptions& options);
 data::PcgSplineData find_shortest_path_on_mesh(const data::PcgGeometry& input,

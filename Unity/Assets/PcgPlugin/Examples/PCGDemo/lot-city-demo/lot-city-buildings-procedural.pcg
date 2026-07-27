@@ -434,9 +434,21 @@
       "data": {"runOver": "detail", "expression": "@randVal = rand(@iteration);\n@numFloors = (@randVal < 0.2) * 3 + (@randVal >= 0.2 && @randVal < 0.7) * 2 + (@randVal >= 0.7 && @randVal < 0.9) * 1;", "parameters": "{}", "ramps": "{}", "__nodeTitle": "number_of_floors"}
     },
     {
+      "id": "n124",
+      "type": "SortGeometry",
+      "position": { "x": 1434, "y": 1865.5 },
+      "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "attribute", "primitiveSeed": 0, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "length", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n123",
+      "type": "MeasureMesh",
+      "position": { "x": 1434, "y": 1805.5 },
+      "data": {"group": "", "elementType": "primitives", "measure": "perimeter", "accumulate": "perElement", "pieceAttribute": "class", "refineToConnected": true, "usePositionAttribute": false, "positionAttribute": "P", "useMinimum": false, "minimum": -1, "useMaximum": false, "maximum": 1, "useWidth": true, "width": 6, "widthScale": "mad", "centerType": "median", "centerFixed": 0, "colorRamp": "{\"interpolation\":\"linear\",\"keys\":[{\"t\":0,\"color\":[0,0,1]},{\"t\":0.5,\"color\":[1,1,1]},{\"t\":1,\"color\":[1,0,0]}]}", "vectorScale": 1, "attributeName": "length", "useTotalAttribute": false, "totalAttributeName": "totalperimeter", "useRangeGroup": false, "rangeGroup": "inrange", "bakeVisualizedRange": false, "useRemapRange": false, "remapMin": 0, "remapMax": 1, "__nodeTitle": ""}
+    },
+    {
       "id": "n122",
       "type": "ConvertLine",
-      "position": { "x": 1438.5, "y": 1733 },
+      "position": { "x": 1434, "y": 1744.5 },
       "data": {"group": "streetFacingEdges", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "__nodeTitle": ""}
     }
   ],
@@ -523,7 +535,9 @@
     {"id": "e614575", "source": "n115", "target": "n118", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e620880", "source": "n118", "target": "n119", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e620881", "source": "n119", "target": "n120", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e625679", "source": "n119", "target": "n122", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e625679", "source": "n119", "target": "n122", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e653838", "source": "n122", "target": "n123", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e653839", "source": "n123", "target": "n124", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

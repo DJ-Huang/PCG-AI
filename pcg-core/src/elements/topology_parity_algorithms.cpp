@@ -117,20 +117,6 @@ double face_area(const data::PcgGeometry& geometry, size_t face_index)
     return area;
 }
 
-double face_perimeter(const data::PcgGeometry& geometry, size_t face_index)
-{
-    const auto& face = geometry.faces()[face_index];
-    if (face.size() < 2)
-        return 0.0;
-    double peri = 0.0;
-    for (size_t i = 0; i < face.size(); ++i) {
-        const auto& a = geometry.points()[static_cast<size_t>(face[i])];
-        const auto& b = geometry.points()[static_cast<size_t>(face[(i + 1) % face.size()])];
-        peri += length(sub(a, b));
-    }
-    return peri;
-}
-
 uint64_t edge_key(int a, int b)
 {
     const int lo = std::min(a, b);
@@ -263,11 +249,17 @@ std::vector<size_t> select_sort_slots(const data::PcgGeometry& geometry,
 
 std::vector<size_t> compute_sort_order(const data::PcgGeometry& geometry,
                                        const SortDomainOptions& options,
-                                       bool primitives)
+                                       bool primitives,
+                                       std::string* error_out = nullptr)
 {
     const size_t count = primitives ? geometry.faces().size() : geometry.points().size();
     std::vector<size_t> identity(count);
     std::iota(identity.begin(), identity.end(), 0);
+    auto fail = [&](const std::string& message) {
+        if (error_out)
+            *error_out = message;
+        return identity;
+    };
     if (count == 0)
         return identity;
 
@@ -288,6 +280,23 @@ std::vector<size_t> compute_sort_order(const data::PcgGeometry& geometry,
         (!options.ordering_attribute.empty())
             ? geometry.attributes().find(owner, options.ordering_attribute)
             : nullptr;
+
+    if (method == "attribute") {
+        if (options.attribute_name.empty())
+            return fail("SortGeometry attribute name is required");
+        if (!sort_attr)
+            return fail("SortGeometry attribute not found: " + options.attribute_name);
+        const int tuple = std::max(1, sort_attr->schema().tuple_size);
+        if (options.component < 0 || options.component >= tuple)
+            return fail("SortGeometry attribute component out of range");
+    }
+    if (method == "reorder") {
+        const data::AttributeArray* idx_attr =
+            ordering_attr != nullptr ? ordering_attr
+                                     : (sort_attr != nullptr ? sort_attr : nullptr);
+        if (!idx_attr || idx_attr->schema().type != data::AttributeType::Int)
+            return fail("SortGeometry reorder requires integer ordering attribute");
+    }
 
     auto stable_tie = [&](size_t a, size_t b) -> int {
         if (options.sort_indices && options.combine_sort_indices && ordering_attr &&
@@ -429,7 +438,10 @@ std::vector<size_t> compute_sort_order(const data::PcgGeometry& geometry,
                 if (read_numeric_attr_component(*sort_attr, index, options.component,
                                                 key.number))
                     return key;
+                return key;
             }
+            if (method == "attribute")
+                return key;
             const data::PcgVec3 p = element_position(geometry, primitives, index);
             if (method == "x") {
                 key.number = p.x;
@@ -459,6 +471,22 @@ std::vector<size_t> compute_sort_order(const data::PcgGeometry& geometry,
             }
             return key;
         };
+
+        for (size_t idx : members) {
+            if (method == "attribute" && sort_attr) {
+                if (sort_attr->schema().type == data::AttributeType::String) {
+                    std::string text;
+                    if (!read_string_attr_component(*sort_attr, idx, options.component, text))
+                        return fail("SortGeometry attribute read failed for primitive/point " +
+                                    std::to_string(idx));
+                } else {
+                    double value = 0.0;
+                    if (!read_numeric_attr_component(*sort_attr, idx, options.component, value))
+                        return fail("SortGeometry attribute read failed for primitive/point " +
+                                    std::to_string(idx));
+                }
+            }
+        }
 
         std::stable_sort(members.begin(), members.end(), [&](size_t a, size_t b) {
             const Key ka = key_of(a);
@@ -623,39 +651,501 @@ int read_iterations_attribute(const data::PcgGeometry& geometry,
     return fallback;
 }
 
+data::PcgVec3 face_point_at(const data::PcgGeometry& geometry,
+                            const std::vector<data::PcgVec3>* positions,
+                            size_t face_index,
+                            size_t corner)
+{
+    const auto& face = geometry.faces()[face_index];
+    const int pi = face[corner % face.size()];
+    if (positions && pi >= 0 && static_cast<size_t>(pi) < positions->size())
+        return (*positions)[static_cast<size_t>(pi)];
+    if (pi >= 0 && static_cast<size_t>(pi) < geometry.points().size())
+        return geometry.points()[static_cast<size_t>(pi)];
+    return {};
+}
+
+double face_area_at(const data::PcgGeometry& geometry,
+                    const std::vector<data::PcgVec3>* positions,
+                    size_t face_index)
+{
+    const auto& face = geometry.faces()[face_index];
+    if (face.size() < 3)
+        return 0.0;
+    const data::PcgVec3 p0 = face_point_at(geometry, positions, face_index, 0);
+    double area = 0.0;
+    for (size_t i = 1; i + 1 < face.size(); ++i) {
+        const data::PcgVec3 p1 = face_point_at(geometry, positions, face_index, i);
+        const data::PcgVec3 p2 = face_point_at(geometry, positions, face_index, i + 1);
+        area += 0.5 * length(cross(sub(p1, p0), sub(p2, p0)));
+    }
+    return area;
+}
+
+double face_perimeter_at(const data::PcgGeometry& geometry,
+                         const std::vector<data::PcgVec3>* positions,
+                         size_t face_index)
+{
+    const auto& face = geometry.faces()[face_index];
+    if (face.size() < 2)
+        return 0.0;
+    double peri = 0.0;
+    for (size_t i = 0; i < face.size(); ++i) {
+        const data::PcgVec3 a = face_point_at(geometry, positions, face_index, i);
+        const data::PcgVec3 b = face_point_at(geometry, positions, face_index, i + 1);
+        peri += length(sub(a, b));
+    }
+    return peri;
+}
+
+double face_volume_contrib_at(const data::PcgGeometry& geometry,
+                              const std::vector<data::PcgVec3>* positions,
+                              size_t face_index)
+{
+    // Signed tet volumes with apex at origin for each triangle fan.
+    const auto& face = geometry.faces()[face_index];
+    if (face.size() < 3)
+        return 0.0;
+    const data::PcgVec3 p0 = face_point_at(geometry, positions, face_index, 0);
+    double volume = 0.0;
+    for (size_t i = 1; i + 1 < face.size(); ++i) {
+        const data::PcgVec3 p1 = face_point_at(geometry, positions, face_index, i);
+        const data::PcgVec3 p2 = face_point_at(geometry, positions, face_index, i + 1);
+        volume += dot(p0, cross(p1, p2)) / 6.0;
+    }
+    return volume;
+}
+
+bool resolve_measure_positions(const data::PcgGeometry& geometry,
+                               const MeasureMeshOptions& options,
+                               std::vector<data::PcgVec3>& positions)
+{
+    if (!options.use_position_attribute || options.position_attribute.empty() ||
+        options.position_attribute == "P")
+        return false;
+
+    const auto* attr =
+        geometry.attributes().find(data::AttributeOwner::Point, options.position_attribute);
+    if (!attr || attr->schema().type != data::AttributeType::Float ||
+        attr->schema().tuple_size < 3)
+        return false;
+
+    positions.resize(geometry.points().size());
+    const auto& values = attr->float_values();
+    const size_t width = static_cast<size_t>(attr->schema().tuple_size);
+    for (size_t i = 0; i < positions.size(); ++i) {
+        if (i >= attr->size()) {
+            positions[i] = geometry.points()[i];
+            continue;
+        }
+        const size_t offset = i * width;
+        positions[i] = {values[offset], values[offset + 1], values[offset + 2]};
+    }
+    return true;
+}
+
+std::vector<size_t> select_measure_slots(const data::PcgGeometry& geometry,
+                                         bool primitives,
+                                         const std::string& group)
+{
+    return select_sort_slots(geometry, primitives, group);
+}
+
+std::string piece_key_for(const data::AttributeArray* piece_attr, size_t index)
+{
+    if (!piece_attr || index >= piece_attr->size())
+        return "0";
+    if (piece_attr->schema().type == data::AttributeType::String) {
+        std::string value;
+        if (read_string_attr_component(*piece_attr, index, 0, value))
+            return value;
+        return "0";
+    }
+    double value = 0.0;
+    if (read_numeric_attr_component(*piece_attr, index, 0, value))
+        return std::to_string(static_cast<long long>(std::llround(value)));
+    return "0";
+}
+
+void accumulate_measure_values(std::vector<double>& values,
+                               const std::vector<size_t>& slots,
+                               const std::string& accumulate,
+                               const data::PcgGeometry& geometry,
+                               bool primitives,
+                               const std::string& piece_attribute,
+                               bool refine_to_connected)
+{
+    if (slots.empty())
+        return;
+
+    if (accumulate == "throughout") {
+        double total = 0.0;
+        for (size_t slot : slots)
+            total += values[slot];
+        for (size_t slot : slots)
+            values[slot] = total;
+        return;
+    }
+
+    if (accumulate != "perPiece")
+        return;
+
+    const data::AttributeOwner owner =
+        primitives ? data::AttributeOwner::Primitive : data::AttributeOwner::Point;
+    const std::string attr_name =
+        piece_attribute.empty() ? std::string("class") : piece_attribute;
+    const data::AttributeArray* piece_attr = geometry.attributes().find(owner, attr_name);
+
+    // Optional: further split by connected components within each piece label.
+    std::vector<int> component(values.size(), -1);
+    if (refine_to_connected && primitives) {
+        std::unordered_map<uint64_t, std::vector<size_t>> edge_faces;
+        for (size_t fi = 0; fi < geometry.faces().size(); ++fi) {
+            const auto& face = geometry.faces()[fi];
+            for (size_t i = 0; i < face.size(); ++i) {
+                const int a = face[i];
+                const int b = face[(i + 1) % face.size()];
+                edge_faces[edge_key(a, b)].push_back(fi);
+            }
+        }
+        int next_comp = 0;
+        for (size_t slot : slots) {
+            if (component[slot] >= 0)
+                continue;
+            std::queue<size_t> queue;
+            queue.push(slot);
+            component[slot] = next_comp;
+            while (!queue.empty()) {
+                const size_t cur = queue.front();
+                queue.pop();
+                const auto& face = geometry.faces()[cur];
+                for (size_t i = 0; i < face.size(); ++i) {
+                    const int a = face[i];
+                    const int b = face[(i + 1) % face.size()];
+                    for (size_t other : edge_faces[edge_key(a, b)]) {
+                        if (component[other] >= 0)
+                            continue;
+                        if (piece_key_for(piece_attr, other) != piece_key_for(piece_attr, cur))
+                            continue;
+                        component[other] = next_comp;
+                        queue.push(other);
+                    }
+                }
+            }
+            ++next_comp;
+        }
+    }
+
+    std::unordered_map<std::string, double> totals;
+    for (size_t slot : slots) {
+        std::string key = piece_key_for(piece_attr, slot);
+        if (refine_to_connected && primitives && component[slot] >= 0)
+            key += "#" + std::to_string(component[slot]);
+        totals[key] += values[slot];
+    }
+    for (size_t slot : slots) {
+        std::string key = piece_key_for(piece_attr, slot);
+        if (refine_to_connected && primitives && component[slot] >= 0)
+            key += "#" + std::to_string(component[slot]);
+        values[slot] = totals[key];
+    }
+}
+
+void apply_visualized_range(std::vector<double>& values,
+                            const std::vector<size_t>& slots,
+                            const MeasureMeshOptions& options,
+                            std::vector<char>& in_range)
+{
+    in_range.assign(values.size(), 1);
+    if (slots.empty())
+        return;
+
+    std::vector<double> raw;
+    raw.reserve(slots.size());
+    for (size_t slot : slots)
+        raw.push_back(values[slot]);
+
+    auto percentile_median = [](std::vector<double> sample) {
+        if (sample.empty())
+            return 0.0;
+        std::sort(sample.begin(), sample.end());
+        const size_t n = sample.size();
+        if (n % 2 == 1)
+            return sample[n / 2];
+        return 0.5 * (sample[n / 2 - 1] + sample[n / 2]);
+    };
+
+    double center = options.center_fixed;
+    if (options.center_type == "mean") {
+        center = std::accumulate(raw.begin(), raw.end(), 0.0) /
+                 static_cast<double>(raw.size());
+    } else if (options.center_type == "median") {
+        center = percentile_median(raw);
+    }
+
+    double half_width = options.width * 0.5;
+    if (options.use_width) {
+        if (options.width_scale == "sd") {
+            const double mean =
+                std::accumulate(raw.begin(), raw.end(), 0.0) / static_cast<double>(raw.size());
+            double var = 0.0;
+            for (double v : raw) {
+                const double d = v - mean;
+                var += d * d;
+            }
+            var /= static_cast<double>(raw.size());
+            half_width *= std::sqrt(std::max(0.0, var));
+        } else if (options.width_scale == "mad") {
+            const double med = percentile_median(raw);
+            std::vector<double> abs_dev;
+            abs_dev.reserve(raw.size());
+            for (double v : raw)
+                abs_dev.push_back(std::abs(v - med));
+            half_width *= percentile_median(std::move(abs_dev));
+        }
+    }
+
+    for (size_t slot : slots) {
+        double v = values[slot];
+        bool clamped = false;
+        if (options.use_minimum && v < options.minimum) {
+            v = options.minimum;
+            clamped = true;
+        }
+        if (options.use_maximum && v > options.maximum) {
+            v = options.maximum;
+            clamped = true;
+        }
+        if (options.use_width) {
+            const double lo = center - half_width;
+            const double hi = center + half_width;
+            if (v < lo) {
+                v = lo;
+                clamped = true;
+            } else if (v > hi) {
+                v = hi;
+                clamped = true;
+            }
+        }
+        in_range[slot] = clamped ? 0 : 1;
+        if (options.bake_visualized_range)
+            values[slot] = v;
+    }
+
+    if (options.bake_visualized_range && options.use_remap_range) {
+        double lo = std::numeric_limits<double>::max();
+        double hi = -std::numeric_limits<double>::max();
+        for (size_t slot : slots) {
+            lo = std::min(lo, values[slot]);
+            hi = std::max(hi, values[slot]);
+        }
+        const double span = hi - lo;
+        for (size_t slot : slots) {
+            const double t = span > kEps ? (values[slot] - lo) / span : 0.0;
+            values[slot] = options.remap_min + t * (options.remap_max - options.remap_min);
+        }
+    }
+}
+
 data::PcgGeometry measure_mesh_geometry(const data::PcgGeometry& input,
                                         const MeasureMeshOptions& options)
 {
     data::PcgGeometry output = input;
-    const size_t face_count = output.faces().size();
-    auto& attr = output.attributes().create_float(
-        data::AttributeOwner::Primitive, options.attribute_name, 1);
-    attr.resize(face_count);
+    const bool primitives = options.element_type != "points";
+    const size_t count = primitives ? output.faces().size() : output.points().size();
+    const auto owner =
+        primitives ? data::AttributeOwner::Primitive : data::AttributeOwner::Point;
+
+    std::vector<data::PcgVec3> override_positions;
+    const std::vector<data::PcgVec3>* positions =
+        resolve_measure_positions(input, options, override_positions) ? &override_positions
+                                                                      : nullptr;
 
     data::PcgVec3 bmin{}, bmax{};
     compute_bbox(input, bmin, bmax);
     const data::PcgVec3 size_v = sub(bmax, bmin);
+    const double bbox_diag = std::max({size_v.x, size_v.y, size_v.z});
+    const double bbox_volume = std::abs(size_v.x * size_v.y * size_v.z);
 
-    for (size_t fi = 0; fi < face_count; ++fi) {
-        double value = 0.0;
+    auto measure_face = [&](size_t fi) -> double {
         if (options.measure == "area")
-            value = face_area(input, fi);
-        else if (options.measure == "size")
-            value = std::max({size_v.x, size_v.y, size_v.z});
-        else if (options.measure == "volume_approx")
-            value = std::abs(size_v.x * size_v.y * size_v.z);
-        else
-            value = face_perimeter(input, fi);
-        attr.float_values_mut()[fi] = value;
+            return face_area_at(input, positions, fi);
+        if (options.measure == "volume")
+            return face_volume_contrib_at(input, positions, fi);
+        if (options.measure == "size")
+            return bbox_diag;
+        if (options.measure == "volume_approx")
+            return bbox_volume;
+        return face_perimeter_at(input, positions, fi);
+    };
+
+    std::vector<double> values(count, 0.0);
+    if (primitives) {
+        for (size_t fi = 0; fi < count; ++fi)
+            values[fi] = measure_face(fi);
+    } else {
+        for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+            const auto& face = input.faces()[fi];
+            if (face.empty())
+                continue;
+            const double share = measure_face(fi) / static_cast<double>(face.size());
+            for (int pi : face) {
+                if (pi >= 0 && static_cast<size_t>(pi) < values.size())
+                    values[static_cast<size_t>(pi)] += share;
+            }
+        }
     }
 
+    auto slots = select_measure_slots(input, primitives, options.group);
+    if (!options.group.empty()) {
+        std::vector<char> selected(count, 0);
+        for (size_t slot : slots)
+            selected[slot] = 1;
+        for (size_t i = 0; i < count; ++i) {
+            if (!selected[i])
+                values[i] = 0.0;
+        }
+    }
+
+    std::string accumulate = options.accumulate;
+    if (accumulate.empty())
+        accumulate = options.piece_attribute.empty() ? "perElement" : "perPiece";
+    accumulate_measure_values(values, slots, accumulate, input, primitives,
+                              options.piece_attribute, options.refine_to_connected);
+
+    std::vector<char> in_range;
+    if (options.bake_visualized_range || options.use_range_group)
+        apply_visualized_range(values, slots, options, in_range);
+
+    auto& attr = output.attributes().create_float(owner, options.attribute_name, 1);
+    attr.resize(count);
+    auto& out_values = attr.float_values_mut();
+    for (size_t i = 0; i < count; ++i)
+        out_values[i] = values[i];
+
     double total = 0.0;
-    for (double v : attr.float_values())
-        total += v;
-    set_detail_float(output, options.attribute_name, total);
+    if (accumulate == "throughout") {
+        total = slots.empty() ? 0.0 : values[slots.front()];
+    } else if (accumulate == "perPiece") {
+        std::unordered_set<std::string> seen;
+        const data::AttributeArray* piece_attr = input.attributes().find(
+            owner, options.piece_attribute.empty() ? "class" : options.piece_attribute);
+        for (size_t slot : slots) {
+            const std::string key = piece_key_for(piece_attr, slot);
+            if (!seen.insert(key).second)
+                continue;
+            total += values[slot];
+        }
+    } else {
+        for (size_t slot : slots)
+            total += values[slot];
+    }
+
+    if (options.use_total_attribute && !options.total_attribute_name.empty())
+        set_detail_float(output, options.total_attribute_name, total);
+
+    if (options.use_range_group && !options.range_group.empty() && !in_range.empty()) {
+        const auto domain =
+            primitives ? geometry::GroupDomain::Face : geometry::GroupDomain::Point;
+        output.groups().clear_group(domain, options.range_group);
+        output.groups().ensure_group(domain, options.range_group);
+        for (size_t slot : slots) {
+            if (in_range[slot])
+                output.groups().add(domain, options.range_group,
+                                    static_cast<geometry::GroupId>(slot));
+        }
+    }
+
     set_detail_float(output, "bbox_size_x", size_v.x);
     set_detail_float(output, "bbox_size_y", size_v.y);
     set_detail_float(output, "bbox_size_z", size_v.z);
+    return output;
+}
+
+double spline_polyline_length(const data::PcgSpline& spline)
+{
+    if (spline.points.size() < 2)
+        return 0.0;
+    double length = 0.0;
+    for (size_t i = 1; i < spline.points.size(); ++i) {
+        const auto& a = spline.points[i - 1];
+        const auto& b = spline.points[i];
+        const double dx = b.x - a.x;
+        const double dy = b.y - a.y;
+        const double dz = b.z - a.z;
+        length += std::sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    if (spline.closed && spline.points.size() >= 2) {
+        const auto& a = spline.points.back();
+        const auto& b = spline.points.front();
+        const double dx = b.x - a.x;
+        const double dy = b.y - a.y;
+        const double dz = b.z - a.z;
+        length += std::sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    return length;
+}
+
+data::PcgSplineData measure_spline_data(const data::PcgSplineData& input,
+                                        const MeasureMeshOptions& options)
+{
+    data::PcgSplineData output = input;
+    const size_t count = output.splines().size();
+    std::vector<double> values(count, 0.0);
+    for (size_t i = 0; i < count; ++i) {
+        // Curves: Perimeter/Length (and aliases) → polyline length; area/volume → 0.
+        if (options.measure == "area" || options.measure == "volume" ||
+            options.measure == "volume_approx")
+            values[i] = 0.0;
+        else if (options.measure == "size") {
+            const auto& pts = output.splines()[i].points;
+            double max_span = 0.0;
+            for (size_t a = 0; a < pts.size(); ++a) {
+                for (size_t b = a + 1; b < pts.size(); ++b) {
+                    const double dx = pts[b].x - pts[a].x;
+                    const double dy = pts[b].y - pts[a].y;
+                    const double dz = pts[b].z - pts[a].z;
+                    max_span = std::max(max_span, std::sqrt(dx * dx + dy * dy + dz * dz));
+                }
+            }
+            values[i] = max_span;
+        } else {
+            values[i] = spline_polyline_length(output.splines()[i]);
+        }
+    }
+
+    std::vector<size_t> slots(count);
+    std::iota(slots.begin(), slots.end(), 0);
+
+    std::string accumulate = options.accumulate;
+    if (accumulate.empty())
+        accumulate = "perElement";
+    if (accumulate == "throughout") {
+        double total = 0.0;
+        for (double v : values)
+            total += v;
+        for (double& v : values)
+            v = total;
+    }
+
+    std::vector<char> in_range;
+    if (options.bake_visualized_range || options.use_range_group)
+        apply_visualized_range(values, slots, options, in_range);
+
+    double total = 0.0;
+    for (size_t i = 0; i < count; ++i) {
+        output.splines_mut()[i].attributes[options.attribute_name] = values[i];
+        if (options.use_range_group && !options.range_group.empty() && !in_range.empty() &&
+            in_range[i])
+            output.splines_mut()[i].attributes[options.range_group] = 1.0;
+        total += (accumulate == "throughout" && count > 0) ? (i == 0 ? values[0] : 0.0)
+                                                           : values[i];
+    }
+
+    if (options.use_total_attribute && !options.total_attribute_name.empty()) {
+        output.metadata().set(options.total_attribute_name, total);
+    }
+
     return output;
 }
 
@@ -971,11 +1461,12 @@ data::PcgGeometry assemble_geometry(const data::PcgGeometry& input,
 }
 
 data::PcgGeometry sort_geometry(const data::PcgGeometry& input,
-                                const SortGeometryOptions& options)
+                                const SortGeometryOptions& options,
+                                std::string* error_out)
 {
-    auto apply_domain = [](const data::PcgGeometry& geometry,
+    auto apply_domain = [&](const data::PcgGeometry& geometry,
                            const SortDomainOptions& domain,
-                           bool primitives) {
+                           bool primitives) -> data::PcgGeometry {
         const size_t count =
             primitives ? geometry.faces().size() : geometry.points().size();
         if (count == 0)
@@ -987,7 +1478,14 @@ data::PcgGeometry sort_geometry(const data::PcgGeometry& input,
         if (!needs_work)
             return geometry;
 
-        const std::vector<size_t> order = compute_sort_order(geometry, domain, primitives);
+        std::string domain_error;
+        const std::vector<size_t> order =
+            compute_sort_order(geometry, domain, primitives, &domain_error);
+        if (!domain_error.empty()) {
+            if (error_out)
+                *error_out = domain_error;
+            return geometry;
+        }
         if (domain.sort_indices) {
             data::PcgGeometry output = geometry;
             write_sort_indices(output, primitives, order, domain.ordering_attribute);
@@ -1009,7 +1507,476 @@ data::PcgGeometry sort_geometry(const data::PcgGeometry& input,
     };
 
     data::PcgGeometry output = apply_domain(input, options.points, false);
+    if (error_out && !error_out->empty())
+        return input;
     output = apply_domain(output, options.primitives, true);
+    if (error_out && !error_out->empty())
+        return input;
+    (void)options.optimize_vertex_order;
+    return output;
+}
+
+data::PcgVec3 spline_centroid(const data::PcgSpline& spline)
+{
+    if (spline.points.empty())
+        return {};
+    data::PcgVec3 center{};
+    for (const auto& point : spline.points) {
+        center.x += point.x;
+        center.y += point.y;
+        center.z += point.z;
+    }
+    const double inv = 1.0 / static_cast<double>(spline.points.size());
+    return {center.x * inv, center.y * inv, center.z * inv};
+}
+
+void compute_spline_bbox(const data::PcgSplineData& input, data::PcgVec3& bmin, data::PcgVec3& bmax)
+{
+    bmin = {std::numeric_limits<double>::max(),
+            std::numeric_limits<double>::max(),
+            std::numeric_limits<double>::max()};
+    bmax = {-std::numeric_limits<double>::max(),
+            -std::numeric_limits<double>::max(),
+            -std::numeric_limits<double>::max()};
+    for (const auto& spline : input.splines()) {
+        const data::PcgVec3 center = spline_centroid(spline);
+        bmin.x = std::min(bmin.x, center.x);
+        bmin.y = std::min(bmin.y, center.y);
+        bmin.z = std::min(bmin.z, center.z);
+        bmax.x = std::max(bmax.x, center.x);
+        bmax.y = std::max(bmax.y, center.y);
+        bmax.z = std::max(bmax.z, center.z);
+    }
+    if (input.splines().empty()) {
+        bmin = {};
+        bmax = {};
+    }
+}
+
+bool spline_primitive_group_member(const data::PcgSpline& spline, const std::string& group)
+{
+    if (group.empty())
+        return true;
+    if (!spline.attributes.is_object() || !spline.attributes.contains(group))
+        return false;
+    const auto& value = spline.attributes[group];
+    if (value.is_boolean())
+        return value.get<bool>();
+    if (value.is_number_integer())
+        return value.get<int64_t>() != 0;
+    if (value.is_number())
+        return value.get<double>() != 0.0;
+    if (value.is_string())
+        return !value.get<std::string>().empty();
+    return false;
+}
+
+bool read_spline_numeric_attr(const nlohmann::json& attributes,
+                              const std::string& name,
+                              int component,
+                              double& out)
+{
+    if (!attributes.is_object() || !attributes.contains(name))
+        return false;
+    const auto& value = attributes[name];
+    if (value.is_number())
+        return (out = value.get<double>(), true);
+    if (value.is_boolean())
+        return (out = value.get<bool>() ? 1.0 : 0.0, true);
+    if (value.is_number_integer())
+        return (out = static_cast<double>(value.get<int64_t>()), true);
+    if (value.is_array()) {
+        if (value.empty())
+            return false;
+        const int index = std::clamp(component, 0, static_cast<int>(value.size()) - 1);
+        const auto& entry = value[index];
+        if (entry.is_number())
+            return (out = entry.get<double>(), true);
+        if (entry.is_boolean())
+            return (out = entry.get<bool>() ? 1.0 : 0.0, true);
+        if (entry.is_number_integer())
+            return (out = static_cast<double>(entry.get<int64_t>()), true);
+    }
+    return false;
+}
+
+bool read_spline_string_attr(const nlohmann::json& attributes,
+                             const std::string& name,
+                             int component,
+                             std::string& out)
+{
+    if (!attributes.is_object() || !attributes.contains(name))
+        return false;
+    const auto& value = attributes[name];
+    if (value.is_string())
+        return (out = value.get<std::string>(), true);
+    if (value.is_array()) {
+        if (value.empty())
+            return false;
+        const int index = std::clamp(component, 0, static_cast<int>(value.size()) - 1);
+        if (value[index].is_string())
+            return (out = value[index].get<std::string>(), true);
+    }
+    return false;
+}
+
+bool spline_attr_component_valid(const nlohmann::json& attributes,
+                                 const std::string& name,
+                                 int component)
+{
+    if (!attributes.is_object() || !attributes.contains(name))
+        return false;
+    const auto& value = attributes[name];
+    if (value.is_array()) {
+        if (value.empty())
+            return false;
+        return component >= 0 && component < static_cast<int>(value.size());
+    }
+    return component == 0;
+}
+
+std::vector<size_t> select_spline_sort_slots(const data::PcgSplineData& input,
+                                             const std::string& group)
+{
+    const size_t count = input.splines().size();
+    std::vector<size_t> slots;
+    slots.reserve(count);
+    if (group.empty()) {
+        for (size_t i = 0; i < count; ++i)
+            slots.push_back(i);
+        return slots;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        if (spline_primitive_group_member(input.splines()[i], group))
+            slots.push_back(i);
+    }
+    return slots;
+}
+
+std::vector<size_t> compute_spline_sort_order(const data::PcgSplineData& input,
+                                              const SortDomainOptions& options,
+                                              std::string* error_out = nullptr)
+{
+    const size_t count = input.splines().size();
+    std::vector<size_t> identity(count);
+    std::iota(identity.begin(), identity.end(), 0);
+    auto fail = [&](const std::string& message) {
+        if (error_out)
+            *error_out = message;
+        return identity;
+    };
+    if (count == 0)
+        return identity;
+
+    const std::string method = resolve_sort_method(options);
+    auto slots = select_spline_sort_slots(input, options.group);
+    if (slots.empty())
+        return identity;
+
+    std::vector<size_t> members = slots;
+    if (method == "attribute") {
+        if (options.attribute_name.empty())
+            return fail("SortGeometry attribute name is required");
+        if (count > 0 &&
+            !input.splines().front().attributes.is_object()) {
+            return fail("SortGeometry attribute not found: " + options.attribute_name);
+        }
+        if (!input.splines().empty() &&
+            !input.splines().front().attributes.contains(options.attribute_name) &&
+            std::none_of(input.splines().begin(), input.splines().end(),
+                         [&](const data::PcgSpline& spline) {
+                             return spline.attributes.is_object() &&
+                                    spline.attributes.contains(options.attribute_name);
+                         }))
+            return fail("SortGeometry attribute not found: " + options.attribute_name);
+        if (!input.splines().empty()) {
+            for (const auto& spline : input.splines()) {
+                if (!spline_attr_component_valid(spline.attributes, options.attribute_name,
+                                                 options.component))
+                    return fail("SortGeometry attribute component out of range");
+            }
+        }
+    }
+    if (method == "reorder") {
+        const std::string attr_name = !options.ordering_attribute.empty()
+                                          ? options.ordering_attribute
+                                          : options.attribute_name;
+        if (attr_name.empty())
+            return fail("SortGeometry reorder requires ordering attribute");
+        bool has_int = false;
+        for (const auto& spline : input.splines()) {
+            if (!spline.attributes.is_object() || !spline.attributes.contains(attr_name))
+                continue;
+            const auto& value = spline.attributes[attr_name];
+            if (value.is_number_integer() || value.is_number())
+                has_int = true;
+        }
+        if (!has_int)
+            return fail("SortGeometry reorder requires integer ordering attribute");
+    }
+
+    auto stable_tie = [&](size_t a, size_t b) -> int {
+        if (options.sort_indices && options.combine_sort_indices &&
+            !options.ordering_attribute.empty()) {
+            double ka = 0.0;
+            double kb = 0.0;
+            const bool ok_a = read_spline_numeric_attr(
+                input.splines()[a].attributes, options.ordering_attribute, 0, ka);
+            const bool ok_b = read_spline_numeric_attr(
+                input.splines()[b].attributes, options.ordering_attribute, 0, kb);
+            if (ok_a && ok_b) {
+                if (ka < kb)
+                    return -1;
+                if (ka > kb)
+                    return 1;
+            }
+        }
+        if (a < b)
+            return -1;
+        if (a > b)
+            return 1;
+        return 0;
+    };
+
+    auto finish_members = [&](std::vector<size_t>& ordered) {
+        if (options.reverse)
+            std::reverse(ordered.begin(), ordered.end());
+    };
+
+    if (method == "nochange") {
+        finish_members(members);
+    } else if (method == "reverse") {
+        std::reverse(members.begin(), members.end());
+        finish_members(members);
+    } else if (method == "shift") {
+        const int n = static_cast<int>(members.size());
+        if (n > 0) {
+            int off = options.offset % n;
+            if (off < 0)
+                off += n;
+            std::vector<size_t> shifted(members.size());
+            for (int i = 0; i < n; ++i)
+                shifted[static_cast<size_t>((i + off) % n)] = members[static_cast<size_t>(i)];
+            members = std::move(shifted);
+        }
+        finish_members(members);
+    } else if (method == "random") {
+        uint32_t state = static_cast<uint32_t>(options.seed) ^ 0xA5A5A5A5u ^
+                         static_cast<uint32_t>(count * 2654435761u);
+        std::vector<std::pair<uint32_t, size_t>> keyed;
+        keyed.reserve(members.size());
+        for (size_t idx : members)
+            keyed.push_back({sort_lcg(state), idx});
+        std::stable_sort(keyed.begin(), keyed.end(),
+                         [](const auto& a, const auto& b) { return a.first < b.first; });
+        for (size_t i = 0; i < members.size(); ++i)
+            members[i] = keyed[i].second;
+        finish_members(members);
+    } else if (method == "reorder") {
+        const std::string attr_name = !options.ordering_attribute.empty()
+                                          ? options.ordering_attribute
+                                          : options.attribute_name;
+        std::vector<std::pair<int64_t, size_t>> keyed;
+        keyed.reserve(members.size());
+        for (size_t idx : members) {
+            double key = 0.0;
+            if (!read_spline_numeric_attr(input.splines()[idx].attributes, attr_name, 0, key))
+                return fail("SortGeometry reorder attribute read failed for primitive " +
+                            std::to_string(idx));
+            keyed.push_back({static_cast<int64_t>(key), idx});
+        }
+        std::stable_sort(keyed.begin(), keyed.end(),
+                         [](const auto& a, const auto& b) { return a.first < b.first; });
+        for (size_t i = 0; i < members.size(); ++i)
+            members[i] = keyed[i].second;
+        finish_members(members);
+    } else if (method == "vertexorder" || method == "primindex") {
+        finish_members(members);
+    } else {
+        enum class KeyType { Number, String };
+        struct Key {
+            KeyType type = KeyType::Number;
+            double number = 0.0;
+            std::string text;
+        };
+        data::PcgVec3 bmin;
+        data::PcgVec3 bmax;
+        if (method == "spatial")
+            compute_spline_bbox(input, bmin, bmax);
+
+        auto key_of = [&](size_t index) -> Key {
+            Key key;
+            const auto& spline = input.splines()[index];
+            if (method == "attribute") {
+                if (read_spline_string_attr(spline.attributes, options.attribute_name,
+                                            options.component, key.text)) {
+                    key.type = KeyType::String;
+                    return key;
+                }
+                if (read_spline_numeric_attr(spline.attributes, options.attribute_name,
+                                             options.component, key.number))
+                    return key;
+                return key;
+            }
+            const data::PcgVec3 center = spline_centroid(spline);
+            if (method == "x") {
+                key.number = center.x;
+            } else if (method == "y") {
+                key.number = center.y;
+            } else if (method == "z") {
+                key.number = center.z;
+            } else if (method == "proximity") {
+                key.number = length(sub(center, options.proximity_point));
+            } else if (method == "vector") {
+                key.number = dot(center, options.vector);
+            } else if (method == "spatial") {
+                const double dx = std::max(bmax.x - bmin.x, kEps);
+                const double dy = std::max(bmax.y - bmin.y, kEps);
+                const double dz = std::max(bmax.z - bmin.z, kEps);
+                const auto q = [&](double v, double lo, double span) {
+                    const double t = std::clamp((v - lo) / span, 0.0, 1.0);
+                    return static_cast<uint32_t>(t * 1023.0 + 0.5);
+                };
+                key.number = static_cast<double>(
+                    morton3(q(center.x, bmin.x, dx), q(center.y, bmin.y, dy),
+                            q(center.z, bmin.z, dz)));
+            } else {
+                key.number = center.x;
+            }
+            return key;
+        };
+
+        for (size_t idx : members) {
+            if (method == "attribute") {
+                const auto& attrs = input.splines()[idx].attributes;
+                if (attrs.is_object() && attrs.contains(options.attribute_name) &&
+                    attrs[options.attribute_name].is_string()) {
+                    std::string text;
+                    if (!read_spline_string_attr(attrs, options.attribute_name,
+                                                 options.component, text))
+                        return fail("SortGeometry attribute read failed for primitive " +
+                                    std::to_string(idx));
+                } else {
+                    double value = 0.0;
+                    if (!read_spline_numeric_attr(attrs, options.attribute_name,
+                                                  options.component, value))
+                        return fail("SortGeometry attribute read failed for primitive " +
+                                    std::to_string(idx));
+                }
+            }
+        }
+
+        std::stable_sort(members.begin(), members.end(), [&](size_t a, size_t b) {
+            const Key ka = key_of(a);
+            const Key kb = key_of(b);
+            if (ka.type == KeyType::String || kb.type == KeyType::String) {
+                if (ka.text != kb.text)
+                    return ka.text < kb.text;
+                return stable_tie(a, b) < 0;
+            }
+            if (ka.number != kb.number)
+                return ka.number < kb.number;
+            return stable_tie(a, b) < 0;
+        });
+        finish_members(members);
+    }
+
+    std::vector<size_t> order = identity;
+    for (size_t i = 0; i < slots.size() && i < members.size(); ++i)
+        order[slots[i]] = members[i];
+    return order;
+}
+
+data::PcgSplineData apply_spline_permutation(const data::PcgSplineData& input,
+                                             const std::vector<size_t>& order)
+{
+    data::PcgSplineData output = input;
+    const size_t count = order.size();
+    std::vector<data::PcgSpline> splines(count);
+    for (size_t dest = 0; dest < count; ++dest) {
+        const size_t src = order[dest];
+        if (src < input.splines().size())
+            splines[dest] = input.splines()[src];
+    }
+    output.splines_mut() = std::move(splines);
+    return output;
+}
+
+void write_spline_sort_indices(data::PcgSplineData& splines,
+                               const std::vector<size_t>& order,
+                               const std::string& attribute_name)
+{
+    if (attribute_name.empty())
+        return;
+    const size_t count = order.size();
+    for (size_t dest = 0; dest < count; ++dest) {
+        const size_t src = order[dest];
+        if (src >= count)
+            continue;
+        splines.splines_mut()[src].attributes[attribute_name] = static_cast<int64_t>(dest);
+    }
+}
+
+std::string validate_spline_point_sort(const SortDomainOptions& domain)
+{
+    const std::string method = resolve_sort_method(domain);
+    if (method != "nochange" || domain.reverse || domain.sort_indices)
+        return "SortGeometry spline input only supports Point Sort No Change";
+    if (!domain.group.empty())
+        return "SortGeometry spline input does not support point groups";
+    return {};
+}
+
+data::PcgSplineData sort_spline_data(const data::PcgSplineData& input,
+                                     const SortGeometryOptions& options,
+                                     std::string* error_out)
+{
+    if (std::string point_error = validate_spline_point_sort(options.points);
+        !point_error.empty()) {
+        if (error_out)
+            *error_out = std::move(point_error);
+        return input;
+    }
+
+    auto apply_domain = [&](const data::PcgSplineData& splines,
+                            const SortDomainOptions& domain) -> data::PcgSplineData {
+        const size_t count = splines.splines().size();
+        if (count == 0)
+            return splines;
+
+        const std::string method = resolve_sort_method(domain);
+        const bool needs_work = method != "nochange" || domain.reverse || domain.sort_indices;
+        if (!needs_work)
+            return splines;
+
+        std::string domain_error;
+        const std::vector<size_t> order = compute_spline_sort_order(splines, domain, &domain_error);
+        if (!domain_error.empty()) {
+            if (error_out)
+                *error_out = domain_error;
+            return splines;
+        }
+        if (domain.sort_indices) {
+            data::PcgSplineData output = splines;
+            write_spline_sort_indices(output, order, domain.ordering_attribute);
+            return output;
+        }
+
+        bool identity = true;
+        for (size_t i = 0; i < order.size(); ++i) {
+            if (order[i] != i) {
+                identity = false;
+                break;
+            }
+        }
+        if (identity)
+            return splines;
+        return apply_spline_permutation(splines, order);
+    };
+
+    data::PcgSplineData output = apply_domain(input, options.primitives);
+    if (error_out && !error_out->empty())
+        return input;
     (void)options.optimize_vertex_order;
     return output;
 }

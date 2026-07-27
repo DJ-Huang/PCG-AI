@@ -170,7 +170,23 @@ namespace DJTechEditor.PCG.Graph
         {
             var sourcePin = NormalizePinType(GetOutputPinType(sourceType, sourceHandle));
             var targetPin = NormalizePinType(GetInputPinType(targetType, targetHandle));
-            return sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any";
+            return PinTypesCompatible(sourcePin, targetPin);
+        }
+
+        public static bool PinTypesCompatible(string sourcePin, string targetPin)
+        {
+            if (sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any")
+                return true;
+            if (sourcePin == "SpatialGeometry" && IsSpatialGeometryFamily(targetPin))
+                return true;
+            if (targetPin == "SpatialGeometry" && IsSpatialGeometryFamily(sourcePin))
+                return true;
+            return false;
+        }
+
+        static bool IsSpatialGeometryFamily(string pinType)
+        {
+            return pinType == "SpatialGeometry" || pinType == "SpatialMesh" || pinType == "SpatialSpline";
         }
 
         static string NormalizePinType(string pinType)
@@ -185,7 +201,7 @@ namespace DJTechEditor.PCG.Graph
             if (!TryGet(nodeType, out var def))
                 return NormalizePinType(GetInputPinType(nodeType)) == pinType;
             foreach (var input in def.inputs)
-                if (NormalizePinType(input.pinType) == pinType || input.pinType == "Any") return true;
+                if (PinTypesCompatible(pinType, NormalizePinType(input.pinType)) || input.pinType == "Any") return true;
             return false;
         }
 
@@ -196,7 +212,7 @@ namespace DJTechEditor.PCG.Graph
             if (!TryGet(nodeType, out var def))
                 return NormalizePinType(GetOutputPinType(nodeType)) == pinType;
             foreach (var output in def.outputs)
-                if (NormalizePinType(output.pinType) == pinType || output.pinType == "Any") return true;
+                if (PinTypesCompatible(pinType, NormalizePinType(output.pinType)) || output.pinType == "Any") return true;
             return false;
         }
 

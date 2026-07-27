@@ -6,7 +6,7 @@ import manifestJson from '../../../schema/node-manifest.json';
 // ── Types ──────────────────────────────────────────────
 
 export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialSurface' | 'SpatialMesh' |
-  'Texture' | 'HeightField' | 'Param' | 'Any';
+  'SpatialGeometry' | 'Texture' | 'HeightField' | 'Param' | 'Any';
 export type PropertyType = 'integer' | 'number' | 'boolean' | 'string' | 'enum' | 'groupSelect' | 'groupMultiSelect';
 export type GroupDomain = 'edge' | 'face' | 'point' | 'vertex';
 
@@ -121,13 +121,20 @@ export function getInputPinType(nodeType: string, handle: string): PinType | und
   return pin?.pinType;
 }
 
+function isSpatialGeometryFamily(pinType: string): boolean {
+  return pinType === 'SpatialGeometry' || pinType === 'SpatialMesh' || pinType === 'SpatialSpline';
+}
+
 /**
  * Checks if two pins can connect based on pinType compatibility.
  * "Any" matches all pinTypes.
  */
 export function pinTypesCompatible(sourcePin: PinType | undefined, targetPin: PinType | undefined): boolean {
   if (!sourcePin || !targetPin) return false;
-  return sourcePin === targetPin || sourcePin === 'Any' || targetPin === 'Any';
+  if (sourcePin === targetPin || sourcePin === 'Any' || targetPin === 'Any') return true;
+  if (sourcePin === 'SpatialGeometry' && isSpatialGeometryFamily(targetPin)) return true;
+  if (targetPin === 'SpatialGeometry' && isSpatialGeometryFamily(sourcePin)) return true;
+  return false;
 }
 
 /**
@@ -194,6 +201,7 @@ export const PIN_TYPE_COLORS: Record<string, string> = {
   SpatialPoint: '#00ccff',
   SpatialSpline: '#4de66a',
   SpatialMesh: '#ff9900',
+  SpatialGeometry: '#ffaa33',
   Param: '#ffd700',
   Texture: '#b34dd9',
   Any: '#a6a6a6',

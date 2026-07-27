@@ -2,7 +2,9 @@
 #include "graph_parser.hpp"
 #include "data/pcg_attribute_table.hpp"
 #include "data/pcg_geometry.hpp"
+#include "elements/facade_foundation_algorithms.hpp"
 #include "elements/topology_parity_algorithms.hpp"
+#include "elements/node_contracts.hpp"
 #include "geometry/spline_geometry.hpp"
 
 #include <cmath>
@@ -51,7 +53,14 @@ int main()
           "version":"1.0",
           "nodes":[
             {"id":"grid","type":"CreateGridMesh","data":{"sizeX":2.0,"sizeY":2.0,"rows":1,"cols":1}},
-            {"id":"measure","type":"MeasureMesh","data":{"measure":"perimeter","attributeName":"length"}},
+            {"id":"measure","type":"MeasureMesh","data":{
+              "elementType":"primitives",
+              "measure":"perimeter",
+              "accumulate":"perElement",
+              "attributeName":"length",
+              "useTotalAttribute":true,
+              "totalAttributeName":"totalperimeter"
+            }},
             {"id":"out","type":"Output","data":{}}
           ],
           "edges":[
@@ -62,13 +71,107 @@ int main()
         const auto result = execute(graph);
         expect(result.source_geometry != nullptr, "MeasureMesh keeps geometry");
         if (result.source_geometry) {
-            const auto* attr = result.source_geometry->attributes().find(
-                pcg::internal::data::AttributeOwner::Detail, "length");
-            expect(attr != nullptr && attr->schema().type ==
-                       pcg::internal::data::AttributeType::Float,
-                   "MeasureMesh writes detail length");
-            if (attr && !attr->float_values().empty())
-                expect(attr->float_values()[0] > 7.0, "grid perimeter ~8");
+            const auto* prim = result.source_geometry->attributes().find(
+                pcg::internal::data::AttributeOwner::Primitive, "length");
+            expect(prim != nullptr && prim->schema().type ==
+                       pcg::internal::data::AttributeType::Float &&
+                       !prim->float_values().empty(),
+                   "MeasureMesh writes primitive length");
+            if (prim && !prim->float_values().empty())
+                expect(prim->float_values()[0] > 7.0, "grid face perimeter ~8");
+            const auto* total = result.source_geometry->attributes().find(
+                pcg::internal::data::AttributeOwner::Detail, "totalperimeter");
+            expect(total != nullptr && !total->float_values().empty() &&
+                       total->float_values()[0] > 7.0,
+                   "MeasureMesh writes detail totalperimeter");
+        }
+    }
+
+    {
+        // Direct API: ConvertLine-style polylines → Measure length attributes.
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::elements::ConvertLineOptions;
+        using pcg::internal::elements::MeasureMeshOptions;
+        using pcg::internal::elements::convert_line_geometry;
+        using pcg::internal::elements::measure_spline_data;
+
+        PcgGeometry grid;
+        grid.points_mut() = {{0, 0, 0}, {2, 0, 0}, {2, 0, 2}, {0, 0, 2}};
+        grid.faces_mut() = {{0, 1, 2, 3}};
+        ConvertLineOptions convert_opts;
+        convert_opts.mode = "unshared";
+        convert_opts.connect_path = true;
+        const auto lines = convert_line_geometry(grid, convert_opts);
+        expect(!lines.splines().empty(), "ConvertLine produces splines");
+
+        MeasureMeshOptions measure_opts;
+        measure_opts.measure = "perimeter";
+        measure_opts.attribute_name = "length";
+        const auto measured = measure_spline_data(lines, measure_opts);
+        expect(!measured.splines().empty(), "Measure keeps splines");
+        bool has_length = false;
+        for (const auto& spline : measured.splines()) {
+            if (spline.attributes.contains("length") &&
+                spline.attributes["length"].is_number() &&
+                spline.attributes["length"].get<double>() > 0.0) {
+                has_length = true;
+                break;
+            }
+        }
+        expect(has_length, "ConvertLine→Measure writes spline length");
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"grid","type":"CreateGridMesh","data":{"sizeX":2.0,"sizeY":2.0,"rows":1,"cols":1}},
+            {"id":"lines","type":"ConvertLine","data":{"connectPath":true,"mode":"unshared"}},
+            {"id":"measure","type":"MeasureMesh","data":{"measure":"perimeter","attributeName":"length"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"grid","target":"lines","sourceHandle":"out","targetHandle":"in"},
+            {"source":"lines","target":"measure","sourceHandle":"out","targetHandle":"in"},
+            {"source":"measure","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.kind == pcg::internal::GraphResultKind::Json ||
+                   result.source_geometry != nullptr || !result.json.is_null(),
+               "ConvertLine→Measure graph cooks");
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":2.0,"height":2.0,"depth":2.0}},
+            {"id":"measure","type":"MeasureMesh","data":{
+              "measure":"area",
+              "accumulate":"throughout",
+              "attributeName":"area",
+              "useTotalAttribute":true,
+              "totalAttributeName":"totalarea"
+            }},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"measure","sourceHandle":"out","targetHandle":"in"},
+            {"source":"measure","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr, "MeasureMesh area throughout keeps geometry");
+        if (result.source_geometry) {
+            const auto* prim = result.source_geometry->attributes().find(
+                pcg::internal::data::AttributeOwner::Primitive, "area");
+            expect(prim != nullptr && prim->size() == 6, "box has 6 face areas");
+            if (prim && prim->size() >= 2) {
+                expect(std::abs(prim->float_values()[0] - prim->float_values()[1]) < 1e-6,
+                       "throughout writes same area on all faces");
+                expect(prim->float_values()[0] > 20.0, "box surface area ~24");
+            }
         }
     }
 
@@ -365,6 +468,107 @@ int main()
         expect(score != nullptr && score->float_values()[0] == 1.0 &&
                    score->float_values()[1] == 2.0,
                "Primitive sort remaps primitive attributes");
+    }
+
+    {
+        using pcg::internal::data::PcgSpline;
+        using pcg::internal::data::PcgSplineData;
+        using pcg::internal::data::PcgSplinePoint;
+        using pcg::internal::elements::SortGeometryOptions;
+        using pcg::internal::elements::sort_spline_data;
+
+        PcgSplineData input;
+        auto make_spline = [](double length, double score, const char* label) {
+            PcgSpline spline;
+            spline.points = {
+                PcgSplinePoint{0.0, 0.0, 0.0},
+                PcgSplinePoint{length, 0.0, 0.0},
+            };
+            spline.attributes["length"] = length;
+            spline.attributes["score"] = score;
+            spline.attributes["label"] = label;
+            return spline;
+        };
+        input.add_spline(make_spline(3.0, 30.0, "c"));
+        input.add_spline(make_spline(1.0, 10.0, "a"));
+        input.add_spline(make_spline(2.0, 20.0, "b"));
+        input.metadata().set("detail_tag", "keep");
+
+        SortGeometryOptions by_length;
+        by_length.primitives.method = "attribute";
+        by_length.primitives.attribute_name = "length";
+        const auto sorted = sort_spline_data(input, by_length);
+        expect(sorted.splines().size() == 3, "Spline sort keeps primitive count");
+        expect(sorted.splines()[0].attributes["length"].get<double>() == 1.0 &&
+                   sorted.splines()[1].attributes["length"].get<double>() == 2.0 &&
+                   sorted.splines()[2].attributes["length"].get<double>() == 3.0,
+               "Spline attribute sort orders by length");
+        expect(sorted.splines()[0].attributes["label"].get<std::string>() == "a",
+               "Spline sort preserves primitive attributes");
+        expect(sorted.metadata().raw().contains("detail_tag"),
+               "Spline sort preserves metadata");
+
+        SortGeometryOptions reverse;
+        reverse.primitives.method = "reverse";
+        const auto reversed = sort_spline_data(sorted, reverse);
+        expect(reversed.splines().front().attributes["length"].get<double>() == 3.0,
+               "Spline reverse primitive sort");
+
+        SortGeometryOptions bad_point;
+        bad_point.points.method = "x";
+        std::string point_error;
+        sort_spline_data(input, bad_point, &point_error);
+        expect(!point_error.empty(), "Spline point sort other than No Change errors");
+
+        SortGeometryOptions missing_attr;
+        missing_attr.primitives.method = "attribute";
+        missing_attr.primitives.attribute_name = "missing";
+        std::string attr_error;
+        sort_spline_data(input, missing_attr, &attr_error);
+        expect(!attr_error.empty(), "Spline missing sort attribute errors");
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"grid","type":"CreateGridMesh","data":{"sizeX":4.0,"sizeY":2.0,"rows":1,"cols":2}},
+            {"id":"lines","type":"ConvertLine","data":{"connectPath":true,"mode":"unshared"}},
+            {"id":"measure","type":"MeasureMesh","data":{"measure":"perimeter","attributeName":"length"}},
+            {"id":"sort","type":"SortGeometry","data":{"pointMethod":"nochange","primitiveMethod":"attribute","primitiveAttributeName":"length"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"grid","target":"lines","sourceHandle":"out","targetHandle":"in"},
+            {"source":"lines","target":"measure","sourceHandle":"out","targetHandle":"in"},
+            {"source":"measure","target":"sort","sourceHandle":"out","targetHandle":"in"},
+            {"source":"sort","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.json.contains("node_stats"), "ConvertLine→Measure→Sort graph reports node_stats");
+        if (result.json.contains("node_stats") && result.json["node_stats"].is_array()) {
+            bool sort_nonzero = false;
+            for (const auto& entry : result.json["node_stats"]) {
+                if (entry.value("node_id", std::string()) == "sort") {
+                    sort_nonzero = entry.value("point_count", 0) > 0 &&
+                                   entry.value("face_count", 0) > 0;
+                }
+            }
+            expect(sort_nonzero, "SortGeometry spline chain keeps non-zero stats");
+        }
+    }
+
+    {
+        using pcg::internal::elements::pin_types_compatible;
+        expect(pin_types_compatible("SpatialSpline", "SpatialGeometry"),
+               "SpatialSpline connects to SpatialGeometry");
+        expect(pin_types_compatible("SpatialMesh", "SpatialGeometry"),
+               "SpatialMesh connects to SpatialGeometry");
+        expect(!pin_types_compatible("SpatialPoint", "SpatialGeometry"),
+               "SpatialPoint cannot connect to SpatialGeometry");
+        expect(!pin_types_compatible("HeightField", "SpatialGeometry"),
+               "HeightField cannot connect to SpatialGeometry");
     }
 
     {

@@ -15,7 +15,7 @@ import { getNodeTypeDefs } from './nodeManifest';
 
 const PIN_TYPES = new Set([
   'Any', 'Param', 'SpatialPoint', 'SpatialSpline', 'SpatialSurface',
-  'SpatialMesh', 'Texture', 'HeightField',
+  'SpatialMesh', 'SpatialGeometry', 'Texture', 'HeightField',
 ]);
 
 function canonicalPinType(value: unknown): string | undefined {
