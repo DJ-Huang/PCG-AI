@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **101 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **119 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -47,6 +47,7 @@
 - [Filter 类别](#filter-类别)
   - [DensityFilter](#densityfilter)
   - [AttributeFilter](#attributefilter)
+  - [Delete](#delete)
   - [Blast](#blast)
 - [Attribute 类别](#attribute-类别)
   - [AttributeWrangle](#attributewrangle)
@@ -105,6 +106,7 @@
 - [Geometry 类别](#geometry-类别)
   - [GroupCreate](#groupcreate)
   - [GroupCombine](#groupcombine)
+  - [GroupPromote](#grouppromote)
   - [FaceGroupByNormal](#facegroupbynormal)
 - [Texture 类别](#texture-类别)
   - [ImageTexture](#imagetexture)
@@ -873,6 +875,30 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 ```
 
 > 配合 `CopyAttributes` 使用：先给点打属性标签，再用 `AttributeFilter` 分类过滤。
+
+---
+
+### Delete
+
+**类别**：Filter
+
+**功能**：Houdini 风格几何删除。支持 Group、Number（pattern/range/expression）、Bounding Volume、Normal、Degenerate、Random 条件并集选择，再按 Entity（points/primitives/edges）执行拓扑删除。默认空配置原样直通。
+
+**限制**：仅支持 polygon mesh、spline、point 元素；不支持 VDB、NURBS 等 Houdini 专属类型。Bounding Volume 为参数框，无第二几何输入。
+
+**属性**：`group`、`deleteNonSelected`、`entity`、`geometryType`、Number/Bounding/Normal/Degenerate/Random 页签字段、`keepPoints`、`deleteUnusedGroups`。
+
+```json
+{
+  "id": "del_top",
+  "type": "Delete",
+  "data": {
+    "entity": "primitives",
+    "group": "top",
+    "deleteNonSelected": false
+  }
+}
+```
 
 ---
 
@@ -2539,23 +2565,33 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 ### MatchSize
 
-**功能**：对 source 做纯 affine bbox 匹配，覆盖 Houdini Match Size 常用子集；不改变 points/faces 拓扑、groups、材质或非变换属性。
+**功能**：Houdini Match Size 对齐的 bbox 匹配：Translate / Justify / Offset、Scale to Fit、Uniform Scale + Scale Axis、Restore/Stash Transform。不改变 points/faces 拓扑、groups、材质或非变换属性。
 
-**输入 Pin**：`source`（必需 `SpatialMesh`）、`reference`（可选 `SpatialMesh`）。连接 reference 时使用其 bbox；否则使用 `targetCenter*` / `targetSize*`。
+**输入 Pin**：`source`（必需 `SpatialMesh`）、`reference`（可选 `SpatialMesh`，标签 Destination Size）。
 
 **输出 Pin**：`out`（`SpatialMesh`）
 
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
-| `scaleToFit` | true | 是否把 source bbox 缩放到目标 bbox |
-| `uniformScale` | false | 使用统一缩放，避免改变比例 |
-| `uniformScaleMode` | `fit` | `fit` 取最小有效轴比例；`fill` 取最大比例 |
-| `sourceJustifyX/Y/Z` | `center` | source anchor：`min` / `center` / `max` |
-| `targetJustifyX/Y/Z` | `center` | target anchor：`min` / `center` / `max` |
-| `targetCenterX/Y/Z` | 0 | 无 reference 时的目标中心 |
-| `targetSizeX/Y/Z` | 1 | 无 reference 时的目标尺寸；必须非负 |
+| `group` / `groupType` | `""` / `guess` | 仅变换子集；空 group 变换全部 |
+| `justifyWith` | `inputIfWired` | `inputIfWired` / `locationAndSize` / `secondInput` / `originAndUnitSize` |
+| `useGroupsForBounds` | false | 用 `sourceGroup` / `targetGroup` 计算 justification bbox |
+| `targetPosition` | `[0,0,0]` | 无 reference 时的目标锚点（Min/Max 时表示边，Center 时表示中心） |
+| `targetSize` | `[1,1,1]` | 无 reference 时的目标尺寸；各分量必须非负 |
+| `translate` | true | 是否平移对齐 |
+| `justifyX/Y/Z` | `center` | source：`none` / `min` / `center` / `max` |
+| `targetJustifyX/Y/Z` | `same` | target：`same` / `min` / `center` / `max` |
+| `offset` | `[0,0,0]`（或 `offsetX/Y/Z`） | 各轴额外偏移 |
+| `scaleToFit` | true | 是否缩放到目标 bbox |
+| `uniformScale` | true | 等比缩放 |
+| `scaleAxis` | `bestFit` | 等比时轴策略：`x` / `y` / `z` / `bestFit` |
+| `scaleX/Y/Z` | true | 非等比时各轴是否缩放 |
+| `restoreTransform` / `restoreAttribute` | false / `xform` | 先应用 detail 矩阵的逆变换 |
+| `stashTransform` / `stashAttribute` | true / `xform` | 把本次 4×4 写入 detail float16 |
 
-输出 Detail owner 上会写入 float16 `pcg_match_xform`（row-major 4×4），供调试或后续装配读取。退化 source 轴保持 scale=1；其余有效轴仍参与 fit/fill。
+兼容旧图：`targetCenter*`、`sourceJustify*`、`uniformScaleMode`（`fit`→`bestFit`，`fill` 仍取最大轴比）。
+
+> 通用装配：`ImportMesh → MatchSize → CopyMeshToPoints`；需要下垂/弧形时在复制前接 `BendMesh`。沿线 chain 继续使用 `InstanceAlongSpline`，或 `ResampleSpline → CopyMeshToPoints`，不增加重复的专用节点。
 
 ### BendMesh
 
@@ -2575,8 +2611,6 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `maskAttribute` | `bendmask` | 输出 point float mask；空字符串可关闭 |
 
 捕获区之前保持不动；区间内按恒定曲率弯曲；区间之后沿末端切线刚性延伸。带 `Position` / `Vector` / `Normal` transform role 的 float3+ 属性会使用各 owner 的位置同步变换。
-
-> 通用装配：`ImportMesh → MatchSize → CopyMeshToPoints`；需要下垂/弧形时在复制前接 `BendMesh`。沿线 chain 继续使用 `InstanceAlongSpline`，或 `ResampleSpline → CopyMeshToPoints`，不增加重复的专用节点。
 
 ---
 
@@ -2707,7 +2741,7 @@ Group 是 PCG 几何管线的核心概念，参考 Houdini 的 Group SOP + PolyB
 
 - **生产者节点**（如 `SweepAlongSpline`）在 manifest 中声明 `outputGroups`，在执行时将几何元素（边/面/点）归入命名组
 - **消费者节点**（如 `BevelMesh`）通过 `edgeGroup` / `excludeGroups` 参数按组名选择操作范围
-- **GroupCreate / GroupCombine** 是中间过滤节点，按规则从上游已有组中筛选或组合，生成新组供下游使用
+- **GroupCreate / GroupCombine / GroupPromote** 是中间过滤节点：按规则筛选、组合，或在 Point/Edge/Face 域之间提升组，供下游使用
 
 #### 支持的域
 
@@ -2894,6 +2928,82 @@ CreateSpline(profile) ──┘
 ```
 
 > 典型用途：将多个 GroupCreate 的输出合并为一个组，或用 subtract 排除某些边（如从 `profile_corner` 中减去 `cap_start` 的边）。
+
+### GroupPromote
+
+**类别**：Geometry
+
+**功能**：在 Point / Edge / Face（Primitives）组之间转换，对齐 Houdini [Group Promote SOP](https://www.sidefx.com/docs/houdini/nodes/sop/grouppromote.html)。典型用途：把朝街点组 `streetFacingPoints` 提升为边组 `streetFacingEdges`（两端点都在源组内才入选）。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Geometry | `SpatialMesh` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Geometry | `SpatialMesh` |
+
+**输出组**：
+
+| 组名 | 域 | 说明 |
+|------|-----|------|
+| `newName`（空则用 `groupName`） | 同 `to` | 提升后的目标域组 |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `numberOfPromotions` | integer | `1` | 提升规则数量（当前单条规则；预留多规则） |
+| `convertFrom` | enum | `"point"` | Points / Vertices / Primitives / Edges |
+| `to` | enum | `"edge"` | Points / Vertices / Primitives / Edges |
+| `groupName` | groupSelect | `""` | 源组名 |
+| `newName` | string | `""` | 新组名；空 = 沿用源名 |
+| `keepOriginalGroup` | boolean | `false` | 是否保留源组 |
+| `includeOnlyOnBoundary` | boolean | `false` | 先转换再只保留边界元素 |
+| `includeUnsharedEdges` | boolean | `true` | 仅 Boundary：边界是否含 unshared 边 |
+| `includeAllUnsharedCurveEdges` | boolean | `true` | 仅 Boundary+Unshared：是否含曲线 unshared 边 |
+| `useConnectivityAttribute` | boolean | `false` | 仅 Boundary：用属性不连续当边界 |
+| `connectivityAttribute` | string | `"uv"` | Connectivity Attribute 名 |
+| `connectivityAttributeTolerance` | number | `0.0001` | 浮点属性容差 |
+| `includeAllPrimitivesSharingAttributeBoundaryPoints` | boolean | `false` | 仅 Boundary 且 To=Primitives |
+| `includeOnlyEntirelyContained` | boolean | `true` | 非 Boundary 且 To∈{Edges,Primitives,Vertices} |
+| `includeOnlyPrimitivesSharingEdge` | boolean | `false` | 非 Boundary 且 To=Primitives |
+| `removeDegenerateBridges` | boolean | `false` | To∈{Points,Edges,Vertices}：去掉退化桥接 |
+| `outputAsIntegerAttribute` | boolean | `false` | To∈{Points,Primitives,Vertices}：写成 0/1 属性并删除组 |
+
+灰显规则与 [Houdini Group Promote](https://www.sidefx.com/docs/houdini/nodes/sop/grouppromote.html) 一致。
+
+**执行逻辑（Points → Edges, entirely contained）**：
+
+```
+枚举网格所有无向边 (a,b)
+  ↓
+仅当 a、b 均属于 groupName 点组 → 加入 newName 边组
+  ↓
+keepOriginalGroup=false → 删除源点组
+```
+
+**用法示例**：
+
+```json
+{
+  "id": "grouppromote1",
+  "type": "GroupPromote",
+  "data": {
+    "convertFrom": "point",
+    "to": "edge",
+    "groupName": "streetFacingPoints",
+    "newName": "streetFacingEdges",
+    "keepOriginalGroup": false,
+    "includeOnlyEntirelyContained": true,
+    "includeOnlyOnBoundary": false
+  }
+}
+```
 
 ### FaceGroupByNormal
 
@@ -3469,7 +3579,22 @@ Houdini `primitive` SOP 子集：绕各面质心均匀缩放（默认 0.85），
 
 **类别**：Spline
 
-Houdini `convertline`：面边 → 折线。`mode=unshared|all|group`。开窗链：`ConvertLine` → `ResampleSpline` → `CopyMeshToPoints` → `BooleanMesh`。
+Houdini `convertline`：将面边转为折线/线段。
+
+| 参数 | Houdini 对应 | 说明 |
+|------|--------------|------|
+| `group` | **Group** | 要转换的 edge group；空 = 全部边 |
+| `connectPath` | **Connect Path** | 将端点连成连续折线（默认开） |
+| `maxDistance` | **Max Distance** | Connect Path 端点合并距离 |
+| `connectOnlyToOtherEndPoints` | **Connect Only To Other End Points** | 仅端点互连 |
+| `keepGroupOrder` | **Keep Group Order** | 按 group 顺序排列（预留） |
+| `makeIsolatedLoopsClosed` | **Make Isolated Loops Closed** | 孤立闭环标记为 closed |
+| `removeUnusedPoints` | **Remove Unused Points** | 移除未引用点（默认开） |
+| `computeLength` + `lengthAttribute` | **Compute Length** | 写入段长属性（默认 `restlength`） |
+
+兼容旧图：`mode=unshared|all|group` 与 `edgeGroup` 仍可读。
+
+开窗链：`ConvertLine` → `ResampleSpline` → `CopyMeshToPoints` → `BooleanMesh`。
 
 ### ExtractCentroid
 

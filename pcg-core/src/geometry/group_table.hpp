@@ -47,6 +47,11 @@ public:
     /// Houdini subset subset: "a", "a - b", "a & b" (whitespace trimmed).
     std::unordered_set<GroupId> eval(GroupDomain domain, const std::string& expr) const;
 
+    /// Houdini group field: named groups plus numeric/range patterns ("0", "0-2", "!*").
+    std::unordered_set<GroupId> eval_indices(GroupDomain domain,
+                                             const std::string& expr,
+                                             int element_count) const;
+
     /// Merge groups from another table; optional prefix avoids name clashes on MergeGeometry.
     void merge_from(const GroupTable& other, const std::string& prefix = "");
 

@@ -1,5 +1,6 @@
 #include "elements/facade_foundation_algorithms.hpp"
 
+#include "data/pcg_attribute_table.hpp"
 #include "geometry/bmesh.hpp"
 #include "geometry/group_table.hpp"
 
@@ -121,16 +122,177 @@ data::PcgGeometry primitive_transform_geometry(const data::PcgGeometry& input,
     return output;
 }
 
-data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
-                                          const ConvertLineOptions& options)
-{
-    data::PcgSplineData output;
-    if (input.points().empty() || input.faces().empty())
-        return output;
+namespace {
 
+struct ConvertEdge {
+    int a = -1;
+    int b = -1;
+    int source_face = -1;
+};
+
+nlohmann::json attribute_element_to_json(const data::AttributeArray& attr, size_t index)
+{
+    if (index >= attr.size())
+        return nullptr;
+
+    const int tuple = std::max(1, attr.schema().tuple_size);
+    const size_t offset = index * static_cast<size_t>(tuple);
+
+    if (attr.schema().type == data::AttributeType::String) {
+        if (tuple == 1) {
+            if (offset >= attr.string_values().size())
+                return nullptr;
+            return attr.string_values()[offset];
+        }
+        nlohmann::json values = nlohmann::json::array();
+        for (int comp = 0; comp < tuple; ++comp) {
+            const size_t slot = offset + static_cast<size_t>(comp);
+            if (slot >= attr.string_values().size())
+                return nullptr;
+            values.push_back(attr.string_values()[slot]);
+        }
+        return values;
+    }
+
+    if (attr.schema().type == data::AttributeType::Int) {
+        if (tuple == 1) {
+            if (offset >= attr.int_values().size())
+                return nullptr;
+            return attr.int_values()[offset];
+        }
+        nlohmann::json values = nlohmann::json::array();
+        for (int comp = 0; comp < tuple; ++comp) {
+            const size_t slot = offset + static_cast<size_t>(comp);
+            if (slot >= attr.int_values().size())
+                return nullptr;
+            values.push_back(attr.int_values()[slot]);
+        }
+        return values;
+    }
+
+    if (tuple == 1) {
+        if (offset >= attr.float_values().size())
+            return nullptr;
+        return attr.float_values()[offset];
+    }
+    nlohmann::json values = nlohmann::json::array();
+    for (int comp = 0; comp < tuple; ++comp) {
+        const size_t slot = offset + static_cast<size_t>(comp);
+        if (slot >= attr.float_values().size())
+            return nullptr;
+        values.push_back(attr.float_values()[slot]);
+    }
+    return values;
+}
+
+void copy_detail_attributes_to_metadata(const data::PcgGeometry& input,
+                                        data::PcgSplineData& output)
+{
+    for (const auto& name : input.attributes().names(data::AttributeOwner::Detail)) {
+        const data::AttributeArray* attr =
+            input.attributes().find(data::AttributeOwner::Detail, name);
+        if (!attr || attr->size() == 0)
+            continue;
+        const nlohmann::json value = attribute_element_to_json(*attr, 0);
+        if (!value.is_null())
+            output.metadata().set(name, value);
+    }
+}
+
+void copy_primitive_attributes_to_json(const data::PcgGeometry& input,
+                                       int face_index,
+                                       nlohmann::json& destination)
+{
+    if (face_index < 0 || static_cast<size_t>(face_index) >= input.faces().size())
+        return;
+
+    const size_t prim_index = static_cast<size_t>(face_index);
+    for (const auto& name : input.attributes().names(data::AttributeOwner::Primitive)) {
+        const data::AttributeArray* attr =
+            input.attributes().find(data::AttributeOwner::Primitive, name);
+        if (!attr || prim_index >= attr->size())
+            continue;
+        const nlohmann::json value = attribute_element_to_json(*attr, prim_index);
+        if (!value.is_null())
+            destination[name] = value;
+    }
+    destination["primnum"] = face_index;
+}
+
+double point_distance_sq(const data::PcgVec3& a, const data::PcgVec3& b)
+{
+    const double dx = a.x - b.x;
+    const double dy = a.y - b.y;
+    const double dz = a.z - b.z;
+    return dx * dx + dy * dy + dz * dz;
+}
+
+double segment_length(const data::PcgVec3& a, const data::PcgVec3& b)
+{
+    return std::sqrt(point_distance_sq(a, b));
+}
+
+class PointUnionFind {
+public:
+    int find(int point)
+    {
+        auto& parent = parents_[point];
+        if (parent == point)
+            return point;
+        parent = find(parent);
+        return parent;
+    }
+
+    void unite(int a, int b)
+    {
+        const int root_a = find(a);
+        const int root_b = find(b);
+        if (root_a == root_b)
+            return;
+        if (root_a < root_b)
+            parents_[root_b] = root_a;
+        else
+            parents_[root_a] = root_b;
+    }
+
+    void ensure(int point) { parents_.emplace(point, point); }
+
+private:
+    std::unordered_map<int, int> parents_;
+};
+
+data::PcgSplinePoint to_spline_point(const data::PcgVec3& point)
+{
+    return {point.x, point.y, point.z};
+}
+
+void append_spline_point(data::PcgSpline& spline, const data::PcgVec3& point)
+{
+    const auto next = to_spline_point(point);
+    if (!spline.points.empty()) {
+        const auto& last = spline.points.back();
+        if (std::abs(last.x - next.x) < 1e-12 && std::abs(last.y - next.y) < 1e-12 &&
+            std::abs(last.z - next.z) < 1e-12)
+            return;
+    }
+    spline.points.push_back(next);
+}
+
+void set_spline_length_attr(data::PcgSpline& spline, const std::string& attr_name, double length)
+{
+    if (attr_name.empty())
+        return;
+    spline.attributes[attr_name] = length;
+}
+
+std::vector<ConvertEdge> collect_convert_edges(const data::PcgGeometry& input,
+                                               const ConvertLineOptions& options)
+{
     std::unordered_map<int64_t, int> edge_face_count;
     std::unordered_map<int64_t, std::pair<int, int>> edge_endpoints;
-    for (const auto& face : input.faces()) {
+    std::unordered_map<int64_t, int> edge_source_face;
+    for (size_t fi = 0; fi < input.faces().size(); ++fi) {
+        const auto& face = input.faces()[fi];
         if (face.size() < 2)
             continue;
         for (size_t i = 0; i < face.size(); ++i) {
@@ -141,6 +303,7 @@ data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
             const int64_t key = geometry::edge_group_id(a, b);
             ++edge_face_count[key];
             edge_endpoints.emplace(key, std::make_pair(std::min(a, b), std::max(a, b)));
+            edge_source_face.emplace(key, static_cast<int>(fi));
         }
     }
 
@@ -153,6 +316,8 @@ data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
             allowed.insert(id);
     }
 
+    std::vector<ConvertEdge> edges;
+    edges.reserve(edge_endpoints.size());
     for (const auto& entry : edge_endpoints) {
         const int64_t key = entry.first;
         if (options.mode == "unshared" && edge_face_count[key] > 1)
@@ -165,15 +330,201 @@ data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
         if (static_cast<size_t>(a_idx) >= input.points().size() ||
             static_cast<size_t>(b_idx) >= input.points().size())
             continue;
+        const auto face_it = edge_source_face.find(key);
+        const int source_face = face_it == edge_source_face.end() ? -1 : face_it->second;
+        edges.push_back({a_idx, b_idx, source_face});
+    }
+    return edges;
+}
+
+void merge_nearby_endpoints(std::vector<ConvertEdge>& edges,
+                            const data::PcgGeometry& input,
+                            const ConvertLineOptions& options)
+{
+    std::unordered_map<int, int> degree;
+    for (const auto& edge : edges) {
+        ++degree[edge.a];
+        ++degree[edge.b];
+    }
+
+    PointUnionFind uf;
+    for (const auto& edge : edges) {
+        uf.ensure(edge.a);
+        uf.ensure(edge.b);
+    }
+
+    const double max_dist2 = options.max_distance * options.max_distance;
+    std::vector<int> endpoints;
+    endpoints.reserve(degree.size());
+    for (const auto& entry : degree) {
+        if (entry.second == 1)
+            endpoints.push_back(entry.first);
+    }
+
+    for (size_t i = 0; i < endpoints.size(); ++i) {
+        for (size_t j = i + 1; j < endpoints.size(); ++j) {
+            const int pi = endpoints[i];
+            const int pj = endpoints[j];
+            if (static_cast<size_t>(pi) >= input.points().size() ||
+                static_cast<size_t>(pj) >= input.points().size())
+                continue;
+            const auto& a = input.points()[static_cast<size_t>(pi)];
+            const auto& b = input.points()[static_cast<size_t>(pj)];
+            if (point_distance_sq(a, b) <= max_dist2)
+                uf.unite(pi, pj);
+        }
+    }
+
+    if (!options.connect_only_to_other_end_points) {
+        for (const int endpoint : endpoints) {
+            if (static_cast<size_t>(endpoint) >= input.points().size())
+                continue;
+            const auto& ep = input.points()[static_cast<size_t>(endpoint)];
+            for (size_t pi = 0; pi < input.points().size(); ++pi) {
+                if (static_cast<int>(pi) == endpoint)
+                    continue;
+                if (degree[static_cast<int>(pi)] == 1)
+                    continue;
+                if (point_distance_sq(ep, input.points()[pi]) <= max_dist2)
+                    uf.unite(endpoint, static_cast<int>(pi));
+            }
+        }
+    }
+
+    for (auto& edge : edges) {
+        edge.a = uf.find(edge.a);
+        edge.b = uf.find(edge.b);
+        if (edge.a > edge.b)
+            std::swap(edge.a, edge.b);
+    }
+}
+
+void emit_segment_spline(data::PcgSplineData& output,
+                         const data::PcgGeometry& input,
+                         const ConvertEdge& edge,
+                         const ConvertLineOptions& options)
+{
+    if (static_cast<size_t>(edge.a) >= input.points().size() ||
+        static_cast<size_t>(edge.b) >= input.points().size())
+        return;
+
+    data::PcgSpline spline;
+    spline.closed = false;
+    const auto& a = input.points()[static_cast<size_t>(edge.a)];
+    const auto& b = input.points()[static_cast<size_t>(edge.b)];
+    spline.points.push_back(to_spline_point(a));
+    spline.points.push_back(to_spline_point(b));
+    if (options.compute_length)
+        set_spline_length_attr(spline, options.length_attribute, segment_length(a, b));
+    copy_primitive_attributes_to_json(input, edge.source_face, spline.attributes);
+    output.splines_mut().push_back(std::move(spline));
+}
+
+void emit_connected_splines(data::PcgSplineData& output,
+                            const data::PcgGeometry& input,
+                            std::vector<ConvertEdge> edges,
+                            const ConvertLineOptions& options)
+{
+    if (edges.empty())
+        return;
+
+    merge_nearby_endpoints(edges, input, options);
+
+    std::unordered_map<int, std::vector<std::pair<int, size_t>>> adjacency;
+    for (size_t edge_index = 0; edge_index < edges.size(); ++edge_index) {
+        const auto& edge = edges[edge_index];
+        adjacency[edge.a].emplace_back(edge.b, edge_index);
+        adjacency[edge.b].emplace_back(edge.a, edge_index);
+    }
+
+    std::vector<bool> used_edge(edges.size(), false);
+
+    const auto extend_path = [&](std::vector<int>& path, int from, int current, bool prepend) {
+        int prev = from;
+        while (true) {
+            bool advanced = false;
+            for (const auto& link : adjacency[current]) {
+                const int next = link.first;
+                const size_t edge_index = link.second;
+                if (used_edge[edge_index] || next == prev)
+                    continue;
+                used_edge[edge_index] = true;
+                if (prepend)
+                    path.insert(path.begin(), next);
+                else
+                    path.push_back(next);
+                prev = current;
+                current = next;
+                advanced = true;
+                break;
+            }
+            if (!advanced)
+                break;
+        }
+    };
+
+    const auto emit_path = [&](const std::vector<int>& path, int source_face) {
+        if (path.size() < 2)
+            return;
 
         data::PcgSpline spline;
         spline.closed = false;
-        const auto& a = input.points()[static_cast<size_t>(a_idx)];
-        const auto& b = input.points()[static_cast<size_t>(b_idx)];
-        spline.points.push_back({a.x, a.y, a.z});
-        spline.points.push_back({b.x, b.y, b.z});
+        double total_length = 0.0;
+        for (size_t i = 0; i < path.size(); ++i) {
+            const auto& point = input.points()[static_cast<size_t>(path[i])];
+            append_spline_point(spline, point);
+            if (i > 0) {
+                const auto& prev = input.points()[static_cast<size_t>(path[i - 1])];
+                total_length += segment_length(prev, point);
+            }
+        }
+
+        const bool isolated_loop = path.size() >= 3 && path.front() == path.back();
+        if (options.make_isolated_loops_closed && isolated_loop) {
+            spline.closed = true;
+            if (spline.points.size() > 1)
+                spline.points.pop_back();
+        }
+
+        if (options.compute_length)
+            set_spline_length_attr(spline, options.length_attribute, total_length);
+        copy_primitive_attributes_to_json(input, source_face, spline.attributes);
         output.splines_mut().push_back(std::move(spline));
+    };
+
+    for (size_t edge_index = 0; edge_index < edges.size(); ++edge_index) {
+        if (used_edge[edge_index])
+            continue;
+        const auto& edge = edges[edge_index];
+        used_edge[edge_index] = true;
+        std::vector<int> path{edge.a, edge.b};
+        extend_path(path, edge.a, edge.b, false);
+        extend_path(path, edge.b, edge.a, true);
+        emit_path(path, edge.source_face);
     }
+}
+
+} // namespace
+
+data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
+                                          const ConvertLineOptions& options)
+{
+    data::PcgSplineData output;
+    if (input.points().empty() || input.faces().empty())
+        return output;
+
+    auto edges = collect_convert_edges(input, options);
+    if (edges.empty())
+        return output;
+
+    if (options.connect_path)
+        emit_connected_splines(output, input, std::move(edges), options);
+    else
+        for (const auto& edge : edges)
+            emit_segment_spline(output, input, edge, options);
+
+    copy_detail_attributes_to_metadata(input, output);
+
     return output;
 }
 

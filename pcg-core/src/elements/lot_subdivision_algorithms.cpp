@@ -1,5 +1,7 @@
 #include "elements/lot_subdivision_algorithms.hpp"
 
+#include "elements/element_utils.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -294,9 +296,7 @@ PcgGeometry lot_subdivide_geometry(const PcgGeometry& input, const LotSubdivisio
     if (opts.alignment != "boundingBox" && opts.alignment != "longestEdge")
         opts.alignment = "longestEdge";
 
-    uint32_t rng = static_cast<uint32_t>(opts.seed) * 747796405u + 2891336453u;
-    if (rng == 0)
-        rng = 0xA5A5A5A5u;
+    uint32_t rng = rng_state_from_seed(opts.seed, opts.graph_seed);
 
     int next_lot_id = 0;
     for (const auto& face : input.faces()) {

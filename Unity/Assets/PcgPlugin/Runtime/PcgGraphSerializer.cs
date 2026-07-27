@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using UnityEngine;
 
 namespace DJTechRuntime.PCG
 {
@@ -384,8 +385,18 @@ namespace DJTechRuntime.PCG
 
         private static void MergeData(string type, PcgNodeData data, Dictionary<string, object> dict)
         {
+            var manifestProps = ManifestLookup?.Invoke(type);
             foreach (var (key, value) in dict)
+            {
+                if (manifestProps != null &&
+                    manifestProps.TryGetValue(key, out var propInfo) &&
+                    propInfo.type == "vector3")
+                {
+                    data.SetRaw(key, PcgVector3Property.NormalizeStored(value));
+                    continue;
+                }
                 data.SetRaw(key, value);
+            }
         }
 
         private static void AppendNode(StringBuilder sb, PcgGraphNodeRecord node, bool pretty, string indent, bool writeInterface)
@@ -435,6 +446,15 @@ namespace DJTechRuntime.PCG
                 {
                     if (!first) sb.Append(", ");
                     first = false;
+                    if (propInfo.type == "vector3")
+                    {
+                        var fallback = PcgVector3Property.ParseOrDefault(
+                            propInfo.defaultValue, Vector3.zero);
+                        var resolved = PcgVector3Property.ResolveFromNodeData(data, key, fallback);
+                        AppendJsonProperty(sb, key, PcgVector3Property.Format(resolved), propInfo.type);
+                        continue;
+                    }
+
                     var value = data.GetRaw(key) ?? propInfo.defaultValue;
                     AppendJsonProperty(sb, key, value, propInfo.type);
                 }
@@ -443,6 +463,8 @@ namespace DJTechRuntime.PCG
                 foreach (var (key, value) in data.EnumerateRaw())
                 {
                     if (manifestKeys.Contains(key))
+                        continue;
+                    if (IsLegacyVectorAxisKey(key, manifestProps))
                         continue;
                     if (!first) sb.Append(", ");
                     first = false;
@@ -464,6 +486,20 @@ namespace DJTechRuntime.PCG
             }
 
             sb.Append('}');
+        }
+
+        private static bool IsLegacyVectorAxisKey(
+            string key, Dictionary<string, ManifestPropertyInfo> manifestProps)
+        {
+            if (manifestProps == null || string.IsNullOrEmpty(key) || key.Length < 2)
+                return false;
+
+            var suffix = key[key.Length - 1];
+            if (suffix != 'X' && suffix != 'Y' && suffix != 'Z')
+                return false;
+
+            var baseKey = key.Substring(0, key.Length - 1);
+            return manifestProps.TryGetValue(baseKey, out var info) && info.type == "vector3";
         }
 
         private static void AppendInferredValue(StringBuilder sb, object value)
@@ -498,6 +534,9 @@ namespace DJTechRuntime.PCG
                     break;
                 case "texture2d":
                     sb.Append(JsonString(value?.ToString() ?? ""));
+                    break;
+                case "vector3":
+                    PcgVector3Property.AppendJson(sb, value);
                     break;
                 default:
                     sb.Append(JsonString(value?.ToString() ?? ""));

@@ -101,10 +101,17 @@ public:
             const auto geometry =
                 get_geometry_input(ctx, "in", "ResampleSpline missing spline/mesh input");
             ConvertLineOptions convert_opts;
-            convert_opts.mode = ctx.node->data.value("edgeMode", std::string("unshared"));
-            convert_opts.edge_group = ctx.node->data.value("edgeGroup", std::string());
-            if (!convert_opts.edge_group.empty())
+            convert_opts.edge_group = ctx.node->data.value(
+                "group", ctx.node->data.value("edgeGroup", std::string()));
+            if (ctx.node->data.contains("edgeMode"))
+                convert_opts.mode = ctx.node->data.value("edgeMode", std::string("unshared"));
+            else if (ctx.node->data.contains("mode"))
+                convert_opts.mode = ctx.node->data.value("mode", std::string("unshared"));
+            else if (!convert_opts.edge_group.empty())
                 convert_opts.mode = "group";
+            else
+                convert_opts.mode = "all";
+            convert_opts.connect_path = ctx.node->data.value("connectPath", true);
             input = convert_line_geometry(geometry, convert_opts);
         } else {
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "ResampleSpline missing spline input");

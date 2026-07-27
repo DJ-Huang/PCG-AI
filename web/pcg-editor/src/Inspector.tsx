@@ -30,6 +30,7 @@ function typesCompatible(paramType: ParameterType, propType: PropertyType): bool
   if (paramType === 'integer') return propType === 'integer';
   if (paramType === 'boolean') return propType === 'boolean';
   if (paramType === 'string') return propType === 'string' || propType === 'enum' || propType === 'groupSelect' || propType === 'groupMultiSelect';
+  if (paramType === 'vector3') return propType === 'vector3';
   return false;
 }
 
@@ -301,9 +302,54 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
         />
       );
 
+    case 'vector3': {
+      const components = parseVector3(value);
+      const setAxis = (index: 0 | 1 | 2, next: number) => {
+        const updated: [number, number, number] = [...components];
+        updated[index] = Number.isFinite(next) ? next : 0;
+        onChange(updated);
+      };
+      return (
+        <div className="pcg-inspector__vector3">
+          {(['X', 'Y', 'Z'] as const).map((label, index) => (
+            <label key={label} className="pcg-inspector__vector3-axis">
+              <span>{label}</span>
+              <input
+                type="number"
+                step="0.1"
+                value={components[index as 0 | 1 | 2]}
+                onChange={(e) => setAxis(index as 0 | 1 | 2, Number(e.target.value))}
+              />
+            </label>
+          ))}
+        </div>
+      );
+    }
+
     default:
       return <span>{String(value)}</span>;
   }
+}
+
+function parseVector3(value: unknown): [number, number, number] {
+  if (Array.isArray(value) && value.length >= 3) {
+    return [
+      Number(value[0]) || 0,
+      Number(value[1]) || 0,
+      Number(value[2]) || 0,
+    ];
+  }
+  if (value && typeof value === 'object') {
+    const obj = value as { x?: unknown; y?: unknown; z?: unknown };
+    return [Number(obj.x) || 0, Number(obj.y) || 0, Number(obj.z) || 0];
+  }
+  if (typeof value === 'string') {
+    const match = value.match(/^\(?\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*,\s*([-\d.eE]+)\s*\)?$/);
+    if (match) {
+      return [Number(match[1]) || 0, Number(match[2]) || 0, Number(match[3]) || 0];
+    }
+  }
+  return [0, 0, 0];
 }
 
 // ── Group Select (single) ──────────────────────────────

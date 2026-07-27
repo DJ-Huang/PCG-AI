@@ -60,8 +60,17 @@ namespace DJTechEditor.PCG.Graph
         /// <summary>Houdini-style: keep row visible but grayed unless driver matches.</summary>
         public string enabledWhenProperty;
         public string enabledWhenEquals;
+        public List<string> enabledWhenOneOf;
+        /// <summary>Optional extra AND clauses (same shape as a single enabledWhen).</summary>
+        public List<ManifestVisibleWhenClause> enabledWhenAll;
         /// <summary>Render this string/number field on the same row as a boolean toggle.</summary>
         public string companionField;
+        /// <summary>Group properties onto one compact Houdini-style row.</summary>
+        public string rowGroup;
+        public int rowOrder;
+        public bool hasRowOrder;
+        /// <summary>Small inline label before this control (e.g. "to", "Offset by").</summary>
+        public string rowPrefix;
         public bool indent;
         public bool multiline;
         public int lines = 1;
@@ -87,6 +96,8 @@ namespace DJTechEditor.PCG.Graph
         public Dictionary<string, ManifestPropertyDef> properties = new();
         public List<ManifestOutputGroupDef> outputGroups = new();
         public List<ManifestSectionDef> inspectorSections = new();
+        /// <summary>foldouts (default) or tabs for section layout.</summary>
+        public string inspectorSectionLayout = "foldouts";
     }
 
     /// <summary>Loads schema/node-manifest.json for manifest-driven GraphView nodes.</summary>
@@ -161,7 +172,23 @@ namespace DJTechEditor.PCG.Graph
         {
             var sourcePin = NormalizePinType(GetOutputPinType(sourceType, sourceHandle));
             var targetPin = NormalizePinType(GetInputPinType(targetType, targetHandle));
-            return sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any";
+            return PinTypesCompatible(sourcePin, targetPin);
+        }
+
+        public static bool PinTypesCompatible(string sourcePin, string targetPin)
+        {
+            if (sourcePin == targetPin || sourcePin == "Any" || targetPin == "Any")
+                return true;
+            if (sourcePin == "SpatialGeometry" && IsSpatialGeometryFamily(targetPin))
+                return true;
+            if (targetPin == "SpatialGeometry" && IsSpatialGeometryFamily(sourcePin))
+                return true;
+            return false;
+        }
+
+        static bool IsSpatialGeometryFamily(string pinType)
+        {
+            return pinType == "SpatialGeometry" || pinType == "SpatialMesh" || pinType == "SpatialSpline";
         }
 
         static string NormalizePinType(string pinType)
@@ -176,7 +203,7 @@ namespace DJTechEditor.PCG.Graph
             if (!TryGet(nodeType, out var def))
                 return NormalizePinType(GetInputPinType(nodeType)) == pinType;
             foreach (var input in def.inputs)
-                if (NormalizePinType(input.pinType) == pinType || input.pinType == "Any") return true;
+                if (PinTypesCompatible(pinType, NormalizePinType(input.pinType)) || input.pinType == "Any") return true;
             return false;
         }
 
@@ -187,7 +214,7 @@ namespace DJTechEditor.PCG.Graph
             if (!TryGet(nodeType, out var def))
                 return NormalizePinType(GetOutputPinType(nodeType)) == pinType;
             foreach (var output in def.outputs)
-                if (NormalizePinType(output.pinType) == pinType || output.pinType == "Any") return true;
+                if (PinTypesCompatible(pinType, NormalizePinType(output.pinType)) || output.pinType == "Any") return true;
             return false;
         }
 
@@ -297,6 +324,7 @@ namespace DJTechEditor.PCG.Graph
                 type = GetString(nodeDict, "type"),
                 displayName = GetString(nodeDict, "displayName", GetString(nodeDict, "type")),
                 category = GetString(nodeDict, "category", "Other"),
+                inspectorSectionLayout = GetString(nodeDict, "inspectorSectionLayout", "foldouts"),
             };
 
             if (nodeDict.TryGetValue("inputs", out var inputs) && inputs is List<object> inputList)
@@ -406,10 +434,56 @@ namespace DJTechEditor.PCG.Graph
                         {
                             propDef.enabledWhenProperty = GetString(enabledDict, "property");
                             propDef.enabledWhenEquals = GetString(enabledDict, "equals", "true");
+                            if (enabledDict.TryGetValue("oneOf", out var enabledOneOfObj) &&
+                                enabledOneOfObj is List<object> enabledOneOfList)
+                            {
+                                propDef.enabledWhenOneOf = new List<string>();
+                                foreach (var one in enabledOneOfList)
+                                {
+                                    if (one == null)
+                                        continue;
+                                    propDef.enabledWhenOneOf.Add(one.ToString());
+                                }
+                            }
+                            if (enabledDict.TryGetValue("all", out var enabledAllObj) &&
+                                enabledAllObj is List<object> enabledAllList)
+                            {
+                                propDef.enabledWhenAll = new List<ManifestVisibleWhenClause>();
+                                foreach (var clauseObj in enabledAllList)
+                                {
+                                    if (clauseObj is not Dictionary<string, object> clauseDict)
+                                        continue;
+                                    var clause = new ManifestVisibleWhenClause
+                                    {
+                                        property = GetString(clauseDict, "property"),
+                                        equals = GetString(clauseDict, "equals", "true"),
+                                    };
+                                    if (clauseDict.TryGetValue("oneOf", out var clauseOneOfObj) &&
+                                        clauseOneOfObj is List<object> clauseOneOfList)
+                                    {
+                                        clause.oneOf = new List<string>();
+                                        foreach (var one in clauseOneOfList)
+                                        {
+                                            if (one == null)
+                                                continue;
+                                            clause.oneOf.Add(one.ToString());
+                                        }
+                                    }
+                                    if (!string.IsNullOrEmpty(clause.property))
+                                        propDef.enabledWhenAll.Add(clause);
+                                }
+                            }
                         }
                         propDef.companionField = GetString(propObj, "companionField");
                         propDef.indent = propObj.TryGetValue("indent", out var indentVal)
                             && Convert.ToBoolean(indentVal, CultureInfo.InvariantCulture);
+                        propDef.rowGroup = GetString(propObj, "rowGroup");
+                        propDef.rowPrefix = GetString(propObj, "rowPrefix");
+                        if (propObj.TryGetValue("rowOrder", out var rowOrderVal) && rowOrderVal != null)
+                        {
+                            propDef.hasRowOrder = true;
+                            propDef.rowOrder = Convert.ToInt32(rowOrderVal, CultureInfo.InvariantCulture);
+                        }
 
                         if (propObj.TryGetValue("options", out var optionsObj) &&
                             optionsObj is List<object> optionsList)
@@ -493,6 +567,7 @@ namespace DJTechEditor.PCG.Graph
                 "number" => 0f,
                 "boolean" => false,
                 "enum" => GetString(prop, "default", ""),
+                "vector3" => ParseVectorDefault(prop),
                 _ => "",
             };
             }
@@ -503,8 +578,16 @@ namespace DJTechEditor.PCG.Graph
                 "number" => Convert.ToSingle(value, CultureInfo.InvariantCulture),
                 "boolean" => Convert.ToBoolean(value, CultureInfo.InvariantCulture),
                 "enum" => value.ToString(),
+                "vector3" => ParseVectorDefault(prop, value),
                 _ => value.ToString(),
             };
+        }
+
+        private static object ParseVectorDefault(Dictionary<string, object> prop, object value = null)
+        {
+            if (value == null && prop.TryGetValue("default", out var defaultValue))
+                value = defaultValue;
+            return PcgVector3Property.NormalizeStored(value);
         }
 
         private static string GetString(Dictionary<string, object> dict, string key, string fallback = "") =>

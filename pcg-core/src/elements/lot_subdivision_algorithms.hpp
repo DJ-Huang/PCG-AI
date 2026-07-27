@@ -10,7 +10,9 @@ struct LotSubdivisionOptions {
     double min_size = 1.0;
     int iterations = 3;
     double irregularity = 0.5;
-    int seed = 0;
+    /// Houdini-style float Random Seed (2.3 is meaningful; do not truncate to int).
+    double seed = 0.0;
+    int graph_seed = 0;
     /// "longestEdge" (shape-relative) or "boundingBox" (world-axis).
     std::string alignment = "longestEdge";
 };

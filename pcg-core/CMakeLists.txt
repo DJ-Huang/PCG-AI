@@ -104,15 +104,19 @@ set(PCG_CORE_SOURCES
     src/elements/element_registry.cpp
     src/elements/node_contracts.cpp
     src/elements/element_utils.cpp
+    src/elements/color_ramp.cpp
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
+    src/elements/delete_algorithms.cpp
     src/elements/primitive_elements.cpp
+    src/geometry/element_pattern.cpp
     src/elements/heightfield_algorithms.cpp
     src/elements/heightfield_algorithms_l3.cpp
     src/elements/heightfield_elements.cpp
     src/elements/structural_algorithms.cpp
     src/elements/structural_elements.cpp
     src/elements/spline_algorithms.cpp
+    src/elements/transform_algorithms.cpp
     src/elements/spline_elements.cpp
     src/elements/spline_mesh_elements.cpp
     src/elements/material_algorithms.cpp
@@ -396,6 +400,11 @@ add_executable(test_topology_parity tests/test_topology_parity.cpp)
 target_link_libraries(test_topology_parity PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_topology_parity PRIVATE src)
 add_test(NAME test_topology_parity COMMAND test_topology_parity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_review_2026_07_27 tests/test_review_2026_07_27.cpp)
+target_link_libraries(test_review_2026_07_27 PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_review_2026_07_27 PRIVATE src)
+add_test(NAME test_review_2026_07_27 COMMAND test_review_2026_07_27 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.

@@ -22,9 +22,34 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <exception>
 #include <limits>
 #include <vector>
 
+namespace {
+
+PcgResultCode abi_catch(char* err_buf, int err_buf_size, char* out_json, int out_json_size)
+{
+    try {
+        throw;
+    } catch (const std::exception& ex) {
+        if (out_json && out_json_size > 0)
+            out_json[0] = '\0';
+        pcg::internal::write_error(err_buf, err_buf_size, ex.what());
+        return PCG_ERR_EXECUTION;
+    } catch (...) {
+        if (out_json && out_json_size > 0)
+            out_json[0] = '\0';
+        pcg::internal::write_error(err_buf, err_buf_size,
+                                   "uncaught C++ exception at C ABI boundary");
+        return PCG_ERR_EXECUTION;
+    }
+}
+
+} // namespace
+
+// Re-open for remaining file-local helpers; abi_catch above is intentionally in an
+// anonymous namespace so linkage stays internal while remaining visible to this TU.
 namespace {
 
 pcg::internal::GraphCookCache g_cook_cache;
@@ -733,7 +758,7 @@ PcgResultCode execute_graph_cached(const char* json,
                                    char* err_buf,
                                    int err_buf_size,
                                    pcg::internal::GraphCookCache* cache)
-{
+try {
     g_cancel_requested.store(false, std::memory_order_relaxed);
     const uint64_t job_id = g_job_counter.fetch_add(1, std::memory_order_relaxed) + 1;
     JobScope job_scope(job_id);
@@ -815,6 +840,8 @@ PcgResultCode execute_graph_cached(const char* json,
 
     write_perf_json(perf, out_perf_json, out_perf_json_size);
     return PCG_OK;
+} catch (...) {
+    return abi_catch(err_buf, err_buf_size, out_json, out_json_size);
 }
 
 } // namespace
@@ -833,11 +860,13 @@ const char* pcg_get_version(void)
 PcgResultCode pcg_validate_graph(const char* json,
                                  char* err_buf,
                                  int err_buf_size)
-{
+try {
     pcg::internal::write_error(err_buf, err_buf_size, "");
 
     pcg::internal::Graph graph;
     return parse_and_validate_graph(json, graph, err_buf, err_buf_size);
+} catch (...) {
+    return abi_catch(err_buf, err_buf_size, nullptr, 0);
 }
 
 PcgResultCode pcg_execute_graph_v2(const char* json,
@@ -851,7 +880,7 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
                                    int* out_index_count,
                                    char* err_buf,
                                    int err_buf_size)
-{
+try {
     g_cancel_requested.store(false, std::memory_order_relaxed);
     const uint64_t job_id = g_job_counter.fetch_add(1, std::memory_order_relaxed) + 1;
     JobScope job_scope(job_id);
@@ -884,6 +913,8 @@ PcgResultCode pcg_execute_graph_v2(const char* json,
                                   out_vertex_count, out_index_count, nullptr, 0, nullptr,
                                   nullptr, 0, nullptr,
                                   err_buf, err_buf_size);
+} catch (...) {
+    return abi_catch(err_buf, err_buf_size, out_json, out_json_size);
 }
 
 PcgResultCode pcg_execute_graph_v3(const char* json,
@@ -899,7 +930,7 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
                                    int* out_index_count,
                                    char* err_buf,
                                    int err_buf_size)
-{
+try {
     g_cancel_requested.store(false, std::memory_order_relaxed);
     const uint64_t job_id = g_job_counter.fetch_add(1, std::memory_order_relaxed) + 1;
     JobScope job_scope(job_id);
@@ -945,6 +976,8 @@ PcgResultCode pcg_execute_graph_v3(const char* json,
                                   out_vertex_count, out_index_count, nullptr, 0, nullptr,
                                   nullptr, 0, nullptr,
                                   err_buf, err_buf_size);
+} catch (...) {
+    return abi_catch(err_buf, err_buf_size, out_json, out_json_size);
 }
 
 PcgResultCode pcg_execute_graph_v4(const char* json,
@@ -962,7 +995,7 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
                                    int* out_index_count,
                                    char* err_buf,
                                    int err_buf_size)
-{
+try {
     g_cancel_requested.store(false, std::memory_order_relaxed);
     const uint64_t job_id = g_job_counter.fetch_add(1, std::memory_order_relaxed) + 1;
     JobScope job_scope(job_id);
@@ -1036,6 +1069,8 @@ PcgResultCode pcg_execute_graph_v4(const char* json,
                                   out_vertex_count, out_index_count, nullptr, 0, nullptr,
                                   nullptr, 0, nullptr,
                                   err_buf, err_buf_size);
+} catch (...) {
+    return abi_catch(err_buf, err_buf_size, out_json, out_json_size);
 }
 
 PcgResultCode pcg_execute_graph(const char* json,

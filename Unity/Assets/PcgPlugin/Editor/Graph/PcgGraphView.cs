@@ -93,6 +93,7 @@ namespace DJTechEditor.PCG.Graph
 
         private PcgSceneEditContext m_SceneEditContext = PcgSceneEditContext.ObjectMode;
         private bool m_DuplicateInProgress;
+        private bool m_InspectorRefreshScheduled;
 
         public PcgSceneEditContext SceneEditContext => m_SceneEditContext;
 
@@ -855,6 +856,30 @@ namespace DJTechEditor.PCG.Graph
                 GetSubgraphInstanceChain());
         }
 
+        /// <summary>
+        /// Houdini-style: selecting Match Size should preview that node's cooked output,
+        /// not leave Scene View showing upstream geometry while only the target box moves.
+        /// </summary>
+        internal void EnsureMatchSizeScenePreview()
+        {
+            var selected = selection.OfType<PcgManifestNodeView>()
+                .FirstOrDefault(node => node.NodeType == "MatchSize");
+            if (selected == null || m_HostWindow is not PcgGraphEditorWindow window)
+                return;
+
+            var scope = CurrentSubgraphId ?? string.Empty;
+            if (window.PreviewNodeId == selected.NodeId &&
+                string.Equals(window.PreviewScopeSubgraphId ?? string.Empty, scope,
+                    System.StringComparison.Ordinal))
+                return;
+
+            window.SetPreviewNode(
+                selected.NodeId,
+                selected.GetDisplayTitle(),
+                CurrentSubgraphId,
+                GetSubgraphInstanceChain());
+        }
+
         public void RefreshNodePreviewVisuals()
         {
             var previewNodeId = m_HostWindow is PcgGraphEditorWindow window ? window.PreviewNodeId : null;
@@ -862,7 +887,23 @@ namespace DJTechEditor.PCG.Graph
                 node.SetNodePreviewState(!string.IsNullOrEmpty(previewNodeId) && node.NodeId == previewNodeId);
         }
 
-        internal void RefreshInspector() => m_Inspector?.OnSelectionChanged();
+        internal void RefreshInspector() => ScheduleInspectorRefresh();
+
+        internal void ScheduleInspectorRefresh()
+        {
+            if (m_Inspector == null)
+                return;
+            if (m_InspectorRefreshScheduled)
+                return;
+            m_InspectorRefreshScheduled = true;
+            EditorApplication.delayCall += () =>
+            {
+                m_InspectorRefreshScheduled = false;
+                if (m_Inspector == null)
+                    return;
+                m_Inspector.OnSelectionChanged();
+            };
+        }
 
         /// <summary>
         /// Re-derive the scene edit context from the current graph selection.
@@ -883,6 +924,10 @@ namespace DJTechEditor.PCG.Graph
                         SceneEditDomain.SplineControlPoint,
                         selected.NodeId,
                         s_SplineDomains);
+                }
+                else if (manifestNode.NodeType == "MatchSize")
+                {
+                    m_SceneEditContext = PcgSceneEditContext.ObjectMode;
                 }
                 else if (manifestNode.NodeType == "GroupCreate" || manifestNode.NodeType == "GroupCombine")
                 {
@@ -1204,7 +1249,8 @@ namespace DJTechEditor.PCG.Graph
             base.AddToSelection(selectable);
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
-            m_Inspector?.OnSelectionChanged();
+            EnsureMatchSizeScenePreview();
+            ScheduleInspectorRefresh();
         }
 
         public override void RemoveFromSelection(ISelectable selectable)
@@ -1212,7 +1258,7 @@ namespace DJTechEditor.PCG.Graph
             base.RemoveFromSelection(selectable);
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
-            m_Inspector?.OnSelectionChanged();
+            ScheduleInspectorRefresh();
         }
 
         public override void ClearSelection()
@@ -1220,7 +1266,7 @@ namespace DJTechEditor.PCG.Graph
             base.ClearSelection();
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
-            m_Inspector?.OnSelectionChanged();
+            ScheduleInspectorRefresh();
         }
 
         public override EventPropagation DeleteSelection()
@@ -2376,6 +2422,7 @@ namespace DJTechEditor.PCG.Graph
                     {
                         CommitState();
                         m_PendingCommit = false;
+                        RefreshInspector();
                     });
                 }
             }
@@ -2446,5 +2493,11 @@ namespace DJTechEditor.PCG.Graph
         /// when MeshFilter is the final merge, not this node's mesh.
         /// </summary>
         public float[] facePolygons;
+        /// <summary>
+        /// Packed point XYZ from the source node geometry: [x,y,z, ...] —
+        /// used for Scene View highlight so point groups do not index the
+        /// final MeshFilter / PolygonPreview.
+        /// </summary>
+        public float[] pointPositions;
     }
 }

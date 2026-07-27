@@ -15,8 +15,16 @@ struct PrimitiveTransformOptions {
 };
 
 struct ConvertLineOptions {
+    /// Houdini Group — edge group to convert. Empty = all edges (when mode is not legacy).
     std::string edge_group;
-    std::string mode = "unshared"; // unshared | all | group
+    /// Legacy graphs: unshared | all | group. New graphs omit mode and rely on edge_group.
+    std::string mode = "all";
+    bool connect_path = true;
+    double max_distance = 1e-4;
+    bool connect_only_to_other_end_points = false;
+    bool make_isolated_loops_closed = false;
+    bool compute_length = false;
+    std::string length_attribute = "restlength";
 };
 
 struct ExtractCentroidOptions {

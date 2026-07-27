@@ -1,6 +1,7 @@
 #include "graph_executor.hpp"
 #include "graph_parser.hpp"
 #include "data/pcg_attribute_table.hpp"
+#include "elements/facade_foundation_algorithms.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -190,6 +191,103 @@ int main()
     }
 
     {
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::elements::ConvertLineOptions;
+        using pcg::internal::elements::convert_line_geometry;
+
+        PcgGeometry grid;
+        grid.points_mut() = {
+            {0.0, 0.0, 0.0}, {4.0, 0.0, 0.0}, {4.0, 0.0, 4.0}, {0.0, 0.0, 4.0}};
+        grid.faces_mut() = {{0, 1, 2, 3}};
+
+        ConvertLineOptions opts;
+        opts.mode = "all";
+        opts.connect_path = true;
+        opts.compute_length = true;
+        opts.length_attribute = "restlength";
+        const auto splines = convert_line_geometry(grid, opts);
+        expect(splines.splines().size() == 1,
+               "ConvertLine connect path chains square boundary into one polyline");
+        if (!splines.splines().empty()) {
+            const auto& spline = splines.splines().front();
+            expect(spline.points.size() >= 4, "ConvertLine connected polyline has corners");
+            expect(spline.attributes.contains("restlength"),
+                   "ConvertLine compute length writes attribute");
+        }
+
+        ConvertLineOptions legacy;
+        legacy.mode = "unshared";
+        const auto legacy_splines = convert_line_geometry(grid, legacy);
+        expect(legacy_splines.splines().size() == 1,
+               "legacy mode=unshared still filters to boundary loop");
+    }
+
+    {
+        using pcg::internal::data::AttributeOwner;
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::elements::ConvertLineOptions;
+        using pcg::internal::elements::convert_line_geometry;
+
+        PcgGeometry grid;
+        grid.points_mut() = {
+            {0.0, 0.0, 0.0}, {4.0, 0.0, 0.0}, {4.0, 0.0, 4.0}, {0.0, 0.0, 4.0}};
+        grid.faces_mut() = {{0, 1, 2, 3}};
+
+        auto& detail = grid.attributes().create_int(AttributeOwner::Detail, "numFloors", 1);
+        detail.resize(1);
+        detail.int_values_mut()[0] = 3;
+
+        auto& piece = grid.attributes().create_int(AttributeOwner::Primitive, "piece", 1);
+        piece.resize(1);
+        piece.int_values_mut()[0] = 7;
+
+        ConvertLineOptions opts;
+        opts.mode = "all";
+        opts.connect_path = true;
+        const auto splines = convert_line_geometry(grid, opts);
+        expect(splines.splines().size() == 1, "ConvertLine attribute propagation emits spline");
+        expect(splines.metadata().has("numFloors"), "ConvertLine copies detail attributes to metadata");
+        if (splines.metadata().has("numFloors"))
+            expect(splines.metadata().get("numFloors").get<int64_t>() == 3,
+                   "ConvertLine detail value preserved");
+        if (!splines.splines().empty()) {
+            const auto& attrs = splines.splines().front().attributes;
+            expect(attrs.contains("piece") && attrs["piece"].get<int64_t>() == 7,
+                   "ConvertLine copies primitive attributes to spline");
+            expect(attrs.contains("primnum") && attrs["primnum"].get<int>() == 0,
+                   "ConvertLine writes primnum from source face");
+        }
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":2.0,"height":2.0,"depth":2.0}},
+            {"id":"wr","type":"AttributeWrangle","data":{"runOver":"detail","expression":"@numFloors = 2;"}},
+            {"id":"lines","type":"ConvertLine","data":{"mode":"all"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"wr","sourceHandle":"out","targetHandle":"in"},
+            {"source":"wr","target":"lines","sourceHandle":"out","targetHandle":"in"},
+            {"source":"lines","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.json.contains("node_attrs"), "ConvertLine graph reports node_attrs");
+        bool lines_has_detail = false;
+        if (result.json.contains("node_attrs") && result.json["node_attrs"].is_array()) {
+            for (const auto& attr : result.json["node_attrs"]) {
+                if (attr.value("node_id", "") == "lines" && attr.value("owner", "") == "detail" &&
+                    attr.value("name", "") == "numFloors")
+                    lines_has_detail = true;
+            }
+        }
+        expect(lines_has_detail, "ConvertLine graph keeps detail attrs visible on spline output");
+    }
+
+    {
         const std::string graph = R"({
           "version":"1.0",
           "nodes":[
@@ -310,6 +408,155 @@ int main()
                        pcg::internal::geometry::GroupDomain::Face, "legacy"),
                    "legacy GroupTransfer still transfers named face group");
         }
+    }
+
+    {
+        // Distance threshold must change transferred point-group membership:
+        // outer-ring source vs dense target grid (Houdini proximity filter).
+        const auto run_xfer = [](double threshold) {
+            char thr[64];
+            std::snprintf(thr, sizeof(thr), "%.8g", threshold);
+            const std::string graph =
+                std::string(R"JSON({
+              "version":"1.0",
+              "nodes":[
+                {"id":"src","type":"CreateGridMesh","data":{"sizeX":10.0,"sizeY":10.0,"rows":1,"cols":1,"plane":"xz"}},
+                {"id":"outline","type":"ConvertLine","data":{"mode":"unshared","edgeGroup":""}},
+                {"id":"rs","type":"Resample","data":{
+                  "useMaxSegmentLength":true,"maxSegmentLength":0.5,"useMaxSegments":false,
+                  "method":"evenLength","measure":"arc","treatPolygonsAs":"straight","levelOfDetail":1
+                }},
+                {"id":"tag","type":"GroupCreate","data":{
+                  "outputGroup":"ring","domain":"point","initialMerge":"replace",
+                  "enableBaseGroup":true,"baseGroup":"",
+                  "enableBounding":false,"enableNormals":false,"enableEdges":false,"enableRandom":false
+                }},
+                {"id":"tgt","type":"CreateGridMesh","data":{"sizeX":10.0,"sizeY":10.0,"rows":4,"cols":4,"plane":"xz"}},
+                {"id":"xfer","type":"GroupTransfer","data":{
+                  "transferPrimitiveGroups":false,"transferPointGroups":true,"pointGroups":"ring",
+                  "transferEdgeGroups":false,"groupNameConflict":"overwrite",
+                  "enableDistanceThreshold":true,"distanceThreshold":)JSON") +
+                thr +
+                R"JSON(,"createEmptyGroups":true}},
+                {"id":"out","type":"Output","data":{}}
+              ],
+              "edges":[
+                {"source":"src","target":"outline","sourceHandle":"out","targetHandle":"in"},
+                {"source":"outline","target":"rs","sourceHandle":"out","targetHandle":"in"},
+                {"source":"rs","target":"tag","sourceHandle":"out","targetHandle":"in"},
+                {"source":"tgt","target":"xfer","sourceHandle":"out","targetHandle":"target"},
+                {"source":"tag","target":"xfer","sourceHandle":"out","targetHandle":"source"},
+                {"source":"xfer","target":"out","sourceHandle":"out","targetHandle":"in"}
+              ]
+            })JSON";
+            return execute(graph);
+        };
+
+        const auto tight = run_xfer(0.25);
+        const auto loose = run_xfer(6.0);
+        expect(tight.source_geometry != nullptr && loose.source_geometry != nullptr,
+               "GroupTransfer distance probe keeps geometry");
+        if (tight.source_geometry && loose.source_geometry) {
+            const auto tight_n = tight.source_geometry->groups()
+                                     .members(pcg::internal::geometry::GroupDomain::Point, "ring")
+                                     .size();
+            const auto loose_n = loose.source_geometry->groups()
+                                     .members(pcg::internal::geometry::GroupDomain::Point, "ring")
+                                     .size();
+            std::printf("  distance probe members: tight(0.25)=%zu loose(6)=%zu\n", tight_n,
+                        loose_n);
+            expect(tight_n < loose_n,
+                   "GroupTransfer distanceThreshold filters point membership");
+            expect(loose_n > 0, "loose threshold still transfers some points");
+        }
+    }
+
+    {
+        // Mimics Unity node-preview upstream cook: ForEachBegin without End, sink id
+        // matches PcgGraphPreviewSubgraph.PreviewSinkNodeId.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+            {"id":"begin","type":"ForEachBegin","data":{"method":"primitive"}},
+            {"id":"prim","type":"PrimitiveTransform","data":{"scale":0.5}},
+            {"id":"__pcg_preview_sink__","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"begin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"begin","target":"prim","sourceHandle":"out","targetHandle":"in"},
+            {"source":"prim","target":"__pcg_preview_sink__","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr,
+               "preview open ForEach cooks first primitive piece");
+        if (result.source_geometry)
+            expect(result.source_geometry->faces().size() == 1,
+                   "preview open ForEach uses first iteration only");
+    }
+
+    {
+        // Nested open outer + closed inner, mimicking lot-city floor ring under lot ForEach.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+            {"id":"obegin","type":"ForEachBegin","data":{"method":"primitive"}},
+            {"id":"prim","type":"PrimitiveTransform","data":{"scale":0.8}},
+            {"id":"ibegin","type":"ForEachBegin","data":{"method":"count","iterations":3}},
+            {"id":"xform","type":"TransformMesh","data":{"translateY":1.0}},
+            {"id":"iend","type":"ForEachEnd","data":{"gatherMethod":"feedback"}},
+            {"id":"__pcg_preview_sink__","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"obegin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"obegin","target":"prim","sourceHandle":"out","targetHandle":"in"},
+            {"source":"prim","target":"ibegin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"ibegin","target":"xform","sourceHandle":"out","targetHandle":"in"},
+            {"source":"xform","target":"iend","sourceHandle":"out","targetHandle":"in"},
+            {"source":"iend","target":"__pcg_preview_sink__","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr,
+               "nested preview open outer ForEach cooks");
+        if (result.source_geometry) {
+            expect(result.source_geometry->faces().size() == 1,
+                   "nested preview open outer still uses first outer piece");
+            double max_y = -1e9;
+            for (const auto& p : result.source_geometry->points())
+                max_y = std::max(max_y, p.y);
+            expect(max_y > 2.5, "inner count feedback still runs fully under open outer");
+        }
+    }
+
+    {
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"box","type":"CreateBoxMesh","data":{"width":1.0,"height":1.0,"depth":1.0}},
+            {"id":"begin","type":"ForEachBegin","data":{"method":"primitive"}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"box","target":"begin","sourceHandle":"out","targetHandle":"in"},
+            {"source":"begin","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        char error[2048] = {};
+        pcg::internal::Graph graph_obj;
+        const PcgResultCode parse_code =
+            pcg::internal::parse_graph(graph.c_str(), graph_obj, error, sizeof(error));
+        expect(parse_code == PCG_OK, "unmatched ForEachBegin graph parses");
+        GraphExecutionResult result;
+        const PcgResultCode execute_code = pcg::internal::execute_graph(
+            graph_obj, 42, result, error, sizeof(error));
+        expect(execute_code != PCG_OK,
+               "unmatched ForEachBegin without preview sink still fails");
+        expect(std::string(error).find("ForEachBegin has no matching ForEachEnd") !=
+                   std::string::npos,
+               "unmatched ForEachBegin reports pairing error");
     }
 
     std::printf("failures=%d\n", failures);

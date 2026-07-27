@@ -302,12 +302,17 @@ function PcgEditor() {
       const currentValue = (nodes.find((n) => n.id === nodeId)?.data as Record<string, unknown>)?.[propertyKey] ?? prop.default;
       const hasRange = prop.minimum !== undefined && prop.maximum !== undefined;
 
-      const paramType: GraphParameter['type'] = (prop.type === 'enum' || prop.type === 'groupSelect' || prop.type === 'groupMultiSelect') ? 'string' : prop.type;
+      const paramType: GraphParameter['type'] =
+        prop.type === 'enum' || prop.type === 'groupSelect' || prop.type === 'groupMultiSelect'
+          ? 'string'
+          : prop.type === 'vector3'
+            ? 'vector3'
+            : (prop.type as GraphParameter['type']);
       const newParam: GraphParameter = {
         id: `p-${propertyKey}-${Date.now()}`,
         name: propertyKey.charAt(0).toUpperCase() + propertyKey.slice(1),
         type: paramType,
-        default: currentValue as number | boolean | string,
+        default: currentValue as number | boolean | string | [number, number, number],
         exposed: true,
         targetNode: nodeId,
         targetProperty: propertyKey,

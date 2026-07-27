@@ -6,8 +6,16 @@ import manifestJson from '../../../schema/node-manifest.json';
 // ── Types ──────────────────────────────────────────────
 
 export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialSurface' | 'SpatialMesh' |
-  'Texture' | 'HeightField' | 'Param' | 'Any';
-export type PropertyType = 'integer' | 'number' | 'boolean' | 'string' | 'enum' | 'groupSelect' | 'groupMultiSelect';
+  'SpatialGeometry' | 'Texture' | 'HeightField' | 'Param' | 'Any';
+export type PropertyType =
+  | 'integer'
+  | 'number'
+  | 'boolean'
+  | 'string'
+  | 'enum'
+  | 'groupSelect'
+  | 'groupMultiSelect'
+  | 'vector3';
 export type GroupDomain = 'edge' | 'face' | 'point' | 'vertex';
 
 export interface ManifestEnumOption {
@@ -17,7 +25,7 @@ export interface ManifestEnumOption {
 
 export interface ManifestProperty {
   type: PropertyType;
-  default: number | boolean | string;
+  default: number | boolean | string | [number, number, number];
   minimum?: number;
   maximum?: number;
   options?: ManifestEnumOption[];
@@ -63,7 +71,32 @@ export interface NodeManifest {
 
 // ── Parse ──────────────────────────────────────────────
 
-const manifest = manifestJson as unknown as NodeManifest;
+const KNOWN_PROPERTY_TYPES: ReadonlySet<string> = new Set([
+  'integer',
+  'number',
+  'boolean',
+  'string',
+  'enum',
+  'groupSelect',
+  'groupMultiSelect',
+  'vector3',
+]);
+
+function assertManifestContract(raw: typeof manifestJson): NodeManifest {
+  for (const node of raw.nodes) {
+    for (const [key, prop] of Object.entries(node.properties ?? {})) {
+      const propType = (prop as { type?: string }).type;
+      if (!propType || !KNOWN_PROPERTY_TYPES.has(propType)) {
+        throw new Error(
+          `node-manifest contract drift: ${node.type}.${key} has unsupported type '${propType}'`,
+        );
+      }
+    }
+  }
+  return raw as NodeManifest;
+}
+
+const manifest = assertManifestContract(manifestJson);
 
 const nodeMap: Map<string, ManifestNodeDef> = new Map();
 for (const def of manifest.nodes) {
@@ -121,13 +154,20 @@ export function getInputPinType(nodeType: string, handle: string): PinType | und
   return pin?.pinType;
 }
 
+function isSpatialGeometryFamily(pinType: string): boolean {
+  return pinType === 'SpatialGeometry' || pinType === 'SpatialMesh' || pinType === 'SpatialSpline';
+}
+
 /**
  * Checks if two pins can connect based on pinType compatibility.
  * "Any" matches all pinTypes.
  */
 export function pinTypesCompatible(sourcePin: PinType | undefined, targetPin: PinType | undefined): boolean {
   if (!sourcePin || !targetPin) return false;
-  return sourcePin === targetPin || sourcePin === 'Any' || targetPin === 'Any';
+  if (sourcePin === targetPin || sourcePin === 'Any' || targetPin === 'Any') return true;
+  if (sourcePin === 'SpatialGeometry' && isSpatialGeometryFamily(targetPin)) return true;
+  if (targetPin === 'SpatialGeometry' && isSpatialGeometryFamily(sourcePin)) return true;
+  return false;
 }
 
 /**
@@ -194,6 +234,7 @@ export const PIN_TYPE_COLORS: Record<string, string> = {
   SpatialPoint: '#00ccff',
   SpatialSpline: '#4de66a',
   SpatialMesh: '#ff9900',
+  SpatialGeometry: '#ffaa33',
   Param: '#ffd700',
   Texture: '#b34dd9',
   Any: '#a6a6a6',

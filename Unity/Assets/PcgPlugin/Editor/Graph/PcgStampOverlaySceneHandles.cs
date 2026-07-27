@@ -330,15 +330,9 @@ namespace DJTechEditor.PCG.Graph
                         continue;
 
                     Undo.RecordObject(window, "Edit Stamp Transform");
-                    node.SetPropertyValue("translateX", localPos.x);
-                    node.SetPropertyValue("translateY", localPos.y);
-                    node.SetPropertyValue("translateZ", localPos.z);
-                    node.SetPropertyValue("rotationX", localEuler.x);
-                    node.SetPropertyValue("rotationY", localEuler.y);
-                    node.SetPropertyValue("rotationZ", localEuler.z);
-                    node.SetPropertyValue("scaleX", localScale.x);
-                    node.SetPropertyValue("scaleY", localScale.y);
-                    node.SetPropertyValue("scaleZ", localScale.z);
+                    node.SetPropertyValue("translate", PcgVector3Property.Format(localPos));
+                    node.SetPropertyValue("rotation", PcgVector3Property.Format(localEuler));
+                    node.SetPropertyValue("scale", PcgVector3Property.Format(localScale));
                     window.GraphView.CommitState();
                     window.GraphView.RefreshInspector();
                     return;
@@ -368,15 +362,9 @@ namespace DJTechEditor.PCG.Graph
             if (component.GraphAsset != null)
                 Undo.RecordObject(component.GraphAsset, "Edit Stamp Transform");
 
-            target.data.SetRaw("translateX", localPos.x);
-            target.data.SetRaw("translateY", localPos.y);
-            target.data.SetRaw("translateZ", localPos.z);
-            target.data.SetRaw("rotationX", localEuler.x);
-            target.data.SetRaw("rotationY", localEuler.y);
-            target.data.SetRaw("rotationZ", localEuler.z);
-            target.data.SetRaw("scaleX", localScale.x);
-            target.data.SetRaw("scaleY", localScale.y);
-            target.data.SetRaw("scaleZ", localScale.z);
+            target.data.SetRaw("translate", PcgVector3Property.Format(localPos));
+            target.data.SetRaw("rotation", PcgVector3Property.Format(localEuler));
+            target.data.SetRaw("scale", PcgVector3Property.Format(localScale));
 
             if (component.GraphAsset != null)
             {

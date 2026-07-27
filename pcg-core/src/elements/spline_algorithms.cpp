@@ -493,44 +493,6 @@ data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
     return result;
 }
 
-data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformMeshOptions& options)
-{
-    data::PcgMeshData out = mesh;
-    const double rx = options.rotation_x_deg * 3.14159265358979323846 / 180.0;
-    const double ry = options.rotation_y_deg * 3.14159265358979323846 / 180.0;
-    const double rz = options.rotation_z_deg * 3.14159265358979323846 / 180.0;
-
-    const auto rot_x = [&](const geometry::Vec3& v) {
-        const double c = std::cos(rx);
-        const double s = std::sin(rx);
-        return geometry::Vec3{v.x, v.y * c - v.z * s, v.y * s + v.z * c};
-    };
-    const auto rot_y = [&](const geometry::Vec3& v) {
-        const double c = std::cos(ry);
-        const double s = std::sin(ry);
-        return geometry::Vec3{v.x * c + v.z * s, v.y, -v.x * s + v.z * c};
-    };
-    const auto rot_z = [&](const geometry::Vec3& v) {
-        const double c = std::cos(rz);
-        const double s = std::sin(rz);
-        return geometry::Vec3{v.x * c - v.y * s, v.x * s + v.y * c, v.z};
-    };
-
-    for (auto& vertex : out.vertices_mut()) {
-        geometry::Vec3 v = to_vec3(vertex);
-        v = rot_x(v);
-        v = rot_y(v);
-        v = rot_z(v);
-        v.x *= options.scale_x;
-        v.y *= options.scale_y;
-        v.z *= options.scale_z;
-        v = geometry::add(v, geometry::Vec3{options.translate_x, options.translate_y, options.translate_z});
-        vertex = to_vertex(v);
-    }
-
-    return out;
-}
-
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b)
 {
     if (a.vertices().empty())

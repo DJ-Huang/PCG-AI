@@ -1,4 +1,5 @@
 #include "elements/mesh_algorithms.hpp"
+#include "elements/transform_algorithms.hpp"
 #include "elements/bevel_blender.hpp"
 #include "elements/element_utils.hpp"
 #include "geometry/bmesh.hpp"
@@ -1843,46 +1844,11 @@ data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
                                     double rotation_x_deg, double rotation_y_deg, double rotation_z_deg,
                                     double scale_x, double scale_y, double scale_z)
 {
-    data::PcgGeometry out = geometry;
-    const double rx = rotation_x_deg * 3.14159265358979323846 / 180.0;
-    const double ry = rotation_y_deg * 3.14159265358979323846 / 180.0;
-    const double rz = rotation_z_deg * 3.14159265358979323846 / 180.0;
-
-    const auto rot_x = [&](double x, double y, double z) {
-        const double c = std::cos(rx), s = std::sin(rx);
-        return data::PcgVec3{x, y * c - z * s, y * s + z * c};
-    };
-    const auto rot_y = [&](double x, double y, double z) {
-        const double c = std::cos(ry), s = std::sin(ry);
-        return data::PcgVec3{x * c + z * s, y, -x * s + z * c};
-    };
-    const auto rot_z = [&](double x, double y, double z) {
-        const double c = std::cos(rz), s = std::sin(rz);
-        return data::PcgVec3{x * c - y * s, x * s + y * c, z};
-    };
-
-    const auto transformed_basis = [&](data::PcgVec3 value) {
-        value.x *= scale_x;
-        value.y *= scale_y;
-        value.z *= scale_z;
-        value = rot_x(value.x, value.y, value.z);
-        value = rot_y(value.x, value.y, value.z);
-        value = rot_z(value.x, value.y, value.z);
-        return value;
-    };
-    const auto x_axis = transformed_basis({1.0, 0.0, 0.0});
-    const auto y_axis = transformed_basis({0.0, 1.0, 0.0});
-    const auto z_axis = transformed_basis({0.0, 0.0, 1.0});
-    data::GeometryAffineTransform transform;
-    transform.linear = {x_axis.x, y_axis.x, z_axis.x,
-                        x_axis.y, y_axis.y, z_axis.y,
-                        x_axis.z, y_axis.z, z_axis.z};
-    transform.translation = {translate_x, translate_y, translate_z};
-    for (auto& point : out.points_mut())
-        point = data::transform_position(transform, point);
-    data::transform_geometry_attributes(out, transform);
-
-    return out;
+    TransformMeshOptions options;
+    options.translate = {translate_x, translate_y, translate_z};
+    options.rotation_deg = {rotation_x_deg, rotation_y_deg, rotation_z_deg};
+    options.scale = {scale_x, scale_y, scale_z};
+    return transform_geometry(geometry, options);
 }
 
 } // namespace pcg::internal::elements

@@ -50,7 +50,7 @@ namespace DJTechEditor.PCG.Graph
                 : target is PcgExternalSubgraphNodeView targetExternal
                     ? targetExternal.GetInputPinType(targetHandle)
                     : PcgNodeManifest.GetInputPinType(target.NodeType, targetHandle);
-            return sourcePin == "Any" || targetPin == "Any" || sourcePin == targetPin;
+            return PcgNodeManifest.PinTypesCompatible(sourcePin, targetPin);
         }
 
         public static bool IsValidConnection(

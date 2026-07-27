@@ -10,7 +10,7 @@ interface BlackboardProps {
   onParametersChange: (params: GraphParameter[]) => void;
 }
 
-const PARAM_TYPES: ParameterType[] = ['integer', 'number', 'boolean', 'string'];
+const PARAM_TYPES: ParameterType[] = ['integer', 'number', 'boolean', 'string', 'vector3'];
 
 let paramCounter = 0;
 
@@ -88,7 +88,11 @@ export default function Blackboard({ parameters, nodes, onParametersChange }: Bl
                 value={param.type}
                 onChange={(e) => {
                   const newType = e.target.value as ParameterType;
-                  const newDefault = newType === 'boolean' ? false : newType === 'string' ? '' : 0;
+                  const newDefault =
+                    newType === 'boolean' ? false
+                    : newType === 'string' ? ''
+                    : newType === 'vector3' ? ([0, 0, 0] as [number, number, number])
+                    : 0;
                   updateParam(param.id, { type: newType, default: newDefault });
                 }}
               >
@@ -119,6 +123,27 @@ export default function Blackboard({ parameters, nodes, onParametersChange }: Bl
                   value={String(param.default)}
                   onChange={(e) => updateParam(param.id, { default: e.target.value })}
                 />
+              ) : param.type === 'vector3' ? (
+                <div className="pcg-inspector__vector3">
+                  {([0, 1, 2] as const).map((axis) => {
+                    const components = Array.isArray(param.default) && param.default.length >= 3
+                      ? param.default as [number, number, number]
+                      : ([0, 0, 0] as [number, number, number]);
+                    return (
+                      <input
+                        key={axis}
+                        type="number"
+                        step="0.1"
+                        value={components[axis]}
+                        onChange={(e) => {
+                          const next: [number, number, number] = [...components];
+                          next[axis] = Number(e.target.value) || 0;
+                          updateParam(param.id, { default: next });
+                        }}
+                      />
+                    );
+                  })}
+                </div>
               ) : (
                 <input
                   type="number"

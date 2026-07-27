@@ -31,11 +31,21 @@ namespace DJTechRuntime.PCG
             SetMesh(null);
         }
 
+        /// <summary>
+        /// Clears point/spline gizmos without touching the Lit MeshFilter used by cooks.
+        /// </summary>
+        public void ClearGizmosOnly()
+        {
+            _points.Clear();
+            _splines.Clear();
+        }
+
         public void SetPoints(IEnumerable<Vector3> points)
         {
             _points.Clear();
             _splines.Clear();
-            SetMesh(null);
+            // Do not clear shared MeshFilter — GraphComponent owns Lit mesh preview.
+            // RuntimeRunner / replacement paths must ClearAll() before switching result kinds.
             _points.AddRange(points);
         }
 
@@ -43,7 +53,6 @@ namespace DJTechRuntime.PCG
         {
             _points.Clear();
             _splines.Clear();
-            SetMesh(null);
             if (splines != null)
                 _splines.AddRange(splines);
         }
@@ -81,16 +90,22 @@ namespace DJTechRuntime.PCG
         {
             Gizmos.color = gizmoColor;
             foreach (var p in _points)
-                Gizmos.DrawSphere(transform.position + p, gizmoSize);
+                Gizmos.DrawSphere(transform.TransformPoint(p), gizmoSize);
 
             Gizmos.color = splineColor;
+            var pointRadius = Mathf.Max(0.02f, gizmoSize * 0.35f);
             foreach (var spline in _splines)
             {
-                for (var i = 1; i < spline.Count; i++)
+                for (var i = 0; i < spline.Count; i++)
                 {
-                    Gizmos.DrawLine(
-                        transform.position + spline[i - 1],
-                        transform.position + spline[i]);
+                    var world = transform.TransformPoint(spline[i]);
+                    Gizmos.DrawSphere(world, pointRadius);
+                    if (i > 0)
+                    {
+                        Gizmos.DrawLine(
+                            transform.TransformPoint(spline[i - 1]),
+                            world);
+                    }
                 }
             }
         }

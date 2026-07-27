@@ -6,6 +6,7 @@
 #include "elements/mesh_algorithms.hpp"
 #include "geometry/bmesh.hpp"
 #include "geometry/group_table.hpp"
+#include "geometry/element_pattern.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -122,6 +123,15 @@ int main()
     groups.add(GroupDomain::Edge, "b", 3);
     const auto diff = groups.eval(GroupDomain::Edge, "a - b");
     if (diff.count(1) != 1 || diff.count(2) != 0) fail("group subset");
+
+    GroupTable empty_groups;
+    const auto prim0 = empty_groups.eval_indices(GroupDomain::Face, "0", 6);
+    if (prim0.size() != 1 || prim0.count(0) != 1) fail("eval_indices numeric 0");
+    std::unordered_set<int> none;
+    if (!compute_element_pattern("!*", 6, none) || !none.empty())
+        fail("element pattern !* matches nothing");
+    std::printf("PASS: GroupTable eval_indices + element pattern !*\n");
+
     std::printf("PASS: GroupTable subset ops\n");
 
     PcgGeometry box;
@@ -196,6 +206,44 @@ int main()
         if (tops.groups().members(GroupDomain::Face, "top_faces").empty())
             fail("GroupCreate normals should select top faces");
         std::printf("PASS: GroupCreate normals filter\n");
+    }
+
+    {
+        // Points → Edges with entirely-contained (Houdini Group Promote default for streetFacing).
+        PcgGeometry geo = create_box_geometry(2.0, 2.0, 2.0);
+        // Top face of unit-ish box: take four top corners (y max). create_box is centered.
+        double max_y = geo.points()[0].y;
+        for (const auto& p : geo.points())
+            max_y = std::max(max_y, p.y);
+        for (size_t i = 0; i < geo.points().size(); ++i) {
+            if (geo.points()[i].y >= max_y - 1e-9)
+                geo.groups().add(GroupDomain::Point, "streetFacingPoints",
+                                 static_cast<GroupId>(i));
+        }
+        GroupPromoteOptions promote_opts;
+        promote_opts.from_domain = "point";
+        promote_opts.to_domain = "edge";
+        promote_opts.group_name = "streetFacingPoints";
+        promote_opts.new_name = "streetFacingEdges";
+        promote_opts.keep_original_group = false;
+        promote_opts.include_only_entirely_contained = true;
+        const PcgGeometry promoted = group_promote(geo, promote_opts);
+        const auto edges = promoted.groups().members(GroupDomain::Edge, "streetFacingEdges");
+        if (edges.size() != 4)
+            fail("GroupPromote points→edges entirely-contained should yield 4 top edges");
+        if (promoted.groups().has_group(GroupDomain::Point, "streetFacingPoints"))
+            fail("GroupPromote should drop original point group when keepOriginal=false");
+        // Any-endpoint mode should include more than the rim (vertical edges touch top points).
+        GroupPromoteOptions any_opts = promote_opts;
+        any_opts.include_only_entirely_contained = false;
+        any_opts.keep_original_group = true;
+        PcgGeometry geo2 = geo;
+        const PcgGeometry any_promoted = group_promote(geo2, any_opts);
+        const auto any_edges = any_promoted.groups().members(GroupDomain::Edge, "streetFacingEdges");
+        if (any_edges.size() <= edges.size())
+            fail("GroupPromote any-endpoint should select more edges than entirely-contained");
+        std::printf("PASS: GroupPromote points→edges (%zu entirely, %zu any)\n", edges.size(),
+                    any_edges.size());
     }
 
     bevel::BevelEdgeSelection edge_sel;

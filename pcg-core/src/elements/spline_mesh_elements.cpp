@@ -4,6 +4,7 @@
 #include "elements/mesh_algorithms.hpp"
 #include "elements/pcg_element.hpp"
 #include "elements/spline_algorithms.hpp"
+#include "elements/transform_algorithms.hpp"
 
 #include <memory>
 #include <string>
@@ -118,24 +119,12 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing node");
 
-        TransformMeshOptions opts;
-        opts.translate_x = ctx.node->data.value("translateX", 0.0);
-        opts.translate_y = ctx.node->data.value("translateY", 0.0);
-        opts.translate_z = ctx.node->data.value("translateZ", 0.0);
-        opts.rotation_x_deg = ctx.node->data.value("rotationX", 0.0);
-        opts.rotation_y_deg = ctx.node->data.value("rotationY", 0.0);
-        opts.rotation_z_deg = ctx.node->data.value("rotationZ", 0.0);
-        opts.scale_x = ctx.node->data.value("scaleX", 1.0);
-        opts.scale_y = ctx.node->data.value("scaleY", 1.0);
-        opts.scale_z = ctx.node->data.value("scaleZ", 1.0);
+        const auto options = parse_transform_mesh_options(ctx.node->data);
 
         if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
             if (geometry->points().empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing mesh input");
-            emit_geometry(ctx, transform_geometry(*geometry,
-                opts.translate_x, opts.translate_y, opts.translate_z,
-                opts.rotation_x_deg, opts.rotation_y_deg, opts.rotation_z_deg,
-                opts.scale_x, opts.scale_y, opts.scale_z));
+            emit_geometry(ctx, transform_geometry(*geometry, options));
             return PCG_OK;
         }
 
@@ -143,7 +132,7 @@ public:
         if (mesh.vertices().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformMesh missing mesh input");
 
-        emit_mesh(ctx, transform_mesh(mesh, opts));
+        emit_mesh(ctx, transform_mesh(mesh, options));
         return PCG_OK;
     }
 };

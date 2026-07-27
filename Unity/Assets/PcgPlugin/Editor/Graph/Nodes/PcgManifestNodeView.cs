@@ -84,10 +84,15 @@ namespace DJTechEditor.PCG.Graph
         public override void SetPropertyValue(string key, object value)
         {
             _data.SetRaw(key, value);
-            if (_def.properties.TryGetValue(key, out var prop) && prop.isGroupOutput)
+            if (_def.properties.TryGetValue(key, out var prop))
             {
-                UpdateGroupTooltip();
-                UpdateGroupBadge();
+                if (prop.type == "vector3")
+                    PcgVector3Property.ClearLegacyAxes(_data, key);
+                if (prop.isGroupOutput)
+                {
+                    UpdateGroupTooltip();
+                    UpdateGroupBadge();
+                }
             }
         }
 

@@ -12,15 +12,6 @@
 namespace pcg::internal::elements {
 namespace {
 
-data::PcgVec3 read_vector(const nlohmann::json& value,
-                          const char* prefix,
-                          data::PcgVec3 fallback)
-{
-    return {value.value(std::string(prefix) + "X", fallback.x),
-            value.value(std::string(prefix) + "Y", fallback.y),
-            value.value(std::string(prefix) + "Z", fallback.z)};
-}
-
 const data::PcgGeometry* optional_geometry_input(PcgContext& ctx,
                                                  const char* pin,
                                                  data::PcgGeometry& storage)
@@ -103,18 +94,59 @@ public:
 
         data::PcgGeometry reference_storage;
         const auto* reference = optional_geometry_input(ctx, "reference", reference_storage);
+        const auto& data = ctx.node->data;
         MatchSizeOptions options;
-        options.scale_to_fit = ctx.node->data.value("scaleToFit", true);
-        options.uniform_scale = ctx.node->data.value("uniformScale", false);
-        options.uniform_scale_mode = ctx.node->data.value("uniformScaleMode", "fit");
-        options.source_justify_x = ctx.node->data.value("sourceJustifyX", "center");
-        options.source_justify_y = ctx.node->data.value("sourceJustifyY", "center");
-        options.source_justify_z = ctx.node->data.value("sourceJustifyZ", "center");
-        options.target_justify_x = ctx.node->data.value("targetJustifyX", "center");
-        options.target_justify_y = ctx.node->data.value("targetJustifyY", "center");
-        options.target_justify_z = ctx.node->data.value("targetJustifyZ", "center");
-        options.target_center = read_vector(ctx.node->data, "targetCenter", {0.0, 0.0, 0.0});
-        options.target_size = read_vector(ctx.node->data, "targetSize", {1.0, 1.0, 1.0});
+        options.justify_with = data.value("justifyWith", "inputIfWired");
+        options.group = data.value("group", "");
+        options.group_type = data.value("groupType", "guess");
+        options.use_groups_for_bounds = data.value("useGroupsForBounds", false);
+        options.source_group = data.value("sourceGroup", "");
+        options.source_group_type = data.value("sourceGroupType", "guess");
+        options.target_group = data.value("targetGroup", "");
+        options.target_group_type = data.value("targetGroupType", "guess");
+        options.translate = data.value("translate", true);
+        options.scale_to_fit = data.value("scaleToFit", true);
+        options.uniform_scale = data.value("uniformScale", true);
+        if (data.contains("scaleAxis")) {
+            options.scale_axis = data.value("scaleAxis", "bestFit");
+        } else {
+            const auto legacy_mode = data.value("uniformScaleMode", "fit");
+            if (legacy_mode == "fill")
+                options.scale_axis = "fill";
+            else
+                options.scale_axis = "bestFit";
+        }
+        options.scale_x = data.value("scaleX", true);
+        options.scale_y = data.value("scaleY", true);
+        options.scale_z = data.value("scaleZ", true);
+        options.justify_x = data.contains("justifyX")
+            ? data.value("justifyX", "center")
+            : data.value("sourceJustifyX", "center");
+        options.justify_y = data.contains("justifyY")
+            ? data.value("justifyY", "center")
+            : data.value("sourceJustifyY", "center");
+        options.justify_z = data.contains("justifyZ")
+            ? data.value("justifyZ", "center")
+            : data.value("sourceJustifyZ", "center");
+        const bool legacy_justify =
+            !data.contains("justifyX") && data.contains("sourceJustifyX");
+        options.target_justify_x =
+            data.value("targetJustifyX", legacy_justify ? "center" : "same");
+        options.target_justify_y =
+            data.value("targetJustifyY", legacy_justify ? "center" : "same");
+        options.target_justify_z =
+            data.value("targetJustifyZ", legacy_justify ? "center" : "same");
+        options.offset = read_vector_param(data, "offset", {0.0, 0.0, 0.0});
+        if (data.contains("targetPosition") || data.contains("targetPositionX")) {
+            options.target_position = read_vector_param(data, "targetPosition", {0.0, 0.0, 0.0});
+        } else {
+            options.target_position = read_vector_param(data, "targetCenter", {0.0, 0.0, 0.0});
+        }
+        options.target_size = read_vector_param(data, "targetSize", {1.0, 1.0, 1.0});
+        options.restore_transform = data.value("restoreTransform", false);
+        options.restore_attribute = data.value("restoreAttribute", "xform");
+        options.stash_transform = data.value("stashTransform", true);
+        options.stash_attribute = data.value("stashAttribute", "xform");
 
         data::PcgGeometry output;
         std::string error;
@@ -143,9 +175,10 @@ public:
         options.min_size = ctx.node->data.value("minSize", 1.0);
         options.iterations = ctx.node->data.value("iterations", 3);
         options.irregularity = ctx.node->data.value("irregularity", 0.5);
-        options.seed = ctx.node->data.value("seed", 0);
+        // Must use read_seed_param_number — data.value("seed", 0) truncates 2.3 → 2.
+        options.seed = read_seed_param_number(ctx.node->data, "seed", 0.0);
+        options.graph_seed = ctx.graph_seed;
         options.alignment = ctx.node->data.value("alignment", "longestEdge");
-        options.seed ^= static_cast<int>(ctx.graph_seed);
 
         if (!std::isfinite(options.min_size) || options.min_size < 0.0)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "LotSubdivision minSize must be >= 0");
@@ -175,9 +208,9 @@ public:
         data::PcgGeometry rest_storage;
         const auto* rest = optional_geometry_input(ctx, "rest", rest_storage);
         BendMeshOptions options;
-        options.capture_origin = read_vector(ctx.node->data, "captureOrigin", {0.0, 0.0, 0.0});
-        options.capture_direction = read_vector(ctx.node->data, "captureDirection", {0.0, 1.0, 0.0});
-        options.up_direction = read_vector(ctx.node->data, "upDirection", {1.0, 0.0, 0.0});
+        options.capture_origin = read_vector_param(ctx.node->data, "captureOrigin", {0.0, 0.0, 0.0});
+        options.capture_direction = read_vector_param(ctx.node->data, "captureDirection", {0.0, 1.0, 0.0});
+        options.up_direction = read_vector_param(ctx.node->data, "upDirection", {1.0, 0.0, 0.0});
         options.capture_length = ctx.node->data.value("captureLength", 1.0);
         options.angle_degrees = ctx.node->data.value("angle", 0.0);
         options.mask_attribute = ctx.node->data.value("maskAttribute", "bendmask");

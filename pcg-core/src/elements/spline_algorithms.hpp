@@ -102,18 +102,6 @@ struct SweepAlongSplineOptions {
     double cusp_angle_deg = 30.0;
 };
 
-struct TransformMeshOptions {
-    double translate_x = 0.0;
-    double translate_y = 0.0;
-    double translate_z = 0.0;
-    double rotation_x_deg = 0.0;
-    double rotation_y_deg = 0.0;
-    double rotation_z_deg = 0.0;
-    double scale_x = 1.0;
-    double scale_y = 1.0;
-    double scale_z = 1.0;
-};
-
 struct InstanceAlongSplineOptions {
     double spacing = 5.0;
     double offset = 0.0;
@@ -157,7 +145,6 @@ data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
 data::PcgGeometry sweep_along_spline_geometry(const data::PcgSplineData& backbone,
                                               const data::PcgSplineData* profile_spline,
                                               const SweepAlongSplineOptions& options);
-data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh, const TransformMeshOptions& options);
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b);
 data::PcgMeshData merge_meshes(const std::vector<data::PcgMeshData>& meshes);
 data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,

@@ -139,8 +139,9 @@ void test_match_size()
                                            {point.x, point.y, point.z});
 
     MatchSizeOptions options;
-    options.target_center = {10.0, 20.0, 30.0};
+    options.target_position = {10.0, 20.0, 30.0};
     options.target_size = {4.0, 8.0, 12.0};
+    options.uniform_scale = false;
     PcgGeometry matched;
     std::string error;
     expect(match_size_geometry(source, nullptr, options, matched, error), error);
@@ -149,7 +150,7 @@ void test_match_size()
            "MatchSize target extents");
     expect(matched.faces() == source.faces(), "MatchSize topology changed");
     expect(matched.groups() == source.groups(), "MatchSize groups changed");
-    expect(matched.attributes().find(AttributeOwner::Detail, "pcg_match_xform") != nullptr,
+    expect(matched.attributes().find(AttributeOwner::Detail, "xform") != nullptr,
            "MatchSize transform detail attribute");
     expect(matched.attributes().find(AttributeOwner::Point, "id")->int_values() ==
                id.int_values(),
@@ -162,7 +163,9 @@ void test_match_size()
         point.z += 3.0;
     }
     PcgGeometry reference_matched;
-    expect(match_size_geometry(source, &reference, MatchSizeOptions{},
+    MatchSizeOptions reference_options;
+    reference_options.uniform_scale = false;
+    expect(match_size_geometry(source, &reference, reference_options,
                                reference_matched, error),
            error);
     const auto reference_extent = size_of(reference_matched);
@@ -189,14 +192,42 @@ void test_match_size()
                near(reference_bounds_center.z, 3.0),
            "MatchSize optional reference controls target alignment");
 
+    // Uniform best-fit keeps aspect ratio and fits inside target.
+    MatchSizeOptions uniform_options;
+    uniform_options.target_position = {0.0, 0.0, 0.0};
+    uniform_options.target_size = {4.0, 8.0, 12.0};
+    uniform_options.uniform_scale = true;
+    uniform_options.scale_axis = "bestFit";
+    PcgGeometry uniform_matched;
+    expect(match_size_geometry(source, nullptr, uniform_options, uniform_matched, error),
+           error);
+    const auto uniform_extent = size_of(uniform_matched);
+    expect(near(uniform_extent.x, 4.0) && near(uniform_extent.y, 8.0) &&
+               near(uniform_extent.z, 12.0),
+           "MatchSize uniform best-fit for proportional source");
+
+    // Restore undoes a previous stash.
+    MatchSizeOptions restore_options;
+    restore_options.scale_to_fit = false;
+    restore_options.translate = false;
+    restore_options.restore_transform = true;
+    restore_options.restore_attribute = "xform";
+    restore_options.stash_transform = false;
+    PcgGeometry restored;
+    expect(match_size_geometry(matched, nullptr, restore_options, restored, error), error);
+    const auto restored_extent = size_of(restored);
+    expect(near(restored_extent.x, 2.0) && near(restored_extent.y, 4.0) &&
+               near(restored_extent.z, 6.0),
+           "MatchSize restore transform");
+
     const auto graph = nlohmann::json{
         {"version", "1.0"},
         {"nodes", nlohmann::json::array({
             {{"id", "box"}, {"type", "CreateBoxMesh"},
              {"data", {{"width", 2.0}, {"height", 2.0}, {"depth", 2.0}}}},
             {{"id", "match"}, {"type", "MatchSize"},
-             {"data", {{"targetSizeX", 4.0}, {"targetSizeY", 6.0},
-                       {"targetSizeZ", 8.0}}}},
+             {"data", {{"targetSize", nlohmann::json::array({4.0, 6.0, 8.0})},
+                       {"uniformScale", false}}}},
             {{"id", "output"}, {"type", "Output"}, {"data", nlohmann::json::object()}},
         })},
         {"edges", nlohmann::json::array({
@@ -209,6 +240,29 @@ void test_match_size()
     expect(near(graph_extent.x, 4.0) && near(graph_extent.y, 6.0) &&
                near(graph_extent.z, 8.0),
            "MatchSize graph result");
+
+    const auto string_graph = nlohmann::json{
+        {"version", "1.0"},
+        {"nodes", nlohmann::json::array({
+            {{"id", "box"}, {"type", "CreateBoxMesh"},
+             {"data", {{"width", 2.0}, {"height", 2.0}, {"depth", 2.0}}}},
+            {{"id", "match"}, {"type", "MatchSize"},
+             {"data", {{"justifyWith", "locationAndSize"},
+                       {"targetPosition", "[0.0,0.0,0.0]"},
+                       {"targetSize", "[4.0,6.0,8.0]"},
+                       {"uniformScale", false}}}},
+            {{"id", "output"}, {"type", "Output"}, {"data", nlohmann::json::object()}},
+        })},
+        {"edges", nlohmann::json::array({
+            {{"source", "box"}, {"target", "match"}, {"targetHandle", "source"}},
+            {{"source", "match"}, {"target", "output"}},
+        })},
+    };
+    const auto string_graph_result = execute_geometry_graph(string_graph);
+    const auto string_extent = size_of(string_graph_result);
+    expect(near(string_extent.x, 4.0) && near(string_extent.y, 6.0) &&
+               near(string_extent.z, 8.0),
+           "MatchSize graph string vector params");
 }
 
 void test_bend_mesh()

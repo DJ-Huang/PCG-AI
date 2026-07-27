@@ -4,6 +4,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <limits>
 
 namespace pcg::internal::elements {
 namespace {
@@ -252,6 +254,58 @@ uint32_t mix_seed(int a, int b)
     return static_cast<uint32_t>(a) ^ static_cast<uint32_t>(b * 2654435761);
 }
 
+int normalize_seed_number(double seed)
+{
+    if (!std::isfinite(seed))
+        return 0;
+
+    const double truncated = std::trunc(seed);
+    if (seed == truncated &&
+        truncated >= static_cast<double>(std::numeric_limits<int>::lowest()) &&
+        truncated <= static_cast<double>(std::numeric_limits<int>::max())) {
+        return static_cast<int>(truncated);
+    }
+
+    // SplitMix64-style mix of IEEE bits so nearby floats diverge.
+    static_assert(sizeof(double) == sizeof(std::uint64_t), "unexpected double size");
+    std::uint64_t bits = 0;
+    std::memcpy(&bits, &seed, sizeof(bits));
+    bits ^= bits >> 30;
+    bits *= 0xbf58476d1ce4e5b9ULL;
+    bits ^= bits >> 27;
+    bits *= 0x94d049bb133111ebULL;
+    bits ^= bits >> 31;
+    return static_cast<int>(static_cast<std::uint32_t>(bits));
+}
+
+double read_seed_param_number(const nlohmann::json& data, const char* key, double default_value)
+{
+    if (key == nullptr || !data.is_object() || !data.contains(key) || data[key].is_null())
+        return default_value;
+
+    const auto& value = data.at(key);
+    // Accept both integer and float JSON numbers without truncating 2.3 → 2.
+    if (value.is_number())
+        return value.get<double>();
+    return default_value;
+}
+
+int read_seed_param(const nlohmann::json& data, const char* key, int default_value)
+{
+    if (key == nullptr || !data.is_object() || !data.contains(key) || data[key].is_null())
+        return default_value;
+    return normalize_seed_number(read_seed_param_number(data, key, static_cast<double>(default_value)));
+}
+
+uint32_t rng_state_from_seed(double node_seed, int graph_seed)
+{
+    const int mixed = normalize_seed_number(node_seed) ^ graph_seed;
+    uint32_t state = static_cast<uint32_t>(mixed) * 747796405u + 2891336453u;
+    if (state == 0)
+        state = 0xA5A5A5A5u;
+    return state;
+}
+
 uint32_t next_rand(uint32_t& state)
 {
     state = state * 1664525u + 1013904223u;
@@ -291,6 +345,82 @@ std::vector<std::string> parse_name_list(const nlohmann::json& data, const char*
     if (!current.empty())
         names.push_back(current);
     return names;
+}
+
+bool try_parse_vector_string(const std::string& text, data::PcgVec3& out)
+{
+    if (text.size() < 5 || text.front() != '[' || text.back() != ']')
+        return false;
+
+    const auto body = text.substr(1, text.size() - 2);
+    const auto comma1 = body.find(',');
+    const auto comma2 = body.find(',', comma1 == std::string::npos ? 0 : comma1 + 1);
+    if (comma1 == std::string::npos || comma2 == std::string::npos)
+        return false;
+
+    try {
+        const double x = std::stod(body.substr(0, comma1));
+        const double y = std::stod(body.substr(comma1 + 1, comma2 - comma1 - 1));
+        const double z = std::stod(body.substr(comma2 + 1));
+        if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+            return false;
+        out = {x, y, z};
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+data::PcgVec3 read_vector_param(const nlohmann::json& data,
+                                const char* key,
+                                const data::PcgVec3& fallback)
+{
+    const std::string prefix(key);
+    const auto legacy_x = data.value(prefix + "X", std::numeric_limits<double>::quiet_NaN());
+    const auto legacy_y = data.value(prefix + "Y", std::numeric_limits<double>::quiet_NaN());
+    const auto legacy_z = data.value(prefix + "Z", std::numeric_limits<double>::quiet_NaN());
+    const bool has_legacy = std::isfinite(legacy_x) || std::isfinite(legacy_y) ||
+                            std::isfinite(legacy_z);
+    const data::PcgVec3 legacy{
+        std::isfinite(legacy_x) ? legacy_x : fallback.x,
+        std::isfinite(legacy_y) ? legacy_y : fallback.y,
+        std::isfinite(legacy_z) ? legacy_z : fallback.z,
+    };
+
+    auto near_vec = [](const data::PcgVec3& a, const data::PcgVec3& b) {
+        return std::abs(a.x - b.x) <= 1.0e-9 && std::abs(a.y - b.y) <= 1.0e-9 &&
+               std::abs(a.z - b.z) <= 1.0e-9;
+    };
+
+    if (data.contains(key)) {
+        const auto& value = data[key];
+        data::PcgVec3 parsed = fallback;
+        bool parsed_ok = false;
+        if (value.is_array() && value.size() >= 3 && value[0].is_number() &&
+            value[1].is_number() && value[2].is_number()) {
+            parsed = {value[0].get<double>(), value[1].get<double>(), value[2].get<double>()};
+            parsed_ok = true;
+        } else if (value.is_object()) {
+            parsed = {value.value("x", fallback.x),
+                      value.value("y", fallback.y),
+                      value.value("z", fallback.z)};
+            parsed_ok = true;
+        } else if (value.is_string()) {
+            parsed_ok = try_parse_vector_string(value.get<std::string>(), parsed);
+        }
+
+        if (parsed_ok) {
+            // Legacy axes win only when the canonical value still equals the
+            // manifest default (avoids default vector emission shadowing legacy).
+            if (!has_legacy || !near_vec(parsed, fallback))
+                return parsed;
+            return legacy;
+        }
+    }
+
+    if (has_legacy)
+        return legacy;
+    return fallback;
 }
 
 } // namespace pcg::internal::elements

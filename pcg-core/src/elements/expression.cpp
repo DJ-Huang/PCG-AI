@@ -1,4 +1,5 @@
 #include "elements/expression.hpp"
+#include "elements/color_ramp.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -130,12 +131,17 @@ private:
 };
 
 struct Value {
-    enum class Kind { Number, String } kind = Kind::Number;
+    enum class Kind { Number, String, Vector } kind = Kind::Number;
     double number = 0.0;
     std::string text;
+    std::array<double, 3> vector{0.0, 0.0, 0.0};
 
-    static Value numeric(double value) { return {Kind::Number, value, {}}; }
-    static Value string(std::string value) { return {Kind::String, 0.0, std::move(value)}; }
+    static Value numeric(double value) { return {Kind::Number, value, {}, {}}; }
+    static Value string(std::string value) { return {Kind::String, 0.0, std::move(value), {}}; }
+    static Value vector3(std::array<double, 3> value)
+    {
+        return {Kind::Vector, 0.0, {}, std::move(value)};
+    }
 };
 
 struct Expr {
@@ -146,6 +152,8 @@ struct Expr {
 };
 
 struct Statement {
+    enum class TargetKind { Attribute, VectorAttribute, LocalScalar, LocalVector } target_kind =
+        TargetKind::Attribute;
     std::string target;
     std::string op;
     std::unique_ptr<Expr> value;
@@ -163,15 +171,28 @@ public:
                 continue;
             }
 
+            bool local_decl = false;
             if (current_.kind == TokenKind::Identifier &&
-                (current_.text == "float" || current_.text == "int" || current_.text == "f"))
+                (current_.text == "float" || current_.text == "int" || current_.text == "f")) {
+                local_decl = true;
                 advance();
+            }
 
-            if (current_.kind != TokenKind::Identifier || current_.text.empty() ||
-                current_.text.front() != '@')
-                return fail(error, "expected an @attribute assignment target");
+            if (current_.kind != TokenKind::Identifier || current_.text.empty())
+                return fail(error, "expected an assignment target");
+
             Statement statement;
-            statement.target = current_.text;
+            if (current_.text.rfind("v@", 0) == 0) {
+                statement.target_kind = Statement::TargetKind::VectorAttribute;
+                statement.target = "@" + current_.text.substr(2);
+            } else if (current_.text.front() == '@') {
+                statement.target_kind = Statement::TargetKind::Attribute;
+                statement.target = current_.text;
+            } else {
+                statement.target_kind =
+                    local_decl ? Statement::TargetKind::LocalScalar : Statement::TargetKind::LocalScalar;
+                statement.target = current_.text;
+            }
             advance();
             if (current_.kind != TokenKind::Operator ||
                 (current_.text != "=" && current_.text != "+=" && current_.text != "-=" &&
@@ -402,6 +423,16 @@ bool require_number(const Value& value, double& number, std::string& error)
     return true;
 }
 
+bool require_vector(const Value& value, std::array<double, 3>& vector, std::string& error)
+{
+    if (value.kind != Value::Kind::Vector) {
+        error = "vector value required";
+        return false;
+    }
+    vector = value.vector;
+    return true;
+}
+
 bool eval_expr(const Expr& expression, EvalContext& context, Value& out, std::string& error);
 
 bool eval_function(const Expr& expression, EvalContext& context, Value& out, std::string& error)
@@ -467,13 +498,50 @@ bool eval_function(const Expr& expression, EvalContext& context, Value& out, std
         out = Value::numeric(a > 0.0 ? 1.0 : (a < 0.0 ? -1.0 : 0.0));
     else if (expression.text == "clamp" && arity(3) && numeric_arg(0, a) && numeric_arg(1, b) && numeric_arg(2, c)) out = Value::numeric(std::clamp(a, b, c));
     else if (expression.text == "lerp" && arity(3) && numeric_arg(0, a) && numeric_arg(1, b) && numeric_arg(2, c)) out = Value::numeric(a + (b - a) * c);
-    else {
+    else if (expression.text == "rand") {
+        if (args.size() == 1 && numeric_arg(0, a))
+            out = Value::numeric(houdini_rand(a));
+        else {
+            error = "rand expects 1 argument";
+            return false;
+        }
+    } else if (expression.text == "chramp") {
+        if (!arity(2))
+            return false;
+        if (args[0].kind != Value::Kind::String) {
+            error = "chramp expects a string ramp name";
+            return false;
+        }
+        double t = 0.0;
+        if (!numeric_arg(1, t))
+            return false;
+        std::array<double, 3> color{};
+        if (!sample_named_color_ramp(context.ramps, args[0].text, t, color, error))
+            return false;
+        out = Value::vector3(color);
+    } else if (expression.text == "vector") {
+        if (args.size() == 1) {
+            if (args[0].kind == Value::Kind::Vector) {
+                out = args[0];
+                return true;
+            }
+            if (numeric_arg(0, a))
+                out = Value::vector3({a, a, a});
+            else
+                return false;
+        } else if (args.size() == 3 && numeric_arg(0, a) && numeric_arg(1, b) && numeric_arg(2, c)) {
+            out = Value::vector3({a, b, c});
+        } else {
+            error = "vector expects 1 or 3 arguments";
+            return false;
+        }
+    } else {
         if (error.empty())
             error = "unknown function or invalid arguments: " + expression.text;
         return false;
     }
 
-    if (!std::isfinite(out.number)) {
+    if (out.kind == Value::Kind::Number && !std::isfinite(out.number)) {
         error = "non-finite result from " + expression.text;
         return false;
     }
@@ -500,8 +568,12 @@ bool eval_expr(const Expr& expression, EvalContext& context, Value& out, std::st
         }
         double value = 0.0;
         if (!context.read_variable || !context.read_variable(expression.text, value)) {
-            error = "unknown or non-numeric variable '" + expression.text + "'";
-            return false;
+            const auto local_it = context.locals.find(expression.text);
+            if (local_it == context.locals.end()) {
+                error = "unknown or non-numeric variable '" + expression.text + "'";
+                return false;
+            }
+            value = local_it->second;
         }
         out = Value::numeric(value);
         return true;
@@ -610,9 +682,67 @@ bool Program::execute(EvalContext& context, std::string& error) const
         Value evaluated;
         if (!eval_expr(*statement.value, context, evaluated, error))
             return false;
+
+        if (statement.target_kind == Statement::TargetKind::VectorAttribute) {
+            if (statement.op != "=") {
+                error = "vector assignments only support '='";
+                return false;
+            }
+            std::array<double, 3> value{};
+            if (!require_vector(evaluated, value, error))
+                return false;
+            for (double component : value) {
+                if (!std::isfinite(component)) {
+                    error = "assignment produced a non-finite vector value";
+                    return false;
+                }
+            }
+            if (!context.write_vector || !context.write_vector(statement.target, value)) {
+                error = "read-only or unsupported vector assignment target '" + statement.target +
+                        "'";
+                return false;
+            }
+            continue;
+        }
+
         double value = 0.0;
-        if (!require_number(evaluated, value, error))
+        if (evaluated.kind == Value::Kind::Vector)
+            value = evaluated.vector[0];
+        else if (!require_number(evaluated, value, error))
             return false;
+
+        if (statement.target_kind == Statement::TargetKind::LocalScalar) {
+            if (statement.op != "=") {
+                const auto local_it = context.locals.find(statement.target);
+                if (local_it == context.locals.end()) {
+                    error = "unknown local variable '" + statement.target + "'";
+                    return false;
+                }
+                if (statement.op == "+=") value = local_it->second + value;
+                else if (statement.op == "-=") value = local_it->second - value;
+                else if (statement.op == "*=") value = local_it->second * value;
+                else if (statement.op == "/=") {
+                    if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
+                        error = "division by zero in assignment";
+                        return false;
+                    }
+                    value = local_it->second / value;
+                } else if (statement.op == "%=") {
+                    if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
+                        error = "modulo by zero in assignment";
+                        return false;
+                    }
+                    value = std::fmod(local_it->second, value);
+                }
+            }
+            if (!std::isfinite(value)) {
+                error = "assignment produced a non-finite value";
+                return false;
+            }
+            context.locals[statement.target] = value;
+            continue;
+        }
+
         if (statement.op != "=") {
             double current = 0.0;
             if (!context.read_variable || !context.read_variable(statement.target, current)) {

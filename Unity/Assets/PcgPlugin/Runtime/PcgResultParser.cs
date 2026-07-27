@@ -761,7 +761,7 @@ namespace DJTechRuntime.PCG
                     splines.Add(line);
                 }
 
-                return splines.Count > 0;
+                return true;
             }
             catch (Exception ex)
             {
@@ -1069,9 +1069,10 @@ namespace DJTechRuntime.PCG
                         return false;
                     }
 
-                    if (end - start < 3)
+                    // Point (1), line/open curve (2+), and closed n-gon (3+) primitives.
+                    if (end - start < 1)
                     {
-                        error = "Each face must have at least 3 indices.";
+                        error = "Each face must have at least 1 index.";
                         return false;
                     }
 
@@ -1124,6 +1125,7 @@ namespace DJTechRuntime.PCG
 
     /// <summary>
     /// Cached Sink polygon topology for Scene View wire overlay (pre-triangulation).
+    /// Supports point (1-vert), line/open-curve (2+ verts), and closed n-gon faces.
     /// </summary>
     public sealed class PcgPolygonPreviewData
     {
@@ -1138,5 +1140,88 @@ namespace DJTechRuntime.PCG
         public int[] FaceOffsets { get; }
         public int[] FaceIndices { get; }
         public int FaceCount => FaceOffsets.Length;
+
+        /// <summary>
+        /// True when no face is a solid polygon ring (has area with distinct first/last).
+        /// Point clouds, lines, and open/closed curves return true so Scene View can show dots.
+        /// </summary>
+        public bool IsPointOrCurveLike()
+        {
+            if (FaceCount <= 0)
+                return Points.Length > 0;
+
+            for (var fi = 0; fi < FaceCount; fi++)
+            {
+                var start = FaceOffsets[fi];
+                var end = fi + 1 < FaceCount ? FaceOffsets[fi + 1] : FaceIndices.Length;
+                if (IsSolidPolygonFace(Points, FaceIndices, start, end))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Solid n-gon: ≥3 verts, first≠last, and Newell normal has area.
+        /// Open polylines (ConvertLine/Resample) are colinear → not solid; closed curves
+        /// encode first==last and are not solid rings for wire wrap.
+        /// </summary>
+        public static bool IsSolidPolygonFace(Vector3[] points, int[] indices, int start, int end)
+        {
+            var count = end - start;
+            if (count < 3 || points == null || indices == null)
+                return false;
+            if (indices[start] == indices[end - 1])
+                return false;
+
+            var nx = 0.0;
+            var ny = 0.0;
+            var nz = 0.0;
+            for (var i = start; i < end; i++)
+            {
+                var aIdx = indices[i];
+                var bIdx = indices[i + 1 < end ? i + 1 : start];
+                if (aIdx < 0 || bIdx < 0 || aIdx >= points.Length || bIdx >= points.Length)
+                    return false;
+                var a = points[aIdx];
+                var b = points[bIdx];
+                nx += (a.y - b.y) * (a.z + b.z);
+                ny += (a.z - b.z) * (a.x + b.x);
+                nz += (a.x - b.x) * (a.y + b.y);
+            }
+
+            return (nx * nx + ny * ny + nz * nz) > 1e-12;
+        }
+
+        /// <summary>
+        /// Builds world-local polylines for Scene gizmos (one list per face with ≥2 verts).
+        /// Closed curves keep the duplicated endpoint so the last segment closes.
+        /// </summary>
+        public List<List<Vector3>> ExtractPolylines()
+        {
+            var result = new List<List<Vector3>>(FaceCount);
+            for (var fi = 0; fi < FaceCount; fi++)
+            {
+                var start = FaceOffsets[fi];
+                var end = fi + 1 < FaceCount ? FaceOffsets[fi + 1] : FaceIndices.Length;
+                var count = end - start;
+                if (count < 2)
+                    continue;
+
+                var line = new List<Vector3>(count);
+                for (var i = start; i < end; i++)
+                {
+                    var idx = FaceIndices[i];
+                    if (idx < 0 || idx >= Points.Length)
+                        continue;
+                    line.Add(Points[idx]);
+                }
+
+                if (line.Count >= 2)
+                    result.Add(line);
+            }
+
+            return result;
+        }
     }
 }

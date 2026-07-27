@@ -11,6 +11,9 @@ namespace DJTechEditor.PCG.Graph
     /// </summary>
     public static class PcgGraphPreviewSubgraph
     {
+        /// Must stay in sync with pcg-core graph_executor kPreviewSinkNodeId.
+        /// When present, unmatched ForEachBegin regions cook the first iteration only
+        /// (Editor node preview truncates ForEachEnd from the upstream subgraph).
         public const string PreviewSinkNodeId = "__pcg_preview_sink__";
         private const string ExternalIdPrefix = "__pcg_ext__/";
 

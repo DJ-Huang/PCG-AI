@@ -113,13 +113,41 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
-        public void U5_FaceFewerThanThree_Fails()
+        public void U5_LineFace_Parses()
         {
             var data = BuildCustomBinary(
                 pointCount: 2,
                 faceCount: 1,
                 offsets: new[] { 0u },
                 indices: new uint[] { 0, 1 });
+            Assert.IsTrue(PcgResultParser.TryParseGeometryBinary(data, out var preview, out var error), error);
+            Assert.AreEqual(1, preview.FaceCount);
+            Assert.AreEqual(2, preview.FaceIndices.Length);
+            Assert.IsTrue(preview.IsPointOrCurveLike());
+        }
+
+        [Test]
+        public void U5_PointOnly_NoFaces_Parses()
+        {
+            var data = BuildCustomBinary(
+                pointCount: 3,
+                faceCount: 0,
+                offsets: Array.Empty<uint>(),
+                indices: Array.Empty<uint>());
+            Assert.IsTrue(PcgResultParser.TryParseGeometryBinary(data, out var preview, out var error), error);
+            Assert.AreEqual(3, preview.Points.Length);
+            Assert.AreEqual(0, preview.FaceCount);
+            Assert.IsTrue(preview.IsPointOrCurveLike());
+        }
+
+        [Test]
+        public void U5_EmptyFace_Fails()
+        {
+            var data = BuildCustomBinary(
+                pointCount: 1,
+                faceCount: 1,
+                offsets: new[] { 0u },
+                indices: Array.Empty<uint>());
             Assert.IsFalse(PcgResultParser.TryParseGeometryBinary(data, out var preview, out _));
             Assert.IsNull(preview);
         }

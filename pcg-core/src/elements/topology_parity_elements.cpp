@@ -39,11 +39,55 @@ public:
     const char* type_name() const override { return "MeasureMesh"; }
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        const auto input = get_geometry_input(ctx, "in", "MeasureMesh missing mesh input");
         MeasureMeshOptions options;
+        options.group = ctx.node->data.value("group", std::string());
+        options.element_type = ctx.node->data.value("elementType", std::string("primitives"));
         options.measure = ctx.node->data.value("measure", std::string("perimeter"));
-        options.attribute_name = ctx.node->data.value("attributeName", std::string("length"));
+        options.accumulate = ctx.node->data.value("accumulate", std::string("perElement"));
         options.piece_attribute = ctx.node->data.value("pieceAttribute", std::string());
+        if (options.piece_attribute.empty())
+            options.piece_attribute = ctx.node->data.value("classAttribute", std::string());
+        // Legacy: non-empty pieceAttribute without accumulate → perPiece.
+        if (!options.piece_attribute.empty() &&
+            !ctx.node->data.contains("accumulate"))
+            options.accumulate = "perPiece";
+        options.refine_to_connected = ctx.node->data.value("refineToConnected", true);
+
+        options.use_position_attribute = ctx.node->data.value("usePositionAttribute", false);
+        options.position_attribute =
+            ctx.node->data.value("positionAttribute", std::string("P"));
+
+        options.use_minimum = ctx.node->data.value("useMinimum", false);
+        options.minimum = ctx.node->data.value("minimum", -1.0);
+        options.use_maximum = ctx.node->data.value("useMaximum", false);
+        options.maximum = ctx.node->data.value("maximum", 1.0);
+        options.use_width = ctx.node->data.value("useWidth", true);
+        options.width = ctx.node->data.value("width", 6.0);
+        options.width_scale = ctx.node->data.value("widthScale", std::string("mad"));
+        options.center_type = ctx.node->data.value("centerType", std::string("median"));
+        options.center_fixed = ctx.node->data.value("centerFixed", 0.0);
+
+        options.attribute_name = ctx.node->data.value("attributeName", std::string("length"));
+        options.use_total_attribute = ctx.node->data.value("useTotalAttribute", false);
+        options.total_attribute_name =
+            ctx.node->data.value("totalAttributeName", std::string("totalperimeter"));
+        options.use_range_group = ctx.node->data.value("useRangeGroup", false);
+        options.range_group = ctx.node->data.value("rangeGroup", std::string("inrange"));
+        options.bake_visualized_range = ctx.node->data.value("bakeVisualizedRange", false);
+        options.use_remap_range = ctx.node->data.value("useRemapRange", false);
+        options.remap_min = ctx.node->data.value("remapMin", 0.0);
+        options.remap_max = ctx.node->data.value("remapMax", 1.0);
+
+        // ConvertLine / CreateSpline → SpatialSpline; mesh nodes → SpatialMesh.
+        if (ctx.inputs.find_splines("in") != nullptr ||
+            (ctx.inputs.find("in") && ctx.inputs.find("in")->splines)) {
+            const auto input =
+                get_splines_input(ctx, "in", "MeasureMesh missing spline/mesh input");
+            emit_splines(ctx, measure_spline_data(input, options));
+            return PCG_OK;
+        }
+
+        const auto input = get_geometry_input(ctx, "in", "MeasureMesh missing mesh input");
         emit_geometry(ctx, measure_mesh_geometry(input, options));
         return PCG_OK;
     }
@@ -189,7 +233,6 @@ public:
     const char* type_name() const override { return "SortGeometry"; }
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        const auto input = get_geometry_input(ctx, "in", "SortGeometry missing mesh input");
         const auto& data = ctx.node->data;
 
         auto read_domain = [&](const char* prefix) {
@@ -263,8 +306,36 @@ public:
                 options.points = std::move(legacy);
         }
         options.optimize_vertex_order = data.value("optimizeVertexOrder", true);
-        emit_geometry(ctx, sort_geometry(input, options));
-        return PCG_OK;
+
+        if (ctx.inputs.find_heightfield("in") != nullptr)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "SortGeometry does not support HeightField input");
+        if (ctx.inputs.find_points("in") != nullptr)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SortGeometry does not support Point input");
+
+        if (ctx.inputs.find_splines("in") != nullptr ||
+            (ctx.inputs.find("in") && ctx.inputs.find("in")->splines)) {
+            const auto input =
+                get_splines_input(ctx, "in", "SortGeometry missing geometry input");
+            std::string error;
+            auto sorted = sort_spline_data(input, options, &error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+            emit_splines(ctx, std::move(sorted));
+            return PCG_OK;
+        }
+
+        if (ctx.inputs.find_geometry("in") != nullptr || ctx.inputs.find_mesh("in") != nullptr) {
+            const auto input = get_geometry_input(ctx, "in", "SortGeometry missing geometry input");
+            std::string error;
+            auto sorted = sort_geometry(input, options, &error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+            emit_geometry(ctx, std::move(sorted));
+            return PCG_OK;
+        }
+
+        return fail_ctx(ctx, PCG_ERR_EXECUTION, "SortGeometry missing geometry input");
     }
 };
 
@@ -306,6 +377,8 @@ ResampleOptions load_resample_options(const PcgContext& ctx)
 data::PcgGeometry splines_to_curve_geometry(const data::PcgSplineData& splines)
 {
     data::PcgGeometry geometry;
+    std::vector<int64_t> closed_flags;
+    closed_flags.reserve(splines.splines().size());
     for (const auto& spline : splines.splines()) {
         if (spline.points.size() < 2)
             continue;
@@ -318,7 +391,14 @@ data::PcgGeometry splines_to_curve_geometry(const data::PcgSplineData& splines)
         }
         if (spline.closed && !face.empty())
             face.push_back(face.front());
+        closed_flags.push_back(spline.closed ? 1 : 0);
         geometry.faces_mut().push_back(std::move(face));
+    }
+    if (!closed_flags.empty()) {
+        auto& closed_attr =
+            geometry.attributes().create_int(data::AttributeOwner::Primitive, "closed", 1);
+        closed_attr.resize(closed_flags.size());
+        closed_attr.int_values_mut() = std::move(closed_flags);
     }
     return geometry;
 }

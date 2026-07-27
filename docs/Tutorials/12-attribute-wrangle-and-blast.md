@@ -16,10 +16,10 @@
 
 ```text
 abs sin cos tan sinh cosh sqrt exp log floor ceil round
-min max pow clamp lerp ch chf chi
+min max pow clamp lerp ch chf chi rand chramp vector
 ```
 
-`parameters` 是数值 JSON 对象，使用 `chf("name")` 读取。例如，把水平 spline 压成中点下垂 3 米的抛物线：
+`parameters` 是数值 JSON 对象，使用 `chf("name")` / `chi("name")` 读取。`ramps` 是颜色渐变 JSON 对象，使用 `chramp("name", t)` 在 0–1 处采样 RGB；支持 `linear` 与 `constant` 插值。Detail 模式下可用 `v@attr = vector(...)` 写入三元组 detail 属性，并支持 `float`/`int` 局部变量声明与重赋值。
 
 ```json
 {

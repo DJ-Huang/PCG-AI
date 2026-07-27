@@ -54,8 +54,17 @@ bool pin_types_compatible(const std::string& source, const std::string& target)
 {
     const std::string normalized_source = normalize_pin_type(source);
     const std::string normalized_target = normalize_pin_type(target);
-    return normalized_source == normalized_target || normalized_source == "Any" ||
-           normalized_target == "Any";
+    if (normalized_source == normalized_target || normalized_source == "Any" ||
+        normalized_target == "Any")
+        return true;
+    const auto spatial_geometry = [](const std::string& type) {
+        return type == "SpatialGeometry" || type == "SpatialMesh" || type == "SpatialSpline";
+    };
+    if (normalized_source == "SpatialGeometry" && spatial_geometry(normalized_target))
+        return true;
+    if (normalized_target == "SpatialGeometry" && spatial_geometry(normalized_source))
+        return true;
+    return false;
 }
 
 } // namespace pcg::internal::elements

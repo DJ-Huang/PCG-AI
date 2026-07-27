@@ -1,5 +1,7 @@
 #include "geometry/group_table.hpp"
 
+#include "geometry/element_pattern.hpp"
+
 #include <algorithm>
 #include <cctype>
 
@@ -191,6 +193,76 @@ std::unordered_set<GroupId> GroupTable::eval(GroupDomain domain, const std::stri
     }
 
     return members(domain, trimmed);
+}
+
+namespace {
+
+std::unordered_set<GroupId> eval_indices_leaf(const GroupTable& table,
+                                              GroupDomain domain,
+                                              const std::string& token,
+                                              int element_count)
+{
+    if (table.has_group(domain, token))
+        return table.members(domain, token);
+
+    std::unordered_set<int> indices;
+    if (!compute_element_pattern(token, element_count, indices))
+        return {};
+
+    std::unordered_set<GroupId> result;
+    for (int index : indices)
+        result.insert(static_cast<GroupId>(index));
+    return result;
+}
+
+size_t find_group_subtract_operator(const std::string& text)
+{
+    for (size_t index = 1; index + 1 < text.size(); ++index) {
+        if (text[index] != '-')
+            continue;
+        if (std::isspace(static_cast<unsigned char>(text[index - 1])) &&
+            std::isspace(static_cast<unsigned char>(text[index + 1])))
+            return index;
+    }
+    return std::string::npos;
+}
+
+} // namespace
+
+std::unordered_set<GroupId> GroupTable::eval_indices(GroupDomain domain,
+                                                     const std::string& expr,
+                                                     int element_count) const
+{
+    const std::string trimmed = trim(expr);
+    if (trimmed.empty() || element_count <= 0)
+        return {};
+
+    const auto amp = trimmed.find('&');
+    if (amp != std::string::npos) {
+        const std::string left = trim(trimmed.substr(0, amp));
+        const std::string right = trim(trimmed.substr(amp + 1));
+        const auto left_set = eval_indices(domain, left, element_count);
+        const auto right_set = eval_indices(domain, right, element_count);
+        std::unordered_set<GroupId> result;
+        for (GroupId id : left_set) {
+            if (right_set.count(id) > 0)
+                result.insert(id);
+        }
+        return result;
+    }
+
+    const auto minus = find_group_subtract_operator(trimmed);
+    if (minus != std::string::npos) {
+        const std::string left = trim(trimmed.substr(0, minus));
+        const std::string right = trim(trimmed.substr(minus + 1));
+        auto result = eval_indices(domain, left, element_count);
+        const auto sub = eval_indices(domain, right, element_count);
+        for (GroupId id : sub)
+            result.erase(id);
+        return result;
+    }
+
+    return eval_indices_leaf(*this, domain, trimmed, element_count);
 }
 
 void GroupTable::merge_from(const GroupTable& other, const std::string& prefix)

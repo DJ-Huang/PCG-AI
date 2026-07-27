@@ -845,15 +845,20 @@ namespace DJTechRuntime.PCG
                                 result.GeometryBinary, out var polygon, out var geometryError))
                         {
                             m_PolygonPreview = polygon;
+                            ApplyPointLineGizmoPreview(polygon);
                         }
                         else
                         {
                             Debug.LogWarning($"[PCG] Failed to parse geometry binary for polygon wire: {geometryError}");
+                            m_PolygonPreview = null;
+                            ClearPointLineGizmoPreview();
                         }
                     }
 #if UNITY_EDITOR
                     else
                     {
+                        m_PolygonPreview = null;
+                        ClearPointLineGizmoPreview();
                         var exportHint = "";
                         if (!string.IsNullOrEmpty(result.Json) &&
                             result.Json.Contains("\"geometry_export\""))
@@ -950,9 +955,42 @@ namespace DJTechRuntime.PCG
                     result.GeometryBinary, out var polygon, out _))
             {
                 m_PolygonPreview = polygon;
+                ApplyPointLineGizmoPreview(polygon);
+            }
+            else
+            {
+                ClearPointLineGizmoPreview();
             }
         }
 #endif
+
+        private void ApplyPointLineGizmoPreview(PcgPolygonPreviewData preview)
+        {
+            if (preview == null || !preview.IsPointOrCurveLike())
+            {
+                ClearPointLineGizmoPreview();
+                return;
+            }
+
+            var gizmos = GetComponent<PcgPreview>() ?? gameObject.AddComponent<PcgPreview>();
+            if (preview.FaceCount <= 0)
+            {
+                gizmos.SetPoints(preview.Points);
+                return;
+            }
+
+            var polylines = preview.ExtractPolylines();
+            if (polylines.Count > 0)
+                gizmos.SetSplines(polylines);
+            else
+                gizmos.SetPoints(preview.Points);
+        }
+
+        private void ClearPointLineGizmoPreview()
+        {
+            var gizmos = GetComponent<PcgPreview>();
+            gizmos?.ClearGizmosOnly();
+        }
 
         private bool ApplyTerrainHostResult(PcgGraphExecuteResult result, PcgResultKind kind)
         {

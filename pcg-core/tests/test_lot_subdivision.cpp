@@ -1,5 +1,6 @@
 #include "elements/geometry_algorithms.hpp"
 #include "elements/lot_subdivision_algorithms.hpp"
+#include "elements/element_utils.hpp"
 #include "elements/mesh_algorithms.hpp"
 #include "elements/vehicle_modeling_algorithms.hpp"
 #include "data/pcg_point_binary.hpp"
@@ -742,6 +743,134 @@ void test_pad_bevel_multi_lot_topology()
            "multi-lot pad bevel should not create city-spanning triangle edges");
 }
 
+void test_float_seed_param()
+{
+    expect(normalize_seed_number(2.0) == 2, "whole float seed 2.0 keeps integer identity");
+    expect(normalize_seed_number(-3.0) == -3, "whole float seed -3.0 keeps integer identity");
+    expect(normalize_seed_number(2.3) != 2, "fractional seed 2.3 must differ from 2");
+    expect(normalize_seed_number(2.3) != normalize_seed_number(2.4),
+           "nearby fractional seeds must diverge");
+    expect(rng_state_from_seed(2.3, 0) != rng_state_from_seed(2.0, 0),
+           "rng state must differ for 2.3 vs 2.0");
+
+    // Regression: nlohmann value("seed", 0) truncates float → int (2.3 becomes 2).
+    const nlohmann::json data{{"seed", 2.3}};
+    expect(std::abs(read_seed_param_number(data, "seed", 0.0) - 2.3) < 1e-12,
+           "read_seed_param_number must keep fractional seed");
+    expect(data.value("seed", 0) == 2,
+           "sanity: nlohmann value<int> truncates 2.3 → 2 (the bug we avoid)");
+
+    LotSubdivisionOptions a;
+    a.min_size = 1.0;
+    a.iterations = 3;
+    a.irregularity = 0.35;
+    a.seed = 2.0;
+    a.alignment = "longestEdge";
+    LotSubdivisionOptions b = a;
+    b.seed = 2.3;
+
+    const auto lots_a = lot_subdivide_geometry(make_ground_quad(20.0, 20.0), a);
+    const auto lots_b = lot_subdivide_geometry(make_ground_quad(20.0, 20.0), b);
+    expect(lots_a.faces().size() >= 2 && lots_b.faces().size() >= 2,
+           "float-seed lots should subdivide");
+
+    bool layout_differs = lots_a.faces().size() != lots_b.faces().size();
+    if (!layout_differs) {
+        const auto& pa = lots_a.points();
+        const auto& pb = lots_b.points();
+        if (pa.size() != pb.size()) {
+            layout_differs = true;
+        } else {
+            for (size_t i = 0; i < pa.size(); ++i) {
+                if (std::abs(pa[i].x - pb[i].x) > 1e-6 ||
+                    std::abs(pa[i].z - pb[i].z) > 1e-6) {
+                    layout_differs = true;
+                    break;
+                }
+            }
+        }
+    }
+    expect(layout_differs, "seed 2.3 should change lot layout vs seed 2.0");
+}
+
+void test_graph_float_seed_cook()
+{
+    auto make_doc = [](double seed) {
+        return nlohmann::json{
+            {"version", "2.0"},
+            {"nodes",
+             nlohmann::json::array({
+                 {{"id", "grid"},
+                  {"type", "CreateGridMesh"},
+                  {"position", {{"x", 0.0}, {"y", 0.0}}},
+                  {"data",
+                   {{"sizeX", 20.0},
+                    {"sizeY", 20.0},
+                    {"rows", 1},
+                    {"cols", 1},
+                    {"plane", "xz"}}}},
+                 {{"id", "lots"},
+                  {"type", "LotSubdivision"},
+                  {"position", {{"x", 0.0}, {"y", 160.0}}},
+                  {"data",
+                   {{"minSize", 0.1},
+                    {"iterations", 4},
+                    {"irregularity", 0.35},
+                    {"seed", seed},
+                    {"alignment", "longestEdge"}}}},
+                 {{"id", "output"},
+                  {"type", "Output"},
+                  {"position", {{"x", 0.0}, {"y", 320.0}}},
+                  {"data", nlohmann::json::object()}},
+             })},
+            {"edges",
+             nlohmann::json::array({
+                 {{"id", "e0"},
+                  {"source", "grid"},
+                  {"target", "lots"},
+                  {"sourceHandle", "out"},
+                  {"targetHandle", "in"}},
+                 {{"id", "e1"},
+                  {"source", "lots"},
+                  {"target", "output"},
+                  {"sourceHandle", "out"},
+                  {"targetHandle", "in"}},
+             })},
+        };
+    };
+
+    auto cook = [](const nlohmann::json& doc) {
+        const std::string json = doc.dump();
+        Graph graph;
+        char error[1024] = {};
+        expect(parse_graph(json.c_str(), graph, error, sizeof(error)) == PCG_OK,
+               std::string("float-seed parse: ") + error);
+        GraphExecutionResult result;
+        expect(execute_graph(graph, 0, result, error, sizeof(error)) == PCG_OK,
+               std::string("float-seed execute: ") + error);
+        expect(result.source_geometry != nullptr, "float-seed cook emits geometry");
+        return *result.source_geometry;
+    };
+
+    const auto geo_a = cook(make_doc(2.0));
+    const auto geo_b = cook(make_doc(2.3));
+    expect(!geo_a.points().empty() && !geo_b.points().empty(), "float-seed cooks have points");
+
+    bool differs = geo_a.faces().size() != geo_b.faces().size() ||
+                   geo_a.points().size() != geo_b.points().size();
+    if (!differs) {
+        const auto& pa = geo_a.points();
+        const auto& pb = geo_b.points();
+        for (size_t i = 0; i < pa.size(); ++i) {
+            if (std::abs(pa[i].x - pb[i].x) > 1e-6 || std::abs(pa[i].z - pb[i].z) > 1e-6) {
+                differs = true;
+                break;
+            }
+        }
+    }
+    expect(differs, "graph cook seed 2.3 must differ from seed 2.0 (not truncated)");
+}
+
 } // namespace
 
 int main()
@@ -756,6 +885,8 @@ int main()
     test_example_graphs();
     test_instanced_city_example_graphs();
     test_pad_bevel_multi_lot_topology();
+    test_float_seed_param();
+    test_graph_float_seed_cook();
     std::printf("test_lot_subdivision: OK\n");
     return 0;
 }
