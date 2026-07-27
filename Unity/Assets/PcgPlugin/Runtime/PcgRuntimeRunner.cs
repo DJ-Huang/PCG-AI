@@ -47,6 +47,9 @@ namespace DJTechRuntime.PCG
             var preview = GetComponent<PcgPreview>();
             var kind = PcgResultParser.DetectKind(result);
 
+            // Replacement semantics: clear previous primary result before applying the new kind.
+            preview?.ClearAll();
+
             switch (kind)
             {
                 case PcgResultKind.Mesh:

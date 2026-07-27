@@ -46,13 +46,13 @@ export interface GraphSubgraph {
 
 // ── Parameters ─────────────────────────────────────────
 
-export type ParameterType = 'integer' | 'number' | 'boolean' | 'string';
+export type ParameterType = 'integer' | 'number' | 'boolean' | 'string' | 'vector3';
 
 export interface GraphParameter {
   id: string;
   name: string;
   type: ParameterType;
-  default: number | boolean | string;
+  default: number | boolean | string | [number, number, number];
   exposed: boolean;
   targetNode: string;
   targetProperty: string;

@@ -22,9 +22,7 @@ struct ConvertLineOptions {
     bool connect_path = true;
     double max_distance = 1e-4;
     bool connect_only_to_other_end_points = false;
-    bool keep_group_order = false;
     bool make_isolated_loops_closed = false;
-    bool remove_unused_points = true;
     bool compute_length = false;
     std::string length_attribute = "restlength";
 };

@@ -106,6 +106,9 @@ data::GeometryAffineTransform multiply_transform(const data::GeometryAffineTrans
     return result;
 }
 
+data::GeometryAffineTransform invert_transform(const data::GeometryAffineTransform& transform,
+                                               bool& ok);
+
 data::GeometryAffineTransform rotation_from_euler(const data::PcgVec3& degrees,
                                                 const std::string& order)
 {
@@ -176,11 +179,10 @@ data::GeometryAffineTransform around_pivot_transform(
         -pivot_translate.z,
     });
     const auto pivot_rotate = rotation_from_euler(pivot_rotate_deg, "xyz");
-    const auto pivot_rotate_inverse = rotation_from_euler({
-        -pivot_rotate_deg.x,
-        -pivot_rotate_deg.y,
-        -pivot_rotate_deg.z,
-    }, "xyz");
+    bool inverse_ok = false;
+    const auto pivot_rotate_inverse = invert_transform(pivot_rotate, inverse_ok);
+    if (!inverse_ok)
+        return multiply_transform(to_pivot, multiply_transform(local, from_pivot));
     return multiply_transform(
         to_pivot,
         multiply_transform(
@@ -403,9 +405,7 @@ TransformMeshOptions parse_transform_mesh_options(const nlohmann::json& data)
     options.pre_rotation_deg = read_vector_param(data, "preRotate", {0.0, 0.0, 0.0});
     options.pre_scale = read_vector_param(data, "preScale", {1.0, 1.0, 1.0});
     options.pre_shear = read_vector_param(data, "preShear", {0.0, 0.0, 0.0});
-    options.attributes = data.value("attributes", "*");
     options.recompute_point_normals = data.value("recomputePointNormals", false);
-    options.recompute_affected_normals = data.value("recomputeAffectedNormals", true);
     options.preserve_normal_length = data.value("preserveNormalLength", true);
     options.invert_transform = data.value("invertTransform", false);
     options.output_transform = data.value("outputTransform", false);

@@ -410,7 +410,9 @@ data::PcgVec3 read_vector_param(const nlohmann::json& data,
         }
 
         if (parsed_ok) {
-            if (!has_legacy || !near_vec(parsed, fallback) || !near_vec(parsed, legacy))
+            // Legacy axes win only when the canonical value still equals the
+            // manifest default (avoids default vector emission shadowing legacy).
+            if (!has_legacy || !near_vec(parsed, fallback))
                 return parsed;
             return legacy;
         }

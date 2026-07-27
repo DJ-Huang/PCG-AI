@@ -97,7 +97,9 @@ namespace DJTechRuntime.PCG
             if (!TryParse(data.GetRaw(key), out var parsed))
                 return hasLegacy ? legacy : fallback;
 
-            if (!hasLegacy || !Approximately(parsed, fallback) || !Approximately(parsed, legacy))
+            // Legacy axes win only when the canonical value still equals the
+            // manifest default (avoids default vector emission shadowing legacy).
+            if (!hasLegacy || !Approximately(parsed, fallback))
                 return parsed;
 
             return legacy;

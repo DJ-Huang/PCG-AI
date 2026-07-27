@@ -45,6 +45,7 @@ namespace DJTechRuntime.PCG
             _points.Clear();
             _splines.Clear();
             // Do not clear shared MeshFilter — GraphComponent owns Lit mesh preview.
+            // RuntimeRunner / replacement paths must ClearAll() before switching result kinds.
             _points.AddRange(points);
         }
 

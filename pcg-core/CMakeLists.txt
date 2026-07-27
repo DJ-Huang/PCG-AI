@@ -401,6 +401,11 @@ target_link_libraries(test_topology_parity PRIVATE PcgCoreStatic nlohmann_json::
 target_include_directories(test_topology_parity PRIVATE src)
 add_test(NAME test_topology_parity COMMAND test_topology_parity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_review_2026_07_27 tests/test_review_2026_07_27.cpp)
+target_link_libraries(test_review_2026_07_27 PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_review_2026_07_27 PRIVATE src)
+add_test(NAME test_review_2026_07_27 COMMAND test_review_2026_07_27 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.
 get_property(PCG_FAST_TESTS DIRECTORY PROPERTY TESTS)

@@ -82,10 +82,8 @@ public:
         options.max_distance = ctx.node->data.value("maxDistance", 1e-4);
         options.connect_only_to_other_end_points =
             ctx.node->data.value("connectOnlyToOtherEndPoints", false);
-        options.keep_group_order = ctx.node->data.value("keepGroupOrder", false);
         options.make_isolated_loops_closed =
             ctx.node->data.value("makeIsolatedLoopsClosed", false);
-        options.remove_unused_points = ctx.node->data.value("removeUnusedPoints", true);
         options.compute_length = ctx.node->data.value("computeLength", false);
         options.length_attribute =
             ctx.node->data.value("lengthAttribute", std::string("restlength"));

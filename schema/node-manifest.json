@@ -6071,26 +6071,12 @@
           "section": "preTransform",
           "order": 40
         },
-        "attributes": {
-          "type": "string",
-          "default": "*",
-          "displayName": "Attributes",
-          "section": "attributes",
-          "order": 10
-        },
         "recomputePointNormals": {
           "type": "boolean",
           "default": false,
           "displayName": "Recompute Point Normals",
           "section": "attributes",
           "order": 20
-        },
-        "recomputeAffectedNormals": {
-          "type": "boolean",
-          "default": true,
-          "displayName": "Recompute Affected Normals",
-          "section": "attributes",
-          "order": 30
         },
         "preserveNormalLength": {
           "type": "boolean",
@@ -8267,6 +8253,14 @@
           "pinType": "SpatialSpline"
         }
       ],
+      "inspectorSections": [
+        {
+          "id": "main",
+          "label": "Convert Line",
+          "foldout": false,
+          "header": true
+        }
+      ],
       "properties": {
         "group": {
           "type": "groupSelect",
@@ -8308,26 +8302,12 @@
             "equals": "true"
           }
         },
-        "keepGroupOrder": {
-          "type": "boolean",
-          "displayName": "Keep Group Order",
-          "default": false,
-          "section": "main",
-          "order": 13
-        },
         "makeIsolatedLoopsClosed": {
           "type": "boolean",
           "displayName": "Make Isolated Loops Closed",
           "default": false,
           "section": "main",
           "order": 20
-        },
-        "removeUnusedPoints": {
-          "type": "boolean",
-          "displayName": "Remove Unused Points",
-          "default": true,
-          "section": "main",
-          "order": 30
         },
         "computeLength": {
           "type": "boolean",

@@ -374,6 +374,31 @@
   height: 16px;
 }
 
+.pcg-inspector__vector3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pcg-inspector__vector3-axis {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: #9aa0b5;
+}
+
+.pcg-inspector__vector3-axis input {
+  width: 100%;
+  padding: 4px 6px;
+  background: #1e1e32;
+  border: 1px solid #444;
+  border-radius: 3px;
+  color: #e0e0e0;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
 .pcg-inspector__bound {
   display: flex;
   align-items: center;

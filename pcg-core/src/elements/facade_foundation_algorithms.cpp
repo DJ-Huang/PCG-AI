@@ -525,8 +525,6 @@ data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
 
     copy_detail_attributes_to_metadata(input, output);
 
-    (void)options.remove_unused_points;
-    (void)options.keep_group_order;
     return output;
 }
 

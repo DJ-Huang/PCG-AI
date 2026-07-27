@@ -92,11 +92,29 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
                 } else {
                     memberArray.push_back(id);
                 }
-                if (d == static_cast<int>(geometry::GroupDomain::Point) ||
-                    d == static_cast<int>(geometry::GroupDomain::Vertex)) {
+                if (d == static_cast<int>(geometry::GroupDomain::Point)) {
                     // Packed XYZ for Scene View — do not index final MeshFilter / preview.
                     if (id >= 0 && id < static_cast<geometry::GroupId>(points.size())) {
                         const auto& p = points[static_cast<size_t>(id)];
+                        pointPositions.push_back(p.x);
+                        pointPositions.push_back(p.y);
+                        pointPositions.push_back(p.z);
+                    }
+                } else if (d == static_cast<int>(geometry::GroupDomain::Vertex)) {
+                    // Vertex IDs are global face-corner indices; map corner → point.
+                    int corner = 0;
+                    int point_index = -1;
+                    for (const auto& face : geometry.faces()) {
+                        const int face_corners = static_cast<int>(face.size());
+                        if (id >= corner && id < corner + face_corners) {
+                            point_index = face[static_cast<size_t>(id - corner)];
+                            break;
+                        }
+                        corner += face_corners;
+                    }
+                    if (point_index >= 0 &&
+                        point_index < static_cast<int>(points.size())) {
+                        const auto& p = points[static_cast<size_t>(point_index)];
                         pointPositions.push_back(p.x);
                         pointPositions.push_back(p.y);
                         pointPositions.push_back(p.z);
@@ -512,15 +530,18 @@ nlohmann::json build_per_node_attributes(const NodeOutputMap& outputs)
             }
 
             if (!splines->splines().empty()) {
-                std::unordered_set<std::string> spline_attr_names;
+                // Attribute names may exist only on later splines (e.g. MeasureMesh
+                // range groups). Sample the first spline that actually owns the key.
+                std::unordered_map<std::string, nlohmann::json> spline_attr_samples;
                 for (const auto& spline : splines->splines()) {
                     if (!spline.attributes.is_object())
                         continue;
-                    for (const auto& [name, value] : spline.attributes.items())
-                        spline_attr_names.insert(name);
+                    for (const auto& [name, value] : spline.attributes.items()) {
+                        if (spline_attr_samples.find(name) == spline_attr_samples.end())
+                            spline_attr_samples.emplace(name, value);
+                    }
                 }
-                for (const auto& name : spline_attr_names) {
-                    const auto& value = splines->splines().front().attributes.at(name);
+                for (const auto& [name, value] : spline_attr_samples) {
                     const char* type = "float";
                     int tuple_size = 1;
                     if (value.is_array()) {

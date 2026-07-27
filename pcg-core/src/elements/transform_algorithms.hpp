@@ -26,9 +26,7 @@ struct TransformMeshOptions {
     data::PcgVec3 pre_rotation_deg{0.0, 0.0, 0.0};
     data::PcgVec3 pre_scale{1.0, 1.0, 1.0};
     data::PcgVec3 pre_shear{0.0, 0.0, 0.0};
-    std::string attributes = "*";
     bool recompute_point_normals = false;
-    bool recompute_affected_normals = true;
     bool preserve_normal_length = true;
     bool invert_transform = false;
     bool output_transform = false;
