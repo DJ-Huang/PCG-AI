@@ -466,13 +466,21 @@ void add_number_selection(const data::PcgGeometry& geometry,
         return;
 
     if (options.number_mode == "pattern" && !options.number_pattern.empty()) {
-        geometry::parse_element_pattern(options.number_pattern, element_count, selected);
+        std::unordered_set<int> number_selected;
+        if (geometry::compute_element_pattern(options.number_pattern, element_count,
+                                              number_selected)) {
+            for (int index : number_selected)
+                selected.insert(index);
+        }
         return;
     }
     if (options.number_mode == "range") {
+        std::unordered_set<int> number_selected;
         geometry::parse_element_range(options.number_range_start, options.number_range_end,
                                       options.number_select_of, options.number_select_offset,
-                                      element_count, selected);
+                                      element_count, number_selected);
+        for (int index : number_selected)
+            selected.insert(index);
         return;
     }
     if (options.number_mode == "expression" && !options.number_expression.empty()) {
@@ -529,16 +537,115 @@ void add_group_selection_geometry(const data::PcgGeometry& geometry,
 {
     if (options.group.empty())
         return;
-    if (entity == "points") {
-        for (int index : geometry.groups().eval(GroupDomain::Point, options.group))
+    const bool points = entity == "points";
+    const bool edges = entity == "edges";
+    const int element_count =
+        points ? static_cast<int>(geometry.points().size())
+               : edges ? static_cast<int>(geometry.groups().members(GroupDomain::Edge, "").size())
+                       : static_cast<int>(geometry.faces().size());
+    if (element_count <= 0)
+        return;
+
+    const GroupDomain domain =
+        points ? GroupDomain::Point : edges ? GroupDomain::Edge : GroupDomain::Face;
+    for (geometry::GroupId id :
+         geometry.groups().eval_indices(domain, options.group, element_count))
+        selected.insert(static_cast<int>(id));
+}
+
+void add_spline_primitive_group_selection(const data::PcgSplineData& source,
+                                          const DeleteOptions& options,
+                                          std::unordered_set<int>& selected)
+{
+    if (options.group.empty())
+        return;
+
+    const int spline_count = static_cast<int>(source.splines().size());
+    if (spline_count <= 0)
+        return;
+
+    bool matched_named = false;
+    for (int index = 0; index < spline_count; ++index) {
+        const auto& spline = source.splines()[static_cast<size_t>(index)];
+        if (!spline.attributes.contains("groups") || !spline.attributes["groups"].is_array())
+            continue;
+        for (const auto& group : spline.attributes["groups"]) {
+            if (group.is_string() && group.get<std::string>() == options.group) {
+                selected.insert(index);
+                matched_named = true;
+                break;
+            }
+        }
+    }
+    if (matched_named)
+        return;
+
+    std::unordered_set<int> pattern_selected;
+    if (geometry::compute_element_pattern(options.group, spline_count, pattern_selected)) {
+        for (int index : pattern_selected)
             selected.insert(index);
-    } else if (entity == "edges") {
-        for (geometry::GroupId edge_id :
-             geometry.groups().eval(GroupDomain::Edge, options.group))
-            selected.insert(static_cast<int>(edge_id));
-    } else {
-        for (int index : geometry.groups().eval(GroupDomain::Face, options.group))
+    }
+}
+
+void add_spline_primitive_number_selection(const data::PcgSplineData& source,
+                                           const DeleteOptions& options,
+                                           std::unordered_set<int>& selected,
+                                           std::string& error)
+{
+    const int spline_count = static_cast<int>(source.splines().size());
+    if (spline_count <= 0)
+        return;
+
+    if (options.number_mode == "pattern" && !options.number_pattern.empty()) {
+        std::unordered_set<int> number_selected;
+        if (geometry::compute_element_pattern(options.number_pattern, spline_count,
+                                              number_selected)) {
+            for (int index : number_selected)
+                selected.insert(index);
+        }
+        return;
+    }
+    if (options.number_mode == "range") {
+        std::unordered_set<int> number_selected;
+        geometry::parse_element_range(options.number_range_start, options.number_range_end,
+                                      options.number_select_of, options.number_select_offset,
+                                      spline_count, number_selected);
+        for (int index : number_selected)
             selected.insert(index);
+        return;
+    }
+    if (options.number_mode == "expression" && !options.number_expression.empty()) {
+        Program program;
+        if (!Program::compile_expression(options.number_expression, program, error))
+            return;
+        for (int index = 0; index < spline_count; ++index) {
+            DeleteEvalVariables variables;
+            variables.element_number = index;
+            variables.element_count = spline_count;
+            bool expression_selected = false;
+            if (!evaluate_number_expression(program, variables, expression_selected, error))
+                continue;
+            if (expression_selected)
+                selected.insert(index);
+        }
+    }
+}
+
+void add_spline_primitive_selection(const data::PcgSplineData& source,
+                                    const DeleteOptions& options,
+                                    int graph_seed,
+                                    std::unordered_set<int>& selected,
+                                    std::string& error)
+{
+    add_spline_primitive_group_selection(source, options, selected);
+    if (options.number_enable)
+        add_spline_primitive_number_selection(source, options, selected, error);
+    if (options.random_enable) {
+        const int spline_count = static_cast<int>(source.splines().size());
+        for (int index = 0; index < spline_count; ++index) {
+            if (random_selected(graph_seed, options, index, 5))
+                selected.insert(index);
+        }
     }
 }
 
@@ -1039,9 +1146,9 @@ data::PcgPointData delete_points(const data::PcgPointData& source,
     if (options.number_enable) {
         std::unordered_set<int> number_selected;
         if (options.number_mode == "pattern" && !options.number_pattern.empty())
-            geometry::parse_element_pattern(options.number_pattern,
-                                            static_cast<int>(source.points().size()),
-                                            number_selected);
+            geometry::compute_element_pattern(options.number_pattern,
+                                              static_cast<int>(source.points().size()),
+                                              number_selected);
         else if (options.number_mode == "range")
             geometry::parse_element_range(options.number_range_start, options.number_range_end,
                                           options.number_select_of, options.number_select_offset,
@@ -1087,33 +1194,28 @@ data::PcgSplineData delete_splines(const data::PcgSplineData& source,
     if (!has_active_delete_condition(options))
         return source;
 
+    if (options.entity == "primitives") {
+        const int spline_count = static_cast<int>(source.splines().size());
+        std::unordered_set<int> selected;
+        add_spline_primitive_selection(source, options, graph_seed, selected, error);
+        if (options.delete_non_selected && spline_count > 0)
+            invert_selection(selected, spline_count);
+
+        data::PcgSplineData output;
+        output.metadata() = source.metadata();
+        for (int index = 0; index < spline_count; ++index) {
+            if (selected.count(index))
+                continue;
+            output.add_spline(source.splines()[static_cast<size_t>(index)]);
+        }
+        return output;
+    }
+
     data::PcgSplineData output;
     output.metadata() = source.metadata();
 
     for (size_t spline_index = 0; spline_index < source.splines().size(); ++spline_index) {
         const auto& spline = source.splines()[spline_index];
-        const auto curve_u = spline_curve_u(spline);
-
-        bool delete_primitive = false;
-        if (options.entity == "primitives") {
-            std::unordered_set<int> selected;
-            if (!options.group.empty() && spline.attributes.contains("groups")) {
-                for (const auto& group : spline.attributes["groups"]) {
-                    if (group.is_string() && group.get<std::string>() == options.group)
-                        delete_primitive = true;
-                }
-            }
-            if (options.number_enable && options.number_mode == "pattern" &&
-                options.number_pattern == "*")
-                delete_primitive = true;
-            if (options.random_enable &&
-                random_selected(graph_seed, options, static_cast<int>(spline_index), 5))
-                delete_primitive = true;
-            if (options.delete_non_selected)
-                delete_primitive = !delete_primitive;
-            if (delete_primitive)
-                continue;
-        }
 
         std::vector<bool> keep(spline.points.size(), true);
         bool removed_any = false;
@@ -1129,17 +1231,21 @@ data::PcgSplineData delete_splines(const data::PcgSplineData& source,
                 }
             }
             if (options.number_enable) {
-                if (options.number_mode == "pattern" && !options.number_pattern.empty())
-                    geometry::parse_element_pattern(options.number_pattern,
-                                                    static_cast<int>(spline.points.size()),
-                                                    selected);
-                else if (options.number_mode == "range")
+                std::unordered_set<int> number_selected;
+                if (options.number_mode == "pattern" && !options.number_pattern.empty()) {
+                    geometry::compute_element_pattern(options.number_pattern,
+                                                      static_cast<int>(spline.points.size()),
+                                                      number_selected);
+                } else if (options.number_mode == "range") {
                     geometry::parse_element_range(options.number_range_start,
                                                   options.number_range_end,
                                                   options.number_select_of,
                                                   options.number_select_offset,
                                                   static_cast<int>(spline.points.size()),
-                                                  selected);
+                                                  number_selected);
+                }
+                for (int index : number_selected)
+                    selected.insert(index);
             }
             if (options.bounding_enable) {
                 const auto& p = spline.points[index];

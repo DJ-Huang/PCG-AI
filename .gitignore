@@ -25,3 +25,4 @@ url-content-out/
 .opencode/node_modules/
 .codely-cli/settings.json
 Plan/
+mem-log/

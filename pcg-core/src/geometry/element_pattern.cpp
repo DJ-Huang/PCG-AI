@@ -31,6 +31,12 @@ std::vector<std::string> split_tokens(const std::string& text)
     return tokens;
 }
 
+void select_all(int element_count, std::unordered_set<int>& selected)
+{
+    for (int index = 0; index < element_count; ++index)
+        selected.insert(index);
+}
+
 void add_index(int index, int element_count, std::unordered_set<int>& selected)
 {
     if (index >= 0 && index < element_count)
@@ -49,26 +55,39 @@ void add_range(int start, int end, int element_count, std::unordered_set<int>& s
         selected.insert(index);
 }
 
-bool parse_single_token(const std::string& token,
-                        int element_count,
-                        bool exclude,
-                        std::unordered_set<int>& selected)
+void erase_range(int start, int end, int element_count, std::unordered_set<int>& selected)
+{
+    if (element_count <= 0)
+        return;
+    const int clamped_start = std::max(0, start);
+    const int clamped_end = std::min(element_count - 1, end);
+    for (int index = clamped_start; index <= clamped_end; ++index)
+        selected.erase(index);
+}
+
+void ensure_universe(int element_count, std::unordered_set<int>& selected)
+{
+    if (!selected.empty())
+        return;
+    select_all(element_count, selected);
+}
+
+void apply_pattern_token(const std::string& token,
+                         int element_count,
+                         std::unordered_set<int>& selected)
 {
     if (token.empty() || element_count <= 0)
-        return false;
+        return;
 
-    const bool negated = !token.empty() && token[0] == '!';
+    const bool negated = token[0] == '!';
     const std::string body = negated ? token.substr(1) : token;
-    const bool effective_exclude = exclude || negated;
 
     if (body == "*" || body.empty()) {
-        if (effective_exclude) {
-            selected.clear();
-        } else {
-            for (int index = 0; index < element_count; ++index)
-                selected.insert(index);
-        }
-        return true;
+        if (negated)
+            return;
+        selected.clear();
+        select_all(element_count, selected);
+        return;
     }
 
     const auto dash = body.find('-');
@@ -76,60 +95,63 @@ bool parse_single_token(const std::string& token,
         try {
             const int start = std::stoi(body.substr(0, dash));
             const int end = std::stoi(body.substr(dash + 1));
-            std::unordered_set<int> range;
-            add_range(start, end, element_count, range);
-            if (effective_exclude) {
-                for (int index : range)
-                    selected.erase(index);
+            if (negated) {
+                ensure_universe(element_count, selected);
+                erase_range(start, end, element_count, selected);
             } else {
-                for (int index : range)
-                    selected.insert(index);
+                add_range(start, end, element_count, selected);
             }
-            return true;
+            return;
         } catch (...) {
-            return false;
+            return;
         }
     }
 
     try {
         const int index = std::stoi(body);
-        if (effective_exclude)
+        if (negated) {
+            ensure_universe(element_count, selected);
             selected.erase(index);
-        else
+        } else {
             add_index(index, element_count, selected);
-        return true;
+        }
     } catch (...) {
-        return false;
     }
 }
 
 } // namespace
 
-bool parse_element_pattern(const std::string& pattern,
-                           int element_count,
-                           std::unordered_set<int>& selected)
+bool compute_element_pattern(const std::string& pattern,
+                             int element_count,
+                             std::unordered_set<int>& selected)
 {
+    selected.clear();
     const std::string trimmed = trim_copy(pattern);
     if (trimmed.empty() || element_count <= 0)
         return false;
 
-    if (trimmed == "*") {
-        for (int index = 0; index < element_count; ++index)
-            selected.insert(index);
+    if (trimmed == "!*")
         return true;
-    }
-    if (trimmed == "!*") {
-        selected.clear();
-        return true;
-    }
 
     const auto tokens = split_tokens(trimmed);
     if (tokens.empty())
         return false;
 
-  for (const auto& token : tokens)
-        parse_single_token(token, element_count, false, selected);
-    return !selected.empty();
+    for (const auto& token : tokens)
+        apply_pattern_token(token, element_count, selected);
+    return true;
+}
+
+bool parse_element_pattern(const std::string& pattern,
+                           int element_count,
+                           std::unordered_set<int>& selected)
+{
+    std::unordered_set<int> computed;
+    if (!compute_element_pattern(pattern, element_count, computed))
+        return false;
+    for (int index : computed)
+        selected.insert(index);
+    return true;
 }
 
 bool parse_element_range(int start,

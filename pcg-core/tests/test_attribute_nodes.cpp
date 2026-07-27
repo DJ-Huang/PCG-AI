@@ -416,5 +416,51 @@ int main()
     expect(inverse_spline.contains("splines") && inverse_spline["splines"].empty(),
            "Delete non-selected with !* yields empty splines");
 
+    const char* delete_spline_keep_prim0_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"path","type":"CreateSpline","data":{
+          "mode":"polyline","closed":false,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0},{\"x\":3,\"y\":0,\"z\":0}]"}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"primitives","group":"0","deleteNonSelected":true,
+          "numberEnable":true,"numberMode":"pattern","numberPattern":"!*"}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"path","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    const json keep_prim0 = execute_json(delete_spline_keep_prim0_graph);
+    expect(keep_prim0.contains("splines") && keep_prim0["splines"].is_array() &&
+               keep_prim0["splines"].size() == 1,
+           "Delete spline primitive group 0 with number !* keeps first primitive");
+
+    const char* delete_group_number_union_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"primitives","group":"0","deleteNonSelected":true,
+          "numberEnable":true,"numberMode":"pattern","numberPattern":"!*"}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode delete_group_number_union_code = pcg_execute_graph_v2(
+        delete_group_number_union_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(delete_group_number_union_code == PCG_OK,
+           "Delete group 0 with number !* and invert executes");
+    expect(index_count == 6,
+           "Delete group 0 with number !* keeps primitive 0 only");
+
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -415,7 +415,6 @@
       "properties": {
         "group": {
           "type": "groupSelect",
-          "groupDomain": "point",
           "displayName": "Group",
           "default": "",
           "order": 0

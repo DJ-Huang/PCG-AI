@@ -6,6 +6,7 @@
 #include "elements/mesh_algorithms.hpp"
 #include "geometry/bmesh.hpp"
 #include "geometry/group_table.hpp"
+#include "geometry/element_pattern.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -122,6 +123,15 @@ int main()
     groups.add(GroupDomain::Edge, "b", 3);
     const auto diff = groups.eval(GroupDomain::Edge, "a - b");
     if (diff.count(1) != 1 || diff.count(2) != 0) fail("group subset");
+
+    GroupTable empty_groups;
+    const auto prim0 = empty_groups.eval_indices(GroupDomain::Face, "0", 6);
+    if (prim0.size() != 1 || prim0.count(0) != 1) fail("eval_indices numeric 0");
+    std::unordered_set<int> none;
+    if (!compute_element_pattern("!*", 6, none) || !none.empty())
+        fail("element pattern !* matches nothing");
+    std::printf("PASS: GroupTable eval_indices + element pattern !*\n");
+
     std::printf("PASS: GroupTable subset ops\n");
 
     PcgGeometry box;

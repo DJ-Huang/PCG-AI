@@ -730,8 +730,7 @@ MonoBehaviour:
   - materialName: plaster_cream
     material: {fileID: 2100000, guid: a7f866d7ad0543f29deca0d26410db42, type: 2}
   m_SplineBindings: []
-  m_LastMaterialNames:
-  - 
+  m_LastMaterialNames: []
   scatterPointScale: 0.2
   scatterPointMesh: {fileID: 0}
   scatterDisplayMode: 1
