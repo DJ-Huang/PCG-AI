@@ -473,7 +473,7 @@ namespace DJTechEditor.PCG.Graph
 
             m_GraphView = new PcgGraphView();
             m_GraphView.SetHostWindow(this);
-            m_GraphView.SceneContextChanged += _ => m_GraphView.RefreshInspector();
+            m_GraphView.SceneContextChanged += _ => m_GraphView.ScheduleInspectorRefresh();
             m_GraphView.SubgraphNavigationChanged += _ =>
             {
                 RefreshSubgraphBreadcrumb();

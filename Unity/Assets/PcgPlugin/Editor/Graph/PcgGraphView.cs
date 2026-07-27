@@ -93,6 +93,7 @@ namespace DJTechEditor.PCG.Graph
 
         private PcgSceneEditContext m_SceneEditContext = PcgSceneEditContext.ObjectMode;
         private bool m_DuplicateInProgress;
+        private bool m_InspectorRefreshScheduled;
 
         public PcgSceneEditContext SceneEditContext => m_SceneEditContext;
 
@@ -886,7 +887,23 @@ namespace DJTechEditor.PCG.Graph
                 node.SetNodePreviewState(!string.IsNullOrEmpty(previewNodeId) && node.NodeId == previewNodeId);
         }
 
-        internal void RefreshInspector() => m_Inspector?.OnSelectionChanged();
+        internal void RefreshInspector() => ScheduleInspectorRefresh();
+
+        internal void ScheduleInspectorRefresh()
+        {
+            if (m_Inspector == null)
+                return;
+            if (m_InspectorRefreshScheduled)
+                return;
+            m_InspectorRefreshScheduled = true;
+            EditorApplication.delayCall += () =>
+            {
+                m_InspectorRefreshScheduled = false;
+                if (m_Inspector == null)
+                    return;
+                m_Inspector.OnSelectionChanged();
+            };
+        }
 
         /// <summary>
         /// Re-derive the scene edit context from the current graph selection.
@@ -1233,7 +1250,7 @@ namespace DJTechEditor.PCG.Graph
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
             EnsureMatchSizeScenePreview();
-            m_Inspector?.OnSelectionChanged();
+            ScheduleInspectorRefresh();
         }
 
         public override void RemoveFromSelection(ISelectable selectable)
@@ -1241,7 +1258,7 @@ namespace DJTechEditor.PCG.Graph
             base.RemoveFromSelection(selectable);
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
-            m_Inspector?.OnSelectionChanged();
+            ScheduleInspectorRefresh();
         }
 
         public override void ClearSelection()
@@ -1249,7 +1266,7 @@ namespace DJTechEditor.PCG.Graph
             base.ClearSelection();
             RefreshAllNodeSelectionVisuals();
             UpdateSceneEditContext();
-            m_Inspector?.OnSelectionChanged();
+            ScheduleInspectorRefresh();
         }
 
         public override EventPropagation DeleteSelection()

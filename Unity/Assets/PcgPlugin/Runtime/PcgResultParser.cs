@@ -761,7 +761,7 @@ namespace DJTechRuntime.PCG
                     splines.Add(line);
                 }
 
-                return splines.Count > 0;
+                return true;
             }
             catch (Exception ex)
             {

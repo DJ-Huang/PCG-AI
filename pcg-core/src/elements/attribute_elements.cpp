@@ -1,3 +1,4 @@
+#include "elements/delete_algorithms.hpp"
 #include "elements/attribute_elements.hpp"
 
 #include "elements/color_ramp.hpp"
@@ -1039,6 +1040,45 @@ public:
     }
 };
 
+class DeleteElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "Delete"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Delete missing node");
+        const data::PcgTaggedData* input = ctx.inputs.find("in");
+        if (!input)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Delete missing input");
+
+        const DeleteOptions options = parse_delete_options(ctx.node->data);
+        std::string error;
+
+        if (input->points) {
+            auto output = delete_points(*input->points, options, ctx.graph_seed, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Delete " + error).c_str());
+            emit_points(ctx, std::move(output));
+            return PCG_OK;
+        }
+        if (input->splines) {
+            auto output = delete_splines(*input->splines, options, ctx.graph_seed, error);
+            emit_splines(ctx, std::move(output));
+            return PCG_OK;
+        }
+        if (input->geometry) {
+            auto output = delete_geometry(*input->geometry, options, ctx.graph_seed, error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Delete " + error).c_str());
+            emit_geometry(ctx, std::move(output));
+            return PCG_OK;
+        }
+        return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                        "Delete supports Point, Spline, or Geometry input");
+    }
+};
+
 class SplitElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "Split"; }
@@ -1132,6 +1172,7 @@ void register_attribute_elements(
 {
     map.emplace("AttributeWrangle", std::make_unique<AttributeWrangleElement>());
     map.emplace("Blast", std::make_unique<BlastElement>());
+    map.emplace("Delete", std::make_unique<DeleteElement>());
     map.emplace("Split", std::make_unique<SplitElement>());
 }
 

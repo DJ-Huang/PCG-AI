@@ -96,6 +96,8 @@ namespace DJTechEditor.PCG.Graph
         public Dictionary<string, ManifestPropertyDef> properties = new();
         public List<ManifestOutputGroupDef> outputGroups = new();
         public List<ManifestSectionDef> inspectorSections = new();
+        /// <summary>foldouts (default) or tabs for section layout.</summary>
+        public string inspectorSectionLayout = "foldouts";
     }
 
     /// <summary>Loads schema/node-manifest.json for manifest-driven GraphView nodes.</summary>
@@ -322,6 +324,7 @@ namespace DJTechEditor.PCG.Graph
                 type = GetString(nodeDict, "type"),
                 displayName = GetString(nodeDict, "displayName", GetString(nodeDict, "type")),
                 category = GetString(nodeDict, "category", "Other"),
+                inspectorSectionLayout = GetString(nodeDict, "inspectorSectionLayout", "foldouts"),
             };
 
             if (nodeDict.TryGetValue("inputs", out var inputs) && inputs is List<object> inputList)

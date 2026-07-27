@@ -107,7 +107,9 @@ set(PCG_CORE_SOURCES
     src/elements/color_ramp.cpp
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
+    src/elements/delete_algorithms.cpp
     src/elements/primitive_elements.cpp
+    src/geometry/element_pattern.cpp
     src/elements/heightfield_algorithms.cpp
     src/elements/heightfield_algorithms_l3.cpp
     src/elements/heightfield_elements.cpp

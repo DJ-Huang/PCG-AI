@@ -1,0 +1,6 @@
+[2026-07-27T10:41:33.436Z] MemoryForge: attached 5 listener(s)
+[2026-07-27T10:41:33.436Z] InitialReadForge: armed one-shot BeforeSend after NewSessionStart
+[2026-07-27T10:41:33.436Z] LiveUpdateForge: session reset, allowLiveUpdate = false
+[2026-07-27T10:41:34.724Z] MemoryForge: attached 5 listener(s)
+[2026-07-27T10:41:34.725Z] InitialReadForge: armed one-shot BeforeSend after NewSessionStart
+[2026-07-27T10:41:34.725Z] LiveUpdateForge: session reset, allowLiveUpdate = false

@@ -25,8 +25,12 @@ namespace DJTechEditor.PCG.Graph
         private ScrollView m_Body;
         private PcgGraphNodeBase m_CurrentNode;
         private bool m_IsRebuilding;
+        private bool m_PendingSelectionDirty;
+        private PcgGraphNodeBase m_PendingNode;
         // Foldout state keyed by "nodeId|sectionId" — survives Inspector rebuild within session.
         private static readonly Dictionary<string, bool> s_SectionExpanded = new();
+        // Active tab keyed by node id for manifest tabs layout.
+        private static readonly Dictionary<string, string> s_ActiveTabSection = new();
 
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
         {
@@ -86,7 +90,16 @@ namespace DJTechEditor.PCG.Graph
 
         public void ToggleVisible()
         {
-            style.display = style.display.value == DisplayStyle.Flex ? DisplayStyle.None : DisplayStyle.Flex;
+            var opening = style.display.value != DisplayStyle.Flex;
+            style.display = opening ? DisplayStyle.Flex : DisplayStyle.None;
+            if (opening && m_PendingSelectionDirty)
+            {
+                m_PendingSelectionDirty = false;
+                if (m_PendingNode != null)
+                    ShowNode(m_PendingNode);
+                else
+                    OnSelectionChanged();
+            }
         }
 
         public void OnSelectionChanged()
@@ -94,10 +107,21 @@ namespace DJTechEditor.PCG.Graph
             var selected = m_GraphView.selection.OfType<PcgGraphNodeBase>().FirstOrDefault();
             if (selected == null)
             {
+                m_PendingSelectionDirty = false;
+                m_PendingNode = null;
                 ShowEmpty();
                 return;
             }
 
+            if (style.display.value != DisplayStyle.Flex)
+            {
+                m_PendingSelectionDirty = true;
+                m_PendingNode = selected;
+                return;
+            }
+
+            m_PendingSelectionDirty = false;
+            m_PendingNode = null;
             ShowNode(selected);
         }
 
@@ -449,6 +473,9 @@ namespace DJTechEditor.PCG.Graph
                     continue;
 
                 VisualElement container = m_Body;
+                if (def.inspectorSectionLayout == "tabs")
+                    continue;
+
                 if (section.foldout)
                 {
                     var foldoutKey = $"{node.NodeId}|{section.id}";
@@ -481,6 +508,94 @@ namespace DJTechEditor.PCG.Graph
                 if (node.NodeType == "TransformMesh" && section.id == "preTransform")
                     container.Add(CreateMoveCentroidButton(node));
             }
+
+            if (def.inspectorSectionLayout == "tabs" && def.inspectorSections.Count > 0)
+                ShowTabbedInspectorSections(node, def, props, companionTargets);
+        }
+
+        private void ShowTabbedInspectorSections(
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            List<(string key, ManifestPropertyDef prop)> props,
+            HashSet<string> companionTargets)
+        {
+            var tabSections = def.inspectorSections
+                .Where(section => props.Any(p =>
+                    p.prop.section == section.id &&
+                    !companionTargets.Contains(p.key) &&
+                    IsPropertyVisible(node, p.key, p.prop)))
+                .ToList();
+            if (tabSections.Count == 0)
+                return;
+
+            var tabKey = node.NodeId;
+            if (!s_ActiveTabSection.TryGetValue(tabKey, out var activeId) ||
+                tabSections.All(s => s.id != activeId))
+                activeId = tabSections[0].id;
+
+            var tabRow = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexWrap = Wrap.Wrap,
+                    marginTop = 6,
+                    marginBottom = 4,
+                },
+            };
+            m_Body.Add(tabRow);
+
+            var tabBody = new VisualElement { style = { marginTop = 2 } };
+            m_Body.Add(tabBody);
+
+            void RebuildActiveTab()
+            {
+                tabBody.Clear();
+                var activeSection = tabSections.FirstOrDefault(s => s.id == activeId) ?? tabSections[0];
+                activeId = activeSection.id;
+                s_ActiveTabSection[tabKey] = activeId;
+
+                var sectionProps = props
+                    .Where(p => p.prop.section == activeSection.id
+                                && !companionTargets.Contains(p.key)
+                                && IsPropertyVisible(node, p.key, p.prop))
+                    .ToList();
+                foreach (var item in BuildSectionPropertyItems(node, def, sectionProps, companionTargets))
+                {
+                    if (item.isGroup)
+                        tabBody.Add(CreateGroupedPropertyRow(node, def, item.members, rebuildOnChange: item.rebuildOnChange));
+                    else
+                        tabBody.Add(CreatePropertyRow(node, item.key, item.prop, def, rebuildOnChange: item.rebuildOnChange));
+                }
+            }
+
+            foreach (var section in tabSections)
+            {
+                var isActive = section.id == activeId;
+                var sectionId = section.id;
+                var button = new Button
+                {
+                    text = string.IsNullOrEmpty(section.label) ? section.id : section.label,
+                };
+                button.clicked += () =>
+                {
+                    if (activeId == sectionId)
+                        return;
+                    activeId = sectionId;
+                    s_ActiveTabSection[tabKey] = sectionId;
+                    foreach (var child in tabRow.Children().OfType<Button>())
+                        child.style.backgroundColor = new StyleColor(StyleKeyword.Null);
+                    button.style.backgroundColor = new Color(0.28f, 0.38f, 0.48f);
+                    RebuildActiveTab();
+                };
+                button.style.marginRight = 2;
+                button.style.marginBottom = 2;
+                if (isActive)
+                    button.style.backgroundColor = new Color(0.28f, 0.38f, 0.48f);
+                tabRow.Add(button);
+            }
+
+            RebuildActiveTab();
         }
 
         private struct SectionPropertyItem

@@ -319,5 +319,102 @@ int main()
         expect(found_paint, "palette writes paint1Cd detail vector attribute");
     }
 
+    const char* delete_passthrough_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"del","type":"Delete","data":{}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode delete_pass_code = pcg_execute_graph_v2(
+        delete_passthrough_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(delete_pass_code == PCG_OK, "Delete default passthrough executes");
+    expect(index_count == 36, "Delete default passthrough keeps box mesh");
+
+    const char* delete_number_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"primitives","numberEnable":true,"numberMode":"pattern","numberPattern":"0"}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode delete_number_code = pcg_execute_graph_v2(
+        delete_number_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(delete_number_code == PCG_OK, "Delete number pattern graph executes");
+    expect(index_count == 30, "Delete number pattern removes one primitive");
+
+    const char* delete_legacy_string_params_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"primitives","deleteNonSelected":"false",
+          "numberEnable":"true","numberMode":"pattern","numberPattern":"0",
+          "numberRangeStart":"0","numberRangeEnd":"0","numberSelectOf":"1",
+          "numberSelectOffset":"0","boundingEnable":"false",
+          "boundingCenterX":"0","boundingCenterY":"0","boundingCenterZ":"0",
+          "boundingSizeX":"1","boundingSizeY":"1","boundingSizeZ":"1",
+          "boundingRadius":"1","normalEnable":"false","normalDirX":"0",
+          "normalDirY":"1","normalDirZ":"0","normalSpread":"180",
+          "degenerateDuplicatePoints":"false","degenerateZeroArea":"false",
+          "degenerateOpenFacePerimeter":"false","degenerateTolerance":"0.0001",
+          "randomEnable":"false","randomSeed":"0","randomPercent":"100",
+          "keepPoints":"false","deleteUnusedGroups":"false"}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    std::memset(error, 0, sizeof(error));
+    const PcgResultCode delete_legacy_string_params_code = pcg_execute_graph_v2(
+        delete_legacy_string_params_graph, 42, &kind, json_buffer.data(),
+        static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+        static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+        error, sizeof(error));
+    expect(delete_legacy_string_params_code == PCG_OK,
+           "Delete accepts legacy string-serialized numeric and boolean parameters");
+    expect(index_count == 30,
+           "Delete legacy string parameters preserve number-pattern behavior");
+
+    const char* delete_inverse_spline_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"path","type":"CreateSpline","data":{
+          "mode":"polyline","closed":false,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0},{\"x\":3,\"y\":0,\"z\":0}]"}},
+        {"id":"del","type":"Delete","data":{
+          "numberEnable":true,"numberMode":"pattern","numberPattern":"!*","deleteNonSelected":true}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"path","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    const json inverse_spline = execute_json(delete_inverse_spline_graph);
+    expect(inverse_spline.contains("splines") && inverse_spline["splines"].empty(),
+           "Delete non-selected with !* yields empty splines");
+
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

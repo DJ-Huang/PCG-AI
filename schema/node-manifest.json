@@ -367,6 +367,346 @@
       }
     },
     {
+      "type": "Delete",
+      "displayName": "Delete",
+      "category": "Filter",
+      "inspectorSectionLayout": "tabs",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "number",
+          "label": "Number",
+          "foldout": false
+        },
+        {
+          "id": "bounding",
+          "label": "Bounding Volume",
+          "foldout": false
+        },
+        {
+          "id": "normal",
+          "label": "Normal",
+          "foldout": false
+        },
+        {
+          "id": "degenerate",
+          "label": "Degenerate",
+          "foldout": false
+        },
+        {
+          "id": "random",
+          "label": "Random",
+          "foldout": false
+        }
+      ],
+      "properties": {
+        "group": {
+          "type": "groupSelect",
+          "groupDomain": "point",
+          "displayName": "Group",
+          "default": "",
+          "order": 0
+        },
+        "deleteNonSelected": {
+          "type": "boolean",
+          "displayName": "Delete Non Selected",
+          "default": false,
+          "order": 10
+        },
+        "entity": {
+          "type": "enum",
+          "displayName": "Entity",
+          "default": "points",
+          "order": 20,
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "geometryType": {
+          "type": "enum",
+          "displayName": "Geometry Type",
+          "default": "all",
+          "order": 30,
+          "options": [
+            { "value": "all", "label": "All Types" },
+            { "value": "polygon", "label": "Polygon" },
+            { "value": "curve", "label": "Curve" }
+          ]
+        },
+        "numberEnable": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "number",
+          "order": 0
+        },
+        "numberMode": {
+          "type": "enum",
+          "displayName": "Mode",
+          "default": "pattern",
+          "section": "number",
+          "order": 10,
+          "visibleWhen": { "property": "numberEnable", "equals": "true" },
+          "options": [
+            { "value": "pattern", "label": "Pattern" },
+            { "value": "range", "label": "Range" },
+            { "value": "expression", "label": "Expression" }
+          ]
+        },
+        "numberPattern": {
+          "type": "string",
+          "displayName": "Pattern",
+          "default": "*",
+          "section": "number",
+          "order": 20,
+          "visibleWhen": { "property": "numberMode", "equals": "pattern" }
+        },
+        "numberRangeStart": {
+          "type": "integer",
+          "displayName": "Start",
+          "default": 0,
+          "section": "number",
+          "order": 30,
+          "visibleWhen": { "property": "numberMode", "equals": "range" }
+        },
+        "numberRangeEnd": {
+          "type": "integer",
+          "displayName": "End",
+          "default": 0,
+          "section": "number",
+          "order": 40,
+          "visibleWhen": { "property": "numberMode", "equals": "range" }
+        },
+        "numberSelectOf": {
+          "type": "integer",
+          "displayName": "Select Of",
+          "default": 1,
+          "section": "number",
+          "order": 50,
+          "visibleWhen": { "property": "numberMode", "equals": "range" }
+        },
+        "numberSelectOffset": {
+          "type": "integer",
+          "displayName": "Offset",
+          "default": 0,
+          "section": "number",
+          "order": 60,
+          "visibleWhen": { "property": "numberMode", "equals": "range" }
+        },
+        "numberExpression": {
+          "type": "string",
+          "displayName": "Expression",
+          "default": "@ptnum == 0",
+          "section": "number",
+          "order": 70,
+          "multiline": true,
+          "lines": 3,
+          "visibleWhen": { "property": "numberMode", "equals": "expression" }
+        },
+        "boundingEnable": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "bounding",
+          "order": 0
+        },
+        "boundingType": {
+          "type": "enum",
+          "displayName": "Type",
+          "default": "box",
+          "section": "bounding",
+          "order": 10,
+          "visibleWhen": { "property": "boundingEnable", "equals": "true" },
+          "options": [
+            { "value": "box", "label": "Box" },
+            { "value": "sphere", "label": "Sphere" }
+          ]
+        },
+        "boundingCenterX": {
+          "type": "number",
+          "displayName": "Center X",
+          "default": 0,
+          "section": "bounding",
+          "order": 20,
+          "visibleWhen": { "property": "boundingEnable", "equals": "true" }
+        },
+        "boundingCenterY": {
+          "type": "number",
+          "displayName": "Center Y",
+          "default": 0,
+          "section": "bounding",
+          "order": 30,
+          "visibleWhen": { "property": "boundingEnable", "equals": "true" }
+        },
+        "boundingCenterZ": {
+          "type": "number",
+          "displayName": "Center Z",
+          "default": 0,
+          "section": "bounding",
+          "order": 40,
+          "visibleWhen": { "property": "boundingEnable", "equals": "true" }
+        },
+        "boundingSizeX": {
+          "type": "number",
+          "displayName": "Size X",
+          "default": 1,
+          "section": "bounding",
+          "order": 50,
+          "visibleWhen": { "property": "boundingType", "equals": "box" }
+        },
+        "boundingSizeY": {
+          "type": "number",
+          "displayName": "Size Y",
+          "default": 1,
+          "section": "bounding",
+          "order": 60,
+          "visibleWhen": { "property": "boundingType", "equals": "box" }
+        },
+        "boundingSizeZ": {
+          "type": "number",
+          "displayName": "Size Z",
+          "default": 1,
+          "section": "bounding",
+          "order": 70,
+          "visibleWhen": { "property": "boundingType", "equals": "box" }
+        },
+        "boundingRadius": {
+          "type": "number",
+          "displayName": "Radius",
+          "default": 1,
+          "section": "bounding",
+          "order": 80,
+          "visibleWhen": { "property": "boundingType", "equals": "sphere" }
+        },
+        "normalEnable": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "normal",
+          "order": 0
+        },
+        "normalDirX": {
+          "type": "number",
+          "displayName": "Direction X",
+          "default": 0,
+          "section": "normal",
+          "order": 10,
+          "visibleWhen": { "property": "normalEnable", "equals": "true" }
+        },
+        "normalDirY": {
+          "type": "number",
+          "displayName": "Direction Y",
+          "default": 1,
+          "section": "normal",
+          "order": 20,
+          "visibleWhen": { "property": "normalEnable", "equals": "true" }
+        },
+        "normalDirZ": {
+          "type": "number",
+          "displayName": "Direction Z",
+          "default": 0,
+          "section": "normal",
+          "order": 30,
+          "visibleWhen": { "property": "normalEnable", "equals": "true" }
+        },
+        "normalSpread": {
+          "type": "number",
+          "displayName": "Spread",
+          "default": 180,
+          "section": "normal",
+          "order": 40,
+          "visibleWhen": { "property": "normalEnable", "equals": "true" }
+        },
+        "degenerateDuplicatePoints": {
+          "type": "boolean",
+          "displayName": "Duplicate Points",
+          "default": false,
+          "section": "degenerate",
+          "order": 0
+        },
+        "degenerateZeroArea": {
+          "type": "boolean",
+          "displayName": "Zero Area Faces",
+          "default": false,
+          "section": "degenerate",
+          "order": 10
+        },
+        "degenerateOpenFacePerimeter": {
+          "type": "boolean",
+          "displayName": "Open Face Perimeter",
+          "default": false,
+          "section": "degenerate",
+          "order": 20
+        },
+        "degenerateTolerance": {
+          "type": "number",
+          "displayName": "Tolerance",
+          "default": 0.0001,
+          "section": "degenerate",
+          "order": 30
+        },
+        "randomEnable": {
+          "type": "boolean",
+          "displayName": "Enable",
+          "default": false,
+          "section": "random",
+          "order": 0
+        },
+        "randomSeed": {
+          "type": "integer",
+          "displayName": "Seed",
+          "default": 0,
+          "section": "random",
+          "order": 10,
+          "visibleWhen": { "property": "randomEnable", "equals": "true" }
+        },
+        "randomSeedAttribute": {
+          "type": "string",
+          "displayName": "Seed Attribute",
+          "default": "",
+          "section": "random",
+          "order": 20,
+          "visibleWhen": { "property": "randomEnable", "equals": "true" }
+        },
+        "randomPercent": {
+          "type": "number",
+          "displayName": "Percent",
+          "default": 100,
+          "section": "random",
+          "order": 30,
+          "visibleWhen": { "property": "randomEnable", "equals": "true" }
+        },
+        "keepPoints": {
+          "type": "boolean",
+          "displayName": "Keep Points",
+          "default": false,
+          "order": 100,
+          "visibleWhen": { "property": "entity", "equals": "primitives" }
+        },
+        "deleteUnusedGroups": {
+          "type": "boolean",
+          "displayName": "Delete Unused Groups",
+          "default": false,
+          "order": 110
+        }
+      }
+    },
+    {
       "type": "Blast",
       "displayName": "Blast",
       "category": "Filter",
