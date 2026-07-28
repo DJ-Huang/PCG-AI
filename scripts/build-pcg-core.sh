@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build pcg-core (dylib + static lib) on macOS and optionally copy into Unity Plugins.
+# Build pcg-core (shared + static). Unity no longer loads these plugins;
+# use scripts/build-pcg-server.sh for Editor cook.
 set -euo pipefail
 
 CONFIGURATION="Release"
@@ -8,9 +9,10 @@ RUN_TESTS=false
 TEST_REGEX=""
 
 usage() {
-    echo "Usage: $0 [--config Debug|Release] [--copy-to-unity] [--run-tests] [--test-regex <regex>]"
+    echo "Usage: $0 [--config Debug|Release] [--run-tests] [--test-regex <regex>]"
     echo "  --run-tests          Run all focused functional tests (demo graphs excluded)"
     echo "  --test-regex <regex> Run only matching focused tests"
+    echo "  --copy-to-unity      DEPRECATED (ignored): Unity uses pcg-server, not Plugins dylib"
     exit 1
 }
 
@@ -94,24 +96,8 @@ echo "==> Artifacts:"
 ls -la "$DYLIB" "$STATIC_LIB"
 
 if $COPY_TO_UNITY; then
-    mkdir -p "$UNITY_PLUGINS"
-    for src in "$DYLIB" "$STATIC_LIB"; do
-        dest="$UNITY_PLUGINS/$(basename "$src")"
-        if cp -f "$src" "$dest" 2>/dev/null; then
-            echo "Copied -> $dest"
-        else
-            pending="${dest}.new"
-            cp -f "$src" "$pending"
-            echo "WARN: Unity may have locked $(basename "$dest"); wrote ${pending} instead."
-            dest="$pending"
-        fi
-        if [[ "$(basename "$dest")" == *.dylib ]]; then
-            xattr -cr "$dest" 2>/dev/null || true
-            codesign --force --sign - "$dest"
-            codesign --verify --verbose=2 "$dest"
-            echo "Re-signed -> $dest"
-        fi
-    done
+    echo "WARN: --copy-to-unity is deprecated and ignored."
+    echo "      Unity no longer loads PcgCore from Plugins/. Use scripts/build-pcg-server.sh instead."
 fi
 
 echo "Done."

@@ -1,22 +1,25 @@
-# Unity 运行时：P/Invoke 绑定、结果解析与预览渲染
+# Unity 运行时：HTTP cook 客户端、结果解析与预览渲染
 
-> [返回目录](index.md) | 前置：[几何内核](06-geometry-kernel.md) | 基于 commit `f50d744`
+> [返回目录](index.md) | 前置：[几何内核](06-geometry-kernel.md)
+>
+> **架构更新（2026-07-28）**：Unity 不再 `DllImport` / 加载 `PcgCore` dylib/dll。
+> C++ 在本机 `pcg-server` 执行；`PcgNative` 是 HTTP 门面。见 [`../pcg-server.md`](../pcg-server.md)。
 
 ## 学习目标
 读完并完成实践后，你能够：
-- 解释 PcgNative.cs 如何通过 P/Invoke 调用 C++ 核心
-- 追踪从 native 调用到 Scene 预览渲染的完整路径
+- 解释 cook 如何经 `PcgCookClient` / `PcgNative` 发到 `pcg-server`
+- 追踪从 HTTP 结果到 Scene 预览渲染的完整路径
 - 理解 Mesh/Point/Geometry 三种二进制结果在 C# 侧的解析方式
 
 ## 1. 从失败场景开始
 
-在 Unity 中执行图后，Scene 视图没有任何预览。Console 报错：
+在 Unity 中执行图后，Scene 视图没有任何预览。Console 报错类似：
 
 ```
-DllNotFoundException: PcgCore
+pcg-server request failed: ... Connection refused
 ```
 
-这是最常见的 M0 验证失败。根因是 `PcgCore.dll` 未正确放置在 `Plugins/x86_64/` 目录下，或 Unity 锁定了旧版 DLL。恢复方法：关闭 Unity → 运行 `build-pcg-core.ps1 -CopyToUnity` → 重新打开 Unity。证据：E-038。
+最常见原因是本机 `pcg-server` 未启动。恢复方法：`./scripts/run-pcg-server.sh`，然后 **PCG → Server → Health Check**。
 
 ## 2. 心智模型
 
@@ -225,14 +228,12 @@ private PcgPolygonPreviewData m_PolygonPreview;
 
 ## 5. 边界、失败与恢复
 
-| 场景 | 代码行为 | 可观察信号 | 根因 | 恢复/排查 | 证据 |
-|------|----------|------------|------|-----------|------|
-| DLL 未找到 | `DllNotFoundException` | Console 报错 | DLL 未复制到 Plugins | `build-pcg-core.ps1 -CopyToUnity` | E-038 |
-| DLL 被锁定 | `Copy-Item` 失败 | 脚本报错 | Unity 占用 DLL | 关闭 Unity 后重拷 | E-038 |
-| 二进制 magic 不匹配 | 解析返回空 | 预览为空 | C#/C++ 常量不同步 | 检查版本对齐 | E-039 |
-| Buffer 太小 | native 返回 `PCG_ERR_EXECUTION` | err_buf: "buffer too small" | 点数或面数过多 | 增大 buffer | E-005 |
-| 异步 cook 结果过期 | generation 不匹配，丢弃 | 预览不更新 | 快速连续修改参数 | 正常行为，等待最新 cook | E-040 |
-| IL2CPP LNK2019 | 链接错误 | `LNK2019 pcg_*` | PcgCore.lib 未就绪 | `build-pcg-core.ps1 -CopyToUnity` | E-047 |
+| 场景 | 代码行为 | 可观察信号 | 根因 | 恢复/排查 |
+|------|----------|------------|------|-----------|
+| 后端未启动 | HTTP 连接失败 | Console：`pcg-server request failed` | 未跑 `run-pcg-server` | 启动服务 + Health Check |
+| 二进制 magic 不匹配 | 解析返回空 | 预览为空 | C#/C++ 常量不同步 | 检查版本对齐 |
+| Buffer 太小 | 服务端 grow/retry 或失败 | err 含 buffer too small | 点数或面数过多 | 看服务端日志 / 增大默认 buffer |
+| 异步 cook 结果过期 | generation 不匹配，丢弃 | 预览不更新 | 快速连续修改参数 | 正常行为，等待最新 cook |
 
 ## 6. 动手实践
 

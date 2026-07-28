@@ -3195,7 +3195,7 @@ keepOriginalGroup=false → 删除源点组
 节点、Manifest 或 native core 发生变化后，提交前执行：
 
 ```bash
-scripts/build-pcg-core.sh --copy-to-unity --run-tests
+./scripts/build-pcg-core.sh --run-tests
 scripts/sync-manifest.sh
 ```
 
