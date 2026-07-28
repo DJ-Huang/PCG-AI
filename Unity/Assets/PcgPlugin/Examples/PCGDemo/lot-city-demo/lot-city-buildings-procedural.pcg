@@ -131,7 +131,7 @@
       "id": "lift_bldgs",
       "type": "TransformMesh",
       "position": { "x": 840, "y": 4560 },
-      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "attributes": "*", "recomputePointNormals": false, "recomputeAffectedNormals": true, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": "Lift Onto Pads"}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0.18,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "attributes": "*", "recomputeAffectedNormals": true, "__nodeTitle": "Lift Onto Pads"}
     },
     {
       "id": "merge",
@@ -173,7 +173,7 @@
       "id": "ring_lines",
       "type": "ConvertLine",
       "position": { "x": 520, "y": 2000 },
-      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "mode": "unshared", "edgeGroup": "", "__nodeTitle": "Ring Edges"}
+      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "mode": "unshared", "edgeGroup": "", "__nodeTitle": "Ring Edges"}
     },
     {
       "id": "win_pts",
@@ -377,7 +377,7 @@
       "id": "n103",
       "type": "ConvertLine",
       "position": { "x": 1173, "y": 902 },
-      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
+      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
     },
     {
       "id": "n112",
@@ -407,7 +407,7 @@
       "id": "n118",
       "type": "TransformMesh",
       "position": { "x": 1212.5, "y": 1573.5 },
-      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 2, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "attributes": "*", "recomputePointNormals": false, "recomputeAffectedNormals": true, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": ""}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 2, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "attributes": "*", "recomputeAffectedNormals": true, "__nodeTitle": ""}
     },
     {
       "id": "n119",
@@ -443,7 +443,7 @@
       "id": "n122",
       "type": "ConvertLine",
       "position": { "x": 1434, "y": 1744.5 },
-      "data": {"group": "streetFacingEdges", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "keepGroupOrder": false, "makeIsolatedLoopsClosed": false, "removeUnusedPoints": true, "computeLength": false, "lengthAttribute": "restlength", "__nodeTitle": ""}
+      "data": {"group": "streetFacingEdges", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "__nodeTitle": ""}
     },
     {
       "id": "n124",

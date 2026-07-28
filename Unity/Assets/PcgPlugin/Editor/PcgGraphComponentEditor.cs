@@ -175,7 +175,7 @@ namespace DJTechEditor.PCG
                 if (GUILayout.Button("Run", GUILayout.Height(28)))
                 {
                     serializedObject.ApplyModifiedProperties();
-                    PcgNative.ClearCookCache();
+                    PcgCookBackend.ClearCookCache();
                     m_Target.Run();
                     serializedObject.Update();
                 }

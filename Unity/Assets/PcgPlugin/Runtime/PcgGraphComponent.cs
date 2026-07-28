@@ -1129,9 +1129,9 @@ namespace DJTechRuntime.PCG
                 if (token.IsCancellationRequested)
                     return AsyncCookResult.FromCancelled(generation);
 
-                // ExecuteGraph performs parse + validation. Avoid a second P/Invoke and
-                // a second full JSON parse on every asynchronous preview cook.
-                var (execCode, execResult) = PcgNative.ExecuteGraph(
+                // ExecuteGraph performs parse + validation. Avoid a second native/HTTP
+                // round-trip and a second full JSON parse on every asynchronous preview cook.
+                var (execCode, execResult) = PcgCookBackend.ExecuteGraph(
                     json, localSeed, textures, meshes, splines, heightfields);
                 if (execCode != PcgResultCode.Ok)
                 {
@@ -1171,7 +1171,7 @@ namespace DJTechRuntime.PCG
             if (m_LastAsyncCookStatus == "cancelling")
                 return true;
 
-            PcgNative.RequestCancel();
+            PcgCookBackend.RequestCancel();
             m_AsyncCookCts?.Cancel();
             // A completed result from the superseded request must never apply.
             m_AsyncCookGeneration++;
@@ -1190,11 +1190,11 @@ namespace DJTechRuntime.PCG
             if (!m_AsyncCookInProgress && task == null)
                 return false;
 
-            // Ask the in-flight Task.Run cook to stop, then WAIT for native ExecuteGraph
+            // Ask the in-flight Task.Run cook to stop, then WAIT for ExecuteGraph
             // to finish. Dropping the Task reference without Wait races the next cook against
             // g_cook_cache / static cancel flag — Mesh may still apply, GeometryBinary often becomes 0
             // (cyan polygon wire empty on node Preview).
-            PcgNative.RequestCancel();
+            PcgCookBackend.RequestCancel();
             m_AsyncCookCts?.Cancel();
 
             m_AsyncCookInProgress = false;
@@ -1229,7 +1229,7 @@ namespace DJTechRuntime.PCG
             }
 
             cts?.Dispose();
-            PcgNative.ClearCancel();
+            PcgCookBackend.ClearCancel();
 
 #if UNITY_EDITOR
             if (log && !string.IsNullOrEmpty(reason))

@@ -1,35 +1,26 @@
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
+using System.IO;
+using DJTechRuntime.PCG;
 
 namespace DJTechEditor.PCG
 {
+    /// <summary>
+    /// FBX export via localhost pcg-server (no PcgFbxExporter dylib/dll in Unity).
+    /// </summary>
     internal static class PcgFbxNative
     {
-        private const string Library = "PcgFbxExporter";
-        private const int ErrorBufferSize = 2048;
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct ExportOptions
+        public static string Version
         {
-            public uint StructSize;
-            public float Scale;
-            public int GenerateNormals;
+            get
+            {
+                var (ok, _, _) = PcgCookClient.TryHealthCheck();
+                if (!ok)
+                    return "unavailable";
+                // Prefer last export header; fall back to health fbx_version if present.
+                return s_LastFbxVersion ?? "pcg-server";
+            }
         }
 
-        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int pcg_fbx_export_v1(
-            byte[] geometryBinary,
-            int geometryBinarySize,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string outputPath,
-            ref ExportOptions options,
-            StringBuilder errorBuffer,
-            int errorBufferSize);
-
-        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr pcg_fbx_get_version();
-
-        public static string Version => Marshal.PtrToStringAnsi(pcg_fbx_get_version());
+        private static string s_LastFbxVersion;
 
         public static bool Export(
             byte[] geometryBinary,
@@ -39,45 +30,25 @@ namespace DJTechEditor.PCG
             out string error)
         {
             error = null;
-            if (geometryBinary == null || geometryBinary.Length == 0)
+            if (!PcgCookClient.TryExportFbx(
+                    geometryBinary, scale, generateNormals,
+                    out var fbxBytes, out var fbxVersion, out error))
             {
-                error = "Cook did not return polygon geometry.";
                 return false;
             }
 
-            var options = new ExportOptions
-            {
-                StructSize = (uint)Marshal.SizeOf<ExportOptions>(),
-                Scale = scale,
-                GenerateNormals = generateNormals ? 1 : 0,
-            };
-            var errorBuffer = new StringBuilder(ErrorBufferSize);
+            s_LastFbxVersion = fbxVersion;
             try
             {
-                var result = pcg_fbx_export_v1(
-                    geometryBinary,
-                    geometryBinary.Length,
-                    outputPath,
-                    ref options,
-                    errorBuffer,
-                    ErrorBufferSize);
-                if (result == 0)
-                    return true;
-
-                error = string.IsNullOrWhiteSpace(errorBuffer.ToString())
-                    ? $"Native FBX exporter failed with code {result}."
-                    : errorBuffer.ToString();
-                return false;
+                var dir = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+                File.WriteAllBytes(outputPath, fbxBytes);
+                return true;
             }
-            catch (DllNotFoundException)
+            catch (IOException ex)
             {
-                error = "PcgFbxExporter native library is missing. Run " +
-                        "scripts/build-pcg-fbx-exporter.sh --copy-to-unity.";
-                return false;
-            }
-            catch (EntryPointNotFoundException)
-            {
-                error = "PcgFbxExporter has an incompatible ABI. Rebuild the native exporter.";
+                error = $"Failed to write FBX '{outputPath}': {ex.Message}";
                 return false;
             }
         }
