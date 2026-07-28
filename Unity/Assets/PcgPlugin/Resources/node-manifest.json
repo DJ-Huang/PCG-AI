@@ -312,7 +312,22 @@
       "inputs": [
         {
           "id": "in",
-          "label": "Geometry",
+          "label": "0",
+          "pinType": "Any"
+        },
+        {
+          "id": "in1",
+          "label": "1",
+          "pinType": "Any"
+        },
+        {
+          "id": "in2",
+          "label": "2",
+          "pinType": "Any"
+        },
+        {
+          "id": "in3",
+          "label": "3",
           "pinType": "Any"
         }
       ],
@@ -324,6 +339,22 @@
         }
       ],
       "properties": {
+        "group": {
+          "type": "groupSelect",
+          "displayName": "Group",
+          "default": ""
+        },
+        "groupType": {
+          "type": "enum",
+          "displayName": "Group Type",
+          "default": "guess",
+          "options": [
+            { "value": "guess", "label": "Guess from Group" },
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
         "runOver": {
           "type": "enum",
           "displayName": "Run Over",
@@ -352,10 +383,21 @@
         },
         "parameters": {
           "type": "string",
-          "displayName": "Parameters (JSON)",
+          "displayName": "Channels",
           "default": "{\"sag\": 3.0}",
+          "multiline": false
+        },
+        "attributesToCreate": {
+          "type": "string",
+          "displayName": "Attributes to Create",
+          "default": "",
           "multiline": true,
-          "lines": 3
+          "lines": 2
+        },
+        "enforcePrototypes": {
+          "type": "boolean",
+          "displayName": "Enforce Prototypes",
+          "default": false
         },
         "ramps": {
           "type": "string",
@@ -798,53 +840,43 @@
         }
       ],
       "properties": {
-        "entity": {
+        "group": {
+          "type": "groupSelect",
+          "displayName": "Group",
+          "default": "",
+          "order": 0
+        },
+        "groupType": {
           "type": "enum",
           "displayName": "Group Type",
-          "default": "primitives",
+          "default": "guess",
+          "order": 10,
           "options": [
             {
-              "value": "primitives",
-              "label": "Primitives"
+              "value": "guess",
+              "label": "Guess from Group"
             },
             {
               "value": "points",
               "label": "Points"
+            },
+            {
+              "value": "primitives",
+              "label": "Primitives"
             }
           ]
-        },
-        "group": {
-          "type": "string",
-          "displayName": "Group",
-          "default": ""
-        },
-        "expression": {
-          "type": "string",
-          "displayName": "Selection Expression",
-          "default": "",
-          "multiline": true,
-          "lines": 4
-        },
-        "parameters": {
-          "type": "string",
-          "displayName": "Parameters (JSON)",
-          "default": "{}",
-          "multiline": true,
-          "lines": 3
         },
         "invertSelection": {
           "type": "boolean",
           "displayName": "Invert Selection",
-          "default": false
+          "default": false,
+          "order": 20
         },
-        "removeUnusedPoints": {
+        "deleteUnusedGroups": {
           "type": "boolean",
-          "displayName": "Remove Unused Points",
-          "default": true,
-          "visibleWhen": {
-            "property": "entity",
-            "equals": "primitives"
-          }
+          "displayName": "Delete Unused Groups",
+          "default": false,
+          "order": 30
         }
       }
     },

@@ -15,6 +15,12 @@ struct EvalContext {
     std::function<bool(const std::string&, double)> write_variable;
     std::function<bool(const std::string&, std::array<double, 3>&)> read_vector;
     std::function<bool(const std::string&, const std::array<double, 3>&)> write_vector;
+    /// nedgesgroup(geoIndex, groupName) → edge count in named edge group.
+    std::function<bool(int, const std::string&, double&)> nedgesgroup;
+    /// getbbox_size(geoIndex) → XYZ size of geometry bounding box.
+    std::function<bool(int, std::array<double, 3>&)> getbbox_size;
+    /// detail(geoIndex, attrName, component) — geoIndex -1 means current/fallback geometry.
+    std::function<bool(int, const std::string&, int, double&)> detail;
     std::unordered_map<std::string, double> parameters;
     std::unordered_map<std::string, double> locals;
     std::unordered_map<std::string, std::array<double, 3>> local_vectors;

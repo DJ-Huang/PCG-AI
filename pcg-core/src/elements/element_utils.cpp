@@ -174,6 +174,36 @@ const data::PcgGeometry* optional_geometry_input(PcgContext& ctx,
         storage = data::geometry_from_mesh(*mesh);
         return &storage;
     }
+    // ConvertLine / Delete spline chains are common secondary inputs for getbbox_size(N).
+    if (const auto* splines = ctx.inputs.find_splines(pin)) {
+        storage = data::PcgGeometry{};
+        for (const auto& spline : splines->splines()) {
+            if (spline.points.size() < 2)
+                continue;
+            std::vector<int> face;
+            face.reserve(spline.points.size() + (spline.closed ? 1 : 0));
+            for (const auto& p : spline.points) {
+                const int index = static_cast<int>(storage.points().size());
+                storage.points_mut().push_back({p.x, p.y, p.z});
+                face.push_back(index);
+            }
+            if (spline.closed && !face.empty())
+                face.push_back(face.front());
+            storage.faces_mut().push_back(std::move(face));
+        }
+        if (storage.points().empty())
+            return nullptr;
+        return &storage;
+    }
+    if (const auto* points = ctx.inputs.find_points(pin)) {
+        storage = data::PcgGeometry{};
+        storage.points_mut().reserve(points->points().size());
+        for (const auto& p : points->points())
+            storage.points_mut().push_back({p.x, p.y, p.z});
+        if (storage.points().empty())
+            return nullptr;
+        return &storage;
+    }
     return nullptr;
 }
 

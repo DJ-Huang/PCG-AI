@@ -48,6 +48,7 @@
   - [DensityFilter](#densityfilter)
   - [AttributeFilter](#attributefilter)
   - [Delete](#delete)
+  - [Split](#split)
   - [Blast](#blast)
 - [Attribute 类别](#attribute-类别)
   - [AttributeWrangle](#attributewrangle)
@@ -898,6 +899,38 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
     "entity": "primitives",
     "group": "top",
     "deleteNonSelected": false
+  }
+}
+```
+
+---
+
+### Split
+
+**类别**：Filter
+
+**功能**：对齐 Houdini Split SOP。按 Group 将几何分成两路：第一输出（`out`）为选中部分，第二输出（`rest`）为补集。
+
+**属性**（与 Houdini UI 对齐）：
+
+| 属性 | 显示名 | 默认 | 语义 |
+|------|--------|------|------|
+| `group` | Group | `""` | 送入第一输出的子集；空 = 全部 |
+| `groupType` | Group Type | `guess` | `guess` / `points` / `primitives`；`guess` 按组域名推断 |
+| `invertSelection` | Invert Selection | `false` | 交换两路输出 |
+| `deleteUnusedGroups` | Delete Unused Groups | `false` | 删除拆分后变空的 group；关闭时保留空 group 名 |
+
+兼容旧图：仍可读 `entity`（等同 `groupType`）与 `removeUnusedPoints`（几何 primitive 拆分时默认丢弃未引用点）。
+
+```json
+{
+  "id": "split_fire_escape",
+  "type": "Split",
+  "data": {
+    "group": "fireEscape",
+    "groupType": "guess",
+    "invertSelection": false,
+    "deleteUnusedGroups": false
   }
 }
 ```

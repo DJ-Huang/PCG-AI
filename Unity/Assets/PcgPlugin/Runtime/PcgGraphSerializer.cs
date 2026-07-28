@@ -395,6 +395,16 @@ namespace DJTechRuntime.PCG
                     data.SetRaw(key, PcgVector3Property.NormalizeStored(value));
                     continue;
                 }
+                // String properties sometimes arrive as JSON objects/arrays from MiniJson
+                // (e.g. AttributeWrangle parameters). Persist as JSON text, not ToString().
+                if (manifestProps != null &&
+                    manifestProps.TryGetValue(key, out var stringProp) &&
+                    stringProp.type == "string" &&
+                    value is Dictionary<string, object> or List<object>)
+                {
+                    data.SetRaw(key, PcgMiniJson.Serialize(value));
+                    continue;
+                }
                 data.SetRaw(key, value);
             }
         }

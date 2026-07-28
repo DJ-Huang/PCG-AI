@@ -6,8 +6,10 @@
 #include "elements/expression.hpp"
 #include "data/pcg_attribute_table.hpp"
 #include "geometry/bmesh.hpp"
+#include "geometry/group_table.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -26,6 +28,16 @@ using expression::Program;
 struct WrangleEnvironment {
     std::unordered_map<std::string, double> parameters;
     ColorRampMap ramps;
+    std::string group;
+    std::string group_type; // points | primitives | edges | guess
+    /// Houdini-style op inputs 0..N; index 0 is the main geometry being wrangled.
+    std::vector<const data::PcgGeometry*> input_geometries;
+};
+
+struct ParamSpec {
+    double literal = 0.0;
+    bool has_literal = false;
+    std::string expr;
 };
 
 struct ElementVariables {
@@ -205,10 +217,10 @@ bool write_table_vector(ElementVariables& variables,
     return false;
 }
 
-std::unordered_map<std::string, double> parse_parameters(const nlohmann::json& data,
-                                                         std::string& error)
+std::unordered_map<std::string, ParamSpec> parse_parameter_specs(const nlohmann::json& data,
+                                                                  std::string& error)
 {
-    std::unordered_map<std::string, double> result;
+    std::unordered_map<std::string, ParamSpec> result;
     if (!data.contains("parameters"))
         return result;
 
@@ -236,23 +248,198 @@ std::unordered_map<std::string, double> parse_parameters(const nlohmann::json& d
         return {};
     }
     for (auto it = parameters.begin(); it != parameters.end(); ++it) {
-        if (it.value().is_number())
-            result[it.key()] = it.value().get<double>();
-        else if (it.value().is_boolean())
-            result[it.key()] = it.value().get<bool>() ? 1.0 : 0.0;
-        else {
-            error = "parameter '" + it.key() + "' must be numeric";
+        ParamSpec spec;
+        if (it.value().is_number()) {
+            spec.literal = it.value().get<double>();
+            spec.has_literal = true;
+        } else if (it.value().is_boolean()) {
+            spec.literal = it.value().get<bool>() ? 1.0 : 0.0;
+            spec.has_literal = true;
+        } else if (it.value().is_string()) {
+            spec.expr = it.value().get<std::string>();
+        } else if (it.value().is_object()) {
+            if (it.value().contains("expr") && it.value()["expr"].is_string())
+                spec.expr = it.value()["expr"].get<std::string>();
+            if (it.value().contains("value") && it.value()["value"].is_number()) {
+                spec.literal = it.value()["value"].get<double>();
+                spec.has_literal = true;
+            } else if (it.value().contains("value") && it.value()["value"].is_boolean()) {
+                spec.literal = it.value()["value"].get<bool>() ? 1.0 : 0.0;
+                spec.has_literal = true;
+            }
+            if (spec.expr.empty() && !spec.has_literal) {
+                error = "parameter '" + it.key() + "' object needs expr and/or value";
+                return {};
+            }
+        } else {
+            error = "parameter '" + it.key() + "' must be numeric, string expr, or {expr,value}";
             return {};
         }
+        result[it.key()] = std::move(spec);
     }
     return result;
 }
 
-WrangleEnvironment build_wrangle_environment(const nlohmann::json& data, std::string& error)
+bool read_detail_component(const data::AttributeTable* table,
+                           const std::string& name,
+                           int component,
+                           double& out)
+{
+    if (!table || name.empty() || component < 0)
+        return false;
+    const data::AttributeArray* attr = table->find(data::AttributeOwner::Detail, name);
+    if (!attr || attr->size() == 0)
+        return false;
+    const int tuple = std::max(1, attr->schema().tuple_size);
+    if (component >= tuple)
+        return false;
+    if (attr->schema().type == data::AttributeType::Float) {
+        const size_t offset = static_cast<size_t>(component);
+        if (offset >= attr->float_values().size())
+            return false;
+        out = attr->float_values()[offset];
+        return true;
+    }
+    if (attr->schema().type == data::AttributeType::Int) {
+        const size_t offset = static_cast<size_t>(component);
+        if (offset >= attr->int_values().size())
+            return false;
+        out = static_cast<double>(attr->int_values()[offset]);
+        return true;
+    }
+    return false;
+}
+
+bool geometry_bbox_size(const data::PcgGeometry& geometry, std::array<double, 3>& size)
+{
+    if (geometry.points().empty()) {
+        size = {0.0, 0.0, 0.0};
+        return true;
+    }
+    double min_x = geometry.points()[0].x;
+    double min_y = geometry.points()[0].y;
+    double min_z = geometry.points()[0].z;
+    double max_x = min_x;
+    double max_y = min_y;
+    double max_z = min_z;
+    for (const auto& point : geometry.points()) {
+        min_x = std::min(min_x, point.x);
+        min_y = std::min(min_y, point.y);
+        min_z = std::min(min_z, point.z);
+        max_x = std::max(max_x, point.x);
+        max_y = std::max(max_y, point.y);
+        max_z = std::max(max_z, point.z);
+    }
+    size = {max_x - min_x, max_y - min_y, max_z - min_z};
+    return true;
+}
+
+void bind_geometry_callbacks(EvalContext& context, const WrangleEnvironment& environment,
+                             data::PcgGeometry* current_geometry);
+
+EvalContext make_context(ElementVariables& variables, const WrangleEnvironment& environment);
+
+const data::PcgGeometry* resolve_input_geometry(const WrangleEnvironment& environment,
+                                                 int geo_index,
+                                                 data::PcgGeometry* current_geometry)
+{
+    if (geo_index < 0)
+        return current_geometry;
+    if (geo_index < static_cast<int>(environment.input_geometries.size()))
+        return environment.input_geometries[static_cast<size_t>(geo_index)];
+    return nullptr;
+}
+
+void bind_geometry_callbacks(EvalContext& context, const WrangleEnvironment& environment,
+                             data::PcgGeometry* current_geometry)
+{
+    context.detail = [&environment, current_geometry](int geo_index, const std::string& name,
+                                                      int component, double& value) {
+        const data::PcgGeometry* geo =
+            resolve_input_geometry(environment, geo_index, current_geometry);
+        if (!geo)
+            return false;
+        return read_detail_component(&geo->attributes(), name, component, value);
+    };
+    context.nedgesgroup = [&environment, current_geometry](int geo_index, const std::string& group,
+                                                           double& value) {
+        const data::PcgGeometry* geo =
+            resolve_input_geometry(environment, geo_index < 0 ? 0 : geo_index, current_geometry);
+        if (!geo) {
+            // Missing/empty secondary input → 0 edges (Houdini-friendly empty).
+            value = 0.0;
+            return true;
+        }
+        value = static_cast<double>(
+            geo->groups().members(geometry::GroupDomain::Edge, group).size());
+        return true;
+    };
+    context.getbbox_size = [&environment, current_geometry](int geo_index,
+                                                            std::array<double, 3>& size) {
+        const data::PcgGeometry* geo =
+            resolve_input_geometry(environment, geo_index < 0 ? 0 : geo_index, current_geometry);
+        if (!geo) {
+            // Missing/empty secondary input → zero bbox instead of hard fail.
+            size = {0.0, 0.0, 0.0};
+            return true;
+        }
+        return geometry_bbox_size(*geo, size);
+    };
+}
+
+bool resolve_parameters(const std::unordered_map<std::string, ParamSpec>& specs,
+                       WrangleEnvironment& environment,
+                       std::string& error)
+{
+    environment.parameters.clear();
+    const data::PcgGeometry* geometry =
+        environment.input_geometries.empty() ? nullptr : environment.input_geometries[0];
+    for (const auto& [name, spec] : specs) {
+        if (spec.expr.empty()) {
+            if (!spec.has_literal) {
+                error = "parameter '" + name + "' has no value";
+                return false;
+            }
+            environment.parameters[name] = spec.literal;
+            continue;
+        }
+
+        Program program;
+        if (!Program::compile_expression(spec.expr, program, error)) {
+            error = "parameter '" + name + "' expr parse error: " + error;
+            return false;
+        }
+
+        ElementVariables variables{nullptr, nullptr, nullptr, nullptr,
+                                   0.0, 0, geometry ? static_cast<int>(geometry->points().size()) : 0,
+                                   0, geometry ? static_cast<int>(geometry->faces().size()) : 0,
+                                   geometry ? const_cast<data::AttributeTable*>(&geometry->attributes())
+                                            : nullptr,
+                                   data::AttributeOwner::Detail, 0};
+        variables.geometry = const_cast<data::PcgGeometry*>(geometry);
+        EvalContext context = make_context(variables, environment);
+        double value = 0.0;
+        if (!program.evaluate(context, value, error)) {
+            error = "parameter '" + name + "' expr failed: " + error;
+            return false;
+        }
+        environment.parameters[name] = value;
+    }
+    return true;
+}
+
+WrangleEnvironment build_wrangle_environment(const nlohmann::json& data,
+                                             std::vector<const data::PcgGeometry*> input_geometries,
+                                             std::string& error)
 {
     WrangleEnvironment environment;
-    environment.parameters = parse_parameters(data, error);
+    environment.group = data.value("group", std::string());
+    environment.group_type = data.value("groupType", std::string("guess"));
+    environment.input_geometries = std::move(input_geometries);
+    const auto specs = parse_parameter_specs(data, error);
     if (!error.empty())
+        return {};
+    if (!resolve_parameters(specs, environment, error))
         return {};
     if (!parse_color_ramps(data, environment.ramps, error))
         return {};
@@ -272,13 +459,11 @@ bool json_number(const nlohmann::json& value, double& out)
     return false;
 }
 
-EvalContext make_context(ElementVariables& variables,
-                         const std::unordered_map<std::string, double>& parameters,
-                         const ColorRampMap& ramps)
+EvalContext make_context(ElementVariables& variables, const WrangleEnvironment& environment)
 {
     EvalContext context;
-    context.parameters = parameters;
-    context.ramps = ramps;
+    context.parameters = environment.parameters;
+    context.ramps = environment.ramps;
     context.read_variable = [&variables](const std::string& name, double& value) {
         if (name == "@P.x" && variables.x) value = *variables.x;
         else if (name == "@P.y" && variables.y) value = *variables.y;
@@ -331,6 +516,7 @@ EvalContext make_context(ElementVariables& variables,
             return false;
         return write_table_vector(variables, name.substr(1), value);
     };
+    bind_geometry_callbacks(context, environment, variables.geometry);
     return context;
 }
 
@@ -373,7 +559,7 @@ bool evaluate_selection(const Program* program,
         selected = true;
         return true;
     }
-    EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+    EvalContext context = make_context(variables, environment);
     double value = 0.0;
     if (!program->evaluate(context, value, error))
         return false;
@@ -394,7 +580,7 @@ bool apply_wrangle_points(data::PcgPointData& points,
             json_number(point.attributes["curveu"], curve_u);
         ElementVariables variables{&point.x, &point.y, &point.z, &point.attributes,
                                    curve_u, index, count, 0, 0};
-        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+        EvalContext context = make_context(variables, environment);
         if (!program.execute(context, error)) {
             error = "point " + std::to_string(index) + ": " + error;
             return false;
@@ -418,7 +604,7 @@ bool apply_wrangle_splines(data::PcgSplineData& splines,
                                        curve_u[static_cast<size_t>(index)], index, count,
                                        static_cast<int>(spline_index),
                                        static_cast<int>(splines.splines().size())};
-            EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+            EvalContext context = make_context(variables, environment);
             if (!program.execute(context, error)) {
                 error = "spline " + std::to_string(spline_index) + " point " +
                         std::to_string(index) + ": " + error;
@@ -435,7 +621,14 @@ bool apply_wrangle_geometry(data::PcgGeometry& geometry,
                             std::string& error)
 {
     const int count = static_cast<int>(geometry.points().size());
+    std::unordered_set<geometry::GroupId> selected;
+    if (!environment.group.empty())
+        selected = geometry.groups().eval_indices(geometry::GroupDomain::Point,
+                                                  environment.group, count);
     for (int index = 0; index < count; ++index) {
+        if (!environment.group.empty() &&
+            selected.find(static_cast<geometry::GroupId>(index)) == selected.end())
+            continue;
         auto& point = geometry.points_mut()[static_cast<size_t>(index)];
         ElementVariables variables{&point.x, &point.y, &point.z, nullptr,
                                    indexed_curve_u(static_cast<size_t>(index), geometry.points().size()),
@@ -443,7 +636,7 @@ bool apply_wrangle_geometry(data::PcgGeometry& geometry,
                                    &geometry.attributes(), data::AttributeOwner::Point,
                                    static_cast<size_t>(index)};
         variables.geometry = &geometry;
-        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+        EvalContext context = make_context(variables, environment);
         if (!program.execute(context, error)) {
             error = "geometry point " + std::to_string(index) + ": " + error;
             return false;
@@ -459,7 +652,14 @@ bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
 {
     const int prim_count = static_cast<int>(geometry.faces().size());
     const int point_count = static_cast<int>(geometry.points().size());
+    std::unordered_set<geometry::GroupId> selected;
+    if (!environment.group.empty())
+        selected = geometry.groups().eval_indices(geometry::GroupDomain::Face,
+                                                  environment.group, prim_count);
     for (int prim = 0; prim < prim_count; ++prim) {
+        if (!environment.group.empty() &&
+            selected.find(static_cast<geometry::GroupId>(prim)) == selected.end())
+            continue;
         const auto& face = geometry.faces()[static_cast<size_t>(prim)];
         if (face.empty())
             continue;
@@ -480,7 +680,7 @@ bool apply_wrangle_geometry_primitives(data::PcgGeometry& geometry,
                                    &geometry.attributes(), data::AttributeOwner::Primitive,
                                    static_cast<size_t>(prim)};
         variables.geometry = &geometry;
-        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+        EvalContext context = make_context(variables, environment);
         if (!program.execute(context, error)) {
             error = "geometry prim " + std::to_string(prim) + ": " + error;
             return false;
@@ -509,7 +709,8 @@ bool apply_wrangle_geometry_detail(data::PcgGeometry& geometry,
                                0.0, 0, static_cast<int>(geometry.points().size()),
                                0, static_cast<int>(geometry.faces().size()),
                                &geometry.attributes(), data::AttributeOwner::Detail, 0};
-    EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+    variables.geometry = &geometry;
+    EvalContext context = make_context(variables, environment);
     if (!program.execute(context, error)) {
         error = std::string("geometry detail: ") + error;
         return false;
@@ -542,7 +743,7 @@ bool apply_wrangle_mesh(data::PcgMeshData& mesh,
                                    indexed_curve_u(static_cast<size_t>(index), mesh.vertices().size()),
                                    index, count, 0,
                                    static_cast<int>(mesh.triangles().size() / 3)};
-        EvalContext context = make_context(variables, environment.parameters, environment.ramps);
+        EvalContext context = make_context(variables, environment);
         if (!program.execute(context, error)) {
             error = "mesh point " + std::to_string(index) + ": " + error;
             return false;
@@ -893,6 +1094,77 @@ data::PcgGeometry blast_geometry(const data::PcgGeometry& source,
                             primitives && remove_unused_points);
 }
 
+bool read_split_bool(const nlohmann::json& data, const char* key, bool default_value)
+{
+    if (!data.contains(key))
+        return default_value;
+    const auto& value = data.at(key);
+    if (value.is_boolean())
+        return value.get<bool>();
+    if (value.is_number_integer())
+        return value.get<int>() != 0;
+    if (value.is_string()) {
+        const auto& text = value.get_ref<const std::string&>();
+        if (text == "true" || text == "1")
+            return true;
+        if (text == "false" || text == "0")
+            return false;
+    }
+    return default_value;
+}
+
+std::string read_split_group_type(const nlohmann::json& data)
+{
+    if (data.contains("groupType") && data["groupType"].is_string()) {
+        const auto value = data["groupType"].get<std::string>();
+        if (!value.empty())
+            return value;
+    }
+    // Legacy PCG Split used `entity` instead of Houdini `groupType`.
+    if (data.contains("entity") && data["entity"].is_string()) {
+        const auto value = data["entity"].get<std::string>();
+        if (!value.empty())
+            return value;
+    }
+    return "guess";
+}
+
+std::string resolve_split_entity(const data::PcgGeometry* geometry,
+                                 const std::string& group,
+                                 const std::string& group_type)
+{
+    if (group_type == "points")
+        return "points";
+    if (group_type == "primitives")
+        return "primitives";
+    // Guess from Group (Houdini default).
+    if (geometry && !group.empty()) {
+        if (geometry->groups().has_group(geometry::GroupDomain::Face, group))
+            return "primitives";
+        if (geometry->groups().has_group(geometry::GroupDomain::Point, group))
+            return "points";
+    }
+    return "primitives";
+}
+
+void apply_split_unused_groups(data::PcgGeometry& output,
+                               const data::PcgGeometry& source,
+                               bool delete_unused_groups)
+{
+    if (delete_unused_groups) {
+        remove_empty_groups(output);
+        return;
+    }
+    // Houdini default (off): keep empty group names that existed on the source.
+    for (const auto domain : {geometry::GroupDomain::Point, geometry::GroupDomain::Edge,
+                              geometry::GroupDomain::Face, geometry::GroupDomain::Vertex}) {
+        for (const auto& name : source.groups().group_names(domain)) {
+            if (!output.groups().has_group(domain, name))
+                output.groups().ensure_group(domain, name);
+        }
+    }
+}
+
 class AttributeWrangleElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "AttributeWrangle"; }
@@ -915,7 +1187,15 @@ public:
         if (!Program::compile_statements(source, program, error))
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             ("AttributeWrangle parse error: " + error).c_str());
-        const auto environment = build_wrangle_environment(ctx.node->data, error);
+        // Houdini-style inputs 0–3: pin in/in1/in2/in3 (mesh pins convert to geometry).
+        data::PcgGeometry input_storage[4];
+        static constexpr const char* kInputPins[] = {"in", "in1", "in2", "in3"};
+        std::vector<const data::PcgGeometry*> input_geometries(4, nullptr);
+        for (int i = 0; i < 4; ++i)
+            input_geometries[static_cast<size_t>(i)] =
+                optional_geometry_input(ctx, kInputPins[i], input_storage[i]);
+        const auto environment =
+            build_wrangle_environment(ctx.node->data, std::move(input_geometries), error);
         if (!error.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             ("AttributeWrangle " + error).c_str());
@@ -1007,7 +1287,11 @@ public:
         if (group.empty() && !program_ptr)
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             "Blast requires a group or selection expression");
-        const auto environment = build_wrangle_environment(ctx.node->data, error);
+        data::PcgGeometry input_storage;
+        const auto environment = build_wrangle_environment(
+            ctx.node->data,
+            {optional_geometry_input(ctx, "in", input_storage)},
+            error);
         if (!error.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Blast " + error).c_str());
 
@@ -1091,11 +1375,18 @@ public:
         if (!input)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "Split missing input");
 
-        const std::string entity = ctx.node->data.value("entity", std::string("primitives"));
         const std::string group = ctx.node->data.value("group", std::string());
+        const std::string group_type = read_split_group_type(ctx.node->data);
+        // Optional legacy Blast-style expression (not in Houdini Split UI).
         const std::string source = ctx.node->data.value("expression", std::string());
-        const bool invert_selection = ctx.node->data.value("invertSelection", false);
-        const bool remove_unused_points = ctx.node->data.value("removeUnusedPoints", true);
+        const bool invert_selection =
+            read_split_bool(ctx.node->data, "invertSelection", false);
+        const bool delete_unused_groups =
+            read_split_bool(ctx.node->data, "deleteUnusedGroups", false);
+        // Houdini Split always drops unused points when splitting primitives.
+        // Legacy graphs may still carry removeUnusedPoints.
+        const bool remove_unused_points =
+            read_split_bool(ctx.node->data, "removeUnusedPoints", true);
 
         Program program;
         Program* program_ptr = nullptr;
@@ -1106,15 +1397,16 @@ public:
                                 ("Split parse error: " + error).c_str());
             program_ptr = &program;
         }
-        if (group.empty() && !program_ptr)
-            return fail_ctx(ctx, PCG_ERR_EXECUTION,
-                            "Split requires a group or selection expression");
-        const auto environment = build_wrangle_environment(ctx.node->data, error);
+        // Empty group = select all (Houdini). Expression remains optional.
+        data::PcgGeometry input_storage;
+        const auto environment = build_wrangle_environment(
+            ctx.node->data,
+            {optional_geometry_input(ctx, "in", input_storage)},
+            error);
         if (!error.empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
 
         // Houdini Split: first output = selection (after Invert), second = complement.
-        // deleteNonSelected=true keeps selection; false deletes selection (keeps complement).
         if (input->points) {
             auto selected = blast_points(*input->points, group, program_ptr, environment,
                                          true, error);
@@ -1146,6 +1438,8 @@ public:
             return PCG_OK;
         }
         if (input->geometry) {
+            const std::string entity =
+                resolve_split_entity(input->geometry.get(), group, group_type);
             auto selected = blast_geometry(*input->geometry, entity, group, program_ptr,
                                            environment, true, remove_unused_points, error);
             if (!error.empty())
@@ -1156,6 +1450,8 @@ public:
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, ("Split " + error).c_str());
             if (invert_selection)
                 std::swap(selected, remainder);
+            apply_split_unused_groups(selected, *input->geometry, delete_unused_groups);
+            apply_split_unused_groups(remainder, *input->geometry, delete_unused_groups);
             ctx.outputs.add_geometry("out", std::move(selected));
             ctx.outputs.add_geometry("rest", std::move(remainder));
             return PCG_OK;

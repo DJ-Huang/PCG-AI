@@ -1003,17 +1003,6 @@ data::PcgGeometry rebuild_geometry_delete(const data::PcgGeometry& source,
     return output;
 }
 
-void remove_empty_groups(data::PcgGeometry& geometry)
-{
-    for (const auto domain :
-         {GroupDomain::Point, GroupDomain::Edge, GroupDomain::Face, GroupDomain::Vertex}) {
-        for (const auto& name : geometry.groups().group_names(domain)) {
-            if (geometry.groups().members(domain, name).empty())
-                geometry.groups().clear_group(domain, name);
-        }
-    }
-}
-
 void append_spline_run(data::PcgSplineData& output,
                        const data::PcgSpline& source,
                        std::vector<data::PcgSplinePoint>& run)
@@ -1031,6 +1020,17 @@ void append_spline_run(data::PcgSplineData& output,
 }
 
 } // namespace
+
+void remove_empty_groups(data::PcgGeometry& geometry)
+{
+    for (const auto domain : {geometry::GroupDomain::Point, geometry::GroupDomain::Edge,
+                              geometry::GroupDomain::Face, geometry::GroupDomain::Vertex}) {
+        for (const auto& name : geometry.groups().group_names(domain)) {
+            if (geometry.groups().members(domain, name).empty())
+                geometry.groups().clear_group(domain, name);
+        }
+    }
+}
 
 DeleteOptions parse_delete_options(const nlohmann::json& data)
 {

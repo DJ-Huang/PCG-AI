@@ -56,6 +56,9 @@ struct DeleteOptions {
 
 DeleteOptions parse_delete_options(const nlohmann::json& data);
 
+/// Remove group names that have no remaining members (Houdini Delete Unused Groups).
+void remove_empty_groups(data::PcgGeometry& geometry);
+
 data::PcgGeometry delete_geometry(const data::PcgGeometry& source,
                                   const DeleteOptions& options,
                                   int graph_seed,

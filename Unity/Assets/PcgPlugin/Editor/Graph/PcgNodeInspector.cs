@@ -342,7 +342,26 @@ namespace DJTechEditor.PCG.Graph
                 && regularProps.Count > 0)
                 AddSectionHeader("Parameters");
             foreach (var (key, prop) in regularProps)
+            {
+                // AttributeWrangle channels: never show raw JSON textarea.
+                if (node.NodeType == "AttributeWrangle" && key == "parameters")
+                {
+                    AddSectionHeader("Channels (chi / chf)");
+                    m_Body.Add(new Label("Add multiple channels. Optional Expr is evaluated once at cook (e.g. @iteration).")
+                    {
+                        style =
+                        {
+                            color = new Color(0.55f, 0.7f, 0.55f),
+                            fontSize = 10,
+                            marginBottom = 4,
+                            whiteSpace = WhiteSpace.Normal,
+                        },
+                    });
+                    m_Body.Add(CreateWrangleParametersEditor(node));
+                    continue;
+                }
                 m_Body.Add(CreatePropertyRow(node, key, prop));
+            }
         }
 
         private bool NodeSupportsGroupViewer(PcgManifestNodeView node)
@@ -1100,6 +1119,13 @@ namespace DJTechEditor.PCG.Graph
 
             // Row 2: value or bound label (full width — not crushed beside + / bind)
             var currentBindingForValue = m_Blackboard.FindBinding(node.NodeId, key);
+            // AttributeWrangle parameters are drawn as a dedicated Channels section in
+            // ShowManifestProperties — never fall back to multiline JSON here.
+            if (node.NodeType == "AttributeWrangle" && key == "parameters")
+            {
+                ApplyEnabledWhen(container, node, prop);
+                return container;
+            }
             container.Add(CreateValueField(key, prop, node, currentBindingForValue, setValueOverride));
             ApplyEnabledWhen(container, node, prop);
             return container;
@@ -1452,6 +1478,247 @@ namespace DJTechEditor.PCG.Graph
         }
 
         // ─── Shared helpers ─────────────────────────────────────────
+
+        private sealed class WrangleParamRow
+        {
+            public string Name = "";
+            public double Value;
+            public string Expr = "";
+        }
+
+        private static List<WrangleParamRow> ParseWrangleParameters(object raw)
+        {
+            var rows = new List<WrangleParamRow>();
+            Dictionary<string, object> dict = null;
+            if (raw is Dictionary<string, object> asDict)
+            {
+                dict = asDict;
+            }
+            else
+            {
+                var text = raw?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(text) || text.StartsWith("System.Collections", StringComparison.Ordinal))
+                    return rows;
+                try
+                {
+                    if (PcgMiniJson.Deserialize(text) is Dictionary<string, object> parsed)
+                        dict = parsed;
+                }
+                catch
+                {
+                    return rows;
+                }
+            }
+
+            if (dict == null)
+                return rows;
+
+            foreach (var (key, value) in dict)
+            {
+                var row = new WrangleParamRow { Name = key };
+                if (value is Dictionary<string, object> obj)
+                {
+                    if (obj.TryGetValue("expr", out var exprObj) && exprObj != null)
+                        row.Expr = exprObj.ToString() ?? "";
+                    if (obj.TryGetValue("value", out var valObj) && valObj != null)
+                        row.Value = Convert.ToDouble(valObj, CultureInfo.InvariantCulture);
+                }
+                else if (value is string s)
+                {
+                    row.Expr = s;
+                }
+                else if (value != null)
+                {
+                    try
+                    {
+                        row.Value = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                    }
+                    catch
+                    {
+                        row.Expr = value.ToString() ?? "";
+                    }
+                }
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        private static string SerializeWrangleParameters(List<WrangleParamRow> rows)
+        {
+            var dict = new Dictionary<string, object>();
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrWhiteSpace(row.Name))
+                    continue;
+                if (!string.IsNullOrWhiteSpace(row.Expr))
+                {
+                    dict[row.Name.Trim()] = new Dictionary<string, object>
+                    {
+                        ["value"] = row.Value,
+                        ["expr"] = row.Expr,
+                    };
+                }
+                else
+                {
+                    dict[row.Name.Trim()] = row.Value;
+                }
+            }
+            return PcgMiniJson.Serialize(dict);
+        }
+
+        private VisualElement CreateWrangleParametersEditor(PcgManifestNodeView node)
+        {
+            var root = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 2,
+                    marginBottom = 8,
+                    paddingLeft = 4,
+                    paddingRight = 4,
+                    paddingTop = 4,
+                    paddingBottom = 4,
+                    width = Length.Percent(100),
+                    backgroundColor = new Color(0.18f, 0.2f, 0.18f, 0.55f),
+                    borderTopLeftRadius = 3,
+                    borderTopRightRadius = 3,
+                    borderBottomLeftRadius = 3,
+                    borderBottomRightRadius = 3,
+                },
+            };
+
+            var rows = ParseWrangleParameters(node.CollectData().GetRaw("parameters"));
+            if (rows.Count == 0)
+                rows.Add(new WrangleParamRow { Name = "sag", Value = 3.0 });
+
+            void Commit()
+            {
+                m_GraphView.WithUndo("Edit Wrangle Parameters", () =>
+                    node.SetPropertyValue("parameters", SerializeWrangleParameters(rows)));
+                NotifyGraphChanged();
+            }
+
+            void Rebuild()
+            {
+                root.Clear();
+
+                var header = new VisualElement
+                {
+                    style =
+                    {
+                        flexDirection = FlexDirection.Row,
+                        marginBottom = 4,
+                        width = Length.Percent(100),
+                    },
+                };
+                Label Col(string text, float grow, float width = 0)
+                {
+                    var label = new Label(text)
+                    {
+                        style =
+                        {
+                            color = new Color(0.65f, 0.85f, 0.65f),
+                            fontSize = 10,
+                            unityFontStyleAndWeight = FontStyle.Bold,
+                            flexGrow = grow,
+                            marginLeft = width > 0 ? 4 : 0,
+                        },
+                    };
+                    if (width > 0)
+                    {
+                        label.style.flexGrow = 0;
+                        label.style.width = width;
+                    }
+                    return label;
+                }
+                header.Add(Col("Name", 1));
+                header.Add(Col("Value", 0, 64));
+                header.Add(Col("Expr (optional)", 1.4f));
+                header.Add(Col("", 0, 22));
+                root.Add(header);
+
+                for (var i = 0; i < rows.Count; i++)
+                {
+                    var index = i;
+                    var row = rows[index];
+                    var line = new VisualElement
+                    {
+                        style =
+                        {
+                            flexDirection = FlexDirection.Row,
+                            alignItems = Align.Center,
+                            marginBottom = 4,
+                            width = Length.Percent(100),
+                        },
+                    };
+
+                    var nameField = new TextField { value = row.Name };
+                    nameField.style.flexGrow = 1;
+                    nameField.style.minWidth = 60;
+                    nameField.RegisterValueChangedCallback(evt =>
+                    {
+                        rows[index].Name = evt.newValue ?? "";
+                        Commit();
+                    });
+                    line.Add(nameField);
+
+                    var valueField = new FloatField { value = (float)row.Value };
+                    valueField.style.width = 64;
+                    valueField.style.marginLeft = 4;
+                    valueField.RegisterValueChangedCallback(evt =>
+                    {
+                        rows[index].Value = evt.newValue;
+                        Commit();
+                    });
+                    line.Add(valueField);
+
+                    var exprField = new TextField { value = row.Expr };
+                    exprField.style.flexGrow = 1.4f;
+                    exprField.style.marginLeft = 4;
+                    exprField.style.minWidth = 80;
+                    exprField.tooltip = "Optional expression, e.g. @iteration or detail(\"iteration\",0)";
+                    exprField.RegisterValueChangedCallback(evt =>
+                    {
+                        rows[index].Expr = evt.newValue ?? "";
+                        Commit();
+                    });
+                    line.Add(exprField);
+
+                    var remove = new Button(() =>
+                    {
+                        rows.RemoveAt(index);
+                        if (rows.Count == 0)
+                            rows.Add(new WrangleParamRow());
+                        Commit();
+                        Rebuild();
+                    })
+                    {
+                        text = "×",
+                        tooltip = "Remove channel",
+                    };
+                    remove.style.width = 22;
+                    remove.style.marginLeft = 4;
+                    line.Add(remove);
+                    root.Add(line);
+                }
+
+                var add = new Button(() =>
+                {
+                    rows.Add(new WrangleParamRow { Name = "param" + rows.Count, Value = 0 });
+                    Commit();
+                    Rebuild();
+                })
+                {
+                    text = "+ Add Channel",
+                };
+                add.style.marginTop = 2;
+                add.style.alignSelf = Align.FlexStart;
+                root.Add(add);
+            }
+
+            Rebuild();
+            return root;
+        }
 
         private VisualElement CreateGetMeshDataPreviewRow(PcgManifestNodeView node)
         {

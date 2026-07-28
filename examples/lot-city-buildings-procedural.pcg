@@ -335,7 +335,7 @@
       "id": "keep_built",
       "type": "Split",
       "position": { "x": 848.5, "y": 659.5 },
-      "data": {"entity": "primitives", "group": "park", "expression": "", "parameters": "{}", "invertSelection": true, "removeUnusedPoints": true, "__nodeTitle": "split4"}
+      "data": {"group": "park", "groupType": "guess", "invertSelection": true, "deleteUnusedGroups": false, "__nodeTitle": "split4"}
     },
     {
       "id": "n102",
