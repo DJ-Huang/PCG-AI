@@ -44,7 +44,9 @@ namespace DJTechEditor.PCG.Graph
                 ? sourceSubgraph.GetOutputPinType(sourceHandle)
                 : source is PcgExternalSubgraphNodeView sourceExternal
                     ? sourceExternal.GetOutputPinType(sourceHandle)
-                    : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
+                    : source.NodeType == PcgStructuralNodeTypes.SubgraphParentRef
+                        ? "Any"
+                        : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
             var targetPin = target is PcgSubgraphNodeView targetSubgraph
                 ? targetSubgraph.GetInputPinType(targetHandle)
                 : target is PcgExternalSubgraphNodeView targetExternal

@@ -24,12 +24,30 @@ namespace DJTechRuntime.PCG
             }
         }
 
+        private sealed class ParentScopeContext
+        {
+            public List<PcgGraphNodeRecord> Nodes;
+            public List<PcgGraphEdgeRecord> Edges;
+            public string Prefix;
+            public Dictionary<string, ExpandedScope> Instances;
+
+            public static ParentScopeContext None => new ParentScopeContext
+            {
+                Nodes = null,
+                Edges = null,
+                Prefix = "",
+                Instances = null,
+            };
+        }
+
         private sealed class ExpandedScope
         {
             public List<PcgGraphNodeRecord> Nodes = new();
             public List<PcgGraphEdgeRecord> Edges = new();
             public Dictionary<string, List<Endpoint>> InputTargets = new(StringComparer.Ordinal);
             public Dictionary<string, List<Endpoint>> OutputSources = new(StringComparer.Ordinal);
+            public Dictionary<string, List<string>> PassthroughInputsByOutput = new(StringComparer.Ordinal);
+            public HashSet<string> DeclaredInputs = new(StringComparer.Ordinal);
         }
 
         public static bool TryFlattenForExecution(
@@ -72,7 +90,8 @@ namespace DJTechRuntime.PCG
                      node == null ||
                      (node.type != PcgStructuralNodeTypes.Subgraph &&
                       node.type != PcgStructuralNodeTypes.SubgraphInput &&
-                      node.type != PcgStructuralNodeTypes.SubgraphOutput))))
+                      node.type != PcgStructuralNodeTypes.SubgraphOutput &&
+                      node.type != PcgStructuralNodeTypes.SubgraphParentRef))))
             {
                 flat = resolved.Clone();
                 flat.version = "2.0";
@@ -87,6 +106,7 @@ namespace DJTechRuntime.PCG
                     prefix: "",
                     definitions,
                     stack,
+                    ParentScopeContext.None,
                     out var expanded,
                     out error))
                 return false;
@@ -117,6 +137,7 @@ namespace DJTechRuntime.PCG
             string prefix,
             Dictionary<string, PcgSubgraphDefinition> definitions,
             List<string> stack,
+            ParentScopeContext parentContext,
             out ExpandedScope output,
             out string error)
         {
@@ -135,8 +156,7 @@ namespace DJTechRuntime.PCG
                 }
 
                 byId[node.id] = node;
-                if (node.type == PcgStructuralNodeTypes.SubgraphInput ||
-                    node.type == PcgStructuralNodeTypes.SubgraphOutput)
+                if (IsStructuralInterfaceNode(node.type))
                     continue;
 
                 if (node.type != PcgStructuralNodeTypes.Subgraph)
@@ -162,12 +182,20 @@ namespace DJTechRuntime.PCG
                 }
 
                 stack.Add(subgraphId);
+                var childParent = new ParentScopeContext
+                {
+                    Nodes = nodes,
+                    Edges = edges,
+                    Prefix = prefix,
+                    Instances = instances,
+                };
                 if (!ExpandScope(
                         definition.nodes ?? new List<PcgGraphNodeRecord>(),
                         definition.edges ?? new List<PcgGraphEdgeRecord>(),
                         prefix + node.id + "/",
                         definitions,
                         stack,
+                        childParent,
                         out var child,
                         out error))
                     return false;
@@ -175,6 +203,11 @@ namespace DJTechRuntime.PCG
 
                 output.Nodes.AddRange(child.Nodes);
                 output.Edges.AddRange(child.Edges);
+                foreach (var input in definition.inputs ?? Enumerable.Empty<PcgSubgraphPort>())
+                {
+                    if (input != null && !string.IsNullOrEmpty(input.id))
+                        child.DeclaredInputs.Add(input.id);
+                }
                 instances[node.id] = child;
             }
 
@@ -190,13 +223,41 @@ namespace DJTechRuntime.PCG
                     return false;
                 }
 
-                var sources = SourceEndpoints(edge, sourceNode, prefix, instances);
+                if (sourceNode.type == PcgStructuralNodeTypes.SubgraphInput &&
+                    targetNode.type == PcgStructuralNodeTypes.SubgraphOutput)
+                {
+                    if (!output.PassthroughInputsByOutput.TryGetValue(edge.targetHandle, out var inputs))
+                    {
+                        inputs = new List<string>();
+                        output.PassthroughInputsByOutput[edge.targetHandle] = inputs;
+                    }
+                    if (!inputs.Contains(edge.sourceHandle))
+                        inputs.Add(edge.sourceHandle);
+                    continue;
+                }
+
+                var sources = SourceEndpoints(
+                    edge,
+                    sourceNode,
+                    prefix,
+                    byId,
+                    edges,
+                    instances,
+                    parentContext,
+                    new HashSet<string>(StringComparer.Ordinal),
+                    out error);
+                if (error != null)
+                    return false;
                 var targets = TargetEndpoints(edge, targetNode, prefix, instances);
 
                 if (sourceNode.type == PcgStructuralNodeTypes.SubgraphInput)
                 {
                     if (targets.Count == 0)
                     {
+                        if (targetNode.type == PcgStructuralNodeTypes.Subgraph &&
+                            instances.TryGetValue(edge.target, out var targetInstance) &&
+                            targetInstance.DeclaredInputs.Contains(edge.targetHandle))
+                            continue;
                         error = "Subgraph input is not connected to an executable node";
                         return false;
                     }
@@ -227,6 +288,11 @@ namespace DJTechRuntime.PCG
 
                 if (sources.Count == 0 || targets.Count == 0)
                 {
+                    if (targets.Count == 0 &&
+                        targetNode.type == PcgStructuralNodeTypes.Subgraph &&
+                        instances.TryGetValue(edge.target, out var targetInstance) &&
+                        targetInstance.DeclaredInputs.Contains(edge.targetHandle))
+                        continue;
                     error = "Subgraph edge resolves to an empty interface";
                     return false;
                 }
@@ -237,8 +303,6 @@ namespace DJTechRuntime.PCG
                     {
                         edgeCounter++;
                         var baseId = string.IsNullOrEmpty(edge.id) ? "edge" : edge.id;
-                        // Fan-out/fan-in expands one authoring edge into many endpoints;
-                        // keep ids unique with a stable counter suffix.
                         output.Edges.Add(new PcgGraphEdgeRecord
                         {
                             id = prefix + baseId + "__" + edgeCounter,
@@ -256,26 +320,147 @@ namespace DJTechRuntime.PCG
             return true;
         }
 
+        private static bool IsStructuralInterfaceNode(string type) =>
+            type == PcgStructuralNodeTypes.SubgraphInput ||
+            type == PcgStructuralNodeTypes.SubgraphOutput ||
+            type == PcgStructuralNodeTypes.SubgraphParentRef;
+
         private static List<Endpoint> SourceEndpoints(
             PcgGraphEdgeRecord edge,
             PcgGraphNodeRecord sourceNode,
             string prefix,
-            Dictionary<string, ExpandedScope> instances)
+            Dictionary<string, PcgGraphNodeRecord> byId,
+            List<PcgGraphEdgeRecord> scopeEdges,
+            Dictionary<string, ExpandedScope> instances,
+            ParentScopeContext parentContext,
+            HashSet<string> resolvingPassthroughs,
+            out string error)
         {
+            error = null;
             if (sourceNode.type == PcgStructuralNodeTypes.SubgraphInput ||
                 sourceNode.type == PcgStructuralNodeTypes.SubgraphOutput)
                 return new List<Endpoint>();
+
+            if (sourceNode.type == PcgStructuralNodeTypes.SubgraphParentRef)
+            {
+                if (!TryResolveParentRefEndpoints(sourceNode, parentContext, out var endpoints, out error))
+                    return new List<Endpoint>();
+                return endpoints;
+            }
 
             if (sourceNode.type == PcgStructuralNodeTypes.Subgraph)
             {
                 if (!instances.TryGetValue(edge.source, out var instance))
                     return new List<Endpoint>();
-                return instance.OutputSources.TryGetValue(edge.sourceHandle, out var list)
+
+                var endpoints = instance.OutputSources.TryGetValue(edge.sourceHandle, out var list)
                     ? new List<Endpoint>(list)
                     : new List<Endpoint>();
+                if (!instance.PassthroughInputsByOutput.TryGetValue(edge.sourceHandle, out var inputHandles))
+                    return endpoints;
+
+                var resolvingKey = edge.source + "\u001f" + edge.sourceHandle;
+                if (!resolvingPassthroughs.Add(resolvingKey))
+                {
+                    error = "Subgraph passthrough cycle detected: " + edge.source + "/" + edge.sourceHandle;
+                    return new List<Endpoint>();
+                }
+
+                foreach (var inputHandle in inputHandles)
+                {
+                    foreach (var incoming in scopeEdges ?? Enumerable.Empty<PcgGraphEdgeRecord>())
+                    {
+                        if (incoming == null ||
+                            incoming.target != edge.source ||
+                            incoming.targetHandle != inputHandle ||
+                            !byId.TryGetValue(incoming.source, out var incomingSource))
+                            continue;
+
+                        var resolved = SourceEndpoints(
+                            incoming,
+                            incomingSource,
+                            prefix,
+                            byId,
+                            scopeEdges,
+                            instances,
+                            parentContext,
+                            resolvingPassthroughs,
+                            out error);
+                        if (error != null)
+                            return new List<Endpoint>();
+                        endpoints.AddRange(resolved);
+                    }
+                }
+
+                resolvingPassthroughs.Remove(resolvingKey);
+                return endpoints;
             }
 
             return new List<Endpoint> { new(prefix + edge.source, edge.sourceHandle) };
+        }
+
+        private static bool TryResolveParentRefEndpoints(
+            PcgGraphNodeRecord refNode,
+            ParentScopeContext parentContext,
+            out List<Endpoint> endpoints,
+            out string error)
+        {
+            endpoints = new List<Endpoint>();
+            error = null;
+
+            if (parentContext?.Nodes == null)
+            {
+                error = "SubgraphParentRef is only valid inside a subgraph definition.";
+                return false;
+            }
+
+            var parentNodeId = refNode.data?.GetRaw("parentNodeId")?.ToString() ?? "";
+            if (string.IsNullOrEmpty(parentNodeId))
+            {
+                error = "SubgraphParentRef missing parentNodeId.";
+                return false;
+            }
+
+            var parentHandle = refNode.data?.GetRaw("parentHandle")?.ToString();
+            if (string.IsNullOrEmpty(parentHandle))
+                parentHandle = "out";
+
+            var parentNode = parentContext.Nodes.FirstOrDefault(n => n.id == parentNodeId);
+            if (parentNode == null)
+            {
+                error = "SubgraphParentRef parent node not found: " + parentNodeId;
+                return false;
+            }
+
+            if (parentNode.type == PcgStructuralNodeTypes.SubgraphInput ||
+                parentNode.type == PcgStructuralNodeTypes.SubgraphOutput ||
+                parentNode.type == PcgStructuralNodeTypes.SubgraphParentRef)
+            {
+                error = "SubgraphParentRef cannot reference structural parent node: " + parentNodeId;
+                return false;
+            }
+
+            if (parentNode.type == PcgStructuralNodeTypes.Subgraph)
+            {
+                if (parentContext.Instances == null ||
+                    !parentContext.Instances.TryGetValue(parentNodeId, out var instance))
+                {
+                    error = "SubgraphParentRef parent subgraph instance is not expanded: " + parentNodeId;
+                    return false;
+                }
+
+                if (!instance.OutputSources.TryGetValue(parentHandle, out var list) || list.Count == 0)
+                {
+                    error = "SubgraphParentRef parent subgraph output is not connected: " + parentNodeId + "/" + parentHandle;
+                    return false;
+                }
+
+                endpoints.AddRange(list);
+                return true;
+            }
+
+            endpoints.Add(new Endpoint(parentContext.Prefix + parentNodeId, parentHandle));
+            return true;
         }
 
         private static List<Endpoint> TargetEndpoints(
@@ -285,7 +470,8 @@ namespace DJTechRuntime.PCG
             Dictionary<string, ExpandedScope> instances)
         {
             if (targetNode.type == PcgStructuralNodeTypes.SubgraphInput ||
-                targetNode.type == PcgStructuralNodeTypes.SubgraphOutput)
+                targetNode.type == PcgStructuralNodeTypes.SubgraphOutput ||
+                targetNode.type == PcgStructuralNodeTypes.SubgraphParentRef)
                 return new List<Endpoint>();
 
             if (targetNode.type == PcgStructuralNodeTypes.Subgraph)

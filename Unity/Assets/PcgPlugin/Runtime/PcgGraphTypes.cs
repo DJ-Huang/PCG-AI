@@ -307,6 +307,7 @@ namespace DJTechRuntime.PCG
         public const string SubgraphInput = "SubgraphInput";
         public const string SubgraphOutput = "SubgraphOutput";
         public const string SubgraphAsset = "SubgraphAsset";
+        public const string SubgraphParentRef = "SubgraphParentRef";
     }
 
     [Serializable]

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DJTechEditor.PCG.Graph;
 using DJTechRuntime.PCG;
 using NUnit.Framework;
 
@@ -55,6 +56,112 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(parsed.nodes[0].subgraphInterface.inputs[0].id, Is.EqualTo("in_a"));
             Assert.That(parsed.nodes[0].data.GetRaw("assetGuid")?.ToString(),
                 Is.EqualTo("0123456789abcdef0123456789abcdef"));
+        }
+
+        [Test]
+        public void LinkedSubgraphInterfaceSync_AddsNewSourcePortsToParentNodeRecord()
+        {
+            var node = new PcgGraphNodeRecord
+            {
+                id = "linked",
+                type = PcgStructuralNodeTypes.SubgraphAsset,
+                subgraphInterface = new PcgSubgraphInterfaceSnapshot
+                {
+                    inputs = { new PcgSubgraphPort { id = "in_1", name = "Input 1", pinType = "SpatialMesh" } },
+                    outputs = { new PcgSubgraphPort { id = "out_1", name = "Output 1", pinType = "SpatialMesh" } },
+                },
+            };
+            var source = new PcgSubgraphInterfaceSnapshot
+            {
+                inputs =
+                {
+                    new PcgSubgraphPort { id = "in_1", name = "Input 1", pinType = "SpatialMesh" },
+                    new PcgSubgraphPort { id = "in_2", name = "Input 2", pinType = "SpatialMesh" },
+                },
+                outputs =
+                {
+                    new PcgSubgraphPort { id = "out_1", name = "Output 1", pinType = "SpatialMesh" },
+                    new PcgSubgraphPort { id = "out_2", name = "Output 2", pinType = "SpatialMesh" },
+                },
+            };
+
+            var result = PcgExternalSubgraphInterfaceSync.ReconcileNodeRecord(
+                node,
+                new List<PcgGraphEdgeRecord>(),
+                source);
+
+            Assert.That(result.Compatible, Is.True);
+            Assert.That(node.subgraphInterface.inputs.ConvertAll(port => port.id),
+                Is.EqualTo(new[] { "in_1", "in_2" }));
+            Assert.That(node.subgraphInterface.outputs.ConvertAll(port => port.id),
+                Is.EqualTo(new[] { "out_1", "out_2" }));
+        }
+
+        [Test]
+        public void LinkedSubgraphInterfaceSync_PreservesConnectedRemovedPortAsGhost()
+        {
+            var node = new PcgGraphNodeRecord
+            {
+                id = "linked",
+                type = PcgStructuralNodeTypes.SubgraphAsset,
+                subgraphInterface = new PcgSubgraphInterfaceSnapshot
+                {
+                    inputs =
+                    {
+                        new PcgSubgraphPort { id = "removed", name = "Removed", pinType = "SpatialMesh" },
+                    },
+                },
+            };
+            var parentEdges = new List<PcgGraphEdgeRecord>
+            {
+                new()
+                {
+                    id = "edge",
+                    source = "source",
+                    target = "linked",
+                    sourceHandle = "out",
+                    targetHandle = "removed",
+                },
+            };
+
+            var result = PcgExternalSubgraphInterfaceSync.ReconcileNodeRecord(
+                node,
+                parentEdges,
+                new PcgSubgraphInterfaceSnapshot());
+
+            Assert.That(result.Compatible, Is.False);
+            Assert.That(result.GhostHandles, Does.Contain("removed"));
+            Assert.That(node.subgraphInterface.inputs.ConvertAll(port => port.id),
+                Is.EqualTo(new[] { "removed" }));
+        }
+
+        [Test]
+        public void SubgraphAsset_LegacyEmptyInterface_IsRepairedOnParse()
+        {
+            const string legacyJson = @"{
+  ""version"": ""1.0"",
+  ""name"": ""Legacy"",
+  ""inputs"": [],
+  ""outputs"": [],
+  ""nodes"": [
+    { ""id"": ""subgraph_input"", ""type"": ""SubgraphInput"", ""position"": { ""x"": 120, ""y"": 80 }, ""data"": {} },
+    { ""id"": ""subgraph_output"", ""type"": ""SubgraphOutput"", ""position"": { ""x"": 120, ""y"": 320 }, ""data"": {} }
+  ],
+  ""edges"": [],
+  ""subgraphs"": []
+}";
+
+            Assert.That(
+                PcgSubgraphAssetSerializer.TryFromJson(legacyJson, out var parsed, out var error),
+                Is.True,
+                error);
+            Assert.That(parsed.inputs.Count, Is.EqualTo(1));
+            Assert.That(parsed.inputs[0].id, Is.EqualTo("in_1"));
+            Assert.That(parsed.outputs.Count, Is.EqualTo(1));
+            Assert.That(parsed.outputs[0].id, Is.EqualTo("out_1"));
+            Assert.That(parsed.edges.Count, Is.EqualTo(1));
+            Assert.That(parsed.edges[0].sourceHandle, Is.EqualTo("in_1"));
+            Assert.That(parsed.edges[0].targetHandle, Is.EqualTo("out_1"));
         }
 
         [Test]
@@ -271,6 +378,191 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(flat.nodes.Exists(node => node.id == "inst/box"), Is.True);
             Assert.That(flat.nodes.Exists(node => node.type == PcgStructuralNodeTypes.Subgraph), Is.False);
             Assert.That(flat.nodes.Exists(node => node.id == "sink"), Is.True);
+        }
+
+        [Test]
+        public void Flatten_MapsMultipleRootInputsToDifferentInternalNodes()
+        {
+            var doc = new PcgGraphDocument
+            {
+                version = "2.0",
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "source_a", type = "CreateBoxMesh", data = new PcgNodeData() },
+                    new PcgGraphNodeRecord { id = "source_b", type = "CreateBoxMesh", data = new PcgNodeData() },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.Subgraph,
+                        data = MakeSubgraphId("sg"),
+                    },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_a", source = "source_a", target = "inst",
+                        sourceHandle = "out", targetHandle = "in_a",
+                    },
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_b", source = "source_b", target = "inst",
+                        sourceHandle = "out", targetHandle = "in_b",
+                    },
+                },
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "sg",
+                        name = "Two Inputs",
+                        inputs =
+                        {
+                            new PcgSubgraphPort { id = "in_a", name = "A", pinType = "SpatialMesh" },
+                            new PcgSubgraphPort { id = "in_b", name = "B", pinType = "SpatialMesh" },
+                        },
+                        nodes =
+                        {
+                            new PcgGraphNodeRecord
+                            {
+                                id = "input", type = PcgStructuralNodeTypes.SubgraphInput, data = new PcgNodeData(),
+                            },
+                            new PcgGraphNodeRecord
+                            {
+                                id = "modify_a", type = "TransformMesh", data = new PcgNodeData(),
+                            },
+                            new PcgGraphNodeRecord
+                            {
+                                id = "modify_b", type = "TransformMesh", data = new PcgNodeData(),
+                            },
+                        },
+                        edges =
+                        {
+                            new PcgGraphEdgeRecord
+                            {
+                                id = "inner_a", source = "input", target = "modify_a",
+                                sourceHandle = "in_a", targetHandle = "in",
+                            },
+                            new PcgGraphEdgeRecord
+                            {
+                                id = "inner_b", source = "input", target = "modify_b",
+                                sourceHandle = "in_b", targetHandle = "in",
+                            },
+                        },
+                    },
+                },
+            };
+
+            Assert.That(PcgGraphFlattener.TryFlattenForExecution(doc, out var flat, out var error), Is.True, error);
+            Assert.That(
+                flat.edges.Exists(edge =>
+                    edge.source == "source_a" &&
+                    edge.target == "inst/modify_a" &&
+                    edge.targetHandle == "in"),
+                Is.True);
+            Assert.That(
+                flat.edges.Exists(edge =>
+                    edge.source == "source_b" &&
+                    edge.target == "inst/modify_b" &&
+                    edge.targetHandle == "in"),
+                Is.True);
+        }
+
+        [Test]
+        public void InlineSubgraphInstance_BuildsAllDeclaredInputPorts()
+        {
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "sg",
+                name = "Two Inputs",
+                inputs =
+                {
+                    new PcgSubgraphPort { id = "in_a", name = "A", pinType = "SpatialMesh" },
+                    new PcgSubgraphPort { id = "in_b", name = "B", pinType = "SpatialMesh" },
+                },
+            };
+
+            var instance = new PcgSubgraphNodeView(definition, PcgSubgraphNodeKind.Instance);
+            instance.Initialize("inst", UnityEngine.Vector2.zero);
+
+            var inputA = instance.FindInputPort("in_a");
+            var inputB = instance.FindInputPort("in_b");
+            Assert.That(inputA, Is.Not.Null);
+            Assert.That(inputB, Is.Not.Null);
+            Assert.That(inputA, Is.Not.SameAs(inputB));
+            Assert.That(inputA.userData, Is.EqualTo("in_a"));
+            Assert.That(inputB.userData, Is.EqualTo("in_b"));
+        }
+
+        [Test]
+        public void Flatten_ResolvesDirectSubgraphInputOutputPassthrough()
+        {
+            var doc = new PcgGraphDocument
+            {
+                version = "2.0",
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "source", type = "CreateBoxMesh", data = new PcgNodeData() },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.Subgraph,
+                        data = MakeSubgraphId("sg"),
+                    },
+                    new PcgGraphNodeRecord { id = "sink", type = "Output", data = new PcgNodeData() },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_in", source = "source", target = "inst",
+                        sourceHandle = "out", targetHandle = "in",
+                    },
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_out", source = "inst", target = "sink",
+                        sourceHandle = "out", targetHandle = "in",
+                    },
+                },
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "sg",
+                        name = "Passthrough",
+                        inputs = { new PcgSubgraphPort { id = "in", name = "In", pinType = "SpatialMesh" } },
+                        outputs = { new PcgSubgraphPort { id = "out", name = "Out", pinType = "SpatialMesh" } },
+                        nodes =
+                        {
+                            new PcgGraphNodeRecord
+                            {
+                                id = "input", type = PcgStructuralNodeTypes.SubgraphInput, data = new PcgNodeData(),
+                            },
+                            new PcgGraphNodeRecord
+                            {
+                                id = "output", type = PcgStructuralNodeTypes.SubgraphOutput, data = new PcgNodeData(),
+                            },
+                        },
+                        edges =
+                        {
+                            new PcgGraphEdgeRecord
+                            {
+                                id = "inner", source = "input", target = "output",
+                                sourceHandle = "in", targetHandle = "out",
+                            },
+                        },
+                    },
+                },
+            };
+
+            Assert.That(PcgGraphFlattener.TryFlattenForExecution(doc, out var flat, out var error), Is.True, error);
+            Assert.That(
+                flat.edges.Exists(edge =>
+                    edge.source == "source" &&
+                    edge.target == "sink" &&
+                    edge.sourceHandle == "out" &&
+                    edge.targetHandle == "in"),
+                Is.True);
         }
 
         private static PcgSubgraphAssetDocument MakePassthroughAsset(string name, string nestedGuid)

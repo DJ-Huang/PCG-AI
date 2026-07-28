@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "3.0",
   "nodes": [
     {
       "id": "ground",
@@ -258,6 +258,17 @@
       "type": "GroupDelete",
       "position": { "x": 1854, "y": 2503.5 },
       "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n140",
+      "type": "SubgraphAsset",
+      "position": { "x": 1854, "y": 2574.5 },
+      "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": ""},
+      "subgraphInterface": {
+        "name": "NewSubgraph",
+        "inputs": [ {"id": "in_1", "name": "Input", "pinType": "Any"}, {"id": "82e81979a5534d7091978111c98d17dc", "name": "in_2", "pinType": "Any"} ],
+        "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"}, {"id": "8ce0f49fc8b145f6a59e82ad64c4566b", "name": "out_2", "pinType": "Any"} ]
+      }
     }
   ],
   "edges": [
@@ -306,7 +317,8 @@
     {"id": "e987100", "source": "n133", "target": "n135", "sourceHandle": "out", "targetHandle": "target"},
     {"id": "e987101", "source": "n134", "target": "n135", "sourceHandle": "out", "targetHandle": "source"},
     {"id": "e1003038", "source": "n129", "target": "n137", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1003565", "source": "n138", "target": "n140", "sourceHandle": "out", "targetHandle": "in_1"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

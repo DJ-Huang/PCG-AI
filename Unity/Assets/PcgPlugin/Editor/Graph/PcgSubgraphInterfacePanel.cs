@@ -110,9 +110,15 @@ namespace DJTechEditor.PCG.Graph
                     pinType = "Any",
                 };
                 if (inputs)
+                {
                     m_Definition.inputs.Add(port);
+                    PcgSubgraphInterfaceUtility.EnsureInterfaceNodes(m_Definition);
+                }
                 else
+                {
                     m_Definition.outputs.Add(port);
+                    PcgSubgraphInterfaceUtility.EnsureInterfaceNodes(m_Definition);
+                }
                 Rebuild();
                 m_GraphView?.NotifyInterfaceChanged();
             });

@@ -263,6 +263,9 @@ namespace DJTechEditor.PCG.Graph
                     if (manifestNode.NodeType == "ExportFBX")
                         m_Body.Add(CreateFbxExportActions(manifestNode));
                 }
+
+                if (node is PcgSubgraphParentRefNodeView parentRef)
+                    ShowParentRefProperties(parentRef);
             }
             finally
             {
@@ -271,6 +274,57 @@ namespace DJTechEditor.PCG.Graph
         }
 
         // ─── Manifest nodes ──────────────────────────────────────────
+
+        private void ShowParentRefProperties(PcgSubgraphParentRefNodeView node)
+        {
+            m_Body.Add(new Label("References a node in the immediate parent scope.")
+            {
+                style =
+                {
+                    color = new Color(0.55f, 0.75f, 0.9f),
+                    fontSize = 10,
+                    marginBottom = 6,
+                    whiteSpace = WhiteSpace.Normal,
+                },
+            });
+
+            if (m_GraphView.TryGetImmediateParentScope(out var parentNodes, out _))
+            {
+                var choices = parentNodes
+                    .Where(n => n != null &&
+                                n.type != PcgStructuralNodeTypes.SubgraphInput &&
+                                n.type != PcgStructuralNodeTypes.SubgraphOutput &&
+                                n.type != PcgStructuralNodeTypes.SubgraphParentRef)
+                    .Select(n => n.id)
+                    .ToList();
+                if (choices.Count > 0)
+                {
+                    var current = node.ParentNodeId;
+                    var index = Mathf.Max(0, choices.IndexOf(current));
+                    var popup = new PopupField<string>(choices, index);
+                    popup.RegisterValueChangedCallback(evt =>
+                    {
+                        m_GraphView.WithUndo("Set Parent Reference", () =>
+                        {
+                            node.SetParentReference(evt.newValue, node.ParentHandle);
+                            m_GraphView.CommitState();
+                        });
+                    });
+                    m_Body.Add(popup);
+                }
+            }
+
+            var handleField = new TextField("Parent Handle") { value = node.ParentHandle };
+            handleField.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Set Parent Handle", () =>
+                {
+                    node.SetParentReference(node.ParentNodeId, evt.newValue);
+                    m_GraphView.CommitState();
+                });
+            });
+            m_Body.Add(handleField);
+        }
 
         private void ShowManifestProperties(PcgManifestNodeView node)
         {

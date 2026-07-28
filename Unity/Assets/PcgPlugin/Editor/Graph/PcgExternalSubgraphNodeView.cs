@@ -310,6 +310,30 @@ namespace DJTechEditor.PCG.Graph
             return result;
         }
 
+        /// <summary>
+        /// Reconciles and updates a persisted linked-subgraph node record.
+        /// Parent-scope edges are used to retain removed or type-changed ports that are still connected.
+        /// </summary>
+        public static ReconcileResult ReconcileNodeRecord(
+            PcgGraphNodeRecord node,
+            IEnumerable<PcgGraphEdgeRecord> parentEdges,
+            PcgSubgraphInterfaceSnapshot source)
+        {
+            if (node == null)
+                throw new ArgumentNullException(nameof(node));
+
+            var edges = parentEdges ?? Enumerable.Empty<PcgGraphEdgeRecord>();
+            bool IsConnected(string handle) =>
+                edges.Any(edge =>
+                    edge != null &&
+                    ((edge.target == node.id && edge.targetHandle == handle) ||
+                     (edge.source == node.id && edge.sourceHandle == handle)));
+
+            var result = Reconcile(node.subgraphInterface, source, IsConnected);
+            node.subgraphInterface = result.Snapshot?.Clone();
+            return result;
+        }
+
         private static List<PcgSubgraphPort> MergePorts(
             List<PcgSubgraphPort> persisted,
             List<PcgSubgraphPort> source,

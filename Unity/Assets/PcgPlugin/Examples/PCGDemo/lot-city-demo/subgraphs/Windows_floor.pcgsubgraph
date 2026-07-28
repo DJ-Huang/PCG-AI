@@ -1,23 +1,24 @@
 {
   "version": "1.0",
   "name": "NewSubgraph",
-  "inputs": [],
-  "outputs": [],
+  "inputs": [ {"id": "in_1", "name": "Input", "pinType": "Any"}, {"id": "82e81979a5534d7091978111c98d17dc", "name": "in_2", "pinType": "Any"} ],
+  "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"}, {"id": "8ce0f49fc8b145f6a59e82ad64c4566b", "name": "out_2", "pinType": "Any"} ],
   "nodes": [
-    {
-      "id": "subgraph_input",
-      "type": "SubgraphInput",
-      "position": { "x": 120, "y": 80 },
-      "data": {}
-    },
     {
       "id": "subgraph_output",
       "type": "SubgraphOutput",
-      "position": { "x": 120, "y": 320 },
-      "data": {}
+      "position": { "x": 0, "y": 0 },
+      "data": {"__nodeTitle": ""}
+    },
+    {
+      "id": "subgraph_input",
+      "type": "SubgraphInput",
+      "position": { "x": 0, "y": 0 },
+      "data": {"__nodeTitle": ""}
     }
   ],
   "edges": [
+    {"id": "iface_passthrough", "source": "subgraph_input", "target": "subgraph_output", "sourceHandle": "in_1", "targetHandle": "out_1"}
   ],
   "subgraphs": [
   ]

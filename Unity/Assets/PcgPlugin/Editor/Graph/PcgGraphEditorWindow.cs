@@ -477,6 +477,7 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView.SubgraphNavigationChanged += _ =>
             {
                 RefreshSubgraphBreadcrumb();
+                RefreshInterfacePanel();
                 ValidatePreviewNodeExists();
             };
             if (!string.IsNullOrEmpty(m_Selected))
@@ -555,6 +556,20 @@ namespace DJTechEditor.PCG.Graph
             m_SubgraphBreadcrumb.text = m_GraphView.IsInsideSubgraph
                 ? m_GraphView.CurrentSubgraphPath
                 : "Root";
+        }
+
+        internal void RefreshInterfacePanel()
+        {
+            if (m_InterfacePanel == null || m_GraphView == null)
+                return;
+
+            var show = m_SubgraphAssetMode || m_GraphView.IsInsideSubgraph;
+            m_InterfacePanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!show)
+                return;
+
+            var definition = m_GraphView.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
+            m_InterfacePanel.Bind(definition);
         }
 
         private void LoadDefaultGraph()
@@ -637,6 +652,8 @@ namespace DJTechEditor.PCG.Graph
 
                 ClearNodePreview(silent: true);
                 m_GraphView.LoadDocument(doc);
+                if (doc.HasExternalSubgraphAssets())
+                    m_GraphView.ReconcileExternalNodes(null);
             }
 
             m_CurrentFilePath = Path.GetFullPath(path);
@@ -655,15 +672,7 @@ namespace DJTechEditor.PCG.Graph
             RefreshScatterDisplayField();
             if (m_Blackboard != null)
                 m_Blackboard.style.display = m_SubgraphAssetMode ? DisplayStyle.None : DisplayStyle.Flex;
-            if (m_InterfacePanel != null)
-            {
-                m_InterfacePanel.style.display = m_SubgraphAssetMode ? DisplayStyle.Flex : DisplayStyle.None;
-                if (m_SubgraphAssetMode)
-                {
-                    var definition = m_GraphView?.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
-                    m_InterfacePanel.Bind(definition);
-                }
-            }
+            RefreshInterfacePanel();
             return true;
         }
 

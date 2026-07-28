@@ -83,6 +83,28 @@ Subgraph 定义内联保存于根 `subgraphs` 数组，主图节点通过 `data.
 - `SubgraphInput` 与 `SubgraphOutput` 仅能作为定义内部的接口节点；它们不是可在根图单独执行的业务节点。
 - 内联 Subgraph 不会生成外部资源文件；联动 `.pcgsubgraph` 则是独立资产，需通过 GUID 引用。
 
+## 内联 Subgraph 接口编辑（P0）
+
+进入任意内联 Subgraph 定义后，左侧 **Subgraph Interface** 面板与 `.pcgsubgraph` 资产模式一致，可 `+ Input` / `+ Output`、改 pin 类型与名称。保存后实例节点端口自动刷新。
+
+## 父层 Promote 为 Subgraph Input（P1）
+
+在父层（Root 或外层 Subgraph）：
+
+1. 选中 **外部节点 → Subgraph 实例** 的连线，右键 **Promote Wire to Subgraph Input**。
+2. 或同时选中一个普通节点与一个 `Subgraph` 实例，右键 **Connect as Subgraph Input**。
+
+操作会写入 `subgraphs[].inputs[]`、确保内部 `SubgraphInput` 节点存在，并在父层连到实例输入 pin。
+
+## 父层节点引用 SubgraphParentRef（P2）
+
+在 Subgraph 定义内部：
+
+1. 右键 **Reference Parent Node → 选择父层节点**（Houdini Object Merge 风格）。
+2. 或在节点搜索窗口 **Structural → Parent Reference** 手动放置，再于 Inspector 填写 `parentNodeId` / `parentHandle`。
+
+Cook / flatten 时会把父层上游展开并替换 `SubgraphParentRef` 输出；仅允许引用**直接父 scope** 的节点，不支持跨多层跳跃。
+
 ## 验证入口
 
 - C++ 行为测试：[pcg-core/tests/test_subgraph.cpp](../../pcg-core/tests/test_subgraph.cpp)，覆盖输入/输出映射、实际 Mesh 执行和递归引用拒绝。

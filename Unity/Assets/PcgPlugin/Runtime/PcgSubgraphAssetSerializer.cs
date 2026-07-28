@@ -102,6 +102,7 @@ namespace DJTechRuntime.PCG
                 PcgGraphSerializer.ParseEdgesPublic(root, doc.edges);
                 if (!PcgGraphSerializer.TryParseSubgraphsPublic(root, doc.subgraphs, allowInterface: true, out error))
                     return false;
+                doc.RepairLegacyEmptyInterface();
                 return true;
             }
             catch (Exception ex)

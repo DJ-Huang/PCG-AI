@@ -60,6 +60,14 @@ namespace DJTechEditor.PCG.Graph
                 return external;
             }
 
+            if (type == PcgStructuralNodeTypes.SubgraphParentRef)
+            {
+                var parentRef = new PcgSubgraphParentRefNodeView();
+                parentRef.Initialize(id, position);
+                parentRef.ApplyData(data);
+                return parentRef;
+            }
+
             if (type == "SubgraphInput" || type == "SubgraphOutput")
             {
                 if (interfaceDefinition == null)

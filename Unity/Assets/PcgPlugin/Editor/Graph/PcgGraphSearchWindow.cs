@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using DJTechRuntime.PCG;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -56,6 +57,16 @@ namespace DJTechEditor.PCG.Graph
 
                 foreach (var group in manifestGroups)
                     AddGroup(tree, group.Key, group.Select(def => def.type));
+
+                if (_graphView.IsInsideSubgraph)
+                {
+                    tree.Add(new SearchTreeGroupEntry(new GUIContent("Structural"), 1));
+                    tree.Add(new SearchTreeEntry(new GUIContent("Parent Reference (SubgraphParentRef)"))
+                    {
+                        level = 2,
+                        userData = PcgStructuralNodeTypes.SubgraphParentRef,
+                    });
+                }
             }
 
             return tree;
