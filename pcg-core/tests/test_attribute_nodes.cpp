@@ -462,5 +462,100 @@ int main()
     expect(index_count == 6,
            "Delete group 0 with number !* keeps primitive 0 only");
 
+    const char* delete_spline_point_group0_dns_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"path","type":"CreateSpline","data":{
+          "mode":"polyline","closed":false,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0},{\"x\":3,\"y\":0,\"z\":0}]"}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"points","group":"0","deleteNonSelected":true,
+          "numberEnable":true,"numberMode":"pattern","numberPattern":"!*" }},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"path","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    const json keep_point0 = execute_json(delete_spline_point_group0_dns_graph);
+    expect(keep_point0.contains("splines") && keep_point0["splines"].is_array() &&
+               keep_point0["splines"].empty(),
+           "Delete spline points group 0 DNS keeps only pt0 (dropped as <2 pts)");
+
+    const char* delete_spline_point_group_last_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"path","type":"CreateSpline","data":{
+          "mode":"polyline","closed":false,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0},{\"x\":3,\"y\":0,\"z\":0}]"}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"points","group":"3","deleteNonSelected":false}},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"path","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    const json drop_last = execute_json(delete_spline_point_group_last_graph);
+    expect(drop_last.contains("splines") && drop_last["splines"].is_array() &&
+               drop_last["splines"].size() == 1 &&
+               drop_last["splines"][0].contains("points") &&
+               drop_last["splines"][0]["points"].size() == 3,
+           "Delete spline points group 3 removes last point");
+
+    const char* delete_spline_point_group1_keep_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"path","type":"CreateSpline","data":{
+          "mode":"polyline","closed":false,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0}]"}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"points","group":"1","deleteNonSelected":true,
+          "numberEnable":true,"numberMode":"pattern","numberPattern":"!*" }},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"path","target":"del"},
+        {"id":"e2","source":"del","target":"out"}
+      ]
+    })";
+    const json keep_mid = execute_json(delete_spline_point_group1_keep_graph);
+    expect(keep_mid.contains("splines") && keep_mid["splines"].is_array() &&
+               keep_mid["splines"].empty(),
+           "Delete spline points group 1 DNS keeps only middle point (dropped)");
+
+    const char* delete_multi_edge_prim_group_graph = R"({
+      "version": "1.0",
+      "nodes": [
+        {"id":"box","type":"CreateBoxMesh","data":{"width":4,"height":0.01,"depth":2}},
+        {"id":"cl","type":"ConvertLine","data":{"group":"","connectPath":false,"removeUnusedPoints":true}},
+        {"id":"ms","type":"MeasureMesh","data":{
+          "group":"","elementType":"primitives","measure":"perimeter","attributeName":"length",
+          "useWidth":false}},
+        {"id":"sort","type":"SortGeometry","data":{
+          "pointMethod":"nochange","primitiveMethod":"attribute",
+          "primitiveAttributeName":"length","reversePrimitives":false}},
+        {"id":"del","type":"Delete","data":{
+          "entity":"primitives","group":"0","deleteNonSelected":true,
+          "numberEnable":true,"numberMode":"pattern","numberPattern":"!*" }},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges": [
+        {"id":"e1","source":"box","target":"cl"},
+        {"id":"e2","source":"cl","target":"ms"},
+        {"id":"e3","source":"ms","target":"sort"},
+        {"id":"e4","source":"sort","target":"del"},
+        {"id":"e5","source":"del","target":"out"}
+      ]
+    })";
+    const json keep_shortest = execute_json(delete_multi_edge_prim_group_graph);
+    expect(keep_shortest.contains("splines") && keep_shortest["splines"].is_array() &&
+               keep_shortest["splines"].size() == 1 &&
+               keep_shortest["splines"][0].contains("points") &&
+               keep_shortest["splines"][0]["points"].size() == 2,
+           "ConvertLine+Sort+Delete group 0 keeps one shortest edge");
+
     return g_failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -443,7 +443,7 @@
       "id": "n122",
       "type": "ConvertLine",
       "position": { "x": 1434, "y": 1744.5 },
-      "data": {"group": "streetFacingEdges", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "__nodeTitle": ""}
+      "data": {"group": "streetFacingEdges", "connectPath": false, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "__nodeTitle": ""}
     },
     {
       "id": "n124",

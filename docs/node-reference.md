@@ -884,6 +884,8 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 **功能**：Houdini 风格几何删除。支持 Group、Number（pattern/range/expression）、Bounding Volume、Normal、Degenerate、Random 条件并集选择，再按 Entity（points/primitives/edges）执行拓扑删除。默认空配置原样直通。
 
+`group` 字段对齐 Houdini：除命名 group 外，支持数字/范围 pattern（如 `"0"`、`"1"`、`"0-2"`、`"!*"`）。`entity=points` 时按点序号（curve 上为局部 `@ptnum`）选择；`entity=primitives` 时按图元序号选择。与 Number 页签条件取并集，再按 `deleteNonSelected` 决定删除选中或非选中。
+
 **限制**：仅支持 polygon mesh、spline、point 元素；不支持 VDB、NURBS 等 Houdini 专属类型。Bounding Volume 为参数框，无第二几何输入。
 
 **属性**：`group`、`deleteNonSelected`、`entity`、`geometryType`、Number/Bounding/Normal/Degenerate/Random 页签字段、`keepPoints`、`deleteUnusedGroups`。
