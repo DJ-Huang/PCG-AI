@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "name": "NewSubgraph",
+  "inputs": [],
+  "outputs": [],
+  "nodes": [
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": { "x": 120, "y": 320 },
+      "data": {"__nodeTitle": ""}
+    },
+    {
+      "id": "subgraph_input",
+      "type": "SubgraphInput",
+      "position": { "x": 120, "y": 91 },
+      "data": {"__nodeTitle": ""}
+    }
+  ],
+  "edges": [
+  ],
+  "subgraphs": [
+  ]
+}

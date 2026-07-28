@@ -409,6 +409,228 @@
       }
     },
     {
+      "type": "AttributeTransfer",
+      "displayName": "Attribute Transfer",
+      "category": "Attribute",
+      "inspectorSectionLayout": "tabs",
+      "inputs": [
+        {
+          "id": "target",
+          "label": "Target",
+          "pinType": "SpatialMesh"
+        },
+        {
+          "id": "source",
+          "label": "Source",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "attributes",
+          "label": "Attributes",
+          "foldout": false
+        },
+        {
+          "id": "conditions",
+          "label": "Conditions",
+          "foldout": false
+        }
+      ],
+      "properties": {
+        "sourceGroup": {
+          "type": "groupSelect",
+          "displayName": "Source Group",
+          "default": "",
+          "order": 10
+        },
+        "sourceGroupType": {
+          "type": "enum",
+          "displayName": "Source Group Type",
+          "default": "primitives",
+          "order": 11,
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "vertices", "label": "Vertices" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "destinationGroup": {
+          "type": "groupSelect",
+          "displayName": "Destination Group",
+          "default": "",
+          "order": 20
+        },
+        "destinationGroupType": {
+          "type": "enum",
+          "displayName": "Destination Group Type",
+          "default": "primitives",
+          "order": 21,
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "vertices", "label": "Vertices" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "transferDetail": {
+          "type": "boolean",
+          "displayName": "Detail",
+          "default": true,
+          "section": "attributes",
+          "order": 30,
+          "companionField": "detailAttributes"
+        },
+        "detailAttributes": {
+          "type": "string",
+          "displayName": "Detail",
+          "default": "*",
+          "section": "attributes",
+          "order": 31
+        },
+        "transferPrimitives": {
+          "type": "boolean",
+          "displayName": "Primitives",
+          "default": false,
+          "section": "attributes",
+          "order": 40,
+          "companionField": "primitiveAttributes"
+        },
+        "primitiveAttributes": {
+          "type": "string",
+          "displayName": "Primitives",
+          "default": "*",
+          "section": "attributes",
+          "order": 41
+        },
+        "transferPoints": {
+          "type": "boolean",
+          "displayName": "Points",
+          "default": false,
+          "section": "attributes",
+          "order": 50,
+          "companionField": "pointAttributes"
+        },
+        "pointAttributes": {
+          "type": "string",
+          "displayName": "Points",
+          "default": "*",
+          "section": "attributes",
+          "order": 51
+        },
+        "transferVertices": {
+          "type": "boolean",
+          "displayName": "Vertices",
+          "default": false,
+          "section": "attributes",
+          "order": 60,
+          "companionField": "vertexAttributes"
+        },
+        "vertexAttributes": {
+          "type": "string",
+          "displayName": "Vertices",
+          "default": "*",
+          "section": "attributes",
+          "order": 61
+        },
+        "copyLocalVariables": {
+          "type": "boolean",
+          "displayName": "Copy Local Variables",
+          "default": true,
+          "section": "attributes",
+          "order": 70
+        },
+        "allowPAttribute": {
+          "type": "boolean",
+          "displayName": "Allow P Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 71
+        },
+        "kernelFunction": {
+          "type": "enum",
+          "displayName": "Kernel Function",
+          "default": "elendt",
+          "section": "conditions",
+          "order": 10,
+          "options": [
+            { "value": "elendt", "label": "Elendt Model" },
+            { "value": "wyvill", "label": "Wyvill Model" },
+            { "value": "blinn", "label": "Blinn Model" },
+            { "value": "hart", "label": "Hart Model" },
+            { "value": "links", "label": "Links Model" },
+            { "value": "heron", "label": "Heron Model" },
+            { "value": "uniform", "label": "Uniform Model" }
+          ]
+        },
+        "kernelRadius": {
+          "type": "number",
+          "displayName": "Kernel Radius",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 20
+        },
+        "maxSampleCount": {
+          "type": "integer",
+          "displayName": "Max Sample Count",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 30
+        },
+        "enableDistanceThreshold": {
+          "type": "boolean",
+          "displayName": "Distance Threshold",
+          "default": true,
+          "section": "conditions",
+          "order": 40,
+          "companionField": "distanceThreshold"
+        },
+        "distanceThreshold": {
+          "type": "number",
+          "displayName": "Distance Threshold",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 41
+        },
+        "blendWidth": {
+          "type": "number",
+          "displayName": "Blend Width",
+          "default": 0.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 50
+        },
+        "uniformBias": {
+          "type": "number",
+          "displayName": "Uniform Bias",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "section": "conditions",
+          "order": 60,
+          "enabledWhen": {
+            "property": "kernelFunction",
+            "equals": "uniform"
+          }
+        }
+      }
+    },
+    {
       "type": "Delete",
       "displayName": "Delete",
       "category": "Filter",
@@ -4235,6 +4457,49 @@
       }
     },
     {
+      "type": "GroupDelete",
+      "displayName": "Group Delete",
+      "category": "Geometry",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "deletions",
+          "label": "Number of Deletions",
+          "foldout": false,
+          "header": false
+        }
+      ],
+      "properties": {
+        "deletions": {
+          "type": "string",
+          "displayName": "Deletions",
+          "default": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]",
+          "section": "deletions",
+          "order": 0
+        },
+        "deleteUnusedGroups": {
+          "type": "boolean",
+          "displayName": "Delete Unused Groups",
+          "default": false,
+          "section": "deletions",
+          "order": 100
+        }
+      }
+    },
+    {
       "type": "GroupPromote",
       "displayName": "Group Promote",
       "category": "Geometry",
@@ -6158,6 +6423,103 @@
             { "value": "post", "label": "Post-Multiply" },
             { "value": "pre", "label": "Pre-Multiply" }
           ]
+        }
+      }
+    },
+    {
+      "type": "TransformByAttribute",
+      "displayName": "Transform by Attribute",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "transform",
+          "label": "Transform",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "attributes",
+          "label": "Attributes",
+          "foldout": false,
+          "header": true
+        }
+      ],
+      "properties": {
+        "group": {
+          "type": "groupSelect",
+          "default": "",
+          "displayName": "Group",
+          "section": "transform",
+          "order": 0
+        },
+        "groupType": {
+          "type": "enum",
+          "default": "guess",
+          "displayName": "Group Type",
+          "section": "transform",
+          "order": 1,
+          "options": [
+            { "value": "guess", "label": "Guess from Group" },
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "transformAttribute": {
+          "type": "string",
+          "default": "xform",
+          "displayName": "Transform Attribute",
+          "section": "transform",
+          "order": 10
+        },
+        "invertTransform": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Invert Transformation",
+          "section": "transform",
+          "order": 20
+        },
+        "attributes": {
+          "type": "string",
+          "default": "*",
+          "displayName": "Attributes to Transform",
+          "section": "attributes",
+          "order": 10
+        },
+        "recomputeAffectedNormals": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Recompute Affected Normals",
+          "section": "attributes",
+          "order": 20
+        },
+        "preserveNormalLength": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Preserve Normal Length",
+          "section": "attributes",
+          "order": 30
+        },
+        "deleteTransformAttribute": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Delete Transform Attribute",
+          "section": "attributes",
+          "order": 40
         }
       }
     },

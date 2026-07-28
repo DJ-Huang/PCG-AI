@@ -1,4 +1,5 @@
 #include "elements/delete_algorithms.hpp"
+#include "elements/attribute_algorithms.hpp"
 #include "elements/attribute_elements.hpp"
 
 #include "elements/color_ramp.hpp"
@@ -1461,12 +1462,60 @@ public:
     }
 };
 
+class AttributeTransferElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "AttributeTransfer"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        const auto target =
+            get_geometry_input(ctx, "target", "AttributeTransfer missing target input");
+        const auto source =
+            get_geometry_input(ctx, "source", "AttributeTransfer missing source input");
+        AttributeTransferOptions options;
+        options.source_group = ctx.node->data.value("sourceGroup", std::string());
+        options.source_group_type =
+            ctx.node->data.value("sourceGroupType", std::string("primitives"));
+        options.destination_group = ctx.node->data.value("destinationGroup", std::string());
+        options.destination_group_type =
+            ctx.node->data.value("destinationGroupType", std::string("primitives"));
+        options.transfer_detail = ctx.node->data.value("transferDetail", true);
+        options.detail_attributes = ctx.node->data.value("detailAttributes", std::string("*"));
+        options.transfer_primitives = ctx.node->data.value("transferPrimitives", false);
+        options.primitive_attributes =
+            ctx.node->data.value("primitiveAttributes", std::string("*"));
+        options.transfer_points = ctx.node->data.value("transferPoints", false);
+        options.point_attributes = ctx.node->data.value("pointAttributes", std::string("*"));
+        options.transfer_vertices = ctx.node->data.value("transferVertices", false);
+        options.vertex_attributes = ctx.node->data.value("vertexAttributes", std::string("*"));
+        options.allow_p_attribute = ctx.node->data.value("allowPAttribute", false);
+        options.copy_local_variables = ctx.node->data.value("copyLocalVariables", true);
+        options.kernel_function = ctx.node->data.value("kernelFunction", std::string("elendt"));
+        options.kernel_radius = ctx.node->data.value("kernelRadius", 10.0);
+        options.max_sample_count = ctx.node->data.value("maxSampleCount", 1);
+        options.enable_distance_threshold =
+            ctx.node->data.value("enableDistanceThreshold", true);
+        options.distance_threshold = ctx.node->data.value("distanceThreshold", 10.0);
+        options.blend_width = ctx.node->data.value("blendWidth", 0.0);
+        options.uniform_bias = ctx.node->data.value("uniformBias", 0.5);
+
+        if (!options.transfer_detail && !options.transfer_primitives &&
+            !options.transfer_points && !options.transfer_vertices)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "AttributeTransfer: enable at least one attribute class");
+
+        emit_geometry(ctx, attribute_transfer_geometry(target, source, options));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_attribute_elements(
     std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("AttributeWrangle", std::make_unique<AttributeWrangleElement>());
+    map.emplace("AttributeTransfer", std::make_unique<AttributeTransferElement>());
     map.emplace("Blast", std::make_unique<BlastElement>());
     map.emplace("Delete", std::make_unique<DeleteElement>());
     map.emplace("Split", std::make_unique<SplitElement>());

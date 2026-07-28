@@ -1863,13 +1863,7 @@ namespace DJTechEditor.PCG.Graph
         /// </summary>
         private static void DrawGroupListSidebar(SceneView sceneView, PcgGraphEditorWindow window)
         {
-            var ctx = window.GraphView.SceneEditContext;
-            bool canShowGroups = ctx.SupportsDomain(SceneEditDomain.Vertex)
-                || ctx.SupportsDomain(SceneEditDomain.Edge)
-                || ctx.SupportsDomain(SceneEditDomain.Face);
-            if (!canShowGroups)
-                return;
-
+            // Always show in PCG mode — group preview is a core debug affordance.
             sceneView.wantsMouseMove = s_GroupListOpen;
 
             const float barW = 32f;

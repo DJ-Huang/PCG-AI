@@ -2,6 +2,7 @@
 
 #include "data/pcg_geometry.hpp"
 
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
@@ -85,5 +86,22 @@ data::PcgGeometry group_combine(const data::PcgGeometry& input, const GroupCombi
 data::PcgGeometry face_group_by_normal(const data::PcgGeometry& input,
                                        const FaceGroupByNormalOptions& options);
 data::PcgGeometry group_promote(const data::PcgGeometry& input, const GroupPromoteOptions& options);
+
+/// Houdini Group Delete SOP: remove named groups without deleting geometry elements.
+struct GroupDeleteRule {
+    bool enabled = true;
+    /// any | points | primitives | edges | vertices
+    std::string group_type = "any";
+    /// Space-separated group names; supports * wildcards.
+    std::string group_names;
+};
+
+struct GroupDeleteOptions {
+    std::vector<GroupDeleteRule> rules;
+    bool delete_unused_groups = false;
+};
+
+std::vector<GroupDeleteRule> parse_group_delete_rules(const nlohmann::json& data);
+data::PcgGeometry group_delete(const data::PcgGeometry& input, const GroupDeleteOptions& options);
 
 } // namespace pcg::internal::elements

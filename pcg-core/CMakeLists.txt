@@ -114,6 +114,7 @@ set(PCG_CORE_SOURCES
     src/elements/color_ramp.cpp
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
+    src/elements/attribute_algorithms.cpp
     src/elements/delete_algorithms.cpp
     src/elements/primitive_elements.cpp
     src/geometry/element_pattern.cpp

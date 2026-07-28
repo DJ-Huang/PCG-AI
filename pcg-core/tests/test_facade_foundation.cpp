@@ -1,11 +1,13 @@
 #include "graph_executor.hpp"
 #include "graph_parser.hpp"
 #include "data/pcg_attribute_table.hpp"
+#include "elements/attribute_algorithms.hpp"
 #include "elements/facade_foundation_algorithms.hpp"
 
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -557,6 +559,132 @@ int main()
         expect(std::string(error).find("ForEachBegin has no matching ForEachEnd") !=
                    std::string::npos,
                "unmatched ForEachBegin reports pairing error");
+    }
+
+    {
+        // Detail xform copy (MatchSize → AttributeTransfer pattern).
+        using pcg::internal::data::AttributeOwner;
+        using pcg::internal::data::AttributeTransformRole;
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::data::PcgVec3;
+        using pcg::internal::elements::AttributeTransferOptions;
+        using pcg::internal::elements::attribute_transfer_geometry;
+
+        PcgGeometry source;
+        source.points_mut() = {
+            PcgVec3{0, 0, 0}, PcgVec3{1, 0, 0}, PcgVec3{1, 0, 1}, PcgVec3{0, 0, 1}};
+        source.faces_mut() = {{0, 1, 2, 3}};
+        auto& xform = source.attributes().create_float(
+            AttributeOwner::Detail, "xform", 16, std::vector<double>(16, 0.0),
+            AttributeTransformRole::Matrix);
+        xform.float_values_mut() = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1};
+
+        auto& id = source.attributes().create_int(AttributeOwner::Point, "id", 1, {-1});
+        id.int_values_mut() = {10, 20, 30, 40};
+
+        PcgGeometry target;
+        target.points_mut() = {PcgVec3{0.05, 0, 0.05}, PcgVec3{1.05, 0, 0.05},
+                               PcgVec3{1.05, 0, 1.05}, PcgVec3{0.05, 0, 1.05}};
+        target.faces_mut() = {{0, 1, 2, 3}};
+
+        AttributeTransferOptions options;
+        options.transfer_detail = true;
+        options.detail_attributes = "xform";
+        options.transfer_points = true;
+        options.point_attributes = "id";
+        options.transfer_primitives = false;
+        options.transfer_vertices = false;
+        options.enable_distance_threshold = true;
+        options.distance_threshold = 1.0;
+
+        const PcgGeometry out = attribute_transfer_geometry(target, source, options);
+        const auto* detail = out.attributes().find(AttributeOwner::Detail, "xform");
+        expect(detail != nullptr && detail->float_values().size() == 16,
+               "AttributeTransfer copies detail xform");
+        if (detail && detail->float_values().size() == 16)
+            expect(std::abs(detail->float_values()[12] - 10.0) < 1e-9 &&
+                       std::abs(detail->float_values()[13] - 20.0) < 1e-9 &&
+                       std::abs(detail->float_values()[14] - 30.0) < 1e-9,
+                   "AttributeTransfer detail xform translation");
+
+        const auto* point_id = out.attributes().find(AttributeOwner::Point, "id");
+        expect(point_id != nullptr && point_id->int_values().size() == 4,
+               "AttributeTransfer copies point id");
+        if (point_id && point_id->int_values().size() == 4)
+            expect(point_id->int_values()[0] == 10 && point_id->int_values()[1] == 20,
+                   "AttributeTransfer nearest point ids");
+    }
+
+    {
+        // Max Sample Count > 1 with kernel blends neighboring float attributes.
+        using pcg::internal::data::AttributeOwner;
+        using pcg::internal::data::PcgGeometry;
+        using pcg::internal::data::PcgVec3;
+        using pcg::internal::elements::AttributeTransferOptions;
+        using pcg::internal::elements::attribute_transfer_geometry;
+
+        PcgGeometry source;
+        source.points_mut() = {PcgVec3{0, 0, 0}, PcgVec3{2, 0, 0}};
+        source.faces_mut() = {{0, 1, 1}}; // unused topology for point attrs
+        auto& heat = source.attributes().create_float(AttributeOwner::Point, "heat", 1, {0.0});
+        heat.float_values_mut() = {0.0, 10.0};
+
+        PcgGeometry target;
+        target.points_mut() = {PcgVec3{1, 0, 0}};
+        target.faces_mut() = {{0, 0, 0}};
+
+        AttributeTransferOptions options;
+        options.transfer_detail = false;
+        options.transfer_points = true;
+        options.point_attributes = "heat";
+        options.kernel_function = "wyvill";
+        options.kernel_radius = 2.0;
+        options.max_sample_count = 2;
+        options.enable_distance_threshold = false;
+        options.blend_width = 0.0;
+
+        const PcgGeometry out = attribute_transfer_geometry(target, source, options);
+        const auto* attr = out.attributes().find(AttributeOwner::Point, "heat");
+        expect(attr != nullptr && attr->float_values().size() == 1,
+               "AttributeTransfer multi-sample creates heat");
+        if (attr && !attr->float_values().empty()) {
+            const double v = attr->float_values()[0];
+            expect(v > 0.0 && v < 10.0, "AttributeTransfer kernel blends two sources");
+            expect(std::abs(v - 5.0) < 1.5, "AttributeTransfer mid-point near average");
+        }
+    }
+
+    {
+        // Graph cook: AttributeTransfer Detail only.
+        const std::string graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"src","type":"CreateBoxMesh","data":{"width":1,"height":1,"depth":1}},
+            {"id":"dst","type":"CreateBoxMesh","data":{"width":1,"height":1,"depth":1}},
+            {"id":"tag","type":"MatchSize","data":{
+              "targetSize":[2,2,2],"uniformScale":false,
+              "stashTransform":true,"stashAttribute":"xform"
+            }},
+            {"id":"xfer","type":"AttributeTransfer","data":{
+              "transferDetail":true,"detailAttributes":"xform",
+              "transferPoints":false,"transferPrimitives":false,"transferVertices":false
+            }},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"src","target":"tag","sourceHandle":"out","targetHandle":"source"},
+            {"source":"dst","target":"xfer","sourceHandle":"out","targetHandle":"target"},
+            {"source":"tag","target":"xfer","sourceHandle":"out","targetHandle":"source"},
+            {"source":"xfer","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto result = execute(graph);
+        expect(result.source_geometry != nullptr, "AttributeTransfer graph keeps geometry");
+        if (result.source_geometry) {
+            const auto* detail = result.source_geometry->attributes().find(
+                pcg::internal::data::AttributeOwner::Detail, "xform");
+            expect(detail != nullptr, "AttributeTransfer graph copies MatchSize xform");
+        }
     }
 
     std::printf("failures=%d\n", failures);

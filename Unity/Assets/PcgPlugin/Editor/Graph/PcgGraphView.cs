@@ -929,7 +929,9 @@ namespace DJTechEditor.PCG.Graph
                 {
                     m_SceneEditContext = PcgSceneEditContext.ObjectMode;
                 }
-                else if (manifestNode.NodeType == "GroupCreate" || manifestNode.NodeType == "GroupCombine")
+                else if (manifestNode.NodeType == "GroupDelete"
+                    || manifestNode.NodeType == "GroupCreate"
+                    || manifestNode.NodeType == "GroupCombine")
                 {
                     var nodeData = manifestNode.CollectData();
                     var domainStr = nodeData?.GetRaw("domain")?.ToString() ?? "edge";

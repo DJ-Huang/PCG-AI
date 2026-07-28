@@ -206,18 +206,6 @@
       "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// find how many street facing edges\nint numStreetFacing = nedgesgroup(0, \"streetFacingEdges\");\n// if > 2, then has an available side for being a fire escape\n// also check if more than 2 floors, looks goofy on short buildings lol\nif(numStreetFacing >= 2 && @numFloors > 2 && rand(buildingIter*20) < 0.5)\n{\n  @hasFireEscape = 1;\n}\n// if too narrow for fire escape, then override\nfloat lengthSide = length(getbbox_size(1));\nif(lengthSide < 1.25) {\n  @hasFireEscape = 0;\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_fire_escape"}
     },
     {
-      "id": "n130",
-      "type": "GroupCreate",
-      "position": { "x": 1567.5, "y": 2356 },
-      "data": {"outputGroup": "base", "domain": "face", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
-    },
-    {
-      "id": "n131",
-      "type": "ForEachBegin",
-      "position": { "x": 1567, "y": 2437.5 },
-      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
-    },
-    {
       "id": "n129",
       "type": "AttributeWrangle",
       "position": { "x": 1438, "y": 2255.5 },
@@ -236,10 +224,40 @@
       "data": {"group": "fireEscape", "groupType": "guess", "invertSelection": false, "deleteUnusedGroups": false, "__nodeTitle": ""}
     },
     {
+      "id": "n130",
+      "type": "GroupCreate",
+      "position": { "x": 1567.5, "y": 2356 },
+      "data": {"outputGroup": "base", "domain": "face", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
+    },
+    {
       "id": "n134",
       "type": "MatchSize",
-      "position": { "x": 1598, "y": 2644.5 },
+      "position": { "x": 1620, "y": 2648 },
       "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "none", "targetJustifyX": "same", "offsetX": 0, "justifyY": "max", "targetJustifyY": "same", "offsetY": 0.05, "justifyZ": "none", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": false, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
+    },
+    {
+      "id": "n135",
+      "type": "AttributeTransfer",
+      "position": { "x": 1567.5, "y": 2730 },
+      "data": {"sourceGroup": "", "sourceGroupType": "primitives", "destinationGroup": "", "destinationGroupType": "primitives", "transferDetail": true, "detailAttributes": "xform", "transferPrimitives": false, "primitiveAttributes": "*", "transferPoints": false, "pointAttributes": "*", "transferVertices": false, "vertexAttributes": "*", "copyLocalVariables": true, "allowPAttribute": false, "kernelFunction": "elendt", "kernelRadius": 10, "maxSampleCount": 1, "enableDistanceThreshold": true, "distanceThreshold": 10, "blendWidth": 0, "uniformBias": 0.5, "__nodeTitle": "apply_matchsize_xform_to_fireescape"}
+    },
+    {
+      "id": "n131",
+      "type": "ForEachBegin",
+      "position": { "x": 1567, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n137",
+      "type": "ForEachBegin",
+      "position": { "x": 1854, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n138",
+      "type": "GroupDelete",
+      "position": { "x": 1854, "y": 2503.5 },
+      "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -284,7 +302,11 @@
     {"id": "e851869", "source": "n130", "target": "n131", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e851870", "source": "n131", "target": "n132", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e859683", "source": "n132", "target": "n133", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e866517", "source": "n133", "target": "n134", "sourceHandle": "rest", "targetHandle": "source"}
+    {"id": "e987099", "source": "n133", "target": "n134", "sourceHandle": "rest", "targetHandle": "source"},
+    {"id": "e987100", "source": "n133", "target": "n135", "sourceHandle": "out", "targetHandle": "target"},
+    {"id": "e987101", "source": "n134", "target": "n135", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e1003038", "source": "n129", "target": "n137", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},

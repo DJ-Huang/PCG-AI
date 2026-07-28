@@ -52,6 +52,7 @@
   - [Blast](#blast)
 - [Attribute 类别](#attribute-类别)
   - [AttributeWrangle](#attributewrangle)
+  - [AttributeTransfer](#attributetransfer)
 - [Transform 类别](#transform-类别)
   - [TransformPoints](#transformpoints)
   - [ProjectPoints](#projectpoints)
@@ -977,6 +978,50 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 ```
 
 完整语法见 [Attribute Wrangle 与 Blast](Tutorials/12-attribute-wrangle-and-blast.md)。
+
+---
+
+### AttributeTransfer
+
+**类别**：Attribute
+
+**功能**：Houdini [`attribtransfer`](https://www.sidefx.com/docs/houdini/nodes/sop/attribtransfer.html) 子集。Inspector 顶部为 Source/Destination Group；下方 **Attributes / Conditions** 两个 Tab。
+
+**Attributes**：Detail / Primitives / Points / Vertices（开关 + 属性名，`*`/`^` 风格通配子集）；Allow P Attribute；Copy Local Variables（no-op）。
+
+**Conditions**（对齐 Houdini）：
+
+| 参数 | 说明 |
+|------|------|
+| Kernel Function | `elendt`（默认）/ `wyvill` / `blinn` / `hart` / `links` / `heron` / `uniform` |
+| Kernel Radius | 多样本加权衰减半径；趋近 0 → 最近邻 |
+| Max Sample Count | 参与插值的源元素上限；`1` = 最近邻 |
+| Distance Threshold | 硬距离上限（可关）；阈值内完全由源决定 |
+| Blend Width | 阈值外羽化带，用 Kernel 与目标原值混合 |
+| Uniform Bias | 仅 `uniform` Kernel：源混合系数，目标为 `1 - bias` |
+
+Detail 仍直接拷贝；Point/Prim/Vertex 按邻近 + Kernel 加权。
+
+```json
+{
+  "id": "xfer",
+  "type": "AttributeTransfer",
+  "data": {
+    "transferDetail": true,
+    "detailAttributes": "xform",
+    "transferPoints": true,
+    "pointAttributes": "Cd",
+    "kernelFunction": "elendt",
+    "kernelRadius": 10.0,
+    "maxSampleCount": 1,
+    "enableDistanceThreshold": true,
+    "distanceThreshold": 10.0,
+    "blendWidth": 0.0
+  }
+}
+```
+
+典型接法：`MatchSize` 写出 Detail `xform` 后，用本节点把 `xform` 传到另一份几何。
 
 ---
 

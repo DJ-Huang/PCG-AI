@@ -191,6 +191,10 @@ namespace DJTechEditor.PCG.Graph
             return pinType == "SpatialGeometry" || pinType == "SpatialMesh" || pinType == "SpatialSpline";
         }
 
+        /// <summary>True when an edge can carry mesh/spline geometry that may own point/edge/face groups.</summary>
+        public static bool IsSpatialGeometryFamilyPin(string pinType) =>
+            IsSpatialGeometryFamily(NormalizePinType(pinType));
+
         static string NormalizePinType(string pinType)
         {
             return pinType == "Spline" ? "SpatialSpline" : pinType;

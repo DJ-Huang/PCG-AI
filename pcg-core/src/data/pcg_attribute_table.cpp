@@ -157,6 +157,42 @@ void AttributeArray::append_element_from(const AttributeArray& other, size_t sou
     }
 }
 
+void AttributeArray::set_element_from(const AttributeArray& other,
+                                      size_t dest_index,
+                                      size_t source_index)
+{
+    if (!schema_compatible(other) || dest_index >= size())
+        return;
+    const size_t width = static_cast<size_t>(schema_.tuple_size);
+    const bool use_default = source_index >= other.size();
+    switch (schema_.type) {
+    case AttributeType::Int: {
+        const auto& src = use_default ? default_int_ : other.int_values_;
+        const size_t src_begin = use_default ? 0 : source_index * width;
+        std::copy(src.begin() + static_cast<std::ptrdiff_t>(src_begin),
+                  src.begin() + static_cast<std::ptrdiff_t>(src_begin + width),
+                  int_values_.begin() + static_cast<std::ptrdiff_t>(dest_index * width));
+        break;
+    }
+    case AttributeType::Float: {
+        const auto& src = use_default ? default_float_ : other.float_values_;
+        const size_t src_begin = use_default ? 0 : source_index * width;
+        std::copy(src.begin() + static_cast<std::ptrdiff_t>(src_begin),
+                  src.begin() + static_cast<std::ptrdiff_t>(src_begin + width),
+                  float_values_.begin() + static_cast<std::ptrdiff_t>(dest_index * width));
+        break;
+    }
+    case AttributeType::String: {
+        const auto& src = use_default ? default_string_ : other.string_values_;
+        const size_t src_begin = use_default ? 0 : source_index * width;
+        std::copy(src.begin() + static_cast<std::ptrdiff_t>(src_begin),
+                  src.begin() + static_cast<std::ptrdiff_t>(src_begin + width),
+                  string_values_.begin() + static_cast<std::ptrdiff_t>(dest_index * width));
+        break;
+    }
+    }
+}
+
 size_t AttributeTable::owner_index(AttributeOwner owner)
 {
     return static_cast<size_t>(owner);

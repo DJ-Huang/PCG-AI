@@ -360,12 +360,20 @@ namespace DJTechEditor.PCG.Graph
                     m_Body.Add(CreateWrangleParametersEditor(node));
                     continue;
                 }
+                if (node.NodeType == "GroupDelete" && key == "deletions")
+                {
+                    m_Body.Add(CreateGroupDeleteRulesEditor(node));
+                    continue;
+                }
                 m_Body.Add(CreatePropertyRow(node, key, prop));
             }
         }
 
         private bool NodeSupportsGroupViewer(PcgManifestNodeView node)
         {
+            if (node.NodeType == "GroupDelete")
+                return true;
+
             if (PcgNodeManifest.TryGet(node.NodeType, out var def))
             {
                 if (def.outputGroups.Count > 0)
@@ -518,6 +526,8 @@ namespace DJTechEditor.PCG.Graph
 
                 foreach (var item in BuildSectionPropertyItems(node, def, sectionProps, companionTargets))
                 {
+                    if (TryAddGroupDeletePropertyRow(container, node, def, item, rebuildOnChange: item.rebuildOnChange))
+                        continue;
                     if (item.isGroup)
                         container.Add(CreateGroupedPropertyRow(node, def, item.members, rebuildOnChange: item.rebuildOnChange));
                     else
@@ -581,6 +591,8 @@ namespace DJTechEditor.PCG.Graph
                     .ToList();
                 foreach (var item in BuildSectionPropertyItems(node, def, sectionProps, companionTargets))
                 {
+                    if (TryAddGroupDeletePropertyRow(tabBody, node, def, item, rebuildOnChange: item.rebuildOnChange))
+                        continue;
                     if (item.isGroup)
                         tabBody.Add(CreateGroupedPropertyRow(node, def, item.members, rebuildOnChange: item.rebuildOnChange));
                     else
@@ -1126,6 +1138,11 @@ namespace DJTechEditor.PCG.Graph
                 ApplyEnabledWhen(container, node, prop);
                 return container;
             }
+            if (node.NodeType == "GroupDelete" && key == "deletions")
+            {
+                ApplyEnabledWhen(container, node, prop);
+                return container;
+            }
             container.Add(CreateValueField(key, prop, node, currentBindingForValue, setValueOverride));
             ApplyEnabledWhen(container, node, prop);
             return container;
@@ -1484,6 +1501,371 @@ namespace DJTechEditor.PCG.Graph
             public string Name = "";
             public double Value;
             public string Expr = "";
+        }
+
+        private sealed class GroupDeleteRuleRow
+        {
+            public bool Enabled = true;
+            public string GroupType = "any";
+            public string GroupNames = "";
+        }
+
+        private static readonly (string value, string label)[] k_GroupDeleteTypeOptions =
+        {
+            ("any", "Any"),
+            ("points", "Points"),
+            ("primitives", "Primitives"),
+            ("edges", "Edges"),
+            ("vertices", "Vertices"),
+        };
+
+        private bool TryAddGroupDeletePropertyRow(
+            VisualElement container,
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            SectionPropertyItem item,
+            bool rebuildOnChange)
+        {
+            if (item.isGroup || node.NodeType != "GroupDelete")
+                return false;
+
+            if (item.key == "deletions")
+            {
+                container.Add(CreateGroupDeleteRulesEditor(node));
+                return true;
+            }
+
+            return false;
+        }
+
+        private static VisualElement CreateHoudiniLabeledRow(string label, VisualElement field, float labelWidth = 96f)
+        {
+            var row = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    marginBottom = 4,
+                    width = Length.Percent(100),
+                },
+            };
+            row.Add(new Label(label)
+            {
+                style =
+                {
+                    width = labelWidth,
+                    minWidth = labelWidth,
+                    flexShrink = 0,
+                    color = new Color(0.85f, 0.85f, 0.85f),
+                    unityFontStyleAndWeight = FontStyle.Normal,
+                },
+            });
+            field.style.flexGrow = 1;
+            field.style.flexShrink = 1;
+            field.style.minWidth = 60;
+            row.Add(field);
+            return row;
+        }
+
+        private VisualElement MakeGroupDeleteNamesField(
+            PcgManifestNodeView node,
+            string currentValue,
+            Action<string> onSet)
+        {
+            var row = new VisualElement
+            {
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
+
+            var textField = new TextField { value = currentValue ?? "" };
+            textField.style.flexGrow = 1;
+            textField.style.flexShrink = 1;
+            textField.RegisterValueChangedCallback(evt =>
+                m_GraphView.WithUndo("Edit Group Names", () => onSet(evt.newValue ?? "")));
+            row.Add(textField);
+
+            var available = ResolveUpstreamGroups(node.NodeId);
+            var expandBtn = new Button { text = "\u25be", tooltip = "Browse available groups" };
+            expandBtn.style.width = 22;
+            expandBtn.style.flexShrink = 0;
+            expandBtn.style.marginLeft = 2;
+            if (available.Count > 0)
+            {
+                expandBtn.clicked += () =>
+                {
+                    var menu = new GenericMenu();
+                    foreach (var sourceGroup in available.GroupBy(g => g.sourceNodeType ?? "Unknown").OrderBy(g => g.Key))
+                    {
+                        foreach (var g in sourceGroup)
+                        {
+                            var capturedName = g.name;
+                            var path = $"{sourceGroup.Key}/{g.name} ({g.domain})";
+                            menu.AddItem(new GUIContent(path), textField.value == capturedName, () =>
+                            {
+                                m_GraphView.WithUndo("Pick Group", () =>
+                                {
+                                    onSet(capturedName);
+                                    textField.value = capturedName;
+                                    NotifyGraphChanged();
+                                });
+                            });
+                        }
+                    }
+
+                    var r = expandBtn.worldBound;
+                    menu.DropDown(new Rect(r.x, r.y + r.height, 0, 0));
+                };
+            }
+            else
+            {
+                expandBtn.SetEnabled(false);
+            }
+
+            row.Add(expandBtn);
+            return row;
+        }
+
+        private static List<GroupDeleteRuleRow> ParseGroupDeleteRules(object raw)
+        {
+            var rows = new List<GroupDeleteRuleRow>();
+            List<object> list = null;
+            if (raw is List<object> asList)
+            {
+                list = asList;
+            }
+            else
+            {
+                var text = raw?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(text) || text.StartsWith("System.Collections", StringComparison.Ordinal))
+                    return rows;
+                try
+                {
+                    if (PcgMiniJson.Deserialize(text) is List<object> parsed)
+                        list = parsed;
+                }
+                catch
+                {
+                    return rows;
+                }
+            }
+
+            if (list == null)
+                return rows;
+
+            foreach (var item in list)
+            {
+                if (item is not Dictionary<string, object> obj)
+                    continue;
+                var row = new GroupDeleteRuleRow();
+                if (obj.TryGetValue("enabled", out var enabledObj) && enabledObj != null)
+                {
+                    if (enabledObj is bool enabledBool)
+                        row.Enabled = enabledBool;
+                    else
+                        row.Enabled = string.Equals(enabledObj.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+                }
+                if (obj.TryGetValue("groupType", out var typeObj) && typeObj != null)
+                    row.GroupType = typeObj.ToString() ?? "any";
+                if (obj.TryGetValue("groupNames", out var namesObj) && namesObj != null)
+                    row.GroupNames = namesObj.ToString() ?? "";
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        private static string SerializeGroupDeleteRules(List<GroupDeleteRuleRow> rows)
+        {
+            var list = new List<object>();
+            foreach (var row in rows)
+            {
+                list.Add(new Dictionary<string, object>
+                {
+                    ["enabled"] = row.Enabled,
+                    ["groupType"] = row.GroupType ?? "any",
+                    ["groupNames"] = row.GroupNames ?? "",
+                });
+            }
+            return PcgMiniJson.Serialize(list);
+        }
+
+        private VisualElement CreateGroupDeleteRulesEditor(PcgManifestNodeView node)
+        {
+            var root = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 2,
+                    marginBottom = 8,
+                    width = Length.Percent(100),
+                },
+            };
+
+            var rows = ParseGroupDeleteRules(node.CollectData().GetRaw("deletions"));
+            if (rows.Count == 0)
+                rows.Add(new GroupDeleteRuleRow { GroupNames = "base" });
+
+            void Commit()
+            {
+                m_GraphView.WithUndo("Edit Group Delete Rules", () =>
+                    node.SetPropertyValue("deletions", SerializeGroupDeleteRules(rows)));
+                NotifyGraphChanged();
+            }
+
+            void SetRowCount(int count)
+            {
+                count = Mathf.Clamp(count, 1, 32);
+                while (rows.Count < count)
+                    rows.Add(new GroupDeleteRuleRow());
+                while (rows.Count > count)
+                    rows.RemoveAt(rows.Count - 1);
+                Commit();
+                Rebuild();
+            }
+
+            void Rebuild()
+            {
+                root.Clear();
+
+                var countRow = new VisualElement
+                {
+                    style =
+                    {
+                        flexDirection = FlexDirection.Row,
+                        alignItems = Align.Center,
+                        marginBottom = 8,
+                        width = Length.Percent(100),
+                    },
+                };
+                countRow.Add(new Label("Number of Deletions")
+                {
+                    style =
+                    {
+                        width = 120,
+                        minWidth = 120,
+                        flexShrink = 0,
+                        color = new Color(0.85f, 0.85f, 0.85f),
+                    },
+                });
+
+                var countField = new IntegerField { value = rows.Count };
+                PcgInspectorWidgets.ConfigureCompactNumericField(countField);
+                countField.style.width = 48;
+                countField.style.marginRight = 4;
+                countField.RegisterValueChangedCallback(evt =>
+                {
+                    SetRowCount(evt.newValue);
+                });
+                countRow.Add(countField);
+
+                var addBtn = new Button(() => SetRowCount(rows.Count + 1))
+                {
+                    text = "+",
+                    tooltip = "Add deletion rule",
+                };
+                addBtn.style.width = 22;
+                addBtn.style.marginRight = 2;
+                countRow.Add(addBtn);
+
+                var removeBtn = new Button(() => SetRowCount(rows.Count - 1))
+                {
+                    text = "-",
+                    tooltip = "Remove last deletion rule",
+                };
+                removeBtn.style.width = 22;
+                countRow.Add(removeBtn);
+                root.Add(countRow);
+
+                for (var i = 0; i < rows.Count; i++)
+                {
+                    var index = i;
+                    var row = rows[index];
+                    var card = new VisualElement
+                    {
+                        style =
+                        {
+                            marginBottom = 8,
+                            paddingLeft = 6,
+                            paddingRight = 6,
+                            paddingTop = 6,
+                            paddingBottom = 6,
+                            width = Length.Percent(100),
+                            backgroundColor = new Color(0.18f, 0.2f, 0.18f, 0.55f),
+                            borderTopLeftRadius = 3,
+                            borderTopRightRadius = 3,
+                            borderBottomLeftRadius = 3,
+                            borderBottomRightRadius = 3,
+                        },
+                    };
+
+                    var enableRow = new VisualElement
+                    {
+                        style =
+                        {
+                            flexDirection = FlexDirection.Row,
+                            alignItems = Align.Center,
+                            marginBottom = 4,
+                            width = Length.Percent(100),
+                        },
+                    };
+                    var enableToggle = new Toggle { value = row.Enabled };
+                    enableToggle.label = string.Empty;
+                    enableToggle.AddToClassList(BaseField<bool>.noLabelVariantUssClassName);
+                    enableToggle.style.flexShrink = 0;
+                    enableToggle.RegisterValueChangedCallback(evt =>
+                    {
+                        rows[index].Enabled = evt.newValue;
+                        Commit();
+                    });
+                    enableRow.Add(enableToggle);
+                    enableRow.Add(new Label($"Deletion {index + 1}")
+                    {
+                        style = { color = new Color(0.7f, 0.7f, 0.7f), fontSize = 10, flexGrow = 1 },
+                    });
+
+                    var removeRule = new Button(() =>
+                    {
+                        rows.RemoveAt(index);
+                        if (rows.Count == 0)
+                            rows.Add(new GroupDeleteRuleRow());
+                        Commit();
+                        Rebuild();
+                    })
+                    {
+                        text = "×",
+                        tooltip = "Remove this deletion rule",
+                    };
+                    removeRule.style.width = 22;
+                    removeRule.style.flexShrink = 0;
+                    enableRow.Add(removeRule);
+                    card.Add(enableRow);
+
+                    var typeChoices = k_GroupDeleteTypeOptions.Select(o => o.label).ToList();
+                    var typeIndex = Array.FindIndex(k_GroupDeleteTypeOptions, o => o.value == row.GroupType);
+                    if (typeIndex < 0)
+                        typeIndex = 0;
+                    var typeField = new PopupField<string>(typeChoices, typeIndex);
+                    typeField.RegisterValueChangedCallback(evt =>
+                    {
+                        var idx = typeChoices.IndexOf(evt.newValue);
+                        rows[index].GroupType = idx >= 0 ? k_GroupDeleteTypeOptions[idx].value : "any";
+                        Commit();
+                    });
+                    card.Add(CreateHoudiniLabeledRow("Group Type", typeField));
+
+                    var namesField = MakeGroupDeleteNamesField(node, row.GroupNames, value =>
+                    {
+                        rows[index].GroupNames = value;
+                        Commit();
+                    });
+                    card.Add(CreateHoudiniLabeledRow("Group Names", namesField));
+
+                    root.Add(card);
+                }
+            }
+
+            Rebuild();
+            return root;
         }
 
         private static List<WrangleParamRow> ParseWrangleParameters(object raw)
@@ -2177,10 +2559,10 @@ namespace DJTechEditor.PCG.Graph
                 if (edge.output?.node is not PcgGraphNodeBase sourceNode)
                     continue;
 
-                // Check if this edge carries SpatialMesh data
+                // Walk geometry edges (SpatialMesh / SpatialGeometry / SpatialSpline).
                 var sourceHandle = edge.output.userData as string ?? edge.output.portName;
                 var outputPinType = PcgNodeManifest.GetOutputPinType(sourceNode.NodeType, sourceHandle);
-                if (outputPinType != "SpatialMesh")
+                if (!PcgNodeManifest.IsSpatialGeometryFamilyPin(outputPinType))
                     continue;
 
                 CollectNodeGroups(sourceNode, result, seen);
