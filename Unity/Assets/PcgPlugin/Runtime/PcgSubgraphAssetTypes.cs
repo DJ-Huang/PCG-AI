@@ -22,7 +22,7 @@ namespace DJTechRuntime.PCG
 
         public PcgSubgraphDefinition ToRootDefinition(string definitionId = "__root__")
         {
-            return new PcgSubgraphDefinition
+            var definition = new PcgSubgraphDefinition
             {
                 id = definitionId,
                 name = name ?? "",
@@ -33,6 +33,8 @@ namespace DJTechRuntime.PCG
                 nodes = nodes.Select(node => node?.Clone()).ToList(),
                 edges = edges.Select(edge => edge?.Clone()).ToList(),
             };
+            PcgSubgraphContractUtility.Synchronize(definition);
+            return definition;
         }
 
         public static PcgSubgraphAssetDocument FromDefinition(PcgSubgraphDefinition definition)
@@ -40,16 +42,17 @@ namespace DJTechRuntime.PCG
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
 
+            var normalized = definition.Clone();
             return new PcgSubgraphAssetDocument
             {
                 version = "1.0",
-                name = definition.name ?? "",
-                inputs = definition.inputs.Select(ClonePort).ToList(),
-                outputs = definition.outputs.Select(ClonePort).ToList(),
-                parameters = definition.parameters?.Select(PcgGraphParameterUtility.CloneParameter).ToList()
+                name = normalized.name ?? "",
+                inputs = normalized.inputs.Select(ClonePort).ToList(),
+                outputs = normalized.outputs.Select(ClonePort).ToList(),
+                parameters = normalized.parameters?.Select(PcgGraphParameterUtility.CloneParameter).ToList()
                     ?? new List<PcgGraphParameter>(),
-                nodes = definition.nodes.Select(node => node?.Clone()).ToList(),
-                edges = definition.edges.Select(edge => edge?.Clone()).ToList(),
+                nodes = normalized.nodes.Select(node => node?.Clone()).ToList(),
+                edges = normalized.edges.Select(edge => edge?.Clone()).ToList(),
                 subgraphs = new List<PcgSubgraphDefinition>(),
             };
         }
@@ -89,19 +92,13 @@ namespace DJTechRuntime.PCG
         /// </summary>
         public bool RepairLegacyEmptyInterface()
         {
-            var repaired = false;
-            if (inputs.Count == 0)
-                repaired |= TryInferPortsFromInterfaceEdges(Direction.Input);
-            if (outputs.Count == 0)
-                repaired |= TryInferPortsFromInterfaceEdges(Direction.Output);
-
-            if (inputs.Count == 0 && outputs.Count == 0)
-            {
-                ApplyDefaultPassthroughInterface();
-                return true;
-            }
-
-            repaired |= PcgSubgraphInterfaceRepair.EnsurePassthroughEdges(inputs, outputs, nodes, edges);
+            var definition = ToRootDefinition();
+            var repaired = PcgSubgraphContractUtility.Synchronize(definition);
+            repaired |= PcgSubgraphInterfaceRepair.EnsurePassthroughEdges(definition);
+            inputs = definition.inputs;
+            outputs = definition.outputs;
+            nodes = definition.nodes;
+            edges = definition.edges;
             return repaired;
         }
 
@@ -227,7 +224,7 @@ namespace DJTechRuntime.PCG
     }
 
     /// <summary>
-    /// Restores missing SubgraphInput → SubgraphOutput passthrough edges for interface-only scopes.
+    /// Restores a missing SubgraphInput → Output passthrough edge for interface-only scopes.
     /// </summary>
     public static class PcgSubgraphInterfaceRepair
     {
@@ -235,15 +232,12 @@ namespace DJTechRuntime.PCG
         {
             if (definition == null)
                 return false;
-            definition.inputs ??= new List<PcgSubgraphPort>();
-            definition.outputs ??= new List<PcgSubgraphPort>();
-            definition.nodes ??= new List<PcgGraphNodeRecord>();
-            definition.edges ??= new List<PcgGraphEdgeRecord>();
+            var changed = PcgSubgraphContractUtility.Synchronize(definition);
             return EnsurePassthroughEdges(
                 definition.inputs,
                 definition.outputs,
                 definition.nodes,
-                definition.edges);
+                definition.edges) || changed;
         }
 
         public static bool EnsurePassthroughEdges(
@@ -256,16 +250,23 @@ namespace DJTechRuntime.PCG
             outputs ??= new List<PcgSubgraphPort>();
             nodes ??= new List<PcgGraphNodeRecord>();
             edges ??= new List<PcgGraphEdgeRecord>();
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "__interface__",
+                inputs = inputs,
+                outputs = outputs,
+                nodes = nodes,
+                edges = edges,
+            };
+            var contractChanged = PcgSubgraphContractUtility.Synchronize(definition);
 
             if (inputs.Count == 0 || outputs.Count == 0)
-                return false;
+                return contractChanged;
 
             if (!IsInterfaceOnlyScope(nodes))
-                return false;
+                return contractChanged;
 
             const string fallbackInputNodeId = "subgraph_input";
-            const string fallbackOutputNodeId = "subgraph_output";
-
             var inputNodeId = nodes
                 .FirstOrDefault(node => node?.type == PcgStructuralNodeTypes.SubgraphInput)?.id
                 ?? fallbackInputNodeId;
@@ -281,53 +282,35 @@ namespace DJTechRuntime.PCG
             }
 
             var outputNodeId = nodes
-                .FirstOrDefault(node => node?.type == PcgStructuralNodeTypes.SubgraphOutput)?.id
-                ?? fallbackOutputNodeId;
-            if (!nodes.Any(node => node?.id == outputNodeId))
-            {
-                nodes.Add(new PcgGraphNodeRecord
-                {
-                    id = outputNodeId,
-                    type = PcgStructuralNodeTypes.SubgraphOutput,
-                    position = new PcgGraphPosition { x = 120f, y = 320f },
-                    data = new PcgNodeData(),
-                });
-            }
+                .FirstOrDefault(node => node?.type == "Output")?.id;
+            if (string.IsNullOrEmpty(outputNodeId))
+                return contractChanged;
 
             var repaired = false;
-            var pairCount = Math.Min(inputs.Count, outputs.Count);
-            for (var index = 0; index < pairCount; index++)
+            var inputPort = inputs[0];
+            if (inputPort == null || string.IsNullOrEmpty(inputPort.id))
+                return contractChanged;
+
+            var hasPassthrough = edges.Any(edge =>
+                edge != null &&
+                edge.source == inputNodeId &&
+                edge.target == outputNodeId &&
+                edge.sourceHandle == inputPort.id &&
+                edge.targetHandle == "in");
+            if (!hasPassthrough)
             {
-                var inputPort = inputs[index];
-                var outputPort = outputs[index];
-                if (inputPort == null || outputPort == null ||
-                    string.IsNullOrEmpty(inputPort.id) ||
-                    string.IsNullOrEmpty(outputPort.id))
-                {
-                    continue;
-                }
-
-                var hasPassthrough = edges.Any(edge =>
-                    edge != null &&
-                    edge.source == inputNodeId &&
-                    edge.target == outputNodeId &&
-                    edge.sourceHandle == inputPort.id &&
-                    edge.targetHandle == outputPort.id);
-                if (hasPassthrough)
-                    continue;
-
                 edges.Add(new PcgGraphEdgeRecord
                 {
-                    id = pairCount == 1 ? "iface_passthrough" : $"iface_passthrough_{index + 1}",
+                    id = "iface_passthrough",
                     source = inputNodeId,
                     target = outputNodeId,
                     sourceHandle = inputPort.id,
-                    targetHandle = outputPort.id,
+                    targetHandle = "in",
                 });
                 repaired = true;
             }
 
-            return repaired;
+            return repaired || contractChanged;
         }
 
         public static void RepairDefinitionsForExecution(IEnumerable<PcgSubgraphDefinition> definitions)
@@ -347,7 +330,8 @@ namespace DJTechRuntime.PCG
                     continue;
                 if (node.type != PcgStructuralNodeTypes.SubgraphInput &&
                     node.type != PcgStructuralNodeTypes.SubgraphOutput &&
-                    node.type != PcgStructuralNodeTypes.SubgraphParentRef)
+                    node.type != PcgStructuralNodeTypes.SubgraphParentRef &&
+                    node.type != "Output")
                 {
                     return false;
                 }
@@ -406,6 +390,11 @@ namespace DJTechRuntime.PCG
             document.nodes ??= new List<PcgGraphNodeRecord>();
             document.edges ??= new List<PcgGraphEdgeRecord>();
             document.subgraphs ??= new List<PcgSubgraphDefinition>();
+            var rootDefinition = document.ToRootDefinition();
+            document.inputs = rootDefinition.inputs;
+            document.outputs = rootDefinition.outputs;
+            document.nodes = rootDefinition.nodes;
+            document.edges = rootDefinition.edges;
             var definitions = BuildDefinitionMap(document.subgraphs);
             RepairScope(
                 document.nodes,
@@ -441,10 +430,7 @@ namespace DJTechRuntime.PCG
             {
                 if (definition == null)
                     continue;
-                definition.inputs ??= new List<PcgSubgraphPort>();
-                definition.outputs ??= new List<PcgSubgraphPort>();
-                definition.nodes ??= new List<PcgGraphNodeRecord>();
-                definition.edges ??= new List<PcgGraphEdgeRecord>();
+                PcgSubgraphContractUtility.Synchronize(definition);
                 RepairScope(
                     definition.nodes,
                     definition.edges,

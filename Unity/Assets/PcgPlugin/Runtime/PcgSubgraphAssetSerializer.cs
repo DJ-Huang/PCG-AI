@@ -14,6 +14,7 @@ namespace DJTechRuntime.PCG
         {
             if (doc == null)
                 throw new ArgumentNullException(nameof(doc));
+            NormalizeInterface(doc);
 
             doc.version = doc.parameters != null && doc.parameters.Count > 0
                 ? PcgSubgraphAssetMigration.Version20
@@ -119,6 +120,7 @@ namespace DJTechRuntime.PCG
                 if (!PcgGraphSerializer.TryParseSubgraphsPublic(root, doc.subgraphs, allowInterface: true, out error))
                     return false;
                 doc.RepairLegacyEmptyInterface();
+                NormalizeInterface(doc);
                 return true;
             }
             catch (Exception ex)
@@ -172,6 +174,24 @@ namespace DJTechRuntime.PCG
                     anchorY = GetFloat(port, "anchorY", 0f),
                 });
             }
+        }
+
+        private static void NormalizeInterface(PcgSubgraphAssetDocument doc)
+        {
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "__root__",
+                name = doc.name,
+                inputs = doc.inputs,
+                outputs = doc.outputs,
+                nodes = doc.nodes,
+                edges = doc.edges,
+            };
+            PcgSubgraphContractUtility.Synchronize(definition);
+            doc.inputs = definition.inputs;
+            doc.outputs = definition.outputs;
+            doc.nodes = definition.nodes;
+            doc.edges = definition.edges;
         }
 
         private static string GetString(Dictionary<string, object> dict, string key, string fallback = "")

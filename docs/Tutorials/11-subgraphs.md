@@ -8,17 +8,17 @@ Subgraph（也可理解为 Houdini 风格的 Subnet）让一组 PCG 节点以一
 
 1. 在画布中选择两个或更多节点。
 2. 右键选择 **Create Subgraph from Selection**。
-3. 编辑器会保留选中节点之间的连线；所有跨越选区边界的输入与输出连线会自动转换为 Subgraph 的接口端口。
+3. 编辑器会保留选中节点之间的连线；跨越选区边界的连线会自动转换为 Subgraph 接口。
    - 外部连入选区的每条边生成一个输入端口，命名为 `in_1`、`in_2`……
-   - 选区连向外部的每条边生成一个输出端口，命名为 `out_1`、`out_2`……
+   - Subgraph 始终只有一个输出端口和一个普通 `Output` 节点；若选区有多个不同的出值，需先在内部合并。
    - 端口类型继承原连线两端已经确认的 pin type，因此不会把 Mesh、Point、Scalar 等连接混为一谈。
 4. 主图中会留下一个 `Subgraph` 节点；双击它进入定义内部查看和编辑细节。
 5. 使用窗口顶部面包屑或 **Back to Parent** 回到上一层。该导航栈支持嵌套 Subgraph。
 
-创建后的定义会出现两类接口节点：
+创建后的定义会出现一个输入接口节点和一个普通输出节点：
 
 - `SubgraphInput`：把主图实例的输入端口传入内部图。
-- `SubgraphOutput`：把内部图的结果传回主图实例的输出端口。
+- `Output`：与根图使用相同的普通输出节点；在 Subgraph 内固定只能有一个。
 
 ## JSON 格式
 
@@ -50,18 +50,18 @@ Subgraph 定义内联保存于根 `subgraphs` 数组，主图节点通过 `data.
       "nodes": [
         { "id": "input", "type": "SubgraphInput", "data": { "portId": "mesh" } },
         { "id": "transform", "type": "TransformMesh", "data": { "translation": [0, 1, 0] } },
-        { "id": "output", "type": "SubgraphOutput", "data": { "portId": "mesh" } }
+        { "id": "output", "type": "Output", "data": {} }
       ],
       "edges": [
         { "source": "input", "target": "transform", "sourceHandle": "mesh", "targetHandle": "in" },
-        { "source": "transform", "target": "output", "sourceHandle": "out", "targetHandle": "mesh" }
+        { "source": "transform", "target": "output", "sourceHandle": "out", "targetHandle": "in" }
       ]
     }
   ]
 }
 ```
 
-接口映射规则很直接：`SubgraphInput` 的**输出** handle 必须等于某个 `inputs[].id`；`SubgraphOutput` 的**输入** handle 必须等于某个 `outputs[].id`。主图中 `Subgraph` 节点的 target/source handle 分别使用对应的输入/输出端口 id。
+接口映射规则很直接：`SubgraphInput` 的**输出** handle 必须等于某个 `inputs[].id`；内部普通 `Output` 使用固定输入 handle `in`。唯一的 `outputs[0].id` 是主图中 `Subgraph` 实例的 source handle。
 
 - Subgraph 可以是内联定义（保存在同一 `.pcg` 的 `subgraphs[]` 中），也可以是联动的外部 `.pcgsubgraph` 资产（graph version `3.0` 的 `SubgraphAsset` 节点）。
 - 内联 Subgraph：复制 `.pcg` 即可携带实现。
@@ -80,12 +80,12 @@ Subgraph 定义内联保存于根 `subgraphs` 数组，主图节点通过 `data.
 
 - 定义不存在、接口端口不存在，或接口节点与声明端口不匹配时，图校验会失败。
 - 递归引用（A 引用 B，B 又直接或间接引用 A）会被拒绝，避免无限展开。
-- `SubgraphInput` 与 `SubgraphOutput` 仅能作为定义内部的接口节点；它们不是可在根图单独执行的业务节点。
+- `SubgraphInput` 仅能作为定义内部的接口节点；旧资产中的 `SubgraphOutput` 会在加载时迁移为普通 `Output`。
 - 内联 Subgraph 不会生成外部资源文件；联动 `.pcgsubgraph` 则是独立资产，需通过 GUID 引用。
 
 ## 内联 Subgraph 接口编辑（P0）
 
-进入任意内联 Subgraph 定义后，左侧 **Subgraph Interface** 面板与 `.pcgsubgraph` 资产模式一致，可 `+ Input` / `+ Output`、改 pin 类型与名称。保存后实例节点端口自动刷新。
+进入任意内联 Subgraph 定义后，左侧 **Subgraph Interface** 面板与 `.pcgsubgraph` 资产模式一致，可 `+ Input` 并修改输入、唯一输出的类型与名称。保存后实例节点端口自动刷新。
 
 ## 父层 Promote 为 Subgraph Input（P1）
 

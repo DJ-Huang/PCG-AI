@@ -24,7 +24,9 @@ namespace DJTechEditor.PCG.Graph
         protected void InitializeInterfaceAnchor(PcgSubgraphPort port, Vector2 position, string kindLabel)
         {
             PortId = port.id;
-            PinType = string.IsNullOrEmpty(port.pinType) ? "Any" : port.pinType;
+            PinType = kindLabel == "Input"
+                ? PcgSubgraphInputUtility.AnyPinType
+                : string.IsNullOrEmpty(port.pinType) ? "Any" : port.pinType;
             viewDataKey = $"iface_{kindLabel.ToLowerInvariant()}_{port.id}";
             capabilities &= ~Capabilities.Deletable;
             title = kindLabel;

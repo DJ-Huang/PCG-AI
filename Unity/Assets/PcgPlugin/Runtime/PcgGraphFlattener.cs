@@ -109,6 +109,7 @@ namespace DJTechRuntime.PCG
                     definitions,
                     stack,
                     ParentScopeContext.None,
+                    null,
                     out var expanded,
                     out error))
                 return false;
@@ -140,6 +141,7 @@ namespace DJTechRuntime.PCG
             Dictionary<string, PcgSubgraphDefinition> definitions,
             List<string> stack,
             ParentScopeContext parentContext,
+            PcgSubgraphDefinition scopeDefinition,
             out ExpandedScope output,
             out string error)
         {
@@ -158,7 +160,8 @@ namespace DJTechRuntime.PCG
                 }
 
                 byId[node.id] = node;
-                if (IsStructuralInterfaceNode(node.type))
+                if (IsStructuralInterfaceNode(node.type) ||
+                    (scopeDefinition != null && node.type == "Output"))
                     continue;
 
                 if (node.type != PcgStructuralNodeTypes.Subgraph)
@@ -198,6 +201,7 @@ namespace DJTechRuntime.PCG
                         definitions,
                         stack,
                         childParent,
+                        definition,
                         out var child,
                         out error))
                     return false;
@@ -226,12 +230,13 @@ namespace DJTechRuntime.PCG
                 }
 
                 if (sourceNode.type == PcgStructuralNodeTypes.SubgraphInput &&
-                    targetNode.type == PcgStructuralNodeTypes.SubgraphOutput)
+                    IsScopeOutputNode(targetNode, scopeDefinition))
                 {
-                    if (!output.PassthroughInputsByOutput.TryGetValue(edge.targetHandle, out var inputs))
+                    var outputHandle = ScopeOutputHandle(scopeDefinition, edge.targetHandle);
+                    if (!output.PassthroughInputsByOutput.TryGetValue(outputHandle, out var inputs))
                     {
                         inputs = new List<string>();
-                        output.PassthroughInputsByOutput[edge.targetHandle] = inputs;
+                        output.PassthroughInputsByOutput[outputHandle] = inputs;
                     }
                     if (!inputs.Contains(edge.sourceHandle))
                         inputs.Add(edge.sourceHandle);
@@ -272,17 +277,18 @@ namespace DJTechRuntime.PCG
                     continue;
                 }
 
-                if (targetNode.type == PcgStructuralNodeTypes.SubgraphOutput)
+                if (IsScopeOutputNode(targetNode, scopeDefinition))
                 {
                     if (sources.Count == 0)
                     {
                         error = "Subgraph output is not connected from an executable node";
                         return false;
                     }
-                    if (!output.OutputSources.TryGetValue(edge.targetHandle, out var list))
+                    var outputHandle = ScopeOutputHandle(scopeDefinition, edge.targetHandle);
+                    if (!output.OutputSources.TryGetValue(outputHandle, out var list))
                     {
                         list = new List<Endpoint>();
-                        output.OutputSources[edge.targetHandle] = list;
+                        output.OutputSources[outputHandle] = list;
                     }
                     list.AddRange(sources);
                     continue;
@@ -326,6 +332,25 @@ namespace DJTechRuntime.PCG
             type == PcgStructuralNodeTypes.SubgraphInput ||
             type == PcgStructuralNodeTypes.SubgraphOutput ||
             type == PcgStructuralNodeTypes.SubgraphParentRef;
+
+        private static bool IsScopeOutputNode(
+            PcgGraphNodeRecord node,
+            PcgSubgraphDefinition scopeDefinition)
+        {
+            if (node == null || scopeDefinition == null)
+                return false;
+            return node.type == "Output" ||
+                   node.type == PcgStructuralNodeTypes.SubgraphOutput;
+        }
+
+        private static string ScopeOutputHandle(
+            PcgSubgraphDefinition scopeDefinition,
+            string legacyHandle)
+        {
+            var portId = scopeDefinition?.outputs?
+                .FirstOrDefault(port => port != null && !string.IsNullOrEmpty(port.id))?.id;
+            return string.IsNullOrEmpty(portId) ? legacyHandle ?? "out_1" : portId;
+        }
 
         private static List<Endpoint> SourceEndpoints(
             PcgGraphEdgeRecord edge,

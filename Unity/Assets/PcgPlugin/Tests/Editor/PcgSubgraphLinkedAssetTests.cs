@@ -227,7 +227,7 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
-        public void InlineSubgraphInstance_ExposesDeclaredPinTypesForInspector()
+        public void InlineSubgraphInstance_ExposesUntypedInputsAndTypedOutputsForInspector()
         {
             var definition = new PcgSubgraphDefinition
             {
@@ -248,7 +248,7 @@ namespace DJTechEditor.PCG.Tests
             var snapshot = instance.InterfaceSnapshot;
 
             Assert.That(snapshot.inputs.ConvertAll(port => port.pinType),
-                Is.EqualTo(new[] { "SpatialMesh", "SpatialPoint" }));
+                Is.EqualTo(new[] { "Any", "Any" }));
             Assert.That(snapshot.outputs.ConvertAll(port => port.pinType),
                 Is.EqualTo(new[] { "SpatialGeometry" }));
         }
@@ -325,9 +325,11 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(parsed.inputs[0].id, Is.EqualTo("in_1"));
             Assert.That(parsed.outputs.Count, Is.EqualTo(1));
             Assert.That(parsed.outputs[0].id, Is.EqualTo("out_1"));
+            Assert.That(parsed.nodes.Count(node => node.type == "Output"), Is.EqualTo(1));
+            Assert.That(parsed.nodes.Any(node => node.type == PcgStructuralNodeTypes.SubgraphOutput), Is.False);
             Assert.That(parsed.edges.Count, Is.EqualTo(1));
             Assert.That(parsed.edges[0].sourceHandle, Is.EqualTo("in_1"));
-            Assert.That(parsed.edges[0].targetHandle, Is.EqualTo("out_1"));
+            Assert.That(parsed.edges[0].targetHandle, Is.EqualTo("in"));
         }
 
         [Test]
@@ -1159,12 +1161,14 @@ namespace DJTechEditor.PCG.Tests
 }";
 
             Assert.That(PcgSubgraphAssetSerializer.TryFromJson(json, out var asset, out var error), Is.True, error);
+            var output = asset.nodes.Single(node => node.type == "Output");
+            Assert.That(asset.nodes.Any(node => node.type == PcgStructuralNodeTypes.SubgraphOutput), Is.False);
             Assert.That(
                 asset.edges.Exists(edge =>
                     edge.source == "subgraph_input" &&
-                    edge.target == "subgraph_output" &&
+                    edge.target == output.id &&
                     edge.sourceHandle == "in_1" &&
-                    edge.targetHandle == "out_1"),
+                    edge.targetHandle == "in"),
                 Is.True);
 
             var doc = new PcgGraphDocument
@@ -1226,6 +1230,91 @@ namespace DJTechEditor.PCG.Tests
                     edge.sourceHandle == "out" &&
                     edge.targetHandle == "in"),
                 Is.True);
+        }
+
+        [Test]
+        public void ExecutionBuilder_SubgraphOrdinaryOutput_DoesNotReplacePreviewSink()
+        {
+            var doc = new PcgGraphDocument
+            {
+                version = "3.0",
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "source", type = "CreateBoxMesh", data = new PcgNodeData() },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.Subgraph,
+                        data = MakeSubgraphId("windows"),
+                    },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "__pcg_preview_sink__",
+                        type = "Output",
+                        data = new PcgNodeData(),
+                    },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_in", source = "source", target = "inst",
+                        sourceHandle = "out", targetHandle = "in_1",
+                    },
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_out", source = "inst", target = "__pcg_preview_sink__",
+                        sourceHandle = "out_1", targetHandle = "in",
+                    },
+                },
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "windows",
+                        inputs = { new PcgSubgraphPort { id = "in_1", pinType = "Any" } },
+                        outputs = { new PcgSubgraphPort { id = "out_1", pinType = "Any" } },
+                        nodes =
+                        {
+                            new PcgGraphNodeRecord
+                            {
+                                id = "input", type = PcgStructuralNodeTypes.SubgraphInput,
+                                data = new PcgNodeData(),
+                            },
+                            new PcgGraphNodeRecord { id = "begin", type = "ForEachBegin", data = new PcgNodeData() },
+                            new PcgGraphNodeRecord { id = "end", type = "ForEachEnd", data = new PcgNodeData() },
+                            new PcgGraphNodeRecord { id = "output", type = "Output", data = new PcgNodeData() },
+                        },
+                        edges =
+                        {
+                            new PcgGraphEdgeRecord
+                            {
+                                id = "i1", source = "input", target = "begin",
+                                sourceHandle = "in_1", targetHandle = "in",
+                            },
+                            new PcgGraphEdgeRecord
+                            {
+                                id = "i2", source = "begin", target = "end",
+                                sourceHandle = "out", targetHandle = "in",
+                            },
+                            new PcgGraphEdgeRecord
+                            {
+                                id = "i3", source = "end", target = "output",
+                                sourceHandle = "out", targetHandle = "in",
+                            },
+                        },
+                    },
+                },
+            };
+
+            Assert.That(
+                PcgExecutionDocumentBuilder.TryBuild(doc, null, out var flat, out _, out var error),
+                Is.True,
+                error);
+            Assert.That(flat.nodes.Any(node => node.id == "inst/output"), Is.False);
+            Assert.That(flat.nodes.Any(node => node.id == "inst/begin"), Is.True);
+            Assert.That(flat.nodes.Any(node => node.id == "inst/end"), Is.True);
+            Assert.That(flat.nodes.Any(node => node.id == "__pcg_preview_sink__"), Is.True);
         }
 
         private static PcgSubgraphAssetDocument MakePassthroughAsset(string name, string nestedGuid)

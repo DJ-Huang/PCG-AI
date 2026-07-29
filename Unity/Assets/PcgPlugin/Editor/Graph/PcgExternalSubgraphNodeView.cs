@@ -138,7 +138,7 @@ namespace DJTechEditor.PCG.Graph
                    !string.Equals(resolved, liveContentHash, StringComparison.Ordinal);
         }
 
-        public string GetInputPinType(string handle) => PortType(m_Snapshot.inputs, handle);
+        public string GetInputPinType(string handle) => PcgSubgraphInputUtility.AnyPinType;
 
         public string GetOutputPinType(string handle) => PortType(m_Snapshot.outputs, handle);
 
@@ -233,7 +233,9 @@ namespace DJTechEditor.PCG.Graph
             foreach (var pair in desired)
             {
                 var pin = pair.Value;
-                var pinType = string.IsNullOrEmpty(pin.pinType) ? "Any" : pin.pinType;
+                var pinType = direction == Direction.Input
+                    ? PcgSubgraphInputUtility.AnyPinType
+                    : string.IsNullOrEmpty(pin.pinType) ? "Any" : pin.pinType;
                 if (ports.TryGetValue(pin.id, out var existing))
                 {
                     // Keep the same Port instance so GraphView edges stay attached.
@@ -245,7 +247,7 @@ namespace DJTechEditor.PCG.Graph
                     continue;
                 }
 
-                var port = InstantiatePort(direction, pin.id, pin.name, pin.pinType);
+                var port = InstantiatePort(direction, pin.id, pin.name, pinType);
                 if (ghosts.Contains(pin.id))
                     MarkGhost(port);
                 container.Add(port);
@@ -386,8 +388,10 @@ namespace DJTechEditor.PCG.Graph
             }
 
             result.Snapshot.name = source.name ?? result.Snapshot.name;
-            result.Snapshot.inputs = MergePorts(result.Snapshot.inputs, source.inputs, isHandleConnected, result);
-            result.Snapshot.outputs = MergePorts(result.Snapshot.outputs, source.outputs, isHandleConnected, result);
+            result.Snapshot.inputs = MergePorts(
+                result.Snapshot.inputs, source.inputs, isHandleConnected, result, inputs: true);
+            result.Snapshot.outputs = MergePorts(
+                result.Snapshot.outputs, source.outputs, isHandleConnected, result, inputs: false);
             return result;
         }
 
@@ -546,7 +550,8 @@ namespace DJTechEditor.PCG.Graph
             List<PcgSubgraphPort> persisted,
             List<PcgSubgraphPort> source,
             Func<string, bool> isHandleConnected,
-            ReconcileResult result)
+            ReconcileResult result,
+            bool inputs)
         {
             persisted ??= new List<PcgSubgraphPort>();
             source ??= new List<PcgSubgraphPort>();
@@ -573,7 +578,8 @@ namespace DJTechEditor.PCG.Graph
                     continue;
                 }
 
-                if (!string.Equals(port.pinType ?? "Any", sourcePort.pinType ?? "Any", StringComparison.Ordinal))
+                if (!inputs &&
+                    !string.Equals(port.pinType ?? "Any", sourcePort.pinType ?? "Any", StringComparison.Ordinal))
                 {
                     if (isHandleConnected != null && isHandleConnected(port.id))
                     {
@@ -585,14 +591,20 @@ namespace DJTechEditor.PCG.Graph
                     }
                 }
 
-                merged.Add(ClonePort(sourcePort));
+                var current = ClonePort(sourcePort);
+                if (inputs)
+                    current.pinType = PcgSubgraphInputUtility.AnyPinType;
+                merged.Add(current);
             }
 
             foreach (var port in source)
             {
                 if (port == null || string.IsNullOrEmpty(port.id) || seen.Contains(port.id))
                     continue;
-                merged.Add(ClonePort(port));
+                var current = ClonePort(port);
+                if (inputs)
+                    current.pinType = PcgSubgraphInputUtility.AnyPinType;
+                merged.Add(current);
             }
 
             return merged;

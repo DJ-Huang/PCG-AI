@@ -10,6 +10,8 @@ namespace DJTechRuntime.PCG
     /// </summary>
     public static class PcgExecutionDocumentBuilder
     {
+        private const string PreviewSinkNodeId = "__pcg_preview_sink__";
+
         public static bool TryBuild(
             PcgGraphDocument authoring,
             PcgExternalSubgraphLoader loader,
@@ -213,6 +215,10 @@ namespace DJTechRuntime.PCG
                     .Select(edge => edge.source),
                 StringComparer.Ordinal);
             var sink = document.nodes.FirstOrDefault(node =>
+                           node != null &&
+                           node.id == PreviewSinkNodeId &&
+                           node.type == "Output")
+                       ?? document.nodes.FirstOrDefault(node =>
                            node != null &&
                            node.type == "Output" &&
                            !nodesWithOutgoing.Contains(node.id))

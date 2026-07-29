@@ -1,14 +1,14 @@
 {
   "version": "1.0",
-  "name": "NewSubgraph",
-  "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0} ],
+  "name": "Windows_floor",
+  "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
   "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ],
   "nodes": [
     {
-      "id": "subgraph_output",
-      "type": "SubgraphOutput",
-      "position": { "x": 0, "y": 0 },
-      "data": {"__nodeTitle": ""}
+      "id": "n145",
+      "type": "Output",
+      "position": { "x": -161.5, "y": 98.5 },
+      "data": {"label": "Output", "__nodeTitle": ""}
     },
     {
       "id": "subgraph_input",
@@ -18,13 +18,7 @@
     }
   ],
   "edges": [
-    {
-      "id": "iface_passthrough",
-      "source": "subgraph_input",
-      "target": "subgraph_output",
-      "sourceHandle": "in_1",
-      "targetHandle": "out_1"
-    }
+    {"id": "e_iface_in_1_n145", "source": "subgraph_input", "target": "n145", "sourceHandle": "in_1", "targetHandle": "in"}
   ],
   "subgraphs": [
   ]

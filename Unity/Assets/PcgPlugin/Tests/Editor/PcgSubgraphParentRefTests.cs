@@ -109,9 +109,64 @@ namespace DJTechEditor.PCG.Tests
             PcgSubgraphInterfaceUtility.EnsureInterfaceNodes(definition);
 
             Assert.That(definition.inputs.Count, Is.EqualTo(1));
+            Assert.That(definition.inputs[0].pinType, Is.EqualTo("Any"));
+            Assert.That(definition.inputs[0].anchorPlaced, Is.True);
             Assert.That(
                 definition.nodes.Exists(n => n.type == PcgStructuralNodeTypes.SubgraphInput),
                 Is.True);
+        }
+
+        [Test]
+        public void SubgraphInputContract_NormalizesLegacyInputsAndCreatesRequiredDefault()
+        {
+            var typed = new PcgSubgraphDefinition
+            {
+                inputs = new List<PcgSubgraphPort>
+                {
+                    new() { id = "mesh", name = "Mesh", pinType = "SpatialMesh" },
+                    new() { id = "spline", name = "Spline", pinType = "SpatialSpline" },
+                },
+            };
+
+            Assert.That(PcgSubgraphInputUtility.Synchronize(typed), Is.True);
+            Assert.That(typed.inputs.ConvertAll(port => port.pinType),
+                Is.EqualTo(new[] { "Any", "Any" }));
+            Assert.That(typed.inputs.TrueForAll(port => port.anchorPlaced), Is.True);
+            Assert.That(typed.inputs[0].anchorY, Is.Not.EqualTo(typed.inputs[1].anchorY));
+
+            var empty = new PcgSubgraphDefinition();
+            Assert.That(PcgSubgraphInputUtility.Synchronize(empty), Is.True);
+            Assert.That(empty.inputs, Has.Count.EqualTo(1));
+            Assert.That(empty.inputs[0].id, Is.EqualTo("in_1"));
+            Assert.That(empty.inputs[0].pinType, Is.EqualTo("Any"));
+            Assert.That(empty.nodes.Exists(node =>
+                node.type == PcgStructuralNodeTypes.SubgraphInput), Is.True);
+        }
+
+        [Test]
+        public void LinkedInputTypeChange_RemainsCompatibleAndNormalizesToAny()
+        {
+            var persisted = new PcgSubgraphInterfaceSnapshot
+            {
+                inputs = new List<PcgSubgraphPort>
+                {
+                    new() { id = "in", name = "Input", pinType = "SpatialMesh" },
+                },
+            };
+            var source = new PcgSubgraphInterfaceSnapshot
+            {
+                inputs = new List<PcgSubgraphPort>
+                {
+                    new() { id = "in", name = "Input", pinType = "SpatialSpline" },
+                },
+            };
+
+            var result = PcgExternalSubgraphInterfaceSync.Reconcile(
+                persisted, source, _ => true);
+
+            Assert.That(result.Compatible, Is.True, result.Error);
+            Assert.That(result.GhostHandles, Is.Empty);
+            Assert.That(result.Snapshot.inputs[0].pinType, Is.EqualTo("Any"));
         }
 
         private static PcgNodeData MakeSubgraphId(string id)

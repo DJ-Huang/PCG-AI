@@ -91,6 +91,27 @@ bool parse_ports(const nlohmann::json& array,
     return true;
 }
 
+bool validate_subgraph_output_contract(const GraphSubgraph& subgraph,
+                                       std::string& error)
+{
+    if (subgraph.outputs.size() != 1) {
+        error = "Subgraph must declare exactly one output port";
+        return false;
+    }
+
+    const auto output_count = std::count_if(
+        subgraph.nodes.begin(),
+        subgraph.nodes.end(),
+        [](const GraphNode& node) {
+            return node.type == "Output" || node.type == "SubgraphOutput";
+        });
+    if (output_count != 1) {
+        error = "Subgraph must contain exactly one Output node";
+        return false;
+    }
+    return true;
+}
+
 struct Endpoint {
     std::string node;
     std::string handle;
@@ -174,14 +195,27 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
                   const std::unordered_map<std::string, const GraphSubgraph*>& definitions,
                   std::vector<std::string>& stack,
                   const ParentScopeContext& parent_context,
+                  const GraphSubgraph* scope_definition,
                   ExpandedScope& out,
                   std::string& error)
 {
+    const auto is_scope_output = [scope_definition](const GraphNode* node) {
+        return scope_definition && node &&
+               (node->type == "Output" || node->type == "SubgraphOutput");
+    };
+    const auto scope_output_handle = [scope_definition](const std::string& legacy_handle) {
+        return scope_definition && !scope_definition->outputs.empty()
+            ? scope_definition->outputs.front().id
+            : legacy_handle;
+    };
+
     std::unordered_map<std::string, const GraphNode*> by_id;
     std::unordered_map<std::string, ExpandedScope> instances;
     for (const auto& node : nodes) {
         by_id[node.id] = &node;
-        if (node.type == "SubgraphInput" || node.type == "SubgraphOutput" || node.type == "SubgraphParentRef")
+        if (node.type == "SubgraphInput" || node.type == "SubgraphOutput" ||
+            node.type == "SubgraphParentRef" ||
+            (scope_definition && node.type == "Output"))
             continue;
         if (node.type != "Subgraph") {
             GraphNode flat = node;
@@ -209,7 +243,7 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
         child_parent.prefix = prefix;
         child_parent.instances = &instances;
         if (!expand_scope(definition.nodes, definition.edges, prefix + node.id + "/",
-                          definitions, stack, child_parent, child, error))
+                          definitions, stack, child_parent, &definition, child, error))
             return false;
         stack.pop_back();
         out.nodes.insert(out.nodes.end(), child.nodes.begin(), child.nodes.end());
@@ -225,7 +259,7 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
         const auto node_it = by_id.find(edge.source);
         if (node_it == by_id.end()) return {};
         if (node_it->second->type == "SubgraphInput") return {};
-        if (node_it->second->type == "SubgraphOutput") return {};
+        if (is_scope_output(node_it->second)) return {};
         if (node_it->second->type == "SubgraphParentRef") {
             std::vector<Endpoint> endpoints;
             if (!resolve_parent_ref_endpoints(*node_it->second, parent_context, endpoints, error))
@@ -270,7 +304,7 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
         const auto node_it = by_id.find(edge.target);
         if (node_it == by_id.end()) return {};
         if (node_it->second->type == "SubgraphInput") return {};
-        if (node_it->second->type == "SubgraphOutput") return {};
+        if (is_scope_output(node_it->second)) return {};
         if (node_it->second->type == "SubgraphParentRef") return {};
         if (node_it->second->type == "Subgraph") {
             const auto instance_it = instances.find(edge.target);
@@ -291,8 +325,9 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
         }
 
         if (source_it->second->type == "SubgraphInput" &&
-            target_it->second->type == "SubgraphOutput") {
-            auto& inputs = out.passthrough_inputs_by_output[edge.target_handle];
+            is_scope_output(target_it->second)) {
+            auto& inputs = out.passthrough_inputs_by_output[
+                scope_output_handle(edge.target_handle)];
             if (std::find(inputs.begin(), inputs.end(), edge.source_handle) == inputs.end())
                 inputs.push_back(edge.source_handle);
             continue;
@@ -317,9 +352,9 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
             list.insert(list.end(), targets.begin(), targets.end());
             continue;
         }
-        if (target_it->second->type == "SubgraphOutput") {
+        if (is_scope_output(target_it->second)) {
             if (sources.empty()) { error = "Subgraph output is not connected from an executable node"; return false; }
-            auto& list = out.output_sources[edge.target_handle];
+            auto& list = out.output_sources[scope_output_handle(edge.target_handle)];
             list.insert(list.end(), sources.begin(), sources.end());
             continue;
         }
@@ -364,7 +399,8 @@ bool flatten_subgraphs(Graph& graph, std::string& error)
     ExpandedScope flat;
     std::vector<std::string> stack;
     ParentScopeContext root_parent;
-    if (!expand_scope(graph.nodes, graph.edges, "", definitions, stack, root_parent, flat, error))
+    if (!expand_scope(graph.nodes, graph.edges, "", definitions, stack, root_parent,
+                      nullptr, flat, error))
         return false;
     graph.nodes = std::move(flat.nodes);
     graph.edges = std::move(flat.edges);
@@ -426,7 +462,8 @@ PcgResultCode parse_graph(const char* json,
                 !parse_ports(inputs, subgraph.inputs, parse_error) ||
                 !parse_ports(outputs, subgraph.outputs, parse_error) ||
                 !parse_nodes(subgraph_json["nodes"], subgraph.nodes, parse_error) ||
-                !parse_edges(subgraph_json["edges"], subgraph.edges, parse_error))
+                !parse_edges(subgraph_json["edges"], subgraph.edges, parse_error) ||
+                !validate_subgraph_output_contract(subgraph, parse_error))
                 return fail(err_buf, err_buf_size, PCG_ERR_INVALID_JSON, parse_error.c_str());
             graph.subgraphs.push_back(std::move(subgraph));
         }

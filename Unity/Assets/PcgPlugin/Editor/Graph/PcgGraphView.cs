@@ -423,6 +423,7 @@ namespace DJTechEditor.PCG.Graph
 
             if (selection.OfType<PcgGraphNodeBase>().Any(node =>
                     node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput" &&
+                    node.NodeType != "Output" &&
                     node.NodeType != PcgStructuralNodeTypes.SubgraphParentRef))
             {
                 evt.menu.AppendSeparator();
@@ -453,8 +454,7 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             var inputs = definition.inputs?.Where(p => p != null).ToList() ?? new List<PcgSubgraphPort>();
-            var outputs = definition.outputs?.Where(p => p != null).ToList() ?? new List<PcgSubgraphPort>();
-            if (inputs.Count == 0 && outputs.Count == 0)
+            if (inputs.Count == 0)
                 return;
 
             evt.menu.AppendSeparator();
@@ -466,13 +466,6 @@ namespace DJTechEditor.PCG.Graph
                     _ => SpawnInterfaceInputConnector(captured));
             }
 
-            foreach (var port in outputs)
-            {
-                var captured = port;
-                evt.menu.AppendAction(
-                    $"Subgraph Interface/Output: {captured.name}",
-                    _ => SpawnInterfaceOutputConnector(captured));
-            }
         }
 
         private void AppendPromoteInlineSubgraphToAssetMenu(ContextualMenuPopulateEvent evt)
@@ -982,6 +975,7 @@ namespace DJTechEditor.PCG.Graph
         {
             var selectedViews = selection.OfType<PcgGraphNodeBase>()
                 .Where(node => node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput" &&
+                               node.NodeType != "Output" &&
                                node.NodeType != PcgStructuralNodeTypes.SubgraphParentRef)
                 .ToList();
             if (selectedViews.Count == 0)
@@ -991,7 +985,6 @@ namespace DJTechEditor.PCG.Graph
             var affectedBindings = PcgGraphParameterUtility.FindBindingsTargetingNodes(
                 EnumerateActiveParameterSources(), selectedIds);
 
-            RecordUndo("Create Subgraph");
             var scope = CaptureVisibleDocument();
             var selectedRecords = scope.nodes.Where(node => selectedIds.Contains(node.id)).ToList();
             var internalEdges = scope.edges.Where(edge =>
@@ -1000,6 +993,19 @@ namespace DJTechEditor.PCG.Graph
                 !selectedIds.Contains(edge.source) && selectedIds.Contains(edge.target)).ToList();
             var outgoing = scope.edges.Where(edge =>
                 selectedIds.Contains(edge.source) && !selectedIds.Contains(edge.target)).ToList();
+            var outputSources = outgoing
+                .Select(edge => (edge.source, edge.sourceHandle))
+                .Distinct()
+                .ToList();
+            if (outputSources.Count > 1)
+            {
+                EditorUtility.DisplayDialog(
+                    "Create Subgraph",
+                    "A Subgraph exposes one Output. Select a network with one distinct outgoing value, or merge the values before creating the Subgraph.",
+                    "OK");
+                return;
+            }
+            RecordUndo("Create Subgraph");
 
             var localSubgraphId = NextSubgraphId();
             var externalRootId = FindExternalNavigationRootId(m_CurrentSubgraphId);
@@ -1030,9 +1036,9 @@ namespace DJTechEditor.PCG.Graph
             definition.nodes.Add(new PcgGraphNodeRecord
             {
                 id = outputNodeId,
-                type = "SubgraphOutput",
+                type = "Output",
                 position = PcgGraphPosition.FromVector2(new Vector2(centerX, maxY + 160f)),
-                data = new PcgNodeData(),
+                data = PcgNodeManifest.DefaultDataFor("Output"),
             });
 
             var parentEdges = scope.edges.Where(edge =>
@@ -1047,7 +1053,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     id = portId,
                     name = string.IsNullOrEmpty(edge.targetHandle) ? portId : edge.targetHandle,
-                    pinType = ResolveVisiblePinType(edge.target, edge.targetHandle, output: false),
+                    pinType = PcgSubgraphInputUtility.AnyPinType,
                 });
                 definition.edges.Add(new PcgGraphEdgeRecord
                 {
@@ -1061,25 +1067,30 @@ namespace DJTechEditor.PCG.Graph
                 });
             }
 
-            for (var i = 0; i < outgoing.Count; i++)
+            var outputPortId = "out_1";
+            var outputSource = outputSources.FirstOrDefault();
+            definition.outputs.Add(new PcgSubgraphPort
             {
-                var edge = outgoing[i];
-                var portId = $"out_{i + 1}";
-                definition.outputs.Add(new PcgSubgraphPort
-                {
-                    id = portId,
-                    name = string.IsNullOrEmpty(edge.sourceHandle) ? portId : edge.sourceHandle,
-                    pinType = ResolveVisiblePinType(edge.source, edge.sourceHandle, output: true),
-                });
+                id = outputPortId,
+                name = string.IsNullOrEmpty(outputSource.sourceHandle) ? "Output" : outputSource.sourceHandle,
+                pinType = outputSources.Count == 0
+                    ? "Any"
+                    : ResolveVisiblePinType(outputSource.source, outputSource.sourceHandle, output: true),
+            });
+            if (outputSources.Count == 1)
+            {
                 definition.edges.Add(new PcgGraphEdgeRecord
                 {
-                    id = $"e{++m_EdgeCounter}", source = edge.source, target = outputNodeId,
-                    sourceHandle = edge.sourceHandle, targetHandle = portId,
+                    id = $"e{++m_EdgeCounter}", source = outputSource.source, target = outputNodeId,
+                    sourceHandle = outputSource.sourceHandle, targetHandle = "in",
                 });
+            }
+            foreach (var edge in outgoing)
+            {
                 parentEdges.Add(new PcgGraphEdgeRecord
                 {
                     id = edge.id, source = instanceId, target = edge.target,
-                    sourceHandle = portId, targetHandle = edge.targetHandle,
+                    sourceHandle = outputPortId, targetHandle = edge.targetHandle,
                 });
             }
 
@@ -1094,6 +1105,7 @@ namespace DJTechEditor.PCG.Graph
                 data = instanceData,
             });
 
+            PcgSubgraphContractUtility.Synchronize(definition);
             m_RootDocument.subgraphs.Add(definition);
             if (affectedBindings.Count > 0)
                 PromoteBindingsIntoDefinition(definition, selectedIds);
@@ -1689,7 +1701,6 @@ namespace DJTechEditor.PCG.Graph
             m_InterfaceOutputAnchors.Clear();
 
             var inputNodeId = PcgSubgraphInterfaceUtility.GetSubgraphInputNodeId(definition);
-            var outputNodeId = PcgSubgraphInterfaceUtility.GetSubgraphOutputNodeId(definition);
             if (doc.edges == null)
                 return;
 
@@ -1708,22 +1719,6 @@ namespace DJTechEditor.PCG.Graph
                         continue;
 
                     var edge = anchor.OutputPort.ConnectTo(input);
-                    edge.userData = edgeRecord.id;
-                    AddElement(edge);
-                }
-                else if (!string.IsNullOrEmpty(outputNodeId) &&
-                         edgeRecord.target == outputNodeId &&
-                         nodeViews.TryGetValue(edgeRecord.source, out var outputSource))
-                {
-                    var portId = edgeRecord.targetHandle ?? string.Empty;
-                    var anchor = GetOrCreateInterfaceOutputAnchor(definition, portId);
-                    anchor.PlaceRightOf(outputSource);
-
-                    var output = outputSource.FindOutputPort(edgeRecord.sourceHandle ?? "out");
-                    if (output == null || anchor.InputPort == null)
-                        continue;
-
-                    var edge = output.ConnectTo(anchor.InputPort);
                     edge.userData = edgeRecord.id;
                     AddElement(edge);
                 }
@@ -1746,14 +1741,6 @@ namespace DJTechEditor.PCG.Graph
                 anchor.SetPosition(new Rect(port.anchorX, port.anchorY, PcgGraphNodeBase.NodeWidth, PcgGraphNodeBase.NodeHeight));
             }
 
-            foreach (var port in definition.outputs ?? Enumerable.Empty<PcgSubgraphPort>())
-            {
-                if (port == null || !port.anchorPlaced || m_InterfaceOutputAnchors.ContainsKey(port.id))
-                    continue;
-
-                var anchor = GetOrCreateInterfaceOutputAnchor(definition, port.id);
-                anchor.SetPosition(new Rect(port.anchorX, port.anchorY, PcgGraphNodeBase.NodeWidth, PcgGraphNodeBase.NodeHeight));
-            }
         }
 
         private PcgInterfaceInputAnchorView GetOrCreateInterfaceInputAnchor(
@@ -1820,16 +1807,6 @@ namespace DJTechEditor.PCG.Graph
                 port.anchorY = pos.y;
             }
 
-            foreach (var port in definition.outputs ?? Enumerable.Empty<PcgSubgraphPort>())
-            {
-                if (port == null || !m_InterfaceOutputAnchors.TryGetValue(port.id, out var anchor))
-                    continue;
-
-                var pos = anchor.GetPosition().position;
-                port.anchorPlaced = true;
-                port.anchorX = pos.x;
-                port.anchorY = pos.y;
-            }
         }
 
         public void ToggleNodePreview(PcgGraphNodeBase node)
@@ -2228,10 +2205,16 @@ namespace DJTechEditor.PCG.Graph
 
         public PcgGraphNodeBase CreateNode(string type, Vector2 position)
         {
+            if (type == "Output" && IsEditingSubgraphInterface())
+                return SelectExistingSubgraphOutput();
+
             RecordUndo("Create Node");
+            var interfaceDefinition = IsEditingSubgraphInterface()
+                ? GetActiveInterfaceDefinition()
+                : null;
             var node = PcgGraphNodeFactory.Create(
                 type, PcgGraphNodeFactory.NextNodeId(), position, null,
-                FindSubgraph(m_CurrentSubgraphId), FindSubgraph);
+                interfaceDefinition, FindSubgraph);
             AttachSubgraphNavigation(node);
             AddElement(node);
             ClearSelection();
@@ -2274,6 +2257,7 @@ namespace DJTechEditor.PCG.Graph
         private bool CanDuplicateSelectedNodes() =>
             selection.OfType<PcgGraphNodeBase>()
                 .Any(node => node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput" &&
+                             (!IsEditingSubgraphInterface() || node.NodeType != "Output") &&
                              node.NodeType != PcgStructuralNodeTypes.SubgraphParentRef);
 
         private void DuplicateSelectedNodes()
@@ -2283,6 +2267,7 @@ namespace DJTechEditor.PCG.Graph
 
             var selectedViews = selection.OfType<PcgGraphNodeBase>()
                 .Where(node => node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput" &&
+                               (!IsEditingSubgraphInterface() || node.NodeType != "Output") &&
                                node.NodeType != PcgStructuralNodeTypes.SubgraphParentRef)
                 .ToList();
             if (selectedViews.Count == 0)
@@ -2422,11 +2407,33 @@ namespace DJTechEditor.PCG.Graph
 
         public void CreateNodeAndConnect(string type, Vector2 position, Port draggedPort)
         {
+            if (type == "Output" && IsEditingSubgraphInterface())
+            {
+                var existing = SelectExistingSubgraphOutput();
+                if (draggedPort?.direction == Direction.Output)
+                {
+                    var input = existing?.FindInputPort("in");
+                    if (input != null && !input.connected)
+                    {
+                        RecordUndo("Connect Subgraph Output");
+                        AddElement(draggedPort.ConnectTo(input));
+                        CommitState();
+                    }
+                }
+                return;
+            }
+
             RecordUndo("Create Node from Port");
 
             m_SuppressUndo = true;
 
-            var node = PcgGraphNodeFactory.Create(type, PcgGraphNodeFactory.NextNodeId(), position);
+            var node = PcgGraphNodeFactory.Create(
+                type,
+                PcgGraphNodeFactory.NextNodeId(),
+                position,
+                null,
+                IsEditingSubgraphInterface() ? GetActiveInterfaceDefinition() : null,
+                FindSubgraph);
             AddElement(node);
             ClearSelection();
             AddToSelection(node);
@@ -2471,9 +2478,25 @@ namespace DJTechEditor.PCG.Graph
             CommitState();
         }
 
+        private PcgGraphNodeBase SelectExistingSubgraphOutput()
+        {
+            var output = nodes
+                .ToList()
+                .OfType<PcgGraphNodeBase>()
+                .FirstOrDefault(node => node.NodeType == "Output");
+            if (output == null)
+                return null;
+            ClearSelection();
+            AddToSelection(output);
+            output.BringToFront();
+            return output;
+        }
+
         public void LoadDocument(PcgGraphDocument doc, bool clearUndo = true)
         {
             m_RootDocument = doc ?? new PcgGraphDocument();
+            foreach (var definition in m_RootDocument.subgraphs ?? Enumerable.Empty<PcgSubgraphDefinition>())
+                PcgSubgraphContractUtility.Synchronize(definition);
             m_CurrentSubgraphId = null;
             m_CurrentSubgraphInstanceId = null;
             m_SubgraphParents.Clear();
@@ -2499,7 +2522,10 @@ namespace DJTechEditor.PCG.Graph
             m_DirtyExternalNavDefIds.Clear();
             m_ExternalNavLoadedContentHashByDefId.Clear();
             if (rootDefinition != null)
+            {
                 rootDefinition.name = assetName ?? rootDefinition.name;
+                PcgSubgraphContractUtility.Synchronize(rootDefinition);
+            }
             LoadScope(
                 rootDefinition?.nodes ?? new List<PcgGraphNodeRecord>(),
                 rootDefinition?.edges ?? new List<PcgGraphEdgeRecord>(),
@@ -2543,6 +2569,8 @@ namespace DJTechEditor.PCG.Graph
             PcgSubgraphDefinition interfaceDefinition,
             bool clearUndo)
         {
+            if (interfaceDefinition != null)
+                PcgSubgraphInterfaceUtility.EnsureInterfaceNodes(interfaceDefinition);
             var doc = new PcgGraphDocument
             {
                 nodes = scopeNodes,
@@ -2881,6 +2909,7 @@ namespace DJTechEditor.PCG.Graph
         {
             var selectedViews = selection.OfType<PcgGraphNodeBase>()
                 .Where(node => node.NodeType != "SubgraphInput" && node.NodeType != "SubgraphOutput" &&
+                               node.NodeType != "Output" &&
                                node.NodeType != PcgStructuralNodeTypes.SubgraphParentRef)
                 .ToList();
             if (selectedViews.Count == 0)
@@ -2905,6 +2934,18 @@ namespace DJTechEditor.PCG.Graph
                 .Where(edge => !selectedIds.Contains(edge.source) && selectedIds.Contains(edge.target)).ToList();
             var outgoing = scope.edges
                 .Where(edge => selectedIds.Contains(edge.source) && !selectedIds.Contains(edge.target)).ToList();
+            var outputSources = outgoing
+                .Select(edge => (edge.source, edge.sourceHandle))
+                .Distinct()
+                .ToList();
+            if (outputSources.Count > 1)
+            {
+                EditorUtility.DisplayDialog(
+                    "Create Subgraph Asset",
+                    "A Subgraph exposes one Output. Select a network with one distinct outgoing value, or merge the values before creating the Subgraph.",
+                    "OK");
+                return;
+            }
 
             var assetDoc = new PcgSubgraphAssetDocument
             {
@@ -2930,9 +2971,9 @@ namespace DJTechEditor.PCG.Graph
             assetDoc.nodes.Add(new PcgGraphNodeRecord
             {
                 id = outputNodeId,
-                type = PcgStructuralNodeTypes.SubgraphOutput,
+                type = "Output",
                 position = PcgGraphPosition.FromVector2(new Vector2(centerX, maxY + 160f)),
-                data = new PcgNodeData(),
+                data = PcgNodeManifest.DefaultDataFor("Output"),
             });
 
             for (var i = 0; i < incoming.Count; i++)
@@ -2943,7 +2984,7 @@ namespace DJTechEditor.PCG.Graph
                 {
                     id = portId,
                     name = string.IsNullOrEmpty(edge.targetHandle) ? $"in_{i + 1}" : edge.targetHandle,
-                    pinType = ResolveVisiblePinType(edge.target, edge.targetHandle, output: false),
+                    pinType = PcgSubgraphInputUtility.AnyPinType,
                 });
                 assetDoc.edges.Add(new PcgGraphEdgeRecord
                 {
@@ -2955,28 +2996,44 @@ namespace DJTechEditor.PCG.Graph
                 });
             }
 
-            for (var i = 0; i < outgoing.Count; i++)
+            var outputPortId = Guid.NewGuid().ToString("N");
+            var outputSource = outputSources.FirstOrDefault();
+            assetDoc.outputs.Add(new PcgSubgraphPort
             {
-                var edge = outgoing[i];
-                var portId = Guid.NewGuid().ToString("N");
-                assetDoc.outputs.Add(new PcgSubgraphPort
-                {
-                    id = portId,
-                    name = string.IsNullOrEmpty(edge.sourceHandle) ? $"out_{i + 1}" : edge.sourceHandle,
-                    pinType = ResolveVisiblePinType(edge.source, edge.sourceHandle, output: true),
-                });
+                id = outputPortId,
+                name = string.IsNullOrEmpty(outputSource.sourceHandle) ? "Output" : outputSource.sourceHandle,
+                pinType = outputSources.Count == 0
+                    ? "Any"
+                    : ResolveVisiblePinType(outputSource.source, outputSource.sourceHandle, output: true),
+            });
+            if (outputSources.Count == 1)
+            {
                 assetDoc.edges.Add(new PcgGraphEdgeRecord
                 {
                     id = $"e{++m_EdgeCounter}",
-                    source = edge.source,
+                    source = outputSource.source,
                     target = outputNodeId,
-                    sourceHandle = edge.sourceHandle,
-                    targetHandle = portId,
+                    sourceHandle = outputSource.sourceHandle,
+                    targetHandle = "in",
                 });
             }
 
             PromoteBindingsIntoAsset(assetDoc, selectedIds);
             PopulateNestedSubgraphDefinitions(assetDoc);
+            var normalizedDefinition = new PcgSubgraphDefinition
+            {
+                id = "__root__",
+                name = assetDoc.name,
+                inputs = assetDoc.inputs,
+                outputs = assetDoc.outputs,
+                nodes = assetDoc.nodes,
+                edges = assetDoc.edges,
+            };
+            PcgSubgraphContractUtility.Synchronize(normalizedDefinition);
+            assetDoc.inputs = normalizedDefinition.inputs;
+            assetDoc.outputs = normalizedDefinition.outputs;
+            assetDoc.nodes = normalizedDefinition.nodes;
+            assetDoc.edges = normalizedDefinition.edges;
 
             var json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
             try
@@ -3033,15 +3090,14 @@ namespace DJTechEditor.PCG.Graph
                 });
             }
 
-            for (var i = 0; i < outgoing.Count; i++)
+            foreach (var edge in outgoing)
             {
-                var edge = outgoing[i];
                 parentEdges.Add(new PcgGraphEdgeRecord
                 {
                     id = edge.id,
                     source = instanceId,
                     target = edge.target,
-                    sourceHandle = assetDoc.outputs[i].id,
+                    sourceHandle = assetDoc.outputs[0].id,
                     targetHandle = edge.targetHandle,
                 });
             }

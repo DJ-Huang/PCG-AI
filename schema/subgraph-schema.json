@@ -14,15 +14,25 @@
     "name": { "type": "string" },
     "inputs": {
       "type": "array",
-      "items": { "$ref": "#/$defs/subgraphPort" }
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/subgraphInputPort" }
     },
     "outputs": {
       "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
       "items": { "$ref": "#/$defs/subgraphPort" }
     },
     "nodes": {
       "type": "array",
-      "items": { "$ref": "#/$defs/node" }
+      "items": { "$ref": "#/$defs/node" },
+      "contains": {
+        "type": "object",
+        "required": ["type"],
+        "properties": { "type": { "const": "Output" } }
+      },
+      "minContains": 1,
+      "maxContains": 1
     },
     "edges": {
       "type": "array",
@@ -45,8 +55,21 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string" },
-        "pinType": { "$ref": "#/$defs/pinType" }
+        "pinType": { "$ref": "#/$defs/pinType" },
+        "anchorPlaced": { "type": "boolean" },
+        "anchorX": { "type": "number" },
+        "anchorY": { "type": "number" }
       }
+    },
+    "subgraphInputPort": {
+      "allOf": [
+        { "$ref": "#/$defs/subgraphPort" },
+        {
+          "properties": {
+            "pinType": { "const": "Any" }
+          }
+        }
+      ]
     },
     "subgraphInterface": {
       "type": "object",
@@ -54,8 +77,8 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string" },
-        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
-        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } }
+        "inputs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/subgraphInputPort" } },
+        "outputs": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/subgraphPort" } }
       }
     },
     "node": {
@@ -121,9 +144,19 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
-        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
-        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "inputs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/subgraphInputPort" } },
+        "outputs": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/subgraphPort" } },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" },
+          "contains": {
+            "type": "object",
+            "required": ["type"],
+            "properties": { "type": { "const": "Output" } }
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
         "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
       }
     }

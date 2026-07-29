@@ -1,5 +1,5 @@
 {
-  "version": "2.0",
+  "version": "3.0",
   "nodes": [
     {
       "id": "ground",
@@ -264,6 +264,17 @@
       "type": "GroupDelete",
       "position": { "x": 1854, "y": 2503.5 },
       "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n150",
+      "type": "SubgraphAsset",
+      "position": { "x": 1854, "y": 2574.5 },
+      "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": "", "resolvedAssetSchemaVersion": 2.0},
+      "subgraphInterface": {
+        "name": "Windows_floor",
+        "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
+        "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ]
+      }
     }
   ],
   "edges": [
@@ -312,7 +323,9 @@
     {"id": "e987100", "source": "n133", "target": "n135", "sourceHandle": "out", "targetHandle": "target"},
     {"id": "e987101", "source": "n134", "target": "n135", "sourceHandle": "out", "targetHandle": "source"},
     {"id": "e1003038", "source": "n129", "target": "n137", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1006941", "source": "n138", "target": "n150", "sourceHandle": "out", "targetHandle": "in_1"},
+    {"id": "e1016618", "source": "n150", "target": "n142", "sourceHandle": "out_1", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
@@ -327,7 +340,7 @@
     {
       "id": "city_roads",
       "name": "City Roads",
-      "inputs": [],
+      "inputs": [ {"id": "in_1", "name": "Input 1", "pinType": "Any", "anchorPlaced": true, "anchorX": -20, "anchorY": 0} ],
       "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
       "parameters": [
       ],
@@ -382,9 +395,15 @@
         },
         {
           "id": "roads_out",
-          "type": "SubgraphOutput",
+          "type": "Output",
           "position": { "x": 360, "y": 800 },
-          "data": {"__nodeTitle": "Roads Out"}
+          "data": {"label": "Output", "__nodeTitle": "Roads Out"}
+        },
+        {
+          "id": "subgraph_input",
+          "type": "SubgraphInput",
+          "position": { "x": -20, "y": 0 },
+          "data": {}
         }
       ],
       "edges": [
@@ -395,13 +414,13 @@
         {"id": "e_bva_m", "source": "road_bevel_a", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
         {"id": "e_bvb_m", "source": "road_bevel_b", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
         {"id": "e_m_mat", "source": "merge_roads", "target": "mat_roads", "sourceHandle": "out", "targetHandle": "in"},
-        {"id": "e_mat_out", "source": "mat_roads", "target": "roads_out", "sourceHandle": "out", "targetHandle": "mesh"}
+        {"id": "e_mat_out", "source": "mat_roads", "target": "roads_out", "sourceHandle": "out", "targetHandle": "in"}
       ]
     },
     {
       "id": "city_pads",
       "name": "City Pads",
-      "inputs": [ {"id": "lots", "name": "Lots", "pinType": "SpatialMesh"}, {"id": "roads", "name": "Roads", "pinType": "SpatialMesh"} ],
+      "inputs": [ {"id": "lots", "name": "Lots", "pinType": "Any", "anchorPlaced": true, "anchorX": -20, "anchorY": 0}, {"id": "roads", "name": "Roads", "pinType": "Any", "anchorPlaced": true, "anchorX": -20, "anchorY": 90} ],
       "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
       "parameters": [
       ],
@@ -450,9 +469,9 @@
         },
         {
           "id": "pads_out",
-          "type": "SubgraphOutput",
+          "type": "Output",
           "position": { "x": 360, "y": 960 },
-          "data": {"__nodeTitle": "Pads Out"}
+          "data": {"label": "Output", "__nodeTitle": "Pads Out"}
         }
       ],
       "edges": [
@@ -462,7 +481,38 @@
         {"id": "e_bv_bool", "source": "pad_bevel", "target": "pad_bool", "sourceHandle": "out", "targetHandle": "a"},
         {"id": "e_rd_bool", "source": "in_roads", "target": "pad_bool", "sourceHandle": "roads", "targetHandle": "b"},
         {"id": "e_bool_mat", "source": "pad_bool", "target": "mat_pad", "sourceHandle": "out", "targetHandle": "in"},
-        {"id": "e_mat_out", "source": "mat_pad", "target": "pads_out", "sourceHandle": "out", "targetHandle": "mesh"}
+        {"id": "e_mat_out", "source": "mat_pad", "target": "pads_out", "sourceHandle": "out", "targetHandle": "in"}
+      ]
+    },
+    {
+      "id": "subgraph_4",
+      "name": "Subgraph 4",
+      "inputs": [ {"id": "in_1", "name": "in", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0} ],
+      "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ],
+      "parameters": [
+      ],
+      "nodes": [
+        {
+          "id": "n146",
+          "type": "Carve",
+          "position": { "x": -161, "y": 109.5 },
+          "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
+        },
+        {
+          "id": "n147",
+          "type": "SubgraphInput",
+          "position": { "x": 1854, "y": 2412.5 },
+          "data": {}
+        },
+        {
+          "id": "n148",
+          "type": "Output",
+          "position": { "x": 1854, "y": 2732.5 },
+          "data": {"label": "Output"}
+        }
+      ],
+      "edges": [
+        {"id": "e1006129", "source": "n147", "target": "n146", "sourceHandle": "in_1", "targetHandle": "in"}
       ]
     }
   ]

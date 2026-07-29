@@ -7,7 +7,8 @@ using UnityEngine;
 namespace DJTechEditor.PCG.Graph
 {
     /// <summary>
-    /// Shared helpers for subgraph interface ports, SubgraphInput/Output nodes, and promote-to-input.
+    /// Shared helpers for subgraph interface ports, SubgraphInput, the single ordinary
+    /// Output node, and promote-to-input.
     /// </summary>
     public static class PcgSubgraphInterfaceUtility
     {
@@ -20,7 +21,7 @@ namespace DJTechEditor.PCG.Graph
             if (definition == null)
                 return;
 
-            definition.nodes ??= new List<PcgGraphNodeRecord>();
+            PcgSubgraphContractUtility.Synchronize(definition);
 
             if (definition.inputs.Count > 0 &&
                 !definition.nodes.Any(n => n.type == PcgStructuralNodeTypes.SubgraphInput))
@@ -34,17 +35,6 @@ namespace DJTechEditor.PCG.Graph
                 });
             }
 
-            if (definition.outputs.Count > 0 &&
-                !definition.nodes.Any(n => n.type == PcgStructuralNodeTypes.SubgraphOutput))
-            {
-                definition.nodes.Add(new PcgGraphNodeRecord
-                {
-                    id = PcgGraphNodeFactory.NextNodeId(),
-                    type = PcgStructuralNodeTypes.SubgraphOutput,
-                    position = PcgGraphPosition.FromVector2(new Vector2(centerX, maxY + 160f)),
-                    data = new PcgNodeData(),
-                });
-            }
         }
 
         public static string NextInputPortId(PcgSubgraphDefinition definition)
@@ -62,6 +52,7 @@ namespace DJTechEditor.PCG.Graph
             string pinType,
             string name = null)
         {
+            definition.inputs ??= new List<PcgSubgraphPort>();
             if (definition.inputs.Any(p => p.id == portId))
                 return definition.inputs.First(p => p.id == portId);
 
@@ -69,9 +60,10 @@ namespace DJTechEditor.PCG.Graph
             {
                 id = portId,
                 name = string.IsNullOrEmpty(name) ? portId : name,
-                pinType = string.IsNullOrEmpty(pinType) ? "Any" : pinType,
+                pinType = PcgSubgraphInputUtility.AnyPinType,
             };
             definition.inputs.Add(port);
+            PcgSubgraphInputUtility.NormalizePorts(definition.inputs, definition.nodes);
             return port;
         }
 
@@ -84,7 +76,7 @@ namespace DJTechEditor.PCG.Graph
         public static string GetSubgraphOutputNodeId(PcgSubgraphDefinition definition)
         {
             return definition.nodes?
-                .FirstOrDefault(n => n.type == PcgStructuralNodeTypes.SubgraphOutput)?.id;
+                .FirstOrDefault(n => n.type == "Output")?.id;
         }
 
         public static void EnsureInternalInputEdge(
@@ -137,7 +129,7 @@ namespace DJTechEditor.PCG.Graph
                 e.source == internalSourceId &&
                 e.target == outputNodeId &&
                 e.sourceHandle == internalSourceHandle &&
-                e.targetHandle == portId);
+                e.targetHandle == "in");
             if (exists)
                 return;
 
@@ -147,7 +139,7 @@ namespace DJTechEditor.PCG.Graph
                 source = internalSourceId,
                 target = outputNodeId,
                 sourceHandle = internalSourceHandle,
-                targetHandle = portId,
+                targetHandle = "in",
             });
         }
 
@@ -177,8 +169,7 @@ namespace DJTechEditor.PCG.Graph
 
             definition.edges.RemoveAll(edge =>
                 edge != null &&
-                edge.target == outputNodeId &&
-                edge.targetHandle == portId);
+                edge.target == outputNodeId);
         }
 
         public static bool TryPromoteWireToSubgraphInput(

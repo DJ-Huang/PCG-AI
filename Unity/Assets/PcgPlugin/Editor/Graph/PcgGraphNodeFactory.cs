@@ -87,6 +87,8 @@ namespace DJTechEditor.PCG.Graph
             var node = new PcgManifestNodeView(def);
             node.Initialize(id, position);
             node.ApplyData(data ?? PcgNodeManifest.DefaultDataFor(type));
+            if (interfaceDefinition != null && type == "Output")
+                node.capabilities &= ~Capabilities.Deletable;
             return node;
         }
     }
@@ -124,7 +126,9 @@ namespace DJTechEditor.PCG.Graph
             PcgSubgraphInterfaceSnapshot.FromDefinition(m_Definition);
 
         public string GetInputPinType(string handle) =>
-            PortType(m_Kind == PcgSubgraphNodeKind.Output ? m_Definition.outputs : m_Definition.inputs, handle);
+            m_Kind == PcgSubgraphNodeKind.Instance
+                ? PcgSubgraphInputUtility.AnyPinType
+                : PortType(m_Definition.outputs, handle);
 
         public string GetOutputPinType(string handle) =>
             PortType(m_Kind == PcgSubgraphNodeKind.Input ? m_Definition.inputs : m_Definition.outputs, handle);
@@ -155,7 +159,12 @@ namespace DJTechEditor.PCG.Graph
             {
                 foreach (var pin in m_Kind == PcgSubgraphNodeKind.Output ? m_Definition.outputs : m_Definition.inputs)
                 {
-                    var port = CreatePort(Direction.Input, pin.id, pin.pinType);
+                    var port = CreatePort(
+                        Direction.Input,
+                        pin.id,
+                        m_Kind == PcgSubgraphNodeKind.Instance
+                            ? PcgSubgraphInputUtility.AnyPinType
+                            : pin.pinType);
                     m_Inputs[pin.id] = port;
                     inputContainer.Add(port);
                 }

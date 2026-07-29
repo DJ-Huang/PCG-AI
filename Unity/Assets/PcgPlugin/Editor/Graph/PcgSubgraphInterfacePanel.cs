@@ -10,7 +10,8 @@ namespace DJTechEditor.PCG.Graph
 {
     /// <summary>
     /// Interface editor for inline subgraphs and linked Subgraph Asset mode.
-    /// Inputs/outputs are wired from here; SubgraphInput/Output nodes stay in data but hidden on canvas.
+    /// Inputs are wired from here. The Subgraph result is represented by one ordinary
+    /// Output node on the canvas.
     /// </summary>
     public sealed class PcgSubgraphInterfacePanel : VisualElement
     {
@@ -19,7 +20,7 @@ namespace DJTechEditor.PCG.Graph
         private readonly VisualElement m_InputList = new();
         private readonly VisualElement m_OutputList = new();
 
-        private static readonly string[] PinTypes =
+        private static readonly string[] OutputPinTypes =
         {
             "Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface",
             "SpatialMesh", "SpatialGeometry", "Texture", "HeightField",
@@ -44,12 +45,11 @@ namespace DJTechEditor.PCG.Graph
 
             Add(new Label("Subgraph Interface") { style = { unityFontStyleAndWeight = FontStyle.Bold } });
             Add(new Label("Inputs") { style = { fontSize = 11, color = new Color(0.7f, 0.7f, 0.7f) } });
-            Add(new Label("Right-click graph → Subgraph Interface → Input/Output to place connector") { style = { fontSize = 10, color = new Color(0.55f, 0.55f, 0.55f), marginBottom = 4, whiteSpace = WhiteSpace.Normal } });
+            Add(new Label("Right-click graph → Subgraph Interface → Input to place a connector") { style = { fontSize = 10, color = new Color(0.55f, 0.55f, 0.55f), marginBottom = 4, whiteSpace = WhiteSpace.Normal } });
             Add(m_InputList);
             Add(new Button(() => AddPort(inputs: true)) { text = "+ Input" });
             Add(new Label("Outputs") { style = { marginTop = 8 } });
             Add(m_OutputList);
-            Add(new Button(() => AddPort(inputs: false)) { text = "+ Output" });
         }
 
         public void Bind(PcgSubgraphDefinition definition)
@@ -124,9 +124,12 @@ namespace DJTechEditor.PCG.Graph
             header.Add(handle);
             header.Add(nameField);
             header.Add(MakeConnectionBadge(isInput ? IsInputConnected(port.id) : IsOutputConnected(port.id)));
-            header.Add(MakeMoveButton(port, isInput, -1));
-            header.Add(MakeMoveButton(port, isInput, 1));
-            header.Add(MakeRemoveButton(port, isInput));
+            if (isInput)
+            {
+                header.Add(MakeMoveButton(port, true, -1));
+                header.Add(MakeMoveButton(port, true, 1));
+                header.Add(MakeRemoveButton(port, true));
+            }
 
             var typeRow = new VisualElement
             {
@@ -149,8 +152,8 @@ namespace DJTechEditor.PCG.Graph
                 },
             });
             var typeField = new PopupField<string>(
-                PinTypes.ToList(),
-                Mathf.Max(0, Array.IndexOf(PinTypes, port.pinType)))
+                OutputPinTypes.ToList(),
+                Mathf.Max(0, Array.IndexOf(OutputPinTypes, port.pinType)))
             {
                 style =
                 {
@@ -170,7 +173,8 @@ namespace DJTechEditor.PCG.Graph
             typeRow.Add(typeField);
 
             card.Add(header);
-            card.Add(typeRow);
+            if (!isInput)
+                card.Add(typeRow);
             return card;
         }
 
@@ -283,7 +287,7 @@ namespace DJTechEditor.PCG.Graph
 
         private Button MakeRemoveButton(PcgSubgraphPort port, bool inputs)
         {
-            return new Button(() => RemovePort(port, inputs))
+            var button = new Button(() => RemovePort(port, inputs))
             {
                 text = "×",
                 style =
@@ -299,6 +303,12 @@ namespace DJTechEditor.PCG.Graph
                     fontSize = 12,
                 },
             };
+            if (inputs && (m_Definition?.inputs?.Count ?? 0) <= 1)
+            {
+                button.SetEnabled(false);
+                button.tooltip = "A Subgraph must expose at least one input.";
+            }
+            return button;
         }
 
         private bool IsInputConnected(string portId)
@@ -320,12 +330,12 @@ namespace DJTechEditor.PCG.Graph
             return m_Definition.edges?.Any(edge =>
                 edge != null &&
                 edge.target == outputNodeId &&
-                edge.targetHandle == portId) == true;
+                edge.targetHandle == "in") == true;
         }
 
         private void AddPort(bool inputs)
         {
-            if (m_Definition == null)
+            if (m_Definition == null || !inputs)
                 return;
             m_GraphView?.WithUndo(inputs ? "Add Interface Input" : "Add Interface Output", () =>
             {
@@ -338,6 +348,7 @@ namespace DJTechEditor.PCG.Graph
                 if (inputs)
                 {
                     m_Definition.inputs.Add(port);
+                    PcgSubgraphInputUtility.NormalizePorts(m_Definition.inputs, m_Definition.nodes);
                     PcgSubgraphInterfaceUtility.EnsureInterfaceNodes(m_Definition);
                 }
                 else
@@ -354,6 +365,14 @@ namespace DJTechEditor.PCG.Graph
         {
             if (m_Definition == null || port == null)
                 return;
+            if (inputs && m_Definition.inputs.Count <= 1)
+            {
+                EditorUtility.DisplayDialog(
+                    "Input Required",
+                    "A Subgraph must expose at least one input.",
+                    "OK");
+                return;
+            }
             if (!EditorUtility.DisplayDialog(
                     "Delete Port",
                     $"Delete port '{port.name}' ({port.id})? Connected edges may become invalid.",

@@ -109,8 +109,14 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
-        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
-        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "outputs": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/subgraphPort" } },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/node" },
+          "contains": { "properties": { "type": { "const": "Output" } }, "required": ["type"] },
+          "minContains": 1,
+          "maxContains": 1
+        },
         "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
       }
     }

@@ -203,6 +203,7 @@ namespace DJTechRuntime.PCG
                 if (!TryParseNodes(subgraphDict, subgraph.nodes, allowInterface, out error))
                     return false;
                 ParseEdges(subgraphDict, subgraph.edges);
+                PcgSubgraphContractUtility.Synchronize(subgraph);
                 output.Add(subgraph);
             }
             return true;
@@ -284,6 +285,8 @@ namespace DJTechRuntime.PCG
             };
             ParsePorts(dict, "inputs", snapshot.inputs);
             ParsePorts(dict, "outputs", snapshot.outputs);
+            PcgSubgraphInputUtility.NormalizePorts(snapshot.inputs);
+            PcgSubgraphOutputUtility.NormalizePorts(snapshot.outputs);
             return snapshot;
         }
 
@@ -330,6 +333,7 @@ namespace DJTechRuntime.PCG
 
         private static void AppendSubgraph(StringBuilder sb, PcgSubgraphDefinition subgraph, bool pretty, string indent, bool writeInterface)
         {
+            PcgSubgraphContractUtility.Synchronize(subgraph);
             var inner = pretty ? indent + "  " : "";
             var deep = pretty ? inner + "  " : "";
             var nl = pretty ? "\n" : "";
