@@ -69,6 +69,8 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            PcgSubgraphInterfaceRepair.RepairDefinitionsForExecution(resolved.subgraphs);
+
             var definitions = new Dictionary<string, PcgSubgraphDefinition>(StringComparer.Ordinal);
             foreach (var definition in resolved.subgraphs ?? Enumerable.Empty<PcgSubgraphDefinition>())
             {

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using DJTechEditor.PCG.Graph;
 using DJTechRuntime.PCG;
 using NUnit.Framework;
@@ -56,6 +57,42 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(parsed.nodes[0].subgraphInterface.inputs[0].id, Is.EqualTo("in_a"));
             Assert.That(parsed.nodes[0].data.GetRaw("assetGuid")?.ToString(),
                 Is.EqualTo("0123456789abcdef0123456789abcdef"));
+        }
+
+        [Test]
+        public void Graph_V2_RoundTrip_PreservesInlineInterfaceAnchorPlacement()
+        {
+            var doc = new PcgGraphDocument
+            {
+                version = "2.0",
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "sg",
+                        name = "Anchored",
+                        inputs =
+                        {
+                            new PcgSubgraphPort
+                            {
+                                id = "in",
+                                name = "Input",
+                                pinType = "SpatialMesh",
+                                anchorPlaced = true,
+                                anchorX = 12.5f,
+                                anchorY = -48f,
+                            },
+                        },
+                    },
+                },
+            };
+
+            var json = PcgGraphSerializer.ToJson(doc, pretty: false);
+            Assert.That(PcgGraphSerializer.TryFromJson(json, out var parsed, out var error), Is.True, error);
+            var port = parsed.subgraphs[0].inputs[0];
+            Assert.That(port.anchorPlaced, Is.True);
+            Assert.That(port.anchorX, Is.EqualTo(12.5f));
+            Assert.That(port.anchorY, Is.EqualTo(-48f));
         }
 
         [Test]
@@ -133,6 +170,60 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(result.GhostHandles, Does.Contain("removed"));
             Assert.That(node.subgraphInterface.inputs.ConvertAll(port => port.id),
                 Is.EqualTo(new[] { "removed" }));
+        }
+
+        [Test]
+        public void LinkedSubgraphInterfaceSync_ReconcilesRecordsInHiddenSubgraphScopes()
+        {
+            const string guid = "0123456789abcdef0123456789abcdef";
+            var linked = new PcgGraphNodeRecord
+            {
+                id = "linked",
+                type = PcgStructuralNodeTypes.SubgraphAsset,
+                data = MakeGuidData(guid),
+                subgraphInterface = new PcgSubgraphInterfaceSnapshot
+                {
+                    inputs =
+                    {
+                        new PcgSubgraphPort { id = "in_1", name = "Input", pinType = "Any" },
+                        new PcgSubgraphPort { id = "stale", name = "Stale", pinType = "Any" },
+                    },
+                },
+            };
+            var document = new PcgGraphDocument
+            {
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "hidden",
+                        nodes = { linked },
+                    },
+                },
+            };
+
+            var report = PcgExternalSubgraphInterfaceSync.ReconcileDocument(
+                document,
+                (string assetGuid, out PcgSubgraphInterfaceSnapshot snapshot, out string contentHash, out string schemaVersion, out string error) =>
+                {
+                    snapshot = new PcgSubgraphInterfaceSnapshot
+                    {
+                        inputs =
+                        {
+                            new PcgSubgraphPort { id = "in_1", name = "Input", pinType = "Any" },
+                        },
+                    };
+                    contentHash = "hash";
+                    schemaVersion = PcgSubgraphAssetMigration.Version10;
+                    error = null;
+                    return assetGuid == guid;
+                });
+
+            Assert.That(report.Compatible, Is.True, string.Join("\n", report.Errors));
+            Assert.That(report.VisitedNodes, Is.EqualTo(1));
+            Assert.That(report.UpdatedNodes, Is.EqualTo(1));
+            Assert.That(linked.subgraphInterface.inputs.ConvertAll(port => port.id),
+                Is.EqualTo(new[] { "in_1" }));
         }
 
         [Test]
@@ -240,18 +331,325 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
-        public void SubgraphAsset_RoundTrip_RejectsParameters()
+        public void SubgraphAsset_V2_RoundTrip_PreservesParametersAndContentHash()
         {
             var asset = PcgSubgraphAssetDocument.CreateEmpty("Demo");
-            asset.inputs.Add(new PcgSubgraphPort { id = "mesh", name = "Mesh", pinType = "SpatialMesh" });
+            asset.version = PcgSubgraphAssetMigration.Version20;
+            asset.parameters.Add(new PcgGraphParameter
+            {
+                id = "width",
+                name = "Width",
+                type = "number",
+                defaultValue = "2",
+                targetNode = "box",
+                targetProperty = "width",
+            });
+            asset.nodes.Add(new PcgGraphNodeRecord
+            {
+                id = "box",
+                type = "CreateBoxMesh",
+                data = new PcgNodeData(),
+            });
+
             var json = PcgSubgraphAssetSerializer.ToJson(asset, pretty: false);
             Assert.That(PcgSubgraphAssetSerializer.TryFromJson(json, out var parsed, out var error), Is.True, error);
-            Assert.That(parsed.name, Is.EqualTo("Demo"));
-            Assert.That(parsed.inputs[0].id, Is.EqualTo("mesh"));
+            Assert.That(parsed.version, Is.EqualTo(PcgSubgraphAssetMigration.Version20));
+            Assert.That(parsed.parameters, Has.Count.EqualTo(1));
+            Assert.That(parsed.parameters[0].id, Is.EqualTo("width"));
+            Assert.That(string.IsNullOrEmpty(parsed.contentHash), Is.False);
+        }
 
-            var withParams = json.TrimEnd('}') + ",\"parameters\":[]}";
-            Assert.That(PcgSubgraphAssetSerializer.TryFromJson(withParams, out _, out error), Is.False);
-            Assert.That(error, Does.Contain("parameters"));
+        [Test]
+        public void SubgraphDefinition_RoundTrip_PreservesParameters()
+        {
+            var doc = new PcgGraphDocument
+            {
+                version = "2.0",
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "sg",
+                        name = "Parametric",
+                        parameters =
+                        {
+                            new PcgGraphParameter
+                            {
+                                id = "height",
+                                name = "Height",
+                                type = "number",
+                                defaultValue = "3",
+                                targetNode = "box",
+                                targetProperty = "height",
+                            },
+                        },
+                    },
+                },
+            };
+
+            var json = PcgGraphSerializer.ToJson(doc, pretty: false);
+            Assert.That(PcgGraphSerializer.TryFromJson(json, out var parsed, out var error), Is.True, error);
+            Assert.That(parsed.subgraphs[0].parameters[0].id, Is.EqualTo("height"));
+        }
+
+        [Test]
+        public void SubgraphParameterResolver_AppliesInstanceOverrideToInternalNode()
+        {
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "sg",
+                parameters =
+                {
+                    new PcgGraphParameter
+                    {
+                        id = "width",
+                        name = "Width",
+                        type = "number",
+                        defaultValue = "1",
+                        targetNode = "box",
+                        targetProperty = "width",
+                    },
+                },
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "box",
+                        type = "CreateBoxMesh",
+                        data = new PcgNodeData(),
+                    },
+                },
+            };
+            var instanceData = new PcgNodeData();
+            instanceData.SetRaw("subgraphId", "sg");
+            PcgSubgraphInstanceParameterStorage.SetOverrideValue(instanceData, definition.parameters[0], 4.5f);
+
+            var document = new PcgGraphDocument
+            {
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.Subgraph,
+                        data = instanceData,
+                    },
+                },
+                subgraphs = { definition },
+            };
+
+            PcgSubgraphParameterResolver.ApplyInstanceOverrides(document);
+            Assert.That(definition.nodes[0].data.GetRaw("width")?.ToString(), Is.EqualTo("4.5"));
+        }
+
+        [Test]
+        public void GraphParameterUtility_PromoteBindingsMovesParametersIntoSubgraphDefinition()
+        {
+            var rootParams = new List<PcgGraphParameter>
+            {
+                new()
+                {
+                    id = "p1",
+                    name = "Width",
+                    type = "number",
+                    defaultValue = "2",
+                    targetNode = "box",
+                    targetProperty = "width",
+                },
+            };
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "sg",
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "box", type = "CreateBoxMesh", data = new PcgNodeData() },
+                },
+            };
+
+            PcgGraphParameterUtility.PromoteBindings(rootParams, definition, new HashSet<string> { "box" });
+
+            Assert.That(rootParams, Is.Empty);
+            Assert.That(definition.parameters, Has.Count.EqualTo(1));
+            Assert.That(definition.parameters[0].targetNode, Is.EqualTo("box"));
+        }
+
+        [Test]
+        public void SubgraphAsset_RoundTrip_PreservesAnchorPlacement()
+        {
+            var asset = PcgSubgraphAssetDocument.CreateEmpty("Anchors");
+            asset.inputs[0].anchorPlaced = true;
+            asset.inputs[0].anchorX = -120.25f;
+            asset.inputs[0].anchorY = 44.5f;
+
+            var json = PcgSubgraphAssetSerializer.ToJson(asset, pretty: false);
+            Assert.That(PcgSubgraphAssetSerializer.TryFromJson(json, out var parsed, out var error),
+                Is.True, error);
+            Assert.That(parsed.inputs[0].anchorPlaced, Is.True);
+            Assert.That(parsed.inputs[0].anchorX, Is.EqualTo(-120.25f));
+            Assert.That(parsed.inputs[0].anchorY, Is.EqualTo(44.5f));
+        }
+
+        [Test]
+        public void SaveRepair_RemovesMissingEndpointsAndInvalidInterfaceHandles()
+        {
+            var asset = PcgSubgraphAssetDocument.CreateEmpty("Repair");
+            asset.nodes.Add(new PcgGraphNodeRecord
+            {
+                id = "box",
+                type = "CreateBoxMesh",
+                data = new PcgNodeData(),
+            });
+            asset.edges.Clear();
+            asset.edges.Add(new PcgGraphEdgeRecord
+            {
+                id = "valid",
+                source = "subgraph_input",
+                target = "box",
+                sourceHandle = "in_1",
+                targetHandle = "in",
+            });
+            asset.edges.Add(new PcgGraphEdgeRecord
+            {
+                id = "missing_node",
+                source = "subgraph_input",
+                target = "deleted",
+                sourceHandle = "in_1",
+                targetHandle = "in",
+            });
+            asset.edges.Add(new PcgGraphEdgeRecord
+            {
+                id = "removed_port",
+                source = "subgraph_input",
+                target = "box",
+                sourceHandle = "removed",
+                targetHandle = "in",
+            });
+
+            var report = PcgGraphIntegrityRepair.RepairForSave(asset);
+
+            Assert.That(report.RemovedOrphanEdges, Is.EqualTo(2));
+            Assert.That(asset.edges.ConvertAll(edge => edge.id), Is.EqualTo(new[] { "valid" }));
+            Assert.That(report.RemovedEdgePaths, Does.Contain("<asset>/missing_node"));
+            Assert.That(report.RemovedEdgePaths, Does.Contain("<asset>/removed_port"));
+        }
+
+        [Test]
+        public void SubgraphDefinitionCloner_ClonesRootDefinitionWithNewId()
+        {
+            var original = new PcgSubgraphDefinition
+            {
+                id = "sg_a",
+                name = "Original",
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "box",
+                        type = "CreateBoxMesh",
+                        data = new PcgNodeData(),
+                    },
+                },
+            };
+            var counter = 0;
+            Assert.That(PcgSubgraphDefinitionCloner.TryCloneDefinitionClosure(
+                    "sg_a",
+                    new[] { original },
+                    () => $"sg_clone_{++counter}",
+                    out var result),
+                Is.True);
+            Assert.That(result.RootDefinitionId, Is.EqualTo("sg_clone_1"));
+            Assert.That(result.Definitions, Has.Count.EqualTo(1));
+            Assert.That(result.Definitions[0].id, Is.EqualTo("sg_clone_1"));
+            Assert.That(result.Definitions[0].name, Is.EqualTo("Original"));
+            Assert.That(result.Definitions[0].nodes[0].id, Is.EqualTo("box"));
+            Assert.That(ReferenceEquals(original, result.Definitions[0]), Is.False);
+        }
+
+        [Test]
+        public void SubgraphDefinitionCloner_ClonesNestedClosureAndRemapsSubgraphIds()
+        {
+            var nested = new PcgSubgraphDefinition
+            {
+                id = "sg_nested",
+                name = "Nested",
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inner",
+                        type = "CreateBoxMesh",
+                        data = new PcgNodeData(),
+                    },
+                },
+            };
+            var root = new PcgSubgraphDefinition
+            {
+                id = "sg_root",
+                name = "Root",
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "child",
+                        type = PcgStructuralNodeTypes.Subgraph,
+                        data = MakeSubgraphIdData("sg_nested"),
+                    },
+                },
+            };
+            var counter = 0;
+            Assert.That(PcgSubgraphDefinitionCloner.TryCloneDefinitionClosure(
+                    "sg_root",
+                    new[] { root, nested },
+                    () => $"sg_clone_{++counter}",
+                    out var result),
+                Is.True);
+            Assert.That(result.Definitions, Has.Count.EqualTo(2));
+            var clonedRoot = result.Definitions.First(definition => definition.id == "sg_clone_1");
+            var clonedNested = result.Definitions.First(definition => definition.id == "sg_clone_2");
+            Assert.That(
+                clonedRoot.nodes[0].data.GetRaw("subgraphId")?.ToString(),
+                Is.EqualTo("sg_clone_2"));
+            Assert.That(clonedNested.nodes[0].id, Is.EqualTo("inner"));
+            Assert.That(
+                nested.nodes[0].data.GetRaw("subgraphId")?.ToString(),
+                Is.EqualTo("sg_nested"));
+        }
+
+        [Test]
+        public void SubgraphDefinitionCloner_EditingCloneDoesNotMutateOriginal()
+        {
+            var original = new PcgSubgraphDefinition
+            {
+                id = "sg_a",
+                name = "Original",
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "box",
+                        type = "CreateBoxMesh",
+                        data = new PcgNodeData(),
+                    },
+                },
+            };
+            var counter = 0;
+            Assert.That(PcgSubgraphDefinitionCloner.TryCloneDefinitionClosure(
+                    "sg_a",
+                    new[] { original },
+                    () => $"sg_clone_{++counter}",
+                    out var result),
+                Is.True);
+            result.Definitions[0].name = "Mutated";
+            result.Definitions[0].nodes[0].id = "changed";
+            Assert.That(original.name, Is.EqualTo("Original"));
+            Assert.That(original.nodes[0].id, Is.EqualTo("box"));
+        }
+
+        private static PcgNodeData MakeSubgraphIdData(string subgraphId)
+        {
+            var data = new PcgNodeData();
+            data.SetRaw("subgraphId", subgraphId);
+            return data;
         }
 
         private static PcgNodeData MakeGuidData(string guid)
@@ -328,6 +726,110 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(result.Document.nodes[0].type, Is.EqualTo(PcgStructuralNodeTypes.Subgraph));
             Assert.That(result.Document.subgraphs.Count, Is.EqualTo(1));
             Assert.That(result.DependencyGuids, Is.EquivalentTo(new[] { guid }));
+        }
+
+        [Test]
+        public void Resolve_UnconnectedRemovedSnapshotPort_IsIgnored()
+        {
+            const string guid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            var asset = MakeSimpleInterfaceAsset();
+            var authoring = new PcgGraphDocument
+            {
+                version = "3.0",
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.SubgraphAsset,
+                        data = MakeGuid(guid),
+                        subgraphInterface = new PcgSubgraphInterfaceSnapshot
+                        {
+                            inputs =
+                            {
+                                new PcgSubgraphPort { id = "in", name = "In", pinType = "Any" },
+                                new PcgSubgraphPort { id = "stale", name = "Stale", pinType = "Any" },
+                            },
+                            outputs =
+                            {
+                                new PcgSubgraphPort { id = "out", name = "Out", pinType = "Any" },
+                            },
+                        },
+                    },
+                },
+            };
+            var assetJson = PcgSubgraphAssetSerializer.ToJson(asset, pretty: false);
+
+            Assert.That(PcgExternalSubgraphResolver.TryResolveToInline(
+                authoring,
+                (string assetGuid, out string json, out string error) =>
+                {
+                    json = assetJson;
+                    error = null;
+                    return assetGuid == guid;
+                },
+                out var result), Is.True, result?.Error);
+        }
+
+        [Test]
+        public void Resolve_ConnectedRemovedSnapshotPort_StillFailsClosed()
+        {
+            const string guid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            var asset = MakeSimpleInterfaceAsset();
+            var authoring = new PcgGraphDocument
+            {
+                version = "3.0",
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "source",
+                        type = "CreateBoxMesh",
+                        data = new PcgNodeData(),
+                    },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.SubgraphAsset,
+                        data = MakeGuid(guid),
+                        subgraphInterface = new PcgSubgraphInterfaceSnapshot
+                        {
+                            inputs =
+                            {
+                                new PcgSubgraphPort { id = "in", name = "In", pinType = "Any" },
+                                new PcgSubgraphPort { id = "stale", name = "Stale", pinType = "Any" },
+                            },
+                            outputs =
+                            {
+                                new PcgSubgraphPort { id = "out", name = "Out", pinType = "Any" },
+                            },
+                        },
+                    },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "connected_stale",
+                        source = "source",
+                        target = "inst",
+                        sourceHandle = "out",
+                        targetHandle = "stale",
+                    },
+                },
+            };
+            var assetJson = PcgSubgraphAssetSerializer.ToJson(asset, pretty: false);
+
+            Assert.That(PcgExternalSubgraphResolver.TryResolveToInline(
+                authoring,
+                (string assetGuid, out string json, out string error) =>
+                {
+                    json = assetJson;
+                    error = null;
+                    return assetGuid == guid;
+                },
+                out var result), Is.False);
+            Assert.That(result.Error, Does.Contain("source removed input port 'stale'"));
         }
 
         [Test]
@@ -640,6 +1142,92 @@ namespace DJTechEditor.PCG.Tests
                 Is.True);
         }
 
+        [Test]
+        public void AssetLoad_RepairsInterfaceOnlySubgraphMissingPassthroughEdges()
+        {
+            var json = @"{
+  ""version"": ""1.0"",
+  ""name"": ""Windows_floor"",
+  ""inputs"": [{""id"": ""in_1"", ""name"": ""GroupDelete"", ""pinType"": ""Any""}],
+  ""outputs"": [{""id"": ""out_1"", ""name"": ""Output"", ""pinType"": ""Any""}],
+  ""nodes"": [
+    {""id"": ""subgraph_output"", ""type"": ""SubgraphOutput"", ""position"": {""x"": 0, ""y"": 0}, ""data"": {}},
+    {""id"": ""subgraph_input"", ""type"": ""SubgraphInput"", ""position"": {""x"": 0, ""y"": -195}, ""data"": {}}
+  ],
+  ""edges"": [],
+  ""subgraphs"": []
+}";
+
+            Assert.That(PcgSubgraphAssetSerializer.TryFromJson(json, out var asset, out var error), Is.True, error);
+            Assert.That(
+                asset.edges.Exists(edge =>
+                    edge.source == "subgraph_input" &&
+                    edge.target == "subgraph_output" &&
+                    edge.sourceHandle == "in_1" &&
+                    edge.targetHandle == "out_1"),
+                Is.True);
+
+            var doc = new PcgGraphDocument
+            {
+                version = "3.0",
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "source", type = "CreateBoxMesh", data = new PcgNodeData() },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "inst",
+                        type = PcgStructuralNodeTypes.Subgraph,
+                        data = MakeSubgraphId("sg"),
+                    },
+                    new PcgGraphNodeRecord { id = "sink", type = "Output", data = new PcgNodeData() },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_in", source = "source", target = "inst",
+                        sourceHandle = "out", targetHandle = "in_1",
+                    },
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "root_out", source = "inst", target = "sink",
+                        sourceHandle = "out_1", targetHandle = "in",
+                    },
+                },
+                subgraphs =
+                {
+                    new PcgSubgraphDefinition
+                    {
+                        id = "sg",
+                        name = "Windows_floor",
+                        inputs = asset.inputs.Select(port => new PcgSubgraphPort
+                        {
+                            id = port.id,
+                            name = port.name,
+                            pinType = port.pinType,
+                        }).ToList(),
+                        outputs = asset.outputs.Select(port => new PcgSubgraphPort
+                        {
+                            id = port.id,
+                            name = port.name,
+                            pinType = port.pinType,
+                        }).ToList(),
+                        nodes = asset.nodes.Select(node => node.Clone()).ToList(),
+                        edges = new List<PcgGraphEdgeRecord>(),
+                    },
+                },
+            };
+
+            Assert.That(PcgGraphFlattener.TryFlattenForExecution(doc, out var flat, out error), Is.True, error);
+            Assert.That(
+                flat.edges.Exists(edge =>
+                    edge.source == "source" &&
+                    edge.target == "sink" &&
+                    edge.sourceHandle == "out" &&
+                    edge.targetHandle == "in"),
+                Is.True);
+        }
+
         private static PcgSubgraphAssetDocument MakePassthroughAsset(string name, string nestedGuid)
         {
             var doc = new PcgSubgraphAssetDocument
@@ -685,6 +1273,48 @@ namespace DJTechEditor.PCG.Tests
                 },
             };
             return doc;
+        }
+
+        private static PcgSubgraphAssetDocument MakeSimpleInterfaceAsset()
+        {
+            return new PcgSubgraphAssetDocument
+            {
+                name = "Simple",
+                inputs =
+                {
+                    new PcgSubgraphPort { id = "in", name = "In", pinType = "Any" },
+                },
+                outputs =
+                {
+                    new PcgSubgraphPort { id = "out", name = "Out", pinType = "Any" },
+                },
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "input",
+                        type = PcgStructuralNodeTypes.SubgraphInput,
+                        data = new PcgNodeData(),
+                    },
+                    new PcgGraphNodeRecord
+                    {
+                        id = "output",
+                        type = PcgStructuralNodeTypes.SubgraphOutput,
+                        data = new PcgNodeData(),
+                    },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "passthrough",
+                        source = "input",
+                        target = "output",
+                        sourceHandle = "in",
+                        targetHandle = "out",
+                    },
+                },
+            };
         }
 
         private static PcgNodeData MakeGuid(string guid)

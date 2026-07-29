@@ -47,6 +47,59 @@ namespace DJTechRuntime.PCG
                 !string.IsNullOrEmpty(parameter.targetNode) &&
                 nodeIds.Contains(parameter.targetNode)).ToList();
         }
+
+        public static PcgGraphParameter CloneParameter(PcgGraphParameter parameter)
+        {
+            if (parameter == null)
+                return null;
+            return new PcgGraphParameter
+            {
+                id = parameter.id,
+                name = parameter.name,
+                type = parameter.type,
+                defaultValue = parameter.defaultValue,
+                exposed = parameter.exposed,
+                targetNode = parameter.targetNode,
+                targetProperty = parameter.targetProperty,
+                hasRange = parameter.hasRange,
+                minValue = parameter.minValue,
+                maxValue = parameter.maxValue,
+            };
+        }
+
+        public static void PromoteBindings(
+            IList<PcgGraphParameter> source,
+            PcgSubgraphDefinition definition,
+            ISet<string> nodeIds)
+        {
+            if (definition == null)
+                return;
+            definition.parameters ??= new List<PcgGraphParameter>();
+            PromoteBindingsToList(source, definition.parameters, nodeIds);
+        }
+
+        public static void PromoteBindingsToList(
+            IList<PcgGraphParameter> source,
+            List<PcgGraphParameter> destination,
+            ISet<string> nodeIds)
+        {
+            if (source == null || destination == null || nodeIds == null || nodeIds.Count == 0)
+                return;
+
+            for (var index = source.Count - 1; index >= 0; index--)
+            {
+                var parameter = source[index];
+                if (parameter == null ||
+                    string.IsNullOrEmpty(parameter.targetNode) ||
+                    !nodeIds.Contains(parameter.targetNode))
+                {
+                    continue;
+                }
+
+                destination.Add(CloneParameter(parameter));
+                source.RemoveAt(index);
+            }
+        }
     }
 
     [Serializable]
@@ -149,6 +202,9 @@ namespace DJTechRuntime.PCG
                 id = port.id,
                 name = port.name,
                 pinType = port.pinType,
+                anchorPlaced = port.anchorPlaced,
+                anchorX = port.anchorX,
+                anchorY = port.anchorY,
             };
         }
     }
@@ -211,6 +267,10 @@ namespace DJTechRuntime.PCG
         public string id;
         public string name;
         public string pinType = "Any";
+        /// <summary>When true, a visible interface anchor is shown on the subgraph canvas.</summary>
+        public bool anchorPlaced;
+        public float anchorX;
+        public float anchorY;
     }
 
     [Serializable]
@@ -220,6 +280,7 @@ namespace DJTechRuntime.PCG
         public string name;
         public List<PcgSubgraphPort> inputs = new();
         public List<PcgSubgraphPort> outputs = new();
+        public List<PcgGraphParameter> parameters = new();
         public List<PcgGraphNodeRecord> nodes = new();
         public List<PcgGraphEdgeRecord> edges = new();
 
@@ -234,13 +295,20 @@ namespace DJTechRuntime.PCG
                     id = port.id,
                     name = port.name,
                     pinType = port.pinType,
+                    anchorPlaced = port.anchorPlaced,
+                    anchorX = port.anchorX,
+                    anchorY = port.anchorY,
                 }).ToList(),
                 outputs = outputs.Select(port => port == null ? null : new PcgSubgraphPort
                 {
                     id = port.id,
                     name = port.name,
                     pinType = port.pinType,
+                    anchorPlaced = port.anchorPlaced,
+                    anchorX = port.anchorX,
+                    anchorY = port.anchorY,
                 }).ToList(),
+                parameters = parameters.Select(PcgGraphParameterUtility.CloneParameter).ToList(),
                 nodes = nodes.Select(node => node?.Clone()).ToList(),
                 edges = edges.Select(edge => edge?.Clone()).ToList(),
             };
@@ -281,24 +349,8 @@ namespace DJTechRuntime.PCG
         private static bool IsExternalSubgraphAsset(PcgGraphNodeRecord node) =>
             node != null && node.type == PcgStructuralNodeTypes.SubgraphAsset;
 
-        private static PcgGraphParameter CloneParameter(PcgGraphParameter parameter)
-        {
-            if (parameter == null)
-                return null;
-            return new PcgGraphParameter
-            {
-                id = parameter.id,
-                name = parameter.name,
-                type = parameter.type,
-                defaultValue = parameter.defaultValue,
-                exposed = parameter.exposed,
-                targetNode = parameter.targetNode,
-                targetProperty = parameter.targetProperty,
-                hasRange = parameter.hasRange,
-                minValue = parameter.minValue,
-                maxValue = parameter.maxValue,
-            };
-        }
+        private static PcgGraphParameter CloneParameter(PcgGraphParameter parameter) =>
+            PcgGraphParameterUtility.CloneParameter(parameter);
     }
 
     public static class PcgStructuralNodeTypes

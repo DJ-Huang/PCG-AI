@@ -81,6 +81,12 @@ namespace DJTechEditor.PCG.Graph
                 .FirstOrDefault(n => n.type == PcgStructuralNodeTypes.SubgraphInput)?.id;
         }
 
+        public static string GetSubgraphOutputNodeId(PcgSubgraphDefinition definition)
+        {
+            return definition.nodes?
+                .FirstOrDefault(n => n.type == PcgStructuralNodeTypes.SubgraphOutput)?.id;
+        }
+
         public static void EnsureInternalInputEdge(
             PcgSubgraphDefinition definition,
             string portId,
@@ -111,6 +117,68 @@ namespace DJTechEditor.PCG.Graph
                 sourceHandle = portId,
                 targetHandle = internalTargetHandle,
             });
+        }
+
+        public static void EnsureInternalOutputEdge(
+            PcgSubgraphDefinition definition,
+            string portId,
+            string internalSourceId,
+            string internalSourceHandle)
+        {
+            if (string.IsNullOrEmpty(portId) || string.IsNullOrEmpty(internalSourceId))
+                return;
+
+            var outputNodeId = GetSubgraphOutputNodeId(definition);
+            if (string.IsNullOrEmpty(outputNodeId))
+                return;
+
+            definition.edges ??= new List<PcgGraphEdgeRecord>();
+            var exists = definition.edges.Any(e =>
+                e.source == internalSourceId &&
+                e.target == outputNodeId &&
+                e.sourceHandle == internalSourceHandle &&
+                e.targetHandle == portId);
+            if (exists)
+                return;
+
+            definition.edges.Add(new PcgGraphEdgeRecord
+            {
+                id = $"e_iface_out_{internalSourceId}_{portId}",
+                source = internalSourceId,
+                target = outputNodeId,
+                sourceHandle = internalSourceHandle,
+                targetHandle = portId,
+            });
+        }
+
+        public static void RemoveInternalInputEdges(PcgSubgraphDefinition definition, string portId)
+        {
+            if (definition?.edges == null || string.IsNullOrEmpty(portId))
+                return;
+
+            var inputNodeId = GetSubgraphInputNodeId(definition);
+            if (string.IsNullOrEmpty(inputNodeId))
+                return;
+
+            definition.edges.RemoveAll(edge =>
+                edge != null &&
+                edge.source == inputNodeId &&
+                edge.sourceHandle == portId);
+        }
+
+        public static void RemoveInternalOutputEdges(PcgSubgraphDefinition definition, string portId)
+        {
+            if (definition?.edges == null || string.IsNullOrEmpty(portId))
+                return;
+
+            var outputNodeId = GetSubgraphOutputNodeId(definition);
+            if (string.IsNullOrEmpty(outputNodeId))
+                return;
+
+            definition.edges.RemoveAll(edge =>
+                edge != null &&
+                edge.target == outputNodeId &&
+                edge.targetHandle == portId);
         }
 
         public static bool TryPromoteWireToSubgraphInput(

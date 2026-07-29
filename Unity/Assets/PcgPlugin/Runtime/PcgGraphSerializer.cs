@@ -119,27 +119,7 @@ namespace DJTechRuntime.PCG
                 ParseEdges(root, doc.edges);
 
                 if (root.TryGetValue("parameters", out var paramsObj) && paramsObj is List<object> paramsList)
-                {
-                    foreach (var paramObj in paramsList)
-                    {
-                        if (paramObj is not Dictionary<string, object> paramDict)
-                            continue;
-
-                        doc.parameters.Add(new PcgGraphParameter
-                        {
-                            id = GetString(paramDict, "id"),
-                            name = GetString(paramDict, "name"),
-                            type = GetString(paramDict, "type", "number"),
-                            defaultValue = GetString(paramDict, "default"),
-                            exposed = GetBool(paramDict, "exposed", true),
-                            targetNode = GetString(paramDict, "targetNode"),
-                            targetProperty = GetString(paramDict, "targetProperty"),
-                            hasRange = GetBool(paramDict, "hasRange", false),
-                            minValue = GetFloat(paramDict, "min", 0f),
-                            maxValue = GetFloat(paramDict, "max", 1f),
-                        });
-                    }
-                }
+                    ParseParameters(paramsList, doc.parameters);
 
                 if (!TryParseSubgraphs(root, doc.subgraphs, allowInterface, out error))
                     return false;
@@ -170,6 +150,12 @@ namespace DJTechRuntime.PCG
 
         internal static bool TryParseSubgraphsPublic(Dictionary<string, object> root, List<PcgSubgraphDefinition> output, bool allowInterface, out string error) =>
             TryParseSubgraphs(root, output, allowInterface, out error);
+
+        internal static void AppendParametersPublic(StringBuilder sb, List<PcgGraphParameter> parameters, bool pretty, string indent) =>
+            AppendParameters(sb, parameters, pretty, indent);
+
+        internal static void ParseParametersPublic(List<object> paramsList, List<PcgGraphParameter> output) =>
+            ParseParameters(paramsList, output);
 
         private static string NormalizeVersion(string version, PcgGraphDocument doc)
         {
@@ -212,6 +198,8 @@ namespace DJTechRuntime.PCG
                 };
                 ParsePorts(subgraphDict, "inputs", subgraph.inputs);
                 ParsePorts(subgraphDict, "outputs", subgraph.outputs);
+                if (subgraphDict.TryGetValue("parameters", out var paramsObj) && paramsObj is List<object> paramsList)
+                    ParseParameters(paramsList, subgraph.parameters);
                 if (!TryParseNodes(subgraphDict, subgraph.nodes, allowInterface, out error))
                     return false;
                 ParseEdges(subgraphDict, subgraph.edges);
@@ -333,6 +321,9 @@ namespace DJTechRuntime.PCG
                     id = GetString(port, "id"),
                     name = GetString(port, "name"),
                     pinType = GetString(port, "pinType", "Any"),
+                    anchorPlaced = GetBool(port, "anchorPlaced", false),
+                    anchorX = GetFloat(port, "anchorX", 0f),
+                    anchorY = GetFloat(port, "anchorY", 0f),
                 });
             }
         }
@@ -349,6 +340,15 @@ namespace DJTechRuntime.PCG
             sb.Append(',').Append(nl);
             AppendPorts(sb, "outputs", subgraph.outputs, pretty, deep);
             sb.Append(',').Append(nl);
+            sb.Append(deep).Append("\"parameters\": [").Append(nl);
+            for (var i = 0; i < subgraph.parameters.Count; i++)
+            {
+                AppendParameter(sb, subgraph.parameters[i], pretty, deep);
+                if (i < subgraph.parameters.Count - 1)
+                    sb.Append(',');
+                sb.Append(nl);
+            }
+            sb.Append(deep).Append("],").Append(nl);
             sb.Append(deep).Append("\"nodes\": [").Append(nl);
             for (var i = 0; i < subgraph.nodes.Count; i++)
             {
@@ -375,9 +375,16 @@ namespace DJTechRuntime.PCG
                 if (i > 0) sb.Append(',');
                 if (pretty) sb.Append(' ');
                 var port = ports[i];
-                sb.Append("{\"id\": ").Append(JsonString(port.id))
-                    .Append(", \"name\": ").Append(JsonString(port.name))
-                    .Append(", \"pinType\": ").Append(JsonString(port.pinType)).Append('}');
+                sb.Append("{\"id\": ").Append(JsonString(port?.id ?? ""))
+                    .Append(", \"name\": ").Append(JsonString(port?.name ?? ""))
+                    .Append(", \"pinType\": ").Append(JsonString(string.IsNullOrEmpty(port?.pinType) ? "Any" : port.pinType));
+                if (port?.anchorPlaced == true)
+                {
+                    sb.Append(", \"anchorPlaced\": true")
+                        .Append(", \"anchorX\": ").Append(port.anchorX.ToString(CultureInfo.InvariantCulture))
+                        .Append(", \"anchorY\": ").Append(port.anchorY.ToString(CultureInfo.InvariantCulture));
+                }
+                sb.Append('}');
             }
             if (pretty && ports.Count > 0) sb.Append(' ');
             sb.Append(']');
@@ -587,6 +594,46 @@ namespace DJTechRuntime.PCG
             sb.Append(", \"min\": ").Append(param.minValue.ToString(CultureInfo.InvariantCulture));
             sb.Append(", \"max\": ").Append(param.maxValue.ToString(CultureInfo.InvariantCulture));
             sb.Append('}');
+        }
+
+        private static void AppendParameters(StringBuilder sb, List<PcgGraphParameter> parameters, bool pretty, string indent)
+        {
+            parameters ??= new List<PcgGraphParameter>();
+            var inner = pretty ? indent + "  " : "";
+            var nl = pretty ? "\n" : "";
+            sb.Append(indent).Append("\"parameters\": [").Append(nl);
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                AppendParameter(sb, parameters[i], pretty, inner);
+                if (i < parameters.Count - 1)
+                    sb.Append(',');
+                sb.Append(nl);
+            }
+            sb.Append(indent).Append(']');
+        }
+
+        private static void ParseParameters(List<object> paramsList, List<PcgGraphParameter> output)
+        {
+            if (paramsList == null || output == null)
+                return;
+            foreach (var paramObj in paramsList)
+            {
+                if (paramObj is not Dictionary<string, object> paramDict)
+                    continue;
+                output.Add(new PcgGraphParameter
+                {
+                    id = GetString(paramDict, "id"),
+                    name = GetString(paramDict, "name"),
+                    type = GetString(paramDict, "type", "number"),
+                    defaultValue = GetString(paramDict, "default"),
+                    exposed = GetBool(paramDict, "exposed", true),
+                    targetNode = GetString(paramDict, "targetNode"),
+                    targetProperty = GetString(paramDict, "targetProperty"),
+                    hasRange = GetBool(paramDict, "hasRange", false),
+                    minValue = GetFloat(paramDict, "min", 0f),
+                    maxValue = GetFloat(paramDict, "max", 1f),
+                });
+            }
         }
 
         private static string InferredJsonValue(string str, string type)

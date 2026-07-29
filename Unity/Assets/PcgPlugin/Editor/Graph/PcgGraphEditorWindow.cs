@@ -81,7 +81,8 @@ namespace DJTechEditor.PCG.Graph
 
         public IReadOnlyList<PcgPreviewMeshBinding> PreviewMeshBindings => m_PreviewMeshBindings;
 
-        public PcgGraphDocument ExportLiveDocument() => m_GraphView?.ExportDocument();
+        public PcgGraphDocument ExportLiveDocument() =>
+            m_GraphView?.ExportDocumentWithExternalInterfacesReconciled();
 
         internal PcgExternalSubgraphLoader CreateExternalSubgraphLoader()
         {
@@ -494,6 +495,7 @@ namespace DJTechEditor.PCG.Graph
 
             m_InterfacePanel = new PcgSubgraphInterfacePanel(m_GraphView);
             m_InterfacePanel.style.display = DisplayStyle.None;
+            m_InterfacePanel.style.flexGrow = 0;
 
             m_Inspector = new PcgNodeInspector(m_GraphView, m_Blackboard);
             m_GraphView.Inspector = m_Inspector;
@@ -509,6 +511,8 @@ namespace DJTechEditor.PCG.Graph
                 style =
                 {
                     flexGrow = 1,
+                    flexShrink = 1,
+                    minWidth = 0,
                     position = Position.Relative,
                 },
             };
@@ -576,6 +580,8 @@ namespace DJTechEditor.PCG.Graph
             var definition = m_GraphView.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
             m_InterfacePanel.Bind(definition);
         }
+
+        internal PcgSubgraphInterfacePanel InterfacePanel => m_InterfacePanel;
 
         private void LoadDefaultGraph()
         {
@@ -818,7 +824,7 @@ namespace DJTechEditor.PCG.Graph
             titleContent = new GUIContent(title, icon);
         }
 
-        private void SetStatus(string message)
+        internal void SetStatus(string message)
         {
             Debug.Log($"[PCG] {message}");
         }

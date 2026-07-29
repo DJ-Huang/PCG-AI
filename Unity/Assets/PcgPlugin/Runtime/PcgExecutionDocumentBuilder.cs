@@ -28,6 +28,7 @@ namespace DJTechRuntime.PCG
             }
 
             var working = authoring.Clone();
+            PcgSubgraphParameterResolver.ApplyInstanceOverrides(working);
             if (!working.HasExternalSubgraphAssets())
             {
                 if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error))
@@ -54,6 +55,8 @@ namespace DJTechRuntime.PCG
                     error += " | chain: " + resolveResult.ErrorChain;
                 return false;
             }
+
+            PcgSubgraphParameterResolver.ApplyInstanceOverrides(resolveResult.Document);
 
             if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error))
                 return false;

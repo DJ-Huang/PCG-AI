@@ -1,5 +1,5 @@
 {
-  "version": "3.0",
+  "version": "2.0",
   "nodes": [
     {
       "id": "ground",
@@ -242,12 +242,6 @@
       "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
-      "id": "n138",
-      "type": "GroupDelete",
-      "position": { "x": 1854, "y": 2503.5 },
-      "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
-    },
-    {
       "id": "n137",
       "type": "ForEachBegin",
       "position": { "x": 1854, "y": 2437.5 },
@@ -263,18 +257,13 @@
       "id": "n142",
       "type": "ForEachEnd",
       "position": { "x": 1854, "y": 2664 },
-      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
+      "data": {"gatherMethod": "merge", "__nodeTitle": "For Each End"}
     },
     {
-      "id": "n140",
-      "type": "SubgraphAsset",
-      "position": { "x": 1854, "y": 2572.5 },
-      "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": ""},
-      "subgraphInterface": {
-        "name": "Windows_floor",
-        "inputs": [ {"id": "in_1", "name": "Input", "pinType": "Any"}, {"id": "82e81979a5534d7091978111c98d17dc", "name": "in_2", "pinType": "Any"} ],
-        "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"}, {"id": "8ce0f49fc8b145f6a59e82ad64c4566b", "name": "out_2", "pinType": "Any"}, {"id": "628e86d1e1fc4516a47d6b8e97a45a35", "name": "out_3", "pinType": "Any"} ]
-      }
+      "id": "n138",
+      "type": "GroupDelete",
+      "position": { "x": 1854, "y": 2503.5 },
+      "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -323,9 +312,7 @@
     {"id": "e987100", "source": "n133", "target": "n135", "sourceHandle": "out", "targetHandle": "target"},
     {"id": "e987101", "source": "n134", "target": "n135", "sourceHandle": "out", "targetHandle": "source"},
     {"id": "e1003038", "source": "n129", "target": "n137", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e1003565", "source": "n138", "target": "n140", "sourceHandle": "out", "targetHandle": "in_1"},
-    {"id": "e1005308", "source": "n140", "target": "n142", "sourceHandle": "out_1", "targetHandle": "in"}
+    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
@@ -342,6 +329,8 @@
       "name": "City Roads",
       "inputs": [],
       "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
+      "parameters": [
+      ],
       "nodes": [
         {
           "id": "road_a",
@@ -414,6 +403,8 @@
       "name": "City Pads",
       "inputs": [ {"id": "lots", "name": "Lots", "pinType": "SpatialMesh"}, {"id": "roads", "name": "Roads", "pinType": "SpatialMesh"} ],
       "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
+      "parameters": [
+      ],
       "nodes": [
         {
           "id": "in_lots",

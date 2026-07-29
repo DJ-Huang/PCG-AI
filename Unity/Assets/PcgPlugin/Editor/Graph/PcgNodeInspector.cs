@@ -265,10 +265,16 @@ namespace DJTechEditor.PCG.Graph
                 }
 
                 if (node is PcgExternalSubgraphNodeView externalSubgraph)
+                {
                     ShowSubgraphInterface(externalSubgraph.Snapshot);
+                    ShowSubgraphPromotedParameters(externalSubgraph);
+                }
                 else if (node is PcgSubgraphNodeView inlineSubgraph &&
                          inlineSubgraph.Kind == PcgSubgraphNodeKind.Instance)
+                {
                     ShowSubgraphInterface(inlineSubgraph.InterfaceSnapshot);
+                    ShowSubgraphPromotedParameters(inlineSubgraph);
+                }
 
                 if (node is PcgSubgraphParentRefNodeView parentRef)
                     ShowParentRefProperties(parentRef);
@@ -306,6 +312,197 @@ namespace DJTechEditor.PCG.Graph
             AddSubgraphPortSection(container, "Inputs", snapshot.inputs);
             AddSubgraphPortSection(container, "Outputs", snapshot.outputs);
             m_Body.Add(container);
+        }
+
+        private void ShowSubgraphPromotedParameters(PcgGraphNodeBase node)
+        {
+            List<PcgGraphParameter> parameters;
+            string liveContentHash = "";
+            string schemaVersion = PcgSubgraphAssetMigration.Version10;
+            PcgExternalSubgraphNodeView external = null;
+
+            if (node is PcgSubgraphNodeView inline &&
+                inline.Kind == PcgSubgraphNodeKind.Instance)
+            {
+                var definition = m_GraphView.FindSubgraphDefinitionForNode(inline);
+                parameters = definition?.parameters;
+            }
+            else if (node is PcgExternalSubgraphNodeView linked)
+            {
+                external = linked;
+                if (!m_GraphView.TryLoadExternalSubgraphParameters(
+                        linked.AssetGuid,
+                        out parameters,
+                        out liveContentHash,
+                        out schemaVersion))
+                {
+                    parameters = null;
+                }
+            }
+            else
+            {
+                return;
+            }
+
+            if (parameters == null || parameters.Count == 0)
+            {
+                if (external != null && external.HasAssetVersionMismatch(liveContentHash))
+                    m_Body.Add(CreateAssetVersionUpgradeRow(external, liveContentHash, schemaVersion));
+                return;
+            }
+
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 8,
+                    paddingTop = 6,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.3f, 0.3f, 0.3f),
+                },
+            };
+            container.Add(new Label("Promoted Parameters")
+            {
+                style =
+                {
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    color = new Color(0.82f, 0.82f, 0.82f),
+                    marginBottom = 4,
+                },
+            });
+
+            var nodeData = node.CollectData();
+            foreach (var parameter in parameters)
+            {
+                if (parameter == null)
+                    continue;
+                var resolved = PcgSubgraphInstanceParameterStorage.ResolveOverride(nodeData, parameter);
+                container.Add(CreateSubgraphOverrideRow(node, parameter, resolved));
+            }
+
+            if (external != null)
+                container.Add(CreateAssetVersionUpgradeRow(external, liveContentHash, schemaVersion));
+
+            m_Body.Add(container);
+        }
+
+        private VisualElement CreateSubgraphOverrideRow(
+            PcgGraphNodeBase node,
+            PcgGraphParameter parameter,
+            PcgParameterOverride resolved)
+        {
+            var row = new VisualElement
+            {
+                style =
+                {
+                    marginBottom = 6,
+                    paddingBottom = 4,
+                    borderBottomWidth = 1,
+                    borderBottomColor = new Color(0.28f, 0.28f, 0.28f),
+                },
+            };
+            row.Add(new Label(string.IsNullOrEmpty(parameter.name) ? parameter.id : parameter.name)
+            {
+                style =
+                {
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    fontSize = 11,
+                    color = new Color(0.78f, 0.78f, 0.78f),
+                },
+            });
+
+            void PersistOverride(object value)
+            {
+                m_GraphView.WithUndo("Change Subgraph Parameter", () =>
+                {
+                    var data = node.CollectData();
+                    PcgSubgraphInstanceParameterStorage.SetOverrideValue(data, parameter, value);
+                    node.ApplyData(data);
+                });
+                NotifyGraphChanged();
+            }
+
+            switch (parameter.type)
+            {
+                case "integer":
+                {
+                    var field = new IntegerField { value = resolved.intValue };
+                    field.RegisterValueChangedCallback(evt => PersistOverride(evt.newValue));
+                    row.Add(field);
+                    break;
+                }
+                case "number":
+                {
+                    var field = new FloatField { value = resolved.floatValue };
+                    field.RegisterValueChangedCallback(evt => PersistOverride(evt.newValue));
+                    row.Add(field);
+                    break;
+                }
+                case "boolean":
+                {
+                    var field = new Toggle { value = resolved.boolValue };
+                    field.RegisterValueChangedCallback(evt => PersistOverride(evt.newValue));
+                    row.Add(field);
+                    break;
+                }
+                default:
+                {
+                    var field = new TextField { value = resolved.stringValue ?? "" };
+                    field.RegisterValueChangedCallback(evt => PersistOverride(evt.newValue));
+                    row.Add(field);
+                    break;
+                }
+            }
+
+            return row;
+        }
+
+        private VisualElement CreateAssetVersionUpgradeRow(
+            PcgExternalSubgraphNodeView external,
+            string liveContentHash,
+            string schemaVersion)
+        {
+            var row = new VisualElement { style = { marginTop = 8 } };
+            if (external.HasAssetVersionMismatch(liveContentHash))
+            {
+                row.Add(new Label($"Asset changed (schema {schemaVersion}). Instance snapshot may be stale.")
+                {
+                    style =
+                    {
+                        color = new Color(0.9f, 0.65f, 0.35f),
+                        fontSize = 10,
+                        whiteSpace = WhiteSpace.Normal,
+                        marginBottom = 4,
+                    },
+                });
+            }
+
+            var buttonRow = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+            buttonRow.Add(new Button(() =>
+            {
+                m_GraphView.UpgradeExternalSubgraphInstance(external);
+                ShowNode(external);
+            })
+            {
+                text = "Upgrade Instance",
+                style = { flexGrow = 1, marginRight = 4 },
+            });
+            buttonRow.Add(new Button(() =>
+            {
+                m_GraphView.WithUndo("Pin Subgraph Asset Version", () =>
+                {
+                    external.PinCurrentAssetVersion(liveContentHash);
+                    var data = external.CollectData();
+                    external.ApplyData(data);
+                });
+                ShowNode(external);
+            })
+            {
+                text = "Pin Version",
+                style = { width = 90 },
+            });
+            row.Add(buttonRow);
+            return row;
         }
 
         private static void AddSubgraphPortSection(

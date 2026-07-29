@@ -53,7 +53,9 @@ namespace DJTechEditor.PCG.Graph
                 PcgSubgraphAssetNaming.ResolveDisplayName(ctx.assetPath, doc),
                 true,
                 "",
-                deps);
+                deps,
+                doc.version,
+                doc.contentHash);
             ctx.AddObjectToAsset("main", asset);
             ctx.SetMainObject(asset);
         }

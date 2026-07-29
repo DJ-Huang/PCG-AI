@@ -13,6 +13,13 @@ namespace DJTechEditor.PCG.Graph
         public string NodeId { get; private set; }
         public abstract string NodeType { get; }
 
+        /// <summary>Session-only nodes (e.g. subgraph interface anchors) opt out of document capture.</summary>
+        public virtual bool SavesToGraphDocument => true;
+
+        protected virtual bool SupportsHoverRadialMenu => true;
+
+        protected virtual bool SupportsRename => true;
+
         protected Port InputPort { get; set; }
         protected Port OutputPort { get; set; }
         private VisualElement m_RightTitleRoot;
@@ -64,7 +71,11 @@ namespace DJTechEditor.PCG.Graph
                     EnsureHoudiniPortContainers();
                 UpdateOverlayPlacement();
             });
-            RegisterCallback<MouseEnterEvent>(_ => ShowRadialMenu());
+            RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                if (SupportsHoverRadialMenu)
+                    ShowRadialMenu();
+            });
             RegisterCallback<MouseDownEvent>(evt =>
             {
                 if (evt.clickCount >= 2)
@@ -522,7 +533,7 @@ namespace DJTechEditor.PCG.Graph
 
         private void BeginRename()
         {
-            if (m_TitleEditor != null)
+            if (!SupportsRename || m_TitleEditor != null)
                 return;
 
             m_TitleEditor = new TextField { value = GetDisplayTitle() };

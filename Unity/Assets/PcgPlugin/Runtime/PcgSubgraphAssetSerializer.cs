@@ -6,7 +6,7 @@ using System.Text;
 namespace DJTechRuntime.PCG
 {
     /// <summary>
-    /// Serializes linked <c>.pcgsubgraph</c> assets (version 1.0, no parameters).
+    /// Serializes linked <c>.pcgsubgraph</c> assets (schema 1.0 / 2.0).
     /// </summary>
     public static class PcgSubgraphAssetSerializer
     {
@@ -15,16 +15,31 @@ namespace DJTechRuntime.PCG
             if (doc == null)
                 throw new ArgumentNullException(nameof(doc));
 
+            doc.version = doc.parameters != null && doc.parameters.Count > 0
+                ? PcgSubgraphAssetMigration.Version20
+                : doc.version ?? PcgSubgraphAssetMigration.Version10;
+            if (doc.version == PcgSubgraphAssetMigration.Version20)
+                doc.contentHash = PcgSubgraphAssetContentHash.Compute(doc);
+
             var indent = pretty ? "  " : "";
             var nl = pretty ? "\n" : "";
             var sb = new StringBuilder(512);
             sb.Append('{').Append(nl);
-            sb.Append(indent).Append("\"version\": ").Append(JsonString("1.0")).Append(',').Append(nl);
+            sb.Append(indent).Append("\"version\": ").Append(JsonString(doc.version ?? PcgSubgraphAssetMigration.Version10)).Append(',').Append(nl);
             sb.Append(indent).Append("\"name\": ").Append(JsonString(doc.name ?? "")).Append(',').Append(nl);
+            if (!string.IsNullOrEmpty(doc.contentHash))
+            {
+                sb.Append(indent).Append("\"contentHash\": ").Append(JsonString(doc.contentHash)).Append(',').Append(nl);
+            }
             AppendPorts(sb, "inputs", doc.inputs, pretty, indent);
             sb.Append(',').Append(nl);
             AppendPorts(sb, "outputs", doc.outputs, pretty, indent);
             sb.Append(',').Append(nl);
+            if (doc.version == PcgSubgraphAssetMigration.Version20)
+            {
+                PcgGraphSerializer.AppendParametersPublic(sb, doc.parameters, pretty, indent);
+                sb.Append(',').Append(nl);
+            }
             sb.Append(indent).Append("\"nodes\": [").Append(nl);
             for (var i = 0; i < doc.nodes.Count; i++)
             {
@@ -75,28 +90,29 @@ namespace DJTechRuntime.PCG
                     return false;
                 }
 
-                if (root.ContainsKey("parameters"))
-                {
-                    error = ".pcgsubgraph assets must not contain parameters.";
+                if (!PcgSubgraphAssetMigration.TryMigrateRoot(root, out error))
                     return false;
-                }
 
                 var version = root.TryGetValue("version", out var versionObj)
                     ? versionObj?.ToString()
-                    : null;
-                if (version != "1.0")
+                    : PcgSubgraphAssetMigration.Version10;
+                if (version != PcgSubgraphAssetMigration.Version10 &&
+                    version != PcgSubgraphAssetMigration.Version20)
                 {
-                    error = "Unsupported or missing subgraph asset version (expected 1.0).";
+                    error = $"Unsupported subgraph asset version '{version}'.";
                     return false;
                 }
 
                 doc = new PcgSubgraphAssetDocument
                 {
-                    version = "1.0",
+                    version = version,
                     name = GetString(root, "name"),
+                    contentHash = GetString(root, "contentHash"),
                 };
                 ParsePorts(root, "inputs", doc.inputs);
                 ParsePorts(root, "outputs", doc.outputs);
+                if (root.TryGetValue("parameters", out var paramsObj) && paramsObj is List<object> paramsList)
+                    PcgGraphSerializer.ParseParametersPublic(paramsList, doc.parameters);
                 if (!PcgGraphSerializer.TryParseNodesPublic(root, doc.nodes, allowInterface: true, out error))
                     return false;
                 PcgGraphSerializer.ParseEdgesPublic(root, doc.edges);
@@ -124,8 +140,14 @@ namespace DJTechRuntime.PCG
                 var port = ports[i];
                 sb.Append("{\"id\": ").Append(JsonString(port?.id ?? ""))
                     .Append(", \"name\": ").Append(JsonString(port?.name ?? ""))
-                    .Append(", \"pinType\": ").Append(JsonString(string.IsNullOrEmpty(port?.pinType) ? "Any" : port.pinType))
-                    .Append('}');
+                    .Append(", \"pinType\": ").Append(JsonString(string.IsNullOrEmpty(port?.pinType) ? "Any" : port.pinType));
+                if (port?.anchorPlaced == true)
+                {
+                    sb.Append(", \"anchorPlaced\": true")
+                        .Append(", \"anchorX\": ").Append(port.anchorX.ToString(CultureInfo.InvariantCulture))
+                        .Append(", \"anchorY\": ").Append(port.anchorY.ToString(CultureInfo.InvariantCulture));
+                }
+                sb.Append('}');
             }
             if (pretty && ports.Count > 0)
                 sb.Append(' ');
@@ -145,6 +167,9 @@ namespace DJTechRuntime.PCG
                     id = GetString(port, "id"),
                     name = GetString(port, "name"),
                     pinType = GetString(port, "pinType", "Any"),
+                    anchorPlaced = GetBool(port, "anchorPlaced", false),
+                    anchorX = GetFloat(port, "anchorX", 0f),
+                    anchorY = GetFloat(port, "anchorY", 0f),
                 });
             }
         }
@@ -152,6 +177,29 @@ namespace DJTechRuntime.PCG
         private static string GetString(Dictionary<string, object> dict, string key, string fallback = "")
         {
             return dict.TryGetValue(key, out var value) ? value?.ToString() ?? fallback : fallback;
+        }
+
+        private static bool GetBool(Dictionary<string, object> dict, string key, bool fallback)
+        {
+            if (!dict.TryGetValue(key, out var value) || value == null)
+                return fallback;
+            return value is bool boolean
+                ? boolean
+                : bool.TryParse(value.ToString(), out var parsed) ? parsed : fallback;
+        }
+
+        private static float GetFloat(Dictionary<string, object> dict, string key, float fallback)
+        {
+            if (!dict.TryGetValue(key, out var value) || value == null)
+                return fallback;
+            try
+            {
+                return Convert.ToSingle(value, CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                return fallback;
+            }
         }
 
         private static string JsonString(string value)
