@@ -260,21 +260,21 @@
       "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// if doesn't have fire escape, random chance of having balcony (less likely for 2 floor)\nif(@hasFireEscape == 0) {\n  if(@numFloors == 2 && rand(buildingIter*17) < 0.5) {\n    @hasBalcony = 1;\n  } else if(@numFloors > 2 && rand(buildingIter*17) < 0.8) {\n    @hasBalcony = 1;\n  }\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_balcony"}
     },
     {
+      "id": "n142",
+      "type": "ForEachEnd",
+      "position": { "x": 1854, "y": 2664 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
+    },
+    {
       "id": "n140",
       "type": "SubgraphAsset",
       "position": { "x": 1854, "y": 2572.5 },
       "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": ""},
       "subgraphInterface": {
-        "name": "NewSubgraph",
+        "name": "Windows_floor",
         "inputs": [ {"id": "in_1", "name": "Input", "pinType": "Any"}, {"id": "82e81979a5534d7091978111c98d17dc", "name": "in_2", "pinType": "Any"} ],
         "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"}, {"id": "8ce0f49fc8b145f6a59e82ad64c4566b", "name": "out_2", "pinType": "Any"}, {"id": "628e86d1e1fc4516a47d6b8e97a45a35", "name": "out_3", "pinType": "Any"} ]
       }
-    },
-    {
-      "id": "n142",
-      "type": "ForEachEnd",
-      "position": { "x": 1854, "y": 2671 },
-      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
     }
   ],
   "edges": [

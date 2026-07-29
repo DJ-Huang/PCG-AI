@@ -429,7 +429,24 @@ namespace DJTechEditor.PCG.Graph
             }
 
             AppendPromoteSubgraphInputMenu(evt);
+            AppendPromoteInlineSubgraphToAssetMenu(evt);
             AppendParentReferenceMenu(evt);
+        }
+
+        private void AppendPromoteInlineSubgraphToAssetMenu(ContextualMenuPopulateEvent evt)
+        {
+            var inlineInstances = selection.OfType<PcgSubgraphNodeView>()
+                .Where(node => node.NodeType == PcgStructuralNodeTypes.Subgraph &&
+                               node.Kind == PcgSubgraphNodeKind.Instance)
+                .ToList();
+            if (inlineInstances.Count != 1 ||
+                selection.OfType<PcgGraphNodeBase>().Count() != 1)
+                return;
+
+            evt.menu.AppendSeparator();
+            evt.menu.AppendAction(
+                "Promote Subgraph to Asset",
+                _ => PromoteInlineSubgraphToAsset(inlineInstances[0]));
         }
 
         private void AppendPromoteSubgraphInputMenu(ContextualMenuPopulateEvent evt)
@@ -2287,7 +2304,7 @@ namespace DJTechEditor.PCG.Graph
             RecordUndo("Add Subgraph Asset");
             var snapshot = new PcgSubgraphInterfaceSnapshot
             {
-                name = assetDoc.name ?? asset.AssetName,
+                name = PcgSubgraphAssetNaming.ResolveDisplayName(asset, assetDoc),
                 inputs = assetDoc.inputs.Select(port => new PcgSubgraphPort
                 {
                     id = port.id, name = port.name, pinType = port.pinType,
@@ -2431,16 +2448,7 @@ namespace DJTechEditor.PCG.Graph
                 });
             }
 
-            if (m_RootDocument?.subgraphs != null)
-            {
-                var needed = new HashSet<string>(StringComparer.Ordinal);
-                CollectReferencedSubgraphIds(assetDoc.nodes, needed);
-                foreach (var definition in m_RootDocument.subgraphs)
-                {
-                    if (definition != null && needed.Contains(definition.id))
-                        assetDoc.subgraphs.Add(definition.Clone());
-                }
-            }
+            PopulateNestedSubgraphDefinitions(assetDoc);
 
             var json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
             try
@@ -2544,6 +2552,190 @@ namespace DJTechEditor.PCG.Graph
             NotifyDocumentChanged();
         }
 
+        private void PromoteInlineSubgraphToAsset(PcgSubgraphNodeView instance)
+        {
+            if (instance == null || instance.NodeType != PcgStructuralNodeTypes.Subgraph)
+                return;
+
+            var definitionId = instance.SubgraphDefinitionId;
+            var definition = FindSubgraph(definitionId);
+            if (definition == null)
+            {
+                EditorUtility.DisplayDialog(
+                    "Promote Subgraph to Asset",
+                    "Subgraph definition was not found in this graph.",
+                    "OK");
+                return;
+            }
+
+            if (CountInlineSubgraphInstanceReferences(definitionId) > 1)
+            {
+                EditorUtility.DisplayDialog(
+                    "Promote Subgraph to Asset",
+                    "This subgraph definition is referenced by more than one instance. " +
+                    "Remove duplicate instances or give each a unique inline subgraph before promoting.",
+                    "OK");
+                return;
+            }
+
+            var internalNodeIds = new HashSet<string>(
+                definition.nodes.Where(node => node != null).Select(node => node.id));
+            IEnumerable<PcgGraphParameter> parameterSource = IsInsideSubgraph
+                ? m_RootDocument?.parameters
+                : m_Blackboard?.Parameters;
+            var affectedBindings = PcgGraphParameterUtility.FindBindingsTargetingNodes(
+                parameterSource, internalNodeIds);
+            if (affectedBindings.Count > 0)
+            {
+                var names = string.Join(", ", affectedBindings.Select(parameter =>
+                    string.IsNullOrEmpty(parameter.name) ? parameter.id : parameter.name));
+                EditorUtility.DisplayDialog(
+                    "Promote Subgraph to Asset",
+                    $"Nodes inside this subgraph are bound to graph parameter(s): {names}. " +
+                    "Clear or move those bindings before promoting.",
+                    "OK");
+                return;
+            }
+
+            var defaultName = string.IsNullOrEmpty(definition.name) ? "NewSubgraph" : definition.name;
+            var savePath = EditorUtility.SaveFilePanelInProject(
+                "Promote Subgraph to Asset",
+                defaultName,
+                "pcgsubgraph",
+                "Choose a location inside Assets/ for the linked Subgraph asset.");
+            if (string.IsNullOrEmpty(savePath))
+                return;
+
+            var assetDoc = PcgSubgraphAssetDocument.FromDefinition(definition);
+            assetDoc.name = Path.GetFileNameWithoutExtension(savePath);
+            PopulateNestedSubgraphDefinitions(assetDoc);
+
+            var json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+            try
+            {
+                File.WriteAllText(savePath, json);
+            }
+            catch (Exception ex)
+            {
+                EditorUtility.DisplayDialog("Promote Subgraph to Asset", ex.Message, "OK");
+                return;
+            }
+
+            AssetDatabase.ImportAsset(savePath);
+            var imported = AssetDatabase.LoadAssetAtPath<PcgSubgraphAsset>(savePath);
+            if (imported == null || !imported.ImportSucceeded)
+            {
+                EditorUtility.DisplayDialog(
+                    "Promote Subgraph to Asset",
+                    imported?.ImportError ?? "Import failed.",
+                    "OK");
+                return;
+            }
+
+            var assetGuid = PcgAssetGuidUtility.Canonicalize(AssetDatabase.AssetPathToGUID(savePath));
+            var snapshot = new PcgSubgraphInterfaceSnapshot
+            {
+                name = assetDoc.name,
+                inputs = assetDoc.inputs.Select(port => new PcgSubgraphPort
+                {
+                    id = port.id, name = port.name, pinType = port.pinType,
+                }).ToList(),
+                outputs = assetDoc.outputs.Select(port => new PcgSubgraphPort
+                {
+                    id = port.id, name = port.name, pinType = port.pinType,
+                }).ToList(),
+            };
+
+            RecordUndo("Promote Subgraph to Asset");
+            SaveVisibleScope();
+
+            var scope = CaptureVisibleDocument();
+            var instanceRecord = scope.nodes.FirstOrDefault(node => node.id == instance.NodeId);
+            if (instanceRecord == null)
+                return;
+
+            var userTitle = instanceRecord.data?.GetRaw("__nodeTitle")?.ToString();
+            instanceRecord.type = PcgStructuralNodeTypes.SubgraphAsset;
+            instanceRecord.data = new PcgNodeData();
+            instanceRecord.data.SetRaw("assetGuid", assetGuid);
+            if (!string.IsNullOrEmpty(userTitle))
+                instanceRecord.data.SetRaw("__nodeTitle", userTitle);
+            instanceRecord.subgraphInterface = snapshot;
+
+            m_RootDocument.subgraphs?.RemoveAll(subgraph =>
+                subgraph != null && string.Equals(subgraph.id, definitionId, StringComparison.Ordinal));
+            m_RootDocument.version = "3.0";
+
+            if (IsInsideSubgraph)
+            {
+                var parent = FindSubgraph(m_CurrentSubgraphId);
+                parent.nodes = scope.nodes;
+                parent.edges = scope.edges;
+                LoadScope(parent.nodes, parent.edges, new List<PcgGraphParameter>(), parent, clearUndo: false);
+            }
+            else
+            {
+                m_RootDocument.nodes = scope.nodes;
+                m_RootDocument.edges = scope.edges;
+                LoadScope(scope.nodes, scope.edges, m_RootDocument.parameters, null, clearUndo: false);
+            }
+
+            CommitState();
+            NotifyDocumentChanged();
+        }
+
+        private void PopulateNestedSubgraphDefinitions(PcgSubgraphAssetDocument assetDoc)
+        {
+            if (assetDoc == null || m_RootDocument?.subgraphs == null)
+                return;
+
+            var needed = new HashSet<string>(StringComparer.Ordinal);
+            CollectReferencedSubgraphIds(assetDoc.nodes, needed);
+            foreach (var nested in m_RootDocument.subgraphs)
+            {
+                if (nested != null && needed.Contains(nested.id))
+                    assetDoc.subgraphs.Add(nested.Clone());
+            }
+        }
+
+        private int CountInlineSubgraphInstanceReferences(string definitionId)
+        {
+            if (string.IsNullOrEmpty(definitionId))
+                return 0;
+
+            var count = 0;
+            foreach (var node in EnumerateAllGraphNodeRecords())
+            {
+                if (node?.type != PcgStructuralNodeTypes.Subgraph)
+                    continue;
+                var id = node.data?.GetRaw("subgraphId")?.ToString();
+                if (string.Equals(id, definitionId, StringComparison.Ordinal))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private IEnumerable<PcgGraphNodeRecord> EnumerateAllGraphNodeRecords()
+        {
+            if (m_RootDocument?.nodes != null)
+            {
+                foreach (var node in m_RootDocument.nodes)
+                    yield return node;
+            }
+
+            if (m_RootDocument?.subgraphs == null)
+                yield break;
+
+            foreach (var definition in m_RootDocument.subgraphs)
+            {
+                if (definition?.nodes == null)
+                    continue;
+                foreach (var node in definition.nodes)
+                    yield return node;
+            }
+        }
+
         private void CollectReferencedSubgraphIds(List<PcgGraphNodeRecord> nodes, HashSet<string> output)
         {
             if (nodes == null)
@@ -2583,7 +2775,7 @@ namespace DJTechEditor.PCG.Graph
 
                 var sourceSnapshot = new PcgSubgraphInterfaceSnapshot
                 {
-                    name = assetDoc.name,
+                    name = PcgSubgraphAssetNaming.ResolveDisplayName(asset, assetDoc),
                     inputs = assetDoc.inputs,
                     outputs = assetDoc.outputs,
                 };

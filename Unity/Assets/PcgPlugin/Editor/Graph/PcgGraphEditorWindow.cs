@@ -676,7 +676,7 @@ namespace DJTechEditor.PCG.Graph
             SetStatus($"Imported: {path}");
             RefreshScatterDisplayField();
             if (m_Blackboard != null)
-                m_Blackboard.style.display = m_SubgraphAssetMode ? DisplayStyle.None : DisplayStyle.Flex;
+                m_Blackboard.style.display = DisplayStyle.None;
             RefreshInterfacePanel();
             return true;
         }
@@ -698,6 +698,7 @@ namespace DJTechEditor.PCG.Graph
                     Debug.LogError($"[PCG] Subgraph asset save failed: {exportError}");
                     return;
                 }
+                assetDoc.name = PcgSubgraphAssetNaming.ResolveDisplayName(m_CurrentFilePath, assetDoc);
                 json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
             }
             else
@@ -721,7 +722,8 @@ namespace DJTechEditor.PCG.Graph
 
         private void SaveAsGraph()
         {
-            string json;
+            PcgSubgraphAssetDocument subgraphAssetDoc = null;
+            string json = null;
             string defaultName;
             string extension;
             string panelTitle;
@@ -734,7 +736,7 @@ namespace DJTechEditor.PCG.Graph
                     Debug.LogError($"[PCG] Subgraph asset Save As failed: {exportError}");
                     return;
                 }
-                json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+                subgraphAssetDoc = assetDoc;
                 defaultName = "subgraph.pcgsubgraph";
                 extension = SubgraphExtension;
                 panelTitle = "Save Subgraph Asset As";
@@ -763,6 +765,12 @@ namespace DJTechEditor.PCG.Graph
 
             if (string.IsNullOrEmpty(path))
                 return;
+
+            if (subgraphAssetDoc != null)
+            {
+                subgraphAssetDoc.name = PcgSubgraphAssetNaming.ResolveDisplayName(path, subgraphAssetDoc);
+                json = PcgSubgraphAssetSerializer.ToJson(subgraphAssetDoc);
+            }
 
             _lastSelfSaveUtc = DateTime.UtcNow;
             File.WriteAllText(path, json);

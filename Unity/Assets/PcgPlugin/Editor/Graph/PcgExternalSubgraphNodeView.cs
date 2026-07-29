@@ -126,6 +126,20 @@ namespace DJTechEditor.PCG.Graph
             if (string.IsNullOrEmpty(guid))
                 return;
             evt.menu.AppendAction(
+                "Show Subgraph Asset in Project",
+                _ =>
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrEmpty(path))
+                        return;
+                    var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                    if (asset == null)
+                        return;
+                    EditorGUIUtility.PingObject(asset);
+                    Selection.activeObject = asset;
+                },
+                DropdownMenuAction.AlwaysEnabled);
+            evt.menu.AppendAction(
                 "Open Subgraph Asset in New Window",
                 _ => OpenSourceInNewWindowRequested?.Invoke(guid),
                 DropdownMenuAction.AlwaysEnabled);
@@ -245,8 +259,20 @@ namespace DJTechEditor.PCG.Graph
         private void RefreshDisplayedTitle()
         {
             var custom = m_Data?.GetRaw("__nodeTitle")?.ToString()?.Trim() ?? "";
-            var assetName = string.IsNullOrEmpty(m_Snapshot?.name) ? "Subgraph Asset" : m_Snapshot.name;
+            var assetName = ResolveLinkedAssetDisplayName();
+            if (m_Snapshot != null && !string.IsNullOrEmpty(assetName))
+                m_Snapshot.name = assetName;
             SetUserTitle(string.IsNullOrEmpty(custom) ? assetName : custom);
+        }
+
+        private string ResolveLinkedAssetDisplayName()
+        {
+            var guid = AssetGuid;
+            if (string.IsNullOrEmpty(guid))
+                return string.IsNullOrEmpty(m_Snapshot?.name) ? "Subgraph Asset" : m_Snapshot.name;
+
+            var path = AssetDatabase.GUIDToAssetPath(guid);
+            return PcgSubgraphAssetNaming.ResolveDisplayName(path, m_Snapshot?.name);
         }
 
         private static void MarkGhost(Port port)
