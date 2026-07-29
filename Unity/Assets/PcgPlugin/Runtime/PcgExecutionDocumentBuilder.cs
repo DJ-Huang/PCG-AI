@@ -32,6 +32,7 @@ namespace DJTechRuntime.PCG
             {
                 if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error))
                     return false;
+                PruneToExecutionSink(flat);
                 resolveResult = new PcgExternalResolveResult
                 {
                     Document = working,
@@ -57,6 +58,7 @@ namespace DJTechRuntime.PCG
             if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error))
                 return false;
 
+            PruneToExecutionSink(flat);
             return true;
         }
 
@@ -189,6 +191,65 @@ namespace DJTechRuntime.PCG
                 if (PcgAssetGuidUtility.IsValid(guid))
                     yield return guid;
             }
+        }
+
+        /// <summary>
+        /// Keeps only the nodes that contribute to the sink selected by pcg-core.
+        /// Disconnected authoring branches are valid work-in-progress and must not
+        /// make the active output fail validation or execution.
+        /// </summary>
+        private static void PruneToExecutionSink(PcgGraphDocument document)
+        {
+            if (document?.nodes == null || document.nodes.Count == 0)
+                return;
+
+            var edges = document.edges ?? new List<PcgGraphEdgeRecord>();
+            var nodesWithOutgoing = new HashSet<string>(
+                edges
+                    .Where(edge => edge != null && !string.IsNullOrEmpty(edge.source))
+                    .Select(edge => edge.source),
+                StringComparer.Ordinal);
+            var sink = document.nodes.FirstOrDefault(node =>
+                           node != null &&
+                           node.type == "Output" &&
+                           !nodesWithOutgoing.Contains(node.id))
+                       ?? document.nodes.FirstOrDefault(node =>
+                           node != null &&
+                           !nodesWithOutgoing.Contains(node.id));
+            if (sink == null || string.IsNullOrEmpty(sink.id))
+                return;
+
+            var incomingByTarget = edges
+                .Where(edge =>
+                    edge != null &&
+                    !string.IsNullOrEmpty(edge.source) &&
+                    !string.IsNullOrEmpty(edge.target))
+                .GroupBy(edge => edge.target, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+            var required = new HashSet<string>(StringComparer.Ordinal) { sink.id };
+            var pending = new Stack<string>();
+            pending.Push(sink.id);
+            while (pending.Count > 0)
+            {
+                var target = pending.Pop();
+                if (!incomingByTarget.TryGetValue(target, out var incoming))
+                    continue;
+                foreach (var edge in incoming)
+                {
+                    if (required.Add(edge.source))
+                        pending.Push(edge.source);
+                }
+            }
+
+            document.nodes = document.nodes
+                .Where(node => node != null && required.Contains(node.id))
+                .ToList();
+            document.edges = edges
+                .Where(edge =>
+                    edge != null &&
+                    required.Contains(edge.source) &&
+                    required.Contains(edge.target))
+                .ToList();
         }
     }
 }

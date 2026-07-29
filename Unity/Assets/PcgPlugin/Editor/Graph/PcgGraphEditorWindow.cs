@@ -83,6 +83,29 @@ namespace DJTechEditor.PCG.Graph
 
         public PcgGraphDocument ExportLiveDocument() => m_GraphView?.ExportDocument();
 
+        internal PcgExternalSubgraphLoader CreateExternalSubgraphLoader()
+        {
+            var diskLoader = PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader();
+            return (string assetGuid, out string sourceJson, out string loadError) =>
+            {
+                sourceJson = null;
+                loadError = null;
+                if (m_GraphView != null &&
+                    m_GraphView.TryGetLiveExternalSubgraphSourceJson(
+                        assetGuid,
+                        out sourceJson,
+                        out loadError))
+                {
+                    return true;
+                }
+
+                if (!string.IsNullOrEmpty(loadError))
+                    return false;
+
+                return diskLoader(assetGuid, out sourceJson, out loadError);
+            };
+        }
+
         public bool MatchesGraphAsset(string assetDatabasePath, string assetGuid)
         {
             if (!string.IsNullOrEmpty(assetGuid) && selectedGuid == assetGuid)
@@ -153,27 +176,9 @@ namespace DJTechEditor.PCG.Graph
             if (string.IsNullOrEmpty(m_PreviewNodeId) || m_GraphView == null)
                 return;
 
-            // Preview is scoped to the navigation level where it was set.
-            if (!string.Equals(
-                    m_PreviewScopeSubgraphId ?? "",
-                    m_GraphView.CurrentSubgraphId ?? "",
-                    System.StringComparison.Ordinal))
-            {
-                ClearNodePreview(silent: true);
-                return;
-            }
-
-            var exists = false;
-            foreach (var node in m_GraphView.nodes)
-            {
-                if (node is PcgGraphNodeBase graphNode && graphNode.NodeId == m_PreviewNodeId)
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (!exists)
+            // Navigation only changes which scope is visible. Keep previewing the
+            // original scoped node while drilling into or out of a Subgraph.
+            if (!m_GraphView.ContainsNodeInScope(m_PreviewNodeId, m_PreviewScopeSubgraphId))
                 ClearNodePreview(silent: true);
         }
 

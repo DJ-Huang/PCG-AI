@@ -136,6 +136,81 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
+        public void InlineSubgraphInstance_ExposesDeclaredPinTypesForInspector()
+        {
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "typed",
+                name = "Typed",
+                inputs =
+                {
+                    new PcgSubgraphPort { id = "mesh", name = "Mesh", pinType = "SpatialMesh" },
+                    new PcgSubgraphPort { id = "points", name = "Points", pinType = "SpatialPoint" },
+                },
+                outputs =
+                {
+                    new PcgSubgraphPort { id = "result", name = "Result", pinType = "SpatialGeometry" },
+                },
+            };
+            var instance = new PcgSubgraphNodeView(definition, PcgSubgraphNodeKind.Instance);
+
+            var snapshot = instance.InterfaceSnapshot;
+
+            Assert.That(snapshot.inputs.ConvertAll(port => port.pinType),
+                Is.EqualTo(new[] { "SpatialMesh", "SpatialPoint" }));
+            Assert.That(snapshot.outputs.ConvertAll(port => port.pinType),
+                Is.EqualTo(new[] { "SpatialGeometry" }));
+        }
+
+        [Test]
+        public void ExecutionBuilder_IgnoresDanglingUnmatchedForEachBranch()
+        {
+            var document = new PcgGraphDocument
+            {
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "box", type = "CreateBoxMesh" },
+                    new PcgGraphNodeRecord { id = "output", type = "Output" },
+                    new PcgGraphNodeRecord { id = "dangling_begin", type = "ForEachBegin" },
+                    new PcgGraphNodeRecord { id = "dangling_body", type = "TransformMesh" },
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "active",
+                        source = "box",
+                        target = "output",
+                        sourceHandle = "out",
+                        targetHandle = "in",
+                    },
+                    new PcgGraphEdgeRecord
+                    {
+                        id = "wip",
+                        source = "dangling_begin",
+                        target = "dangling_body",
+                        sourceHandle = "out",
+                        targetHandle = "in",
+                    },
+                },
+            };
+
+            Assert.That(
+                PcgExecutionDocumentBuilder.TryBuild(
+                    document,
+                    null,
+                    out var flat,
+                    out _,
+                    out var error),
+                Is.True,
+                error);
+            Assert.That(flat.nodes.ConvertAll(node => node.id),
+                Is.EqualTo(new[] { "box", "output" }));
+            Assert.That(flat.edges.ConvertAll(edge => edge.id),
+                Is.EqualTo(new[] { "active" }));
+        }
+
+        [Test]
         public void SubgraphAsset_LegacyEmptyInterface_IsRepairedOnParse()
         {
             const string legacyJson = @"{

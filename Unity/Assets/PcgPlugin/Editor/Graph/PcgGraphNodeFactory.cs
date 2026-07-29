@@ -118,6 +118,11 @@ namespace DJTechEditor.PCG.Graph
 
         public string SubgraphDefinitionId => m_Definition.id;
 
+        public PcgSubgraphNodeKind Kind => m_Kind;
+
+        public PcgSubgraphInterfaceSnapshot InterfaceSnapshot =>
+            PcgSubgraphInterfaceSnapshot.FromDefinition(m_Definition);
+
         public string GetInputPinType(string handle) =>
             PortType(m_Kind == PcgSubgraphNodeKind.Output ? m_Definition.outputs : m_Definition.inputs, handle);
 

@@ -264,6 +264,12 @@ namespace DJTechEditor.PCG.Graph
                         m_Body.Add(CreateFbxExportActions(manifestNode));
                 }
 
+                if (node is PcgExternalSubgraphNodeView externalSubgraph)
+                    ShowSubgraphInterface(externalSubgraph.Snapshot);
+                else if (node is PcgSubgraphNodeView inlineSubgraph &&
+                         inlineSubgraph.Kind == PcgSubgraphNodeKind.Instance)
+                    ShowSubgraphInterface(inlineSubgraph.InterfaceSnapshot);
+
                 if (node is PcgSubgraphParentRefNodeView parentRef)
                     ShowParentRefProperties(parentRef);
             }
@@ -274,6 +280,106 @@ namespace DJTechEditor.PCG.Graph
         }
 
         // ─── Manifest nodes ──────────────────────────────────────────
+
+        private void ShowSubgraphInterface(PcgSubgraphInterfaceSnapshot snapshot)
+        {
+            snapshot ??= new PcgSubgraphInterfaceSnapshot();
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 4,
+                    paddingTop = 6,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.3f, 0.3f, 0.3f),
+                },
+            };
+            container.Add(new Label("Interface Pins")
+            {
+                style =
+                {
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    color = new Color(0.82f, 0.82f, 0.82f),
+                    marginBottom = 4,
+                },
+            });
+            AddSubgraphPortSection(container, "Inputs", snapshot.inputs);
+            AddSubgraphPortSection(container, "Outputs", snapshot.outputs);
+            m_Body.Add(container);
+        }
+
+        private static void AddSubgraphPortSection(
+            VisualElement container,
+            string title,
+            IReadOnlyList<PcgSubgraphPort> ports)
+        {
+            ports ??= Array.Empty<PcgSubgraphPort>();
+            container.Add(new Label($"{title} ({ports.Count})")
+            {
+                style =
+                {
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                    color = new Color(0.62f, 0.72f, 0.82f),
+                    fontSize = 10,
+                    marginTop = 3,
+                    marginBottom = 2,
+                },
+            });
+
+            if (ports.Count == 0)
+            {
+                container.Add(new Label("(none)")
+                {
+                    style =
+                    {
+                        color = new Color(0.48f, 0.48f, 0.48f),
+                        fontSize = 10,
+                        marginLeft = 8,
+                    },
+                });
+                return;
+            }
+
+            foreach (var port in ports)
+            {
+                if (port == null)
+                    continue;
+                var row = new VisualElement
+                {
+                    tooltip = $"Stable id: {port.id}",
+                    style =
+                    {
+                        flexDirection = FlexDirection.Row,
+                        alignItems = Align.Center,
+                        minHeight = 20,
+                        marginLeft = 8,
+                        marginBottom = 1,
+                    },
+                };
+                row.Add(new Label(string.IsNullOrEmpty(port.name) ? port.id : port.name)
+                {
+                    style =
+                    {
+                        flexGrow = 1,
+                        color = new Color(0.8f, 0.8f, 0.8f),
+                        overflow = Overflow.Hidden,
+                        unityTextAlign = TextAnchor.MiddleLeft,
+                    },
+                });
+                row.Add(new Label(string.IsNullOrEmpty(port.pinType) ? "Any" : port.pinType)
+                {
+                    style =
+                    {
+                        minWidth = 105,
+                        color = new Color(0.55f, 0.82f, 1f),
+                        unityTextAlign = TextAnchor.MiddleRight,
+                        unityFontStyleAndWeight = FontStyle.Bold,
+                        fontSize = 10,
+                    },
+                });
+                container.Add(row);
+            }
+        }
 
         private void ShowParentRefProperties(PcgSubgraphParentRefNodeView node)
         {

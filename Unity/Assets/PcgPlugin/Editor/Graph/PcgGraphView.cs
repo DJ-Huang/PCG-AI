@@ -859,6 +859,27 @@ namespace DJTechEditor.PCG.Graph
 
         public PcgSubgraphDefinition FindSubgraphDefinition(string subgraphId) => FindSubgraph(subgraphId);
 
+        internal bool ContainsNodeInScope(string nodeId, string scopeSubgraphId)
+        {
+            if (string.IsNullOrEmpty(nodeId))
+                return false;
+
+            if (string.Equals(
+                    m_CurrentSubgraphId ?? "",
+                    scopeSubgraphId ?? "",
+                    StringComparison.Ordinal))
+            {
+                return nodes
+                    .OfType<PcgGraphNodeBase>()
+                    .Any(node => node.NodeId == nodeId);
+            }
+
+            var scopeNodes = string.IsNullOrEmpty(scopeSubgraphId)
+                ? m_RootDocument?.nodes
+                : FindSubgraph(scopeSubgraphId)?.nodes;
+            return scopeNodes?.Any(node => node != null && node.id == nodeId) == true;
+        }
+
         internal void RefreshSubgraphInstanceTitles(string subgraphId)
         {
             if (string.IsNullOrEmpty(subgraphId))
@@ -2152,6 +2173,36 @@ namespace DJTechEditor.PCG.Graph
                 m_DirtyExternalNavDefIds.Remove(definitionId);
             }
 
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the in-memory source for a linked SubgraphAsset opened through this graph.
+        /// This keeps preview cooks consistent with unsaved interface edits.
+        /// </summary>
+        internal bool TryGetLiveExternalSubgraphSourceJson(
+            string assetGuid,
+            out string sourceJson,
+            out string error)
+        {
+            sourceJson = null;
+            error = null;
+            var canonical = PcgAssetGuidUtility.Canonicalize(assetGuid);
+            var rootDefinitionId = m_ExternalNavRootGuidByDefId
+                .FirstOrDefault(pair =>
+                    string.Equals(
+                        PcgAssetGuidUtility.Canonicalize(pair.Value),
+                        canonical,
+                        StringComparison.Ordinal))
+                .Key;
+            if (string.IsNullOrEmpty(rootDefinitionId))
+                return false;
+
+            SaveVisibleScope();
+            if (!TryBuildAssetDocumentFromExternalNav(rootDefinitionId, out var assetDoc, out error))
+                return false;
+
+            sourceJson = PcgSubgraphAssetSerializer.ToJson(assetDoc, pretty: false);
             return true;
         }
 

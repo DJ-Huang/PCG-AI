@@ -99,7 +99,7 @@ namespace DJTechEditor.PCG
 
                 if (!PcgExecutionDocumentBuilder.TryBuildJson(
                         cookDoc,
-                        PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader(),
+                        window.CreateExternalSubgraphLoader(),
                         out var flatJson,
                         out _,
                         out var buildError,

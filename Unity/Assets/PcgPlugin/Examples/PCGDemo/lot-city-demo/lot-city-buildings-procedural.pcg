@@ -206,12 +206,6 @@
       "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// find how many street facing edges\nint numStreetFacing = nedgesgroup(0, \"streetFacingEdges\");\n// if > 2, then has an available side for being a fire escape\n// also check if more than 2 floors, looks goofy on short buildings lol\nif(numStreetFacing >= 2 && @numFloors > 2 && rand(buildingIter*20) < 0.5)\n{\n  @hasFireEscape = 1;\n}\n// if too narrow for fire escape, then override\nfloat lengthSide = length(getbbox_size(1));\nif(lengthSide < 1.25) {\n  @hasFireEscape = 0;\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_fire_escape"}
     },
     {
-      "id": "n129",
-      "type": "AttributeWrangle",
-      "position": { "x": 1438, "y": 2255.5 },
-      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// if doesn't have fire escape, random chance of having balcony (less likely for 2 floor)\nif(@hasFireEscape == 0) {\n  if(@numFloors == 2 && rand(buildingIter*17) < 0.5) {\n    @hasBalcony = 1;\n  } else if(@numFloors > 2 && rand(buildingIter*17) < 0.8) {\n    @hasBalcony = 1;\n  }\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_balcony"}
-    },
-    {
       "id": "n132",
       "type": "AttributeWrangle",
       "position": { "x": 1567, "y": 2515 },
@@ -248,27 +242,39 @@
       "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
-      "id": "n137",
-      "type": "ForEachBegin",
-      "position": { "x": 1854, "y": 2437.5 },
-      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
-    },
-    {
       "id": "n138",
       "type": "GroupDelete",
       "position": { "x": 1854, "y": 2503.5 },
       "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
     },
     {
+      "id": "n137",
+      "type": "ForEachBegin",
+      "position": { "x": 1854, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n129",
+      "type": "AttributeWrangle",
+      "position": { "x": 1438, "y": 2255.5 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// if doesn't have fire escape, random chance of having balcony (less likely for 2 floor)\nif(@hasFireEscape == 0) {\n  if(@numFloors == 2 && rand(buildingIter*17) < 0.5) {\n    @hasBalcony = 1;\n  } else if(@numFloors > 2 && rand(buildingIter*17) < 0.8) {\n    @hasBalcony = 1;\n  }\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_balcony"}
+    },
+    {
       "id": "n140",
       "type": "SubgraphAsset",
-      "position": { "x": 1854, "y": 2574.5 },
+      "position": { "x": 1854, "y": 2572.5 },
       "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": ""},
       "subgraphInterface": {
         "name": "NewSubgraph",
         "inputs": [ {"id": "in_1", "name": "Input", "pinType": "Any"}, {"id": "82e81979a5534d7091978111c98d17dc", "name": "in_2", "pinType": "Any"} ],
-        "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"}, {"id": "8ce0f49fc8b145f6a59e82ad64c4566b", "name": "out_2", "pinType": "Any"} ]
+        "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"}, {"id": "8ce0f49fc8b145f6a59e82ad64c4566b", "name": "out_2", "pinType": "Any"}, {"id": "628e86d1e1fc4516a47d6b8e97a45a35", "name": "out_3", "pinType": "Any"} ]
       }
+    },
+    {
+      "id": "n142",
+      "type": "ForEachEnd",
+      "position": { "x": 1854, "y": 2671 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
     }
   ],
   "edges": [
@@ -318,7 +324,8 @@
     {"id": "e987101", "source": "n134", "target": "n135", "sourceHandle": "out", "targetHandle": "source"},
     {"id": "e1003038", "source": "n129", "target": "n137", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e1003565", "source": "n138", "target": "n140", "sourceHandle": "out", "targetHandle": "in_1"}
+    {"id": "e1003565", "source": "n138", "target": "n140", "sourceHandle": "out", "targetHandle": "in_1"},
+    {"id": "e1005308", "source": "n140", "target": "n142", "sourceHandle": "out_1", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
