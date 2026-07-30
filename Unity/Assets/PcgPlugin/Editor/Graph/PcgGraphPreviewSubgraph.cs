@@ -89,6 +89,7 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
+            EnsurePreviewSink(cookDoc);
             StripInterfaceNodes(cookDoc);
             return true;
         }
@@ -121,10 +122,9 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
-            if (targetNode.type == "SubgraphInput")
+            if (targetNode.type == PcgStructuralNodeTypes.SubgraphInput)
             {
-                error = "SubgraphInput has no geometry to preview.";
-                return false;
+                return TryBuildSubgraphInputPlaceholder(source, targetNode, out subgraph, out error);
             }
 
             if (targetNode.type == PcgStructuralNodeTypes.SubgraphParentRef)
@@ -133,13 +133,15 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
-            // Previewing SubgraphOutput → show whatever feeds into that interface port.
-            if (targetNode.type == "SubgraphOutput")
+            // Previewing the subgraph interface Output (or legacy SubgraphOutput) cooks
+            // whatever feeds the port, not the boundary node itself.
+            if (targetNode.type == PcgStructuralNodeTypes.SubgraphOutput ||
+                targetNode.type == "Output")
             {
                 var incoming = source.edges.FirstOrDefault(e => e.target == targetNodeId);
                 if (incoming == null)
                 {
-                    error = $"SubgraphOutput '{targetNodeId}' has no connected source.";
+                    error = $"Output node '{targetNodeId}' has no connected source.";
                     return false;
                 }
 
@@ -199,27 +201,136 @@ namespace DJTechEditor.PCG.Graph
             // Keep definitions so Subgraph instances in the upstream set can flatten.
             subgraph.subgraphs = CloneSubgraphs(source.subgraphs);
 
-            if (targetNode.type != "Output")
-            {
-                var sourceHandle = ResolvePreviewSourceHandle(source, targetNode);
-                subgraph.nodes.Add(new PcgGraphNodeRecord
-                {
-                    id = PreviewSinkNodeId,
-                    type = "Output",
-                    position = targetNode.position,
-                    data = new PcgNodeData(),
-                });
-                subgraph.edges.Add(new PcgGraphEdgeRecord
-                {
-                    id = $"{PreviewSinkNodeId}_edge",
-                    source = targetNodeId,
-                    target = PreviewSinkNodeId,
-                    sourceHandle = sourceHandle,
-                    targetHandle = "in",
-                });
-            }
+            var sourceHandle = ResolvePreviewSourceHandle(source, targetNode);
+            AddPreviewSinkEdge(subgraph, targetNodeId, sourceHandle, targetNode.position);
 
             return true;
+        }
+
+        /// <summary>
+        /// Passthrough subgraph previews recurse to SubgraphInput. Keep the input node and
+        /// its outgoing interface edges so <see cref="TryGraftInstanceInputs"/> can replace
+        /// them with parent-scope upstream before <see cref="EnsurePreviewSink"/>.
+        /// </summary>
+        private static bool TryBuildSubgraphInputPlaceholder(
+            PcgGraphDocument source,
+            PcgGraphNodeRecord inputNode,
+            out PcgGraphDocument subgraph,
+            out string error)
+        {
+            subgraph = null;
+            error = null;
+            if (source == null || inputNode == null)
+            {
+                error = "SubgraphInput placeholder scope is invalid.";
+                return false;
+            }
+
+            subgraph = new PcgGraphDocument { version = source.version };
+            subgraph.nodes.Add(inputNode.Clone());
+            foreach (var edge in source.edges ?? Enumerable.Empty<PcgGraphEdgeRecord>())
+            {
+                if (edge == null || edge.source != inputNode.id)
+                    continue;
+
+                subgraph.edges.Add(new PcgGraphEdgeRecord
+                {
+                    id = edge.id,
+                    source = edge.source,
+                    target = edge.target,
+                    sourceHandle = edge.sourceHandle,
+                    targetHandle = edge.targetHandle,
+                });
+
+                var consumer = source.nodes?.FirstOrDefault(n => n.id == edge.target);
+                if (consumer == null ||
+                    (consumer.type != "Output" &&
+                     consumer.type != PcgStructuralNodeTypes.SubgraphOutput))
+                {
+                    continue;
+                }
+
+                if (subgraph.nodes.All(n => n.id != consumer.id))
+                    subgraph.nodes.Add(consumer.Clone());
+            }
+
+            subgraph.subgraphs = CloneSubgraphs(source.subgraphs);
+            return true;
+        }
+
+        private static void EnsurePreviewSink(PcgGraphDocument cookDoc)
+        {
+            if (cookDoc?.nodes == null || cookDoc.nodes.Count == 0)
+                return;
+            if (cookDoc.nodes.Any(n => n.id == PreviewSinkNodeId))
+                return;
+
+            var edges = cookDoc.edges ?? new List<PcgGraphEdgeRecord>();
+            var authoringOutputs = cookDoc.nodes
+                .Where(n => n != null &&
+                            (n.type == "Output" ||
+                             n.type == PcgStructuralNodeTypes.SubgraphOutput))
+                .ToList();
+            if (authoringOutputs.Count == 0)
+            {
+                var sourcesWithOutgoing = new HashSet<string>(
+                    edges
+                        .Where(edge => edge != null && !string.IsNullOrEmpty(edge.source))
+                        .Select(edge => edge.source));
+                var terminal = cookDoc.nodes.FirstOrDefault(n =>
+                    n != null &&
+                    n.type != "Output" &&
+                    n.type != PcgStructuralNodeTypes.SubgraphOutput &&
+                    !sourcesWithOutgoing.Contains(n.id));
+                if (terminal == null)
+                    return;
+
+                AddPreviewSinkEdge(
+                    cookDoc,
+                    terminal.id,
+                    ResolvePreviewSourceHandle(cookDoc, terminal),
+                    terminal.position);
+                return;
+            }
+
+            var output = authoringOutputs[0];
+            var incoming = edges.FirstOrDefault(edge => edge != null && edge.target == output.id);
+            if (incoming == null || string.IsNullOrEmpty(incoming.source))
+                return;
+
+            AddPreviewSinkEdge(
+                cookDoc,
+                incoming.source,
+                incoming.sourceHandle,
+                output.position);
+
+            var outputIds = authoringOutputs.Select(node => node.id).ToHashSet();
+            cookDoc.edges.RemoveAll(edge =>
+                edge != null && (outputIds.Contains(edge.source) || outputIds.Contains(edge.target)));
+            cookDoc.nodes.RemoveAll(node => node != null && outputIds.Contains(node.id));
+        }
+
+        private static void AddPreviewSinkEdge(
+            PcgGraphDocument cookDoc,
+            string sourceNodeId,
+            string sourceHandle,
+            PcgGraphPosition position)
+        {
+            cookDoc.nodes.Add(new PcgGraphNodeRecord
+            {
+                id = PreviewSinkNodeId,
+                type = "Output",
+                position = position,
+                data = new PcgNodeData(),
+            });
+            cookDoc.edges.Add(new PcgGraphEdgeRecord
+            {
+                id = $"{PreviewSinkNodeId}_edge",
+                source = sourceNodeId,
+                target = PreviewSinkNodeId,
+                sourceHandle = string.IsNullOrEmpty(sourceHandle) ? "out" : sourceHandle,
+                targetHandle = "in",
+            });
         }
 
         private static string ResolvePreviewSourceHandle(PcgGraphDocument source, PcgGraphNodeRecord targetNode)

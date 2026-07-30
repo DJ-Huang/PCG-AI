@@ -950,7 +950,27 @@ namespace DJTechEditor.PCG.Graph
             }
             ApplyExternalInterfaceSyncToVisibleNode(exitingInstanceId, externalInterfaceSync);
             SubgraphNavigationChanged?.Invoke(m_CurrentSubgraphId);
-            FrameAll();
+            FocusNodeById(exitingInstanceId);
+        }
+
+        private void FocusNodeById(string nodeId)
+        {
+            if (string.IsNullOrEmpty(nodeId))
+            {
+                FrameAll();
+                return;
+            }
+
+            var view = nodes.OfType<PcgGraphNodeBase>().FirstOrDefault(node => node.NodeId == nodeId);
+            if (view == null)
+            {
+                FrameAll();
+                return;
+            }
+
+            ClearSelection();
+            AddToSelection(view);
+            FrameSelection();
         }
 
         private void EnterSubgraph(string instanceNodeId, string definitionId)

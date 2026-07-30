@@ -644,6 +644,10 @@ namespace DJTechRuntime.PCG
 #endif
             if (string.IsNullOrEmpty(json))
             {
+#if UNITY_EDITOR
+                if (EditorIsNodePreviewActive?.Invoke(this) == true)
+                    return false;
+#endif
                 if (!TryBuildExecutionJson(out json))
                     return false;
             }
