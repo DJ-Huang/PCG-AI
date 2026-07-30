@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "name": "Windows_floor",
-  "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
+  "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161, "anchorY": -110}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
   "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ],
   "nodes": [
     {
@@ -11,6 +11,12 @@
       "data": {"label": "Output", "__nodeTitle": ""}
     },
     {
+      "id": "n151",
+      "type": "Carve",
+      "position": { "x": -161, "y": -18.5 },
+      "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
+    },
+    {
       "id": "subgraph_input",
       "type": "SubgraphInput",
       "position": { "x": 0, "y": -195 },
@@ -18,7 +24,8 @@
     }
   ],
   "edges": [
-    {"id": "e_iface_in_1_n145", "source": "subgraph_input", "target": "n145", "sourceHandle": "in_1", "targetHandle": "in"}
+    {"id": "e2842", "source": "n151", "target": "n145", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_iface_in_1_n151", "source": "subgraph_input", "target": "n151", "sourceHandle": "in_1", "targetHandle": "in"}
   ],
   "subgraphs": [
   ]

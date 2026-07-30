@@ -272,7 +272,7 @@
       "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": "", "resolvedAssetSchemaVersion": 2.0},
       "subgraphInterface": {
         "name": "Windows_floor",
-        "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
+        "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161, "anchorY": -110}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
         "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ]
       }
     }

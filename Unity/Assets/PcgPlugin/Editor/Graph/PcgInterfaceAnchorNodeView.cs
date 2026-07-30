@@ -11,6 +11,9 @@ namespace DJTechEditor.PCG.Graph
     {
         protected string PinType { get; private set; }
 
+        /// <summary>Pin type used by connection validation (anchors are not in the node manifest).</summary>
+        public string ResolvedPinType => PinType;
+
         public string PortId { get; private set; }
 
         public Port InterfacePort { get; protected set; }

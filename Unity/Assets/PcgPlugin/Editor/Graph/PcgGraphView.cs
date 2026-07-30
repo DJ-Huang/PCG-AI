@@ -1410,6 +1410,8 @@ namespace DJTechEditor.PCG.Graph
 
         private static string ResolveNodePinType(PcgGraphNodeBase node, string handle, bool output)
         {
+            if (node is PcgInterfaceAnchorNodeBase anchor)
+                return anchor.ResolvedPinType;
             if (node is PcgSubgraphNodeView subgraph)
                 return output ? subgraph.GetOutputPinType(handle) : subgraph.GetInputPinType(handle);
             if (node is PcgExternalSubgraphNodeView external)
@@ -1799,7 +1801,16 @@ namespace DJTechEditor.PCG.Graph
                 {
                     var portId = edgeRecord.sourceHandle ?? string.Empty;
                     var anchor = GetOrCreateInterfaceInputAnchor(definition, portId);
-                    anchor.PlaceLeftOf(inputTarget);
+                    var savedPort = definition.inputs?.FirstOrDefault(p => p.id == portId);
+                    if (savedPort is { anchorPlaced: true })
+                    {
+                        anchor.SetPosition(new Rect(savedPort.anchorX, savedPort.anchorY,
+                            PcgGraphNodeBase.NodeWidth, PcgGraphNodeBase.NodeHeight));
+                    }
+                    else
+                    {
+                        anchor.PlaceLeftOf(inputTarget);
+                    }
 
                     var input = inputTarget.FindInputPort(edgeRecord.targetHandle ?? "in");
                     if (anchor.OutputPort == null || input == null)
