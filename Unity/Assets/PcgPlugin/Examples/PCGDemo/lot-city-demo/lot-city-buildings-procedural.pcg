@@ -206,12 +206,6 @@
       "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// find how many street facing edges\nint numStreetFacing = nedgesgroup(0, \"streetFacingEdges\");\n// if > 2, then has an available side for being a fire escape\n// also check if more than 2 floors, looks goofy on short buildings lol\nif(numStreetFacing >= 2 && @numFloors > 2 && rand(buildingIter*20) < 0.5)\n{\n  @hasFireEscape = 1;\n}\n// if too narrow for fire escape, then override\nfloat lengthSide = length(getbbox_size(1));\nif(lengthSide < 1.25) {\n  @hasFireEscape = 0;\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_fire_escape"}
     },
     {
-      "id": "n132",
-      "type": "AttributeWrangle",
-      "position": { "x": 1567, "y": 2515 },
-      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "// 0 = windowed\n// 1 = shop\n\nint buildingIter = chi(\"buildingIter\");\nint floorIter = chi(\"floorIter\");\n\nif(floorIter == 0) {\n    @floorType = 1;\n} else {\n    @floorType = 0;\n}", "parameters": "{\"buildingIter\": 3, \"floorIter\": 0}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": ""}
-    },
-    {
       "id": "n133",
       "type": "Split",
       "position": { "x": 1567.5, "y": 2572.5 },
@@ -242,12 +236,6 @@
       "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
-      "id": "n137",
-      "type": "ForEachBegin",
-      "position": { "x": 1854, "y": 2437.5 },
-      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
-    },
-    {
       "id": "n129",
       "type": "AttributeWrangle",
       "position": { "x": 1438, "y": 2255.5 },
@@ -260,6 +248,18 @@
       "data": {"gatherMethod": "merge", "__nodeTitle": "For Each End"}
     },
     {
+      "id": "n137",
+      "type": "ForEachBegin",
+      "position": { "x": 1854, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n132",
+      "type": "AttributeWrangle",
+      "position": { "x": 1567, "y": 2515 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "// 0 = windowed\n// 1 = shop\n\nint buildingIter = chi(\"buildingIter\");\nint floorIter = chi(\"floorIter\");\n\nif(floorIter == 0) {\n    @floorType = 1;\n} else {\n    @floorType = 0;\n}", "parameters": "{\"buildingIter\": 3, \"floorIter\": 0}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": ""}
+    },
+    {
       "id": "n138",
       "type": "GroupDelete",
       "position": { "x": 1854, "y": 2503.5 },
@@ -268,7 +268,7 @@
     {
       "id": "n150",
       "type": "SubgraphAsset",
-      "position": { "x": 1854, "y": 2574.5 },
+      "position": { "x": 1854, "y": 2572.5 },
       "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": "", "resolvedAssetSchemaVersion": 2.0},
       "subgraphInterface": {
         "name": "Windows_floor",

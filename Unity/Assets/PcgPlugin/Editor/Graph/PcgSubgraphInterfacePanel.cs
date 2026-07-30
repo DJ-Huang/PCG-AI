@@ -29,6 +29,12 @@ namespace DJTechEditor.PCG.Graph
         public PcgSubgraphInterfacePanel(PcgGraphView graphView)
         {
             m_GraphView = graphView;
+            // Floating panel docked to the left edge; the host window shifts its
+            // left offset when the Parameters panel is visible.
+            style.position = Position.Absolute;
+            style.left = 0;
+            style.top = 0;
+            style.bottom = 0;
             style.flexDirection = FlexDirection.Column;
             style.width = 300;
             style.minWidth = 280;

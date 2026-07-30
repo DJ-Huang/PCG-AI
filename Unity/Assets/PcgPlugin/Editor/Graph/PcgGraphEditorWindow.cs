@@ -546,13 +546,34 @@ namespace DJTechEditor.PCG.Graph
             };
             graphHost.Add(m_PreviewStatusLabel);
 
+            contentRow.Add(graphHost);
             contentRow.Add(m_Blackboard);
             contentRow.Add(m_InterfacePanel);
-            contentRow.Add(graphHost);
             contentRow.Add(m_Inspector);
+
+            // Panels float over the graph canvas; the interface panel docks to the
+            // blackboard's right edge and must follow its width/visibility.
+            m_Blackboard.RegisterCallback<GeometryChangedEvent>(_ => UpdateInterfacePanelOffset());
+            UpdateInterfacePanelOffset();
 
             rootVisualElement.Add(contentRow);
             RefreshPreviewToolbar();
+        }
+
+        private void UpdateInterfacePanelOffset()
+        {
+            if (m_InterfacePanel == null || m_Blackboard == null)
+                return;
+
+            var blackboardVisible = m_Blackboard.style.display.value == DisplayStyle.Flex;
+            var offset = 0f;
+            if (blackboardVisible)
+            {
+                offset = m_Blackboard.resolvedStyle.width;
+                if (float.IsNaN(offset))
+                    offset = 0f;
+            }
+            m_InterfacePanel.style.left = offset;
         }
 
         private void RefreshSubgraphBreadcrumb()
@@ -577,6 +598,7 @@ namespace DJTechEditor.PCG.Graph
             if (!show)
                 return;
 
+            UpdateInterfacePanelOffset();
             var definition = m_GraphView.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
             m_InterfacePanel.Bind(definition);
         }
@@ -849,6 +871,7 @@ namespace DJTechEditor.PCG.Graph
         {
             var visible = m_Blackboard.style.display.value == DisplayStyle.Flex;
             m_Blackboard.style.display = visible ? DisplayStyle.None : DisplayStyle.Flex;
+            UpdateInterfacePanelOffset();
         }
 
         internal void ToggleInspector()

@@ -41,17 +41,17 @@ namespace DJTechEditor.PCG.Graph
 
         private void BuildUI()
         {
-            // Wider panel; long labels wrap (Houdini-style) instead of horizontal scroll.
+            // Floating panel docked to the right edge of the graph canvas.
+            // Content-sized height; clamp to window so tall forms still scroll.
+            style.position = Position.Absolute;
+            style.right = 0;
+            style.top = 0;
             style.width = 400;
             style.minWidth = 340;
             style.borderLeftWidth = 1;
             style.borderLeftColor = new Color(0.15f, 0.15f, 0.15f);
             style.backgroundColor = new Color(0.22f, 0.22f, 0.22f);
             style.flexDirection = FlexDirection.Column;
-            style.flexShrink = 0;
-            style.flexGrow = 0;
-            // Content-sized height (not stretch-to-parent); clamp to window so tall forms still scroll.
-            style.alignSelf = Align.FlexStart;
             style.height = StyleKeyword.Auto;
             style.maxHeight = Length.Percent(100);
 
@@ -84,8 +84,31 @@ namespace DJTechEditor.PCG.Graph
             };
             Add(m_Body);
 
+            Add(new PcgPanelResizer(
+                this,
+                PcgPanelResizer.Edge.Left,
+                minSize: 340f,
+                maxSize: () => PcgPanelResizer.GetRowWidth(this, 1600f) - 320f,
+                onBeforeApply: null,
+                onReset: ResetPanelSize));
+            Add(new PcgPanelResizer(
+                this,
+                PcgPanelResizer.Edge.Bottom,
+                minSize: 160f,
+                maxSize: () => PcgPanelResizer.GetRowHeight(this, 2000f),
+                onBeforeApply: null,
+                onReset: ResetPanelSize));
+
             ShowEmpty();
             style.display = DisplayStyle.None;
+        }
+
+        private void ResetPanelSize()
+        {
+            style.width = 400;
+            style.minWidth = 340;
+            style.height = StyleKeyword.Auto;
+            style.maxHeight = Length.Percent(100);
         }
 
         public void ToggleVisible()

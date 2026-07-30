@@ -32,13 +32,17 @@ namespace DJTechEditor.PCG.Graph
 
         private void BuildUI()
         {
+            // Floating panel docked to the left edge of the graph canvas.
+            style.position = Position.Absolute;
+            style.left = 0;
+            style.top = 0;
+            style.bottom = 0;
             style.width = 300;
             style.minWidth = 240;
             style.borderRightWidth = 1;
             style.borderRightColor = new Color(0.15f, 0.15f, 0.15f);
             style.backgroundColor = new Color(0.22f, 0.22f, 0.22f);
             style.flexDirection = FlexDirection.Column;
-            style.flexShrink = 1;
 
             var header = new VisualElement
             {
@@ -84,6 +88,38 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
             Add(m_ParameterList);
+
+            Add(new PcgPanelResizer(
+                this,
+                PcgPanelResizer.Edge.Right,
+                minSize: 240f,
+                maxSize: () => PcgPanelResizer.GetRowWidth(this, 1600f) - 320f,
+                onBeforeApply: null,
+                onReset: ResetPanelSize));
+            Add(new PcgPanelResizer(
+                this,
+                PcgPanelResizer.Edge.Bottom,
+                minSize: 120f,
+                maxSize: () => PcgPanelResizer.GetRowHeight(this, 2000f),
+                onBeforeApply: SwitchToExplicitHeight,
+                onReset: ResetPanelSize));
+        }
+
+        private void SwitchToExplicitHeight()
+        {
+            // Detach from the bottom edge so the explicit height wins and the
+            // graph canvas shows below the panel.
+            style.bottom = StyleKeyword.Null;
+            style.maxHeight = StyleKeyword.Null;
+        }
+
+        private void ResetPanelSize()
+        {
+            style.width = 300;
+            style.minWidth = 240;
+            style.height = StyleKeyword.Null;
+            style.maxHeight = StyleKeyword.Null;
+            style.bottom = 0;
         }
 
         public void ToggleVisible()
