@@ -212,28 +212,10 @@
       "data": {"group": "fireEscape", "groupType": "guess", "invertSelection": false, "deleteUnusedGroups": false, "__nodeTitle": ""}
     },
     {
-      "id": "n130",
-      "type": "GroupCreate",
-      "position": { "x": 1567.5, "y": 2356 },
-      "data": {"outputGroup": "base", "domain": "face", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
-    },
-    {
-      "id": "n134",
-      "type": "MatchSize",
-      "position": { "x": 1620, "y": 2648 },
-      "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "none", "targetJustifyX": "same", "offsetX": 0, "justifyY": "max", "targetJustifyY": "same", "offsetY": 0.05, "justifyZ": "none", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": false, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
-    },
-    {
       "id": "n135",
       "type": "AttributeTransfer",
       "position": { "x": 1567.5, "y": 2730 },
       "data": {"sourceGroup": "", "sourceGroupType": "primitives", "destinationGroup": "", "destinationGroupType": "primitives", "transferDetail": true, "detailAttributes": "xform", "transferPrimitives": false, "primitiveAttributes": "*", "transferPoints": false, "pointAttributes": "*", "transferVertices": false, "vertexAttributes": "*", "copyLocalVariables": true, "allowPAttribute": false, "kernelFunction": "elendt", "kernelRadius": 10, "maxSampleCount": 1, "enableDistanceThreshold": true, "distanceThreshold": 10, "blendWidth": 0, "uniformBias": 0.5, "__nodeTitle": "apply_matchsize_xform_to_fireescape"}
-    },
-    {
-      "id": "n131",
-      "type": "ForEachBegin",
-      "position": { "x": 1567, "y": 2437.5 },
-      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
       "id": "n129",
@@ -258,6 +240,24 @@
       "type": "AttributeWrangle",
       "position": { "x": 1567, "y": 2515 },
       "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "// 0 = windowed\n// 1 = shop\n\nint buildingIter = chi(\"buildingIter\");\nint floorIter = chi(\"floorIter\");\n\nif(floorIter == 0) {\n    @floorType = 1;\n} else {\n    @floorType = 0;\n}", "parameters": "{\"buildingIter\": 3, \"floorIter\": 0}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": ""}
+    },
+    {
+      "id": "n134",
+      "type": "MatchSize",
+      "position": { "x": 1620, "y": 2648 },
+      "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "none", "targetJustifyX": "same", "offsetX": 0, "justifyY": "max", "targetJustifyY": "same", "offsetY": 0.05, "justifyZ": "none", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": false, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
+    },
+    {
+      "id": "n130",
+      "type": "GroupCreate",
+      "position": { "x": 1567.5, "y": 2356 },
+      "data": {"outputGroup": "base", "domain": "face", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "n131",
+      "type": "ForEachBegin",
+      "position": { "x": 1567, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
     },
     {
       "id": "n138",

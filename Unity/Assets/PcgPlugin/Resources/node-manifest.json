@@ -10239,7 +10239,8 @@
           "type": "boolean",
           "displayName": "First U",
           "default": true,
-          "order": 20
+          "order": 20,
+          "companionField": "uStart"
         },
         "uStart": {
           "type": "number",
@@ -10267,7 +10268,8 @@
           "type": "boolean",
           "displayName": "Second U",
           "default": true,
-          "order": 50
+          "order": 50,
+          "companionField": "uEnd"
         },
         "uEnd": {
           "type": "number",
@@ -10295,7 +10297,8 @@
           "type": "boolean",
           "displayName": "First V",
           "default": true,
-          "order": 80
+          "order": 80,
+          "companionField": "vStart"
         },
         "vStart": {
           "type": "number",
@@ -10323,7 +10326,8 @@
           "type": "boolean",
           "displayName": "Second V",
           "default": true,
-          "order": 110
+          "order": 110,
+          "companionField": "vEnd"
         },
         "vEnd": {
           "type": "number",

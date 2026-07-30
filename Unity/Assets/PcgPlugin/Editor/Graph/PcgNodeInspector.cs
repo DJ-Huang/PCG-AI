@@ -666,6 +666,12 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
+            if (node.NodeType == "Carve")
+            {
+                ShowCarveProperties(node, def);
+                return;
+            }
+
             if (def.inspectorSections != null && def.inspectorSections.Count > 0)
             {
                 ShowSectionedManifestProperties(node, def);
@@ -677,8 +683,14 @@ namespace DJTechEditor.PCG.Graph
             var inputGroupProps = new List<(string key, ManifestPropertyDef prop)>();
             var outputGroupProps = new List<(string key, ManifestPropertyDef prop)>();
             var regularProps = new List<(string key, ManifestPropertyDef prop)>();
+            var companionTargets = new HashSet<string>(
+                def.properties.Values
+                    .Where(prop => !string.IsNullOrEmpty(prop.companionField))
+                    .Select(prop => prop.companionField));
             foreach (var (key, prop) in def.properties)
             {
+                if (companionTargets.Contains(key) || !IsPropertyVisible(node, key, prop))
+                    continue;
                 if (prop.type is "groupSelect" or "groupMultiSelect")
                     inputGroupProps.Add((key, prop));
                 else if (prop.isGroupOutput)
@@ -691,7 +703,8 @@ namespace DJTechEditor.PCG.Graph
             {
                 AddSectionHeader("Input Groups");
                 foreach (var (key, prop) in inputGroupProps)
-                    m_Body.Add(CreatePropertyRow(node, key, prop));
+                    m_Body.Add(CreatePropertyRow(
+                        node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
 
                 var available = ResolveUpstreamGroups(node.NodeId);
                 if (available.Count > 0)
@@ -714,7 +727,8 @@ namespace DJTechEditor.PCG.Graph
             {
                 AddSectionHeader("Output Groups");
                 foreach (var (key, prop) in outputGroupProps)
-                    m_Body.Add(CreatePropertyRow(node, key, prop));
+                    m_Body.Add(CreatePropertyRow(
+                        node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
                 AddFixedOutputGroupRows(node, def, outputGroupProps);
             }
 
@@ -745,8 +759,112 @@ namespace DJTechEditor.PCG.Graph
                     m_Body.Add(CreateGroupDeleteRulesEditor(node));
                     continue;
                 }
-                m_Body.Add(CreatePropertyRow(node, key, prop));
+                m_Body.Add(CreatePropertyRow(
+                    node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
             }
+        }
+
+        private void ShowCarveProperties(PcgManifestNodeView node, ManifestNodeDef def)
+        {
+            foreach (var key in new[] { "group", "useFirstU", "useSecondU", "useFirstV", "useSecondV" })
+                AddCarvePropertyRow(m_Body, node, def, key);
+
+            m_Body.Add(CreateCarveModePanel(
+                node,
+                def,
+                "location",
+                "uDivisions",
+                "vDivisions",
+                "cutAtAllInternalUBreakpoints",
+                "cutAtAllInternalVBreakpoints"));
+            m_Body.Add(CreateCarveModePanel(
+                node,
+                def,
+                "operation",
+                "keepInside",
+                "keepOutside",
+                "extractType",
+                "keepOriginal",
+                "onlyAtBreakpoints"));
+        }
+
+        private VisualElement CreateCarveModePanel(
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            string modeKey,
+            params string[] contentKeys)
+        {
+            var panel = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 6,
+                    marginBottom = 6,
+                    paddingLeft = 2,
+                    paddingRight = 2,
+                    paddingTop = 2,
+                    paddingBottom = 4,
+                    borderTopWidth = 1,
+                    borderBottomWidth = 1,
+                    borderLeftWidth = 1,
+                    borderRightWidth = 1,
+                    borderTopColor = new Color(0.12f, 0.12f, 0.12f),
+                    borderBottomColor = new Color(0.12f, 0.12f, 0.12f),
+                    borderLeftColor = new Color(0.12f, 0.12f, 0.12f),
+                    borderRightColor = new Color(0.12f, 0.12f, 0.12f),
+                },
+            };
+
+            AddCarvePropertyRow(panel, node, def, modeKey, hideLabel: true);
+
+            var content = new VisualElement
+            {
+                style =
+                {
+                    paddingLeft = 92,
+                    paddingTop = 2,
+                },
+            };
+            foreach (var key in contentKeys)
+                AddCarvePropertyRow(content, node, def, key);
+            panel.Add(content);
+            return panel;
+        }
+
+        private void AddCarvePropertyRow(
+            VisualElement parent,
+            PcgManifestNodeView node,
+            ManifestNodeDef def,
+            string key,
+            bool hideLabel = false)
+        {
+            if (!def.properties.TryGetValue(key, out var prop) ||
+                !IsPropertyVisible(node, key, prop))
+                return;
+
+            var row = CreatePropertyRow(
+                node,
+                key,
+                prop,
+                def,
+                rebuildOnChange: IsVisibilityDriver(def, key),
+                showActions: false,
+                hideLabel: hideLabel);
+
+            if (key is "uDivisions" or "cutAtAllInternalUBreakpoints")
+            {
+                row.SetEnabled(
+                    MatchesVisibleClause(node, "useFirstU", "true", null) ||
+                    MatchesVisibleClause(node, "useSecondU", "true", null));
+            }
+            else if (key is "vDivisions" or "cutAtAllInternalVBreakpoints")
+            {
+                row.SetEnabled(
+                    MatchesVisibleClause(node, "useFirstV", "true", null) ||
+                    MatchesVisibleClause(node, "useSecondV", "true", null));
+            }
+
+            parent.Add(row);
         }
 
         private bool NodeSupportsGroupViewer(PcgManifestNodeView node)
@@ -1405,7 +1523,9 @@ namespace DJTechEditor.PCG.Graph
             string key,
             ManifestPropertyDef prop,
             ManifestNodeDef def,
-            bool rebuildOnChange = false)
+            bool rebuildOnChange = false,
+            bool showActions = true,
+            bool hideLabel = false)
         {
             Action<object> setValueOverride = null;
             if (rebuildOnChange)
@@ -1418,7 +1538,8 @@ namespace DJTechEditor.PCG.Graph
             }
 
             if (prop.type == "boolean")
-                return CreateHoudiniToggleRow(node, key, prop, def, setValueOverride);
+                return CreateHoudiniToggleRow(
+                    node, key, prop, def, setValueOverride, showActions);
 
             var container = new VisualElement
             {
@@ -1441,21 +1562,24 @@ namespace DJTechEditor.PCG.Graph
                 },
             };
 
-            row.Add(new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
+            if (!hideLabel)
             {
-                style =
+                row.Add(new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
                 {
-                    width = 92,
-                    minWidth = 56,
-                    flexShrink = 0,
-                    whiteSpace = WhiteSpace.Normal,
-                    unityTextAlign = TextAnchor.MiddleRight,
-                    color = new Color(0.8f, 0.8f, 0.8f),
-                    fontSize = 10,
-                    paddingTop = 1,
-                    marginRight = 6,
-                },
-            });
+                    style =
+                    {
+                        width = 92,
+                        minWidth = 56,
+                        flexShrink = 0,
+                        whiteSpace = WhiteSpace.Normal,
+                        unityTextAlign = TextAnchor.MiddleRight,
+                        color = new Color(0.8f, 0.8f, 0.8f),
+                        fontSize = 10,
+                        paddingTop = 1,
+                        marginRight = 6,
+                    },
+                });
+            }
 
             var valueHolder = new VisualElement
             {
@@ -1464,7 +1588,7 @@ namespace DJTechEditor.PCG.Graph
                     flexGrow = 1,
                     flexShrink = 1,
                     minWidth = 48,
-                    marginRight = 4,
+                    marginRight = showActions ? 4 : 0,
                 },
             };
 
@@ -1481,60 +1605,69 @@ namespace DJTechEditor.PCG.Graph
                 var valueElement = CreateValueField(key, prop, node, binding, setValueOverride);
                 valueElement.style.marginTop = 0;
                 valueElement.style.width = Length.Percent(100);
+                if (hideLabel && prop.uiHint == "radio")
+                {
+                    valueElement.style.width = StyleKeyword.Auto;
+                    valueElement.style.maxWidth = 132;
+                    valueElement.style.flexGrow = 0;
+                }
                 valueHolder.Add(valueElement);
             }
 
             RebuildValue();
             row.Add(valueHolder);
 
-            var actions = new VisualElement
+            if (showActions)
             {
-                style =
+                var actions = new VisualElement
                 {
-                    flexDirection = FlexDirection.Row,
-                    flexShrink = 0,
-                    alignItems = Align.Center,
-                },
-            };
+                    style =
+                    {
+                        flexDirection = FlexDirection.Row,
+                        flexShrink = 0,
+                        alignItems = Align.Center,
+                    },
+                };
 
-            // Promote-to-parameter button
-            var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
-            {
-                text = "+",
-                tooltip = "Promote to parameter",
-            };
-            promoteBtn.style.width = 22;
-            promoteBtn.style.flexShrink = 0;
-            actions.Add(promoteBtn);
-
-            // Bind dropdown
-            var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
-            var bindPopup = new PopupField<string>(bindOptions, currentIdx);
-            bindPopup.style.width = 72;
-            bindPopup.style.flexShrink = 0;
-            bindPopup.style.marginLeft = 2;
-            bindPopup.RegisterValueChangedCallback(evt =>
-            {
-                var idx = bindOptions.IndexOf(evt.newValue);
-                var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
-                var currentBinding = m_Blackboard.FindBinding(node.NodeId, key);
-                var currentId = currentBinding?.id ?? "";
-                if (paramId == currentId)
-                    return;
-
-                m_GraphView.WithUndo("Bind Parameter", () =>
+                // Promote-to-parameter button
+                var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
                 {
-                    if (string.IsNullOrEmpty(paramId))
-                        m_Blackboard.ClearBindingForNode(node.NodeId, key);
-                    else
-                        m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                    text = "+",
+                    tooltip = "Promote to parameter",
+                };
+                promoteBtn.style.width = 22;
+                promoteBtn.style.flexShrink = 0;
+                actions.Add(promoteBtn);
+
+                // Bind dropdown
+                var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
+                var bindPopup = new PopupField<string>(bindOptions, currentIdx);
+                bindPopup.style.width = 72;
+                bindPopup.style.flexShrink = 0;
+                bindPopup.style.marginLeft = 2;
+                bindPopup.RegisterValueChangedCallback(evt =>
+                {
+                    var idx = bindOptions.IndexOf(evt.newValue);
+                    var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
+                    var currentBinding = m_Blackboard.FindBinding(node.NodeId, key);
+                    var currentId = currentBinding?.id ?? "";
+                    if (paramId == currentId)
+                        return;
+
+                    m_GraphView.WithUndo("Bind Parameter", () =>
+                    {
+                        if (string.IsNullOrEmpty(paramId))
+                            m_Blackboard.ClearBindingForNode(node.NodeId, key);
+                        else
+                            m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                    });
+
+                    // Refresh value only — full ShowNode() on BevelMesh retriggers PopupFields and can stack-overflow.
+                    RebuildValue();
                 });
-
-                // Refresh value only — full ShowNode() on BevelMesh retriggers PopupFields and can stack-overflow.
-                RebuildValue();
-            });
-            actions.Add(bindPopup);
-            row.Add(actions);
+                actions.Add(bindPopup);
+                row.Add(actions);
+            }
 
             container.Add(row);
             ApplyEnabledWhen(container, node, prop);
@@ -1542,15 +1675,16 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Houdini-style: ☐ wrapping label … [optional companion below]  [+] [bind]
-        /// Long labels wrap within the row; promote/bind stay top-right (or wrap under if needed).
+        /// Houdini-style: ☐ label [optional companion value / slider] [+] [bind].
+        /// A toggle and its companion are one parameter row, matching Houdini's enabled parameters.
         /// </summary>
         private VisualElement CreateHoudiniToggleRow(
             PcgManifestNodeView node,
             string key,
             ManifestPropertyDef prop,
             ManifestNodeDef def,
-            Action<object> setValueOverride)
+            Action<object> setValueOverride,
+            bool showActions)
         {
             var container = new VisualElement
             {
@@ -1585,24 +1719,31 @@ namespace DJTechEditor.PCG.Graph
                 style =
                 {
                     flexDirection = FlexDirection.Row,
-                    alignItems = Align.FlexStart,
-                    flexWrap = Wrap.Wrap,
+                    alignItems = Align.Center,
+                    flexWrap = Wrap.NoWrap,
                     width = Length.Percent(100),
                 },
             };
 
-            // Split checkbox + label so the label can wrap (Toggle's built-in text does not).
+            ManifestPropertyDef companionProp = null;
+            var hasCompanion = def != null &&
+                               !string.IsNullOrEmpty(prop.companionField) &&
+                               def.properties.TryGetValue(prop.companionField, out companionProp);
+
+            // Split checkbox + label so the label remains a compact, clickable Houdini-style prefix.
             var toggleBlock = new VisualElement
             {
                 style =
                 {
                     flexDirection = FlexDirection.Row,
-                    alignItems = Align.FlexStart,
-                    flexGrow = 1,
+                    alignItems = Align.Center,
+                    flexGrow = hasCompanion ? 0 : 1,
                     flexShrink = 1,
-                    minWidth = 120,
+                    minWidth = hasCompanion ? 92 : 120,
                 },
             };
+            if (hasCompanion)
+                toggleBlock.style.width = 92;
 
             var toggle = new Toggle { value = toggled };
             toggle.label = string.Empty;
@@ -1617,8 +1758,8 @@ namespace DJTechEditor.PCG.Graph
                 {
                     flexGrow = 1,
                     flexShrink = 1,
-                    minWidth = 60,
-                    whiteSpace = WhiteSpace.Normal,
+                    minWidth = 0,
+                    whiteSpace = WhiteSpace.NoWrap,
                     color = new Color(0.85f, 0.85f, 0.85f),
                     paddingTop = 2,
                 },
@@ -1644,67 +1785,72 @@ namespace DJTechEditor.PCG.Graph
             toggleBlock.Add(toggleLabel);
             topRow.Add(toggleBlock);
 
-            var actions = new VisualElement
-            {
-                style =
-                {
-                    flexDirection = FlexDirection.Row,
-                    flexShrink = 0,
-                    alignItems = Align.Center,
-                    marginLeft = 4,
-                },
-            };
-
-            var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
-            {
-                text = "+",
-                tooltip = "Promote to parameter",
-            };
-            promoteBtn.style.width = 22;
-            promoteBtn.style.flexShrink = 0;
-            actions.Add(promoteBtn);
-
-            var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
-            var bindPopup = new PopupField<string>(bindOptions, currentIdx);
-            bindPopup.style.width = 72;
-            bindPopup.style.flexShrink = 0;
-            bindPopup.style.marginLeft = 2;
-            bindPopup.RegisterValueChangedCallback(evt =>
-            {
-                var idx = bindOptions.IndexOf(evt.newValue);
-                var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
-                var currentBinding = m_Blackboard.FindBinding(node.NodeId, key);
-                var currentId = currentBinding?.id ?? "";
-                if (paramId == currentId)
-                    return;
-
-                m_GraphView.WithUndo("Bind Parameter", () =>
-                {
-                    if (string.IsNullOrEmpty(paramId))
-                        m_Blackboard.ClearBindingForNode(node.NodeId, key);
-                    else
-                        m_Blackboard.SetBinding(paramId, node.NodeId, key);
-                });
-                ScheduleInspectorRebuild(node);
-            });
-            actions.Add(bindPopup);
-            topRow.Add(actions);
-            container.Add(topRow);
-
-            if (def != null &&
-                !string.IsNullOrEmpty(prop.companionField) &&
-                def.properties.TryGetValue(prop.companionField, out var companionProp))
+            if (hasCompanion)
             {
                 var companionBinding = m_Blackboard.FindBinding(node.NodeId, prop.companionField);
                 var companionField = CreateValueField(
                     prop.companionField, companionProp, node, companionBinding, null);
-                companionField.style.width = Length.Percent(100);
-                companionField.style.marginLeft = 22;
-                companionField.style.marginTop = 2;
+                companionField.style.flexGrow = 1;
+                companionField.style.flexShrink = 1;
+                companionField.style.minWidth = 80;
+                companionField.style.width = StyleKeyword.Auto;
+                companionField.style.marginLeft = 4;
+                companionField.style.marginRight = 4;
+                companionField.style.marginTop = 0;
                 companionField.SetEnabled(toggled);
                 toggle.RegisterValueChangedCallback(evt => companionField.SetEnabled(evt.newValue));
-                container.Add(companionField);
+                topRow.Add(companionField);
             }
+
+            if (showActions)
+            {
+                var actions = new VisualElement
+                {
+                    style =
+                    {
+                        flexDirection = FlexDirection.Row,
+                        flexShrink = 0,
+                        alignItems = Align.Center,
+                        marginLeft = 4,
+                    },
+                };
+
+                var promoteBtn = new Button(() => PromoteToParameter(node, key, prop))
+                {
+                    text = "+",
+                    tooltip = "Promote to parameter",
+                };
+                promoteBtn.style.width = 22;
+                promoteBtn.style.flexShrink = 0;
+                actions.Add(promoteBtn);
+
+                var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
+                var bindPopup = new PopupField<string>(bindOptions, currentIdx);
+                bindPopup.style.width = 72;
+                bindPopup.style.flexShrink = 0;
+                bindPopup.style.marginLeft = 2;
+                bindPopup.RegisterValueChangedCallback(evt =>
+                {
+                    var idx = bindOptions.IndexOf(evt.newValue);
+                    var paramId = idx >= 0 && idx < paramIds.Count ? paramIds[idx] : "";
+                    var currentBinding = m_Blackboard.FindBinding(node.NodeId, key);
+                    var currentId = currentBinding?.id ?? "";
+                    if (paramId == currentId)
+                        return;
+
+                    m_GraphView.WithUndo("Bind Parameter", () =>
+                    {
+                        if (string.IsNullOrEmpty(paramId))
+                            m_Blackboard.ClearBindingForNode(node.NodeId, key);
+                        else
+                            m_Blackboard.SetBinding(paramId, node.NodeId, key);
+                    });
+                    ScheduleInspectorRebuild(node);
+                });
+                actions.Add(bindPopup);
+                topRow.Add(actions);
+            }
+            container.Add(topRow);
 
             ApplyEnabledWhen(container, node, prop);
             return container;

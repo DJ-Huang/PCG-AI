@@ -528,6 +528,53 @@ data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
     return output;
 }
 
+data::PcgSplineData convert_geometry_primitives_to_splines(
+    const data::PcgGeometry& input)
+{
+    data::PcgSplineData output;
+    for (size_t face_index = 0; face_index < input.faces().size(); ++face_index) {
+        const auto& face = input.faces()[face_index];
+        if (face.size() < 2)
+            continue;
+
+        const bool repeats_first = face.size() > 2 && face.front() == face.back();
+        const size_t point_count = face.size() - (repeats_first ? 1u : 0u);
+        if (point_count < 2)
+            continue;
+
+        data::PcgSpline spline;
+        spline.closed = repeats_first || point_count > 2;
+        spline.points.reserve(point_count);
+        bool valid = true;
+        for (size_t corner = 0; corner < point_count; ++corner) {
+            const int point_index = face[corner];
+            if (point_index < 0 ||
+                static_cast<size_t>(point_index) >= input.points().size()) {
+                valid = false;
+                break;
+            }
+            spline.points.push_back(
+                to_spline_point(input.points()[static_cast<size_t>(point_index)]));
+        }
+        if (!valid)
+            continue;
+
+        copy_primitive_attributes_to_json(
+            input, static_cast<int>(face_index), spline.attributes);
+        for (const auto& group_name :
+             input.groups().group_names(geometry::GroupDomain::Face)) {
+            if (input.groups().contains(geometry::GroupDomain::Face,
+                                        group_name,
+                                        static_cast<geometry::GroupId>(face_index))) {
+                spline.attributes[group_name] = true;
+            }
+        }
+        output.add_spline(std::move(spline));
+    }
+    copy_detail_attributes_to_metadata(input, output);
+    return output;
+}
+
 data::PcgPointData extract_centroid_geometry(const data::PcgGeometry& input,
                                              const ExtractCentroidOptions& options)
 {

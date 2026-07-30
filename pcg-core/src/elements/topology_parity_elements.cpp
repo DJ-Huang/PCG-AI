@@ -2,6 +2,7 @@
 
 #include "elements/element_utils.hpp"
 #include "elements/expression.hpp"
+#include "elements/facade_foundation_algorithms.hpp"
 #include "elements/topology_parity_algorithms.hpp"
 
 #include <algorithm>
@@ -433,7 +434,22 @@ public:
     const char* type_name() const override { return "Carve"; }
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        const auto input = get_splines_input(ctx, "in", "Carve missing spline input");
+        const data::PcgTaggedData* source = ctx.inputs.find("in");
+        if (!source)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Carve missing input");
+
+        data::PcgSplineData input;
+        if (source->splines) {
+            input = *source->splines;
+        } else if (source->geometry) {
+            input = convert_geometry_primitives_to_splines(*source->geometry);
+        } else if (source->mesh) {
+            input = convert_geometry_primitives_to_splines(
+                data::geometry_from_mesh(*source->mesh));
+        } else {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "Carve supports Spline, Geometry, or Mesh input");
+        }
         CarveSplineOptions options;
         options.group = ctx.node->data.value("group", std::string());
         options.u_start = ctx.node->data.value("uStart", 0.0);

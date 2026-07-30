@@ -70,6 +70,11 @@ data::PcgGeometry primitive_transform_geometry(const data::PcgGeometry& input,
 data::PcgSplineData convert_line_geometry(const data::PcgGeometry& input,
                                           const ConvertLineOptions& options);
 
+/// Convert each polygon primitive to one Houdini-style curve primitive.
+/// Unlike ConvertLine, adjacent primitives are never joined through shared points.
+data::PcgSplineData convert_geometry_primitives_to_splines(
+    const data::PcgGeometry& input);
+
 data::PcgPointData extract_centroid_geometry(const data::PcgGeometry& input,
                                              const ExtractCentroidOptions& options);
 
