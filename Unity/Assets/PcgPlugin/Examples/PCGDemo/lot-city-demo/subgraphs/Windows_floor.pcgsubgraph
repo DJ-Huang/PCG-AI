@@ -13,7 +13,7 @@
     {
       "id": "n151",
       "type": "Carve",
-      "position": { "x": -161, "y": -18.5 },
+      "position": { "x": -83, "y": -20.5 },
       "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
     },
     {
@@ -24,8 +24,7 @@
     }
   ],
   "edges": [
-    {"id": "e2842", "source": "n151", "target": "n145", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_iface_in_1_n151", "source": "subgraph_input", "target": "n151", "sourceHandle": "in_1", "targetHandle": "in"}
+    {"id": "e383", "source": "n151", "target": "n145", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "subgraphs": [
   ]

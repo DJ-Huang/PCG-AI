@@ -31,6 +31,8 @@ namespace DJTechEditor.PCG.Graph
         private PcgNodeInspector m_Inspector;
         private Button m_BlackboardToggle;
         private Button m_InspectorToggle;
+        private Button m_InterfaceToggle;
+        private bool m_InterfacePanelVisible;
         private Button m_SubgraphBackButton;
         private Label m_SubgraphBreadcrumb;
         private EnumField m_ScatterDisplayField;
@@ -441,6 +443,11 @@ namespace DJTechEditor.PCG.Graph
             m_BlackboardToggle = MakeButton("Parameters", ToggleBlackboard);
             toolbar.Add(m_BlackboardToggle);
 
+            m_InterfaceToggle = MakeButton("Interface", ToggleInterfacePanel);
+            m_InterfaceToggle.tooltip =
+                "Show/hide the Subgraph Interface panel (inputs/outputs). Only available inside a Subgraph.";
+            toolbar.Add(m_InterfaceToggle);
+
             m_InspectorToggle = MakeButton("Inspector", ToggleInspector);
             toolbar.Add(m_InspectorToggle);
 
@@ -593,8 +600,11 @@ namespace DJTechEditor.PCG.Graph
             if (m_InterfacePanel == null || m_GraphView == null)
                 return;
 
-            var show = m_SubgraphAssetMode || m_GraphView.IsInsideSubgraph;
+            var eligible = m_SubgraphAssetMode || m_GraphView.IsInsideSubgraph;
+            var show = eligible && m_InterfacePanelVisible;
             m_InterfacePanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (m_InterfaceToggle != null)
+                m_InterfaceToggle.SetEnabled(eligible);
             if (!show)
                 return;
 
@@ -877,6 +887,12 @@ namespace DJTechEditor.PCG.Graph
         internal void ToggleInspector()
         {
             m_Inspector.ToggleVisible();
+        }
+
+        internal void ToggleInterfacePanel()
+        {
+            m_InterfacePanelVisible = !m_InterfacePanelVisible;
+            RefreshInterfacePanel();
         }
 
         private static string AssetPathToFullPath(string assetPath)

@@ -263,7 +263,7 @@
       "id": "n138",
       "type": "GroupDelete",
       "position": { "x": 1854, "y": 2503.5 },
-      "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": ""}
+      "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": "Group Delete"}
     },
     {
       "id": "n150",
