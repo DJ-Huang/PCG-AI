@@ -133,6 +133,9 @@ namespace DJTechEditor.PCG.Graph
 
         private void PositionNear(PcgGraphNodeBase node)
         {
+            // Node title labels are siblings in contentViewContainer; stay above them.
+            BringToFront();
+
             // Same graph-space coordinates as radial menu overlays in contentViewContainer.
             var rect = node.GetPosition();
             const float panelWidth = 300f;
