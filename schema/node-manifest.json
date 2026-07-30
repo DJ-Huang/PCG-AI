@@ -10218,16 +10218,28 @@
       "outputs": [
         {
           "id": "out",
-          "label": "Spline",
-          "pinType": "SpatialSpline"
+          "label": "Out",
+          "pinType": "Any"
         }
       ],
       "properties": {
+        "group": {
+          "type": "string",
+          "displayName": "Group",
+          "default": "",
+          "order": 0
+        },
+        "arcLengthU": {
+          "type": "boolean",
+          "displayName": "Carve Curves by Relative Arc Length",
+          "default": true,
+          "order": 10
+        },
         "useFirstU": {
           "type": "boolean",
           "displayName": "First U",
           "default": true,
-          "order": 0
+          "order": 20
         },
         "uStart": {
           "type": "number",
@@ -10236,15 +10248,26 @@
           "minimum": 0.0,
           "maximum": 1.0,
           "visibleWhen": {
-            "useFirstU": true
+            "property": "useFirstU",
+            "equals": true
           },
-          "order": 10
+          "order": 30
+        },
+        "uStartAttrib": {
+          "type": "string",
+          "displayName": "First U Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useFirstU",
+            "equals": true
+          },
+          "order": 40
         },
         "useSecondU": {
           "type": "boolean",
           "displayName": "Second U",
           "default": true,
-          "order": 20
+          "order": 50
         },
         "uEnd": {
           "type": "number",
@@ -10253,62 +10276,212 @@
           "minimum": 0.0,
           "maximum": 1.0,
           "visibleWhen": {
-            "useSecondU": true
+            "property": "useSecondU",
+            "equals": true
           },
-          "order": 30
+          "order": 60
         },
-        "arcLengthU": {
+        "uEndAttrib": {
+          "type": "string",
+          "displayName": "Second U Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useSecondU",
+            "equals": true
+          },
+          "order": 70
+        },
+        "useFirstV": {
           "type": "boolean",
-          "displayName": "Carve Curves by Relative Arc Length",
+          "displayName": "First V",
           "default": true,
-          "order": 40
+          "order": 80
+        },
+        "vStart": {
+          "type": "number",
+          "displayName": "First V Value",
+          "default": 0.25,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "visibleWhen": {
+            "property": "useFirstV",
+            "equals": true
+          },
+          "order": 90
+        },
+        "vStartAttrib": {
+          "type": "string",
+          "displayName": "First V Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useFirstV",
+            "equals": true
+          },
+          "order": 100
+        },
+        "useSecondV": {
+          "type": "boolean",
+          "displayName": "Second V",
+          "default": true,
+          "order": 110
+        },
+        "vEnd": {
+          "type": "number",
+          "displayName": "Second V Value",
+          "default": 0.75,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "visibleWhen": {
+            "property": "useSecondV",
+            "equals": true
+          },
+          "order": 120
+        },
+        "vEndAttrib": {
+          "type": "string",
+          "displayName": "Second V Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useSecondV",
+            "equals": true
+          },
+          "order": 130
         },
         "location": {
           "type": "enum",
           "displayName": "Location",
-          "default": "breakpoints",
+          "default": "divisions",
+          "uiHint": "radio",
           "options": [
-            {
-              "value": "breakpoints",
-              "label": "Breakpoints"
-            },
             {
               "value": "divisions",
               "label": "Divisions"
+            },
+            {
+              "value": "breakpoints",
+              "label": "Breakpoints"
             }
           ],
-          "order": 50
+          "order": 140
+        },
+        "uDivisions": {
+          "type": "integer",
+          "displayName": "U Divisions",
+          "default": 2,
+          "minimum": 1,
+          "visibleWhen": {
+            "property": "location",
+            "equals": "divisions"
+          },
+          "order": 150
+        },
+        "vDivisions": {
+          "type": "integer",
+          "displayName": "V Divisions",
+          "default": 2,
+          "minimum": 1,
+          "visibleWhen": {
+            "property": "location",
+            "equals": "divisions"
+          },
+          "order": 160
         },
         "cutAtAllInternalUBreakpoints": {
           "type": "boolean",
           "displayName": "Cut At All Internal U Breakpoints",
           "default": true,
           "visibleWhen": {
-            "location": "breakpoints"
+            "property": "location",
+            "equals": "breakpoints"
           },
-          "order": 60
+          "order": 170
         },
-        "uDivisions": {
-          "type": "integer",
-          "displayName": "U Divisions",
-          "default": 1,
-          "minimum": 1,
+        "cutAtAllInternalVBreakpoints": {
+          "type": "boolean",
+          "displayName": "Cut At All Internal V Breakpoints",
+          "default": true,
           "visibleWhen": {
-            "location": "divisions"
+            "property": "location",
+            "equals": "breakpoints"
           },
-          "order": 70
+          "order": 180
+        },
+        "operation": {
+          "type": "enum",
+          "displayName": "Operation",
+          "default": "cut",
+          "uiHint": "radio",
+          "options": [
+            {
+              "value": "cut",
+              "label": "Cut"
+            },
+            {
+              "value": "extract",
+              "label": "Extract"
+            }
+          ],
+          "order": 190
         },
         "keepInside": {
           "type": "boolean",
           "displayName": "Keep Inside",
           "default": true,
-          "order": 80
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "cut"
+          },
+          "order": 200
         },
         "keepOutside": {
           "type": "boolean",
           "displayName": "Keep Outside",
           "default": false,
-          "order": 90
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "cut"
+          },
+          "order": 210
+        },
+        "extractType": {
+          "type": "enum",
+          "displayName": "Extract Type",
+          "default": "curves3d",
+          "options": [
+            {
+              "value": "curves3d",
+              "label": "Extract 3D Isoparametric Curve(s)"
+            },
+            {
+              "value": "points",
+              "label": "Extract Point(s)"
+            }
+          ],
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "extract"
+          },
+          "order": 220
+        },
+        "keepOriginal": {
+          "type": "boolean",
+          "displayName": "Keep Original",
+          "default": false,
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "extract"
+          },
+          "order": 230
+        },
+        "onlyAtBreakpoints": {
+          "type": "boolean",
+          "displayName": "Only At Breakpoints",
+          "default": false,
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "extract"
+          },
+          "order": 240
         }
       }
     },

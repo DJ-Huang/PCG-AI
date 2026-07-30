@@ -374,6 +374,35 @@
   height: 16px;
 }
 
+.pcg-inspector__radio {
+  display: flex;
+  width: 100%;
+}
+
+.pcg-inspector__radio-btn {
+  flex: 1;
+  padding: 4px 6px;
+  background: #16161f;
+  border: 1px solid #333;
+  color: #bfbfbf;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pcg-inspector__radio-btn:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.pcg-inspector__radio-btn:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.pcg-inspector__radio-btn--active {
+  background: #38597f;
+  border-color: #181818;
+  color: #fff;
+}
+
 .pcg-inspector__vector3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

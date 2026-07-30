@@ -1228,7 +1228,8 @@ namespace DJTechEditor.PCG.Graph
                         m_GraphView.EndDrag();
                         NotifyGraphChanged();
                     },
-                    onFieldCommit: v => m_GraphView.WithUndo("Change Property", () => onSet(v)));
+                    onFieldCommit: v => m_GraphView.WithUndo("Change Property", () => onSet(v)),
+                    numericFirst: true);
                 slider.style.flexGrow = 1;
                 slider.style.minWidth = 120;
                 slider.style.maxWidth = 180;
@@ -1273,6 +1274,8 @@ namespace DJTechEditor.PCG.Graph
             ManifestPropertyDef prop, object val, Action<string> onSet)
         {
             var field = MakeEnumField(string.Empty, prop, val, onSet);
+            if (prop.uiHint == "radio")
+                return field;
             field.style.width = 72;
             field.style.minWidth = 72;
             field.style.maxWidth = 96;
@@ -1390,7 +1393,7 @@ namespace DJTechEditor.PCG.Graph
         }
 
         /// <summary>
-        /// Two-row layout matching other nodes: header (label + promote + bind), then full-width value.
+        /// Houdini-style single row: [right-aligned label] [value field / slider …] [+] [bind].
         /// Booleans use a compact Houdini-style checkbox row (label on the toggle).
         /// </summary>
         private VisualElement CreatePropertyRow(
@@ -1421,40 +1424,68 @@ namespace DJTechEditor.PCG.Graph
             {
                 style =
                 {
-                    marginBottom = 6,
+                    marginBottom = 2,
                     flexShrink = 0,
                     width = Length.Percent(100),
                     marginLeft = prop.indent ? 16 : 0,
                 },
             };
 
-            // Row 1: wrapping label + promote/bind (Houdini: label wraps, actions stay top-right)
-            var headerRow = new VisualElement
+            var row = new VisualElement
             {
                 style =
                 {
                     flexDirection = FlexDirection.Row,
-                    alignItems = Align.FlexStart,
-                    flexWrap = Wrap.Wrap,
+                    alignItems = Align.Center,
                     width = Length.Percent(100),
                 },
             };
 
-            var label = new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
+            row.Add(new Label(PcgGroupResolution.PropertyDisplayLabel(key, prop))
+            {
+                style =
+                {
+                    width = 92,
+                    minWidth = 56,
+                    flexShrink = 0,
+                    whiteSpace = WhiteSpace.Normal,
+                    unityTextAlign = TextAnchor.MiddleRight,
+                    color = new Color(0.8f, 0.8f, 0.8f),
+                    fontSize = 10,
+                    paddingTop = 1,
+                    marginRight = 6,
+                },
+            });
+
+            var valueHolder = new VisualElement
             {
                 style =
                 {
                     flexGrow = 1,
                     flexShrink = 1,
-                    minWidth = 80,
-                    whiteSpace = WhiteSpace.Normal,
-                    color = new Color(0.8f, 0.8f, 0.8f),
-                    unityFontStyleAndWeight = FontStyle.Bold,
-                    paddingTop = 2,
-                    paddingRight = 4,
+                    minWidth = 48,
+                    marginRight = 4,
                 },
             };
-            headerRow.Add(label);
+
+            void RebuildValue()
+            {
+                valueHolder.Clear();
+                // AttributeWrangle parameters are drawn as a dedicated Channels section in
+                // ShowManifestProperties — never fall back to multiline JSON here.
+                if (node.NodeType == "AttributeWrangle" && key == "parameters")
+                    return;
+                if (node.NodeType == "GroupDelete" && key == "deletions")
+                    return;
+                var binding = m_Blackboard.FindBinding(node.NodeId, key);
+                var valueElement = CreateValueField(key, prop, node, binding, setValueOverride);
+                valueElement.style.marginTop = 0;
+                valueElement.style.width = Length.Percent(100);
+                valueHolder.Add(valueElement);
+            }
+
+            RebuildValue();
+            row.Add(valueHolder);
 
             var actions = new VisualElement
             {
@@ -1479,9 +1510,9 @@ namespace DJTechEditor.PCG.Graph
             // Bind dropdown
             var (bindOptions, paramIds, currentIdx) = BuildBindOptions(node.NodeId, key, prop.type);
             var bindPopup = new PopupField<string>(bindOptions, currentIdx);
-            bindPopup.style.width = 90;
+            bindPopup.style.width = 72;
             bindPopup.style.flexShrink = 0;
-            bindPopup.style.marginLeft = 4;
+            bindPopup.style.marginLeft = 2;
             bindPopup.RegisterValueChangedCallback(evt =>
             {
                 var idx = bindOptions.IndexOf(evt.newValue);
@@ -1499,31 +1530,13 @@ namespace DJTechEditor.PCG.Graph
                         m_Blackboard.SetBinding(paramId, node.NodeId, key);
                 });
 
-                // Refresh value row only — full ShowNode() on BevelMesh retriggers PopupFields and can stack-overflow.
-                if (container.childCount > 1)
-                    container.RemoveAt(container.childCount - 1);
-                var binding = m_Blackboard.FindBinding(node.NodeId, key);
-                container.Add(CreateValueField(key, prop, node, binding, setValueOverride));
+                // Refresh value only — full ShowNode() on BevelMesh retriggers PopupFields and can stack-overflow.
+                RebuildValue();
             });
             actions.Add(bindPopup);
-            headerRow.Add(actions);
-            container.Add(headerRow);
+            row.Add(actions);
 
-            // Row 2: value or bound label (full width — not crushed beside + / bind)
-            var currentBindingForValue = m_Blackboard.FindBinding(node.NodeId, key);
-            // AttributeWrangle parameters are drawn as a dedicated Channels section in
-            // ShowManifestProperties — never fall back to multiline JSON here.
-            if (node.NodeType == "AttributeWrangle" && key == "parameters")
-            {
-                ApplyEnabledWhen(container, node, prop);
-                return container;
-            }
-            if (node.NodeType == "GroupDelete" && key == "deletions")
-            {
-                ApplyEnabledWhen(container, node, prop);
-                return container;
-            }
-            container.Add(CreateValueField(key, prop, node, currentBindingForValue, setValueOverride));
+            container.Add(row);
             ApplyEnabledWhen(container, node, prop);
             return container;
         }
@@ -1772,7 +1785,8 @@ namespace DJTechEditor.PCG.Graph
                         {
                             m_GraphView.EndDrag();
                             NotifyGraphChanged();
-                        }));
+                        },
+                        numericFirst: true));
                 }
                 else
                 {
@@ -1819,7 +1833,8 @@ namespace DJTechEditor.PCG.Graph
                                 apply(newValue);
                         });
                         NotifyGraphChanged();
-                    }));
+                    },
+                    numericFirst: true));
                 return wrapper;
             }
 
@@ -2833,6 +2848,9 @@ namespace DJTechEditor.PCG.Graph
                 values.Add(currentStr);
             }
 
+            if (prop.uiHint == "radio")
+                return MakeRadioEnumField(labels, values, selectedIdx, onSet);
+
             var popup = new PopupField<string>(labels, selectedIdx);
             popup.RegisterValueChangedCallback(evt =>
             {
@@ -2845,6 +2863,72 @@ namespace DJTechEditor.PCG.Graph
                 NotifyGraphChanged();
             });
             return popup;
+        }
+
+        private VisualElement MakeRadioEnumField(
+            List<string> labels, List<string> values, int selectedIdx, Action<string> onSet)
+        {
+            var row = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexGrow = 1,
+                    marginBottom = 2,
+                },
+            };
+
+            var buttons = new List<Button>();
+            void Refresh(int active)
+            {
+                for (var i = 0; i < buttons.Count; i++)
+                {
+                    var selected = i == active;
+                    buttons[i].style.backgroundColor = selected
+                        ? new Color(0.22f, 0.35f, 0.55f)
+                        : new Color(0.16f, 0.16f, 0.16f);
+                    buttons[i].style.color = selected
+                        ? Color.white
+                        : new Color(0.75f, 0.75f, 0.75f);
+                }
+            }
+
+            for (var i = 0; i < labels.Count; i++)
+            {
+                var index = i;
+                var button = new Button(() =>
+                {
+                    m_GraphView.WithUndo("Change Property", () => onSet(values[index]));
+                    NotifyGraphChanged();
+                    Refresh(index);
+                })
+                {
+                    text = labels[i],
+                    style =
+                    {
+                        flexGrow = 1,
+                        marginLeft = 0,
+                        marginRight = 0,
+                        borderTopLeftRadius = i == 0 ? 3 : 0,
+                        borderBottomLeftRadius = i == 0 ? 3 : 0,
+                        borderTopRightRadius = i == labels.Count - 1 ? 3 : 0,
+                        borderBottomRightRadius = i == labels.Count - 1 ? 3 : 0,
+                        borderTopWidth = 1,
+                        borderBottomWidth = 1,
+                        borderLeftWidth = 1,
+                        borderRightWidth = 1,
+                        borderTopColor = new Color(0.09f, 0.09f, 0.09f),
+                        borderBottomColor = new Color(0.09f, 0.09f, 0.09f),
+                        borderLeftColor = new Color(0.09f, 0.09f, 0.09f),
+                        borderRightColor = new Color(0.09f, 0.09f, 0.09f),
+                        unityTextAlign = TextAnchor.MiddleCenter,
+                    },
+                };
+                buttons.Add(button);
+                row.Add(button);
+            }
+            Refresh(selectedIdx);
+            return row;
         }
 
         private VisualElement MakeTextureField(string key, object val, Action<string> onSet)

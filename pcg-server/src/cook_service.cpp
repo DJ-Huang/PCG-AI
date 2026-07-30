@@ -168,7 +168,7 @@ size_t ComputePointsPayloadSize(
     const std::vector<uint8_t>& points_buf,
     int point_count,
     uint32_t attr_flags) {
-    if (point_count <= 0 || points_buf.size() < 16 ||
+    if (point_count < 0 || points_buf.size() < 16 ||
         ReadU32(points_buf.data()) != PCG_POINT_BINARY_MAGIC) {
         return 0;
     }

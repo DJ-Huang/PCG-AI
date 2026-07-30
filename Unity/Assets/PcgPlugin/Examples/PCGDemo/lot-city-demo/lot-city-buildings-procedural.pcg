@@ -77,7 +77,7 @@
       "id": "n104",
       "type": "Carve",
       "position": { "x": 1173, "y": 978 },
-      "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
+      "data": {"group": "", "arcLengthU": true, "useFirstU": true, "uStart": 0, "uStartAttrib": "", "useSecondU": true, "uEnd": 1, "uEndAttrib": "", "useFirstV": true, "vStart": 0.25, "vStartAttrib": "", "useSecondV": true, "vEnd": 0.75, "vEndAttrib": "", "location": "breakpoints", "uDivisions": 1, "vDivisions": 2, "cutAtAllInternalUBreakpoints": true, "cutAtAllInternalVBreakpoints": true, "operation": "cut", "keepInside": true, "keepOutside": false, "extractType": "curves3d", "keepOriginal": false, "onlyAtBreakpoints": false, "__nodeTitle": ""}
     },
     {
       "id": "n107",
@@ -496,7 +496,7 @@
           "id": "n146",
           "type": "Carve",
           "position": { "x": -161, "y": 109.5 },
-          "data": {"useFirstU": true, "uStart": 0, "useSecondU": true, "uEnd": 1, "arcLengthU": true, "location": "breakpoints", "cutAtAllInternalUBreakpoints": true, "uDivisions": 1, "keepInside": true, "keepOutside": false, "__nodeTitle": ""}
+          "data": {"group": "", "arcLengthU": true, "useFirstU": true, "uStart": 0, "uStartAttrib": "", "useSecondU": true, "uEnd": 1, "uEndAttrib": "", "useFirstV": true, "vStart": 0.25, "vStartAttrib": "", "useSecondV": true, "vEnd": 0.75, "vEndAttrib": "", "location": "breakpoints", "uDivisions": 1, "vDivisions": 2, "cutAtAllInternalUBreakpoints": true, "cutAtAllInternalVBreakpoints": true, "operation": "cut", "keepInside": true, "keepOutside": false, "extractType": "curves3d", "keepOriginal": false, "onlyAtBreakpoints": false, "__nodeTitle": ""}
         },
         {
           "id": "n147",

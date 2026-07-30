@@ -72,6 +72,8 @@ namespace DJTechEditor.PCG.Graph
         /// <summary>Small inline label before this control (e.g. "to", "Offset by").</summary>
         public string rowPrefix;
         public bool indent;
+        /// <summary>Control flavor hint, e.g. "radio" renders an enum as Houdini-style tab buttons.</summary>
+        public string uiHint;
         public bool multiline;
         public int lines = 1;
     }
@@ -378,6 +380,7 @@ namespace DJTechEditor.PCG.Graph
                         // Optional Inspector layout metadata (opt-in; missing → legacy UI path)
                         propDef.displayName = GetString(propObj, "displayName");
                         propDef.section = GetString(propObj, "section");
+                        propDef.uiHint = GetString(propObj, "uiHint");
                         propDef.multiline = propObj.TryGetValue("multiline", out var multilineVal)
                             && Convert.ToBoolean(multilineVal, CultureInfo.InvariantCulture);
                         if (propObj.TryGetValue("lines", out var linesVal) && linesVal != null)

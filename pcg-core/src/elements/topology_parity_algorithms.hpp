@@ -121,16 +121,35 @@ struct SortGeometryOptions {
 };
 
 struct CarveSplineOptions {
+    std::string group;
     double u_start = 0.0;
     double u_end = 1.0;
     bool use_first_u = true;
     bool use_second_u = true;
+    /** Houdini: primitive attribute scaling First/Second U per spline. */
+    std::string u_start_attrib;
+    std::string u_end_attrib;
     /** Houdini: Carve Curves by Relative Arc Length */
     bool arc_length_u = true;
-    /** "breakpoints" | "divisions" */
-    std::string location = "breakpoints";
+    /** V parameters carve surfaces in Houdini; parsed for parity, no-op on 1D splines. */
+    double v_start = 0.25;
+    double v_end = 0.75;
+    bool use_first_v = true;
+    bool use_second_v = true;
+    std::string v_start_attrib;
+    std::string v_end_attrib;
+    /** "divisions" | "breakpoints" */
+    std::string location = "divisions";
+    int u_divisions = 2;
+    int v_divisions = 2;
     bool cut_at_all_internal_u_breakpoints = true;
-    int u_divisions = 1;
+    bool cut_at_all_internal_v_breakpoints = true;
+    /** "cut" | "extract" */
+    std::string operation = "cut";
+    /** "curves3d" | "points"; identical on 1D splines (iso-curve of a curve is a point). */
+    std::string extract_type = "curves3d";
+    bool keep_original = false;
+    bool only_at_breakpoints = false;
     bool keep_inside = true;
     bool keep_outside = false;
 };
@@ -215,6 +234,9 @@ data::PcgSplineData sort_spline_data(const data::PcgSplineData& input,
                                      std::string* error_out = nullptr);
 data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                                       const CarveSplineOptions& options);
+/// Houdini Carve Extract: points at each U location (and original vertices when keep_original).
+data::PcgPointData carve_spline_extract_points(const data::PcgSplineData& input,
+                                               const CarveSplineOptions& options);
 data::PcgSplineData find_shortest_path_on_mesh(const data::PcgGeometry& input,
                                                const FindShortestPathOptions& options);
 data::PcgGeometry resample_geometry(const data::PcgGeometry& input,

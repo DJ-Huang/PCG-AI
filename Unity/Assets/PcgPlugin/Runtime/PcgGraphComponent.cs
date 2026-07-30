@@ -893,7 +893,13 @@ namespace DJTechRuntime.PCG
                 case PcgResultKind.Points:
                     if (result.Kind == PcgExecuteKind.Points)
                     {
-                        if (!PcgResultParser.TryParsePointBinary(result.PointBinary, out var points, out var binaryError))
+                        List<PcgScatterPoint> points;
+                        if (result.PointBinary == null && result.PointCount == 0)
+                        {
+                            // Empty point set: server may omit the 16-byte header-only payload.
+                            points = new List<PcgScatterPoint>();
+                        }
+                        else if (!PcgResultParser.TryParsePointBinary(result.PointBinary, out points, out var binaryError))
                         {
                             Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
                             return false;

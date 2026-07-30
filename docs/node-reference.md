@@ -1503,6 +1503,56 @@ blast_short → StaticMeshSpawner(short) ─┘
 
 ---
 
+### Carve
+
+**类别**：Spline
+
+**功能**：对齐 Houdini Carve SOP。按 U 参数（0~1）切割样条为多段（Cut），或在指定 U 位置提取点（Extract）。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Spline | `SpatialSpline` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Out | `Any`（Cut 输出 `SpatialSpline`，Extract 输出 `SpatialPoint` 点云） |
+
+**属性**（面板顺序与 Houdini 一致）：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `group` | string | `""` | 只处理该属性组内的样条；组外样条原样透传（Extract 模式下以其顶点形式进入点云） |
+| `arcLengthU` | boolean | true | Carve Curves by Relative Arc Length：U 按弧长而非顶点参数化解释 |
+| `useFirstU` / `uStart` | boolean / number | true / 0.0 | First U 起始位置 |
+| `uStartAttrib` | string | `""` | First U Attrib：样条属性缩放 First U（`uStart * attrib`） |
+| `useSecondU` / `uEnd` | boolean / number | true / 1.0 | Second U 结束位置 |
+| `uEndAttrib` | string | `""` | Second U Attrib：样条属性缩放 Second U |
+| `useFirstV` / `vStart` / `vStartAttrib` | — | true / 0.25 / `""` | Houdini 曲面雕刻参数；对一维样条无作用，仅为参数面板对齐保留 |
+| `useSecondV` / `vEnd` / `vEndAttrib` | — | true / 0.75 / `""` | 同上 |
+| `location` | enum(radio) | `"divisions"` | `divisions` / `breakpoints` 页签 |
+| `uDivisions` | integer | 2 | Divisions 页签：U 方向切/提取段数（N 段 → N-1 个内部切点） |
+| `vDivisions` | integer | 2 | 曲面参数，样条上无作用 |
+| `cutAtAllInternalUBreakpoints` | boolean | true | Breakpoints 页签：在区间内所有内部顶点处切割 |
+| `cutAtAllInternalVBreakpoints` | boolean | true | 曲面参数，样条上无作用 |
+| `operation` | enum(radio) | `"cut"` | `cut` / `extract` 单选 |
+| `keepInside` | boolean | true | Cut：保留 `[First U, Second U]` 区间内的段 |
+| `keepOutside` | boolean | false | Cut：保留区间外的段 |
+| `extractType` | enum | `"curves3d"` | Extract：`curves3d`（Extract 3D Isoparametric Curve(s)）/ `points`（Extract Point(s)）；一维样条的等参截面即点，两者行为一致 |
+| `keepOriginal` | boolean | false | Extract：输出中追加原始样条顶点 |
+| `onlyAtBreakpoints` | boolean | false | Extract：只在已存在顶点（breakpoints）处执行，落在边中间的 U 位置被丢弃 |
+
+**执行逻辑**：
+1. Cut：在 First/Second U（可被 Attrib 缩放）与 Divisions/Breakpoints 内部切点处拆分样条，按 `keepInside`/`keepOutside` 保留区间段；`group` 外的样条不参与切割、原样输出。
+2. Extract：在每个 U 位置输出一个点（属性继承自源样条），`keepOriginal` 追加原始顶点，`onlyAtBreakpoints` 将位置限制到已存在顶点。
+
+**Houdini 差异说明**：Houdini Carve 同时支持面/曲面（V 参数、2D 等参曲线提取）；本节点输入为 `SpatialSpline`，V 参数与 Extract Type 仅做面板与参数解析对齐，对一维样条无额外效果（与 Houdini 作用于曲线时一致：V 无效、提取结果为点）。
+
+---
+
 ### CreateBezierSpline
 
 **类别**：Spline
