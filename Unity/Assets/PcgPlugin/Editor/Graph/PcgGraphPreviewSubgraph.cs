@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DJTechRuntime.PCG;
@@ -17,6 +18,10 @@ namespace DJTechEditor.PCG.Graph
         public const string PreviewSinkNodeId = "__pcg_preview_sink__";
         private const string ExternalIdPrefix = "__pcg_ext__/";
 
+        /// Must stay in sync with PcgInterfaceAnchorNodeBase.InitializeInterfaceAnchor.
+        private const string OutputAnchorIdPrefix = "iface_Output_";
+        private const string InputAnchorIdPrefix = "iface_Input_";
+
         public static bool TryBuildPreviewCook(
             PcgGraphDocument liveDoc,
             string previewNodeId,
@@ -25,7 +30,27 @@ namespace DJTechEditor.PCG.Graph
             out PcgGraphDocument cookDoc,
             out string error)
         {
+            return TryBuildPreviewCook(
+                liveDoc,
+                previewNodeId,
+                scopeSubgraphId,
+                instanceChainRootToLeaf,
+                out cookDoc,
+                out _,
+                out error);
+        }
+
+        public static bool TryBuildPreviewCook(
+            PcgGraphDocument liveDoc,
+            string previewNodeId,
+            string scopeSubgraphId,
+            IReadOnlyList<string> instanceChainRootToLeaf,
+            out PcgGraphDocument cookDoc,
+            out Dictionary<string, string> outputStatsAliases,
+            out string error)
+        {
             cookDoc = null;
+            outputStatsAliases = new Dictionary<string, string>();
             error = null;
 
             if (liveDoc == null)
@@ -44,6 +69,7 @@ namespace DJTechEditor.PCG.Graph
             {
                 if (!TryBuildUpstream(liveDoc, previewNodeId, out cookDoc, out error))
                     return false;
+                CollectScopeOutputStatsAliases(liveDoc, cookDoc, null, outputStatsAliases);
                 return true;
             }
 
@@ -54,6 +80,10 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
+            // Interface anchors are display-only; previewing one targets the hidden
+            // structural SubgraphInput/Output node it represents.
+            var effectivePreviewNodeId = ResolveInterfaceAnchorNodeId(definition, previewNodeId);
+
             var scopeDoc = new PcgGraphDocument
             {
                 version = liveDoc.version,
@@ -63,7 +93,7 @@ namespace DJTechEditor.PCG.Graph
                 parameters = CloneParametersForNodes(liveDoc.parameters, definition.nodes),
             };
 
-            if (!TryBuildUpstream(scopeDoc, previewNodeId, out cookDoc, out error))
+            if (!TryBuildUpstream(scopeDoc, effectivePreviewNodeId, out cookDoc, out error))
                 return false;
 
             // Graft parent inputs from innermost opened instance out to root.
@@ -89,9 +119,95 @@ namespace DJTechEditor.PCG.Graph
                 return false;
             }
 
+            CollectScopeOutputStatsAliases(scopeDoc, cookDoc, definition, outputStatsAliases);
+
             EnsurePreviewSink(cookDoc);
             StripInterfaceNodes(cookDoc);
             return true;
+        }
+
+        /// <summary>
+        /// Interface Output nodes (and their display-only canvas anchors) never reach the
+        /// cook — the preview doc cooks whatever feeds them. Alias the Output node id and
+        /// each <c>iface_Output_{portId}</c> anchor id to the cooked source node so the
+        /// info panel can show its geometry stats (Houdini shows subnet output info on the
+        /// output node). Computed after parent-input grafting but before
+        /// <see cref="EnsurePreviewSink"/> strips the authoring Output, so passthrough
+        /// outputs resolve to the grafted <c>__pcg_ext__/</c> parent source.
+        /// </summary>
+        private static void CollectScopeOutputStatsAliases(
+            PcgGraphDocument scopeDoc,
+            PcgGraphDocument cookDoc,
+            PcgSubgraphDefinition definition,
+            Dictionary<string, string> aliases)
+        {
+            if (scopeDoc?.nodes == null || cookDoc?.nodes == null || aliases == null)
+                return;
+
+            foreach (var outputNode in scopeDoc.nodes)
+            {
+                if (outputNode == null ||
+                    (outputNode.type != "Output" &&
+                     outputNode.type != PcgStructuralNodeTypes.SubgraphOutput))
+                {
+                    continue;
+                }
+
+                var source = cookDoc.edges?
+                    .FirstOrDefault(e => e != null && e.target == outputNode.id)?.source;
+                if (string.IsNullOrEmpty(source))
+                {
+                    var definitionEdge = scopeDoc.edges?.FirstOrDefault(
+                        e => e != null && e.target == outputNode.id);
+                    if (definitionEdge != null &&
+                        !string.IsNullOrEmpty(definitionEdge.source) &&
+                        cookDoc.nodes.Any(n => n != null && n.id == definitionEdge.source))
+                    {
+                        source = definitionEdge.source;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(source))
+                    continue;
+
+                aliases[outputNode.id] = source;
+                if (definition?.outputs == null)
+                    continue;
+                foreach (var port in definition.outputs)
+                {
+                    if (port == null || string.IsNullOrEmpty(port.id))
+                        continue;
+                    aliases[$"{OutputAnchorIdPrefix}{port.id}"] = source;
+                }
+            }
+        }
+
+        private static string ResolveInterfaceAnchorNodeId(
+            PcgSubgraphDefinition definition,
+            string previewNodeId)
+        {
+            if (definition?.nodes == null || string.IsNullOrEmpty(previewNodeId))
+                return previewNodeId;
+
+            if (previewNodeId.StartsWith(OutputAnchorIdPrefix, StringComparison.Ordinal))
+            {
+                var outputNodeId = definition.nodes
+                    .FirstOrDefault(n => n != null &&
+                                         (n.type == "Output" ||
+                                          n.type == PcgStructuralNodeTypes.SubgraphOutput))
+                    ?.id;
+                return string.IsNullOrEmpty(outputNodeId) ? previewNodeId : outputNodeId;
+            }
+
+            if (previewNodeId.StartsWith(InputAnchorIdPrefix, StringComparison.Ordinal))
+            {
+                var inputNodeId = definition.nodes
+                    .FirstOrDefault(n => n != null && n.type == PcgStructuralNodeTypes.SubgraphInput)
+                    ?.id;
+                return string.IsNullOrEmpty(inputNodeId) ? previewNodeId : inputNodeId;
+            }
+
+            return previewNodeId;
         }
 
         public static bool TryBuildUpstream(

@@ -19,9 +19,21 @@ namespace DJTechRuntime.PCG
             out PcgExternalResolveResult resolveResult,
             out string error)
         {
+            return TryBuild(authoring, loader, out flat, out resolveResult, out error, out _);
+        }
+
+        public static bool TryBuild(
+            PcgGraphDocument authoring,
+            PcgExternalSubgraphLoader loader,
+            out PcgGraphDocument flat,
+            out PcgExternalResolveResult resolveResult,
+            out string error,
+            out Dictionary<string, string> outputStatsAliases)
+        {
             flat = null;
             resolveResult = null;
             error = null;
+            outputStatsAliases = new Dictionary<string, string>();
 
             if (authoring == null)
             {
@@ -33,7 +45,7 @@ namespace DJTechRuntime.PCG
             PcgSubgraphParameterResolver.ApplyInstanceOverrides(working);
             if (!working.HasExternalSubgraphAssets())
             {
-                if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error))
+                if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error, out outputStatsAliases))
                     return false;
                 PruneToExecutionSink(flat);
                 resolveResult = new PcgExternalResolveResult
@@ -60,7 +72,7 @@ namespace DJTechRuntime.PCG
 
             PcgSubgraphParameterResolver.ApplyInstanceOverrides(resolveResult.Document);
 
-            if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error))
+            if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error, out outputStatsAliases))
                 return false;
 
             PruneToExecutionSink(flat);
@@ -75,8 +87,21 @@ namespace DJTechRuntime.PCG
             out string error,
             bool pretty = false)
         {
+            return TryBuildJson(
+                authoring, loader, out flatJson, out resolveResult, out error, out _, pretty);
+        }
+
+        public static bool TryBuildJson(
+            PcgGraphDocument authoring,
+            PcgExternalSubgraphLoader loader,
+            out string flatJson,
+            out PcgExternalResolveResult resolveResult,
+            out string error,
+            out Dictionary<string, string> outputStatsAliases,
+            bool pretty = false)
+        {
             flatJson = null;
-            if (!TryBuild(authoring, loader, out var flat, out resolveResult, out error))
+            if (!TryBuild(authoring, loader, out var flat, out resolveResult, out error, out outputStatsAliases))
                 return false;
             flatJson = PcgGraphSerializer.ToJson(flat, pretty);
             return true;

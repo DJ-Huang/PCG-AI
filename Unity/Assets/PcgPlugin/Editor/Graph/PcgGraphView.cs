@@ -165,9 +165,10 @@ namespace DJTechEditor.PCG.Graph
         internal bool TryGetNodeMeshStats(string nodeId, out PcgNodeMeshStats stats)
         {
             var json = ResolveCookResultJson();
-            if (json != m_LastStatsJson)
+            var cacheKey = (json ?? "") + "\u001f" + PcgGraphExecutionBridge.LastOutputStatsAliasesVersion;
+            if (cacheKey != m_LastStatsJson)
             {
-                m_LastStatsJson = json;
+                m_LastStatsJson = cacheKey;
                 m_NodeMeshStats.Clear();
                 m_NodeGroups.Clear();
                 m_NodeAttrs.Clear();
@@ -215,8 +216,74 @@ namespace DJTechEditor.PCG.Graph
                     }
                     catch { /* JSON shape mismatch — silently skip */ }
                 }
+
+                ApplyOutputStatsAliases(
+                    PcgGraphExecutionBridge.LastOutputStatsAliases,
+                    m_NodeMeshStats,
+                    m_NodeGroups,
+                    m_NodeAttrs);
             }
             return m_NodeMeshStats.TryGetValue(nodeId, out stats);
+        }
+
+        /// <summary>
+        /// Subgraph instances are flattened away before cook, so the cook result has no stats
+        /// under the instance node id. Alias each instance to the flat node that sourced its
+        /// first output (Houdini shows the subnet output's geometry info on the subnet node).
+        /// </summary>
+        public static void ApplyOutputStatsAliases(
+            System.Collections.Generic.IReadOnlyDictionary<string, string> aliases,
+            Dictionary<string, PcgNodeMeshStats> nodeMeshStats,
+            Dictionary<string, List<NodeGroupEntry>> nodeGroups,
+            Dictionary<string, List<NodeAttrEntry>> nodeAttrs)
+        {
+            if (aliases == null)
+                return;
+
+            foreach (var pair in aliases)
+            {
+                var source = ResolveStatsAliasSource(aliases, pair.Key, nodeMeshStats);
+                if (source == null)
+                    continue;
+                if (!nodeMeshStats.ContainsKey(pair.Key) &&
+                    nodeMeshStats.TryGetValue(source, out var stats))
+                    nodeMeshStats[pair.Key] = stats;
+                if (!nodeGroups.ContainsKey(pair.Key) &&
+                    nodeGroups.TryGetValue(source, out var groups))
+                    nodeGroups[pair.Key] = groups;
+                if (!nodeAttrs.ContainsKey(pair.Key) &&
+                    nodeAttrs.TryGetValue(source, out var attrs))
+                    nodeAttrs[pair.Key] = attrs;
+            }
+        }
+
+        /// <summary>
+        /// Follows alias chains (e.g. interface Output anchor → Subgraph instance → flat
+        /// internal node) and returns the first target that has cook stats; falls back to
+        /// the chain end so groups/attrs can still resolve there.
+        /// </summary>
+        private static string ResolveStatsAliasSource(
+            System.Collections.Generic.IReadOnlyDictionary<string, string> aliases,
+            string key,
+            Dictionary<string, PcgNodeMeshStats> nodeMeshStats)
+        {
+            if (!aliases.TryGetValue(key, out var target) || string.IsNullOrEmpty(target))
+                return null;
+
+            var visited = new HashSet<string> { key };
+            var current = target;
+            string last = null;
+            while (current != null && visited.Add(current))
+            {
+                last = current;
+                if (nodeMeshStats.ContainsKey(current))
+                    return current;
+                if (!aliases.TryGetValue(current, out var next) || next == current)
+                    break;
+                current = next;
+            }
+
+            return last;
         }
 
         internal bool TryGetNodeGroups(string nodeId, out List<NodeGroupEntry> groups)

@@ -55,8 +55,24 @@ namespace DJTechRuntime.PCG
             out PcgGraphDocument flat,
             out string error)
         {
+            return TryFlattenForExecution(resolved, out flat, out error, out _);
+        }
+
+        /// <param name="outputStatsAliases">
+        /// Root-scope Subgraph instance node id → flat node id that sourced the instance's
+        /// first output port. Used by the editor info panel: a Subgraph instance is flattened
+        /// away, so the cook result never carries stats under the instance id (Houdini shows
+        /// the subnet output's geometry info on the subnet node itself).
+        /// </param>
+        public static bool TryFlattenForExecution(
+            PcgGraphDocument resolved,
+            out PcgGraphDocument flat,
+            out string error,
+            out Dictionary<string, string> outputStatsAliases)
+        {
             flat = null;
             error = null;
+            outputStatsAliases = new Dictionary<string, string>(StringComparer.Ordinal);
             if (resolved == null)
             {
                 error = "Resolved document is null.";
@@ -102,6 +118,7 @@ namespace DJTechRuntime.PCG
             }
 
             var stack = new List<string>();
+            var rootInstances = new Dictionary<string, ExpandedScope>(StringComparer.Ordinal);
             if (!ExpandScope(
                     resolved.nodes ?? new List<PcgGraphNodeRecord>(),
                     resolved.edges ?? new List<PcgGraphEdgeRecord>(),
@@ -110,9 +127,12 @@ namespace DJTechRuntime.PCG
                     stack,
                     ParentScopeContext.None,
                     null,
+                    rootInstances,
                     out var expanded,
                     out error))
                 return false;
+
+            CollectOutputStatsAliases(resolved, definitions, rootInstances, outputStatsAliases);
 
             if (expanded.Nodes.Count > MaxFlatNodes)
             {
@@ -142,6 +162,7 @@ namespace DJTechRuntime.PCG
             List<string> stack,
             ParentScopeContext parentContext,
             PcgSubgraphDefinition scopeDefinition,
+            Dictionary<string, ExpandedScope> rootInstances,
             out ExpandedScope output,
             out string error)
         {
@@ -202,6 +223,7 @@ namespace DJTechRuntime.PCG
                         stack,
                         childParent,
                         definition,
+                        rootInstances,
                         out var child,
                         out error))
                     return false;
@@ -215,6 +237,8 @@ namespace DJTechRuntime.PCG
                         child.DeclaredInputs.Add(input.id);
                 }
                 instances[node.id] = child;
+                if (prefix.Length == 0)
+                    rootInstances[node.id] = child;
             }
 
             var edgeCounter = 0;
@@ -326,6 +350,65 @@ namespace DJTechRuntime.PCG
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Resolves each root-scope Subgraph instance's first output port to the flat node
+        /// that feeds it (direct output source or passthrough through the instance inputs).
+        /// Best-effort: instances whose output cannot be resolved are skipped.
+        /// </summary>
+        private static void CollectOutputStatsAliases(
+            PcgGraphDocument resolved,
+            Dictionary<string, PcgSubgraphDefinition> definitions,
+            Dictionary<string, ExpandedScope> rootInstances,
+            Dictionary<string, string> outputStatsAliases)
+        {
+            if (rootInstances == null || rootInstances.Count == 0)
+                return;
+
+            var rootNodes = resolved.nodes ?? new List<PcgGraphNodeRecord>();
+            var rootEdges = resolved.edges ?? new List<PcgGraphEdgeRecord>();
+            var byId = new Dictionary<string, PcgGraphNodeRecord>(StringComparer.Ordinal);
+            foreach (var node in rootNodes)
+            {
+                if (node != null && !string.IsNullOrEmpty(node.id))
+                    byId[node.id] = node;
+            }
+
+            foreach (var pair in rootInstances)
+            {
+                if (!byId.TryGetValue(pair.Key, out var instanceNode))
+                    continue;
+
+                var subgraphId = instanceNode.data?.GetRaw("subgraphId")?.ToString() ?? "";
+                if (!definitions.TryGetValue(subgraphId, out var definition))
+                    continue;
+
+                var outputHandle = definition.outputs?
+                    .FirstOrDefault(port => port != null && !string.IsNullOrEmpty(port.id))?.id;
+                if (string.IsNullOrEmpty(outputHandle))
+                    outputHandle = "out";
+
+                var synthetic = new PcgGraphEdgeRecord
+                {
+                    source = pair.Key,
+                    sourceHandle = outputHandle,
+                };
+                var endpoints = SourceEndpoints(
+                    synthetic,
+                    instanceNode,
+                    prefix: "",
+                    byId,
+                    rootEdges,
+                    rootInstances,
+                    ParentScopeContext.None,
+                    new HashSet<string>(StringComparer.Ordinal),
+                    out _);
+                if (endpoints == null || endpoints.Count == 0)
+                    continue;
+
+                outputStatsAliases[pair.Key] = endpoints[0].Node;
+            }
         }
 
         private static bool IsStructuralInterfaceNode(string type) =>
