@@ -22,6 +22,17 @@ namespace DJTechRuntime.PCG
 
         private static readonly HttpClient s_Http = CreateClient();
 
+#if UNITY_EDITOR
+        // EditorPrefs is main-thread-only; async preview cooks read BaseUrl from Task.Run.
+        private static string s_CachedBaseUrl = DefaultBaseUrl;
+
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void EditorLoadBaseUrl()
+        {
+            s_CachedBaseUrl = UnityEditor.EditorPrefs.GetString("PCG.CookServer.BaseUrl", DefaultBaseUrl);
+        }
+#endif
+
         private static HttpClient CreateClient()
         {
             var client = new HttpClient();
@@ -34,7 +45,7 @@ namespace DJTechRuntime.PCG
             get
             {
 #if UNITY_EDITOR
-                return UnityEditor.EditorPrefs.GetString("PCG.CookServer.BaseUrl", DefaultBaseUrl);
+                return s_CachedBaseUrl;
 #else
                 return DefaultBaseUrl;
 #endif
@@ -42,9 +53,9 @@ namespace DJTechRuntime.PCG
             set
             {
 #if UNITY_EDITOR
-                UnityEditor.EditorPrefs.SetString(
-                    "PCG.CookServer.BaseUrl",
-                    string.IsNullOrWhiteSpace(value) ? DefaultBaseUrl : value.TrimEnd('/'));
+                var normalized = string.IsNullOrWhiteSpace(value) ? DefaultBaseUrl : value.TrimEnd('/');
+                s_CachedBaseUrl = normalized;
+                UnityEditor.EditorPrefs.SetString("PCG.CookServer.BaseUrl", normalized);
 #endif
             }
         }
