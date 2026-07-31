@@ -70,7 +70,7 @@ namespace DJTechEditor.PCG.Tests
 
         [TestCase(false)]
         [TestCase(true)]
-        public void PcgMode_SelectionChange_RestoresLockedObjectWithoutExiting(bool selectOtherObject)
+        public void PcgMode_SelectionChange_RestoresLockedSceneObjectWithoutExiting(bool selectOtherObject)
         {
             var type = typeof(PcgCreateSplineSceneHandles);
             var flags = BindingFlags.Static | BindingFlags.NonPublic;
@@ -105,6 +105,46 @@ namespace DJTechEditor.PCG.Tests
                 Selection.objects = originalSelection;
                 Object.DestroyImmediate(locked);
                 Object.DestroyImmediate(other);
+            }
+        }
+
+        [Test]
+        public void PcgMode_SelectionChange_AllowsProjectAssetSelection()
+        {
+            var type = typeof(PcgCreateSplineSceneHandles);
+            var flags = BindingFlags.Static | BindingFlags.NonPublic;
+            var modeActive = type.GetField("s_PcgModeActive", flags);
+            var lockedSelection = type.GetField("s_LockedSelection", flags);
+            var selectionGuard = type.GetField("s_SelectionGuard", flags);
+            var onSelectionChanged = type.GetMethod("OnSelectionChanged", flags);
+            var originalSelection = Selection.objects;
+            var originalModeActive = modeActive.GetValue(null);
+            var originalLockedSelection = lockedSelection.GetValue(null);
+            var originalSelectionGuard = selectionGuard.GetValue(null);
+            var locked = new GameObject("PCG Mode Locked Selection Test");
+            var asset = ScriptableObject.CreateInstance<ScriptableObject>();
+
+            try
+            {
+                modeActive.SetValue(null, true);
+                lockedSelection.SetValue(null, locked);
+                selectionGuard.SetValue(null, false);
+
+                Selection.activeObject = asset;
+                onSelectionChanged.Invoke(null, null);
+
+                Assert.IsTrue((bool)modeActive.GetValue(null));
+                Assert.AreEqual(asset, Selection.activeObject);
+                Assert.IsNull(Selection.activeGameObject);
+            }
+            finally
+            {
+                modeActive.SetValue(null, originalModeActive);
+                lockedSelection.SetValue(null, originalLockedSelection);
+                selectionGuard.SetValue(null, originalSelectionGuard);
+                Selection.objects = originalSelection;
+                Object.DestroyImmediate(locked);
+                Object.DestroyImmediate(asset);
             }
         }
     }

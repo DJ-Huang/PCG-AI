@@ -380,14 +380,45 @@ namespace DJTechEditor.PCG.Graph
             if (!s_PcgModeActive || s_LockedSelection == null || s_SelectionGuard)
                 return;
 
-            if (Selection.activeGameObject != s_LockedSelection)
+            if (ShouldRestoreLockedSelection())
             {
-                // PCG Mode owns Scene View selection until the user explicitly exits.
-                // Restoring selection here, rather than registering a default control,
-                // avoids leaving GUIUtility.hotControl assigned to a PCG control after
-                // the corresponding MouseUp has been handled by Unity.
+                // Block scene/hierarchy object picks only. Project-window asset
+                // selections keep activeGameObject null and must not be overridden.
                 RestoreLockedSelection();
             }
+        }
+
+        /// <summary>
+        /// True when PCG Mode should snap Selection back to the locked scene object.
+        /// Project assets and other non-scene objects are left alone.
+        /// </summary>
+        private static bool ShouldRestoreLockedSelection()
+        {
+            if (!s_PcgModeActive || s_LockedSelection == null)
+                return false;
+
+            var activeGo = Selection.activeGameObject;
+            if (activeGo == s_LockedSelection)
+                return false;
+
+            if (activeGo != null)
+                return IsObjectInLoadedScene(activeGo);
+
+            // Cleared scene selection, or a Project/Inspector asset is active.
+            var activeObject = Selection.activeObject;
+            if (activeObject != null && !IsObjectInLoadedScene(activeObject))
+                return false;
+
+            return true;
+        }
+
+        private static bool IsObjectInLoadedScene(Object obj)
+        {
+            if (obj is GameObject go)
+                return go.scene.IsValid();
+            if (obj is Component component)
+                return component.gameObject.scene.IsValid();
+            return false;
         }
 
         private static void RestoreLockedSelection()
@@ -434,19 +465,17 @@ namespace DJTechEditor.PCG.Graph
 
             // Do not rely solely on Selection.selectionChanged here. Some editor input
             // paths apply the new selection just before SceneGUI is invoked, so the
-            // callback can arrive after this frame. Polling keeps PCG Mode's selection
-            // lock in effect for those paths too.
-            if (s_PcgModeActive && s_LockedSelection != null &&
-                Selection.activeGameObject != s_LockedSelection)
-            {
+            // callback can arrive after this frame. Polling keeps PCG Mode's scene
+            // selection lock in effect for those paths too.
+            if (s_PcgModeActive && s_LockedSelection != null && ShouldRestoreLockedSelection())
                 RestoreLockedSelection();
-                return;
-            }
 
             // Show the toolbar/entry when the selected object has a PcgGraphComponent,
             // regardless of whether a Graph Editor window is open.
             RefreshSelectionCacheIfNeeded();
-            var component = s_CachedSelectionComponent;
+            var component = s_PcgModeActive && s_ActiveComponent != null
+                ? s_ActiveComponent
+                : s_CachedSelectionComponent;
 
             if (component == null || component.GraphAsset == null)
             {
@@ -641,18 +670,7 @@ namespace DJTechEditor.PCG.Graph
                 }
 
                 if (component != null)
-                {
                     s_LockedSelection = component.gameObject;
-                    s_SelectionGuard = true;
-                    try
-                    {
-                        Selection.activeGameObject = s_LockedSelection;
-                    }
-                    finally
-                    {
-                        s_SelectionGuard = false;
-                    }
-                }
 
                 CaptureEditorToolForPcgMode();
                 var setupContext = window != null && window.GraphView != null
@@ -679,18 +697,7 @@ namespace DJTechEditor.PCG.Graph
             // Use the selected component's transform as the preview anchor directly.
             var anchor = component != null ? component.transform : FindPreviewAnchor(window);
             if (anchor != null)
-            {
                 s_LockedSelection = anchor.gameObject;
-                s_SelectionGuard = true;
-                try
-                {
-                    Selection.activeGameObject = s_LockedSelection;
-                }
-                finally
-                {
-                    s_SelectionGuard = false;
-                }
-            }
 
             CaptureEditorToolForPcgMode();
             var context = window != null && window.GraphView != null
