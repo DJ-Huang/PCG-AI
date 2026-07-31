@@ -1023,14 +1023,6 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            var activeIndex = GetActivePointIndex(node.NodeId, selectedIndices, points.Count);
-            var selectionChangedThisEvent = HandleRawSplinePointSelection(
-                sceneView,
-                node,
-                worldPoints,
-                activeIndex,
-                ref selectedIndices);
-
             if (mode == "catmullRom")
             {
                 var previewTangents = PcgSplineControlPoints.GetTangents(points, nodeData, closed);
@@ -1066,8 +1058,17 @@ namespace DJTechEditor.PCG.Graph
                 tangentWorldPositions[i * 2 + 1] = wp - tangentDirWorld;   // in-tangent (mirrored)
             }
 
-            // Draw tangent handles for selected points (BEFORE selection click
-            // so their hit tests register first and grab hotControl)
+            var activeIndex = GetActivePointIndex(node.NodeId, selectedIndices, points.Count);
+            var selectionChangedThisEvent = HandleRawSplinePointSelection(
+                sceneView,
+                node,
+                worldPoints,
+                activeIndex,
+                ref selectedIndices);
+
+            // Tangents retain priority when their own handles are hit. Unselected
+            // control points use the raw, hit-tested selection path above, while the
+            // active point keeps Unity's native transform-handle appearance.
             if (selectedIndices.Count > 0 && !selectionChangedThisEvent)
             {
                 changed |= DrawTangentHandles(
@@ -1432,12 +1433,14 @@ namespace DJTechEditor.PCG.Graph
                 toolbarWidth,
                 toolbarHeight);
             GUI.Box(toolbarArea, GUIContent.none, EditorStyles.toolbar);
-
-            GUILayout.BeginArea(toolbarArea);
-            GUILayout.BeginHorizontal();
+            var buttonRect = new Rect(
+                toolbarArea.x + 3f,
+                toolbarArea.y + 3f,
+                btnWidth,
+                btnHeight);
 
             // Object mode — cube icon
-            if (IconToolbarButton(IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
+            if (IconToolbarButton(buttonRect, IconObjectActive, IconObjectNormal, "Object Mode", ctx.IsObjectMode))
             {
                 s_GroupListOpen = false;
                 ClearGroupHover();
@@ -1446,25 +1449,27 @@ namespace DJTechEditor.PCG.Graph
                 s_SelectedGroupDomain = null;
                 window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
             }
+            buttonRect.x += btnWidth + 2f;
 
             // Spline CP — curve icon (only when supported)
             if (showSpline)
             {
-                if (IconToolbarButton(IconSplineActive, IconSplineNormal, "Spline Control Points",
+                if (IconToolbarButton(buttonRect, IconSplineActive, IconSplineNormal, "Spline Control Points",
                         ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint))
                 {
                     s_GroupListOpen = false;
                     ClearGroupHover();
                     window.GraphView.SetSceneMode(SceneEditLevel.Component, SceneEditDomain.SplineControlPoint);
                 }
+                buttonRect.x += btnWidth + 2f;
             }
 
-            GUILayout.Space(spacing);
+            buttonRect.x += spacing;
 
             // Display markers — Houdini-style, independent of Group View selection
             var pointsBg = new Color(0.3f, 0.5f, 0.95f);
             var edgesBg = new Color(0.85f, 0.55f, 0.15f);
-            if (IconToolbarButton(IconDisplayPointsOn, IconDisplayPointsOff,
+            if (IconToolbarButton(buttonRect, IconDisplayPointsOn, IconDisplayPointsOff,
                     "Display Points — show all geometry points (independent of groups)",
                     s_DisplayPoints, pointsBg))
             {
@@ -1472,8 +1477,9 @@ namespace DJTechEditor.PCG.Graph
                 EditorPrefs.SetBool(PrefDisplayPoints, s_DisplayPoints);
                 sceneView.Repaint();
             }
+            buttonRect.x += btnWidth + 2f;
 
-            if (IconToolbarButton(IconDisplayEdgesOn, IconDisplayEdgesOff,
+            if (IconToolbarButton(buttonRect, IconDisplayEdgesOn, IconDisplayEdgesOff,
                     "Display Edges — show polygon/curve edges (independent of groups)",
                     s_DisplayEdges, edgesBg))
             {
@@ -1481,8 +1487,10 @@ namespace DJTechEditor.PCG.Graph
                 EditorPrefs.SetBool(PrefDisplayEdges, s_DisplayEdges);
                 sceneView.Repaint();
             }
+            buttonRect.x += btnWidth + 2f;
 
             if (IconToolbarButton(
+                    buttonRect,
                     IconGroupListOn,
                     IconGroupListOff,
                     "Group List — all point/edge/face groups; hover to preview",
@@ -1494,40 +1502,46 @@ namespace DJTechEditor.PCG.Graph
                     ClearGroupHover();
                 sceneView.Repaint();
             }
+            buttonRect.x += btnWidth + 2f + spacing;
 
-            GUILayout.Space(spacing);
+            // Display mode popup — short label
+            var oldDisplay = s_OthersDisplay;
+            var popupRect = new Rect(buttonRect.x, buttonRect.y, popupWidth, btnHeight);
+            s_OthersDisplay = (OthersDisplayMode)EditorGUI.EnumPopup(
+                popupRect, s_OthersDisplay, EditorStyles.toolbarPopup);
+            if (s_OthersDisplay != oldDisplay)
+                ApplyOthersDisplayMode();
 
-                // Display mode popup — short label
-                var oldDisplay = s_OthersDisplay;
-                s_OthersDisplay = (OthersDisplayMode)EditorGUILayout.EnumPopup(
-                    s_OthersDisplay, EditorStyles.toolbarPopup,
-                    GUILayout.Width(popupWidth));
-                if (s_OthersDisplay != oldDisplay)
-                    ApplyOthersDisplayMode();
-
-                GUILayout.Space(spacing);
-
-                // Exit — X icon
-                var exitColor = GUI.color;
-                GUI.color = new Color(1f, 0.7f, 0.5f);
-                if (GUILayout.Button(new GUIContent(IconExit, "Exit PCG Mode"), EditorStyles.toolbarButton,
-                        GUILayout.Width(exitWidth)))
-                {
-                    ExitPcgMode();
-                    sceneView.Repaint();
-                }
-                GUI.color = exitColor;
-
-                GUILayout.EndHorizontal();
-                GUILayout.EndArea();
-        }
-
-        private static bool IconToolbarButton(Texture2D activeIcon, Texture2D normalIcon, string tooltip, bool active)
-        {
-            return IconToolbarButton(activeIcon, normalIcon, tooltip, active, new Color(0.4f, 0.6f, 0.9f));
+            // Exit — X icon
+            var exitRect = new Rect(popupRect.xMax + spacing, buttonRect.y, exitWidth, btnHeight);
+            var exitColor = GUI.color;
+            GUI.color = new Color(1f, 0.7f, 0.5f);
+            if (GUI.Button(exitRect, new GUIContent(IconExit, "Exit PCG Mode"), EditorStyles.toolbarButton))
+            {
+                ExitPcgMode();
+                sceneView.Repaint();
+            }
+            GUI.color = exitColor;
         }
 
         private static bool IconToolbarButton(
+            Rect rect,
+            Texture2D activeIcon,
+            Texture2D normalIcon,
+            string tooltip,
+            bool active)
+        {
+            return IconToolbarButton(
+                rect,
+                activeIcon,
+                normalIcon,
+                tooltip,
+                active,
+                new Color(0.4f, 0.6f, 0.9f));
+        }
+
+        private static bool IconToolbarButton(
+            Rect rect,
             Texture2D activeIcon, Texture2D normalIcon, string tooltip, bool active, Color activeBackground)
         {
             var icon = active ? activeIcon : normalIcon;
@@ -1535,7 +1549,7 @@ namespace DJTechEditor.PCG.Graph
             var oldBg = GUI.backgroundColor;
             if (active)
                 GUI.backgroundColor = activeBackground;
-            var clicked = GUILayout.Button(content, EditorStyles.toolbarButton, GUILayout.Width(24f), GUILayout.Height(20f));
+            var clicked = GUI.Button(rect, content, EditorStyles.toolbarButton);
             GUI.backgroundColor = oldBg;
             return clicked;
         }
@@ -1558,16 +1572,17 @@ namespace DJTechEditor.PCG.Graph
                     height);
                 GUI.Box(area, GUIContent.none, EditorStyles.helpBox);
 
-                var paddedArea = new Rect(area.x + 6f, area.y, area.width - 6f, area.height);
-                GUILayout.BeginArea(paddedArea);
-                GUILayout.Space(4f);
-                GUILayout.Label($"Mode: {ctx.Level}" + (ctx.Domain != SceneEditDomain.None ? $" / {ctx.Domain}" : ""), EditorStyles.boldLabel);
-                GUILayout.Label($"Selected: {selText}", EditorStyles.miniLabel);
+                var textX = area.x + 6f;
+                var textWidth = area.width - 12f;
+                GUI.Label(
+                    new Rect(textX, area.y + 5f, textWidth, 18f),
+                    $"Mode: {ctx.Level}" + (ctx.Domain != SceneEditDomain.None ? $" / {ctx.Domain}" : ""),
+                    EditorStyles.boldLabel);
+                GUI.Label(new Rect(textX, area.y + 24f, textWidth, 16f), $"Selected: {selText}", EditorStyles.miniLabel);
                 var markers = (s_DisplayPoints ? "Pts " : "") + (s_DisplayEdges ? "Edges" : "");
                 if (string.IsNullOrEmpty(markers))
                     markers = "off";
-                GUILayout.Label($"Display: {markers.Trim()}", EditorStyles.miniLabel);
-                GUILayout.EndArea();
+                GUI.Label(new Rect(textX, area.y + 41f, textWidth, 16f), $"Display: {markers.Trim()}", EditorStyles.miniLabel);
             }
             finally
             {
