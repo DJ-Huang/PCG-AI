@@ -19,7 +19,6 @@ namespace DJTechEditor.PCG.Graph
         private static readonly Color s_CurvePreviewColor = new(1f, 0.65f, 0.1f, 0.55f);
         private static readonly Color s_HandleColor = new(0.25f, 0.85f, 1f, 1f);
         private static readonly Color s_SelectedHandleColor = new(1f, 0.45f, 0.15f, 1f);
-        private static readonly Color s_SegmentPickColor = new(0.9f, 0.9f, 0.2f, 0.9f);
         private static readonly Color s_TangentLineColor = new(0.6f, 1f, 0.4f, 0.7f);
         private static readonly Color s_TangentHandleColor = new(0.4f, 0.9f, 0.3f, 1f);
         private static readonly Color s_TangentHandleActiveColor = new(0.7f, 1f, 0.5f, 1f);
@@ -29,6 +28,7 @@ namespace DJTechEditor.PCG.Graph
         private const float SceneOverlayMargin = 12f;
 
         private static readonly Dictionary<string, HashSet<int>> s_SelectedPointByNode = new();
+        private static readonly Dictionary<string, int> s_ActivePointByNode = new();
         private static GUIStyle s_ShortcutHintStyle;
 
         private static bool s_DragActive;
@@ -36,6 +36,25 @@ namespace DJTechEditor.PCG.Graph
         private static PcgGraphView s_DragGraphView;
         private static PcgGraphEditorWindow s_DragWindow;
         private static bool s_TangentDragActive;
+        private static ManualSplineDragMode s_ManualSplineDragMode;
+        private static string s_ManualSplineDragNodeId;
+        private static Vector2 s_ManualSplineDragStartMouse;
+        private static Vector3 s_ManualSplineDragAxis;
+        private static Vector2 s_ManualSplineDragScreenAxis;
+        private static float s_ManualSplineDragWorldPerPixel;
+        private static Plane s_ManualSplineDragPlane;
+        private static Vector3 s_ManualSplineDragPlaneHit;
+        private static List<Vector3> s_ManualSplineDragStartPoints;
+        private static HashSet<int> s_ManualSplineDragSelection;
+
+        private enum ManualSplineDragMode
+        {
+            None,
+            Free,
+            X,
+            Y,
+            Z,
+        }
 
         private static bool s_PcgModeActive;
         private static PcgGraphEditorWindow s_ActiveWindow;
@@ -356,10 +375,6 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
-            DrawPcgModeToolbar(sceneView, graphWindow);
-            DrawPolygonWireOverlay(sceneView, graphWindow);
-            DrawGroupListSidebar(sceneView, graphWindow);
-
             var splineNodes = new List<(PcgGraphEditorWindow window, PcgGraphView graphView, PcgManifestNodeView node)>();
             foreach (var node in graphWindow.GraphView.selection.OfType<PcgManifestNodeView>())
             {
@@ -368,13 +383,30 @@ namespace DJTechEditor.PCG.Graph
             }
 
             var ctx = graphWindow.GraphView.SceneEditContext;
-            if (splineNodes.Count > 0 && ctx.IsComponentMode && ctx.Domain == SceneEditDomain.SplineControlPoint)
+            var splineHandlesActive =
+                splineNodes.Count > 0 &&
+                ctx.IsComponentMode &&
+                ctx.Domain == SceneEditDomain.SplineControlPoint;
+            if (splineHandlesActive)
             {
                 HandleSplineShortcuts(sceneView, splineNodes);
-                DrawSplineOverlay(sceneView, splineNodes[0].node);
 
                 foreach (var (window, graphView, node) in splineNodes)
                     DrawNodeSpline(sceneView, window, graphView, node);
+            }
+
+            TryEndSplineDrag();
+
+            // Register and process all 3D handles before entering any IMGUI overlay.
+            // GUILayout controls may consume MouseDown, which prevents Unity's native
+            // PositionHandle from acquiring hotControl when overlays run first.
+            DrawPolygonWireOverlay(sceneView, graphWindow);
+            DrawPcgModeToolbar(sceneView, graphWindow);
+            DrawGroupListSidebar(sceneView, graphWindow);
+
+            if (splineHandlesActive)
+            {
+                DrawSplineOverlay(sceneView, splineNodes[0].node);
             }
             else if (s_GroupListOpen)
             {
@@ -394,8 +426,6 @@ namespace DJTechEditor.PCG.Graph
             {
                 DrawPcgModeStatusOverlay(sceneView, graphWindow);
             }
-
-            TryEndSplineDrag();
 
             // AddDefaultControl registers a fallback that absorbs clicks on empty
             // space, preventing Unity's hierarchy picker from changing selection.
@@ -529,6 +559,7 @@ namespace DJTechEditor.PCG.Graph
             s_WireBuiltEdgeCount = 0;
             s_WireUploadedEdgeCount = 0;
             s_SelectedPointByNode.Clear();
+            s_ActivePointByNode.Clear();
             s_SelectedGroupName = null;
             s_SelectedGroupSource = null;
             s_SelectedGroupDomain = null;
@@ -607,6 +638,32 @@ namespace DJTechEditor.PCG.Graph
             var selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
             var closed = ReadBool(nodeData, "closed", false);
             var mode = nodeData?.GetRaw("mode")?.ToString() ?? "polyline";
+            var changed = false;
+
+            if (TryAddOrInsertPointClick(
+                    sceneView,
+                    window,
+                    graphView,
+                    node,
+                    points,
+                    worldPoints,
+                    sceneOffset,
+                    editPlane,
+                    usesExplicit,
+                    closed,
+                    anchor))
+            {
+                sceneView.Repaint();
+                return;
+            }
+
+            var activeIndex = GetActivePointIndex(node.NodeId, selectedIndices, points.Count);
+            var selectionChangedThisEvent = HandleRawSplinePointSelection(
+                sceneView,
+                node,
+                worldPoints,
+                activeIndex,
+                ref selectedIndices);
 
             if (mode == "catmullRom")
             {
@@ -643,11 +700,9 @@ namespace DJTechEditor.PCG.Graph
                 tangentWorldPositions[i * 2 + 1] = wp - tangentDirWorld;   // in-tangent (mirrored)
             }
 
-            var changed = false;
-
             // Draw tangent handles for selected points (BEFORE selection click
             // so their hit tests register first and grab hotControl)
-            if (selectedIndices.Count > 0)
+            if (selectedIndices.Count > 0 && !selectionChangedThisEvent)
             {
                 changed |= DrawTangentHandles(
                     sceneView, window, graphView, node, points, worldPoints,
@@ -655,74 +710,50 @@ namespace DJTechEditor.PCG.Graph
                     usesExplicit, hasExplicitTangents, closed, anchor, selectedIndices);
             }
 
-            // Draw control point handles — only selected points get a PositionHandle
-            // (BEFORE selection click so PositionHandle axes register first)
-            for (var i = 0; i < worldPoints.Length; i++)
+            activeIndex = GetActivePointIndex(node.NodeId, selectedIndices, points.Count);
+
+            if (Event.current.type == EventType.Repaint)
             {
-                var isSelected = selectedIndices.Contains(i);
-
-                if (!isSelected)
+                for (var i = 0; i < worldPoints.Length; i++)
                 {
-                    // Unselected: small clickable sphere only, no position handle
-                    if (Event.current.type == EventType.Repaint)
-                    {
-                        Handles.color = s_UnselectedPointColor;
-                        var unselectedSize = HandleUtility.GetHandleSize(worldPoints[i]) * 0.08f;
-                        Handles.SphereHandleCap(0, worldPoints[i], Quaternion.identity, unselectedSize, EventType.Repaint);
-                    }
-                    continue;
-                }
+                    var isSelected = selectedIndices.Contains(i);
+                    if (i == activeIndex)
+                        continue;
 
-                // Selected: larger sphere + position handle
-                if (Event.current.type == EventType.Repaint)
-                {
-                    Handles.color = s_SelectedHandleColor;
-                    var pickSize = HandleUtility.GetHandleSize(worldPoints[i]) * 0.11f;
-                    Handles.SphereHandleCap(0, worldPoints[i], Quaternion.identity, pickSize, EventType.Repaint);
+                    Handles.color = isSelected ? s_SelectedHandleColor : s_UnselectedPointColor;
+                    var markerSize = HandleUtility.GetHandleSize(worldPoints[i]) * (isSelected ? 0.11f : 0.08f);
+                    Handles.SphereHandleCap(
+                        0,
+                        worldPoints[i],
+                        Quaternion.identity,
+                        markerSize,
+                        EventType.Repaint);
                 }
+            }
+
+            if (activeIndex >= 0 && !selectionChangedThisEvent)
+            {
+                var activeWorld = worldPoints[activeIndex];
+                var handleRotation = Tools.pivotRotation == PivotRotation.Local && anchor != null
+                    ? anchor.rotation
+                    : Quaternion.identity;
 
                 EditorGUI.BeginChangeCheck();
-                var newWorld = Handles.PositionHandle(worldPoints[i], Quaternion.identity);
-                if (!EditorGUI.EndChangeCheck())
-                    continue;
-
-                BeginSplineDrag(graphView, window);
-
-                var delta = newWorld - worldPoints[i];
-                foreach (var selIdx in selectedIndices)
+                var newWorld = Handles.PositionHandle(activeWorld, handleRotation);
+                if (EditorGUI.EndChangeCheck())
                 {
-                    var newLocal = WorldToLocal(worldPoints[selIdx] + delta, anchor) - sceneOffset;
-                    newLocal = ConstrainToEditPlane(newLocal, points[selIdx], editPlane);
-                    points[selIdx] = newLocal;
+                    BeginSplineDrag(graphView, window);
+
+                    var delta = newWorld - activeWorld;
+                    foreach (var selectedIndex in selectedIndices)
+                    {
+                        var movedWorld = worldPoints[selectedIndex] + delta;
+                        points[selectedIndex] = WorldToLocal(movedWorld, anchor) - sceneOffset;
+                    }
+
+                    WritePointsToNode(node, points, usesExplicit);
+                    changed = true;
                 }
-                WritePointsToNode(node, points, usesExplicit);
-                changed = true;
-                break;
-            }
-
-            // Selection click handling — AFTER handles so hotControl is set
-            // by PositionHandle / FreeMoveHandle before we check it.
-            if (TrySelectPointClick(worldPoints, node.NodeId))
-            {
-                selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
-                sceneView.Repaint();
-            }
-
-            if (TryInsertOnSegmentClick(
-                    sceneView,
-                    window,
-                    graphView,
-                    node,
-                    points,
-                    worldPoints,
-                    sceneOffset,
-                    editPlane,
-                    usesExplicit,
-                    closed,
-                    anchor))
-            {
-                sceneView.Repaint();
-                return;
             }
 
             if (!changed)
@@ -730,7 +761,7 @@ namespace DJTechEditor.PCG.Graph
 
             graphView.CommitState();
             graphView.RefreshInspector();
-            PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
+            PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: false);
             sceneView.Repaint();
             HandleUtility.Repaint();
         }
@@ -1152,8 +1183,8 @@ namespace DJTechEditor.PCG.Graph
             Handles.BeginGUI();
             try
             {
-                const float width = 300f;
-                const float height = 118f;
+                const float width = 360f;
+                const float height = 124f;
                 var area = new Rect(
                     (sceneView.position.width - width) / 2f,
                     SceneOverlayMargin + 30f,
@@ -1169,6 +1200,16 @@ namespace DJTechEditor.PCG.Graph
                     EditorStyles.miniLabel);
 
                 GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Add Point (A)", GUILayout.Height(22f)))
+                {
+                    if (AddPointForNode(node))
+                    {
+                        pointCount = PcgSplineControlPoints.GetEffectivePoints(node.CollectData()).Count;
+                        selectedIndices = GetSelectedPointIndices(node.NodeId, pointCount);
+                        selectedCount = selectedIndices.Count;
+                    }
+                }
+
                 GUI.enabled = pointCount >= 2;
                 if (GUILayout.Button("Insert Point (I)", GUILayout.Height(22f)))
                 {
@@ -1195,7 +1236,7 @@ namespace DJTechEditor.PCG.Graph
                 GUILayout.EndHorizontal();
 
                 GUILayout.Label(
-                    "Click point to select · Shift+click multi-select · Ctrl+click segment insert · Drag green handles for tangent",
+                    "Click/drag point · Shift multi-select · Ctrl/Cmd+click segment inserts, empty space adds · Del deletes",
                     ShortcutHintStyle);
                 GUILayout.EndArea();
             }
@@ -1213,13 +1254,25 @@ namespace DJTechEditor.PCG.Graph
             if (evt.type != EventType.KeyDown || EditorGUIUtility.editingTextField)
                 return;
 
-            if (evt.keyCode != KeyCode.I &&
+            if (evt.keyCode != KeyCode.A &&
+                evt.keyCode != KeyCode.I &&
                 evt.keyCode != KeyCode.Delete &&
                 evt.keyCode != KeyCode.Backspace)
                 return;
 
             var target = activeNodes[0].node;
             var selectedIndices = GetSelectedPointIndices(target.NodeId, int.MaxValue);
+
+            if (evt.keyCode == KeyCode.A)
+            {
+                if (AddPointForNode(target))
+                {
+                    evt.Use();
+                    sceneView.Repaint();
+                }
+
+                return;
+            }
 
             if (evt.keyCode == KeyCode.I)
             {
@@ -1242,77 +1295,33 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static bool TrySelectPointClick(IReadOnlyList<Vector3> worldPoints, string nodeId)
+        private static void UpdatePointSelection(
+            string nodeId,
+            int pointCount,
+            int pointIndex,
+            bool toggle)
         {
-            var evt = Event.current;
-            if (evt.type != EventType.MouseDown ||
-                evt.button != 0 ||
-                evt.alt ||
-                evt.control)
-                return false;
+            if (pointIndex < 0 || pointIndex >= pointCount)
+                return;
 
-            // If a handle is already hot (PositionHandle axis or FreeMoveHandle),
-            // don't intercept — let the handle receive the drag.
-            if (GUIUtility.hotControl != 0)
-                return false;
-
-            var bestIndex = -1;
-            var bestDistance = float.MaxValue;
-            for (var i = 0; i < worldPoints.Count; i++)
+            var selected = GetSelectedPointIndices(nodeId, pointCount);
+            if (toggle)
             {
-                var distance = HandleUtility.DistanceToCircle(worldPoints[i], 0f);
-                if (distance > 20f || distance >= bestDistance)
-                    continue;
-
-                bestDistance = distance;
-                bestIndex = i;
-            }
-
-            if (bestIndex < 0)
-            {
-                // Click on empty space — deselect all (no modifiers)
-                if (!evt.shift)
-                {
-                    SetSelectedPointIndices(nodeId, new HashSet<int>());
-                    evt.Use();
-                    return true;
-                }
-                return false;
-            }
-
-            if (evt.shift)
-            {
-                // Shift+click: toggle selection, consume event (no drag)
-                evt.Use();
-                var current = GetSelectedPointIndices(nodeId, worldPoints.Count);
-                if (current.Contains(bestIndex))
-                    current.Remove(bestIndex);
+                if (selected.Contains(pointIndex))
+                    selected.Remove(pointIndex);
                 else
-                    current.Add(bestIndex);
-                SetSelectedPointIndices(nodeId, current);
+                    selected.Add(pointIndex);
             }
             else
             {
-                // Normal click on a point:
-                // - If already selected: DON'T consume — let PositionHandle
-                //   receive the MouseDown and start a drag.
-                // - If newly selected: select and consume (user clicks again
-                //   to drag, standard select-then-move UX).
-                var current = GetSelectedPointIndices(nodeId, worldPoints.Count);
-                if (current.Count == 1 && current.Contains(bestIndex))
-                {
-                    // Already solely selected — let event flow to PositionHandle
-                    return true;
-                }
-
-                SetSelectedPointIndices(nodeId, new HashSet<int> { bestIndex });
-                evt.Use();
+                selected.Clear();
+                selected.Add(pointIndex);
             }
 
-            return true;
+            SetSelectedPointIndices(nodeId, selected, selected.Contains(pointIndex) ? pointIndex : -1);
         }
 
-        private static bool TryInsertOnSegmentClick(
+        private static bool TryAddOrInsertPointClick(
             SceneView sceneView,
             PcgGraphEditorWindow window,
             PcgGraphView graphView,
@@ -1326,42 +1335,100 @@ namespace DJTechEditor.PCG.Graph
             Transform anchor)
         {
             var evt = Event.current;
-            if (evt.type != EventType.MouseDown ||
+            if (evt.rawType != EventType.MouseDown ||
                 evt.button != 0 ||
-                !evt.control ||
+                (!evt.control && !evt.command) ||
                 evt.alt ||
                 evt.shift)
                 return false;
 
             var nodeData = node.CollectData();
-
             var ray = HandleUtility.GUIPointToWorldRay(evt.mousePosition);
-            if (!TryPickSegment(worldPoints, closed, ray, 12f, out var segmentIndex, out var hitWorld))
-                return false;
+            int insertIndex;
+            Vector3 localPoint;
+            var actionName = "Add Spline Control Point";
 
-            var insertIndex = segmentIndex + 1;
-            var localPoint = WorldToLocal(hitWorld, anchor) - sceneOffset;
-            var segEndIndex = (segmentIndex + 1) % points.Count;
-            var segT = SegmentBlendT(worldPoints[segmentIndex], worldPoints[segEndIndex], hitWorld);
-            var onSegment = Vector3.Lerp(points[segmentIndex], points[segEndIndex], segT);
-            localPoint = ConstrainToEditPlane(localPoint, onSegment, editPlane);
+            if (TryPickSegment(worldPoints, closed, ray, 12f, out var segmentIndex, out var hitWorld))
+            {
+                actionName = "Insert Spline Control Point";
+                insertIndex = segmentIndex + 1;
+                localPoint = WorldToLocal(hitWorld, anchor) - sceneOffset;
+                var segEndIndex = (segmentIndex + 1) % points.Count;
+                var segT = SegmentBlendT(worldPoints[segmentIndex], worldPoints[segEndIndex], hitWorld);
+                var onSegment = Vector3.Lerp(points[segmentIndex], points[segEndIndex], segT);
+                localPoint = ConstrainToEditPlane(localPoint, onSegment, editPlane);
+            }
+            else
+            {
+                var selected = GetSelectedPointIndices(node.NodeId, points.Count);
+                var activeIndex = GetActivePointIndex(node.NodeId, selected, points.Count);
+                var referenceIndex = activeIndex >= 0 ? activeIndex : points.Count - 1;
+                if (!TryProjectMouseToEditPlane(
+                        sceneView,
+                        ray,
+                        points[referenceIndex],
+                        sceneOffset,
+                        editPlane,
+                        anchor,
+                        out hitWorld))
+                    return false;
 
-            graphView.WithUndo("Insert Spline Control Point", () =>
+                insertIndex = points.Count;
+                localPoint = WorldToLocal(hitWorld, anchor) - sceneOffset;
+                localPoint = ConstrainToEditPlane(localPoint, points[referenceIndex], editPlane);
+            }
+
+            graphView.WithUndo(actionName, () =>
             {
                 points.Insert(insertIndex, localPoint);
                 WritePointsToNode(node, points, usesExplicit);
                 InsertTangentAtIndex(node, nodeData, points, insertIndex, closed);
             });
 
-            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex });
+            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex }, insertIndex);
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
 
-            Handles.color = s_SegmentPickColor;
-            Handles.SphereHandleCap(0, hitWorld, Quaternion.identity, HandleUtility.GetHandleSize(hitWorld) * 0.08f, EventType.Repaint);
-
             evt.Use();
             HandleUtility.Repaint();
+            return true;
+        }
+
+        private static bool AddPointForNode(PcgManifestNodeView node)
+        {
+            if (!TryGetActiveContext(node, out var window, out var graphView))
+                return false;
+
+            var nodeData = node.CollectData();
+            var usesExplicit = PcgSplineControlPoints.HasExplicitControlPoints(nodeData);
+            var points = PcgSplineControlPoints.GetEffectivePoints(nodeData);
+            if (points.Count < 2)
+                return false;
+
+            var closed = ReadBool(nodeData, "closed", false);
+            Vector3 newPoint;
+            if (closed)
+            {
+                newPoint = (points[^1] + points[0]) * 0.5f;
+            }
+            else
+            {
+                var extension = points[^1] - points[^2];
+                newPoint = points[^1] + (extension.sqrMagnitude > 1e-8f ? extension : Vector3.right);
+            }
+
+            var insertIndex = points.Count;
+            graphView.WithUndo("Add Spline Control Point", () =>
+            {
+                points.Add(newPoint);
+                WritePointsToNode(node, points, usesExplicit);
+                InsertTangentAtIndex(node, nodeData, points, insertIndex, closed);
+            });
+
+            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex }, insertIndex);
+            graphView.RefreshInspector();
+            PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
+            SceneView.RepaintAll();
             return true;
         }
 
@@ -1377,13 +1444,14 @@ namespace DJTechEditor.PCG.Graph
                 return false;
 
             var closed = ReadBool(nodeData, "closed", false);
+            var activeIndex = GetActivePointIndex(node.NodeId, selectedIndices, points.Count);
+            var segmentStart = activeIndex >= 0 ? activeIndex : points.Count - 2;
+            if (!closed && segmentStart >= points.Count - 1)
+                segmentStart = points.Count - 2;
 
-            var insertIndex = selectedIndices.Count > 0
-                ? Mathf.Clamp(selectedIndices.Max() + 1, 0, points.Count)
-                : points.Count;
-
-            var left = points[Mathf.Clamp(insertIndex - 1, 0, points.Count - 1)];
-            var right = points[Mathf.Clamp(insertIndex, 0, points.Count - 1)];
+            var insertIndex = segmentStart + 1;
+            var left = points[segmentStart];
+            var right = points[(segmentStart + 1) % points.Count];
             var midpoint = (left + right) * 0.5f;
 
             graphView.WithUndo("Insert Spline Control Point", () =>
@@ -1393,7 +1461,7 @@ namespace DJTechEditor.PCG.Graph
                 InsertTangentAtIndex(node, nodeData, points, insertIndex, closed);
             });
 
-            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex });
+            SetSelectedPointIndices(node.NodeId, new HashSet<int> { insertIndex }, insertIndex);
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             SceneView.RepaintAll();
@@ -1424,7 +1492,8 @@ namespace DJTechEditor.PCG.Graph
                 DeleteTangentsAtIndices(node, nodeData, sorted, points.Count);
             });
 
-            SetSelectedPointIndices(node.NodeId, new HashSet<int>());
+            var nextIndex = Mathf.Clamp(selectedIndices.Min(), 0, points.Count - 1);
+            SetSelectedPointIndices(node.NodeId, new HashSet<int> { nextIndex }, nextIndex);
             graphView.RefreshInspector();
             PcgGraphEditorCookBridge.NotifyGraphChanged(window, immediate: true);
             SceneView.RepaintAll();
@@ -1493,9 +1562,457 @@ namespace DJTechEditor.PCG.Graph
             return valid;
         }
 
-        private static void SetSelectedPointIndices(string nodeId, HashSet<int> indices)
+        private static bool HandleRawSplinePointSelection(
+            SceneView sceneView,
+            PcgManifestNodeView node,
+            IReadOnlyList<Vector3> worldPoints,
+            int activeIndex,
+            ref HashSet<int> selectedIndices)
+        {
+            var evt = Event.current;
+            if (evt == null ||
+                evt.rawType != EventType.MouseDown ||
+                evt.button != 0 ||
+                evt.alt ||
+                evt.control ||
+                evt.command ||
+                GUIUtility.hotControl != 0)
+            {
+                return false;
+            }
+
+            const float pickRadius = 15f;
+            var pointIndex = -1;
+            var bestDistance = pickRadius;
+            for (var i = 0; i < worldPoints.Count; i++)
+            {
+                // The active point is owned by Unity's PositionHandle center control.
+                // Never consume its MouseDown here or the native gizmo cannot drag.
+                if (i == activeIndex ||
+                    sceneView.camera == null ||
+                    sceneView.camera.WorldToScreenPoint(worldPoints[i]).z <= 0f)
+                {
+                    continue;
+                }
+
+                var distance = Vector2.Distance(
+                    evt.mousePosition,
+                    HandleUtility.WorldToGUIPoint(worldPoints[i]));
+                if (distance > bestDistance)
+                    continue;
+
+                bestDistance = distance;
+                pointIndex = i;
+            }
+
+            if (pointIndex < 0)
+                return false;
+
+            UpdatePointSelection(node.NodeId, worldPoints.Count, pointIndex, evt.shift);
+            selectedIndices = GetSelectedPointIndices(node.NodeId, worldPoints.Count);
+            if (evt.type != EventType.Used)
+                evt.Use();
+            sceneView.Repaint();
+            return true;
+        }
+
+        private static bool HandleRawSplinePositionInput(
+            SceneView sceneView,
+            PcgGraphEditorWindow window,
+            PcgGraphView graphView,
+            PcgManifestNodeView node,
+            List<Vector3> points,
+            IReadOnlyList<Vector3> worldPoints,
+            Vector3 sceneOffset,
+            bool usesExplicit,
+            Transform anchor,
+            ref HashSet<int> selectedIndices)
+        {
+            var evt = Event.current;
+            if (evt == null)
+                return false;
+
+            if (evt.rawType == EventType.MouseDown)
+            {
+                if (evt.button != 0 || evt.alt || evt.control || evt.command)
+                    return false;
+
+                var activeIndex = GetActivePointIndex(node.NodeId, selectedIndices, points.Count);
+                var handleRotation = Tools.pivotRotation == PivotRotation.Local && anchor != null
+                    ? anchor.rotation
+                    : Quaternion.identity;
+
+                if (activeIndex >= 0 &&
+                    TryPickManualSplineHandle(
+                        sceneView,
+                        worldPoints[activeIndex],
+                        handleRotation,
+                        evt.mousePosition,
+                        out var handleMode,
+                        out var handleAxis,
+                        out var screenAxis,
+                        out var worldPerPixel))
+                {
+                    BeginManualSplineDrag(
+                        sceneView,
+                        window,
+                        graphView,
+                        node.NodeId,
+                        points,
+                        selectedIndices,
+                        worldPoints[activeIndex],
+                        handleMode,
+                        handleAxis,
+                        screenAxis,
+                        worldPerPixel,
+                        evt.mousePosition);
+                    ConsumeSplineMouseEvent(evt);
+                    return false;
+                }
+
+                if (!TryPickSplinePoint(sceneView, worldPoints, evt.mousePosition, out var pointIndex))
+                    return false;
+
+                UpdatePointSelection(node.NodeId, points.Count, pointIndex, evt.shift);
+                selectedIndices = GetSelectedPointIndices(node.NodeId, points.Count);
+
+                if (selectedIndices.Contains(pointIndex))
+                {
+                    BeginManualSplineDrag(
+                        sceneView,
+                        window,
+                        graphView,
+                        node.NodeId,
+                        points,
+                        selectedIndices,
+                        worldPoints[pointIndex],
+                        ManualSplineDragMode.Free,
+                        Vector3.zero,
+                        Vector2.zero,
+                        0f,
+                        evt.mousePosition);
+                }
+
+                ConsumeSplineMouseEvent(evt);
+                sceneView.Repaint();
+                return false;
+            }
+
+            if (evt.rawType == EventType.MouseDrag &&
+                s_ManualSplineDragMode != ManualSplineDragMode.None &&
+                s_ManualSplineDragNodeId == node.NodeId &&
+                s_ManualSplineDragStartPoints != null &&
+                s_ManualSplineDragSelection != null)
+            {
+                if (!TryGetManualSplineDragDelta(evt.mousePosition, out var worldDelta))
+                    return false;
+
+                foreach (var index in s_ManualSplineDragSelection)
+                {
+                    if (index < 0 ||
+                        index >= points.Count ||
+                        index >= s_ManualSplineDragStartPoints.Count)
+                    {
+                        continue;
+                    }
+
+                    var startWorld = LocalToWorld(
+                        s_ManualSplineDragStartPoints[index] + sceneOffset,
+                        anchor);
+                    points[index] = WorldToLocal(startWorld + worldDelta, anchor) - sceneOffset;
+                }
+
+                WritePointsToNode(node, points, usesExplicit);
+                ConsumeSplineMouseEvent(evt);
+                sceneView.Repaint();
+                return true;
+            }
+
+            if (evt.rawType == EventType.MouseUp &&
+                s_ManualSplineDragMode != ManualSplineDragMode.None &&
+                s_ManualSplineDragNodeId == node.NodeId)
+            {
+                EndManualSplineDrag();
+                ConsumeSplineMouseEvent(evt);
+                sceneView.Repaint();
+            }
+
+            return false;
+        }
+
+        private static void BeginManualSplineDrag(
+            SceneView sceneView,
+            PcgGraphEditorWindow window,
+            PcgGraphView graphView,
+            string nodeId,
+            IReadOnlyList<Vector3> points,
+            IReadOnlyCollection<int> selectedIndices,
+            Vector3 activeWorld,
+            ManualSplineDragMode mode,
+            Vector3 axis,
+            Vector2 screenAxis,
+            float worldPerPixel,
+            Vector2 mousePosition)
+        {
+            BeginSplineDrag(graphView, window);
+
+            s_ManualSplineDragMode = mode;
+            s_ManualSplineDragNodeId = nodeId;
+            s_ManualSplineDragStartMouse = mousePosition;
+            s_ManualSplineDragAxis = axis;
+            s_ManualSplineDragScreenAxis = screenAxis;
+            s_ManualSplineDragWorldPerPixel = worldPerPixel;
+            s_ManualSplineDragStartPoints = new List<Vector3>(points);
+            s_ManualSplineDragSelection = new HashSet<int>(selectedIndices);
+
+            var cameraForward = sceneView != null && sceneView.camera != null
+                ? sceneView.camera.transform.forward
+                : Vector3.forward;
+            s_ManualSplineDragPlane = new Plane(cameraForward, activeWorld);
+            s_ManualSplineDragPlaneHit = activeWorld;
+
+            if (mode == ManualSplineDragMode.Free)
+            {
+                var ray = HandleUtility.GUIPointToWorldRay(mousePosition);
+                if (s_ManualSplineDragPlane.Raycast(ray, out var distance))
+                    s_ManualSplineDragPlaneHit = ray.GetPoint(distance);
+            }
+        }
+
+        private static void EndManualSplineDrag()
+        {
+            s_ManualSplineDragMode = ManualSplineDragMode.None;
+            s_ManualSplineDragNodeId = null;
+            s_ManualSplineDragStartPoints = null;
+            s_ManualSplineDragSelection = null;
+            s_ManualSplineDragAxis = Vector3.zero;
+            s_ManualSplineDragScreenAxis = Vector2.zero;
+            s_ManualSplineDragWorldPerPixel = 0f;
+        }
+
+        private static bool TryGetManualSplineDragDelta(
+            Vector2 mousePosition,
+            out Vector3 worldDelta)
+        {
+            worldDelta = Vector3.zero;
+            if (s_ManualSplineDragMode == ManualSplineDragMode.None)
+                return false;
+
+            if (s_ManualSplineDragMode == ManualSplineDragMode.Free)
+            {
+                var ray = HandleUtility.GUIPointToWorldRay(mousePosition);
+                if (!s_ManualSplineDragPlane.Raycast(ray, out var distance))
+                    return false;
+
+                worldDelta = ray.GetPoint(distance) - s_ManualSplineDragPlaneHit;
+                return true;
+            }
+
+            if (s_ManualSplineDragScreenAxis.sqrMagnitude < 1e-6f ||
+                s_ManualSplineDragAxis.sqrMagnitude < 1e-6f)
+            {
+                return false;
+            }
+
+            var pixels = Vector2.Dot(
+                mousePosition - s_ManualSplineDragStartMouse,
+                s_ManualSplineDragScreenAxis);
+            var amount = pixels * s_ManualSplineDragWorldPerPixel;
+            var snap = s_ManualSplineDragMode switch
+            {
+                ManualSplineDragMode.X => Mathf.Abs(EditorSnapSettings.move.x),
+                ManualSplineDragMode.Y => Mathf.Abs(EditorSnapSettings.move.y),
+                ManualSplineDragMode.Z => Mathf.Abs(EditorSnapSettings.move.z),
+                _ => 0f,
+            };
+            if (snap > 1e-6f)
+                amount = Mathf.Round(amount / snap) * snap;
+
+            worldDelta = s_ManualSplineDragAxis.normalized * amount;
+            return true;
+        }
+
+        private static bool TryPickSplinePoint(
+            SceneView sceneView,
+            IReadOnlyList<Vector3> worldPoints,
+            Vector2 mousePosition,
+            out int pointIndex)
+        {
+            pointIndex = -1;
+            if (sceneView == null || sceneView.camera == null)
+                return false;
+
+            const float pickRadius = 15f;
+            var bestDistance = pickRadius;
+            for (var i = 0; i < worldPoints.Count; i++)
+            {
+                if (sceneView.camera.WorldToScreenPoint(worldPoints[i]).z <= 0f)
+                    continue;
+
+                var distance = Vector2.Distance(
+                    mousePosition,
+                    HandleUtility.WorldToGUIPoint(worldPoints[i]));
+                if (distance > bestDistance)
+                    continue;
+
+                bestDistance = distance;
+                pointIndex = i;
+            }
+
+            return pointIndex >= 0;
+        }
+
+        private static bool TryPickManualSplineHandle(
+            SceneView sceneView,
+            Vector3 position,
+            Quaternion rotation,
+            Vector2 mousePosition,
+            out ManualSplineDragMode mode,
+            out Vector3 axis,
+            out Vector2 screenAxis,
+            out float worldPerPixel)
+        {
+            mode = ManualSplineDragMode.None;
+            axis = Vector3.zero;
+            screenAxis = Vector2.zero;
+            worldPerPixel = 0f;
+
+            if (sceneView == null || sceneView.camera == null)
+                return false;
+
+            var centerGui = HandleUtility.WorldToGUIPoint(position);
+            if (Vector2.Distance(mousePosition, centerGui) <= 14f)
+            {
+                mode = ManualSplineDragMode.Free;
+                return true;
+            }
+
+            var handleSize = HandleUtility.GetHandleSize(position) * 0.8f;
+            var bestDistance = 10f;
+            var axes = new[]
+            {
+                (ManualSplineDragMode.X, rotation * Vector3.right),
+                (ManualSplineDragMode.Y, rotation * Vector3.up),
+                (ManualSplineDragMode.Z, rotation * Vector3.forward),
+            };
+
+            foreach (var candidate in axes)
+            {
+                var endpointGui = HandleUtility.WorldToGUIPoint(
+                    position + candidate.Item2 * handleSize);
+                var projected = endpointGui - centerGui;
+                var projectedLength = projected.magnitude;
+                if (projectedLength < 8f)
+                    continue;
+
+                var distance = DistanceToGuiSegment(
+                    mousePosition,
+                    centerGui + projected.normalized * 12f,
+                    endpointGui);
+                if (distance > bestDistance)
+                    continue;
+
+                bestDistance = distance;
+                mode = candidate.Item1;
+                axis = candidate.Item2.normalized;
+                screenAxis = projected / projectedLength;
+                worldPerPixel = handleSize / projectedLength;
+            }
+
+            return mode != ManualSplineDragMode.None;
+        }
+
+        private static float DistanceToGuiSegment(Vector2 point, Vector2 start, Vector2 end)
+        {
+            var segment = end - start;
+            var lengthSquared = segment.sqrMagnitude;
+            if (lengthSquared < 1e-6f)
+                return Vector2.Distance(point, start);
+
+            var t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / lengthSquared);
+            return Vector2.Distance(point, start + segment * t);
+        }
+
+        private static void DrawManualSplinePositionHandle(
+            Vector3 position,
+            Quaternion rotation)
+        {
+            if (Event.current.type != EventType.Repaint)
+                return;
+
+            var size = HandleUtility.GetHandleSize(position) * 0.8f;
+            var capSize = size * 0.16f;
+            var axes = new[]
+            {
+                (Handles.xAxisColor, rotation * Vector3.right),
+                (Handles.yAxisColor, rotation * Vector3.up),
+                (Handles.zAxisColor, rotation * Vector3.forward),
+            };
+
+            foreach (var candidate in axes)
+            {
+                var direction = candidate.Item2.normalized;
+                var endpoint = position + direction * size;
+                Handles.color = candidate.Item1;
+                Handles.DrawAAPolyLine(3f, position, endpoint);
+                Handles.ArrowHandleCap(
+                    0,
+                    endpoint,
+                    Quaternion.LookRotation(direction),
+                    capSize,
+                    EventType.Repaint);
+            }
+
+            Handles.color = s_SelectedHandleColor;
+            Handles.SphereHandleCap(
+                0,
+                position,
+                Quaternion.identity,
+                size * 0.13f,
+                EventType.Repaint);
+        }
+
+        private static void ConsumeSplineMouseEvent(Event evt)
+        {
+            if (evt != null && evt.type != EventType.Used)
+                evt.Use();
+        }
+
+        private static int GetActivePointIndex(
+            string nodeId,
+            IReadOnlyCollection<int> selectedIndices,
+            int pointCount)
+        {
+            if (selectedIndices == null || selectedIndices.Count == 0)
+                return -1;
+
+            if (s_ActivePointByNode.TryGetValue(nodeId, out var activeIndex) &&
+                activeIndex >= 0 &&
+                activeIndex < pointCount &&
+                selectedIndices.Contains(activeIndex))
+                return activeIndex;
+
+            activeIndex = selectedIndices.First();
+            s_ActivePointByNode[nodeId] = activeIndex;
+            return activeIndex;
+        }
+
+        private static void SetSelectedPointIndices(
+            string nodeId,
+            HashSet<int> indices,
+            int activeIndex = -1)
         {
             s_SelectedPointByNode[nodeId] = indices;
+            if (activeIndex >= 0 && indices.Contains(activeIndex))
+            {
+                s_ActivePointByNode[nodeId] = activeIndex;
+                return;
+            }
+
+            if (indices.Count > 0)
+                s_ActivePointByNode[nodeId] = indices.First();
+            else
+                s_ActivePointByNode.Remove(nodeId);
         }
 
         private static bool TryPickSegment(
@@ -1534,22 +2051,72 @@ namespace DJTechEditor.PCG.Graph
         {
             closest = Vector3.zero;
             var segment = b - a;
-            var segmentLengthSq = segment.sqrMagnitude;
-            if (segmentLengthSq < 1e-8f)
+            var segmentLengthSq = Vector3.Dot(segment, segment);
+            if (segmentLengthSq < 1e-8f || ray.direction.sqrMagnitude < 1e-8f)
                 return false;
 
-            var t = Mathf.Clamp01(Vector3.Dot(ray.origin - a, segment) / segmentLengthSq);
-            var pointOnSegment = a + segment * t;
-            var toPoint = pointOnSegment - ray.origin;
-            var projection = Vector3.Project(toPoint, ray.direction);
-            closest = ray.origin + projection;
+            var direction = ray.direction.normalized;
+            var originToA = ray.origin - a;
+            var directionDotSegment = Vector3.Dot(direction, segment);
+            var directionDotOrigin = Vector3.Dot(direction, originToA);
+            var segmentDotOrigin = Vector3.Dot(segment, originToA);
+            var denominator = segmentLengthSq - directionDotSegment * directionDotSegment;
 
-            var along = Vector3.Dot(projection, ray.direction);
-            if (along < 0f)
+            var segmentT = denominator > 1e-8f
+                ? Mathf.Clamp01(
+                    (segmentDotOrigin - directionDotSegment * directionDotOrigin) /
+                    denominator)
+                : Mathf.Clamp01(segmentDotOrigin / segmentLengthSq);
+
+            closest = a + segment * segmentT;
+            var rayT = Vector3.Dot(closest - ray.origin, direction);
+            if (rayT < 0f)
                 return false;
 
-            var lateral = toPoint - projection;
-            return lateral.sqrMagnitude < 4f;
+            return true;
+        }
+
+        private static bool TryProjectMouseToEditPlane(
+            SceneView sceneView,
+            Ray ray,
+            Vector3 referencePoint,
+            Vector3 sceneOffset,
+            string editPlane,
+            Transform anchor,
+            out Vector3 hitWorld)
+        {
+            hitWorld = Vector3.zero;
+            var planePoint = LocalToWorld(referencePoint + sceneOffset, anchor);
+
+            Vector3 localNormal;
+            switch (editPlane)
+            {
+                case "xy":
+                    localNormal = Vector3.forward;
+                    break;
+                case "xz":
+                    localNormal = Vector3.up;
+                    break;
+                case "yz":
+                    localNormal = Vector3.right;
+                    break;
+                default:
+                    var camera = sceneView != null ? sceneView.camera : null;
+                    var viewNormal = camera != null ? camera.transform.forward : ray.direction;
+                    var viewPlane = new Plane(viewNormal, planePoint);
+                    if (!viewPlane.Raycast(ray, out var viewDistance))
+                        return false;
+                    hitWorld = ray.GetPoint(viewDistance);
+                    return true;
+            }
+
+            var worldNormal = LocalDirToWorldDir(localNormal, anchor).normalized;
+            var editPlaneWorld = new Plane(worldNormal, planePoint);
+            if (!editPlaneWorld.Raycast(ray, out var distance))
+                return false;
+
+            hitWorld = ray.GetPoint(distance);
+            return true;
         }
 
         private static List<Vector3> SampleHermiteSpline(
@@ -1620,7 +2187,7 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             var evt = Event.current;
-            var mouseReleased = evt.type == EventType.MouseUp;
+            var mouseReleased = evt.type == EventType.MouseUp || evt.rawType == EventType.MouseUp;
             var hotControlReleased = s_HandleHot &&
                                      GUIUtility.hotControl == 0 &&
                                      (evt.type == EventType.Repaint || evt.type == EventType.Layout);
@@ -1628,6 +2195,7 @@ namespace DJTechEditor.PCG.Graph
             if (!mouseReleased && !hotControlReleased)
                 return;
 
+            EndManualSplineDrag();
             s_DragGraphView.EndDrag();
             if (s_DragWindow != null)
                 PcgGraphEditorCookBridge.NotifyGraphChanged(s_DragWindow, immediate: true);
@@ -1646,6 +2214,7 @@ namespace DJTechEditor.PCG.Graph
         /// </summary>
         internal static void ForceClearDragState()
         {
+            EndManualSplineDrag();
             s_DragActive = false;
             s_HandleHot = false;
             s_TangentDragActive = false;
