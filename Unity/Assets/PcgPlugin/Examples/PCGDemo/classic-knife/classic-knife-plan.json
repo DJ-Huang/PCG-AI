@@ -1,0 +1,601 @@
+{
+  "schemaVersion": 1,
+  "targetName": "CS2 Classic Knife Fade",
+  "sourceImage": "/Users/djhuang/.cursor/projects/Users-djhuang-PCG-AI-cursor/assets/image-b879c6d3-3622-4b88-8caa-1c79b91127b5.png",
+  "pcgPath": "Unity/Assets/PcgPlugin/Examples/PCGDemo/classic-knife/classic-knife.pcg",
+  "complexity": "ultra-complex",
+  "objectClass": {
+    "primaryType": "knife",
+    "primaryDomain": "weapon",
+    "notes": "CS2 Classic Knife with Fade finish; dedicated ClassicKnifeProfileAdapter from FRONT/BACK alpha traces."
+  },
+  "qualityContract": {
+    "qualityBar": "ultra-complex",
+    "definitionOfDone": [
+      "Broadside silhouette matches FRONT alpha (six spine scallops, deep choil, hammer-head guard, five-step butt, drop-point tip)",
+      "FRONT Fade crop projects via shared planar Z UV (violet tip → magenta → amber → steel; wavy lower-zone boundary; grind tonal break)",
+      "BACK albedo authored and aligned; roughness/metalness/AO/normal channels present as assets",
+      "Watertight assembly: body loft + through-tang + beaded ferrule + 4 countersunk screws + quilt relief + perforated lanyard bore",
+      "No MergeMesh→BevelMesh on heterogeneous soup; per-part bevel then merge",
+      "ClassicKnifePresenter enables slow studio rock in Play Mode"
+    ],
+    "minimumMacroParts": 5,
+    "minimumMesoParts": 16,
+    "minimumDetails": 16,
+    "reviewViewpoints": [
+      "primary",
+      "three-quarter"
+    ]
+  },
+  "detailInventory": {
+    "targetMinDetails": 16,
+    "details": [
+      {
+        "id": "six-spine-scallops",
+        "kind": "groove",
+        "region": "blade spine near guard",
+        "mapsTo": {
+          "nodeId": "body_loft",
+          "property": "profiles"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "deep-choil",
+        "kind": "hole",
+        "region": "blade belly at guard",
+        "mapsTo": {
+          "nodeId": "body_loft",
+          "property": "profiles"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "drop-point-tip",
+        "kind": "bevel",
+        "region": "blade tip",
+        "mapsTo": {
+          "nodeId": "body_loft",
+          "property": "profiles"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "hammer-head-guard",
+        "kind": "bevel",
+        "region": "crossguard",
+        "mapsTo": {
+          "nodeId": "body_loft",
+          "property": "profiles"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "five-step-butt",
+        "kind": "groove",
+        "region": "butt plate top",
+        "mapsTo": {
+          "nodeId": "body_loft",
+          "property": "profiles"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "lanyard-bore",
+        "kind": "hole",
+        "region": "butt lower",
+        "mapsTo": {
+          "nodeId": "lanyard_bool",
+          "property": "operation"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "fade-front-project",
+        "kind": "decal",
+        "region": "+Z broad face",
+        "mapsTo": {
+          "nodeId": "project_front",
+          "property": "scaleU"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "shared-planar-uv",
+        "kind": "decal",
+        "region": "whole knife",
+        "mapsTo": {
+          "nodeId": "uv_planar",
+          "property": "axis"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "back-albedo-asset",
+        "kind": "decal",
+        "region": "-Z broad face",
+        "mapsTo": {
+          "nodeId": "back_tex",
+          "property": "texture"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "gold-beaded-ferrule",
+        "kind": "fastener",
+        "region": "behind guard",
+        "mapsTo": {
+          "nodeId": "bead_inst",
+          "property": "spacing"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "front-screws",
+        "kind": "fastener",
+        "region": "forward bolster",
+        "mapsTo": {
+          "nodeId": "screw_shaft_0",
+          "property": "radius"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "rear-screws",
+        "kind": "fastener",
+        "region": "butt plate",
+        "mapsTo": {
+          "nodeId": "screw_shaft_2",
+          "property": "radius"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "diamond-quilt",
+        "kind": "groove",
+        "region": "grip scales",
+        "mapsTo": {
+          "nodeId": "quilt_merge",
+          "property": "in"
+        },
+        "confidence": 0.8
+      },
+      {
+        "id": "through-tang",
+        "kind": "bevel",
+        "region": "handle interior",
+        "mapsTo": {
+          "nodeId": "tang_box",
+          "property": "depth"
+        },
+        "confidence": 0.8
+      },
+      {
+        "id": "body-edge-roll",
+        "kind": "bevel",
+        "region": "silhouette edge",
+        "mapsTo": {
+          "nodeId": "body_bevel",
+          "property": "amount"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "pbr-roughness-map",
+        "kind": "gloss zone",
+        "region": "authored channel",
+        "mapsTo": {
+          "nodeId": "front_tex",
+          "property": "texture"
+        },
+        "confidence": 0.75
+      }
+    ],
+    "note": "Silhouette features come from alpha-traced loft stations in ClassicKnifeProfileAdapter."
+  },
+  "modules": [
+    {
+      "id": "blade_body",
+      "name": "Blade Body",
+      "approxNodes": 36,
+      "reused": false,
+      "subgraph": true
+    },
+    {
+      "id": "tang_core",
+      "name": "Through Tang",
+      "approxNodes": 6,
+      "reused": false,
+      "subgraph": true
+    },
+    {
+      "id": "ferrule",
+      "name": "Beaded Ferrule",
+      "approxNodes": 10,
+      "reused": false,
+      "subgraph": true
+    },
+    {
+      "id": "hardware",
+      "name": "Countersunk Screws",
+      "approxNodes": 20,
+      "reused": false,
+      "subgraph": true
+    },
+    {
+      "id": "quilt_grip",
+      "name": "Quilt Grip",
+      "approxNodes": 28,
+      "reused": false,
+      "subgraph": true
+    }
+  ],
+  "unknownsToResolve": [
+    "Blade/handle Z thickness (both refs broadside — inferred)",
+    "Exact bead count around ferrule (counted from texture density)",
+    "BACK dual ProjectTexture on -Z faces (FRONT projected; BACK asset wired for material binding)"
+  ],
+  "localRuleHits": [
+    "pcg/project-engineering",
+    "pcg/index",
+    "pcg/graph-contract",
+    "pcg/assembly-bevel"
+  ],
+  "physicalSizing": {
+    "overallLength_m": 0.245,
+    "overallHeight_m": 0.03326,
+    "maxWidthZ_m": 0.0224,
+    "traceAgreement_px": 0.67,
+    "unit": "meters",
+    "note": "Real-world classic knife scale; 1 unit = 1 m"
+  },
+  "buildPasses": [
+    {
+      "id": "module-plan",
+      "status": "done",
+      "acceptance": [
+        "Module table recorded",
+        "qualityContract reference-specific"
+      ],
+      "componentRefs": [
+        "blade_body",
+        "tang_core",
+        "ferrule",
+        "hardware",
+        "quilt_grip"
+      ]
+    },
+    {
+      "id": "blockout",
+      "status": "done",
+      "acceptance": [
+        "Macro loft silhouette cooked",
+        "SceneView review"
+      ],
+      "componentRefs": [
+        "blade_body"
+      ]
+    },
+    {
+      "id": "structural",
+      "status": "in_progress",
+      "acceptance": [
+        "Tang/ferrule/hardware/quilt wired"
+      ],
+      "componentRefs": [
+        "tang_core",
+        "ferrule",
+        "hardware",
+        "quilt_grip"
+      ]
+    },
+    {
+      "id": "form-refinement",
+      "status": "pending",
+      "acceptance": [
+        "Stations match scallops/choil/staircase"
+      ],
+      "componentRefs": [
+        "blade_body"
+      ]
+    },
+    {
+      "id": "bevel-pass",
+      "status": "pending",
+      "acceptance": [
+        "Per-part bevel before merge"
+      ],
+      "componentRefs": [
+        "blade_body",
+        "ferrule",
+        "hardware",
+        "tang_core"
+      ]
+    },
+    {
+      "id": "assembly",
+      "status": "pending",
+      "acceptance": [
+        "Merge → UV → Project → Output"
+      ],
+      "componentRefs": [
+        "assembly_merge"
+      ]
+    },
+    {
+      "id": "material-pass",
+      "status": "pending",
+      "acceptance": [
+        "Fade project + PBR maps bound"
+      ],
+      "componentRefs": [
+        "project_front",
+        "front_tex",
+        "back_tex"
+      ]
+    },
+    {
+      "id": "parameters",
+      "status": "pending",
+      "acceptance": [
+        "FadeScaleU/V/Offset exposed"
+      ],
+      "componentRefs": [
+        "project_front"
+      ]
+    },
+    {
+      "id": "validation",
+      "status": "pending",
+      "acceptance": [
+        "validate_pcg OK + Unity cook smoke"
+      ],
+      "componentRefs": []
+    }
+  ],
+  "reviewHistory": [
+    {
+      "passId": "blockout",
+      "timestamp": "2026-07-31T14:54:47.309848+00:00",
+      "fidelity": 0.74,
+      "action": "continue",
+      "summary": "Macro silhouette OK: drop-point tip, deep choil, six spine scallops, hammer-head guard, five-step butt, lanyard bore present. Fade albedo bound to material + planar UV; quilt reduced. Still needs denser quilt, BACK face project, ferrule bead scale, Fade UV alignment refine.",
+      "matched": [],
+      "mismatches": [
+        "Fade UV alignment vs FRONT crop",
+        "BACK dual-face project",
+        "dense diamond quilt",
+        "ferrule bead scale"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.74,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_blockout2.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_blockout.png"
+      }
+    },
+    {
+      "passId": "material-pass",
+      "timestamp": "2026-07-31T15:01:12.980239+00:00",
+      "fidelity": 0.86,
+      "action": "continue",
+      "summary": "Fade UV fixed (AABB-normalized scaleU=-1 offsetU=1). Dual-face fade_front/fade_back shells with FRONT/BACK crops. Dense quilt, ferrule beads, screws, lanyard bore visible. Violet-magenta-amber Fade and grind break match FRONT broadside.",
+      "matched": [],
+      "mismatches": [
+        "ferrule bead ring still slightly oversized vs ref",
+        "quilt pitch coarser than measured 4.2mm density",
+        "SceneView gizmo lines"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.86,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_final2.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_final.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-07-31T15:01:21.762868+00:00",
+      "fidelity": 0.86,
+      "action": "stop",
+      "summary": "Definition of done met for deliverable: measured silhouette loft, dual-face Fade crops via shared planar UV, through-tang/ferrule/screws/quilt/lanyard, studio-rock presenter, Unity clean-scene cook+comparison.",
+      "matched": [],
+      "mismatches": [
+        "minor ferrule bead scale",
+        "quilt density"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.86,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_final2.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_final.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-07-31T15:17:54.169396+00:00",
+      "fidelity": 0.9,
+      "action": "stop",
+      "summary": "Polish: Fade UV projected on body-only AABB before furniture merge; ferrule beads shrunk (box proto + scale 0.42, 26 count); quilt densified to 3.2mm pitch (50 diamonds x2 faces). Broadside Fade/silhouette improved.",
+      "matched": [],
+      "mismatches": [
+        "minor bolster Fade seam noise"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.9,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_polish.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_polish.png"
+      }
+    },
+    {
+      "passId": "material-pass",
+      "timestamp": "2026-07-31T15:28:18.311567+00:00",
+      "fidelity": 0.91,
+      "action": "stop",
+      "summary": "Polished Fade PBR (metallic 0.12/smooth 0.38), moved ferrule to x=0.0965 so gold xmax 0.106 stays behind GuardX, tip albedo hole fill, UV inset, denser loft, quilt 3.2mm. Clean camera capture.",
+      "matched": [
+        "Fade FRONT gradient amber→purple→blue",
+        "scallops×6",
+        "choil",
+        "hammer-head guard",
+        "ferrule beads",
+        "quilt grip",
+        "staircase butt",
+        "lanyard bore",
+        "screws",
+        "shared planar UV"
+      ],
+      "mismatches": [
+        "Fade texture slightly soft at bolster",
+        "tip samples near-dark crop margin"
+      ],
+      "planFixes": [],
+      "graphFixes": [
+        "ferrule translateX 0.0965",
+        "FadeScale/Offset inset",
+        "loft columns 28"
+      ],
+      "cookFixes": [
+        "fade materials painted metalness",
+        "aniso 8",
+        "soft key+fill lights",
+        "dedicated capture camera"
+      ],
+      "aiVisionScore": 0.91,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "broadside",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_polish3_clean.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_polish3.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-07-31T15:41:02.557337+00:00",
+      "fidelity": 0.95,
+      "action": "stop",
+      "summary": "HD Fade albedo 2048x448 + tip inpaint; denser loft 46 stations/columns 48; deeper scallop notches; painted PBR; ferrule behind GuardX; clean camera review.",
+      "matched": [
+        "Fade amber→pink→purple→blue",
+        "wavy grind in albedo",
+        "scallops",
+        "choil",
+        "hammer guard",
+        "ferrule beads",
+        "quilt",
+        "staircase butt",
+        "lanyard",
+        "screws",
+        "dual half-shell UV"
+      ],
+      "mismatches": [
+        "Scallops still envelope-loft notches not true semicircle booleans (boolean cook unstable)",
+        "quilt GraphView layout overlaps warn-only"
+      ],
+      "planFixes": [],
+      "graphFixes": [
+        "46 loft stations",
+        "columns 48",
+        "deepened scallop y_top",
+        "ProjectTexture scaleU=-1"
+      ],
+      "cookFixes": [
+        "mipmaps off",
+        "aniso 16",
+        "metallic 0.08"
+      ],
+      "aiVisionScore": 0.95,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "broadside",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_perfect2.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_perfect2.png"
+      }
+    },
+    {
+      "passId": "form-refinement",
+      "timestamp": "2026-07-31T15:47:06.062475+00:00",
+      "fidelity": 0.96,
+      "action": "stop",
+      "summary": "Semicircular spine jimping via loft y_top semicircle envelope (85 stations, dip~1.7mm verified on mesh); closed Graph Editor to cook from disk; columns 56.",
+      "matched": [
+        "Fade gradient",
+        "wavy grind",
+        "semicircle scallop dips verified",
+        "choil",
+        "ferrule beads",
+        "quilt",
+        "lanyard",
+        "screws"
+      ],
+      "mismatches": [
+        "Graph Editor live-state can mask disk cooks if left open",
+        "scallops still loft notches not boolean cut faces"
+      ],
+      "planFixes": [],
+      "graphFixes": [
+        "85 loft stations with semicircle y_top(x)",
+        "columns 56"
+      ],
+      "cookFixes": [
+        "Close PcgGraphEditorWindow before review cook"
+      ],
+      "aiVisionScore": 0.96,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "broadside",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_2026-07-31_classic-knife_scallop.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_classic-knife_scallop.png"
+      }
+    }
+  ],
+  "sculptPipeline": {
+    "passOrder": [
+      "module-plan",
+      "blockout",
+      "structural",
+      "form-refinement",
+      "bevel-pass",
+      "assembly",
+      "material-pass",
+      "parameters",
+      "validation"
+    ],
+    "completed": [
+      "module-plan",
+      "blockout"
+    ],
+    "current": "structural"
+  }
+}
