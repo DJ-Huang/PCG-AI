@@ -33,6 +33,13 @@ namespace DJTechEditor.PCG.Graph
 
         private static void OnEditorUpdate()
         {
+            if (!PcgCreateSplineSceneHandles.IsPcgModeActive ||
+                PcgCreateSplineSceneHandles.IsExternalSceneHandleIsolation)
+            {
+                ForceClearInteractionState(requestCook: false);
+                return;
+            }
+
             // PositionHandle often ends without a MouseUp that our SceneGUI still sees.
             // Detect drag end via hotControl clearing, then cook + force editor tick.
             if (!s_Dragging || s_DragComponent == null)
@@ -54,6 +61,16 @@ namespace DJTechEditor.PCG.Graph
         {
             if (Application.isPlaying || sceneView == null)
                 return;
+
+            // Stamp handles are part of PCG viewport editing. Registering them in the
+            // normal Scene View competes with Unity's object Transform gizmo even after
+            // the PCG toolbar has exited.
+            if (!PcgCreateSplineSceneHandles.IsPcgModeActive ||
+                PcgCreateSplineSceneHandles.IsExternalSceneHandleIsolation)
+            {
+                ForceClearInteractionState(requestCook: false);
+                return;
+            }
 
             var component = Selection.activeGameObject != null
                 ? Selection.activeGameObject.GetComponent<PcgGraphComponent>()
@@ -100,15 +117,22 @@ namespace DJTechEditor.PCG.Graph
             HandleDragCookRelease(component, window);
         }
 
+        internal static void ForceClearInteractionState(bool requestCook)
+        {
+            if (requestCook && s_Dragging && s_DragComponent != null)
+            {
+                FinishStampDragCook();
+                return;
+            }
+
+            ClearStampDragState();
+        }
+
         private static void FinishStampDragCook()
         {
             var component = s_DragComponent;
             var window = s_DragWindow;
-            s_Dragging = false;
-            s_DragHadHotControl = false;
-            s_DragTransformNodeId = null;
-            s_DragComponent = null;
-            s_DragWindow = null;
+            ClearStampDragState();
 
             if (component == null)
                 return;
@@ -121,6 +145,15 @@ namespace DJTechEditor.PCG.Graph
 
             EditorApplication.QueuePlayerLoopUpdate();
             SceneView.RepaintAll();
+        }
+
+        private static void ClearStampDragState()
+        {
+            s_Dragging = false;
+            s_DragHadHotControl = false;
+            s_DragTransformNodeId = null;
+            s_DragComponent = null;
+            s_DragWindow = null;
         }
 
         private struct StampSpace

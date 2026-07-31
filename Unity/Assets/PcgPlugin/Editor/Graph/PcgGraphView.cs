@@ -2069,7 +2069,15 @@ namespace DJTechEditor.PCG.Graph
         {
             if (level == SceneEditLevel.Object)
             {
-                m_SceneEditContext = PcgSceneEditContext.ObjectMode;
+                // Keep the capabilities inferred from the selected graph node. Object
+                // Mode only changes which handles own the Scene View; it must not make
+                // the Spline/Group toolbar entries disappear until the node selection
+                // actually changes.
+                m_SceneEditContext = new PcgSceneEditContext(
+                    SceneEditLevel.Object,
+                    SceneEditDomain.None,
+                    m_SceneEditContext.ActiveNodeId,
+                    m_SceneEditContext.SupportedDomains);
             }
             else
             {

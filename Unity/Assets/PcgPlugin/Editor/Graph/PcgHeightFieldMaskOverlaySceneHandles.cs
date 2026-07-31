@@ -48,7 +48,8 @@ namespace DJTechEditor.PCG.Graph
                 return;
 
             // Mask tint is an editing aid — only while Enter PCG Mode is active.
-            if (!PcgCreateSplineSceneHandles.IsPcgModeActive)
+            if (!PcgCreateSplineSceneHandles.IsPcgModeActive ||
+                PcgCreateSplineSceneHandles.IsExternalSceneHandleIsolation)
             {
                 if (s_Mesh != null)
                     DestroyCachedResources();

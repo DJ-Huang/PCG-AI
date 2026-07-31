@@ -57,17 +57,53 @@ namespace DJTechEditor.PCG.Graph
         }
 
         private static bool s_PcgModeActive;
+        // Temporary diagnostic stage. ToolLifecycleOnly restores only the PCG tool
+        // save/restore path; every SceneView callback, overlay, selection lock and
+        // renderer visibility change remains disabled until the regression is isolated.
+        private enum DiagnosticSceneViewStage
+        {
+            FullIsolation,
+            ToolLifecycleOnly,
+            ReadOnlyStatusOverlay,
+            InteractiveToolbar,
+            CoreModeSetup,
+            CoreSceneGuiShell,
+            CoreShellWithGroupUi,
+            PcgCoreSceneGui,
+        }
+
+        private const DiagnosticSceneViewStage DiagnosticStage =
+            DiagnosticSceneViewStage.PcgCoreSceneGui;
         private static PcgGraphEditorWindow s_ActiveWindow;
         private static PcgGraphComponent s_ActiveComponent;
 
         /// <summary>True while Scene View toolbar is in Enter PCG Mode.</summary>
         internal static bool IsPcgModeActive => s_PcgModeActive;
+        internal static bool IsSceneViewInputIsolated =>
+            s_PcgModeActive &&
+            DiagnosticStage != DiagnosticSceneViewStage.CoreSceneGuiShell &&
+            DiagnosticStage != DiagnosticSceneViewStage.CoreShellWithGroupUi &&
+            DiagnosticStage != DiagnosticSceneViewStage.PcgCoreSceneGui;
+
+        /// <summary>
+        /// Keeps independent Stamp/Mask/Match Size SceneView callbacks out of the
+        /// current diagnostic stage while the core PCG SceneView pipeline is tested.
+        /// </summary>
+        internal static bool IsExternalSceneHandleIsolation => s_PcgModeActive;
 
         /// <summary>Component locked for Scene View edits in PCG Mode; null when inactive.</summary>
         internal static PcgGraphComponent ActivePcgModeComponent => s_ActiveComponent;
         private static GameObject s_LockedSelection;
         private static bool s_SelectionGuard;
-        private static Tool s_PrevTool;
+        private static Tool s_PrevTool = Tool.Move;
+        private static bool s_HasPrevTool;
+        private static bool s_ExitScheduled;
+        private static bool s_ScheduledExitNotifiesGraphChanged;
+
+        private const string SessionToolOverrideActive =
+            "DJTechEditor.PCG.PcgMode.ToolOverrideActive";
+        private const string SessionPreviousTool =
+            "DJTechEditor.PCG.PcgMode.PreviousTool";
 
         // SceneView invokes duringSceneGui several times per frame. Resolve the selected
         // component/window only when selection changes instead of hitting AssetDatabase
@@ -310,11 +346,31 @@ namespace DJTechEditor.PCG.Graph
 
         static PcgCreateSplineSceneHandles()
         {
+            RecoverInterruptedEditorToolOverride();
+
             SceneView.duringSceneGui -= OnSceneGui;
             Selection.selectionChanged -= OnSelectionChanged;
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             SceneView.duringSceneGui += OnSceneGui;
             Selection.selectionChanged += OnSelectionChanged;
+            AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
 
+        private static void OnBeforeAssemblyReload()
+        {
+            if (s_PcgModeActive || HasPersistedEditorToolOverride())
+                ExitPcgMode(notifyGraphChanged: false);
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode &&
+                (s_PcgModeActive || HasPersistedEditorToolOverride()))
+            {
+                ExitPcgMode(notifyGraphChanged: false);
+            }
         }
 
         private static void OnSelectionChanged()
@@ -326,8 +382,26 @@ namespace DJTechEditor.PCG.Graph
 
             if (Selection.activeGameObject != s_LockedSelection)
             {
-                s_SelectionGuard = true;
+                // PCG Mode owns Scene View selection until the user explicitly exits.
+                // Restoring selection here, rather than registering a default control,
+                // avoids leaving GUIUtility.hotControl assigned to a PCG control after
+                // the corresponding MouseUp has been handled by Unity.
+                RestoreLockedSelection();
+            }
+        }
+
+        private static void RestoreLockedSelection()
+        {
+            if (s_LockedSelection == null || s_SelectionGuard)
+                return;
+
+            s_SelectionGuard = true;
+            try
+            {
                 Selection.activeGameObject = s_LockedSelection;
+            }
+            finally
+            {
                 s_SelectionGuard = false;
             }
         }
@@ -336,6 +410,38 @@ namespace DJTechEditor.PCG.Graph
         {
             if (Application.isPlaying)
                 return;
+
+            if (IsSceneViewInputIsolated)
+            {
+                // Diagnostic stages restore a single UI layer at a time. Custom Handles,
+                // selection ownership and preview drawing remain disabled until each layer
+                // has proved it cannot interfere with Unity's native transform gizmos.
+                if (s_ActiveWindow != null)
+                {
+                    if (DiagnosticStage == DiagnosticSceneViewStage.ReadOnlyStatusOverlay ||
+                        DiagnosticStage == DiagnosticSceneViewStage.InteractiveToolbar ||
+                        DiagnosticStage == DiagnosticSceneViewStage.CoreModeSetup)
+                    {
+                        DrawPcgModeStatusOverlay(sceneView, s_ActiveWindow);
+                    }
+
+                    if (DiagnosticStage == DiagnosticSceneViewStage.InteractiveToolbar ||
+                        DiagnosticStage == DiagnosticSceneViewStage.CoreModeSetup)
+                        DrawPcgModeToolbar(sceneView, s_ActiveWindow);
+                }
+                return;
+            }
+
+            // Do not rely solely on Selection.selectionChanged here. Some editor input
+            // paths apply the new selection just before SceneGUI is invoked, so the
+            // callback can arrive after this frame. Polling keeps PCG Mode's selection
+            // lock in effect for those paths too.
+            if (s_PcgModeActive && s_LockedSelection != null &&
+                Selection.activeGameObject != s_LockedSelection)
+            {
+                RestoreLockedSelection();
+                return;
+            }
 
             // Show the toolbar/entry when the selected object has a PcgGraphComponent,
             // regardless of whether a Graph Editor window is open.
@@ -383,7 +489,14 @@ namespace DJTechEditor.PCG.Graph
             }
 
             var ctx = graphWindow.GraphView.SceneEditContext;
+            SyncEditorToolWithSceneContext(ctx);
+            var customPcgHandlesEnabled =
+                DiagnosticStage != DiagnosticSceneViewStage.CoreSceneGuiShell &&
+                DiagnosticStage != DiagnosticSceneViewStage.CoreShellWithGroupUi;
+            var groupUiEnabled =
+                DiagnosticStage != DiagnosticSceneViewStage.CoreSceneGuiShell;
             var splineHandlesActive =
+                customPcgHandlesEnabled &&
                 splineNodes.Count > 0 &&
                 ctx.IsComponentMode &&
                 ctx.Domain == SceneEditDomain.SplineControlPoint;
@@ -395,20 +508,20 @@ namespace DJTechEditor.PCG.Graph
                     DrawNodeSpline(sceneView, window, graphView, node);
             }
 
-            TryEndSplineDrag();
+            if (customPcgHandlesEnabled)
+                TryEndSplineDrag();
 
             // Register and process all 3D handles before entering any IMGUI overlay.
             // GUILayout controls may consume MouseDown, which prevents Unity's native
             // PositionHandle from acquiring hotControl when overlays run first.
             DrawPolygonWireOverlay(sceneView, graphWindow);
             DrawPcgModeToolbar(sceneView, graphWindow);
-            DrawGroupListSidebar(sceneView, graphWindow);
 
             if (splineHandlesActive)
             {
                 DrawSplineOverlay(sceneView, splineNodes[0].node);
             }
-            else if (s_GroupListOpen)
+            else if (groupUiEnabled && s_GroupListOpen)
             {
                 // Panel is opt-in via right-strip Group List button only — never auto-open.
                 var groupNode = graphWindow.GraphView.selection.OfType<PcgManifestNodeView>().FirstOrDefault();
@@ -427,19 +540,10 @@ namespace DJTechEditor.PCG.Graph
                 DrawPcgModeStatusOverlay(sceneView, graphWindow);
             }
 
-            // AddDefaultControl registers a fallback that absorbs clicks on empty
-            // space, preventing Unity's hierarchy picker from changing selection.
-            // It must be called AFTER all GUI buttons and 3D handles have registered
-            // their hit tests so they take priority over the default control.
-            //
-            // Do NOT set Selection.activeGameObject here — doing so during MouseDown
-            // clears GUIUtility.hotControl, which prevents GUILayout.Button from
-            // detecting clicks (Exit, Insert Point, etc.). Selection locking is
-            // handled by OnSelectionChanged instead.
-            if (s_LockedSelection != null)
-            {
-                HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
-            }
+            // Selection locking is handled by OnSelectionChanged. Do not register an
+            // AddDefaultControl fallback here: if PCG Mode exits before that control
+            // receives its matching MouseUp, it can leave GUIUtility.hotControl owned
+            // by a control that no longer exists and disable every Scene View handle.
         }
 
         private static void RefreshSelectionCacheIfNeeded()
@@ -504,12 +608,69 @@ namespace DJTechEditor.PCG.Graph
             s_ActiveWindow = window;
             s_ActiveComponent = component;
             s_CachedSelectionWindow = window;
-            // Re-derive context from current selection instead of resetting to
-            // Object/None. If a node (e.g. GroupCreate) was already selected,
-            // the toolbar activates the correct domain on entry.
+
+            if (DiagnosticStage == DiagnosticSceneViewStage.FullIsolation)
+            {
+                // Baseline for user repro: do not touch selection, tools, renderers,
+                // graph context, or SceneView callbacks. Exit through the temporary
+                // PCG/Diagnostics menu item below.
+                s_LockedSelection = null;
+                Debug.Log("[PCG] SceneView input isolation is active. Use PCG/Diagnostics/Exit Isolated PCG Mode to exit.");
+                return;
+            }
+
+            if (DiagnosticStage == DiagnosticSceneViewStage.ToolLifecycleOnly ||
+                DiagnosticStage == DiagnosticSceneViewStage.ReadOnlyStatusOverlay ||
+                DiagnosticStage == DiagnosticSceneViewStage.InteractiveToolbar)
+            {
+                CaptureEditorToolForPcgMode();
+                SyncEditorToolWithSceneContext(PcgSceneEditContext.ObjectMode);
+                Debug.Log("[PCG] Tool-lifecycle diagnostic is active. All SceneView callbacks remain disabled; use PCG/Diagnostics/Exit Isolated PCG Mode to exit.");
+                return;
+            }
+
+            if (DiagnosticStage == DiagnosticSceneViewStage.CoreModeSetup)
+            {
+                // Restore the graph context and selection ownership used by production
+                // PCG Mode, but leave every custom 3D Handle disabled. This verifies
+                // that mode setup itself never removes Unity's object transform tool.
+                if (window != null && window.GraphView != null)
+                {
+                    window.GraphView.RefreshSceneEditContext();
+                    window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
+                }
+
+                if (component != null)
+                {
+                    s_LockedSelection = component.gameObject;
+                    s_SelectionGuard = true;
+                    try
+                    {
+                        Selection.activeGameObject = s_LockedSelection;
+                    }
+                    finally
+                    {
+                        s_SelectionGuard = false;
+                    }
+                }
+
+                CaptureEditorToolForPcgMode();
+                var setupContext = window != null && window.GraphView != null
+                    ? window.GraphView.SceneEditContext
+                    : PcgSceneEditContext.ObjectMode;
+                SyncEditorToolWithSceneContext(setupContext);
+                Debug.Log("[PCG] Core mode-setup diagnostic is active. Custom SceneView handles remain disabled.");
+                return;
+            }
+            // Enter in Object Mode. The GraphView normally retains its last selected
+            // node, which can be a spline/group node; deriving the context from that
+            // selection here immediately switches Tools.current to None and makes the
+            // just-entered Scene View look as though its transform gizmo is broken.
+            // Component modes remain available through the PCG toolbar.
             if (window != null && window.GraphView != null)
             {
                 window.GraphView.RefreshSceneEditContext();
+                window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
                 window.GraphView.EnsureMatchSizeScenePreview();
             }
 
@@ -521,12 +682,21 @@ namespace DJTechEditor.PCG.Graph
             {
                 s_LockedSelection = anchor.gameObject;
                 s_SelectionGuard = true;
-                Selection.activeGameObject = s_LockedSelection;
-                s_SelectionGuard = false;
+                try
+                {
+                    Selection.activeGameObject = s_LockedSelection;
+                }
+                finally
+                {
+                    s_SelectionGuard = false;
+                }
             }
 
-            s_PrevTool = Tools.current;
-            Tools.current = Tool.None;
+            CaptureEditorToolForPcgMode();
+            var context = window != null && window.GraphView != null
+                ? window.GraphView.SceneEditContext
+                : PcgSceneEditContext.ObjectMode;
+            SyncEditorToolWithSceneContext(context);
             ApplyOthersDisplayMode();
 
             // Frame the Scene View on the selected object.
@@ -543,37 +713,233 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void ExitPcgMode()
+        private static void ExitPcgMode(bool notifyGraphChanged = true)
         {
-            if (s_LockedSelection != null)
+            // Toolbar and overlay buttons invoke this while Handles.BeginGUI is still
+            // active. Releasing hotControl inside that callback is too early: EndGUI
+            // can restore the button's control id afterwards, which blocks every
+            // native Move/Rotate/Scale handle. Finish the teardown on the next editor
+            // tick, after the current IMGUI event has completed.
+            if (Event.current != null)
             {
-                var gv = s_LockedSelection.GetComponent<PcgGroupVisualizer>();
-                gv?.ClearHighlight();
+                SchedulePcgModeExit(notifyGraphChanged);
+                return;
             }
-            s_PcgModeActive = false;
-            s_ActiveWindow = null;
-            s_ActiveComponent = null;
-            s_LockedSelection = null;
-            s_WirePreviewCache = null;
-            s_WireEdgePairs = null;
-            s_WireBuiltEdgeCount = 0;
-            s_WireUploadedEdgeCount = 0;
-            s_SelectedPointByNode.Clear();
-            s_ActivePointByNode.Clear();
-            s_SelectedGroupName = null;
-            s_SelectedGroupSource = null;
-            s_SelectedGroupDomain = null;
-            s_SelectedGroupNodeId = null;
-            ClearGroupHover();
-            s_GroupListOpen = false;
-            s_GroupListFilter = "*";
-            s_GroupListScroll = Vector2.zero;
-            s_AvailableGroups.Clear();
-            s_LastParsedJson = null;
-            Tools.current = s_PrevTool;
-            RestoreHiddenRenderers();
-            PcgHeightFieldMaskOverlaySceneHandles.DestroyCachedResources();
-            SceneView.RepaintAll();
+
+            ExitPcgModeNow(notifyGraphChanged);
+        }
+
+        private static void SchedulePcgModeExit(bool notifyGraphChanged)
+        {
+            if (s_ExitScheduled)
+            {
+                // A no-cook shutdown (assembly reload / play-mode transition) wins.
+                s_ScheduledExitNotifiesGraphChanged &= notifyGraphChanged;
+                return;
+            }
+
+            s_ExitScheduled = true;
+            s_ScheduledExitNotifiesGraphChanged = notifyGraphChanged;
+            EditorApplication.delayCall += CompleteScheduledPcgModeExit;
+        }
+
+        private static void CompleteScheduledPcgModeExit()
+        {
+            var notifyGraphChanged = s_ScheduledExitNotifiesGraphChanged;
+            s_ExitScheduled = false;
+            s_ScheduledExitNotifiesGraphChanged = false;
+            ExitPcgModeNow(notifyGraphChanged);
+        }
+
+        [MenuItem("PCG/Diagnostics/Exit Isolated PCG Mode", false, 999)]
+        private static void ExitIsolatedPcgMode()
+        {
+            if (s_PcgModeActive)
+                ExitPcgModeNow(notifyGraphChanged: false);
+        }
+
+        [MenuItem("PCG/Diagnostics/Exit Isolated PCG Mode", true)]
+        private static bool ValidateExitIsolatedPcgMode() =>
+            s_PcgModeActive;
+
+        private static void ExitPcgModeNow(bool notifyGraphChanged)
+        {
+            try
+            {
+                FinishActiveSplineInteraction(notifyGraphChanged);
+                PcgStampOverlaySceneHandles.ForceClearInteractionState(notifyGraphChanged);
+
+                if (s_LockedSelection != null)
+                {
+                    var gv = s_LockedSelection.GetComponent<PcgGroupVisualizer>();
+                    gv?.ClearHighlight();
+                }
+
+                ClearGroupHover();
+                RestoreHiddenRenderers();
+                PcgHeightFieldMaskOverlaySceneHandles.DestroyCachedResources();
+            }
+            catch (System.Exception exception)
+            {
+                // Cleanup must continue even if a final cook or preview teardown fails.
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                s_PcgModeActive = false;
+                s_ActiveWindow = null;
+                s_ActiveComponent = null;
+                s_LockedSelection = null;
+                s_WirePreviewCache = null;
+                s_WireEdgePairs = null;
+                s_WireBuiltEdgeCount = 0;
+                s_WireUploadedEdgeCount = 0;
+                s_SelectedPointByNode.Clear();
+                s_ActivePointByNode.Clear();
+                s_SelectedGroupName = null;
+                s_SelectedGroupSource = null;
+                s_SelectedGroupDomain = null;
+                s_SelectedGroupNodeId = null;
+                s_GroupListOpen = false;
+                s_GroupListFilter = "*";
+                s_GroupListScroll = Vector2.zero;
+                s_AvailableGroups.Clear();
+                s_LastParsedJson = null;
+                s_SelectionGuard = false;
+
+                try
+                {
+                    RestoreEditorToolAfterPcgMode();
+                }
+                catch (System.Exception exception)
+                {
+                    Debug.LogException(exception);
+                    Tools.current = Tool.Move;
+                    SessionState.EraseBool(SessionToolOverrideActive);
+                    SessionState.EraseInt(SessionPreviousTool);
+                }
+                finally
+                {
+                    ReleaseSceneViewInputState();
+                    SceneView.RepaintAll();
+                }
+            }
+        }
+
+        private static void CaptureEditorToolForPcgMode()
+        {
+            s_PrevTool = GetRestorableEditorTool(Tools.current);
+            s_HasPrevTool = true;
+            PersistEditorToolOverride();
+        }
+
+        private static void SyncEditorToolWithSceneContext(PcgSceneEditContext context)
+        {
+            if (!s_HasPrevTool)
+                CaptureEditorToolForPcgMode();
+
+            if (context.IsComponentMode)
+            {
+                // Component handles own Scene View input. Preserve a tool selected
+                // while in Object Mode, then hide Unity's object transform handle.
+                if (Tools.current != Tool.None)
+                {
+                    s_PrevTool = GetRestorableEditorTool(Tools.current);
+                    PersistEditorToolOverride();
+                }
+
+                Tools.current = GetEditorToolForSceneContext(context, s_PrevTool);
+                return;
+            }
+
+            // Object Mode must keep Unity's native transform gizmo usable.
+            if (Tools.current == Tool.None)
+            {
+                Tools.current = GetRestorableEditorTool(s_PrevTool);
+                return;
+            }
+
+            // Remember W/E/R/T changes made while PCG Object Mode is active.
+            s_PrevTool = GetRestorableEditorTool(Tools.current);
+            PersistEditorToolOverride();
+        }
+
+        private static void RestoreEditorToolAfterPcgMode()
+        {
+            var persisted = HasPersistedEditorToolOverride();
+            var fallback = persisted
+                ? (Tool)SessionState.GetInt(SessionPreviousTool, (int)Tool.Move)
+                : s_PrevTool;
+
+            if (s_HasPrevTool || persisted || Tools.current == Tool.None)
+                Tools.current = GetRestorableEditorTool(fallback);
+
+            s_HasPrevTool = false;
+            SessionState.EraseBool(SessionToolOverrideActive);
+            SessionState.EraseInt(SessionPreviousTool);
+        }
+
+        private static void RecoverInterruptedEditorToolOverride()
+        {
+            if (!HasPersistedEditorToolOverride())
+                return;
+
+            var previous = (Tool)SessionState.GetInt(SessionPreviousTool, (int)Tool.Move);
+            Tools.current = GetRestorableEditorTool(previous);
+            SessionState.EraseBool(SessionToolOverrideActive);
+            SessionState.EraseInt(SessionPreviousTool);
+        }
+
+        private static void PersistEditorToolOverride()
+        {
+            SessionState.SetBool(SessionToolOverrideActive, true);
+            SessionState.SetInt(
+                SessionPreviousTool,
+                (int)GetRestorableEditorTool(s_PrevTool));
+        }
+
+        private static bool HasPersistedEditorToolOverride() =>
+            SessionState.GetBool(SessionToolOverrideActive, false);
+
+        internal static Tool GetRestorableEditorTool(Tool tool) =>
+            tool == Tool.None ? Tool.Move : tool;
+
+        internal static Tool GetEditorToolForSceneContext(
+            PcgSceneEditContext context,
+            Tool previousTool) =>
+            context.IsComponentMode
+                ? Tool.None
+                : GetRestorableEditorTool(previousTool);
+
+        private static void ReleaseSceneViewInputState()
+        {
+            // Exiting an editor mode is a hard ownership boundary. A control registered
+            // only by PCG Mode cannot receive MouseUp after the mode disappears, so
+            // release both IMGUI capture channels explicitly.
+            GUIUtility.hotControl = 0;
+            GUIUtility.keyboardControl = 0;
+            EditorGUIUtility.SetWantsMouseJumping(0);
+        }
+
+        private static void FinishActiveSplineInteraction(bool notifyGraphChanged)
+        {
+            try
+            {
+                if (s_DragActive && s_DragGraphView != null)
+                {
+                    s_DragGraphView.EndDrag();
+                    if (notifyGraphChanged && s_DragWindow != null)
+                        PcgGraphEditorCookBridge.NotifyGraphChanged(s_DragWindow, immediate: true);
+                }
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                ForceClearDragState();
+            }
         }
 
         private static void ApplyOthersDisplayMode()
@@ -1010,6 +1376,38 @@ namespace DJTechEditor.PCG.Graph
 
         private static void DrawPcgModeToolbar(SceneView sceneView, PcgGraphEditorWindow window)
         {
+            Handles.BeginGUI();
+            try
+            {
+                DrawPcgModeToolbarGui(sceneView, window);
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawPcgModeToolbarAndSidebar(
+            SceneView sceneView, PcgGraphEditorWindow window, bool showGroupSidebar)
+        {
+            // Tuanjie loses the native transform gizmo after three independent
+            // BeginGUI/EndGUI pairs in one duringSceneGui event. Keep the two always-on
+            // PCG tool strips in one scope; other opt-in panels remain separate.
+            Handles.BeginGUI();
+            try
+            {
+                DrawPcgModeToolbarGui(sceneView, window);
+                if (showGroupSidebar)
+                    DrawGroupListSidebarGui(sceneView, window);
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawPcgModeToolbarGui(SceneView sceneView, PcgGraphEditorWindow window)
+        {
             var ctx = window.GraphView.SceneEditContext;
 
             // Count visible buttons to compute dynamic toolbar width
@@ -1023,15 +1421,11 @@ namespace DJTechEditor.PCG.Graph
             int buttonCount = 1; // Object always visible
             bool showSpline = ctx.SupportsDomain(SceneEditDomain.SplineControlPoint);
             if (showSpline) buttonCount++;
-            // Group V/E/F live on the right Houdini-style strip — not here.
-            // + Display Points/Edges (always) + popup + exit
-            const int displayButtonCount = 2;
+            // + Display Points/Edges + Group List (always) + popup + exit
+            const int displayButtonCount = 3;
             float toolbarWidth = (buttonCount + displayButtonCount) * (btnWidth + 2f)
                 + spacing * 2f + popupWidth + spacing + exitWidth + 6f;
 
-            Handles.BeginGUI();
-            try
-            {
             var toolbarArea = new Rect(
                 (sceneView.position.width - toolbarWidth) / 2f,
                 SceneOverlayMargin,
@@ -1088,6 +1482,19 @@ namespace DJTechEditor.PCG.Graph
                 sceneView.Repaint();
             }
 
+            if (IconToolbarButton(
+                    IconGroupListOn,
+                    IconGroupListOff,
+                    "Group List — all point/edge/face groups; hover to preview",
+                    s_GroupListOpen,
+                    new Color(0.3f, 0.7f, 0.4f)))
+            {
+                s_GroupListOpen = !s_GroupListOpen;
+                if (!s_GroupListOpen)
+                    ClearGroupHover();
+                sceneView.Repaint();
+            }
+
             GUILayout.Space(spacing);
 
                 // Display mode popup — short label
@@ -1113,11 +1520,6 @@ namespace DJTechEditor.PCG.Graph
 
                 GUILayout.EndHorizontal();
                 GUILayout.EndArea();
-            }
-            finally
-            {
-                Handles.EndGUI();
-            }
         }
 
         private static bool IconToolbarButton(Texture2D activeIcon, Texture2D normalIcon, string tooltip, bool active)
@@ -2432,6 +2834,19 @@ namespace DJTechEditor.PCG.Graph
         /// </summary>
         private static void DrawGroupListSidebar(SceneView sceneView, PcgGraphEditorWindow window)
         {
+            Handles.BeginGUI();
+            try
+            {
+                DrawGroupListSidebarGui(sceneView, window);
+            }
+            finally
+            {
+                Handles.EndGUI();
+            }
+        }
+
+        private static void DrawGroupListSidebarGui(SceneView sceneView, PcgGraphEditorWindow window)
+        {
             // Always show in PCG mode — group preview is a core debug affordance.
             sceneView.wantsMouseMove = s_GroupListOpen;
 
@@ -2444,33 +2859,30 @@ namespace DJTechEditor.PCG.Graph
             float barY = Mathf.Max(40f, (viewH - barH) * 0.35f);
             var barRect = new Rect(viewW - barW, barY, barW, barH);
 
-            Handles.BeginGUI();
-            try
+            EditorGUI.DrawRect(barRect, new Color(0.18f, 0.18f, 0.18f, 0.92f));
+            EditorGUI.DrawRect(new Rect(barRect.x, barRect.y, 1f, barRect.height),
+                new Color(0.08f, 0.08f, 0.08f, 1f));
+
+            var buttonRect = new Rect(barRect.x + pad, barRect.y + pad, btn, btn);
+            if (s_GroupListOpen)
+                EditorGUI.DrawRect(buttonRect, new Color(0.3f, 0.7f, 0.4f));
+
+            var icon = s_GroupListOpen ? IconGroupListOn : IconGroupListOff;
+            if (icon != null)
+                GUI.DrawTexture(buttonRect, icon, ScaleMode.ScaleToFit, true);
+
+            // Do not use GUILayout.Button here. In Tuanjie SceneView, allocating a
+            // further IMGUI control ID beside native transform handles can leave their
+            // hotControl unusable even though this button was never clicked.
+            var evt = Event.current;
+            if (evt != null && evt.type == EventType.MouseDown && evt.button == 0 &&
+                buttonRect.Contains(evt.mousePosition))
             {
-                EditorGUI.DrawRect(barRect, new Color(0.18f, 0.18f, 0.18f, 0.92f));
-                EditorGUI.DrawRect(new Rect(barRect.x, barRect.y, 1f, barRect.height),
-                    new Color(0.08f, 0.08f, 0.08f, 1f));
-
-                GUILayout.BeginArea(new Rect(barRect.x + pad, barRect.y + pad, barW - pad * 2f, barH - pad * 2f));
-
-                if (SidebarIconButton(
-                        s_GroupListOpen ? IconGroupListOn : IconGroupListOff,
-                        "Group List — all point/edge/face groups; hover to preview",
-                        s_GroupListOpen,
-                        new Color(0.3f, 0.7f, 0.4f),
-                        btn))
-                {
-                    s_GroupListOpen = !s_GroupListOpen;
-                    if (!s_GroupListOpen)
-                        ClearGroupHover();
-                    sceneView.Repaint();
-                }
-
-                GUILayout.EndArea();
-            }
-            finally
-            {
-                Handles.EndGUI();
+                s_GroupListOpen = !s_GroupListOpen;
+                if (!s_GroupListOpen)
+                    ClearGroupHover();
+                evt.Use();
+                sceneView.Repaint();
             }
         }
 
