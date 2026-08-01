@@ -64,10 +64,33 @@ struct ShellMeshOptions {
     std::string rim_group = "shell_rim";
 };
 
+/// One station for column×row outline loft (img2threejs loft columns: x, yTop, yBottom).
+struct OutlineColumn {
+    double x = 0.0;
+    double y_top = 0.0;
+    double y_bot = 0.0;
+    double half_z = 0.0; ///< Max half-thickness at this station (face centre / slab plateau).
+};
+
 /// Closed planar outline × thickness along an axis → welded solid (img2threejs loft(outline,zAt)).
+/// When `columns` is non-empty, builds a graded column×row solid instead of a flat extrusion.
 struct OutlineSolidOptions {
     double thickness = 0.01;
     std::string thickness_axis = "z";
+    /// Per-outline-vertex full thickness (meters). Empty → use constant `thickness`.
+    /// Length must match ring size after dropping a duplicate close vertex (or be empty).
+    std::vector<double> thickness_samples;
+    /// Column stations for grind/roll loft. Empty → closed-outline extrusion path.
+    std::vector<OutlineColumn> columns;
+    /// Interior rows along t∈[0,1] (spine→edge). 0 = flat faces (extrusion / columns with 1 row).
+    int rows = 0;
+    /// Thickness profile across t: constant | slab | blade (img2threejs slabZ / bladeZ).
+    std::string profile_mode = "constant";
+    double spine_roll_frac = 0.08;
+    double handle_roll_frac = 0.12;
+    double edge_frac = 0.2;
+    double grind_start_frac = 0.35;
+    double edge_bevel_frac = 0.92;
     std::string front_group = "front";
     std::string back_group = "back";
     std::string rim_group = "rim";

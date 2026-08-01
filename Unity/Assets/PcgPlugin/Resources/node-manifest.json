@@ -5824,7 +5824,7 @@
       "type": "OutlineSolid",
       "displayName": "Outline Solid",
       "category": "Mesh",
-      "description": "Closed planar outline × thickness → welded solid (front/back/rim face groups). Prefer over micro-cylinder BooleanMesh chains for knife/plate bodies.",
+      "description": "Closed planar outline × thickness → welded solid, or columnsJson×rows loft with zAt profile (constant/slab/blade). Prefer over micro-cylinder BooleanMesh chains for knife/plate bodies.",
       "inputs": [
         {
           "id": "outline",
@@ -5862,7 +5862,7 @@
           "default": 0.01,
           "minimum": 0.0001,
           "displayName": "Thickness",
-          "description": "Solid thickness along thicknessAxis (meters)."
+          "description": "Constant full thickness along thicknessAxis when thicknessSamples is empty (meters)."
         },
         "thicknessAxis": {
           "type": "enum",
@@ -5873,6 +5873,72 @@
             { "value": "y", "label": "Y" },
             { "value": "z", "label": "Z" }
           ]
+        },
+        "thicknessSamples": {
+          "type": "string",
+          "default": "[]",
+          "displayName": "Thickness Samples",
+          "description": "JSON array of full thickness per outline vertex (meters). Empty = use thickness. Length must match outline ring."
+        },
+        "columnsJson": {
+          "type": "string",
+          "default": "[]",
+          "displayName": "Columns JSON",
+          "description": "JSON array of {x,y_top,y_bot,half_z} stations. Non-empty → column×row loft (img2threejs loft); outline pin unused."
+        },
+        "rows": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "Rows",
+          "description": "Interior rows for columnsJson loft (cosine-graded t). 0 → treated as 1 band. Ignored for closed-outline extrusion."
+        },
+        "profileMode": {
+          "type": "enum",
+          "default": "constant",
+          "displayName": "Profile Mode",
+          "description": "zAt across t for columnsJson: constant, slab (handle roll), blade (grind + spine roll).",
+          "options": [
+            { "value": "constant", "label": "Constant" },
+            { "value": "slab", "label": "Slab" },
+            { "value": "blade", "label": "Blade" }
+          ]
+        },
+        "spineRollFrac": {
+          "type": "number",
+          "default": 0.08,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Spine Roll Frac"
+        },
+        "handleRollFrac": {
+          "type": "number",
+          "default": 0.12,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Handle Roll Frac"
+        },
+        "edgeFrac": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Edge Frac",
+          "description": "Thickness retained at outline edge for slab/blade roll (fraction of half_z)."
+        },
+        "grindStartFrac": {
+          "type": "number",
+          "default": 0.35,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Grind Start Frac"
+        },
+        "edgeBevelFrac": {
+          "type": "number",
+          "default": 0.92,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Edge Bevel Frac"
         },
         "frontGroup": {
           "type": "string",

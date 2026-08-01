@@ -2874,13 +2874,13 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 **类别**：Mesh
 
-**功能**：闭合平面轮廓样条 × 厚度 → 焊接实体（front / back / rim 面组）。用于刀身/板片类参考图投影主体，替代「薄挤出 + 大量微圆柱 Boolean」的不稳定路径。
+**功能**：闭合平面轮廓 × 厚度 → 焊接实体（front / back / rim），或 `columnsJson`×`rows` 列向 loft（对齐 img2threejs `loft(outline,zAt)`：constant / slab / blade）。用于刀身/板片类参考图投影主体。
 
 **输入 Pin**：
 
 | Pin ID | 标签 | 类型 |
 |--------|------|------|
-| `outline` | Outline | `SpatialSpline` |
+| `outline` | Outline | `SpatialSpline`（`columnsJson` 非空时可不用） |
 
 **输出 Pin**：
 
@@ -2900,18 +2900,24 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 | 属性名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `thickness` | number | 0.01 | 沿 `thicknessAxis` 的总厚度（m），≥ 0.0001 |
+| `thickness` | number | 0.01 | 常量总厚度（m）；`thicknessSamples` 为空时使用 |
 | `thicknessAxis` | enum | `"z"` | `x` / `y` / `z` |
+| `thicknessSamples` | string | `"[]"` | JSON 数组：逐轮廓顶点总厚度；长度须匹配 ring |
+| `columnsJson` | string | `"[]"` | JSON `[{x,y_top,y_bot,half_z},…]`；非空走列×行 loft |
+| `rows` | integer | 0 | 列 loft 的余弦分级行数（0→按 1 带处理） |
+| `profileMode` | enum | `"constant"` | `constant` / `slab` / `blade` |
+| `spineRollFrac` / `handleRollFrac` / `edgeFrac` / `grindStartFrac` / `edgeBevelFrac` | number | 见 manifest | blade/slab 截面参数 |
 | `frontGroup` | string | `"front"` | 前盖面组名 |
 | `backGroup` | string | `"back"` | 后盖面组名 |
 | `rimGroup` | string | `"rim"` | 侧面组名 |
 
 **执行逻辑**：
-1. 读取闭合轮廓（≥3 点；重复闭合点会被丢弃）
-2. 沿轴偏移 ±thickness/2 生成前后环，共享焊接顶点索引
-3. 前/后面 + 每段 rim 四边形；维护 `unshared` 边组
+1. 若 `columnsJson` 非空：按站 × 行生成焊接前后网格 + rim（zAt=`profileMode`）
+2. 否则：闭合轮廓（≥3 点）沿轴 ±half 挤出；可用 `thicknessSamples` 逐点变厚度
+3. 维护 `unshared` 边组
 
-> 典型连接：`CreateSpline(closed) → OutlineSolid → ProjectTexture → Output`
+> 典型连接：`CreateSpline(closed) → OutlineSolid → ProjectTexture → Output`  
+> 列 loft：`OutlineSolid(columnsJson=stations_loft, rows=8, profileMode=blade)`
 
 ---
 

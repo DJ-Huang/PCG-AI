@@ -81,11 +81,56 @@ void test_outline_solid_outward_normals()
     expect(std::fabs(vol - expected) < 1e-6, "outline solid volume matches L*W*T");
 }
 
+void test_outline_solid_thickness_samples()
+{
+    PcgSpline outline;
+    outline.closed = true;
+    outline.points = {
+        {0.0, 0.0, 0.0},
+        {0.1, 0.0, 0.0},
+        {0.1, 0.04, 0.0},
+        {0.0, 0.04, 0.0},
+    };
+    OutlineSolidOptions opts;
+    opts.thickness = 0.01;
+    opts.thickness_samples = {0.004, 0.008, 0.008, 0.004};
+    opts.thickness_axis = "z";
+    auto geo = outline_solid_from_spline(outline, opts);
+    expect(geo.points().size() == 8, "variable thickness keeps welded front/back rings");
+    const auto& pts = geo.points();
+    expect(std::fabs(pts[0].z - 0.002) < 1e-9, "sample0 half-z on +side");
+    expect(std::fabs(pts[1].z - 0.004) < 1e-9, "sample1 half-z on +side");
+    expect(std::fabs(pts[4].z + 0.002) < 1e-9, "sample0 half-z on -side");
+}
+
+void test_outline_solid_columns_blade()
+{
+    OutlineSolidOptions opts;
+    opts.thickness_axis = "z";
+    opts.rows = 4;
+    opts.profile_mode = "blade";
+    opts.columns = {
+        {0.0, 0.01, -0.01, 0.005},
+        {0.05, 0.012, -0.008, 0.004},
+        {0.1, 0.006, 0.0, 0.001},
+    };
+    PcgSpline unused;
+    auto geo = outline_solid_from_spline(unused, opts);
+    expect(!geo.points().empty(), "columnsJson blade loft produces geometry");
+    // 3 cols × 5 rows × 2 sides
+    expect(geo.points().size() == 3 * 5 * 2, "column×row welded point count");
+    expect(!geo.faces().empty(), "column loft emits face quads");
+    const double vol = signed_volume(triangulate_geometry(geo));
+    expect(vol > 0.0, "blade column loft has positive volume");
+}
+
 } // namespace
 
 int main()
 {
     test_outline_solid_outward_normals();
+    test_outline_solid_thickness_samples();
+    test_outline_solid_columns_blade();
 
     const char* body_graph = R"({
       "version":"1.0",
