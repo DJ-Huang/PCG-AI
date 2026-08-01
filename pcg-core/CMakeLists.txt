@@ -25,6 +25,8 @@ FetchContent_MakeAvailable(json)
 
 # ImportMesh uses the same pinned Assimp version as pcg-fbx-exporter, but only
 # builds the OBJ/FBX/glTF importers needed by the graph runtime.
+# pcg-server may set PCG_CORE_ENABLE_FBX_EXPORT=ON to also build the FBX exporter.
+option(PCG_CORE_ENABLE_FBX_EXPORT "Enable Assimp FBX exporter (pcg-server)" OFF)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
@@ -36,7 +38,12 @@ set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_FBX_IMPORTER ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_GLTF_IMPORTER ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
-set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+if(PCG_CORE_ENABLE_FBX_EXPORT)
+    set(ASSIMP_NO_EXPORT OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_FBX_EXPORTER ON CACHE BOOL "" FORCE)
+else()
+    set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+endif()
 if(APPLE)
     set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL "" FORCE)
 else()
@@ -107,6 +114,7 @@ set(PCG_CORE_SOURCES
     src/elements/color_ramp.cpp
     src/elements/expression.cpp
     src/elements/attribute_elements.cpp
+    src/elements/attribute_algorithms.cpp
     src/elements/delete_algorithms.cpp
     src/elements/primitive_elements.cpp
     src/geometry/element_pattern.cpp
@@ -168,6 +176,12 @@ if(MSVC)
 endif()
 
 # ── Tests ─────────────────────────────────────────────
+# pcg-server can set PCG_CORE_SKIP_TESTS=ON to avoid compiling ~40 test binaries.
+option(PCG_CORE_SKIP_TESTS "Skip building pcg-core ctest executables" OFF)
+if(PCG_CORE_SKIP_TESTS)
+    return()
+endif()
+
 enable_testing()
 
 add_executable(test_executor tests/test_executor.cpp)

@@ -78,11 +78,18 @@ public:
         const double offset_u = ctx.node->data.value("offsetU", 0.0);
         const double offset_v = ctx.node->data.value("offsetV", 0.0);
 
+        ProjectTextureCropBounds crop;
+        crop.use_reference = ctx.node->data.value("useReferenceBounds", false);
+        crop.min_u = ctx.node->data.value("refMinU", 0.0);
+        crop.max_u = ctx.node->data.value("refMaxU", 1.0);
+        crop.min_v = ctx.node->data.value("refMinV", 0.0);
+        crop.max_v = ctx.node->data.value("refMaxV", 1.0);
+
         if (const data::PcgGeometry* geometry = ctx.inputs.find_geometry("in")) {
             data::PcgGeometry out = *geometry;
             out.set_uvs(project_texture_uv_geometry(*geometry, direction,
                                                      scale_u, scale_v, offset_u, offset_v,
-                                                     repeat_x, repeat_y));
+                                                     repeat_x, repeat_y, crop));
             out.expand_point_uvs_to_corners();
             emit_geometry(ctx, std::move(out));
             return PCG_OK;
@@ -90,7 +97,7 @@ public:
 
         data::PcgMeshData mesh = get_mesh_input(ctx, "in", "ProjectTexture missing mesh input");
         project_texture_uv(mesh, direction, scale_u, scale_v,
-                           offset_u, offset_v, repeat_x, repeat_y);
+                           offset_u, offset_v, repeat_x, repeat_y, crop);
         emit_mesh(ctx, std::move(mesh));
         return PCG_OK;
     }

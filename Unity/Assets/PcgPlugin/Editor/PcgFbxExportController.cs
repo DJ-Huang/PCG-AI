@@ -53,7 +53,7 @@ namespace DJTechEditor.PCG
 
             if (!PcgExecutionDocumentBuilder.TryBuildJson(
                     cookDocument,
-                    PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader(),
+                    window.CreateExternalSubgraphLoader(),
                     out var json,
                     out _,
                     out var flattenError,

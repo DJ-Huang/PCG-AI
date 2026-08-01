@@ -40,12 +40,18 @@ namespace DJTechEditor.PCG.Graph
             string sourceHandle,
             string targetHandle)
         {
-            var sourcePin = source is PcgSubgraphNodeView sourceSubgraph
+            var sourcePin = source is PcgInterfaceAnchorNodeBase sourceAnchor
+                ? sourceAnchor.ResolvedPinType
+                : source is PcgSubgraphNodeView sourceSubgraph
                 ? sourceSubgraph.GetOutputPinType(sourceHandle)
                 : source is PcgExternalSubgraphNodeView sourceExternal
                     ? sourceExternal.GetOutputPinType(sourceHandle)
-                    : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
-            var targetPin = target is PcgSubgraphNodeView targetSubgraph
+                    : source.NodeType == PcgStructuralNodeTypes.SubgraphParentRef
+                        ? "Any"
+                        : PcgNodeManifest.GetOutputPinType(source.NodeType, sourceHandle);
+            var targetPin = target is PcgInterfaceAnchorNodeBase targetAnchor
+                ? targetAnchor.ResolvedPinType
+                : target is PcgSubgraphNodeView targetSubgraph
                 ? targetSubgraph.GetInputPinType(targetHandle)
                 : target is PcgExternalSubgraphNodeView targetExternal
                     ? targetExternal.GetInputPinType(targetHandle)

@@ -48,7 +48,14 @@ namespace DJTechEditor.PCG.Graph
                     ctx.DependsOnSourceAsset(path);
             }
 
-            asset.SetImportResult(json, doc.name, true, "", deps);
+            asset.SetImportResult(
+                json,
+                PcgSubgraphAssetNaming.ResolveDisplayName(ctx.assetPath, doc),
+                true,
+                "",
+                deps,
+                doc.version,
+                doc.contentHash);
             ctx.AddObjectToAsset("main", asset);
             ctx.SetMainObject(asset);
         }

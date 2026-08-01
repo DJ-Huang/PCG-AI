@@ -26,7 +26,7 @@ namespace DJTechEditor.PCG
             PcgGraphRunner.RunFileAndUpdatePreview(path);
         }
 
-        [MenuItem(MenuRoot + "Print PcgCore Version")]
+        [MenuItem(MenuRoot + "Print pcg-server Version")]
         public static void PrintVersion()
         {
             var version = PcgNative.GetVersion();

@@ -29,6 +29,7 @@ data::PcgMeshData parse_mesh_input(const nlohmann::json& json);
 data::PcgMeshData get_mesh_input(PcgContext& ctx, const char* pin, const char* label);
 data::PcgGeometry get_geometry_input(PcgContext& ctx, const char* pin, const char* label);
 /// Returns nullptr when the pin is disconnected or empty (optional second inputs).
+/// Accepts Geometry, Mesh, Spline, or Point payloads (Spline/Point convert into storage).
 const data::PcgGeometry* optional_geometry_input(PcgContext& ctx,
                                                  const char* pin,
                                                  data::PcgGeometry& storage);

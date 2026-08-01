@@ -2,38 +2,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://pcg.example.com/subgraph-schema.json",
   "title": "PCG Linked Subgraph Asset",
-  "description": "Single-definition linked Subgraph asset (.pcgsubgraph). No graph parameters. May nest inline Subgraph and SubgraphAsset references.",
-  "type": "object",
-  "required": ["version", "name", "inputs", "outputs", "nodes", "edges"],
-  "additionalProperties": false,
-  "properties": {
-    "version": {
-      "type": "string",
-      "const": "1.0"
-    },
-    "name": { "type": "string" },
-    "inputs": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/subgraphPort" }
-    },
-    "outputs": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/subgraphPort" }
-    },
-    "nodes": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/node" }
-    },
-    "edges": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/edge" }
-    },
-    "subgraphs": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/subgraph" }
-    }
-  },
+  "description": "Versioned contract for linked .pcgsubgraph assets. Version 1.0 remains valid on disk; serializer output and migrated assets use version 2.0.",
+  "oneOf": [
+    { "$ref": "#/$defs/assetV1" },
+    { "$ref": "#/$defs/assetV2" }
+  ],
   "$defs": {
+    "assetV1": {
+      "type": "object",
+      "required": ["version", "name", "inputs", "outputs", "nodes", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": "1.0" },
+        "name": { "type": "string" },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+        "subgraphs": { "type": "array", "items": { "$ref": "#/$defs/subgraph" } }
+      }
+    },
+    "assetV2": {
+      "type": "object",
+      "required": ["version", "name", "contentHash", "inputs", "outputs", "parameters", "nodes", "edges", "subgraphs"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "const": "2.0" },
+        "name": { "type": "string" },
+        "contentHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+        "subgraphs": { "type": "array", "items": { "$ref": "#/$defs/subgraph" } }
+      }
+    },
     "pinType": {
       "type": "string",
       "enum": ["Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface", "SpatialMesh", "SpatialGeometry", "Texture", "HeightField"]
@@ -45,7 +49,10 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string" },
-        "pinType": { "$ref": "#/$defs/pinType" }
+        "pinType": { "$ref": "#/$defs/pinType" },
+        "anchorPlaced": { "type": "boolean" },
+        "anchorX": { "type": "number" },
+        "anchorY": { "type": "number" }
       }
     },
     "subgraphInterface": {
@@ -68,6 +75,7 @@
         "position": {
           "type": "object",
           "required": ["x", "y"],
+          "additionalProperties": false,
           "properties": {
             "x": { "type": "number" },
             "y": { "type": "number" }
@@ -89,10 +97,7 @@
                 "type": "object",
                 "required": ["assetGuid"],
                 "properties": {
-                  "assetGuid": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{32}$"
-                  }
+                  "assetGuid": { "type": "string", "pattern": "^[0-9a-fA-F]{32}$" }
                 }
               }
             }
@@ -102,7 +107,7 @@
     },
     "edge": {
       "type": "object",
-      "required": ["id", "source", "target", "sourceHandle", "targetHandle"],
+      "required": ["id", "source", "target"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
@@ -114,15 +119,33 @@
         "targetPinType": { "$ref": "#/$defs/pinType" }
       }
     },
+    "parameter": {
+      "type": "object",
+      "required": ["id", "name", "type", "default", "exposed", "targetNode", "targetProperty", "hasRange", "min", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["integer", "number", "boolean", "string"] },
+        "default": {},
+        "exposed": { "type": "boolean" },
+        "targetNode": { "type": "string" },
+        "targetProperty": { "type": "string" },
+        "hasRange": { "type": "boolean" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
     "subgraph": {
       "type": "object",
-      "required": ["id", "name", "inputs", "outputs", "nodes", "edges"],
+      "required": ["id", "name", "inputs", "outputs", "parameters", "nodes", "edges"],
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "inputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
         "outputs": { "type": "array", "items": { "$ref": "#/$defs/subgraphPort" } },
+        "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
         "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
         "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } }
       }

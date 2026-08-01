@@ -177,6 +177,63 @@ public:
     }
 };
 
+class ConditionOutlineElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "ConditionOutline"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConditionOutline missing node");
+
+        const data::PcgSplineData input =
+            get_splines_input(ctx, "in", "ConditionOutline missing spline input");
+        if (input.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConditionOutline missing spline input");
+
+        ConditionOutlineOptions opts;
+        opts.win = ctx.node->data.value("win", 1);
+        opts.eps = ctx.node->data.value("eps", 0.0);
+
+        nlohmann::json spans_json;
+        try {
+            if (ctx.node->data.contains("protectSpans") && ctx.node->data["protectSpans"].is_array()) {
+                spans_json = ctx.node->data["protectSpans"];
+            } else {
+                spans_json = nlohmann::json::parse(
+                    ctx.node->data.value("protectSpans", std::string("[]")));
+            }
+        } catch (...) {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConditionOutline protectSpans is not valid JSON");
+        }
+        if (!spans_json.is_array())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ConditionOutline protectSpans must be a JSON array");
+
+        for (const auto& item : spans_json) {
+            if (!item.is_object())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "ConditionOutline protectSpans entries must be objects");
+            if (!item.contains("start") || !item.contains("end") ||
+                !item["start"].is_number_integer() || !item["end"].is_number_integer()) {
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "ConditionOutline protectSpans requires integer start/end");
+            }
+            ProtectSpan span;
+            span.start = item["start"].get<int>();
+            span.end = item["end"].get<int>();
+            opts.protect_spans.push_back(span);
+        }
+
+        std::string error;
+        data::PcgSplineData conditioned = condition_outline_data(input, opts, &error);
+        if (!error.empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+
+        emit_splines(ctx, std::move(conditioned));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 class CreateSpiralSplineElement final : public IPcgElement {
@@ -237,6 +294,7 @@ void register_spline_elements(std::unordered_map<std::string, std::unique_ptr<IP
     map.emplace("GetSplineData", std::make_unique<GetSplineDataElement>());
     map.emplace("ResampleSpline", std::make_unique<ResampleSplineElement>());
     map.emplace("SampleAlongSpline", std::make_unique<SampleAlongSplineElement>());
+    map.emplace("ConditionOutline", std::make_unique<ConditionOutlineElement>());
 }
 
 } // namespace pcg::internal::elements

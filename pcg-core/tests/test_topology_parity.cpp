@@ -658,6 +658,153 @@ int main()
         outside.keep_outside = true;
         const auto outer = carve_spline_data(input, outside);
         expect(outer.splines().size() == 2, "Carve keep outside yields two edge segments");
+
+        CarveSplineOptions dice;
+        dice.location = "divisions";
+        dice.u_divisions = 2;
+        dice.cut_at_all_internal_u_breakpoints = false;
+        const auto diced = carve_spline_data(input, dice);
+        expect(diced.splines().size() == 2, "Carve divisions=2 splits at midpoint");
+        if (diced.splines().size() == 2) {
+            expect(diced.splines()[0].points.back().x == 20.0 &&
+                       diced.splines()[1].points.front().x == 20.0,
+                   "Carve divisions=2 cut lands at arc-length midpoint 20");
+        }
+
+        using pcg::internal::elements::carve_spline_extract_points;
+
+        CarveSplineOptions extract;
+        extract.operation = "extract";
+        extract.u_start = 0.25;
+        extract.u_end = 0.75;
+        extract.location = "breakpoints";
+        extract.cut_at_all_internal_u_breakpoints = false;
+        const auto extracted = carve_spline_extract_points(input, extract);
+        expect(extracted.points().size() == 2, "Carve extract yields points at First/Second U");
+        if (extracted.points().size() == 2) {
+            expect(extracted.points()[0].x == 10.0 && extracted.points()[1].x == 30.0,
+                   "Carve extract points sit at arc-length U=0.25/0.75");
+        }
+
+        CarveSplineOptions extract_keep = extract;
+        extract_keep.keep_original = true;
+        const auto extracted_keep = carve_spline_extract_points(input, extract_keep);
+        expect(extracted_keep.points().size() == 6,
+               "Carve extract Keep Original appends source vertices");
+
+        CarveSplineOptions extract_bp = extract;
+        extract_bp.u_start = 0.5;
+        extract_bp.u_end = 1.0;
+        extract_bp.cut_at_all_internal_u_breakpoints = true;
+        extract_bp.only_at_breakpoints = true;
+        const auto extracted_bp = carve_spline_extract_points(input, extract_bp);
+        expect(extracted_bp.points().size() == 2 && extracted_bp.points()[0].x == 30.0 &&
+                   extracted_bp.points()[1].x == 40.0,
+               "Carve extract Only At Breakpoints drops non-vertex U");
+
+        PcgSplineData grouped_input;
+        PcgSpline in_group = spline;
+        in_group.attributes = nlohmann::json::object({{"roads", true}});
+        PcgSpline out_group = spline;
+        grouped_input.add_spline(in_group);
+        grouped_input.add_spline(out_group);
+
+        CarveSplineOptions grouped;
+        grouped.group = "roads";
+        grouped.u_start = 0.25;
+        grouped.u_end = 0.75;
+        grouped.location = "breakpoints";
+        grouped.cut_at_all_internal_u_breakpoints = false;
+        const auto grouped_out = carve_spline_data(grouped_input, grouped);
+        expect(grouped_out.splines().size() == 2,
+               "Carve group trims member and passes non-member through");
+        if (grouped_out.splines().size() == 2) {
+            expect(grouped_out.splines()[0].points.size() == 2 &&
+                       grouped_out.splines()[0].points[0].x == 10.0,
+                   "Carve group member is trimmed");
+            expect(grouped_out.splines()[1].points.size() == 4,
+                   "Carve non-member spline passes through untouched");
+        }
+
+        CarveSplineOptions attrib;
+        attrib.u_start = 0.5;
+        attrib.u_end = 1.0;
+        attrib.u_start_attrib = "carve_start";
+        attrib.location = "breakpoints";
+        attrib.cut_at_all_internal_u_breakpoints = false;
+        PcgSplineData attrib_input;
+        PcgSpline attrib_spline = spline;
+        attrib_spline.attributes = nlohmann::json::object({{"carve_start", 0.5}});
+        attrib_input.add_spline(attrib_spline);
+        const auto attrib_out = carve_spline_data(attrib_input, attrib);
+        expect(attrib_out.splines().size() == 1 &&
+                   attrib_out.splines()[0].points.front().x == 10.0,
+               "Carve First U Attrib scales start to U=0.25");
+
+        using pcg::internal::elements::convert_geometry_primitives_to_splines;
+        pcg::internal::data::PcgGeometry polygon_curves;
+        polygon_curves.points_mut() = {
+            {0, 0, 0}, {1, 0, 0},
+            {0, 0, 1}, {1, 0, 1},
+            {0, 0, 2}, {1, 0, 2},
+            {0, 0, 3}, {1, 0, 3},
+        };
+        polygon_curves.faces_mut() = {
+            {0, 1}, {2, 3}, {4, 5}, {6, 7},
+        };
+        const auto polygon_splines =
+            convert_geometry_primitives_to_splines(polygon_curves);
+        expect(polygon_splines.splines().size() == 4,
+               "Carve converts each two-vertex polygon primitive independently");
+        bool polygon_curves_are_open = true;
+        for (const auto& polygon_spline : polygon_splines.splines()) {
+            polygon_curves_are_open =
+                polygon_curves_are_open && !polygon_spline.closed &&
+                polygon_spline.points.size() == 2;
+        }
+        expect(polygon_curves_are_open,
+               "Two-vertex polygon primitives remain open curves");
+        const auto carved_polygon_splines =
+            carve_spline_data(polygon_splines, dice);
+        expect(carved_polygon_splines.splines().size() == 8,
+               "Carve divisions=2 splits four polygon curves into eight primitives");
+
+        const std::string geometry_graph = R"({
+          "version":"1.0",
+          "nodes":[
+            {"id":"grid","type":"CreateGridMesh","data":{
+              "sizeX":2.0,"sizeY":2.0,"rows":1,"cols":1
+            }},
+            {"id":"carve","type":"Carve","data":{
+              "useFirstU":true,"uStart":0.0,
+              "useSecondU":true,"uEnd":1.0,
+              "location":"divisions","uDivisions":2,
+              "operation":"cut","keepInside":true,"keepOutside":false
+            }},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges":[
+            {"source":"grid","target":"carve","sourceHandle":"out","targetHandle":"in"},
+            {"source":"carve","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        const auto geometry_result = execute(geometry_graph);
+        expect(geometry_result.json.contains("splines") &&
+                   geometry_result.json["splines"].is_array(),
+               "Carve accepts polygon Geometry input");
+        if (geometry_result.json.contains("splines") &&
+            geometry_result.json["splines"].is_array()) {
+            const auto& carved_splines = geometry_result.json["splines"];
+            expect(carved_splines.size() == 2,
+                   "Carve Geometry divisions=2 produces two curve primitives");
+            size_t carved_point_count = 0;
+            for (const auto& carved : carved_splines) {
+                if (carved.contains("points") && carved["points"].is_array())
+                    carved_point_count += carved["points"].size();
+            }
+            expect(carved_point_count == 6,
+                   "Carve Geometry output retains non-empty curve data");
+        }
     }
 
     {

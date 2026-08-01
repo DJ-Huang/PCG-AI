@@ -73,6 +73,7 @@ namespace DJTechEditor.PCG.Graph
             SetUserTitle(_data.GetRaw("__nodeTitle")?.ToString() ?? "");
             UpdateGroupTooltip();
             UpdateGroupBadge();
+            UpdateInputPortVisibility();
         }
 
         public override PcgNodeData CollectData()
@@ -94,6 +95,45 @@ namespace DJTechEditor.PCG.Graph
                     UpdateGroupBadge();
                 }
             }
+            // Pin visibility often drives off mode enums (e.g. OutlineSolid.inputMode).
+            UpdateInputPortVisibility();
+        }
+
+        void UpdateInputPortVisibility()
+        {
+            foreach (var pin in _def.inputs)
+            {
+                if (!_inputPorts.TryGetValue(pin.id, out var port))
+                    continue;
+                var visible = IsPinVisible(pin);
+                port.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+        }
+
+        bool IsPinVisible(ManifestPinDef pin)
+        {
+            if (string.IsNullOrEmpty(pin.visibleWhenProperty))
+                return true;
+
+            var current = _data.GetRaw(pin.visibleWhenProperty)?.ToString() ?? "";
+            if (string.IsNullOrEmpty(current) &&
+                _def.properties.TryGetValue(pin.visibleWhenProperty, out var driver) &&
+                driver.defaultValue != null)
+            {
+                current = driver.defaultValue.ToString();
+            }
+
+            if (pin.visibleWhenOneOf != null && pin.visibleWhenOneOf.Count > 0)
+            {
+                foreach (var candidate in pin.visibleWhenOneOf)
+                {
+                    if (string.Equals(current, candidate, StringComparison.Ordinal))
+                        return true;
+                }
+                return false;
+            }
+
+            return string.Equals(current, pin.visibleWhenEquals ?? "", StringComparison.Ordinal);
         }
 
         private void UpdateGroupTooltip()

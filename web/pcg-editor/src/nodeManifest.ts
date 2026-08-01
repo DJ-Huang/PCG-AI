@@ -26,9 +26,19 @@ export interface ManifestEnumOption {
 export interface ManifestProperty {
   type: PropertyType;
   default: number | boolean | string | [number, number, number];
+  /** Human-readable label (Houdini parm label); falls back to the property key */
+  displayName?: string;
   minimum?: number;
   maximum?: number;
   options?: ManifestEnumOption[];
+  /** Control flavor hint, e.g. "radio" renders an enum as Houdini-style tab buttons */
+  uiHint?: string;
+  /** Conditional visibility: show only when another property equals a value */
+  visibleWhen?: {
+    property?: string;
+    equals?: number | boolean | string;
+    oneOf?: Array<number | boolean | string>;
+  };
   /** For groupSelect/groupMultiSelect: filter available groups by domain */
   groupDomain?: GroupDomain;
   /** True for outputGroup-style properties that define a new group name */

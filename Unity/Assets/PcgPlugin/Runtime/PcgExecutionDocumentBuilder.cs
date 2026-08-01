@@ -10,6 +10,8 @@ namespace DJTechRuntime.PCG
     /// </summary>
     public static class PcgExecutionDocumentBuilder
     {
+        private const string PreviewSinkNodeId = "__pcg_preview_sink__";
+
         public static bool TryBuild(
             PcgGraphDocument authoring,
             PcgExternalSubgraphLoader loader,
@@ -17,9 +19,21 @@ namespace DJTechRuntime.PCG
             out PcgExternalResolveResult resolveResult,
             out string error)
         {
+            return TryBuild(authoring, loader, out flat, out resolveResult, out error, out _);
+        }
+
+        public static bool TryBuild(
+            PcgGraphDocument authoring,
+            PcgExternalSubgraphLoader loader,
+            out PcgGraphDocument flat,
+            out PcgExternalResolveResult resolveResult,
+            out string error,
+            out Dictionary<string, string> outputStatsAliases)
+        {
             flat = null;
             resolveResult = null;
             error = null;
+            outputStatsAliases = new Dictionary<string, string>();
 
             if (authoring == null)
             {
@@ -30,8 +44,9 @@ namespace DJTechRuntime.PCG
             var working = authoring.Clone();
             if (!working.HasExternalSubgraphAssets())
             {
-                if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error))
+                if (!PcgGraphFlattener.TryFlattenForExecution(working, out flat, out error, out outputStatsAliases))
                     return false;
+                PruneToExecutionSink(flat);
                 resolveResult = new PcgExternalResolveResult
                 {
                     Document = working,
@@ -54,9 +69,10 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
-            if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error))
+            if (!PcgGraphFlattener.TryFlattenForExecution(resolveResult.Document, out flat, out error, out outputStatsAliases))
                 return false;
 
+            PruneToExecutionSink(flat);
             return true;
         }
 
@@ -68,8 +84,21 @@ namespace DJTechRuntime.PCG
             out string error,
             bool pretty = false)
         {
+            return TryBuildJson(
+                authoring, loader, out flatJson, out resolveResult, out error, out _, pretty);
+        }
+
+        public static bool TryBuildJson(
+            PcgGraphDocument authoring,
+            PcgExternalSubgraphLoader loader,
+            out string flatJson,
+            out PcgExternalResolveResult resolveResult,
+            out string error,
+            out Dictionary<string, string> outputStatsAliases,
+            bool pretty = false)
+        {
             flatJson = null;
-            if (!TryBuild(authoring, loader, out var flat, out resolveResult, out error))
+            if (!TryBuild(authoring, loader, out var flat, out resolveResult, out error, out outputStatsAliases))
                 return false;
             flatJson = PcgGraphSerializer.ToJson(flat, pretty);
             return true;
@@ -189,6 +218,69 @@ namespace DJTechRuntime.PCG
                 if (PcgAssetGuidUtility.IsValid(guid))
                     yield return guid;
             }
+        }
+
+        /// <summary>
+        /// Keeps only the nodes that contribute to the sink selected by pcg-core.
+        /// Disconnected authoring branches are valid work-in-progress and must not
+        /// make the active output fail validation or execution.
+        /// </summary>
+        private static void PruneToExecutionSink(PcgGraphDocument document)
+        {
+            if (document?.nodes == null || document.nodes.Count == 0)
+                return;
+
+            var edges = document.edges ?? new List<PcgGraphEdgeRecord>();
+            var nodesWithOutgoing = new HashSet<string>(
+                edges
+                    .Where(edge => edge != null && !string.IsNullOrEmpty(edge.source))
+                    .Select(edge => edge.source),
+                StringComparer.Ordinal);
+            var sink = document.nodes.FirstOrDefault(node =>
+                           node != null &&
+                           node.id == PreviewSinkNodeId &&
+                           node.type == "Output")
+                       ?? document.nodes.FirstOrDefault(node =>
+                           node != null &&
+                           node.type == "Output" &&
+                           !nodesWithOutgoing.Contains(node.id))
+                       ?? document.nodes.FirstOrDefault(node =>
+                           node != null &&
+                           !nodesWithOutgoing.Contains(node.id));
+            if (sink == null || string.IsNullOrEmpty(sink.id))
+                return;
+
+            var incomingByTarget = edges
+                .Where(edge =>
+                    edge != null &&
+                    !string.IsNullOrEmpty(edge.source) &&
+                    !string.IsNullOrEmpty(edge.target))
+                .GroupBy(edge => edge.target, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
+            var required = new HashSet<string>(StringComparer.Ordinal) { sink.id };
+            var pending = new Stack<string>();
+            pending.Push(sink.id);
+            while (pending.Count > 0)
+            {
+                var target = pending.Pop();
+                if (!incomingByTarget.TryGetValue(target, out var incoming))
+                    continue;
+                foreach (var edge in incoming)
+                {
+                    if (required.Add(edge.source))
+                        pending.Push(edge.source);
+                }
+            }
+
+            document.nodes = document.nodes
+                .Where(node => node != null && required.Contains(node.id))
+                .ToList();
+            document.edges = edges
+                .Where(edge =>
+                    edge != null &&
+                    required.Contains(edge.source) &&
+                    required.Contains(edge.target))
+                .ToList();
         }
     }
 }

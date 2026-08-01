@@ -48,9 +48,11 @@
   - [DensityFilter](#densityfilter)
   - [AttributeFilter](#attributefilter)
   - [Delete](#delete)
+  - [Split](#split)
   - [Blast](#blast)
 - [Attribute 类别](#attribute-类别)
   - [AttributeWrangle](#attributewrangle)
+  - [AttributeTransfer](#attributetransfer)
 - [Transform 类别](#transform-类别)
   - [TransformPoints](#transformpoints)
   - [ProjectPoints](#projectpoints)
@@ -68,6 +70,7 @@
   - [CreateSpline](#createspline)
   - [CreateBezierSpline](#createbezierspline)
   - [ResampleSpline](#resamplespline)
+  - [ConditionOutline](#conditionoutline)
   - [SampleAlongSpline](#samplealongspline)
   - [SweepAlongSpline](#sweepalongspline)
   - [ExtrudeAlongSpline](#extrudealongspline)
@@ -101,6 +104,7 @@
   - [BendMesh](#bendmesh)
   - [MergeMesh](#mergemesh)
   - [BooleanMesh](#booleanmesh)
+  - [OutlineSolid](#outlinesolid)
   - [CreateCylinderMesh](#createcylindermesh)
   - [RevolveMesh](#revolvemesh)
 - [Geometry 类别](#geometry-类别)
@@ -884,6 +888,8 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 **功能**：Houdini 风格几何删除。支持 Group、Number（pattern/range/expression）、Bounding Volume、Normal、Degenerate、Random 条件并集选择，再按 Entity（points/primitives/edges）执行拓扑删除。默认空配置原样直通。
 
+`group` 字段对齐 Houdini：除命名 group 外，支持数字/范围 pattern（如 `"0"`、`"1"`、`"0-2"`、`"!*"`）。`entity=points` 时按点序号（curve 上为局部 `@ptnum`）选择；`entity=primitives` 时按图元序号选择。与 Number 页签条件取并集，再按 `deleteNonSelected` 决定删除选中或非选中。
+
 **限制**：仅支持 polygon mesh、spline、point 元素；不支持 VDB、NURBS 等 Houdini 专属类型。Bounding Volume 为参数框，无第二几何输入。
 
 **属性**：`group`、`deleteNonSelected`、`entity`、`geometryType`、Number/Bounding/Normal/Degenerate/Random 页签字段、`keepPoints`、`deleteUnusedGroups`。
@@ -896,6 +902,38 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
     "entity": "primitives",
     "group": "top",
     "deleteNonSelected": false
+  }
+}
+```
+
+---
+
+### Split
+
+**类别**：Filter
+
+**功能**：对齐 Houdini Split SOP。按 Group 将几何分成两路：第一输出（`out`）为选中部分，第二输出（`rest`）为补集。
+
+**属性**（与 Houdini UI 对齐）：
+
+| 属性 | 显示名 | 默认 | 语义 |
+|------|--------|------|------|
+| `group` | Group | `""` | 送入第一输出的子集；空 = 全部 |
+| `groupType` | Group Type | `guess` | `guess` / `points` / `primitives`；`guess` 按组域名推断 |
+| `invertSelection` | Invert Selection | `false` | 交换两路输出 |
+| `deleteUnusedGroups` | Delete Unused Groups | `false` | 删除拆分后变空的 group；关闭时保留空 group 名 |
+
+兼容旧图：仍可读 `entity`（等同 `groupType`）与 `removeUnusedPoints`（几何 primitive 拆分时默认丢弃未引用点）。
+
+```json
+{
+  "id": "split_fire_escape",
+  "type": "Split",
+  "data": {
+    "group": "fireEscape",
+    "groupType": "guess",
+    "invertSelection": false,
+    "deleteUnusedGroups": false
   }
 }
 ```
@@ -942,6 +980,50 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 ```
 
 完整语法见 [Attribute Wrangle 与 Blast](Tutorials/12-attribute-wrangle-and-blast.md)。
+
+---
+
+### AttributeTransfer
+
+**类别**：Attribute
+
+**功能**：Houdini [`attribtransfer`](https://www.sidefx.com/docs/houdini/nodes/sop/attribtransfer.html) 子集。Inspector 顶部为 Source/Destination Group；下方 **Attributes / Conditions** 两个 Tab。
+
+**Attributes**：Detail / Primitives / Points / Vertices（开关 + 属性名，`*`/`^` 风格通配子集）；Allow P Attribute；Copy Local Variables（no-op）。
+
+**Conditions**（对齐 Houdini）：
+
+| 参数 | 说明 |
+|------|------|
+| Kernel Function | `elendt`（默认）/ `wyvill` / `blinn` / `hart` / `links` / `heron` / `uniform` |
+| Kernel Radius | 多样本加权衰减半径；趋近 0 → 最近邻 |
+| Max Sample Count | 参与插值的源元素上限；`1` = 最近邻 |
+| Distance Threshold | 硬距离上限（可关）；阈值内完全由源决定 |
+| Blend Width | 阈值外羽化带，用 Kernel 与目标原值混合 |
+| Uniform Bias | 仅 `uniform` Kernel：源混合系数，目标为 `1 - bias` |
+
+Detail 仍直接拷贝；Point/Prim/Vertex 按邻近 + Kernel 加权。
+
+```json
+{
+  "id": "xfer",
+  "type": "AttributeTransfer",
+  "data": {
+    "transferDetail": true,
+    "detailAttributes": "xform",
+    "transferPoints": true,
+    "pointAttributes": "Cd",
+    "kernelFunction": "elendt",
+    "kernelRadius": 10.0,
+    "maxSampleCount": 1,
+    "enableDistanceThreshold": true,
+    "distanceThreshold": 10.0,
+    "blendWidth": 0.0
+  }
+}
+```
+
+典型接法：`MatchSize` 写出 Detail `xform` 后，用本节点把 `xform` 传到另一份几何。
 
 ---
 
@@ -1423,6 +1505,56 @@ blast_short → StaticMeshSpawner(short) ─┘
 
 ---
 
+### Carve
+
+**类别**：Spline
+
+**功能**：对齐 Houdini Carve SOP。按 U 参数（0~1）切割样条为多段（Cut），或在指定 U 位置提取点（Extract）。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Spline | `SpatialSpline` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Out | `Any`（Cut 输出 `SpatialSpline`，Extract 输出 `SpatialPoint` 点云） |
+
+**属性**（面板顺序与 Houdini 一致）：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `group` | string | `""` | 只处理该属性组内的样条；组外样条原样透传（Extract 模式下以其顶点形式进入点云） |
+| `arcLengthU` | boolean | true | Carve Curves by Relative Arc Length：U 按弧长而非顶点参数化解释 |
+| `useFirstU` / `uStart` | boolean / number | true / 0.0 | First U 起始位置 |
+| `uStartAttrib` | string | `""` | First U Attrib：样条属性缩放 First U（`uStart * attrib`） |
+| `useSecondU` / `uEnd` | boolean / number | true / 1.0 | Second U 结束位置 |
+| `uEndAttrib` | string | `""` | Second U Attrib：样条属性缩放 Second U |
+| `useFirstV` / `vStart` / `vStartAttrib` | — | true / 0.25 / `""` | Houdini 曲面雕刻参数；对一维样条无作用，仅为参数面板对齐保留 |
+| `useSecondV` / `vEnd` / `vEndAttrib` | — | true / 0.75 / `""` | 同上 |
+| `location` | enum(radio) | `"divisions"` | `divisions` / `breakpoints` 页签 |
+| `uDivisions` | integer | 2 | Divisions 页签：U 方向切/提取段数（N 段 → N-1 个内部切点） |
+| `vDivisions` | integer | 2 | 曲面参数，样条上无作用 |
+| `cutAtAllInternalUBreakpoints` | boolean | true | Breakpoints 页签：在区间内所有内部顶点处切割 |
+| `cutAtAllInternalVBreakpoints` | boolean | true | 曲面参数，样条上无作用 |
+| `operation` | enum(radio) | `"cut"` | `cut` / `extract` 单选 |
+| `keepInside` | boolean | true | Cut：保留 `[First U, Second U]` 区间内的段 |
+| `keepOutside` | boolean | false | Cut：保留区间外的段 |
+| `extractType` | enum | `"curves3d"` | Extract：`curves3d`（Extract 3D Isoparametric Curve(s)）/ `points`（Extract Point(s)）；一维样条的等参截面即点，两者行为一致 |
+| `keepOriginal` | boolean | false | Extract：输出中追加原始样条顶点 |
+| `onlyAtBreakpoints` | boolean | false | Extract：只在已存在顶点（breakpoints）处执行，落在边中间的 U 位置被丢弃 |
+
+**执行逻辑**：
+1. Cut：在 First/Second U（可被 Attrib 缩放）与 Divisions/Breakpoints 内部切点处拆分样条，按 `keepInside`/`keepOutside` 保留区间段；`group` 外的样条不参与切割、原样输出。
+2. Extract：在每个 U 位置输出一个点（属性继承自源样条），`keepOriginal` 追加原始顶点，`onlyAtBreakpoints` 将位置限制到已存在顶点。
+
+**Houdini 差异说明**：Houdini Carve 同时支持面/曲面（V 参数、2D 等参曲线提取）；本节点输入为 `SpatialSpline`，V 参数与 Extract Type 仅做面板与参数解析对齐，对一维样条无额外效果（与 Houdini 作用于曲线时一致：V 无效、提取结果为点）。
+
+---
+
 ### CreateBezierSpline
 
 **类别**：Spline
@@ -1487,6 +1619,59 @@ blast_short → StaticMeshSpawner(short) ─┘
   "data": { "mode": "spacing", "spacing": 2.0 }
 }
 ```
+
+---
+
+### ConditionOutline
+
+**类别**：Spline
+
+**功能**：对输入 `SpatialSpline` 先做窗口平滑，再做 RDP 简化。`protectSpans` 用**输入点索引闭区间**保护特征点（不是 Group）。默认 `win=1`、`eps=0` 为 no-op；进入实际处理时，closed spline 的显式重复首点会被规范化为 `closed=true` 且不重复首点。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Spline | `SpatialSpline` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Spline | `SpatialSpline` |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `win` | integer | 1 | 奇数 ≥ 1 | 平滑窗口；`1` 禁用平滑 |
+| `eps` | number | 0.0 | ≥ 0 | RDP 点到线段距离阈值；`0` 禁用简化（不因共线隐式删点） |
+| `protectSpans` | string(JSON) | `[]` | — | `[{start,end},…]` 输入点索引闭区间；跨 seam（`start>end`）仅允许 closed；索引按规范化前输入解释 |
+
+**执行逻辑**：
+1. 校验 `win`（奇数）、`eps`（有限且 ≥0）、`protectSpans` JSON/索引
+2. 每条 spline 独立处理；保留顺序、`closed`、curve attributes
+3. 点数 < 3 或参数 no-op → 原样输出；实际处理时 closed 输入若首尾重复，先移除末尾重复点，末点保护映射到逻辑首点
+4. 平滑：仅更新未保护点；open 端点邻域 clamp，closed 环绕；输出不产生非重合 seam
+5. RDP：保护点与 open 端点为锚；相邻锚点片段上按 `distance <= eps` 可删
+6. **非目标**：弧长重采样、自交修复、point attribute 插值、转 columns
+
+**用法示例**：
+
+```json
+{
+  "id": "condition",
+  "type": "ConditionOutline",
+  "position": { "x": 0, "y": 220 },
+  "data": {
+    "win": 3,
+    "eps": 0.002,
+    "protectSpans": "[{\"start\":0,\"end\":2}]"
+  }
+}
+```
+
+> 典型连接：`CreateSpline(closed) → ConditionOutline → OutlineSolid(inputMode=outline)`。
 
 ---
 
@@ -2695,10 +2880,12 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `detriangulate` | enum | `"all"` | 去三角化：`all`（按输入面来源重建）/ `unchanged`（仅重建未被切割的输入面）/ `none`（保留三角） |
 | `weldEpsilon` | number | 0.0001 | 焊接容差（≥ 1e-8） |
 | `triangleBudget` | integer | 500000 | 三角形数量上限（≥ 1000） |
+| `timeoutMs` | integer | 0 | 墙钟超时（毫秒）。`0` = 不超时。在交线候选循环中 best-effort 中止，返回可观测错误（或见 `onFailure`） |
+| `onFailure` | enum | `"error"` | `error`：cook 失败并带明确消息（cancel/timeout/budget）；`passthroughA`：输出 A 并继续（避免空结果，失败细节仅在 `error` 路径可见） |
 
 **执行逻辑**：
 1. 读取两个输入网格，按 `weldEpsilon` 焊接重合顶点
-2. 计算两网格的相交线，将面沿交线切割
+2. 计算两网格的相交线，将面沿交线切割（循环中响应 `ctx.is_cancel_requested` 与 `timeoutMs`）
 3. 根据 `operation` 选择保留的面：
    - `union`：保留 A 外部 + B 外部的面
    - `intersect`：保留 A 内部 + B 内部的面
@@ -2707,8 +2894,12 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 4. 根据 `treatAAs`/`treatBAs` 调整整/表面模式下的内部/外部判定
 5. `detriangulate` 按 Houdini Boolean 语义重建输入面：`all` 只合并来自同一输入 polygon 的相邻三角；`unchanged` 进一步排除被交线切割的输入面；A-B seam 边不会被跨越
 6. 标记输出组（a_inside_b / a_outside_b / b_inside_a / b_outside_a / ab_seams）
-7. 若三角形数超过 `triangleBudget`，报错终止
+7. 若三角形数超过 `triangleBudget`，或 cancel/timeout，报错终止（除非 `onFailure=passthroughA`）
 8. 输出布尔运算结果网格
+
+**稳定性提示**：
+- 多 cutter / 高密度交线可能很慢；设 `timeoutMs` 并确保失败路径可观测（默认 `onFailure=error`），不要依赖静默挂死。
+- **不要**用一长串亚毫米 `CreateCylinderMesh` cutter 作为 jimping/锯齿的唯一手段；优先 `OutlineSolid` / 剖面包络，或更大、更少的 cutter。
 
 **用法示例**：
 
@@ -2722,12 +2913,70 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
     "treatAAs": "solid",
     "treatBAs": "solid",
     "detriangulate": "all",
-    "weldEpsilon": 0.0001
+    "weldEpsilon": 0.0001,
+    "timeoutMs": 30000,
+    "onFailure": "error"
   }
 }
 ```
 
 > 典型连接：`GetMeshData(A) + CreateBoxMesh(B) → BooleanMesh(subtract) → Output`，从实体中挖洞/开槽。
+
+---
+
+### OutlineSolid
+
+**类别**：Mesh
+
+**功能**：闭合平面轮廓 × 厚度 → 焊接实体（front / back / rim），或列向 loft（对齐 img2threejs `loft(outline,zAt)`）。用 **`inputMode`** 显式选择路径（不按有无数据自动切换）。
+
+**输入 Pin**（随 `inputMode` 显隐）：
+
+| Pin ID | 标签 | 类型 | 模式 |
+|--------|------|------|------|
+| `outline` | Outline | `SpatialSpline` | `outline` |
+| `spine` | Spine | `SpatialSpline`（`(x, y_top, half_z)`） | `spineEdge` |
+| `edge` | Edge | `SpatialSpline`（`(x, y_bot, half_z)`） | `spineEdge` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Mesh | `SpatialMesh` |
+
+**输出组**：
+
+| 组名 | 域 | 说明 |
+|------|-----|------|
+| `front` | face | 厚度轴正侧盖面（可用 `frontGroup` 改名） |
+| `back` | face | 厚度轴负侧盖面 |
+| `rim` | face | 侧面环面 |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `inputMode` | enum | `"outline"` | `outline` / `columnsJson` / `spineEdge`（必选，决定读哪路输入） |
+| `thickness` | number | 0.01 | 常量总厚度（m）；列模式也作 half_z 回退 |
+| `thicknessAxis` | enum | `"z"` | `x` / `y` / `z` |
+| `thicknessSamples` | string | `"[]"` | 仅 `outline`：逐顶点总厚度 |
+| `columnsJson` | string | `"[]"` | 仅 `columnsJson`：站数组 |
+| `rows` | integer | 0 | 仅列模式：余弦分级行数（0→1 带） |
+| `profileMode` | enum | `"constant"` | 仅列模式：`constant` / `slab` / `blade` |
+| `spineRollFrac` / `handleRollFrac` / `edgeFrac` / `grindStartFrac` / `edgeBevelFrac` | number | 见 manifest | blade/slab 截面参数 |
+| `frontGroup` | string | `"front"` | 前盖面组名 |
+| `backGroup` | string | `"back"` | 后盖面组名 |
+| `rimGroup` | string | `"rim"` | 侧面组名 |
+
+**执行逻辑**：
+1. 读 `inputMode`，只走对应分支（缺输入则报错，不回退到其它模式）
+2. `outline`：闭合轮廓 ±half；可选 `thicknessSamples`
+3. `columnsJson` / `spineEdge`：列 × 行焊接 loft（`profileMode` = zAt）
+4. 维护 `unshared` 边组
+
+> `inputMode=outline`：`CreateSpline(closed) → OutlineSolid.outline`  
+> `inputMode=columnsJson`：`OutlineSolid(columnsJson=…, rows=8, profileMode=blade)`  
+> `inputMode=spineEdge`：`CreateSpline(spine)+CreateSpline(edge) → OutlineSolid`
 
 ---
 
@@ -3195,7 +3444,7 @@ keepOriginalGroup=false → 删除源点组
 节点、Manifest 或 native core 发生变化后，提交前执行：
 
 ```bash
-scripts/build-pcg-core.sh --copy-to-unity --run-tests
+./scripts/build-pcg-core.sh --run-tests
 scripts/sync-manifest.sh
 ```
 
@@ -3375,8 +3624,8 @@ CreateSpline ──(profile)──┘
 
 | 属性 | 类型 | 默认值 | 范围 | 说明 |
 |------|------|--------|------|------|
-| radius | number | 1.0 | ≥ 0.001 | 半径 |
-| height | number | 2.0 | ≥ 0.001 | 高度 |
+| radius | number | 1.0 | ≥ 0.001 | 半径。实用下限约 0.001 m；亚毫米 cutter 做 jimping/锯齿再进 `BooleanMesh` 不稳定，优先 `OutlineSolid` 剖面包络或更大 cutter |
+| height | number | 2.0 | ≥ 0.001 | 高度。避免把「一串微圆柱 Boolean」当作唯一微细节手段 |
 | radialSegments | integer | 16 | 3–128 | 圆周分段 |
 | heightSegments | integer | 1 | 1–64 | 高度分段 |
 | capTop | boolean | true | | 顶盖 |
@@ -3536,6 +3785,8 @@ CopyAttributes(tag, values=tree/rock)
 | 文件 | 测试链路 | 验证内容 |
 |------|---------|---------|
 | `test-cylinder.pcg` | `CreateCylinderMesh → Output` | 圆柱生成、顶点/索引数、cap winding |
+| `test-outline-solid.pcg` | `CreateSpline → OutlineSolid → Output` | 闭合轮廓×厚度焊接实体、front/back/rim |
+| `test-condition-outline.pcg` | `CreateSpline → ConditionOutline → Output` | 平滑/RDP/protectSpans；JSON spline sink |
 | `test-revolve-bevel.pcg` | `CreateSpline → RevolveMesh → BevelMesh → Output` | 回转体生成、BevelMesh 几何链保持 |
 | `test-spiral-sweep.pcg` | `CreateSpiralSpline → SweepAlongSpline → Output` | 螺旋线采样、Sweep 扫掠 |
 | `test-color-uv-material.pcg` | `CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output` | RGBA colors（含 alpha）、UV0、material metadata 跨 native boundary 传递 |

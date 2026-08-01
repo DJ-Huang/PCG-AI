@@ -39,6 +39,21 @@ void preserve_control_attributes(const data::PcgGeometry& source, data::PcgGeome
         promote_number(data::AttributeOwner::Primitive, name);
 }
 
+const char* boolean_error_label(BooleanErrorType error)
+{
+    switch (error) {
+    case BooleanErrorType::Ok: return "ok";
+    case BooleanErrorType::NonManifold: return "non-manifold";
+    case BooleanErrorType::PrecisionOverflow: return "precision overflow";
+    case BooleanErrorType::TriangleBudgetExceeded: return "triangle budget exceeded";
+    case BooleanErrorType::SelfIntersectionUnresolved: return "self-intersection unresolved";
+    case BooleanErrorType::InvalidInput: return "invalid input";
+    case BooleanErrorType::Cancelled: return "cancelled";
+    case BooleanErrorType::Timeout: return "timeout";
+    }
+    return "unknown";
+}
+
 } // namespace
 
 // ── boolean_geometry implementation ────────────────────────
@@ -127,10 +142,61 @@ public:
 
         opts.weld_epsilon = ctx.node->data.value("weldEpsilon", 0.0001);
         opts.triangle_budget = ctx.node->data.value("triangleBudget", 500000);
+        opts.timeout_ms = ctx.node->data.value("timeoutMs", 0);
+        opts.is_cancel_requested = ctx.is_cancel_requested;
 
-        data::PcgGeometry result = boolean_geometry(a, b, opts);
-        if (result.points().empty())
+        const std::string on_failure =
+            ctx.node->data.value("onFailure", std::string("error"));
+
+        BooleanResult raw = execute_boolean(a, b, opts);
+        if (raw.error != BooleanErrorType::Ok) {
+            const std::string detail = raw.message.empty()
+                ? boolean_error_label(raw.error)
+                : raw.message;
+            if (on_failure == "passthroughA") {
+                // Observable: empty result is avoided; cook continues with A.
+                // Detail is preserved in the error string only when failing hard.
+                emit_geometry(ctx, data::PcgGeometry(a));
+                return PCG_OK;
+            }
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            ("BooleanMesh failed: " + detail).c_str());
+        }
+
+        // Rematerialize groups (same as boolean_geometry).
+        if (raw.face_origins.size() == raw.geometry.faces().size()) {
+            auto rematerialize = [&](const data::PcgGeometry& source, int source_index) {
+                for (const auto& name :
+                     source.groups().group_names(geometry::GroupDomain::Face)) {
+                    if (name == BooleanGroups::A_INSIDE_B || name == BooleanGroups::A_OUTSIDE_B ||
+                        name == BooleanGroups::B_INSIDE_A || name == BooleanGroups::B_OUTSIDE_A)
+                        continue;
+                    const auto members =
+                        source.groups().members(geometry::GroupDomain::Face, name);
+                    std::unordered_set<geometry::GroupId> member_set(members.begin(), members.end());
+                    for (size_t fi = 0; fi < raw.face_origins.size(); ++fi) {
+                        const auto& origin = raw.face_origins[fi];
+                        if (origin.source != source_index || origin.original_face < 0)
+                            continue;
+                        if (member_set.count(origin.original_face) > 0)
+                            raw.geometry.groups().add(geometry::GroupDomain::Face, name,
+                                                      static_cast<geometry::GroupId>(fi));
+                    }
+                }
+            };
+            rematerialize(a, 0);
+            rematerialize(b, 1);
+        }
+
+        data::PcgGeometry result = finalize_boolean_output(raw, opts.detriangulate);
+        preserve_control_attributes(a, result);
+        if (result.points().empty()) {
+            if (on_failure == "passthroughA") {
+                emit_geometry(ctx, data::PcgGeometry(a));
+                return PCG_OK;
+            }
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "BooleanMesh produced empty result");
+        }
 
         emit_geometry(ctx, std::move(result));
         return PCG_OK;

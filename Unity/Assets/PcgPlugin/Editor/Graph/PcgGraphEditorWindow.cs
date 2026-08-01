@@ -31,6 +31,8 @@ namespace DJTechEditor.PCG.Graph
         private PcgNodeInspector m_Inspector;
         private Button m_BlackboardToggle;
         private Button m_InspectorToggle;
+        private Button m_InterfaceToggle;
+        private bool m_InterfacePanelVisible;
         private Button m_SubgraphBackButton;
         private Label m_SubgraphBreadcrumb;
         private EnumField m_ScatterDisplayField;
@@ -81,7 +83,31 @@ namespace DJTechEditor.PCG.Graph
 
         public IReadOnlyList<PcgPreviewMeshBinding> PreviewMeshBindings => m_PreviewMeshBindings;
 
-        public PcgGraphDocument ExportLiveDocument() => m_GraphView?.ExportDocument();
+        public PcgGraphDocument ExportLiveDocument() =>
+            m_GraphView?.ExportDocumentWithExternalInterfacesReconciled();
+
+        internal PcgExternalSubgraphLoader CreateExternalSubgraphLoader()
+        {
+            var diskLoader = PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader();
+            return (string assetGuid, out string sourceJson, out string loadError) =>
+            {
+                sourceJson = null;
+                loadError = null;
+                if (m_GraphView != null &&
+                    m_GraphView.TryGetLiveExternalSubgraphSourceJson(
+                        assetGuid,
+                        out sourceJson,
+                        out loadError))
+                {
+                    return true;
+                }
+
+                if (!string.IsNullOrEmpty(loadError))
+                    return false;
+
+                return diskLoader(assetGuid, out sourceJson, out loadError);
+            };
+        }
 
         public bool MatchesGraphAsset(string assetDatabasePath, string assetGuid)
         {
@@ -153,27 +179,9 @@ namespace DJTechEditor.PCG.Graph
             if (string.IsNullOrEmpty(m_PreviewNodeId) || m_GraphView == null)
                 return;
 
-            // Preview is scoped to the navigation level where it was set.
-            if (!string.Equals(
-                    m_PreviewScopeSubgraphId ?? "",
-                    m_GraphView.CurrentSubgraphId ?? "",
-                    System.StringComparison.Ordinal))
-            {
-                ClearNodePreview(silent: true);
-                return;
-            }
-
-            var exists = false;
-            foreach (var node in m_GraphView.nodes)
-            {
-                if (node is PcgGraphNodeBase graphNode && graphNode.NodeId == m_PreviewNodeId)
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (!exists)
+            // Navigation only changes which scope is visible. Keep previewing the
+            // original scoped node while drilling into or out of a Subgraph.
+            if (!m_GraphView.ContainsNodeInScope(m_PreviewNodeId, m_PreviewScopeSubgraphId))
                 ClearNodePreview(silent: true);
         }
 
@@ -435,6 +443,11 @@ namespace DJTechEditor.PCG.Graph
             m_BlackboardToggle = MakeButton("Parameters", ToggleBlackboard);
             toolbar.Add(m_BlackboardToggle);
 
+            m_InterfaceToggle = MakeButton("Interface", ToggleInterfacePanel);
+            m_InterfaceToggle.tooltip =
+                "Show/hide the Subgraph Interface panel (inputs/outputs). Only available inside a Subgraph.";
+            toolbar.Add(m_InterfaceToggle);
+
             m_InspectorToggle = MakeButton("Inspector", ToggleInspector);
             toolbar.Add(m_InspectorToggle);
 
@@ -477,6 +490,7 @@ namespace DJTechEditor.PCG.Graph
             m_GraphView.SubgraphNavigationChanged += _ =>
             {
                 RefreshSubgraphBreadcrumb();
+                RefreshInterfacePanel();
                 ValidatePreviewNodeExists();
             };
             if (!string.IsNullOrEmpty(m_Selected))
@@ -488,6 +502,7 @@ namespace DJTechEditor.PCG.Graph
 
             m_InterfacePanel = new PcgSubgraphInterfacePanel(m_GraphView);
             m_InterfacePanel.style.display = DisplayStyle.None;
+            m_InterfacePanel.style.flexGrow = 0;
 
             m_Inspector = new PcgNodeInspector(m_GraphView, m_Blackboard);
             m_GraphView.Inspector = m_Inspector;
@@ -503,6 +518,8 @@ namespace DJTechEditor.PCG.Graph
                 style =
                 {
                     flexGrow = 1,
+                    flexShrink = 1,
+                    minWidth = 0,
                     position = Position.Relative,
                 },
             };
@@ -536,13 +553,34 @@ namespace DJTechEditor.PCG.Graph
             };
             graphHost.Add(m_PreviewStatusLabel);
 
+            contentRow.Add(graphHost);
             contentRow.Add(m_Blackboard);
             contentRow.Add(m_InterfacePanel);
-            contentRow.Add(graphHost);
             contentRow.Add(m_Inspector);
+
+            // Panels float over the graph canvas; the interface panel docks to the
+            // blackboard's right edge and must follow its width/visibility.
+            m_Blackboard.RegisterCallback<GeometryChangedEvent>(_ => UpdateInterfacePanelOffset());
+            UpdateInterfacePanelOffset();
 
             rootVisualElement.Add(contentRow);
             RefreshPreviewToolbar();
+        }
+
+        private void UpdateInterfacePanelOffset()
+        {
+            if (m_InterfacePanel == null || m_Blackboard == null)
+                return;
+
+            var blackboardVisible = m_Blackboard.style.display.value == DisplayStyle.Flex;
+            var offset = 0f;
+            if (blackboardVisible)
+            {
+                offset = m_Blackboard.resolvedStyle.width;
+                if (float.IsNaN(offset))
+                    offset = 0f;
+            }
+            m_InterfacePanel.style.left = offset;
         }
 
         private void RefreshSubgraphBreadcrumb()
@@ -556,6 +594,26 @@ namespace DJTechEditor.PCG.Graph
                 ? m_GraphView.CurrentSubgraphPath
                 : "Root";
         }
+
+        internal void RefreshInterfacePanel()
+        {
+            if (m_InterfacePanel == null || m_GraphView == null)
+                return;
+
+            var eligible = m_SubgraphAssetMode || m_GraphView.IsInsideSubgraph;
+            var show = eligible && m_InterfacePanelVisible;
+            m_InterfacePanel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (m_InterfaceToggle != null)
+                m_InterfaceToggle.SetEnabled(eligible);
+            if (!show)
+                return;
+
+            UpdateInterfacePanelOffset();
+            var definition = m_GraphView.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
+            m_InterfacePanel.Bind(definition);
+        }
+
+        internal PcgSubgraphInterfacePanel InterfacePanel => m_InterfacePanel;
 
         private void LoadDefaultGraph()
         {
@@ -637,6 +695,8 @@ namespace DJTechEditor.PCG.Graph
 
                 ClearNodePreview(silent: true);
                 m_GraphView.LoadDocument(doc);
+                if (doc.HasExternalSubgraphAssets())
+                    m_GraphView.ReconcileExternalNodes(null);
             }
 
             m_CurrentFilePath = Path.GetFullPath(path);
@@ -654,16 +714,8 @@ namespace DJTechEditor.PCG.Graph
             SetStatus($"Imported: {path}");
             RefreshScatterDisplayField();
             if (m_Blackboard != null)
-                m_Blackboard.style.display = m_SubgraphAssetMode ? DisplayStyle.None : DisplayStyle.Flex;
-            if (m_InterfacePanel != null)
-            {
-                m_InterfacePanel.style.display = m_SubgraphAssetMode ? DisplayStyle.Flex : DisplayStyle.None;
-                if (m_SubgraphAssetMode)
-                {
-                    var definition = m_GraphView?.FindSubgraphDefinition(m_GraphView.CurrentSubgraphId);
-                    m_InterfacePanel.Bind(definition);
-                }
-            }
+                m_Blackboard.style.display = DisplayStyle.None;
+            RefreshInterfacePanel();
             return true;
         }
 
@@ -684,6 +736,7 @@ namespace DJTechEditor.PCG.Graph
                     Debug.LogError($"[PCG] Subgraph asset save failed: {exportError}");
                     return;
                 }
+                assetDoc.name = PcgSubgraphAssetNaming.ResolveDisplayName(m_CurrentFilePath, assetDoc);
                 json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
             }
             else
@@ -707,7 +760,8 @@ namespace DJTechEditor.PCG.Graph
 
         private void SaveAsGraph()
         {
-            string json;
+            PcgSubgraphAssetDocument subgraphAssetDoc = null;
+            string json = null;
             string defaultName;
             string extension;
             string panelTitle;
@@ -720,7 +774,7 @@ namespace DJTechEditor.PCG.Graph
                     Debug.LogError($"[PCG] Subgraph asset Save As failed: {exportError}");
                     return;
                 }
-                json = PcgSubgraphAssetSerializer.ToJson(assetDoc);
+                subgraphAssetDoc = assetDoc;
                 defaultName = "subgraph.pcgsubgraph";
                 extension = SubgraphExtension;
                 panelTitle = "Save Subgraph Asset As";
@@ -749,6 +803,12 @@ namespace DJTechEditor.PCG.Graph
 
             if (string.IsNullOrEmpty(path))
                 return;
+
+            if (subgraphAssetDoc != null)
+            {
+                subgraphAssetDoc.name = PcgSubgraphAssetNaming.ResolveDisplayName(path, subgraphAssetDoc);
+                json = PcgSubgraphAssetSerializer.ToJson(subgraphAssetDoc);
+            }
 
             _lastSelfSaveUtc = DateTime.UtcNow;
             File.WriteAllText(path, json);
@@ -796,7 +856,7 @@ namespace DJTechEditor.PCG.Graph
             titleContent = new GUIContent(title, icon);
         }
 
-        private void SetStatus(string message)
+        internal void SetStatus(string message)
         {
             Debug.Log($"[PCG] {message}");
         }
@@ -821,11 +881,18 @@ namespace DJTechEditor.PCG.Graph
         {
             var visible = m_Blackboard.style.display.value == DisplayStyle.Flex;
             m_Blackboard.style.display = visible ? DisplayStyle.None : DisplayStyle.Flex;
+            UpdateInterfacePanelOffset();
         }
 
         internal void ToggleInspector()
         {
             m_Inspector.ToggleVisible();
+        }
+
+        internal void ToggleInterfacePanel()
+        {
+            m_InterfacePanelVisible = !m_InterfacePanelVisible;
+            RefreshInterfacePanel();
         }
 
         private static string AssetPathToFullPath(string assetPath)

@@ -55,6 +55,8 @@ public:
     void append_defaults(size_t element_count);
     bool append_from(const AttributeArray& other);
     void append_element_from(const AttributeArray& other, size_t source_index);
+    /// Overwrite destination element with source element (or defaults if source OOB).
+    void set_element_from(const AttributeArray& other, size_t dest_index, size_t source_index);
 
     const std::vector<int64_t>& int_values() const { return int_values_; }
     std::vector<int64_t>& int_values_mut() { return int_values_; }

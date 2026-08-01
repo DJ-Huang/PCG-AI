@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using DJTechRuntime.PCG;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -38,7 +39,6 @@ namespace DJTechEditor.PCG.Graph
 
             if (_draggedPort != null && _compatibleTypes != null)
             {
-                // Filtered mode: only show compatible types
                 var manifestGroups = PcgNodeManifest.All
                     .Where(def => _compatibleTypes.Contains(def.type))
                     .GroupBy(def => def.category ?? "Other")
@@ -49,7 +49,6 @@ namespace DJTechEditor.PCG.Graph
             }
             else
             {
-                // Unfiltered mode: show all types
                 var manifestGroups = PcgNodeManifest.All
                     .GroupBy(def => def.category ?? "Other")
                     .OrderBy(g => g.Key);
@@ -80,8 +79,6 @@ namespace DJTechEditor.PCG.Graph
             var compactDisplay = displayName.Replace(" ", "");
             var compactType = type.Replace(" ", "");
 
-            // Include both displayName and raw type so SearchWindow can match either style:
-            // "Sample Mesh Surface" or "SampleMeshSurface".
             if (compactDisplay == compactType)
                 return $"{displayName} ({type})";
             return $"{displayName} ({type}) [{compactDisplay}]";

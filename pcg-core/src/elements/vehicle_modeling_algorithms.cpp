@@ -643,4 +643,249 @@ data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
     return output;
 }
 
+namespace {
+
+data::PcgVec3 axis_unit(const std::string& axis)
+{
+    if (axis == "x") return {1.0, 0.0, 0.0};
+    if (axis == "y") return {0.0, 1.0, 0.0};
+    return {0.0, 0.0, 1.0};
+}
+
+double graded_t(int r, int rows)
+{
+    if (rows <= 0) return 0.0;
+    return 0.5 - 0.5 * std::cos(kPi * (static_cast<double>(r) / static_cast<double>(rows)));
+}
+
+/// Half-thickness at outline parameter t∈[0,1] and station xf∈[0,1] (img2threejs zAt).
+double profile_half_z(double t, double xf, double half_z, const OutlineSolidOptions& options)
+{
+    const double h = std::max(0.0, half_z);
+    if (h <= 0.0) return 0.0;
+    const std::string& mode = options.profile_mode;
+    if (mode == "slab") {
+        const double roll = std::max(1e-6, options.handle_roll_frac);
+        const double d = std::min(t, 1.0 - t) / roll;
+        if (d >= 1.0) return h;
+        const double k = 1.0 - d;
+        const double edge = std::clamp(options.edge_frac, 0.0, 1.0);
+        return h * (edge + (1.0 - edge) * std::sqrt(std::max(0.0, 1.0 - k * k)));
+    }
+    if (mode == "blade") {
+        const double sr = std::max(1e-6, options.spine_roll_frac);
+        const double gs = std::clamp(options.grind_start_frac, sr, 1.0);
+        const double eb = std::clamp(options.edge_bevel_frac, gs, 1.0);
+        const double edge = std::clamp(options.edge_frac, 0.0, 1.0);
+        if (t < sr) {
+            const double k = 1.0 - t / sr;
+            return h * (edge + (1.0 - edge) * std::sqrt(std::max(0.0, 1.0 - k * k)));
+        }
+        if (t < gs)
+            return h * (1.0 - 0.12 * (t - sr) / std::max(gs - sr, 1e-4));
+        if (t < eb)
+            return std::max(0.0, h * (0.88 - 0.74 * (t - gs) / std::max(eb - gs, 1e-4)));
+        return std::max(0.0, h * (0.14 - 0.115 * (t - eb) / std::max(1.0 - eb, 1e-4)));
+    }
+    (void)xf;
+    return h;
+}
+
+data::PcgGeometry outline_solid_from_columns(const std::vector<OutlineColumn>& columns,
+                                             const OutlineSolidOptions& options)
+{
+    data::PcgGeometry output;
+    if (columns.size() < 2) return output;
+
+    const int cols = static_cast<int>(columns.size());
+    // At least one interior band so spine/edge rows produce face quads.
+    const int rows = std::max(1, options.rows);
+    const int row_count = rows + 1; // r = 0..rows
+    const data::PcgVec3 axis = axis_unit(options.thickness_axis);
+    const double x0 = columns.front().x;
+    const double x1 = columns.back().x;
+    const double span = std::max(std::fabs(x1 - x0), 1e-6);
+    const int face_verts = cols * row_count;
+
+    auto at = [&](int side, int c, int r) { return side * face_verts + c * row_count + r; };
+
+    // side0 = +axis (front), side1 = -axis (back)
+    for (int side = 0; side < 2; ++side) {
+        const double sign = side == 0 ? 1.0 : -1.0;
+        for (int c = 0; c < cols; ++c) {
+            const auto& col = columns[static_cast<size_t>(c)];
+            const double xf = (col.x - x0) / span;
+            for (int r = 0; r < row_count; ++r) {
+                const double t = graded_t(r, rows);
+                const double y = col.y_top + (col.y_bot - col.y_top) * t;
+                const double hz = profile_half_z(t, xf, col.half_z, options);
+                data::PcgVec3 p{col.x, y, 0.0};
+                // Place XY in the plane perpendicular to thicknessAxis.
+                if (options.thickness_axis == "x")
+                    p = {0.0, col.x, y};
+                else if (options.thickness_axis == "y")
+                    p = {col.x, 0.0, y};
+                output.points_mut().push_back(add(p, scale(axis, sign * hz)));
+            }
+        }
+    }
+
+    // Broad faces as quads (triangulate later). Front: +axis; back: reverse winding.
+    for (int side = 0; side < 2; ++side) {
+        for (int c = 0; c < cols - 1; ++c) {
+            for (int r = 0; r < rows; ++r) {
+                const int a = at(side, c, r);
+                const int b = at(side, c + 1, r);
+                const int a1 = at(side, c, r + 1);
+                const int b1 = at(side, c + 1, r + 1);
+                const int face = static_cast<int>(output.faces().size());
+                if (side == 0)
+                    output.faces_mut().push_back({a, a1, b1, b});
+                else
+                    output.faces_mut().push_back({a, b, b1, a1});
+                output.groups().add(geometry::GroupDomain::Face,
+                                    side == 0 ? options.front_group : options.back_group, face);
+            }
+        }
+    }
+
+    // Rim: spine (r=0), edge (r=rows), plus butt/tip caps at c=0 and c=cols-1.
+    auto add_rim = [&](int a, int b, int c, int d) {
+        const int face = static_cast<int>(output.faces().size());
+        output.faces_mut().push_back({a, b, c, d});
+        output.groups().add(geometry::GroupDomain::Face, options.rim_group, face);
+    };
+    for (int c = 0; c < cols - 1; ++c) {
+        // Spine (+Y / r=0): outward
+        add_rim(at(0, c, 0), at(0, c + 1, 0), at(1, c + 1, 0), at(1, c, 0));
+        // Cutting edge (r=rows)
+        add_rim(at(0, c, rows), at(1, c, rows), at(1, c + 1, rows), at(0, c + 1, rows));
+    }
+    // Butt / tip strips along rows
+    for (int r = 0; r < rows; ++r) {
+        add_rim(at(0, 0, r), at(1, 0, r), at(1, 0, r + 1), at(0, 0, r + 1));
+        add_rim(at(0, cols - 1, r), at(0, cols - 1, r + 1), at(1, cols - 1, r + 1),
+                at(1, cols - 1, r));
+    }
+
+    data::maintain_unshared_edge_group(output);
+    return output;
+}
+
+} // namespace
+
+std::vector<OutlineColumn> columns_from_spine_edge(const data::PcgSpline& spine,
+                                                   const data::PcgSpline& edge,
+                                                   double fallback_half_z)
+{
+    std::vector<OutlineColumn> columns;
+    if (spine.points.size() < 2 || spine.points.size() != edge.points.size())
+        return columns;
+    columns.reserve(spine.points.size());
+    const double fb = fallback_half_z > 0.0 ? fallback_half_z : 0.0;
+    for (size_t i = 0; i < spine.points.size(); ++i) {
+        const auto& s = spine.points[i];
+        const auto& e = edge.points[i];
+        OutlineColumn col;
+        col.x = s.x;
+        col.y_top = s.y;
+        col.y_bot = e.y;
+        // Encode half-thickness in Z of the station polylines (XY = silhouette).
+        if (s.z > 0.0)
+            col.half_z = s.z;
+        else if (e.z > 0.0)
+            col.half_z = e.z;
+        else
+            col.half_z = fb;
+        columns.push_back(col);
+    }
+    return columns;
+}
+
+data::PcgGeometry outline_solid_from_spline(const data::PcgSpline& outline,
+                                            const OutlineSolidOptions& options)
+{
+    if (!options.columns.empty())
+        return outline_solid_from_columns(options.columns, options);
+
+    data::PcgGeometry output;
+    if (outline.points.size() < 3)
+        return output;
+
+    std::vector<data::PcgVec3> ring;
+    ring.reserve(outline.points.size());
+    for (const auto& pt : outline.points)
+        ring.push_back({pt.x, pt.y, pt.z});
+
+    // Drop duplicate closing vertex on closed polylines.
+    if (ring.size() >= 2) {
+        const auto& a = ring.front();
+        const auto& b = ring.back();
+        const double dx = a.x - b.x;
+        const double dy = a.y - b.y;
+        const double dz = a.z - b.z;
+        if (dx * dx + dy * dy + dz * dz <= 1e-16)
+            ring.pop_back();
+    }
+    if (ring.size() < 3)
+        return output;
+
+    const int n = static_cast<int>(ring.size());
+    std::vector<double> halves(static_cast<size_t>(n), options.thickness * 0.5);
+    if (!options.thickness_samples.empty()) {
+        if (static_cast<int>(options.thickness_samples.size()) != n)
+            return output;
+        for (int i = 0; i < n; ++i)
+            halves[static_cast<size_t>(i)] =
+                options.thickness_samples[static_cast<size_t>(i)] * 0.5;
+    }
+    bool any_positive = false;
+    for (double h : halves) {
+        if (h > 0.0) {
+            any_positive = true;
+            break;
+        }
+    }
+    if (!any_positive)
+        return output;
+
+    const data::PcgVec3 axis = axis_unit(options.thickness_axis);
+
+    // Front (+half) then back (-half); rim shares these welded point indices.
+    for (int i = 0; i < n; ++i)
+        output.points_mut().push_back(add(ring[static_cast<size_t>(i)],
+                                          scale(axis, halves[static_cast<size_t>(i)])));
+    for (int i = 0; i < n; ++i)
+        output.points_mut().push_back(add(ring[static_cast<size_t>(i)],
+                                          scale(axis, -halves[static_cast<size_t>(i)])));
+
+    std::vector<int> front(static_cast<size_t>(n));
+    std::vector<int> back(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        front[static_cast<size_t>(i)] = i;
+        // Reverse winding on back so normals face outward.
+        back[static_cast<size_t>(i)] = n + (n - 1 - i);
+    }
+
+    const int front_face = static_cast<int>(output.faces().size());
+    output.faces_mut().push_back(front);
+    output.groups().add(geometry::GroupDomain::Face, options.front_group, front_face);
+
+    const int back_face = static_cast<int>(output.faces().size());
+    output.faces_mut().push_back(back);
+    output.groups().add(geometry::GroupDomain::Face, options.back_group, back_face);
+
+    for (int i = 0; i < n; ++i) {
+        const int j = (i + 1) % n;
+        const int rim_face = static_cast<int>(output.faces().size());
+        // Outward rim for CCW outline (viewed along +thicknessAxis):
+        // front-i → back-i → back-j → front-j.
+        output.faces_mut().push_back({i, n + i, n + j, j});
+        output.groups().add(geometry::GroupDomain::Face, options.rim_group, rim_face);
+    }
+
+    data::maintain_unshared_edge_group(output);
+    return output;
+}
+
 } // namespace pcg::internal::elements

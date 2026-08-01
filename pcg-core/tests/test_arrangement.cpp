@@ -7,8 +7,11 @@
 #include "elements/mesh_algorithms.hpp"
 
 #include <cmath>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
+#include <thread>
 
 using namespace pcg::internal::geometry;
 using namespace pcg::internal::data;
@@ -246,6 +249,61 @@ void test_groups_present()
         fail("Shatter: should have face groups");
 }
 
+bool always_cancel()
+{
+    return true;
+}
+
+void test_cancel_observable()
+{
+    PcgGeometry a = box_geometry(2.0, 2.0, 2.0);
+    PcgGeometry b = box_geometry(2.0, 2.0, 2.0);
+    for (auto& p : b.points_mut())
+        p.x += 0.5;
+
+    ::pcg::internal::geometry::BooleanOptions opts;
+    opts.operation = ::pcg::internal::geometry::BooleanOp::Subtract;
+    opts.is_cancel_requested = &always_cancel;
+
+    auto result = execute_boolean(a, b, opts);
+    if (result.error != BooleanErrorType::Cancelled)
+        fail(("cancel should return Cancelled, got " + result.message).c_str());
+    if (result.message.find("cancel") == std::string::npos)
+        fail("cancel message should mention cancel");
+}
+
+bool sleep_once_no_cancel()
+{
+    static bool slept = false;
+    if (!slept) {
+        slept = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    return false;
+}
+
+void test_timeout_observable()
+{
+    PcgGeometry a = box_geometry(2.0, 2.0, 2.0);
+    PcgGeometry b = box_geometry(2.0, 2.0, 2.0);
+    for (auto& p : b.points_mut())
+        p.x += 0.5;
+
+    ::pcg::internal::geometry::BooleanOptions opts;
+    opts.operation = ::pcg::internal::geometry::BooleanOp::Subtract;
+    opts.timeout_ms = 1;
+    // First cancel-poll sleeps past the 1 ms deadline; timeout check runs on pair_i%64==0.
+    opts.is_cancel_requested = &sleep_once_no_cancel;
+
+    auto result = execute_boolean(a, b, opts);
+    if (result.error != BooleanErrorType::Timeout)
+        fail(("timeout should return Timeout, got error=" +
+              std::to_string(static_cast<int>(result.error)) + " msg=" + result.message)
+                 .c_str());
+    if (result.message.find("timed out") == std::string::npos)
+        fail("timeout message should mention timed out");
+}
+
 } // namespace
 
 int main()
@@ -256,6 +314,8 @@ int main()
     test_intersect();
     test_invalid_input();
     test_groups_present();
+    test_cancel_observable();
+    test_timeout_observable();
 
     std::printf("test_arrangement: all tests passed\n");
     return 0;

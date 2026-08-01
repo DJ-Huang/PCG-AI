@@ -1,5 +1,6 @@
 #include "elements/geometry_algorithms.hpp"
 
+#include "elements/delete_algorithms.hpp"
 #include "elements/element_utils.hpp"
 #include "geometry/bmesh.hpp"
 #include "geometry/bvh.hpp"
@@ -1164,6 +1165,81 @@ void write_integer_attribute(data::PcgGeometry& geometry,
     }
 }
 
+bool group_name_glob_match(const std::string& name, const std::string& pattern)
+{
+    if (pattern == "*")
+        return true;
+    const auto star = pattern.find('*');
+    if (star == std::string::npos)
+        return name == pattern;
+    if (pattern.size() == 1)
+        return true;
+    if (star == 0) {
+        const std::string suffix = pattern.substr(1);
+        return name.size() >= suffix.size() &&
+               name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+    if (star + 1 == pattern.size()) {
+        const std::string prefix = pattern.substr(0, star);
+        return name.size() >= prefix.size() && name.compare(0, prefix.size(), prefix) == 0;
+    }
+    const std::string prefix = pattern.substr(0, star);
+    const std::string suffix = pattern.substr(star + 1);
+    return name.size() >= prefix.size() + suffix.size() &&
+           name.compare(0, prefix.size(), prefix) == 0 &&
+           name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+std::vector<std::string> split_group_name_tokens(const std::string& text)
+{
+    std::vector<std::string> tokens;
+    std::string current;
+    for (char ch : text) {
+        if (ch == ' ' || ch == '\t' || ch == ',') {
+            if (!current.empty()) {
+                tokens.push_back(current);
+                current.clear();
+            }
+        } else {
+            current.push_back(ch);
+        }
+    }
+    if (!current.empty())
+        tokens.push_back(current);
+    return tokens;
+}
+
+geometry::GroupDomain parse_group_delete_domain(const std::string& type)
+{
+    if (type == "points" || type == "point")
+        return geometry::GroupDomain::Point;
+    if (type == "edges" || type == "edge")
+        return geometry::GroupDomain::Edge;
+    if (type == "vertices" || type == "vertex")
+        return geometry::GroupDomain::Vertex;
+    if (type == "primitives" || type == "primitive" || type == "face")
+        return geometry::GroupDomain::Face;
+    return geometry::GroupDomain::Face;
+}
+
+std::vector<geometry::GroupDomain> domains_for_group_delete_type(const std::string& type)
+{
+    if (type == "any")
+        return {geometry::GroupDomain::Point, geometry::GroupDomain::Edge,
+                geometry::GroupDomain::Face, geometry::GroupDomain::Vertex};
+    return {parse_group_delete_domain(type)};
+}
+
+bool group_name_matches_patterns(const std::string& name,
+                                 const std::vector<std::string>& patterns)
+{
+    for (const auto& pattern : patterns) {
+        if (group_name_glob_match(name, pattern))
+            return true;
+    }
+    return false;
+}
+
 } // namespace
 
 data::PcgGeometry group_promote(const data::PcgGeometry& input, const GroupPromoteOptions& options)
@@ -1202,6 +1278,76 @@ data::PcgGeometry group_promote(const data::PcgGeometry& input, const GroupPromo
 
     if (!options.keep_original_group && !same_slot)
         result.groups().clear_group(from, options.group_name);
+
+    return result;
+}
+
+std::vector<GroupDeleteRule> parse_group_delete_rules(const nlohmann::json& data)
+{
+    std::vector<GroupDeleteRule> rules;
+    nlohmann::json array = nlohmann::json::array();
+
+    if (data.contains("deletions")) {
+        if (data["deletions"].is_array())
+            array = data["deletions"];
+        else if (data["deletions"].is_string()) {
+            try {
+                array = nlohmann::json::parse(data["deletions"].get<std::string>());
+            } catch (...) {
+                array = nlohmann::json::array();
+            }
+        }
+    }
+
+    if (array.is_array()) {
+        for (const auto& item : array) {
+            if (!item.is_object())
+                continue;
+            GroupDeleteRule rule;
+            if (item.contains("enabled")) {
+                if (item["enabled"].is_boolean())
+                    rule.enabled = item["enabled"].get<bool>();
+                else if (item["enabled"].is_string())
+                    rule.enabled = item["enabled"].get<std::string>() == "true";
+            }
+            rule.group_type = item.value("groupType", std::string("any"));
+            rule.group_names = item.value("groupNames", std::string(""));
+            rules.push_back(rule);
+        }
+    }
+
+    if (rules.empty()) {
+        GroupDeleteRule rule;
+        rule.enabled = true;
+        rule.group_type = "any";
+        rule.group_names = data.value("groupNames", std::string(""));
+        rules.push_back(rule);
+    }
+    return rules;
+}
+
+data::PcgGeometry group_delete(const data::PcgGeometry& input, const GroupDeleteOptions& options)
+{
+    data::PcgGeometry result = input;
+
+    for (const GroupDeleteRule& rule : options.rules) {
+        if (!rule.enabled)
+            continue;
+
+        const auto patterns = split_group_name_tokens(rule.group_names);
+        if (patterns.empty())
+            continue;
+
+        for (const geometry::GroupDomain domain : domains_for_group_delete_type(rule.group_type)) {
+            for (const std::string& name : result.groups().group_names(domain)) {
+                if (group_name_matches_patterns(name, patterns))
+                    result.groups().clear_group(domain, name);
+            }
+        }
+    }
+
+    if (options.delete_unused_groups)
+        remove_empty_groups(result);
 
     return result;
 }

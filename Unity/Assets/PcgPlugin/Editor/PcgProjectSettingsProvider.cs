@@ -15,6 +15,7 @@ namespace DJTechEditor.PCG
                 guiHandler = _ =>
                 {
                     var logging = PcgProjectSettings.IsLogEnabled;
+                    var serverUrl = PcgCookClient.BaseUrl;
 
                     EditorGUILayout.Space();
                     EditorGUI.BeginChangeCheck();
@@ -23,11 +24,23 @@ namespace DJTechEditor.PCG
                         PcgProjectSettings.SetLogging(logging);
 
                     EditorGUILayout.Space();
+                    EditorGUILayout.LabelField("Cook Backend", PcgCookBackend.DescribeBackend());
+                    EditorGUI.BeginChangeCheck();
+                    serverUrl = EditorGUILayout.TextField("Cook Server URL", serverUrl);
+                    if (EditorGUI.EndChangeCheck())
+                        PcgCookClient.BaseUrl = serverUrl;
+
+                    if (GUILayout.Button("Health Check"))
+                        PcgServerMenu.HealthCheck();
+
+                    EditorGUILayout.Space();
                     EditorGUILayout.HelpBox(
-                        "When enabled, PCG graph execution results will be logged to the Console.",
+                        "All C++ cook/FBX work runs in localhost pcg-server. " +
+                        "Unity no longer loads PcgCore / PcgFbxExporter native plugins. " +
+                        "Start the server with scripts/run-pcg-server.sh before cooking.",
                         MessageType.Info);
                 },
-                keywords = new[] { "PCG", "logging", "debug" },
+                keywords = new[] { "PCG", "logging", "debug", "server", "backend", "cook" },
             };
 
             return provider;

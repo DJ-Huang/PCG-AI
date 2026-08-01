@@ -137,6 +137,42 @@ public:
     }
 };
 
+class TransformByAttributeElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "TransformByAttribute"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformByAttribute missing node");
+
+        TransformByAttributeOptions options;
+        options.group = ctx.node->data.value("group", "");
+        options.group_type = ctx.node->data.value("groupType", "guess");
+        options.transform_attribute = ctx.node->data.value("transformAttribute", "xform");
+        options.invert_transform = ctx.node->data.value("invertTransform", false);
+        options.attributes = ctx.node->data.value("attributes", "*");
+        options.recompute_affected_normals =
+            ctx.node->data.value("recomputeAffectedNormals", true);
+        options.preserve_normal_length = ctx.node->data.value("preserveNormalLength", true);
+        options.delete_transform_attribute =
+            ctx.node->data.value("deleteTransformAttribute", true);
+
+        const data::PcgGeometry input =
+            get_geometry_input(ctx, "in", "TransformByAttribute missing mesh input");
+        if (input.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TransformByAttribute missing mesh input");
+
+        data::PcgGeometry output;
+        std::string error;
+        if (!transform_by_attribute_geometry(input, options, output, error))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+
+        emit_geometry(ctx, std::move(output));
+        return PCG_OK;
+    }
+};
+
 class MergeMeshElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "MergeMesh"; }
@@ -250,6 +286,7 @@ void register_spline_mesh_elements(std::unordered_map<std::string, std::unique_p
     map.emplace("SweepAlongSpline", std::make_unique<SweepAlongSplineElement>());
     map.emplace("ExtrudeAlongSpline", std::make_unique<ExtrudeAlongSplineElement>());
     map.emplace("TransformMesh", std::make_unique<TransformMeshElement>());
+    map.emplace("TransformByAttribute", std::make_unique<TransformByAttributeElement>());
     map.emplace("MergeMesh", std::make_unique<MergeMeshElement>());
     map.emplace("CrossSectionProfile", std::make_unique<CrossSectionProfileElement>());
     map.emplace("InstanceAlongSpline", std::make_unique<InstanceAlongSplineElement>());

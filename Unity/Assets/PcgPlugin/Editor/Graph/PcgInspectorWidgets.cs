@@ -20,7 +20,8 @@ namespace DJTechEditor.PCG.Graph
             Action onDragBegin = null,
             Action onDragEnd = null,
             Action<float> onFieldCommit = null,
-            bool readOnly = false)
+            bool readOnly = false,
+            bool numericFirst = false)
         {
             onFieldCommit ??= onSliderChange;
             var container = new VisualElement();
@@ -70,8 +71,18 @@ namespace DJTechEditor.PCG.Graph
                     onFieldCommit(v);
                 });
 
-                row.Add(slider);
-                row.Add(intField);
+                if (numericFirst)
+                {
+                    intField.style.marginLeft = 0;
+                    intField.style.marginRight = 4;
+                    row.Add(intField);
+                    row.Add(slider);
+                }
+                else
+                {
+                    row.Add(slider);
+                    row.Add(intField);
+                }
             }
             else
             {
@@ -95,8 +106,18 @@ namespace DJTechEditor.PCG.Graph
                     onFieldCommit(v);
                 });
 
-                row.Add(slider);
-                row.Add(floatField);
+                if (numericFirst)
+                {
+                    floatField.style.marginLeft = 0;
+                    floatField.style.marginRight = 4;
+                    row.Add(floatField);
+                    row.Add(slider);
+                }
+                else
+                {
+                    row.Add(slider);
+                    row.Add(floatField);
+                }
             }
 
             container.Add(row);

@@ -6,7 +6,8 @@ COPY_TO_UNITY=false
 RUN_TESTS=false
 
 usage() {
-    echo "Usage: $0 [--config Debug|Release] [--copy-to-unity] [--run-tests]"
+    echo "Usage: $0 [--config Debug|Release] [--run-tests]"
+    echo "  --copy-to-unity  DEPRECATED (ignored): FBX export is in pcg-server"
     exit 1
 }
 
@@ -42,10 +43,7 @@ else
 fi
 
 if $COPY_TO_UNITY; then
-    mkdir -p "$UNITY_PLUGINS"
-    cp -f "$LIBRARY" "$UNITY_PLUGINS/libPcgFbxExporter.dylib"
-    xattr -cr "$UNITY_PLUGINS/libPcgFbxExporter.dylib" 2>/dev/null || true
-    codesign --force --sign - "$UNITY_PLUGINS/libPcgFbxExporter.dylib"
+    echo "WARN: --copy-to-unity is deprecated and ignored. FBX export runs in pcg-server."
 fi
 
 echo "Built $LIBRARY"

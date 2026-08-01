@@ -1,12 +1,18 @@
 #include "pcg_api.h"
 
 #include "data/pcg_mesh_binary.hpp"
+#include "data/pcg_spline_data.hpp"
 #include "elements/spline_algorithms.hpp"
 #include "elements/mesh_algorithms.hpp"
 #include "geometry/spline_geometry.hpp"
 
+#include <nlohmann/json.hpp>
+
+#include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -65,6 +71,278 @@ PcgResultCode execute_mesh_graph(const char* json, int seed, int& vertex_count, 
     if (rc != PCG_OK)
         std::printf("execute error: %s\n", err);
     return rc;
+}
+
+bool nearly_equal(double a, double b, double tol = 1e-9)
+{
+    return std::fabs(a - b) <= tol;
+}
+
+bool splines_match(const pcg::internal::data::PcgSplineData& actual,
+                   const nlohmann::json& expected,
+                   const char* label)
+{
+    if (!expected.contains("splines") || !expected["splines"].is_array()) {
+        std::printf("FAIL: %s expected.splines missing\n", label);
+        return false;
+    }
+    const auto& expected_splines = expected["splines"];
+    if (actual.splines().size() != expected_splines.size()) {
+        std::printf("FAIL: %s spline count %zu != %zu\n", label, actual.splines().size(),
+                    expected_splines.size());
+        return false;
+    }
+    for (size_t i = 0; i < actual.splines().size(); ++i) {
+        const auto& spline = actual.splines()[i];
+        const auto& exp = expected_splines[i];
+        if (spline.closed != exp.value("closed", false)) {
+            std::printf("FAIL: %s spline[%zu] closed mismatch\n", label, i);
+            return false;
+        }
+        if (exp.contains("attributes") && !spline.attributes.empty()) {
+            if (spline.attributes != exp["attributes"]) {
+                std::printf("FAIL: %s spline[%zu] attributes mismatch\n", label, i);
+                return false;
+            }
+        }
+        if (!exp.contains("points") || !exp["points"].is_array() ||
+            spline.points.size() != exp["points"].size()) {
+            std::printf("FAIL: %s spline[%zu] point count %zu\n", label, i, spline.points.size());
+            return false;
+        }
+        for (size_t p = 0; p < spline.points.size(); ++p) {
+            const auto& pt = spline.points[p];
+            const auto& ept = exp["points"][p];
+            if (!nearly_equal(pt.x, ept.value("x", 0.0)) ||
+                !nearly_equal(pt.y, ept.value("y", 0.0)) ||
+                !nearly_equal(pt.z, ept.value("z", 0.0))) {
+                std::printf("FAIL: %s spline[%zu] point[%zu] got (%.17g,%.17g,%.17g)\n", label, i, p,
+                            pt.x, pt.y, pt.z);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool run_condition_outline_golden()
+{
+    using namespace pcg::internal::elements;
+    using namespace pcg::internal::data;
+
+    std::ifstream in("fixtures/condition-outline-golden.json");
+    if (!in) {
+        std::printf("FAIL: cannot open fixtures/condition-outline-golden.json\n");
+        return false;
+    }
+    nlohmann::json root;
+    in >> root;
+    if (!root.contains("cases") || !root["cases"].is_array()) {
+        std::printf("FAIL: golden cases missing\n");
+        return false;
+    }
+
+    for (const auto& test_case : root["cases"]) {
+        const std::string id = test_case.value("id", std::string("case"));
+        ConditionOutlineOptions opts;
+        opts.win = test_case.value("win", 1);
+        opts.eps = test_case.value("eps", 0.0);
+        if (test_case.contains("protectSpans") && test_case["protectSpans"].is_array()) {
+            for (const auto& item : test_case["protectSpans"]) {
+                ProtectSpan span;
+                span.start = item.value("start", 0);
+                span.end = item.value("end", 0);
+                opts.protect_spans.push_back(span);
+            }
+        }
+        const PcgSplineData input = PcgSplineData::from_json(test_case["input"]);
+        std::string error;
+        const PcgSplineData actual = condition_outline_data(input, opts, &error);
+        if (!error.empty()) {
+            std::printf("FAIL: %s unexpected error: %s\n", id.c_str(), error.c_str());
+            return false;
+        }
+        if (!splines_match(actual, test_case["expected"], id.c_str()))
+            return false;
+
+        // AC1: protected input coordinates remain bit-identical after conditioning.
+        if (!opts.protect_spans.empty() && !input.splines().empty()) {
+            const auto& src = input.splines().front();
+            const auto& dst = actual.splines().front();
+            std::vector<char> mask(src.points.size(), 0);
+            for (const auto& span : opts.protect_spans) {
+                if (span.start <= span.end) {
+                    for (int i = span.start; i <= span.end; ++i)
+                        mask[static_cast<size_t>(i)] = 1;
+                } else {
+                    for (int i = span.start; i < static_cast<int>(src.points.size()); ++i)
+                        mask[static_cast<size_t>(i)] = 1;
+                    for (int i = 0; i <= span.end; ++i)
+                        mask[static_cast<size_t>(i)] = 1;
+                }
+            }
+            size_t dst_i = 0;
+            for (size_t i = 0; i < src.points.size(); ++i) {
+                if (!mask[i])
+                    continue;
+                bool found = false;
+                for (; dst_i < dst.points.size(); ++dst_i) {
+                    if (nearly_equal(dst.points[dst_i].x, src.points[i].x) &&
+                        nearly_equal(dst.points[dst_i].y, src.points[i].y) &&
+                        nearly_equal(dst.points[dst_i].z, src.points[i].z)) {
+                        found = true;
+                        ++dst_i;
+                        break;
+                    }
+                }
+                if (!found && src.closed && i + 1 == src.points.size() &&
+                    !dst.points.empty() &&
+                    nearly_equal(dst.points.front().x, src.points[i].x) &&
+                    nearly_equal(dst.points.front().y, src.points[i].y) &&
+                    nearly_equal(dst.points.front().z, src.points[i].z)) {
+                    // Active conditioning canonicalizes an explicit closing duplicate
+                    // to the logical first point while retaining closed=true.
+                    found = true;
+                }
+                if (!found) {
+                    std::printf("FAIL: %s protected input point %zu missing in output\n", id.c_str(),
+                                i);
+                    return false;
+                }
+            }
+            if (src.closed != dst.closed) {
+                std::printf("FAIL: %s closed flag changed\n", id.c_str());
+                return false;
+            }
+        }
+        std::printf("PASS: condition_outline golden %s\n", id.c_str());
+    }
+
+    // Illegal parameter coverage (AC2).
+    {
+        PcgSpline open;
+        open.closed = false;
+        open.points = {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}};
+        PcgSplineData input;
+        input.add_spline(open);
+
+        ConditionOutlineOptions bad_win;
+        bad_win.win = 2;
+        std::string error;
+        condition_outline_data(input, bad_win, &error);
+        if (error.find("odd") == std::string::npos) {
+            std::printf("FAIL: even win should error\n");
+            return false;
+        }
+
+        ConditionOutlineOptions bad_eps;
+        bad_eps.eps = std::numeric_limits<double>::quiet_NaN();
+        error.clear();
+        condition_outline_data(input, bad_eps, &error);
+        if (error.find("eps") == std::string::npos) {
+            std::printf("FAIL: non-finite eps should error\n");
+            return false;
+        }
+
+        ConditionOutlineOptions bad_span;
+        bad_span.protect_spans.push_back({0, 99});
+        error.clear();
+        condition_outline_data(input, bad_span, &error);
+        if (error.find("out of range") == std::string::npos) {
+            std::printf("FAIL: OOB protectSpans should error\n");
+            return false;
+        }
+
+        ConditionOutlineOptions seam_on_open;
+        seam_on_open.protect_spans.push_back({3, 0});
+        error.clear();
+        condition_outline_data(input, seam_on_open, &error);
+        if (error.find("closed") == std::string::npos) {
+            std::printf("FAIL: cross-seam on open should error\n");
+            return false;
+        }
+        std::printf("PASS: condition_outline illegal parameter errors\n");
+    }
+
+    return true;
+}
+
+bool run_condition_outline_graph()
+{
+    using namespace pcg::internal::data;
+
+    // CMake add_test WORKING_DIRECTORY = ${CMAKE_CURRENT_SOURCE_DIR}/tests (= pcg-core/tests).
+    const char* candidates[] = {
+        "../../examples/Test/test-condition-outline.pcg",
+        "../examples/Test/test-condition-outline.pcg",
+        "examples/Test/test-condition-outline.pcg",
+    };
+    std::ifstream gin;
+    std::string graph_path;
+    for (const char* path : candidates) {
+        gin.open(path);
+        if (gin) {
+            graph_path = path;
+            break;
+        }
+        gin.clear();
+    }
+    if (!gin) {
+        std::printf("FAIL: cannot open test-condition-outline.pcg\n");
+        return false;
+    }
+    std::string graph((std::istreambuf_iterator<char>(gin)), std::istreambuf_iterator<char>());
+
+    std::vector<char> json_out(1 << 20);
+    int kind = 0;
+    int vertex_count = 0;
+    int index_count = 0;
+    char err[512] = {};
+    const PcgResultCode rc = pcg_execute_graph_v7(
+        graph.c_str(), 42, nullptr, 0, nullptr, 0, nullptr, 0, &kind, json_out.data(),
+        static_cast<int>(json_out.size()), nullptr, 0, nullptr, 0, nullptr, nullptr, &vertex_count,
+        &index_count, nullptr, nullptr, 0, err, sizeof(err));
+    if (rc != PCG_OK) {
+        std::printf("FAIL: condition outline graph cook (%s): %s\n", graph_path.c_str(), err);
+        return false;
+    }
+    if (kind != PCG_RESULT_KIND_JSON) {
+        std::printf("FAIL: condition outline graph kind=%d expected JSON\n", kind);
+        return false;
+    }
+    const auto payload = nlohmann::json::parse(json_out.data());
+    if (!payload.contains("splines") || !payload["splines"].is_array() ||
+        payload["splines"].empty()) {
+        std::printf("FAIL: condition outline graph JSON missing splines\n");
+        return false;
+    }
+
+    std::ifstream golden_in("fixtures/condition-outline-golden.json");
+    if (!golden_in) {
+        std::printf("FAIL: cannot open condition-outline golden for graph comparison\n");
+        return false;
+    }
+    nlohmann::json golden_root;
+    golden_in >> golden_root;
+    nlohmann::json expected_case;
+    for (const auto& test_case : golden_root.value("cases", nlohmann::json::array())) {
+        if (test_case.value("id", std::string()) == "closed_duplicate_smooth") {
+            expected_case = test_case;
+            break;
+        }
+    }
+    if (!expected_case.is_object()) {
+        std::printf("FAIL: closed_duplicate_smooth golden case missing\n");
+        return false;
+    }
+
+    const PcgSplineData actual = PcgSplineData::from_json(payload);
+    if (!splines_match(actual, expected_case["expected"], "condition outline graph")) {
+        return false;
+    }
+    std::printf("PASS: condition outline graph matches golden (%s, %s)\n",
+                expected_case.value("id", std::string("case")).c_str(), graph_path.c_str());
+    return true;
 }
 
 } // namespace
@@ -370,6 +648,11 @@ int main()
     }
     std::printf("PASS: closed-backbone sweep is closed manifold (%zu verts, %zu tris)\n",
                 ring_mesh.vertices().size(), ring_mesh.triangles().size() / 3);
+
+    if (!run_condition_outline_golden())
+        return 1;
+    if (!run_condition_outline_graph())
+        return 1;
 
     std::printf("All phase45 spline tests passed.\n");
     return 0;

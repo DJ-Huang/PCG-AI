@@ -22,6 +22,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_ScatterPointMeshProp;
         private SerializedProperty m_ScatterDisplayModeProp;
         private SerializedProperty m_EnableAsyncCookInEditorProp;
+        private SerializedProperty m_PreferDiskGraphProp;
         private SerializedProperty m_ShowStampOverlaysProp;
         private SerializedProperty m_ShowMaskOverlayProp;
         private SerializedProperty m_MaskOverlayLayerProp;
@@ -44,6 +45,7 @@ namespace DJTechEditor.PCG
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
             m_ScatterDisplayModeProp = serializedObject.FindProperty("scatterDisplayMode");
             m_EnableAsyncCookInEditorProp = serializedObject.FindProperty("enableAsyncCookInEditor");
+            m_PreferDiskGraphProp = serializedObject.FindProperty("preferDiskGraph");
             m_ShowStampOverlaysProp = serializedObject.FindProperty("showStampOverlays");
             m_ShowMaskOverlayProp = serializedObject.FindProperty("showMaskOverlay");
             m_MaskOverlayLayerProp = serializedObject.FindProperty("maskOverlayLayer");
@@ -94,6 +96,16 @@ namespace DJTechEditor.PCG
                 EditorGUILayout.PropertyField(
                     m_EnableAsyncCookInEditorProp,
                     new GUIContent("Async Cook In Editor", "Run cook in background thread; Esc cancels current cook."));
+                if (m_PreferDiskGraphProp != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        m_PreferDiskGraphProp,
+                        new GUIContent(
+                            "Prefer Disk Graph",
+                            "Full-graph cook uses the saved on-disk .pcg even if Graph Editor is open (Agent/MCP reviews). " +
+                            "Turn off while authoring so Inspector/Graph edits recook. " +
+                            "Node Preview always uses the live Graph Editor document."));
+                }
             }
             if (m_ShowStampOverlaysProp != null)
             {
@@ -175,7 +187,7 @@ namespace DJTechEditor.PCG
                 if (GUILayout.Button("Run", GUILayout.Height(28)))
                 {
                     serializedObject.ApplyModifiedProperties();
-                    PcgNative.ClearCookCache();
+                    PcgCookBackend.ClearCookCache();
                     m_Target.Run();
                     serializedObject.Update();
                 }

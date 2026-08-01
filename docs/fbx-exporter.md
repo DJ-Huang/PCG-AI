@@ -76,19 +76,18 @@ intentionally rejects non-polygon results instead of silently inventing a mesh.
 
 ## Build and verification
 
-macOS:
+FBX export runs inside `pcg-server`（`POST /v1/export-fbx`）。Unity 不再加载 `PcgFbxExporter` dylib/dll。
 
-```sh
-./scripts/build-pcg-fbx-exporter.sh --run-tests --copy-to-unity
+```bash
+./scripts/build-pcg-server.sh
+./scripts/run-pcg-server.sh
 ```
 
-Windows:
+Standalone FBX unit tests（optional，与 Unity 无关）：
 
-```powershell
-./scripts/build-pcg-fbx-exporter.ps1 -RunTests -CopyToUnity
+```bash
+./scripts/build-pcg-fbx-exporter.sh --run-tests
 ```
 
-The shipping build compiles Assimp exporter-only. A separate test configuration
-can enable `PCG_FBX_ENABLE_READBACK_TESTS=ON`; it enables the FBX importer only
-for tests and verifies n-gon, UV, vertex-color, material, and unit metadata after
-an export/import round trip.
+The shipping Assimp build is exporter-oriented. A separate test configuration can
+enable `PCG_FBX_ENABLE_READBACK_TESTS=ON` for export/import round trips.

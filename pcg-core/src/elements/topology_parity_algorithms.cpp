@@ -2081,54 +2081,102 @@ void append_carved_spline(data::PcgSplineData& output,
     output.add_spline(std::move(carved));
 }
 
+// Effective First/Second U after toggles, per-spline attribute scaling and clamping.
+// u_min/u_max are the scaled cut positions (unswapped); [u0, u1] is the ordered range.
+struct CarveURange {
+    double u_min;
+    double u_max;
+    double u0;
+    double u1;
+};
+
+CarveURange carve_u_range(const data::PcgSpline& spline,
+                          const CarveSplineOptions& options)
+{
+    double u_min = options.use_first_u ? options.u_start : 0.0;
+    double u_max = options.use_second_u ? options.u_end : 1.0;
+    double scale = 1.0;
+    if (options.use_first_u && !options.u_start_attrib.empty() &&
+        read_spline_numeric_attr(spline.attributes, options.u_start_attrib, 0, scale))
+        u_min *= scale;
+    if (options.use_second_u && !options.u_end_attrib.empty() &&
+        read_spline_numeric_attr(spline.attributes, options.u_end_attrib, 0, scale))
+        u_max *= scale;
+    u_min = std::clamp(u_min, 0.0, 1.0);
+    u_max = std::clamp(u_max, 0.0, 1.0);
+    return {u_min, u_max, std::min(u_min, u_max), std::max(u_min, u_max)};
+}
+
+// Houdini carve locations inside [u0, u1]: First/Second U plus division or
+// internal-breakpoint cuts. Endpoints 0/1 are NOT included (caller adds them for Cut).
+std::vector<double> collect_carve_locations(const CarveSplineOptions& options,
+                                            const std::vector<double>& vertex_u,
+                                            const CarveURange& range)
+{
+    const double u0 = range.u0;
+    const double u1 = range.u1;
+    std::vector<double> cuts;
+    if (options.use_first_u)
+        cuts.push_back(range.u_min);
+    if (options.use_second_u)
+        cuts.push_back(range.u_max);
+    if (options.location != "divisions") {
+        if (options.cut_at_all_internal_u_breakpoints) {
+            for (size_t i = 1; i + 1 < vertex_u.size(); ++i) {
+                const double u = vertex_u[i];
+                if (u > u0 + kEps && u < u1 - kEps)
+                    cuts.push_back(u);
+            }
+        }
+    } else {
+        const int divisions = std::max(1, options.u_divisions);
+        for (int d = 1; d < divisions; ++d)
+            cuts.push_back(u0 + (u1 - u0) * static_cast<double>(d) /
+                                      static_cast<double>(divisions));
+    }
+
+    std::sort(cuts.begin(), cuts.end());
+    cuts.erase(std::unique(cuts.begin(), cuts.end(),
+                           [](double a, double b) { return std::abs(a - b) <= kEps; }),
+               cuts.end());
+
+    if (options.only_at_breakpoints) {
+        std::vector<double> snapped;
+        for (const double u : cuts) {
+            const bool on_vertex = std::any_of(vertex_u.begin(), vertex_u.end(),
+                                               [&](double v) { return std::abs(v - u) <= kEps; });
+            if (on_vertex)
+                snapped.push_back(u);
+        }
+        cuts = std::move(snapped);
+    }
+    return cuts;
+}
+
 data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                                       const CarveSplineOptions& options)
 {
     data::PcgSplineData output;
-    const double u_min_raw = options.use_first_u ? std::clamp(options.u_start, 0.0, 1.0) : 0.0;
-    const double u_max_raw =
-        options.use_second_u ? std::clamp(options.u_end, 0.0, 1.0) : 1.0;
-    const double u0 = std::min(u_min_raw, u_max_raw);
-    const double u1 = std::max(u_min_raw, u_max_raw);
     const bool keep_inside = options.keep_inside;
     const bool keep_outside = options.keep_outside;
     if (!keep_inside && !keep_outside)
         return output;
 
-    const bool breakpoints = options.location != "divisions";
-
     for (const auto& spline : input.splines()) {
+        if (!spline_primitive_group_member(spline, options.group)) {
+            output.add_spline(spline);
+            continue;
+        }
         if (spline.points.size() < 2)
             continue;
 
         const std::vector<double> vertex_u =
             spline_vertex_u(spline, options.arc_length_u);
-        const size_t n = spline.points.size();
+        const CarveURange range = carve_u_range(spline, options);
+        const double u0 = range.u0;
+        const double u1 = range.u1;
 
-        std::vector<double> cuts;
-        if (breakpoints) {
-            if (options.use_first_u)
-                cuts.push_back(u_min_raw);
-            if (options.use_second_u)
-                cuts.push_back(u_max_raw);
-            if (options.cut_at_all_internal_u_breakpoints) {
-                for (size_t i = 1; i + 1 < n; ++i) {
-                    const double u = vertex_u[i];
-                    if (u > u0 + kEps && u < u1 - kEps)
-                        cuts.push_back(u);
-                }
-            }
-        } else {
-            if (options.use_first_u)
-                cuts.push_back(u_min_raw);
-            if (options.use_second_u)
-                cuts.push_back(u_max_raw);
-            const int divisions = std::max(1, options.u_divisions);
-            for (int d = 1; d < divisions; ++d)
-                cuts.push_back(u0 + (u1 - u0) * static_cast<double>(d) /
-                                          static_cast<double>(divisions));
-        }
-
+        std::vector<double> cuts = collect_carve_locations(options, vertex_u, range);
         cuts.push_back(0.0);
         cuts.push_back(1.0);
         std::sort(cuts.begin(), cuts.end());
@@ -2151,6 +2199,44 @@ data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                 continue;
             append_carved_spline(output, spline,
                                  build_carved_segment(spline, vertex_u, seg_u0, seg_u1));
+        }
+    }
+    return output;
+}
+
+data::PcgPointData carve_spline_extract_points(const data::PcgSplineData& input,
+                                               const CarveSplineOptions& options)
+{
+    data::PcgPointData output;
+    auto append_point = [&](const data::PcgSplinePoint& p, const nlohmann::json& attributes) {
+        data::PcgPoint point;
+        point.x = p.x;
+        point.y = p.y;
+        point.z = p.z;
+        point.attributes = attributes;
+        output.add_point(point);
+    };
+
+    for (const auto& spline : input.splines()) {
+        if (!spline_primitive_group_member(spline, options.group)) {
+            // Non-grouped splines pass through as their vertices in the points stream.
+            for (const auto& p : spline.points)
+                append_point(p, spline.attributes);
+            continue;
+        }
+        if (spline.points.empty())
+            continue;
+
+        if (spline.points.size() >= 2) {
+            const std::vector<double> vertex_u =
+                spline_vertex_u(spline, options.arc_length_u);
+            const CarveURange range = carve_u_range(spline, options);
+            for (const double u : collect_carve_locations(options, vertex_u, range))
+                append_point(evaluate_spline_at_u(spline, vertex_u, u), spline.attributes);
+        }
+        if (options.keep_original) {
+            for (const auto& p : spline.points)
+                append_point(p, spline.attributes);
         }
     }
     return output;

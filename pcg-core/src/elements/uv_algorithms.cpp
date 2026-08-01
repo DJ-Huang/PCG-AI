@@ -124,7 +124,8 @@ void project_texture_uv(data::PcgMeshData& mesh,
                         const std::string& direction,
                         double scale_u, double scale_v,
                         double offset_u, double offset_v,
-                        double repeat_x, double repeat_y)
+                        double repeat_x, double repeat_y,
+                        const ProjectTextureCropBounds& crop)
 {
     const int vc = static_cast<int>(mesh.vertices().size());
     if (vc == 0)
@@ -137,15 +138,26 @@ void project_texture_uv(data::PcgMeshData& mesh,
 
     const auto& verts = mesh.vertices();
 
-    double min_a = get_coord(verts[0], ua);
-    double max_a = min_a;
-    double min_b = get_coord(verts[0], ub);
-    double max_b = min_b;
-    for (const auto& v : verts) {
-        min_a = std::min(min_a, get_coord(v, ua));
-        max_a = std::max(max_a, get_coord(v, ua));
-        min_b = std::min(min_b, get_coord(v, ub));
-        max_b = std::max(max_b, get_coord(v, ub));
+    double min_a = 0.0;
+    double max_a = 1.0;
+    double min_b = 0.0;
+    double max_b = 1.0;
+    if (crop.use_reference) {
+        min_a = crop.min_u;
+        max_a = crop.max_u;
+        min_b = crop.min_v;
+        max_b = crop.max_v;
+    } else {
+        min_a = get_coord(verts[0], ua);
+        max_a = min_a;
+        min_b = get_coord(verts[0], ub);
+        max_b = min_b;
+        for (const auto& v : verts) {
+            min_a = std::min(min_a, get_coord(v, ua));
+            max_a = std::max(max_a, get_coord(v, ua));
+            min_b = std::min(min_b, get_coord(v, ub));
+            max_b = std::max(max_b, get_coord(v, ub));
+        }
     }
     const double ext_a = max_a - min_a;
     const double ext_b = max_b - min_b;
@@ -154,8 +166,8 @@ void project_texture_uv(data::PcgMeshData& mesh,
     const double eff_u = scale_u * repeat_x;
     const double eff_v = scale_v * repeat_y;
     for (int i = 0; i < vc; ++i) {
-        double u = ext_a > kEps ? (get_coord(verts[i], ua) - min_a) / ext_a : 0.0;
-        double v = ext_b > kEps ? (get_coord(verts[i], ub) - min_b) / ext_b : 0.0;
+        double u = std::abs(ext_a) > kEps ? (get_coord(verts[i], ua) - min_a) / ext_a : 0.0;
+        double v = std::abs(ext_b) > kEps ? (get_coord(verts[i], ub) - min_b) / ext_b : 0.0;
         uvs[i] = {u * eff_u + offset_u, v * eff_v + offset_v};
     }
 
@@ -281,7 +293,8 @@ std::vector<data::PcgVec2> project_texture_uv_geometry(const data::PcgGeometry& 
                                                         const std::string& direction,
                                                         double scale_u, double scale_v,
                                                         double offset_u, double offset_v,
-                                                        double repeat_x, double repeat_y)
+                                                        double repeat_x, double repeat_y,
+                                                        const ProjectTextureCropBounds& crop)
 {
     const auto& pts = geometry.points();
     const int vc = static_cast<int>(pts.size());
@@ -293,15 +306,26 @@ std::vector<data::PcgVec2> project_texture_uv_geometry(const data::PcgGeometry& 
     else if (direction == "y") { ua = 0; ub = 2; }
     else                       { ua = 0; ub = 1; }
 
-    double min_a = get_coord_v3(pts[0], ua);
-    double max_a = min_a;
-    double min_b = get_coord_v3(pts[0], ub);
-    double max_b = min_b;
-    for (const auto& p : pts) {
-        min_a = std::min(min_a, get_coord_v3(p, ua));
-        max_a = std::max(max_a, get_coord_v3(p, ua));
-        min_b = std::min(min_b, get_coord_v3(p, ub));
-        max_b = std::max(max_b, get_coord_v3(p, ub));
+    double min_a = 0.0;
+    double max_a = 1.0;
+    double min_b = 0.0;
+    double max_b = 1.0;
+    if (crop.use_reference) {
+        min_a = crop.min_u;
+        max_a = crop.max_u;
+        min_b = crop.min_v;
+        max_b = crop.max_v;
+    } else {
+        min_a = get_coord_v3(pts[0], ua);
+        max_a = min_a;
+        min_b = get_coord_v3(pts[0], ub);
+        max_b = min_b;
+        for (const auto& p : pts) {
+            min_a = std::min(min_a, get_coord_v3(p, ua));
+            max_a = std::max(max_a, get_coord_v3(p, ua));
+            min_b = std::min(min_b, get_coord_v3(p, ub));
+            max_b = std::max(max_b, get_coord_v3(p, ub));
+        }
     }
     const double ext_a = max_a - min_a;
     const double ext_b = max_b - min_b;
@@ -310,8 +334,12 @@ std::vector<data::PcgVec2> project_texture_uv_geometry(const data::PcgGeometry& 
     const double eff_u = scale_u * repeat_x;
     const double eff_v = scale_v * repeat_y;
     for (int i = 0; i < vc; ++i) {
-        double u = ext_a > kEps ? (get_coord_v3(pts[static_cast<size_t>(i)], ua) - min_a) / ext_a : 0.0;
-        double v = ext_b > kEps ? (get_coord_v3(pts[static_cast<size_t>(i)], ub) - min_b) / ext_b : 0.0;
+        double u = std::abs(ext_a) > kEps
+            ? (get_coord_v3(pts[static_cast<size_t>(i)], ua) - min_a) / ext_a
+            : 0.0;
+        double v = std::abs(ext_b) > kEps
+            ? (get_coord_v3(pts[static_cast<size_t>(i)], ub) - min_b) / ext_b
+            : 0.0;
         uvs[static_cast<size_t>(i)] = {u * eff_u + offset_u, v * eff_v + offset_v};
     }
 

@@ -122,18 +122,16 @@ async function sendToUnity(graph) {
 
 ### 4.2 构建脚本
 
-`scripts/build-pcg-core.ps1`（证据：E-053）：
+```bash
+# Unity 联调：重建并启动 HTTP 后端（不要 copy dylib 到 Unity）
+./scripts/build-pcg-server.sh
+./scripts/run-pcg-server.sh
 
-```powershell
-# 一键构建 + 拷贝 + 测试
-.\scripts\build-pcg-core.ps1 -CopyToUnity -RunTests
+# 仅算法回归
+./scripts/build-pcg-core.sh --run-tests
 ```
 
-参数：
-- `-CopyToUnity`：自动复制 DLL 到 `Plugins/x86_64/`
-- `-RunTests`：构建后运行 ctest
-
-macOS 对应 `scripts/build-pcg-core.sh`。
+`--copy-to-unity` / `-CopyToUnity` 已废弃（Unity 不再加载 native plugin）。
 
 ### 4.3 CTest 测试
 
@@ -192,18 +190,17 @@ macOS 对应 `scripts/build-pcg-core.sh`。
 | Mesh 黑色 | normals 缺失 | 检查 binary flags | 确认 normal 生成 |
 | Boolean 崩溃 | 非流形输入 | 检查输入网格 | 焊接顶点 |
 
-### 5.3 IL2CPP 发布验证
+### 5.3 发布验证
 
-发布前检查（证据：E-047, E-054）：
+```bash
+./scripts/build-pcg-server.sh
+./scripts/run-pcg-server.sh
+# Editor：PCG → Server → Health Check 后 cook
+```
+
+Player 本期不链入 `PcgCore`。可选：
 
 ```powershell
-# 1. 构建并确保 lib 就绪
-.\scripts\build-pcg-core.ps1 -CopyToUnity -RunTests
-
-# 2. Unity Build Settings → Windows → IL2CPP → x86_64
-# 3. 构建 Player
-
-# 4. 验证产物
 .\scripts\verify-release-package.ps1 -PlayerBuildPath "Build\Windows"
 ```
 

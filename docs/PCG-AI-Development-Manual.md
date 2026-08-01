@@ -799,15 +799,11 @@ PcgSceneEditContext (单一 mode 真源，定义在 PcgGraphView 上)
 - Scene View selection lock 三层防护：`AddDefaultControl` + `Selection.selectionChanged` + `Tools.current = None`
 - 多窗口隔离：所有 Scene 逻辑带活动 graph/window token
 
-### 8.6 IL2CPP 发布
+### 8.6 Cook 后端（无 Unity native plugin）
 
-| 模式 | 原生产物 | PluginImporter |
-|------|----------|----------------|
-| Unity Editor (Win64) | `PcgCore.dll` | Editor: 开，Standalone: 关 |
-| Unity Editor (macOS) | `libPcgCore.dylib` | Editor ARM64: 开 |
-| IL2CPP Player | `PcgCore.lib` | Standalone Win64: 开 |
+Unity Editor 通过 localhost `pcg-server` 执行 C++（HTTP）。**不要**再把 `PcgCore` / `PcgFbxExporter` copy 到 `Plugins/`。
 
-`PcgIl2CppBuildProcessor` 在 IL2CPP 构建时将 `.lib` 链入 `GameAssembly.dll`。
+见 `docs/pcg-server.md`。Player 本期不链入 `PcgCore.lib`。
 
 ---
 
@@ -815,27 +811,24 @@ PcgSceneEditContext (单一 mode 真源，定义在 PcgGraphView 上)
 
 ### 9.1 构建
 
-#### Windows (x64)
+```bash
+# Cook 后端（Unity 联调必需）
+./scripts/build-pcg-server.sh
+./scripts/run-pcg-server.sh
 
-```powershell
-# 推荐：一键构建 + 拷贝 + 测试
-.\scripts\build-pcg-core.ps1 -CopyToUnity -RunTests
-
-# 手动 CMake
-cd pcg-core
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+# 仅 pcg-core 算法测试（不 copy 到 Unity）
+./scripts/build-pcg-core.sh --run-tests
 ```
 
-#### macOS (Apple Silicon)
-
-```bash
-./scripts/build-pcg-core.sh --copy-to-unity --run-tests
+```powershell
+.\scripts\build-pcg-server.ps1 -Run
+.\scripts\build-pcg-core.ps1 -RunTests
 ```
 
 ### 9.2 测试
 
-#### CTest 矩阵（22 targets）
+#### CTest 矩阵
+
 
 | Target | 阶段 | 类型 | 覆盖内容 |
 |--------|------|------|----------|

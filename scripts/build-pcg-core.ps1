@@ -1,4 +1,5 @@
-# Build pcg-core (DLL + LIB) and optionally copy artifacts into Unity Plugins.
+# Build pcg-core (DLL + LIB). Unity no longer loads these plugins;
+# use scripts/build-pcg-server.ps1 for Editor cook.
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
@@ -55,22 +56,7 @@ Write-Host "==> Artifacts:"
 Get-Item $Dll, $Lib | Format-Table Name, Length, LastWriteTime
 
 if ($CopyToUnity) {
-    if (-not (Test-Path $UnityPlugins)) {
-        New-Item -ItemType Directory -Path $UnityPlugins -Force | Out-Null
-    }
-
-    foreach ($src in @($Dll, $Lib)) {
-        $dest = Join-Path $UnityPlugins (Split-Path $src -Leaf)
-        try {
-            Copy-Item -Path $src -Destination $dest -Force
-            Write-Host "Copied -> $dest"
-        }
-        catch {
-            $pending = "$dest.new"
-            Copy-Item -Path $src -Destination $pending -Force
-            Write-Warning "Unity may have locked $($dest.Name); wrote $pending instead."
-        }
-    }
+    Write-Warning "-CopyToUnity is deprecated and ignored. Unity uses pcg-server (HTTP), not Plugins DLL. Run scripts/build-pcg-server.ps1 instead."
 }
 
 Write-Host "Done."

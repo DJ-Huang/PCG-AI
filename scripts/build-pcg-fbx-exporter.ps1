@@ -28,8 +28,7 @@ if (-not (Test-Path $Library)) {
 }
 
 if ($CopyToUnity) {
-    New-Item -ItemType Directory -Force -Path $UnityPlugins | Out-Null
-    Copy-Item -Force $Library (Join-Path $UnityPlugins "PcgFbxExporter.dll")
+    Write-Warning "-CopyToUnity is deprecated and ignored. FBX export runs in pcg-server."
 }
 
 Write-Host "Built $Library"

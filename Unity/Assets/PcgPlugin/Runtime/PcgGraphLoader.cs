@@ -107,7 +107,7 @@ namespace DJTechRuntime.PCG
 
             // ExecuteGraph parses and validates the same document. A separate native
             // validation call doubled JSON parsing on every cook without adding safety.
-            var (execCode, result) = PcgNative.ExecuteGraph(
+            var (execCode, result) = PcgCookBackend.ExecuteGraph(
                 json, seed, textures, meshes, splines, heightfields);
             if (execCode != PcgResultCode.Ok)
             {

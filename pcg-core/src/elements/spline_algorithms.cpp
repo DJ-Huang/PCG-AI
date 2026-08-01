@@ -5,8 +5,10 @@
 #include "geometry/spline_geometry.hpp"
 #include "geometry/sweep_geometry.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace pcg::internal::elements {
 namespace {
@@ -210,6 +212,300 @@ data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options
     }
 
     out.add_spline(std::move(spline));
+    return out;
+}
+
+namespace {
+
+void set_error(std::string* error, const char* message)
+{
+    if (error)
+        *error = message;
+}
+
+bool is_finite_number(double value)
+{
+    return std::isfinite(value);
+}
+
+double point_to_segment_distance(const geometry::Vec3& p,
+                                 const geometry::Vec3& a,
+                                 const geometry::Vec3& b)
+{
+    const geometry::Vec3 ab = geometry::sub(b, a);
+    const geometry::Vec3 ap = geometry::sub(p, a);
+    const double ab2 = geometry::dot(ab, ab);
+    if (ab2 <= 1e-30)
+        return geometry::length(ap);
+    double t = geometry::dot(ap, ab) / ab2;
+    if (t < 0.0)
+        t = 0.0;
+    else if (t > 1.0)
+        t = 1.0;
+    const geometry::Vec3 q = geometry::add(a, geometry::scale(ab, t));
+    return geometry::length(geometry::sub(p, q));
+}
+
+bool mark_protect_mask(const data::PcgSpline& spline,
+                       const std::vector<ProtectSpan>& spans,
+                       std::vector<char>& protected_mask,
+                       std::string* error)
+{
+    const int n = static_cast<int>(spline.points.size());
+    protected_mask.assign(static_cast<size_t>(n), 0);
+    for (const ProtectSpan& span : spans) {
+        if (span.start < 0 || span.end < 0 || span.start >= n || span.end >= n) {
+            set_error(error, "ConditionOutline protectSpans index out of range");
+            return false;
+        }
+        if (span.start <= span.end) {
+            for (int i = span.start; i <= span.end; ++i)
+                protected_mask[static_cast<size_t>(i)] = 1;
+        } else {
+            if (!spline.closed) {
+                set_error(error, "ConditionOutline cross-seam protectSpans requires closed spline");
+                return false;
+            }
+            for (int i = span.start; i < n; ++i)
+                protected_mask[static_cast<size_t>(i)] = 1;
+            for (int i = 0; i <= span.end; ++i)
+                protected_mask[static_cast<size_t>(i)] = 1;
+        }
+    }
+    return true;
+}
+
+bool has_explicit_close_duplicate(const data::PcgSpline& spline)
+{
+    if (!spline.closed || spline.points.size() < 2)
+        return false;
+
+    const auto& first = spline.points.front();
+    const auto& last = spline.points.back();
+    return geometry::length(
+               geometry::sub(geometry::Vec3{first.x, first.y, first.z},
+                              geometry::Vec3{last.x, last.y, last.z})) <= 1e-9;
+}
+
+std::vector<geometry::Vec3> smooth_polyline(const std::vector<geometry::Vec3>& src,
+                                            bool closed,
+                                            int win,
+                                            const std::vector<char>& protected_mask)
+{
+    std::vector<geometry::Vec3> out = src;
+    if (win <= 1 || src.empty())
+        return out;
+
+    const int n = static_cast<int>(src.size());
+    const int half = win / 2;
+    for (int i = 0; i < n; ++i) {
+        if (protected_mask[static_cast<size_t>(i)])
+            continue;
+        geometry::Vec3 acc{0.0, 0.0, 0.0};
+        for (int k = -half; k <= half; ++k) {
+            int j = i + k;
+            if (closed) {
+                j %= n;
+                if (j < 0)
+                    j += n;
+            } else {
+                j = std::max(0, std::min(n - 1, j));
+            }
+            acc = geometry::add(acc, src[static_cast<size_t>(j)]);
+        }
+        out[static_cast<size_t>(i)] = geometry::scale(acc, 1.0 / static_cast<double>(win));
+    }
+    return out;
+}
+
+void rdp_mark_segment(const std::vector<geometry::Vec3>& pts,
+                      const std::vector<int>& path,
+                      double eps,
+                      std::vector<char>& keep)
+{
+    if (path.size() <= 2)
+        return;
+
+    const geometry::Vec3& a = pts[static_cast<size_t>(path.front())];
+    const geometry::Vec3& b = pts[static_cast<size_t>(path.back())];
+    double best_d = -1.0;
+    size_t best_pos = 0;
+    for (size_t i = 1; i + 1 < path.size(); ++i) {
+        const double d = point_to_segment_distance(pts[static_cast<size_t>(path[i])], a, b);
+        if (d > best_d) {
+            best_d = d;
+            best_pos = i;
+        }
+    }
+    // Fixed <= rule: distance <= eps may be deleted; only > eps becomes a keep anchor.
+    if (best_d <= eps)
+        return;
+
+    const int pivot = path[best_pos];
+    keep[static_cast<size_t>(pivot)] = 1;
+    std::vector<int> left(path.begin(), path.begin() + static_cast<std::ptrdiff_t>(best_pos) + 1);
+    std::vector<int> right(path.begin() + static_cast<std::ptrdiff_t>(best_pos), path.end());
+    rdp_mark_segment(pts, left, eps, keep);
+    rdp_mark_segment(pts, right, eps, keep);
+}
+
+std::vector<int> closed_path_indices(int start, int end, int n)
+{
+    std::vector<int> path;
+    path.reserve(static_cast<size_t>(n + 1));
+    int j = start;
+    path.push_back(j);
+    while (j != end) {
+        j = (j + 1) % n;
+        path.push_back(j);
+    }
+    return path;
+}
+
+std::vector<geometry::Vec3> simplify_rdp(const std::vector<geometry::Vec3>& pts,
+                                         bool closed,
+                                         double eps,
+                                         const std::vector<char>& protected_mask)
+{
+    const int n = static_cast<int>(pts.size());
+    if (n == 0 || eps <= 0.0)
+        return pts;
+
+    std::vector<char> keep(static_cast<size_t>(n), 0);
+    for (int i = 0; i < n; ++i) {
+        if (protected_mask[static_cast<size_t>(i)])
+            keep[static_cast<size_t>(i)] = 1;
+    }
+    if (!closed) {
+        keep[0] = 1;
+        keep[static_cast<size_t>(n - 1)] = 1;
+    } else {
+        bool any = false;
+        for (char flag : keep) {
+            if (flag) {
+                any = true;
+                break;
+            }
+        }
+        if (!any) {
+            // Deterministic closed seed: index 0 and farthest point from it.
+            keep[0] = 1;
+            int farthest = 0;
+            double best = -1.0;
+            for (int i = 1; i < n; ++i) {
+                const double d = geometry::length(geometry::sub(pts[static_cast<size_t>(i)], pts[0]));
+                if (d > best) {
+                    best = d;
+                    farthest = i;
+                }
+            }
+            keep[static_cast<size_t>(farthest)] = 1;
+        }
+    }
+
+    std::vector<int> anchors;
+    anchors.reserve(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        if (keep[static_cast<size_t>(i)])
+            anchors.push_back(i);
+    }
+
+    if (!closed) {
+        for (size_t a = 0; a + 1 < anchors.size(); ++a) {
+            std::vector<int> path;
+            for (int i = anchors[a]; i <= anchors[a + 1]; ++i)
+                path.push_back(i);
+            rdp_mark_segment(pts, path, eps, keep);
+        }
+    } else {
+        const size_t count = anchors.size();
+        for (size_t a = 0; a < count; ++a) {
+            const int start = anchors[a];
+            const int end = anchors[(a + 1) % count];
+            const std::vector<int> path = closed_path_indices(start, end, n);
+            rdp_mark_segment(pts, path, eps, keep);
+        }
+    }
+
+    std::vector<geometry::Vec3> out;
+    out.reserve(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        if (keep[static_cast<size_t>(i)])
+            out.push_back(pts[static_cast<size_t>(i)]);
+    }
+    return out;
+}
+
+data::PcgSpline condition_one_spline(const data::PcgSpline& spline,
+                                     const ConditionOutlineOptions& options,
+                                     std::string* error)
+{
+    data::PcgSpline out = spline;
+
+    std::vector<char> input_protected_mask;
+    if (!mark_protect_mask(spline, options.protect_spans, input_protected_mask, error))
+        return {};
+
+    if (spline.points.size() < 3)
+        return out;
+
+    const bool noop = options.win <= 1 && options.eps <= 0.0;
+    if (noop)
+        return out;
+
+    const bool explicit_close_duplicate = has_explicit_close_duplicate(spline);
+    const size_t logical_count =
+        spline.points.size() - (explicit_close_duplicate ? static_cast<size_t>(1) : 0u);
+    if (logical_count < 3)
+        return out;
+
+    std::vector<char> protected_mask(logical_count, 0);
+    for (size_t i = 0; i < logical_count; ++i)
+        protected_mask[i] = input_protected_mask[i];
+    if (explicit_close_duplicate && input_protected_mask.back())
+        protected_mask.front() = 1;
+
+    std::vector<geometry::Vec3> work;
+    work.reserve(logical_count);
+    for (size_t i = 0; i < logical_count; ++i)
+        work.push_back(to_vec3(spline.points[i]));
+
+    work = smooth_polyline(work, spline.closed, options.win, protected_mask);
+    work = simplify_rdp(work, spline.closed, options.eps, protected_mask);
+
+    out.points.clear();
+    out.points.reserve(work.size());
+    for (const auto& p : work)
+        out.points.push_back(data::PcgSplinePoint{p.x, p.y, p.z});
+    return out;
+}
+
+} // namespace
+
+data::PcgSplineData condition_outline_data(const data::PcgSplineData& input,
+                                           const ConditionOutlineOptions& options,
+                                           std::string* error)
+{
+    if (error)
+        error->clear();
+
+    if (options.win < 1 || (options.win % 2) == 0) {
+        set_error(error, "ConditionOutline win must be an odd integer >= 1");
+        return {};
+    }
+    if (!is_finite_number(options.eps) || options.eps < 0.0) {
+        set_error(error, "ConditionOutline eps must be a finite number >= 0");
+        return {};
+    }
+
+    data::PcgSplineData out;
+    out.metadata() = input.metadata();
+    for (const auto& spline : input.splines()) {
+        data::PcgSpline next = condition_one_spline(spline, options, error);
+        if (error && !error->empty())
+            return {};
+        out.add_spline(std::move(next));
+    }
     return out;
 }
 

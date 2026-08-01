@@ -6,6 +6,7 @@ pcg-core/build-debug/
 pcg-core/build-manual/
 pcg-core/build/
 pcg-fbx-exporter/build*/
+pcg-server/build/
 schema/graph-schema.json
 web/pcg-editor/dist/
 web/pcg-editor/node_modules/
@@ -26,3 +27,4 @@ url-content-out/
 .codely-cli/settings.json
 Plan/
 mem-log/
+tmp/

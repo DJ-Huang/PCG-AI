@@ -2,24 +2,6 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "span_path",
-      "type": "CreateSpline",
-      "position": { "x": 200, "y": 0 },
-      "data": {"mode": "line", "closed": false, "subdivisions": 8, "startX": 0, "startY": 2.2, "startZ": 0, "endX": 20, "endY": 2.2, "endZ": 0, "controlPoints": "[{\"x\":0,\"y\":2.2,\"z\":0},{\"x\":20,\"y\":2.2,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Span Path"}
-    },
-    {
-      "id": "span_resample",
-      "type": "ResampleSpline",
-      "position": { "x": 200, "y": 160 },
-      "data": {"mode": "spacing", "spacing": 0.25, "pointCount": 32, "__nodeTitle": "Resample Span"}
-    },
-    {
-      "id": "sag_wrangle",
-      "type": "AttributeWrangle",
-      "position": { "x": 200, "y": 320 },
-      "data": {"runOver": "points", "expression": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);", "parameters": "{\"sag\":1.8}", "__nodeTitle": "Sag Wrangle"}
-    },
-    {
       "id": "broken_blast",
       "type": "Blast",
       "position": { "x": 200, "y": 480 },
@@ -29,13 +11,13 @@
       "id": "offset_l",
       "type": "AttributeWrangle",
       "position": { "x": -120, "y": 640 },
-      "data": {"runOver": "points", "expression": "@P.z -= chf(\"halfWidth\");", "parameters": "{\"halfWidth\":1.0}", "__nodeTitle": "Offset Rope L"}
+      "data": {"group": "", "groupType": "guess", "runOver": "points", "expression": "@P.z -= chf(\"halfWidth\");", "parameters": "{\"halfWidth\":1.0}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "Offset Rope L"}
     },
     {
       "id": "offset_r",
       "type": "AttributeWrangle",
       "position": { "x": 520, "y": 640 },
-      "data": {"runOver": "points", "expression": "@P.z += chf(\"halfWidth\");", "parameters": "{\"halfWidth\":1.0}", "__nodeTitle": "Offset Rope R"}
+      "data": {"group": "", "groupType": "guess", "runOver": "points", "expression": "@P.z += chf(\"halfWidth\");", "parameters": "{\"halfWidth\":1.0}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "Offset Rope R"}
     },
     {
       "id": "plank_sample",
@@ -59,7 +41,7 @@
       "id": "plank_jitter",
       "type": "AttributeRandomize",
       "position": { "x": 200, "y": 800 },
-      "data": {"seed": 17, "translateX": 0, "translateY": 0, "translateZ": 0, "rotateX": 2, "rotateY": 0, "rotateZ": 5.485714, "scaleMin": 1, "scaleMax": 1, "__nodeTitle": "Plank Jitter"}
+      "data": {"seed": 17, "translateX": 0, "translateY": 0, "translateZ": 0, "rotateX": 2, "rotateY": 0, "rotateZ": 5.485714, "scaleMin": 1, "scaleMax": 1, "colorMinR": 1, "colorMinG": 1, "colorMinB": 1, "colorMaxR": 1, "colorMaxG": 1, "colorMaxB": 1, "materialNames": "", "__nodeTitle": "Plank Jitter"}
     },
     {
       "id": "plank_proto",
@@ -101,7 +83,7 @@
       "id": "post_fl_xf",
       "type": "TransformMesh",
       "position": { "x": -760, "y": 160 },
-      "data": {"translateX": 0, "translateY": 1.25, "translateZ": -1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post FL Xform"}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,1.25,-1], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": "Post FL Xform"}
     },
     {
       "id": "post_fr",
@@ -113,7 +95,7 @@
       "id": "post_fr_xf",
       "type": "TransformMesh",
       "position": { "x": -440, "y": 160 },
-      "data": {"translateX": 0, "translateY": 1.25, "translateZ": 1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post FR Xform"}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,1.25,1], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": "Post FR Xform"}
     },
     {
       "id": "post_rl",
@@ -125,7 +107,7 @@
       "id": "post_rl_xf",
       "type": "TransformMesh",
       "position": { "x": -760, "y": 480 },
-      "data": {"translateX": 20, "translateY": 1.25, "translateZ": -1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post RL Xform"}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [20,1.25,-1], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": "Post RL Xform"}
     },
     {
       "id": "post_rr",
@@ -137,7 +119,7 @@
       "id": "post_rr_xf",
       "type": "TransformMesh",
       "position": { "x": -440, "y": 480 },
-      "data": {"translateX": 20, "translateY": 1.25, "translateZ": 1, "rotationX": 0, "rotationY": 0, "rotationZ": 0, "scaleX": 1, "scaleY": 1, "scaleZ": 1, "__nodeTitle": "Post RR Xform"}
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [20,1.25,1], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 1, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "__nodeTitle": "Post RR Xform"}
     },
     {
       "id": "posts_merge",
@@ -162,10 +144,27 @@
       "type": "Output",
       "position": { "x": 200, "y": 1440 },
       "data": {"label": "Output", "__nodeTitle": "Output"}
+    },
+    {
+      "id": "span_path",
+      "type": "CreateSpline",
+      "position": { "x": 200, "y": 0 },
+      "data": {"mode": "catmullRom", "closed": false, "subdivisions": 1, "startX": 0, "startY": 2.2, "startZ": 0, "endX": 20, "endY": 2.2, "endZ": 0, "controlPoints": "[{\"x\":-0.1479996,\"y\":2.2,\"z\":-0.1637497},{\"x\":2.507455,\"y\":1.968184,\"z\":-0.1421661},{\"x\":6.326049,\"y\":1.931523,\"z\":-0.1111298},{\"x\":11.25675,\"y\":1.960757,\"z\":-0.07105637},{\"x\":16.21724,\"y\":2.0072,\"z\":-0.03074265},{\"x\":20,\"y\":2.2,\"z\":0}]", "editPlane": "none", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Span Path"}
+    },
+    {
+      "id": "span_resample",
+      "type": "ResampleSpline",
+      "position": { "x": 200, "y": 160 },
+      "data": {"edgeMode": "unshared", "edgeGroup": "", "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 1, "useMaxSegments": false, "maxSegments": 2, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "mode": "spacing", "spacing": 0.25, "pointCount": 32, "__nodeTitle": "Resample Span"}
+    },
+    {
+      "id": "sag_wrangle",
+      "type": "AttributeWrangle",
+      "position": { "x": 200, "y": 320 },
+      "data": {"group": "", "groupType": "guess", "runOver": "points", "expression": "@P.y -= chf(\"sag\") * 4.0 * @curveu * (1.0 - @curveu);", "parameters": "{\"sag\":1.8}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "Sag Wrangle"}
     }
   ],
   "edges": [
-    {"id": "e_path_resample", "source": "span_path", "target": "span_resample", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_resample_sag", "source": "span_resample", "target": "sag_wrangle", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_sag_blast", "source": "sag_wrangle", "target": "broken_blast", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_blast_ol", "source": "broken_blast", "target": "offset_l", "sourceHandle": "out", "targetHandle": "in"},
@@ -192,7 +191,8 @@
     {"id": "e_merge_rope_r", "source": "mat_rope_r", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_merge_planks", "source": "mat_plank", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
     {"id": "e_merge_posts", "source": "mat_post", "target": "bridge_merge", "sourceHandle": "out", "targetHandle": "in"},
-    {"id": "e_merge_out", "source": "bridge_merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+    {"id": "e_merge_out", "source": "bridge_merge", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e688", "source": "span_path", "target": "span_resample", "sourceHandle": "out", "targetHandle": "in"}
   ],
   "parameters": [
     {"id": "p1", "name": "PlankSpacing", "type": "number", "default": 0.55, "exposed": true, "targetNode": "plank_sample", "targetProperty": "spacing", "hasRange": true, "min": 0.3, "max": 1.5},

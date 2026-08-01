@@ -2,6 +2,7 @@
 
 #include "elements/element_utils.hpp"
 #include "elements/expression.hpp"
+#include "elements/facade_foundation_algorithms.hpp"
 #include "elements/topology_parity_algorithms.hpp"
 
 #include <algorithm>
@@ -433,19 +434,54 @@ public:
     const char* type_name() const override { return "Carve"; }
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        const auto input = get_splines_input(ctx, "in", "Carve missing spline input");
+        const data::PcgTaggedData* source = ctx.inputs.find("in");
+        if (!source)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Carve missing input");
+
+        data::PcgSplineData input;
+        if (source->splines) {
+            input = *source->splines;
+        } else if (source->geometry) {
+            input = convert_geometry_primitives_to_splines(*source->geometry);
+        } else if (source->mesh) {
+            input = convert_geometry_primitives_to_splines(
+                data::geometry_from_mesh(*source->mesh));
+        } else {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "Carve supports Spline, Geometry, or Mesh input");
+        }
         CarveSplineOptions options;
+        options.group = ctx.node->data.value("group", std::string());
         options.u_start = ctx.node->data.value("uStart", 0.0);
         options.u_end = ctx.node->data.value("uEnd", 1.0);
         options.use_first_u = ctx.node->data.value("useFirstU", true);
         options.use_second_u = ctx.node->data.value("useSecondU", true);
+        options.u_start_attrib = ctx.node->data.value("uStartAttrib", std::string());
+        options.u_end_attrib = ctx.node->data.value("uEndAttrib", std::string());
         options.arc_length_u = ctx.node->data.value("arcLengthU", true);
-        options.location = ctx.node->data.value("location", std::string("breakpoints"));
+        options.v_start = ctx.node->data.value("vStart", 0.25);
+        options.v_end = ctx.node->data.value("vEnd", 0.75);
+        options.use_first_v = ctx.node->data.value("useFirstV", true);
+        options.use_second_v = ctx.node->data.value("useSecondV", true);
+        options.v_start_attrib = ctx.node->data.value("vStartAttrib", std::string());
+        options.v_end_attrib = ctx.node->data.value("vEndAttrib", std::string());
+        options.location = ctx.node->data.value("location", std::string("divisions"));
+        options.u_divisions = ctx.node->data.value("uDivisions", 2);
+        options.v_divisions = ctx.node->data.value("vDivisions", 2);
         options.cut_at_all_internal_u_breakpoints =
             ctx.node->data.value("cutAtAllInternalUBreakpoints", true);
-        options.u_divisions = ctx.node->data.value("uDivisions", 1);
+        options.cut_at_all_internal_v_breakpoints =
+            ctx.node->data.value("cutAtAllInternalVBreakpoints", true);
+        options.operation = ctx.node->data.value("operation", std::string("cut"));
+        options.extract_type = ctx.node->data.value("extractType", std::string("curves3d"));
+        options.keep_original = ctx.node->data.value("keepOriginal", false);
+        options.only_at_breakpoints = ctx.node->data.value("onlyAtBreakpoints", false);
         options.keep_inside = ctx.node->data.value("keepInside", true);
         options.keep_outside = ctx.node->data.value("keepOutside", false);
+        if (options.operation == "extract") {
+            emit_points(ctx, carve_spline_extract_points(input, options));
+            return PCG_OK;
+        }
         emit_splines(ctx, carve_spline_data(input, options));
         return PCG_OK;
     }

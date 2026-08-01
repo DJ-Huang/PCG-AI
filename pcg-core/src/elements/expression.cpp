@@ -21,6 +21,8 @@ enum class TokenKind {
     String,
     LParen,
     RParen,
+    LBrace,
+    RBrace,
     Comma,
     Semicolon,
     Operator,
@@ -89,6 +91,8 @@ public:
         switch (c) {
         case '(': return {TokenKind::LParen, "(", 0.0, start};
         case ')': return {TokenKind::RParen, ")", 0.0, start};
+        case '{': return {TokenKind::LBrace, "{", 0.0, start};
+        case '}': return {TokenKind::RBrace, "}", 0.0, start};
         case ',': return {TokenKind::Comma, ",", 0.0, start};
         case ';': return {TokenKind::Semicolon, ";", 0.0, start};
         default: break;
@@ -152,11 +156,15 @@ struct Expr {
 };
 
 struct Statement {
+    enum class Kind { Assignment, If } kind = Kind::Assignment;
     enum class TargetKind { Attribute, VectorAttribute, LocalScalar, LocalVector } target_kind =
         TargetKind::Attribute;
     std::string target;
     std::string op;
     std::unique_ptr<Expr> value;
+    std::unique_ptr<Expr> condition;
+    std::vector<Statement> then_body;
+    std::vector<Statement> else_body;
 };
 
 class Parser {
@@ -165,15 +173,40 @@ public:
 
     bool parse_statements(std::vector<Statement>& statements, std::string& error)
     {
-        while (current_.kind != TokenKind::End) {
+        while (current_.kind != TokenKind::End && current_.kind != TokenKind::RBrace) {
             if (current_.kind == TokenKind::Semicolon) {
                 advance();
                 continue;
             }
 
+            if (current_.kind == TokenKind::Identifier && current_.text == "if") {
+                Statement statement;
+                statement.kind = Statement::Kind::If;
+                advance();
+                if (current_.kind != TokenKind::LParen)
+                    return fail(error, "expected '(' after if");
+                advance();
+                statement.condition = parse_logical_or(error);
+                if (!statement.condition)
+                    return false;
+                if (current_.kind != TokenKind::RParen)
+                    return fail(error, "expected ')' after if condition");
+                advance();
+                if (!parse_block_or_statement(statement.then_body, error))
+                    return false;
+                if (current_.kind == TokenKind::Identifier && current_.text == "else") {
+                    advance();
+                    if (!parse_block_or_statement(statement.else_body, error))
+                        return false;
+                }
+                statements.push_back(std::move(statement));
+                continue;
+            }
+
             bool local_decl = false;
             if (current_.kind == TokenKind::Identifier &&
-                (current_.text == "float" || current_.text == "int" || current_.text == "f")) {
+                (current_.text == "float" || current_.text == "int" || current_.text == "f" ||
+                 current_.text == "vector")) {
                 local_decl = true;
                 advance();
             }
@@ -182,6 +215,7 @@ public:
                 return fail(error, "expected an assignment target");
 
             Statement statement;
+            statement.kind = Statement::Kind::Assignment;
             if (current_.text.rfind("v@", 0) == 0) {
                 statement.target_kind = Statement::TargetKind::VectorAttribute;
                 statement.target = "@" + current_.text.substr(2);
@@ -189,8 +223,8 @@ public:
                 statement.target_kind = Statement::TargetKind::Attribute;
                 statement.target = current_.text;
             } else {
-                statement.target_kind =
-                    local_decl ? Statement::TargetKind::LocalScalar : Statement::TargetKind::LocalScalar;
+                statement.target_kind = local_decl ? Statement::TargetKind::LocalScalar
+                                                  : Statement::TargetKind::LocalScalar;
                 statement.target = current_.text;
             }
             advance();
@@ -206,9 +240,95 @@ public:
             statements.push_back(std::move(statement));
             if (current_.kind == TokenKind::Semicolon)
                 advance();
-            else if (current_.kind != TokenKind::End)
+            else if (current_.kind != TokenKind::End && current_.kind != TokenKind::RBrace)
                 return fail(error, "expected ';' between assignments");
         }
+        return true;
+    }
+
+    bool parse_block_or_statement(std::vector<Statement>& body, std::string& error)
+    {
+        if (current_.kind == TokenKind::LBrace) {
+            advance();
+            if (!parse_statements(body, error))
+                return false;
+            if (current_.kind != TokenKind::RBrace)
+                return fail(error, "expected '}' to close block");
+            advance();
+            return true;
+        }
+        // Single statement without braces (assignment or nested if).
+        const size_t before = body.size();
+        if (!parse_statements_one(body, error))
+            return false;
+        if (body.size() == before)
+            return fail(error, "expected statement after if/else");
+        return true;
+    }
+
+    bool parse_statements_one(std::vector<Statement>& statements, std::string& error)
+    {
+        if (current_.kind == TokenKind::End || current_.kind == TokenKind::RBrace)
+            return fail(error, "expected a statement");
+        if (current_.kind == TokenKind::Identifier && current_.text == "if") {
+            Statement statement;
+            statement.kind = Statement::Kind::If;
+            advance();
+            if (current_.kind != TokenKind::LParen)
+                return fail(error, "expected '(' after if");
+            advance();
+            statement.condition = parse_logical_or(error);
+            if (!statement.condition)
+                return false;
+            if (current_.kind != TokenKind::RParen)
+                return fail(error, "expected ')' after if condition");
+            advance();
+            if (!parse_block_or_statement(statement.then_body, error))
+                return false;
+            if (current_.kind == TokenKind::Identifier && current_.text == "else") {
+                advance();
+                if (!parse_block_or_statement(statement.else_body, error))
+                    return false;
+            }
+            statements.push_back(std::move(statement));
+            return true;
+        }
+
+        bool local_decl = false;
+        if (current_.kind == TokenKind::Identifier &&
+            (current_.text == "float" || current_.text == "int" || current_.text == "f" ||
+             current_.text == "vector")) {
+            local_decl = true;
+            advance();
+        }
+        if (current_.kind != TokenKind::Identifier || current_.text.empty())
+            return fail(error, "expected an assignment target");
+        Statement statement;
+        statement.kind = Statement::Kind::Assignment;
+        if (current_.text.rfind("v@", 0) == 0) {
+            statement.target_kind = Statement::TargetKind::VectorAttribute;
+            statement.target = "@" + current_.text.substr(2);
+        } else if (current_.text.front() == '@') {
+            statement.target_kind = Statement::TargetKind::Attribute;
+            statement.target = current_.text;
+        } else {
+            statement.target_kind = Statement::TargetKind::LocalScalar;
+            statement.target = current_.text;
+            (void)local_decl;
+        }
+        advance();
+        if (current_.kind != TokenKind::Operator ||
+            (current_.text != "=" && current_.text != "+=" && current_.text != "-=" &&
+             current_.text != "*=" && current_.text != "/=" && current_.text != "%="))
+            return fail(error, "expected assignment operator");
+        statement.op = current_.text;
+        advance();
+        statement.value = parse_logical_or(error);
+        if (!statement.value)
+            return false;
+        statements.push_back(std::move(statement));
+        if (current_.kind == TokenKind::Semicolon)
+            advance();
         return true;
     }
 
@@ -535,6 +655,78 @@ bool eval_function(const Expr& expression, EvalContext& context, Value& out, std
             error = "vector expects 1 or 3 arguments";
             return false;
         }
+    } else if (expression.text == "length") {
+        if (!arity(1))
+            return false;
+        if (args[0].kind == Value::Kind::Vector) {
+            const auto& v = args[0].vector;
+            out = Value::numeric(std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]));
+        } else if (numeric_arg(0, a)) {
+            out = Value::numeric(std::abs(a));
+        } else {
+            return false;
+        }
+    } else if (expression.text == "detail") {
+        std::string name;
+        int component = 0;
+        int geo_index = -1;
+        if (args.size() == 2 && args[0].kind == Value::Kind::String && numeric_arg(1, a)) {
+            name = args[0].text;
+            component = static_cast<int>(std::lround(a));
+        } else if (args.size() == 3 && numeric_arg(0, a) && args[1].kind == Value::Kind::String &&
+                   numeric_arg(2, b)) {
+            geo_index = static_cast<int>(std::lround(a));
+            name = args[1].text;
+            component = static_cast<int>(std::lround(b));
+        } else {
+            error = "detail expects (\"name\", component) or (geoIndex, \"name\", component)";
+            return false;
+        }
+        if (!context.detail) {
+            error = "detail is unavailable in this context";
+            return false;
+        }
+        double value = 0.0;
+        if (!context.detail(geo_index, name, component, value)) {
+            error = "unknown detail attribute '" + name + "'";
+            return false;
+        }
+        out = Value::numeric(value);
+        return true;
+    } else if (expression.text == "nedgesgroup") {
+        if (!arity(2))
+            return false;
+        if (!numeric_arg(0, a) || args[1].kind != Value::Kind::String) {
+            error = "nedgesgroup expects (geoIndex, \"group\")";
+            return false;
+        }
+        if (!context.nedgesgroup) {
+            error = "nedgesgroup is unavailable in this context";
+            return false;
+        }
+        double count = 0.0;
+        if (!context.nedgesgroup(static_cast<int>(std::lround(a)), args[1].text, count)) {
+            error = "nedgesgroup failed for group '" + args[1].text + "'";
+            return false;
+        }
+        out = Value::numeric(count);
+        return true;
+    } else if (expression.text == "getbbox_size") {
+        if (!arity(1))
+            return false;
+        if (!numeric_arg(0, a))
+            return false;
+        if (!context.getbbox_size) {
+            error = "getbbox_size is unavailable in this context";
+            return false;
+        }
+        std::array<double, 3> size{};
+        if (!context.getbbox_size(static_cast<int>(std::lround(a)), size)) {
+            error = "getbbox_size failed";
+            return false;
+        }
+        out = Value::vector3(size);
+        return true;
     } else {
         if (error.empty())
             error = "unknown function or invalid arguments: " + expression.text;
@@ -646,6 +838,136 @@ bool eval_expr(const Expr& expression, EvalContext& context, Value& out, std::st
     return true;
 }
 
+bool execute_assignment(const Statement& statement, EvalContext& context, std::string& error)
+{
+    Value evaluated;
+    if (!eval_expr(*statement.value, context, evaluated, error))
+        return false;
+
+    if (statement.target_kind == Statement::TargetKind::VectorAttribute) {
+        if (statement.op != "=") {
+            error = "vector assignments only support '='";
+            return false;
+        }
+        std::array<double, 3> value{};
+        if (!require_vector(evaluated, value, error))
+            return false;
+        for (double component : value) {
+            if (!std::isfinite(component)) {
+                error = "assignment produced a non-finite vector value";
+                return false;
+            }
+        }
+        if (!context.write_vector || !context.write_vector(statement.target, value)) {
+            error = "read-only or unsupported vector assignment target '" + statement.target + "'";
+            return false;
+        }
+        return true;
+    }
+
+    double value = 0.0;
+    if (evaluated.kind == Value::Kind::Vector)
+        value = evaluated.vector[0];
+    else if (!require_number(evaluated, value, error))
+        return false;
+
+    if (statement.target_kind == Statement::TargetKind::LocalScalar) {
+        if (statement.op != "=") {
+            const auto local_it = context.locals.find(statement.target);
+            if (local_it == context.locals.end()) {
+                error = "unknown local variable '" + statement.target + "'";
+                return false;
+            }
+            if (statement.op == "+=") value = local_it->second + value;
+            else if (statement.op == "-=") value = local_it->second - value;
+            else if (statement.op == "*=") value = local_it->second * value;
+            else if (statement.op == "/=") {
+                if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
+                    error = "division by zero in assignment";
+                    return false;
+                }
+                value = local_it->second / value;
+            } else if (statement.op == "%=") {
+                if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
+                    error = "modulo by zero in assignment";
+                    return false;
+                }
+                value = std::fmod(local_it->second, value);
+            }
+        }
+        if (!std::isfinite(value)) {
+            error = "assignment produced a non-finite value";
+            return false;
+        }
+        context.locals[statement.target] = value;
+        return true;
+    }
+
+    if (statement.op != "=") {
+        double current = 0.0;
+        if (!context.read_variable || !context.read_variable(statement.target, current)) {
+            error = "cannot read assignment target '" + statement.target + "'";
+            return false;
+        }
+        if (statement.op == "+=") value = current + value;
+        else if (statement.op == "-=") value = current - value;
+        else if (statement.op == "*=") value = current * value;
+        else if (statement.op == "/=") {
+            if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
+                error = "division by zero in assignment";
+                return false;
+            }
+            value = current / value;
+        } else if (statement.op == "%=") {
+            if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
+                error = "modulo by zero in assignment";
+                return false;
+            }
+            value = std::fmod(current, value);
+        }
+    }
+    if (!std::isfinite(value)) {
+        error = "assignment produced a non-finite value";
+        return false;
+    }
+    if (!context.write_variable || !context.write_variable(statement.target, value)) {
+        error = "read-only or unsupported assignment target '" + statement.target + "'";
+        return false;
+    }
+    return true;
+}
+
+bool execute_statements(const std::vector<Statement>& statements,
+                        EvalContext& context,
+                        std::string& error);
+
+bool execute_statement(const Statement& statement, EvalContext& context, std::string& error)
+{
+    if (statement.kind == Statement::Kind::If) {
+        Value condition_value;
+        if (!statement.condition || !eval_expr(*statement.condition, context, condition_value, error))
+            return false;
+        double condition = 0.0;
+        if (!require_number(condition_value, condition, error))
+            return false;
+        if (condition != 0.0)
+            return execute_statements(statement.then_body, context, error);
+        return execute_statements(statement.else_body, context, error);
+    }
+    return execute_assignment(statement, context, error);
+}
+
+bool execute_statements(const std::vector<Statement>& statements,
+                        EvalContext& context,
+                        std::string& error)
+{
+    for (const auto& statement : statements) {
+        if (!execute_statement(statement, context, error))
+            return false;
+    }
+    return true;
+}
+
 } // namespace
 
 struct Program::Impl {
@@ -678,104 +1000,7 @@ bool Program::compile_expression(const std::string& source, Program& out, std::s
 
 bool Program::execute(EvalContext& context, std::string& error) const
 {
-    for (const auto& statement : impl_->statements) {
-        Value evaluated;
-        if (!eval_expr(*statement.value, context, evaluated, error))
-            return false;
-
-        if (statement.target_kind == Statement::TargetKind::VectorAttribute) {
-            if (statement.op != "=") {
-                error = "vector assignments only support '='";
-                return false;
-            }
-            std::array<double, 3> value{};
-            if (!require_vector(evaluated, value, error))
-                return false;
-            for (double component : value) {
-                if (!std::isfinite(component)) {
-                    error = "assignment produced a non-finite vector value";
-                    return false;
-                }
-            }
-            if (!context.write_vector || !context.write_vector(statement.target, value)) {
-                error = "read-only or unsupported vector assignment target '" + statement.target +
-                        "'";
-                return false;
-            }
-            continue;
-        }
-
-        double value = 0.0;
-        if (evaluated.kind == Value::Kind::Vector)
-            value = evaluated.vector[0];
-        else if (!require_number(evaluated, value, error))
-            return false;
-
-        if (statement.target_kind == Statement::TargetKind::LocalScalar) {
-            if (statement.op != "=") {
-                const auto local_it = context.locals.find(statement.target);
-                if (local_it == context.locals.end()) {
-                    error = "unknown local variable '" + statement.target + "'";
-                    return false;
-                }
-                if (statement.op == "+=") value = local_it->second + value;
-                else if (statement.op == "-=") value = local_it->second - value;
-                else if (statement.op == "*=") value = local_it->second * value;
-                else if (statement.op == "/=") {
-                    if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
-                        error = "division by zero in assignment";
-                        return false;
-                    }
-                    value = local_it->second / value;
-                } else if (statement.op == "%=") {
-                    if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
-                        error = "modulo by zero in assignment";
-                        return false;
-                    }
-                    value = std::fmod(local_it->second, value);
-                }
-            }
-            if (!std::isfinite(value)) {
-                error = "assignment produced a non-finite value";
-                return false;
-            }
-            context.locals[statement.target] = value;
-            continue;
-        }
-
-        if (statement.op != "=") {
-            double current = 0.0;
-            if (!context.read_variable || !context.read_variable(statement.target, current)) {
-                error = "cannot read assignment target '" + statement.target + "'";
-                return false;
-            }
-            if (statement.op == "+=") value = current + value;
-            else if (statement.op == "-=") value = current - value;
-            else if (statement.op == "*=") value = current * value;
-            else if (statement.op == "/=") {
-                if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
-                    error = "division by zero in assignment";
-                    return false;
-                }
-                value = current / value;
-            } else if (statement.op == "%=") {
-                if (std::abs(value) <= std::numeric_limits<double>::epsilon()) {
-                    error = "modulo by zero in assignment";
-                    return false;
-                }
-                value = std::fmod(current, value);
-            }
-        }
-        if (!std::isfinite(value)) {
-            error = "assignment produced a non-finite value";
-            return false;
-        }
-        if (!context.write_variable || !context.write_variable(statement.target, value)) {
-            error = "read-only or unsupported assignment target '" + statement.target + "'";
-            return false;
-        }
-    }
-    return true;
+    return execute_statements(impl_->statements, context, error);
 }
 
 bool Program::evaluate(EvalContext& context, double& value, std::string& error) const

@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "name": "Golden V1 Empty",
+  "inputs": [ {"id": "in_1", "name": "Input", "pinType": "Any", "anchorPlaced": true, "anchorX": -200, "anchorY": 0} ],
+  "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ],
+  "nodes": [
+    {
+      "id": "subgraph_input",
+      "type": "SubgraphInput",
+      "position": { "x": -200, "y": 0 },
+      "data": {}
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": { "x": 0, "y": 160 },
+      "data": {"label": "Output"}
+    }
+  ],
+  "edges": [
+    {"id": "iface_passthrough", "source": "subgraph_input", "target": "output", "sourceHandle": "in_1", "targetHandle": "in"}
+  ],
+  "subgraphs": [
+  ]
+}

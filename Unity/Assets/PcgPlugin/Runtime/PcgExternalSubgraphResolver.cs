@@ -53,6 +53,7 @@ namespace DJTechRuntime.PCG
             working.subgraphs ??= new List<PcgSubgraphDefinition>();
             if (!ResolveScope(
                     working.nodes,
+                    working.edges,
                     working.subgraphs,
                     working.subgraphs,
                     loader,
@@ -99,6 +100,7 @@ namespace DJTechRuntime.PCG
 
         private static bool ResolveScope(
             List<PcgGraphNodeRecord> nodes,
+            List<PcgGraphEdgeRecord> edges,
             List<PcgSubgraphDefinition> localDefinitions,
             List<PcgSubgraphDefinition> rootDefinitions,
             PcgExternalSubgraphLoader loader,
@@ -124,6 +126,7 @@ namespace DJTechRuntime.PCG
                         continue;
                     if (!ResolveScope(
                             definition.nodes,
+                            definition.edges,
                             null,
                             rootDefinitions,
                             loader,
@@ -232,6 +235,7 @@ namespace DJTechRuntime.PCG
                     stack.Add(guid);
                     if (!ResolveScope(
                             assetDoc.nodes,
+                            assetDoc.edges,
                             assetDoc.subgraphs,
                             rootDefinitions,
                             loader,
@@ -257,7 +261,12 @@ namespace DJTechRuntime.PCG
                     }
                 }
 
-                if (!InterfacesCompatible(node.subgraphInterface, resolved.Interface, out var mismatch))
+                if (!InterfacesCompatible(
+                        node.subgraphInterface,
+                        resolved.Interface,
+                        edges,
+                        node.id,
+                        out var mismatch))
                 {
                     error = $"SubgraphAsset interface mismatch on '{node.id}': {mismatch}";
                     chain = BuildChain(stack, instancePath, node.id);
@@ -318,6 +327,8 @@ namespace DJTechRuntime.PCG
         private static bool InterfacesCompatible(
             PcgSubgraphInterfaceSnapshot snapshot,
             PcgSubgraphInterfaceSnapshot source,
+            List<PcgGraphEdgeRecord> scopeEdges,
+            string nodeId,
             out string mismatch)
         {
             mismatch = null;
@@ -327,9 +338,21 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
-            if (!PortsCompatible(snapshot.inputs, source.inputs, "input", out mismatch))
+            if (!PortsCompatible(
+                    snapshot.inputs,
+                    source.inputs,
+                    scopeEdges,
+                    nodeId,
+                    input: true,
+                    mismatch: out mismatch))
                 return false;
-            if (!PortsCompatible(snapshot.outputs, source.outputs, "output", out mismatch))
+            if (!PortsCompatible(
+                    snapshot.outputs,
+                    source.outputs,
+                    scopeEdges,
+                    nodeId,
+                    input: false,
+                    mismatch: out mismatch))
                 return false;
             return true;
         }
@@ -337,12 +360,16 @@ namespace DJTechRuntime.PCG
         private static bool PortsCompatible(
             List<PcgSubgraphPort> snapshotPorts,
             List<PcgSubgraphPort> sourcePorts,
-            string direction,
+            List<PcgGraphEdgeRecord> scopeEdges,
+            string nodeId,
+            bool input,
             out string mismatch)
         {
             mismatch = null;
+            var direction = input ? "input" : "output";
             snapshotPorts ??= new List<PcgSubgraphPort>();
             sourcePorts ??= new List<PcgSubgraphPort>();
+            scopeEdges ??= new List<PcgGraphEdgeRecord>();
 
             var sourceById = new Dictionary<string, PcgSubgraphPort>(StringComparer.Ordinal);
             foreach (var port in sourcePorts)
@@ -369,13 +396,31 @@ namespace DJTechRuntime.PCG
 
                 if (!sourceById.TryGetValue(port.id, out var sourcePort))
                 {
-                    // Connected ghost ports are allowed at authoring time, but bake fails closed.
+                    // Unconnected stale snapshot ports are harmless and may be dropped by the
+                    // Editor's model-level reconcile. Connected ghost ports still fail closed
+                    // so a removed interface can never silently rewire authoring data.
+                    var connected = scopeEdges.Any(edge =>
+                        edge != null &&
+                        (input
+                            ? edge.target == nodeId && edge.targetHandle == port.id
+                            : edge.source == nodeId && edge.sourceHandle == port.id));
+                    if (!connected)
+                        continue;
+
                     mismatch = $"source removed {direction} port '{port.id}'";
                     return false;
                 }
 
                 if (!string.Equals(port.pinType ?? "Any", sourcePort.pinType ?? "Any", StringComparison.Ordinal))
                 {
+                    var connected = scopeEdges.Any(edge =>
+                        edge != null &&
+                        (input
+                            ? edge.target == nodeId && edge.targetHandle == port.id
+                            : edge.source == nodeId && edge.sourceHandle == port.id));
+                    if (!connected)
+                        continue;
+
                     mismatch = $"{direction} port '{port.id}' pinType changed ({port.pinType} -> {sourcePort.pinType})";
                     return false;
                 }

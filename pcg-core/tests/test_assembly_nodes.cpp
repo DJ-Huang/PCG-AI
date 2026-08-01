@@ -1,5 +1,6 @@
 #include "elements/assembly_algorithms.hpp"
 #include "elements/mesh_algorithms.hpp"
+#include "elements/transform_algorithms.hpp"
 #include "elements/vehicle_modeling_algorithms.hpp"
 #include "cook_hash.hpp"
 #include "graph_execution_result.hpp"
@@ -265,6 +266,67 @@ void test_match_size()
            "MatchSize graph string vector params");
 }
 
+void test_transform_by_attribute()
+{
+    auto source = geometry_from_mesh(create_box_mesh(2.0, 4.0, 6.0));
+    auto& custom_p = source.attributes().create_float(
+        AttributeOwner::Point, "customP", 3, {0.0, 0.0, 0.0},
+        AttributeTransformRole::Position);
+    for (const auto& point : source.points())
+        custom_p.float_values_mut().insert(custom_p.float_values_mut().end(),
+                                           {point.x, point.y, point.z});
+
+    auto& xform = source.attributes().create_float(
+        AttributeOwner::Detail, "xform", 16, std::vector<double>(16, 0.0),
+        AttributeTransformRole::Matrix);
+    xform.float_values_mut() = {
+        2.0, 0.0, 0.0, 10.0,
+        0.0, 2.0, 0.0, 20.0,
+        0.0, 0.0, 2.0, 30.0,
+        0.0, 0.0, 0.0, 1.0,
+    };
+
+    TransformByAttributeOptions apply_options;
+    PcgGeometry applied;
+    std::string error;
+    expect(transform_by_attribute_geometry(source, apply_options, applied, error), error);
+    expect(applied.attributes().find(AttributeOwner::Detail, "xform") == nullptr,
+           "TransformByAttribute deletes xform by default");
+    const auto extent = size_of(applied);
+    expect(near(extent.x, 4.0) && near(extent.y, 8.0) && near(extent.z, 12.0),
+           "TransformByAttribute applies detail xform");
+    const auto* transformed_custom =
+        applied.attributes().find(AttributeOwner::Point, "customP");
+    expect(transformed_custom != nullptr &&
+               near(transformed_custom->float_values()[0], applied.points()[0].x) &&
+               near(transformed_custom->float_values()[1], applied.points()[0].y),
+           "TransformByAttribute updates position-role attributes");
+
+    PcgGeometry inverted;
+    TransformByAttributeOptions forward_keep;
+    forward_keep.delete_transform_attribute = false;
+    PcgGeometry forward_applied;
+    expect(transform_by_attribute_geometry(source, forward_keep, forward_applied, error), error);
+    TransformByAttributeOptions invert_options;
+    invert_options.invert_transform = true;
+    invert_options.delete_transform_attribute = true;
+    expect(transform_by_attribute_geometry(forward_applied, invert_options, inverted, error),
+           error);
+    const auto restored_extent = size_of(inverted);
+    expect(near(restored_extent.x, 2.0) && near(restored_extent.y, 4.0) &&
+               near(restored_extent.z, 6.0),
+           "TransformByAttribute invert restores geometry");
+
+    auto matched = geometry_from_mesh(create_box_mesh(2.0, 4.0, 6.0));
+    MatchSizeOptions match_options;
+    match_options.target_position = {10.0, 20.0, 30.0};
+    match_options.target_size = {4.0, 8.0, 12.0};
+    match_options.uniform_scale = false;
+    expect(match_size_geometry(matched, nullptr, match_options, matched, error), error);
+    expect(matched.attributes().find(AttributeOwner::Detail, "xform") != nullptr,
+           "TransformByAttribute works with MatchSize-stashed xform attribute");
+}
+
 void test_bend_mesh()
 {
     PcgGeometry strip;
@@ -503,6 +565,7 @@ int main()
     const auto fixture = std::filesystem::absolute("fixtures/import_quad.obj");
     test_import_mesh(fixture);
     test_match_size();
+    test_transform_by_attribute();
     test_bend_mesh();
     test_topology_remap_contract();
     test_import_dependency_hash();

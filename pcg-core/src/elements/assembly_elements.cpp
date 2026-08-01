@@ -12,18 +12,7 @@
 namespace pcg::internal::elements {
 namespace {
 
-const data::PcgGeometry* optional_geometry_input(PcgContext& ctx,
-                                                 const char* pin,
-                                                 data::PcgGeometry& storage)
-{
-    if (const auto* geometry = ctx.inputs.find_geometry(pin))
-        return geometry;
-    if (const auto* mesh = ctx.inputs.find_mesh(pin)) {
-        storage = data::geometry_from_mesh(*mesh);
-        return &storage;
-    }
-    return nullptr;
-}
+// Use shared optional_geometry_input from element_utils.hpp (Geometry/Mesh/Spline/Point).
 
 class ImportMeshElement final : public IPcgElement {
 public:

@@ -44,6 +44,13 @@ namespace DJTechRuntime.PCG
         private float editModeCookInterval = 0.15f;
         [SerializeField] private bool enableAsyncCookInEditor = true;
 
+        /// <summary>
+        /// When true, full-graph Editor cook skips live Graph Editor document and uses on-disk .pcg
+        /// (Agent / MCP reproducible reviews). Node Preview still uses the live document.
+        /// </summary>
+        [FormerlySerializedAs("preferAssetJson")]
+        [SerializeField] private bool preferDiskGraph = false;
+
         [SerializeField]
         private List<PcgParameterOverride> m_ParameterOverrides = new();
 
@@ -232,6 +239,15 @@ namespace DJTechRuntime.PCG
 
         public bool IsAsyncCookInProgress => m_AsyncCookInProgress;
         public string LastAsyncCookStatus => m_LastAsyncCookStatus;
+
+        /// <summary>
+        /// Prefer on-disk .pcg over an open Graph Editor live document for full-graph cooks.
+        /// </summary>
+        public bool PreferDiskGraph
+        {
+            get => preferDiskGraph;
+            set => preferDiskGraph = value;
+        }
 
         /// <summary>
         /// Edit Mode: <see cref="PcgCookMode.EveryFrame"/> is downgraded to
@@ -644,6 +660,10 @@ namespace DJTechRuntime.PCG
 #endif
             if (string.IsNullOrEmpty(json))
             {
+#if UNITY_EDITOR
+                if (EditorIsNodePreviewActive?.Invoke(this) == true)
+                    return false;
+#endif
                 if (!TryBuildExecutionJson(out json))
                     return false;
             }
@@ -889,7 +909,13 @@ namespace DJTechRuntime.PCG
                 case PcgResultKind.Points:
                     if (result.Kind == PcgExecuteKind.Points)
                     {
-                        if (!PcgResultParser.TryParsePointBinary(result.PointBinary, out var points, out var binaryError))
+                        List<PcgScatterPoint> points;
+                        if (result.PointBinary == null && result.PointCount == 0)
+                        {
+                            // Empty point set: server may omit the 16-byte header-only payload.
+                            points = new List<PcgScatterPoint>();
+                        }
+                        else if (!PcgResultParser.TryParsePointBinary(result.PointBinary, out points, out var binaryError))
                         {
                             Debug.LogError($"[PCG] Failed to parse point binary result: {binaryError}");
                             return false;
@@ -1129,9 +1155,9 @@ namespace DJTechRuntime.PCG
                 if (token.IsCancellationRequested)
                     return AsyncCookResult.FromCancelled(generation);
 
-                // ExecuteGraph performs parse + validation. Avoid a second P/Invoke and
-                // a second full JSON parse on every asynchronous preview cook.
-                var (execCode, execResult) = PcgNative.ExecuteGraph(
+                // ExecuteGraph performs parse + validation. Avoid a second native/HTTP
+                // round-trip and a second full JSON parse on every asynchronous preview cook.
+                var (execCode, execResult) = PcgCookBackend.ExecuteGraph(
                     json, localSeed, textures, meshes, splines, heightfields);
                 if (execCode != PcgResultCode.Ok)
                 {
@@ -1171,7 +1197,7 @@ namespace DJTechRuntime.PCG
             if (m_LastAsyncCookStatus == "cancelling")
                 return true;
 
-            PcgNative.RequestCancel();
+            PcgCookBackend.RequestCancel();
             m_AsyncCookCts?.Cancel();
             // A completed result from the superseded request must never apply.
             m_AsyncCookGeneration++;
@@ -1190,11 +1216,11 @@ namespace DJTechRuntime.PCG
             if (!m_AsyncCookInProgress && task == null)
                 return false;
 
-            // Ask the in-flight Task.Run cook to stop, then WAIT for native ExecuteGraph
+            // Ask the in-flight Task.Run cook to stop, then WAIT for ExecuteGraph
             // to finish. Dropping the Task reference without Wait races the next cook against
             // g_cook_cache / static cancel flag — Mesh may still apply, GeometryBinary often becomes 0
             // (cyan polygon wire empty on node Preview).
-            PcgNative.RequestCancel();
+            PcgCookBackend.RequestCancel();
             m_AsyncCookCts?.Cancel();
 
             m_AsyncCookInProgress = false;
@@ -1229,7 +1255,7 @@ namespace DJTechRuntime.PCG
             }
 
             cts?.Dispose();
-            PcgNative.ClearCancel();
+            PcgCookBackend.ClearCancel();
 
 #if UNITY_EDITOR
             if (log && !string.IsNullOrEmpty(reason))

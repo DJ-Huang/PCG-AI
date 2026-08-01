@@ -7,6 +7,9 @@
 #include "geometry/bmesh.hpp"
 #include "geometry/group_table.hpp"
 #include "geometry/element_pattern.hpp"
+#include "pcg_api.h"
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cstdio>
@@ -244,6 +247,93 @@ int main()
             fail("GroupPromote any-endpoint should select more edges than entirely-contained");
         std::printf("PASS: GroupPromote points→edges (%zu entirely, %zu any)\n", edges.size(),
                     any_edges.size());
+    }
+
+    {
+        PcgGeometry geo = create_box_geometry(2.0, 2.0, 2.0);
+        geo.groups().add(GroupDomain::Face, "base", 0);
+        geo.groups().add(GroupDomain::Face, "lots", 1);
+        geo.groups().add(GroupDomain::Edge, "base", edge_key(0, 1));
+
+        GroupDeleteOptions delete_opts;
+        GroupDeleteRule rule;
+        rule.enabled = true;
+        rule.group_type = "any";
+        rule.group_names = "base";
+        delete_opts.rules.push_back(rule);
+        const PcgGeometry deleted = group_delete(geo, delete_opts);
+        if (deleted.groups().has_group(GroupDomain::Face, "base"))
+            fail("GroupDelete should remove face group base");
+        if (deleted.groups().has_group(GroupDomain::Edge, "base"))
+            fail("GroupDelete any should remove edge group base");
+        if (!deleted.groups().has_group(GroupDomain::Face, "lots"))
+            fail("GroupDelete should keep unrelated groups");
+        std::printf("PASS: GroupDelete removes named groups\n");
+    }
+
+    {
+        PcgGeometry geo = create_box_geometry(2.0, 2.0, 2.0);
+        geo.groups().add(GroupDomain::Face, "base", 0);
+        geo.groups().ensure_group(GroupDomain::Face, "empty_face");
+
+        GroupDeleteOptions delete_opts;
+        GroupDeleteRule rule;
+        rule.enabled = true;
+        rule.group_type = "primitives";
+        rule.group_names = "base";
+        delete_opts.rules.push_back(rule);
+        delete_opts.delete_unused_groups = true;
+        const PcgGeometry deleted = group_delete(geo, delete_opts);
+        if (deleted.groups().has_group(GroupDomain::Face, "base"))
+            fail("GroupDelete primitives should remove base");
+        if (deleted.groups().has_group(GroupDomain::Face, "empty_face"))
+            fail("GroupDelete deleteUnusedGroups should remove empty groups");
+        std::printf("PASS: GroupDelete deleteUnusedGroups\n");
+    }
+
+    {
+        const char* group_delete_graph = R"({
+          "version": "1.0",
+          "nodes": [
+            {"id":"box","type":"CreateBoxMesh","data":{"width":2,"height":2,"depth":2}},
+            {"id":"grp","type":"GroupCreate","data":{
+              "outputGroup":"base","domain":"face","enableBaseGroup":true,
+              "enableEdges":false,"enableBounding":false,"enableNormals":false,
+              "enableRandom":false}},
+            {"id":"del","type":"GroupDelete","data":{
+              "deletions":"[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]",
+              "deleteUnusedGroups":false}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges": [
+            {"id":"e1","source":"box","target":"grp","sourceHandle":"out","targetHandle":"in"},
+            {"id":"e2","source":"grp","target":"del","sourceHandle":"out","targetHandle":"in"},
+            {"id":"e3","source":"del","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        std::vector<char> json_buffer(1024 * 1024, 0);
+        std::vector<uint8_t> mesh_buffer(1024 * 1024, 0);
+        int kind = 0;
+        int vertex_count = 0;
+        int index_count = 0;
+        char err_buffer[512] = {};
+        const PcgResultCode code = pcg_execute_graph_v2(
+            group_delete_graph, 42, &kind, json_buffer.data(),
+            static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+            static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+            err_buffer, static_cast<int>(sizeof(err_buffer)));
+        if (code != PCG_OK) {
+            std::printf("GroupDelete graph error: %s\n", err_buffer);
+            fail("GroupDelete graph cook failed");
+        }
+        const auto result = nlohmann::json::parse(json_buffer.data());
+        if (!result.contains("groups") || !result["groups"].is_array())
+            fail("GroupDelete graph missing groups export");
+        for (const auto& group : result["groups"]) {
+            if (group.value("name", std::string()) == "base")
+                fail("GroupDelete graph should remove base group");
+        }
+        std::printf("PASS: GroupDelete graph cook\n");
     }
 
     bevel::BevelEdgeSelection edge_sel;

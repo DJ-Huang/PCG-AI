@@ -10,6 +10,7 @@
 #include "geometry/coplanar_partition.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
@@ -244,7 +245,25 @@ SplitResult build_split_mesh(const data::PcgGeometry& geo_a,
     };
     std::vector<CoplanarPair> coplanar_pairs;
 
-    for (const auto& [a_idx, b_idx] : candidate_pairs) {
+    const auto deadline = opts.timeout_ms > 0
+        ? std::chrono::steady_clock::now() + std::chrono::milliseconds(opts.timeout_ms)
+        : std::chrono::steady_clock::time_point::max();
+
+    for (size_t pair_i = 0; pair_i < candidate_pairs.size(); ++pair_i) {
+        if (opts.is_cancel_requested && opts.is_cancel_requested()) {
+            error = BooleanErrorType::Cancelled;
+            error_msg = "BooleanMesh cancelled";
+            return {};
+        }
+        if (opts.timeout_ms > 0 &&
+            (pair_i % 64 == 0) &&
+            std::chrono::steady_clock::now() >= deadline) {
+            error = BooleanErrorType::Timeout;
+            error_msg = "BooleanMesh timed out after " + std::to_string(opts.timeout_ms) + " ms";
+            return {};
+        }
+
+        const auto& [a_idx, b_idx] = candidate_pairs[pair_i];
         const auto& tri_a = mesh_a.tris[static_cast<size_t>(a_idx)];
         const auto& tri_b = mesh_b.tris[static_cast<size_t>(b_idx)];
 

@@ -133,6 +133,23 @@ struct CreateArcSplineOptions {
 data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options);
 
 data::PcgSplineData resample_spline_data(const data::PcgSplineData& input, const ResampleSplineOptions& options);
+
+struct ProtectSpan {
+    int start = 0;
+    int end = 0;
+};
+
+struct ConditionOutlineOptions {
+    int win = 1;           // odd >= 1; 1 = no smooth
+    double eps = 0.0;      // finite >= 0; 0 disables RDP deletion
+    std::vector<ProtectSpan> protect_spans;
+};
+
+/** Smooth then RDP-simplify each spline. Writes a concrete error and returns {} on failure. */
+data::PcgSplineData condition_outline_data(const data::PcgSplineData& input,
+                                           const ConditionOutlineOptions& options,
+                                           std::string* error = nullptr);
+
 data::PcgPointData sample_along_spline(const data::PcgSplineData& splines, const SampleAlongSplineOptions& options);
 data::PcgMeshData extrude_along_spline(const data::PcgSplineData& splines,
                                          const data::PcgMeshData* profile_mesh,

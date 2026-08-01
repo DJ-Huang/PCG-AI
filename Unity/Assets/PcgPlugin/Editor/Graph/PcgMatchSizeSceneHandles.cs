@@ -30,6 +30,9 @@ namespace DJTechEditor.PCG.Graph
             if (Event.current == null || Event.current.type != EventType.Repaint)
                 return;
 
+            if (PcgCreateSplineSceneHandles.IsExternalSceneHandleIsolation)
+                return;
+
             var window = ResolveGraphWindow();
             if (window == null || !window.HasLoadedGraph)
                 return;

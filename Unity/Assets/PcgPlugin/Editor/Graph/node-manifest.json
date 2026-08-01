@@ -312,7 +312,22 @@
       "inputs": [
         {
           "id": "in",
-          "label": "Geometry",
+          "label": "0",
+          "pinType": "Any"
+        },
+        {
+          "id": "in1",
+          "label": "1",
+          "pinType": "Any"
+        },
+        {
+          "id": "in2",
+          "label": "2",
+          "pinType": "Any"
+        },
+        {
+          "id": "in3",
+          "label": "3",
           "pinType": "Any"
         }
       ],
@@ -324,6 +339,22 @@
         }
       ],
       "properties": {
+        "group": {
+          "type": "groupSelect",
+          "displayName": "Group",
+          "default": ""
+        },
+        "groupType": {
+          "type": "enum",
+          "displayName": "Group Type",
+          "default": "guess",
+          "options": [
+            { "value": "guess", "label": "Guess from Group" },
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
         "runOver": {
           "type": "enum",
           "displayName": "Run Over",
@@ -352,10 +383,21 @@
         },
         "parameters": {
           "type": "string",
-          "displayName": "Parameters (JSON)",
+          "displayName": "Channels",
           "default": "{\"sag\": 3.0}",
+          "multiline": false
+        },
+        "attributesToCreate": {
+          "type": "string",
+          "displayName": "Attributes to Create",
+          "default": "",
           "multiline": true,
-          "lines": 3
+          "lines": 2
+        },
+        "enforcePrototypes": {
+          "type": "boolean",
+          "displayName": "Enforce Prototypes",
+          "default": false
         },
         "ramps": {
           "type": "string",
@@ -363,6 +405,228 @@
           "default": "{}",
           "multiline": true,
           "lines": 6
+        }
+      }
+    },
+    {
+      "type": "AttributeTransfer",
+      "displayName": "Attribute Transfer",
+      "category": "Attribute",
+      "inspectorSectionLayout": "tabs",
+      "inputs": [
+        {
+          "id": "target",
+          "label": "Target",
+          "pinType": "SpatialMesh"
+        },
+        {
+          "id": "source",
+          "label": "Source",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "attributes",
+          "label": "Attributes",
+          "foldout": false
+        },
+        {
+          "id": "conditions",
+          "label": "Conditions",
+          "foldout": false
+        }
+      ],
+      "properties": {
+        "sourceGroup": {
+          "type": "groupSelect",
+          "displayName": "Source Group",
+          "default": "",
+          "order": 10
+        },
+        "sourceGroupType": {
+          "type": "enum",
+          "displayName": "Source Group Type",
+          "default": "primitives",
+          "order": 11,
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "vertices", "label": "Vertices" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "destinationGroup": {
+          "type": "groupSelect",
+          "displayName": "Destination Group",
+          "default": "",
+          "order": 20
+        },
+        "destinationGroupType": {
+          "type": "enum",
+          "displayName": "Destination Group Type",
+          "default": "primitives",
+          "order": 21,
+          "options": [
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "vertices", "label": "Vertices" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "transferDetail": {
+          "type": "boolean",
+          "displayName": "Detail",
+          "default": true,
+          "section": "attributes",
+          "order": 30,
+          "companionField": "detailAttributes"
+        },
+        "detailAttributes": {
+          "type": "string",
+          "displayName": "Detail",
+          "default": "*",
+          "section": "attributes",
+          "order": 31
+        },
+        "transferPrimitives": {
+          "type": "boolean",
+          "displayName": "Primitives",
+          "default": false,
+          "section": "attributes",
+          "order": 40,
+          "companionField": "primitiveAttributes"
+        },
+        "primitiveAttributes": {
+          "type": "string",
+          "displayName": "Primitives",
+          "default": "*",
+          "section": "attributes",
+          "order": 41
+        },
+        "transferPoints": {
+          "type": "boolean",
+          "displayName": "Points",
+          "default": false,
+          "section": "attributes",
+          "order": 50,
+          "companionField": "pointAttributes"
+        },
+        "pointAttributes": {
+          "type": "string",
+          "displayName": "Points",
+          "default": "*",
+          "section": "attributes",
+          "order": 51
+        },
+        "transferVertices": {
+          "type": "boolean",
+          "displayName": "Vertices",
+          "default": false,
+          "section": "attributes",
+          "order": 60,
+          "companionField": "vertexAttributes"
+        },
+        "vertexAttributes": {
+          "type": "string",
+          "displayName": "Vertices",
+          "default": "*",
+          "section": "attributes",
+          "order": 61
+        },
+        "copyLocalVariables": {
+          "type": "boolean",
+          "displayName": "Copy Local Variables",
+          "default": true,
+          "section": "attributes",
+          "order": 70
+        },
+        "allowPAttribute": {
+          "type": "boolean",
+          "displayName": "Allow P Attribute",
+          "default": false,
+          "section": "attributes",
+          "order": 71
+        },
+        "kernelFunction": {
+          "type": "enum",
+          "displayName": "Kernel Function",
+          "default": "elendt",
+          "section": "conditions",
+          "order": 10,
+          "options": [
+            { "value": "elendt", "label": "Elendt Model" },
+            { "value": "wyvill", "label": "Wyvill Model" },
+            { "value": "blinn", "label": "Blinn Model" },
+            { "value": "hart", "label": "Hart Model" },
+            { "value": "links", "label": "Links Model" },
+            { "value": "heron", "label": "Heron Model" },
+            { "value": "uniform", "label": "Uniform Model" }
+          ]
+        },
+        "kernelRadius": {
+          "type": "number",
+          "displayName": "Kernel Radius",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 20
+        },
+        "maxSampleCount": {
+          "type": "integer",
+          "displayName": "Max Sample Count",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 30
+        },
+        "enableDistanceThreshold": {
+          "type": "boolean",
+          "displayName": "Distance Threshold",
+          "default": true,
+          "section": "conditions",
+          "order": 40,
+          "companionField": "distanceThreshold"
+        },
+        "distanceThreshold": {
+          "type": "number",
+          "displayName": "Distance Threshold",
+          "default": 10.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 41
+        },
+        "blendWidth": {
+          "type": "number",
+          "displayName": "Blend Width",
+          "default": 0.0,
+          "minimum": 0,
+          "maximum": 100,
+          "section": "conditions",
+          "order": 50
+        },
+        "uniformBias": {
+          "type": "number",
+          "displayName": "Uniform Bias",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "section": "conditions",
+          "order": 60,
+          "enabledWhen": {
+            "property": "kernelFunction",
+            "equals": "uniform"
+          }
         }
       }
     },
@@ -798,53 +1062,43 @@
         }
       ],
       "properties": {
-        "entity": {
+        "group": {
+          "type": "groupSelect",
+          "displayName": "Group",
+          "default": "",
+          "order": 0
+        },
+        "groupType": {
           "type": "enum",
           "displayName": "Group Type",
-          "default": "primitives",
+          "default": "guess",
+          "order": 10,
           "options": [
             {
-              "value": "primitives",
-              "label": "Primitives"
+              "value": "guess",
+              "label": "Guess from Group"
             },
             {
               "value": "points",
               "label": "Points"
+            },
+            {
+              "value": "primitives",
+              "label": "Primitives"
             }
           ]
-        },
-        "group": {
-          "type": "string",
-          "displayName": "Group",
-          "default": ""
-        },
-        "expression": {
-          "type": "string",
-          "displayName": "Selection Expression",
-          "default": "",
-          "multiline": true,
-          "lines": 4
-        },
-        "parameters": {
-          "type": "string",
-          "displayName": "Parameters (JSON)",
-          "default": "{}",
-          "multiline": true,
-          "lines": 3
         },
         "invertSelection": {
           "type": "boolean",
           "displayName": "Invert Selection",
-          "default": false
+          "default": false,
+          "order": 20
         },
-        "removeUnusedPoints": {
+        "deleteUnusedGroups": {
           "type": "boolean",
-          "displayName": "Remove Unused Points",
-          "default": true,
-          "visibleWhen": {
-            "property": "entity",
-            "equals": "primitives"
-          }
+          "displayName": "Delete Unused Groups",
+          "default": false,
+          "order": 30
         }
       }
     },
@@ -4203,6 +4457,49 @@
       }
     },
     {
+      "type": "GroupDelete",
+      "displayName": "Group Delete",
+      "category": "Geometry",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "deletions",
+          "label": "Number of Deletions",
+          "foldout": false,
+          "header": false
+        }
+      ],
+      "properties": {
+        "deletions": {
+          "type": "string",
+          "displayName": "Deletions",
+          "default": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]",
+          "section": "deletions",
+          "order": 0
+        },
+        "deleteUnusedGroups": {
+          "type": "boolean",
+          "displayName": "Delete Unused Groups",
+          "default": false,
+          "section": "deletions",
+          "order": 100
+        }
+      }
+    },
+    {
       "type": "GroupPromote",
       "displayName": "Group Promote",
       "category": "Geometry",
@@ -5524,6 +5821,240 @@
       }
     },
     {
+      "type": "ConditionOutline",
+      "displayName": "Condition Outline",
+      "category": "Spline",
+      "description": "Smooth then RDP-simplify SpatialSpline outlines. protectSpans are input-point index closed intervals (not Groups). Defaults are no-op. Active processing canonicalizes an explicit duplicate closing point on closed splines. Does not resample, repair self-intersections, or convert to columns.",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Spline",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Spline",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "properties": {
+        "win": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "displayName": "Smooth Window",
+          "description": "Odd window size >= 1. 1 disables smoothing."
+        },
+        "eps": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0.0,
+          "displayName": "RDP Epsilon",
+          "description": "Max point-to-segment distance kept by RDP. 0 disables simplification (no collinear collapse)."
+        },
+        "protectSpans": {
+          "type": "string",
+          "default": "[]",
+          "displayName": "Protect Spans",
+          "description": "JSON array of {start,end} input-point index closed intervals. Protected points are not smoothed or deleted; indices refer to the input before closing-point canonicalization. Cross-seam (start>end) only on closed splines."
+        }
+      }
+    },
+    {
+      "type": "OutlineSolid",
+      "displayName": "Outline Solid",
+      "category": "Mesh",
+      "description": "Welded solid from closed outline, columnsJson, or spine+edge stations. Select path with inputMode (no auto-detect). Prefer over micro-cylinder BooleanMesh chains for knife/plate bodies.",
+      "inputs": [
+        {
+          "id": "outline",
+          "label": "Outline",
+          "pinType": "SpatialSpline",
+          "visibleWhen": { "property": "inputMode", "equals": "outline" }
+        },
+        {
+          "id": "spine",
+          "label": "Spine",
+          "pinType": "SpatialSpline",
+          "visibleWhen": { "property": "inputMode", "equals": "spineEdge" }
+        },
+        {
+          "id": "edge",
+          "label": "Edge",
+          "pinType": "SpatialSpline",
+          "visibleWhen": { "property": "inputMode", "equals": "spineEdge" }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputGroups": [
+        {
+          "name": "front",
+          "domain": "face",
+          "label": "Front face"
+        },
+        {
+          "name": "back",
+          "domain": "face",
+          "label": "Back face"
+        },
+        {
+          "name": "rim",
+          "domain": "face",
+          "label": "Rim faces"
+        }
+      ],
+      "properties": {
+        "inputMode": {
+          "type": "enum",
+          "default": "outline",
+          "displayName": "Input Mode",
+          "description": "Explicit input path. outline = closed spline extrusion; columnsJson = stations JSON; spineEdge = paired spine/edge polylines.",
+          "uiHint": "radio",
+          "options": [
+            { "value": "outline", "label": "Outline" },
+            { "value": "columnsJson", "label": "Columns JSON" },
+            { "value": "spineEdge", "label": "Spine / Edge" }
+          ]
+        },
+        "thickness": {
+          "type": "number",
+          "default": 0.01,
+          "minimum": 0.0001,
+          "displayName": "Thickness",
+          "description": "Full thickness (m). Outline mode default; also fallback half_z for column modes."
+        },
+        "thicknessAxis": {
+          "type": "enum",
+          "default": "z",
+          "displayName": "Thickness Axis",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "thicknessSamples": {
+          "type": "string",
+          "default": "[]",
+          "displayName": "Thickness Samples",
+          "description": "JSON array of full thickness per outline vertex (meters). Empty = use thickness.",
+          "visibleWhen": { "property": "inputMode", "equals": "outline" }
+        },
+        "columnsJson": {
+          "type": "string",
+          "default": "[]",
+          "displayName": "Columns JSON",
+          "description": "JSON array of {x,y_top,y_bot,half_z} stations.",
+          "visibleWhen": { "property": "inputMode", "equals": "columnsJson" }
+        },
+        "rows": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "Rows",
+          "description": "Interior rows for column loft (cosine-graded t). 0 → 1 band.",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
+        },
+        "profileMode": {
+          "type": "enum",
+          "default": "constant",
+          "displayName": "Profile Mode",
+          "description": "zAt across t: constant, slab, blade.",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          },
+          "options": [
+            { "value": "constant", "label": "Constant" },
+            { "value": "slab", "label": "Slab" },
+            { "value": "blade", "label": "Blade" }
+          ]
+        },
+        "spineRollFrac": {
+          "type": "number",
+          "default": 0.08,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Spine Roll Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
+        },
+        "handleRollFrac": {
+          "type": "number",
+          "default": 0.12,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Handle Roll Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
+        },
+        "edgeFrac": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Edge Frac",
+          "description": "Thickness retained at outline edge for slab/blade roll (fraction of half_z).",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
+        },
+        "grindStartFrac": {
+          "type": "number",
+          "default": 0.35,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Grind Start Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
+        },
+        "edgeBevelFrac": {
+          "type": "number",
+          "default": 0.92,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "displayName": "Edge Bevel Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
+        },
+        "frontGroup": {
+          "type": "string",
+          "default": "front",
+          "displayName": "Front Group"
+        },
+        "backGroup": {
+          "type": "string",
+          "default": "back",
+          "displayName": "Back Group"
+        },
+        "rimGroup": {
+          "type": "string",
+          "default": "rim",
+          "displayName": "Rim Group"
+        }
+      }
+    },
+    {
       "type": "SweepAlongSpline",
       "displayName": "Sweep Along Spline",
       "category": "Spline",
@@ -6126,6 +6657,103 @@
             { "value": "post", "label": "Post-Multiply" },
             { "value": "pre", "label": "Pre-Multiply" }
           ]
+        }
+      }
+    },
+    {
+      "type": "TransformByAttribute",
+      "displayName": "Transform by Attribute",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "inspectorSections": [
+        {
+          "id": "transform",
+          "label": "Transform",
+          "foldout": false,
+          "header": true
+        },
+        {
+          "id": "attributes",
+          "label": "Attributes",
+          "foldout": false,
+          "header": true
+        }
+      ],
+      "properties": {
+        "group": {
+          "type": "groupSelect",
+          "default": "",
+          "displayName": "Group",
+          "section": "transform",
+          "order": 0
+        },
+        "groupType": {
+          "type": "enum",
+          "default": "guess",
+          "displayName": "Group Type",
+          "section": "transform",
+          "order": 1,
+          "options": [
+            { "value": "guess", "label": "Guess from Group" },
+            { "value": "points", "label": "Points" },
+            { "value": "primitives", "label": "Primitives" },
+            { "value": "edges", "label": "Edges" }
+          ]
+        },
+        "transformAttribute": {
+          "type": "string",
+          "default": "xform",
+          "displayName": "Transform Attribute",
+          "section": "transform",
+          "order": 10
+        },
+        "invertTransform": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Invert Transformation",
+          "section": "transform",
+          "order": 20
+        },
+        "attributes": {
+          "type": "string",
+          "default": "*",
+          "displayName": "Attributes to Transform",
+          "section": "attributes",
+          "order": 10
+        },
+        "recomputeAffectedNormals": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Recompute Affected Normals",
+          "section": "attributes",
+          "order": 20
+        },
+        "preserveNormalLength": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Preserve Normal Length",
+          "section": "attributes",
+          "order": 30
+        },
+        "deleteTransformAttribute": {
+          "type": "boolean",
+          "default": true,
+          "displayName": "Delete Transform Attribute",
+          "section": "attributes",
+          "order": 40
         }
       }
     },
@@ -7537,6 +8165,23 @@
           "type": "integer",
           "default": 500000,
           "minimum": 1000
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "Timeout (ms)",
+          "description": "0 = no timeout. Best-effort wall-clock abort during intersection; returns observable error (or passthrough A)."
+        },
+        "onFailure": {
+          "type": "enum",
+          "default": "error",
+          "displayName": "On Failure",
+          "description": "error = fail cook with message (cancel/timeout/budget). passthroughA = emit mesh A and continue (avoid silent hang).",
+          "options": [
+            { "value": "error", "label": "Error (observable)" },
+            { "value": "passthroughA", "label": "Passthrough A" }
+          ]
         }
       }
     },
@@ -7610,12 +8255,14 @@
         "radius": {
           "type": "number",
           "default": 1.0,
-          "minimum": 0.001
+          "minimum": 0.001,
+          "description": "Practical min ~0.001 m. Sub-mm cutters for jimping/scallops via BooleanMesh are unstable — prefer OutlineSolid profile envelopes or larger cutters."
         },
         "height": {
           "type": "number",
           "default": 2.0,
-          "minimum": 0.001
+          "minimum": 0.001,
+          "description": "Practical min ~0.001 m. Avoid chaining tiny cylinders as the only micro-detail strategy."
         },
         "radialSegments": {
           "type": "integer",
@@ -8019,12 +8666,11 @@
         "scaleU": {
           "type": "number",
           "default": 1.0,
-          "minimum": 0.001
+          "description": "Deprecated for mirror: prefer flipping refMinU/refMaxU (crop SSOT). Negative retained for compatibility."
         },
         "scaleV": {
           "type": "number",
-          "default": 1.0,
-          "minimum": 0.001
+          "default": 1.0
         },
         "offsetU": {
           "type": "number",
@@ -8033,6 +8679,36 @@
         "offsetV": {
           "type": "number",
           "default": 0.0
+        },
+        "useReferenceBounds": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Use Reference Bounds",
+          "description": "When true, planar UV uses refMin/Max world crop (textureCrop SSOT) instead of mesh AABB."
+        },
+        "refMinU": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Ref Min U",
+          "description": "World-space min along projection U axis (e.g. X when direction=Z)."
+        },
+        "refMaxU": {
+          "type": "number",
+          "default": 1.0,
+          "displayName": "Ref Max U",
+          "description": "World-space max along projection U axis."
+        },
+        "refMinV": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Ref Min V",
+          "description": "World-space min along projection V axis (e.g. Y when direction=Z)."
+        },
+        "refMaxV": {
+          "type": "number",
+          "default": 1.0,
+          "displayName": "Ref Max V",
+          "description": "World-space max along projection V axis."
         }
       }
     },
@@ -9824,16 +10500,29 @@
       "outputs": [
         {
           "id": "out",
-          "label": "Spline",
-          "pinType": "SpatialSpline"
+          "label": "Out",
+          "pinType": "Any"
         }
       ],
       "properties": {
+        "group": {
+          "type": "string",
+          "displayName": "Group",
+          "default": "",
+          "order": 0
+        },
+        "arcLengthU": {
+          "type": "boolean",
+          "displayName": "Carve Curves by Relative Arc Length",
+          "default": true,
+          "order": 10
+        },
         "useFirstU": {
           "type": "boolean",
           "displayName": "First U",
           "default": true,
-          "order": 0
+          "order": 20,
+          "companionField": "uStart"
         },
         "uStart": {
           "type": "number",
@@ -9842,15 +10531,27 @@
           "minimum": 0.0,
           "maximum": 1.0,
           "visibleWhen": {
-            "useFirstU": true
+            "property": "useFirstU",
+            "equals": true
           },
-          "order": 10
+          "order": 30
+        },
+        "uStartAttrib": {
+          "type": "string",
+          "displayName": "First U Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useFirstU",
+            "equals": true
+          },
+          "order": 40
         },
         "useSecondU": {
           "type": "boolean",
           "displayName": "Second U",
           "default": true,
-          "order": 20
+          "order": 50,
+          "companionField": "uEnd"
         },
         "uEnd": {
           "type": "number",
@@ -9859,62 +10560,214 @@
           "minimum": 0.0,
           "maximum": 1.0,
           "visibleWhen": {
-            "useSecondU": true
+            "property": "useSecondU",
+            "equals": true
           },
-          "order": 30
+          "order": 60
         },
-        "arcLengthU": {
+        "uEndAttrib": {
+          "type": "string",
+          "displayName": "Second U Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useSecondU",
+            "equals": true
+          },
+          "order": 70
+        },
+        "useFirstV": {
           "type": "boolean",
-          "displayName": "Carve Curves by Relative Arc Length",
+          "displayName": "First V",
           "default": true,
-          "order": 40
+          "order": 80,
+          "companionField": "vStart"
+        },
+        "vStart": {
+          "type": "number",
+          "displayName": "First V Value",
+          "default": 0.25,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "visibleWhen": {
+            "property": "useFirstV",
+            "equals": true
+          },
+          "order": 90
+        },
+        "vStartAttrib": {
+          "type": "string",
+          "displayName": "First V Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useFirstV",
+            "equals": true
+          },
+          "order": 100
+        },
+        "useSecondV": {
+          "type": "boolean",
+          "displayName": "Second V",
+          "default": true,
+          "order": 110,
+          "companionField": "vEnd"
+        },
+        "vEnd": {
+          "type": "number",
+          "displayName": "Second V Value",
+          "default": 0.75,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "visibleWhen": {
+            "property": "useSecondV",
+            "equals": true
+          },
+          "order": 120
+        },
+        "vEndAttrib": {
+          "type": "string",
+          "displayName": "Second V Attrib",
+          "default": "",
+          "visibleWhen": {
+            "property": "useSecondV",
+            "equals": true
+          },
+          "order": 130
         },
         "location": {
           "type": "enum",
           "displayName": "Location",
-          "default": "breakpoints",
+          "default": "divisions",
+          "uiHint": "radio",
           "options": [
-            {
-              "value": "breakpoints",
-              "label": "Breakpoints"
-            },
             {
               "value": "divisions",
               "label": "Divisions"
+            },
+            {
+              "value": "breakpoints",
+              "label": "Breakpoints"
             }
           ],
-          "order": 50
+          "order": 140
+        },
+        "uDivisions": {
+          "type": "integer",
+          "displayName": "U Divisions",
+          "default": 2,
+          "minimum": 1,
+          "visibleWhen": {
+            "property": "location",
+            "equals": "divisions"
+          },
+          "order": 150
+        },
+        "vDivisions": {
+          "type": "integer",
+          "displayName": "V Divisions",
+          "default": 2,
+          "minimum": 1,
+          "visibleWhen": {
+            "property": "location",
+            "equals": "divisions"
+          },
+          "order": 160
         },
         "cutAtAllInternalUBreakpoints": {
           "type": "boolean",
           "displayName": "Cut At All Internal U Breakpoints",
           "default": true,
           "visibleWhen": {
-            "location": "breakpoints"
+            "property": "location",
+            "equals": "breakpoints"
           },
-          "order": 60
+          "order": 170
         },
-        "uDivisions": {
-          "type": "integer",
-          "displayName": "U Divisions",
-          "default": 1,
-          "minimum": 1,
+        "cutAtAllInternalVBreakpoints": {
+          "type": "boolean",
+          "displayName": "Cut At All Internal V Breakpoints",
+          "default": true,
           "visibleWhen": {
-            "location": "divisions"
+            "property": "location",
+            "equals": "breakpoints"
           },
-          "order": 70
+          "order": 180
+        },
+        "operation": {
+          "type": "enum",
+          "displayName": "Operation",
+          "default": "cut",
+          "uiHint": "radio",
+          "options": [
+            {
+              "value": "cut",
+              "label": "Cut"
+            },
+            {
+              "value": "extract",
+              "label": "Extract"
+            }
+          ],
+          "order": 190
         },
         "keepInside": {
           "type": "boolean",
           "displayName": "Keep Inside",
           "default": true,
-          "order": 80
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "cut"
+          },
+          "order": 200
         },
         "keepOutside": {
           "type": "boolean",
           "displayName": "Keep Outside",
           "default": false,
-          "order": 90
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "cut"
+          },
+          "order": 210
+        },
+        "extractType": {
+          "type": "enum",
+          "displayName": "Extract Type",
+          "default": "curves3d",
+          "options": [
+            {
+              "value": "curves3d",
+              "label": "Extract 3D Isoparametric Curve(s)"
+            },
+            {
+              "value": "points",
+              "label": "Extract Point(s)"
+            }
+          ],
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "extract"
+          },
+          "order": 220
+        },
+        "keepOriginal": {
+          "type": "boolean",
+          "displayName": "Keep Original",
+          "default": false,
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "extract"
+          },
+          "order": 230
+        },
+        "onlyAtBreakpoints": {
+          "type": "boolean",
+          "displayName": "Only At Breakpoints",
+          "default": false,
+          "visibleWhen": {
+            "property": "operation",
+            "equals": "extract"
+          },
+          "order": 240
         }
       }
     },

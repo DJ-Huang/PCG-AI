@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.Collections.Generic;
 using DJTechEditor.PCG.Graph;
 using DJTechRuntime.PCG;
 using UnityEditor;
@@ -8,11 +9,28 @@ namespace DJTechEditor.PCG
 {
     /// <summary>
     /// When PcgGraphComponent runs in the Editor, prefer the live Graph Editor document
-    /// (includes unsaved ImageTexture assignments) over the on-disk .pcg file.
+    /// (includes unsaved ImageTexture assignments) over the on-disk .pcg file —
+    /// unless <see cref="SessionPreferDiskGraph"/> or the component's PreferDiskGraph is set.
     /// </summary>
     [InitializeOnLoad]
     public static class PcgGraphExecutionBridge
     {
+        /// <summary>
+        /// Session-wide override for Agent/MCP cooks: when true, full-graph cook uses on-disk .pcg
+        /// even if a Graph Editor window is open for the same asset.
+        /// </summary>
+        public static bool SessionPreferDiskGraph { get; set; }
+
+        /// <summary>
+        /// Root-scope Subgraph instance node id → flat node id that sourced its first output,
+        /// captured by the most recent <see cref="BuildExecutionJson"/>. Read by the Graph
+        /// Editor info panel so a flattened Subgraph instance still shows its output stats.
+        /// </summary>
+        internal static IReadOnlyDictionary<string, string> LastOutputStatsAliases { get; private set; }
+
+        /// <summary>Bumped whenever <see cref="LastOutputStatsAliases"/> is replaced.</summary>
+        internal static long LastOutputStatsAliasesVersion { get; private set; }
+
         static PcgGraphExecutionBridge()
         {
             PcgGraphComponent.EditorBuildExecutionJson = BuildExecutionJson;
@@ -51,6 +69,18 @@ namespace DJTechEditor.PCG
             if (string.IsNullOrEmpty(assetPath))
                 return null;
 
+            // Node Preview always needs the live Graph Editor document + truncated cook.
+            // PreferDiskGraph/SessionPreferDiskGraph only apply to full-graph Output cooks.
+            var preferDisk = !IsNodePreviewActive(component) &&
+                (SessionPreferDiskGraph || component.PreferDiskGraph);
+            if (preferDisk)
+            {
+                Debug.Log(
+                    $"[PCG] preferDiskGraph: using on-disk .pcg for '{assetPath}' " +
+                    $"(session={SessionPreferDiskGraph}, component={component.PreferDiskGraph}).");
+                return null;
+            }
+
             var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
             foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())
             {
@@ -74,6 +104,7 @@ namespace DJTechEditor.PCG
 
                 var cookDoc = liveDoc;
                 var previewNodeId = window.PreviewNodeId;
+                Dictionary<string, string> previewStatsAliases = null;
                 if (!string.IsNullOrEmpty(previewNodeId))
                 {
                     if (!PcgGraphPreviewSubgraph.TryBuildPreviewCook(
@@ -82,6 +113,7 @@ namespace DJTechEditor.PCG
                             window.PreviewScopeSubgraphId,
                             window.PreviewInstanceChain,
                             out var subgraph,
+                            out previewStatsAliases,
                             out var previewError))
                     {
                         Debug.LogError($"[PCG] Node preview subgraph failed: {previewError}");
@@ -99,20 +131,51 @@ namespace DJTechEditor.PCG
 
                 if (!PcgExecutionDocumentBuilder.TryBuildJson(
                         cookDoc,
-                        PcgExecutionDocumentBuilder.CreateEditorAssetDatabaseLoader(),
+                        window.CreateExternalSubgraphLoader(),
                         out var flatJson,
                         out _,
                         out var buildError,
+                        out var outputStatsAliases,
                         pretty: false))
                 {
                     Debug.LogError($"[PCG] Failed to build execution document: {buildError}");
                     return null;
                 }
 
+                LastOutputStatsAliases = MergeOutputStatsAliases(outputStatsAliases, previewStatsAliases);
+                LastOutputStatsAliasesVersion++;
+
                 return flatJson;
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Flattener aliases (Subgraph instances → flat source) win on key collision;
+        /// preview aliases (interface Output/anchor ids → cooked source) fill the rest.
+        /// </summary>
+        private static IReadOnlyDictionary<string, string> MergeOutputStatsAliases(
+            IReadOnlyDictionary<string, string> flattenerAliases,
+            IReadOnlyDictionary<string, string> previewAliases)
+        {
+            if (previewAliases == null || previewAliases.Count == 0)
+                return flattenerAliases;
+
+            var merged = new Dictionary<string, string>();
+            if (flattenerAliases != null)
+            {
+                foreach (var pair in flattenerAliases)
+                    merged[pair.Key] = pair.Value;
+            }
+
+            foreach (var pair in previewAliases)
+            {
+                if (!merged.ContainsKey(pair.Key))
+                    merged[pair.Key] = pair.Value;
+            }
+
+            return merged;
         }
     }
 }

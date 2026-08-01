@@ -79,9 +79,27 @@ export default function Inspector({
   const data = selectedNode.data as NodeData;
 
   // Split properties into group-related and regular
+  const normalizeVisible = (v: unknown): string => {
+    if (v == null) return '';
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    if (typeof v === 'string' && (v === 'true' || v === 'false')) return v;
+    return String(v);
+  };
+  const isPropVisible = (prop: ManifestProperty): boolean => {
+    const vw = prop.visibleWhen;
+    if (!vw?.property) return true;
+    const driver = def.properties[vw.property];
+    const current = normalizeVisible(data[vw.property] ?? driver?.default);
+    if (vw.oneOf && vw.oneOf.length > 0) {
+      return vw.oneOf.some((c) => normalizeVisible(c) === current);
+    }
+    return current === normalizeVisible(vw.equals);
+  };
+
   const groupProps: [string, ManifestProperty][] = [];
   const regularProps: [string, ManifestProperty][] = [];
   for (const [key, prop] of Object.entries(def.properties)) {
+    if (!isPropVisible(prop)) continue;
     if (prop.type === 'groupSelect' || prop.type === 'groupMultiSelect' || prop.isGroupOutput) {
       groupProps.push([key, prop]);
     } else {
@@ -102,7 +120,7 @@ export default function Inspector({
     return (
       <div key={key} className="pcg-inspector__prop">
         <div className="pcg-inspector__prop-header">
-          <span className="pcg-inspector__prop-label">{key}</span>
+          <span className="pcg-inspector__prop-label">{prop.displayName ?? key}</span>
           <div className="pcg-inspector__prop-actions">
             <button
               type="button"
@@ -262,6 +280,22 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
       );
 
     case 'enum':
+      if (prop.uiHint === 'radio') {
+        return (
+          <div className="pcg-inspector__radio">
+            {prop.options?.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`pcg-inspector__radio-btn${String(value) === opt.value ? ' pcg-inspector__radio-btn--active' : ''}`}
+                onClick={() => onChange(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        );
+      }
       return (
         <select
           value={String(value)}

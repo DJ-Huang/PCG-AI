@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "outline",
+      "type": "CreateSpline",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "mode": "polyline",
+        "closed": true,
+        "subdivisions": 1,
+        "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":0.12,\"y\":0,\"z\":0},{\"x\":0.12,\"y\":0.05,\"z\":0},{\"x\":0,\"y\":0.05,\"z\":0}]"
+      }
+    },
+    {
+      "id": "solid",
+      "type": "OutlineSolid",
+      "position": {
+        "x": 0,
+        "y": 220
+      },
+      "data": {
+        "thickness": 0.01,
+        "thicknessAxis": "z",
+        "frontGroup": "front",
+        "backGroup": "back",
+        "rimGroup": "rim",
+        "inputMode": "outline"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 0,
+        "y": 440
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "outline",
+      "target": "solid",
+      "sourceHandle": "out",
+      "targetHandle": "outline"
+    },
+    {
+      "id": "e1",
+      "source": "solid",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

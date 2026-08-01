@@ -42,4 +42,20 @@ data::PcgGeometry transform_geometry(const data::PcgGeometry& geometry,
 data::PcgMeshData transform_mesh(const data::PcgMeshData& mesh,
                                  const TransformMeshOptions& options);
 
+struct TransformByAttributeOptions {
+    std::string group;
+    std::string group_type = "guess";
+    std::string transform_attribute = "xform";
+    bool invert_transform = false;
+    std::string attributes = "*";
+    bool recompute_affected_normals = true;
+    bool preserve_normal_length = true;
+    bool delete_transform_attribute = true;
+};
+
+bool transform_by_attribute_geometry(const data::PcgGeometry& geometry,
+                                     const TransformByAttributeOptions& options,
+                                     data::PcgGeometry& output,
+                                     std::string& error);
+
 } // namespace pcg::internal::elements

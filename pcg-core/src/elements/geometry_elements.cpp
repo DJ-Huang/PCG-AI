@@ -181,6 +181,50 @@ public:
     }
 };
 
+class GroupDeleteElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "GroupDelete"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupDelete missing node");
+
+        data::PcgGeometry storage;
+        const data::PcgGeometry* input = optional_geometry_input(ctx, "in", storage);
+        if (input == nullptr) {
+            const data::PcgTaggedData* tagged = ctx.inputs.find("in");
+            if (tagged != nullptr && tagged->geometry)
+                input = tagged->geometry.get();
+            else if (tagged != nullptr && tagged->mesh && !tagged->mesh->vertices().empty()) {
+                storage = data::geometry_from_mesh(*tagged->mesh);
+                input = &storage;
+            }
+        }
+
+        if (input == nullptr) {
+            const data::PcgTaggedData* tagged = ctx.inputs.find("in");
+            if (tagged != nullptr && tagged->splines) {
+                emit_splines(ctx, *tagged->splines);
+                return PCG_OK;
+            }
+            if (tagged != nullptr && tagged->points) {
+                emit_points(ctx, *tagged->points);
+                return PCG_OK;
+            }
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "GroupDelete missing geometry input (connect Geometry/Mesh to input)");
+        }
+
+        GroupDeleteOptions opts;
+        opts.rules = parse_group_delete_rules(ctx.node->data);
+        opts.delete_unused_groups = ctx.node->data.value("deleteUnusedGroups", false);
+
+        emit_geometry(ctx, group_delete(*input, opts));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
@@ -189,6 +233,7 @@ void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<
     map.emplace("GroupCombine", std::make_unique<GroupCombineElement>());
     map.emplace("FaceGroupByNormal", std::make_unique<FaceGroupByNormalElement>());
     map.emplace("GroupPromote", std::make_unique<GroupPromoteElement>());
+    map.emplace("GroupDelete", std::make_unique<GroupDeleteElement>());
 }
 
 } // namespace pcg::internal::elements
