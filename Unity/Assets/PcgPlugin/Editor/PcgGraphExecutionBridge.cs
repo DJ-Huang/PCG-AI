@@ -10,16 +10,16 @@ namespace DJTechEditor.PCG
     /// <summary>
     /// When PcgGraphComponent runs in the Editor, prefer the live Graph Editor document
     /// (includes unsaved ImageTexture assignments) over the on-disk .pcg file —
-    /// unless <see cref="SessionPreferAssetJson"/> or the component's PreferAssetJson is set.
+    /// unless <see cref="SessionPreferDiskGraph"/> or the component's PreferDiskGraph is set.
     /// </summary>
     [InitializeOnLoad]
     public static class PcgGraphExecutionBridge
     {
         /// <summary>
-        /// Session-wide override for Agent/MCP cooks: when true, always use on-disk .pcg
+        /// Session-wide override for Agent/MCP cooks: when true, full-graph cook uses on-disk .pcg
         /// even if a Graph Editor window is open for the same asset.
         /// </summary>
-        public static bool SessionPreferAssetJson { get; set; }
+        public static bool SessionPreferDiskGraph { get; set; }
 
         /// <summary>
         /// Root-scope Subgraph instance node id → flat node id that sourced its first output,
@@ -70,14 +70,14 @@ namespace DJTechEditor.PCG
                 return null;
 
             // Node Preview always needs the live Graph Editor document + truncated cook.
-            // PreferAssetJson/SessionPreferAssetJson only apply to full-graph Output cooks.
-            var preferAsset = !IsNodePreviewActive(component) &&
-                (SessionPreferAssetJson || component.PreferAssetJson);
-            if (preferAsset)
+            // PreferDiskGraph/SessionPreferDiskGraph only apply to full-graph Output cooks.
+            var preferDisk = !IsNodePreviewActive(component) &&
+                (SessionPreferDiskGraph || component.PreferDiskGraph);
+            if (preferDisk)
             {
                 Debug.Log(
-                    $"[PCG] preferAssetJson: using on-disk asset for '{assetPath}' " +
-                    $"(session={SessionPreferAssetJson}, component={component.PreferAssetJson}).");
+                    $"[PCG] preferDiskGraph: using on-disk .pcg for '{assetPath}' " +
+                    $"(session={SessionPreferDiskGraph}, component={component.PreferDiskGraph}).");
                 return null;
             }
 

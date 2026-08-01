@@ -45,10 +45,11 @@ namespace DJTechRuntime.PCG
         [SerializeField] private bool enableAsyncCookInEditor = true;
 
         /// <summary>
-        /// When true, Editor cook skips live Graph Editor document and uses on-disk .pcg
-        /// (Agent / MCP default for reproducible reviews). Live preview remains available when false.
+        /// When true, full-graph Editor cook skips live Graph Editor document and uses on-disk .pcg
+        /// (Agent / MCP reproducible reviews). Node Preview still uses the live document.
         /// </summary>
-        [SerializeField] private bool preferAssetJson = false;
+        [FormerlySerializedAs("preferAssetJson")]
+        [SerializeField] private bool preferDiskGraph = false;
 
         [SerializeField]
         private List<PcgParameterOverride> m_ParameterOverrides = new();
@@ -240,12 +241,12 @@ namespace DJTechRuntime.PCG
         public string LastAsyncCookStatus => m_LastAsyncCookStatus;
 
         /// <summary>
-        /// Prefer on-disk graph JSON over an open Graph Editor live document when cooking.
+        /// Prefer on-disk .pcg over an open Graph Editor live document for full-graph cooks.
         /// </summary>
-        public bool PreferAssetJson
+        public bool PreferDiskGraph
         {
-            get => preferAssetJson;
-            set => preferAssetJson = value;
+            get => preferDiskGraph;
+            set => preferDiskGraph = value;
         }
 
         /// <summary>
