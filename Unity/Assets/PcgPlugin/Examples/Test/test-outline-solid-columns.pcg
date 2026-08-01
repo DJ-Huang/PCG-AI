@@ -22,7 +22,8 @@
         "edgeBevelFrac": 0.92,
         "frontGroup": "front",
         "backGroup": "back",
-        "rimGroup": "rim"
+        "rimGroup": "rim",
+        "inputMode": "columnsJson"
       }
     },
     {

@@ -2874,13 +2874,15 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 **类别**：Mesh
 
-**功能**：闭合平面轮廓 × 厚度 → 焊接实体（front / back / rim），或 `columnsJson`×`rows` 列向 loft（对齐 img2threejs `loft(outline,zAt)`：constant / slab / blade）。用于刀身/板片类参考图投影主体。
+**功能**：闭合平面轮廓 × 厚度 → 焊接实体（front / back / rim），或列向 loft（对齐 img2threejs `loft(outline,zAt)`）。用 **`inputMode`** 显式选择路径（不按有无数据自动切换）。
 
-**输入 Pin**：
+**输入 Pin**（随 `inputMode` 显隐）：
 
-| Pin ID | 标签 | 类型 |
-|--------|------|------|
-| `outline` | Outline | `SpatialSpline`（`columnsJson` 非空时可不用） |
+| Pin ID | 标签 | 类型 | 模式 |
+|--------|------|------|------|
+| `outline` | Outline | `SpatialSpline` | `outline` |
+| `spine` | Spine | `SpatialSpline`（`(x, y_top, half_z)`） | `spineEdge` |
+| `edge` | Edge | `SpatialSpline`（`(x, y_bot, half_z)`） | `spineEdge` |
 
 **输出 Pin**：
 
@@ -2900,24 +2902,27 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 | 属性名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `thickness` | number | 0.01 | 常量总厚度（m）；`thicknessSamples` 为空时使用 |
+| `inputMode` | enum | `"outline"` | `outline` / `columnsJson` / `spineEdge`（必选，决定读哪路输入） |
+| `thickness` | number | 0.01 | 常量总厚度（m）；列模式也作 half_z 回退 |
 | `thicknessAxis` | enum | `"z"` | `x` / `y` / `z` |
-| `thicknessSamples` | string | `"[]"` | JSON 数组：逐轮廓顶点总厚度；长度须匹配 ring |
-| `columnsJson` | string | `"[]"` | JSON `[{x,y_top,y_bot,half_z},…]`；非空走列×行 loft |
-| `rows` | integer | 0 | 列 loft 的余弦分级行数（0→按 1 带处理） |
-| `profileMode` | enum | `"constant"` | `constant` / `slab` / `blade` |
+| `thicknessSamples` | string | `"[]"` | 仅 `outline`：逐顶点总厚度 |
+| `columnsJson` | string | `"[]"` | 仅 `columnsJson`：站数组 |
+| `rows` | integer | 0 | 仅列模式：余弦分级行数（0→1 带） |
+| `profileMode` | enum | `"constant"` | 仅列模式：`constant` / `slab` / `blade` |
 | `spineRollFrac` / `handleRollFrac` / `edgeFrac` / `grindStartFrac` / `edgeBevelFrac` | number | 见 manifest | blade/slab 截面参数 |
 | `frontGroup` | string | `"front"` | 前盖面组名 |
 | `backGroup` | string | `"back"` | 后盖面组名 |
 | `rimGroup` | string | `"rim"` | 侧面组名 |
 
 **执行逻辑**：
-1. 若 `columnsJson` 非空：按站 × 行生成焊接前后网格 + rim（zAt=`profileMode`）
-2. 否则：闭合轮廓（≥3 点）沿轴 ±half 挤出；可用 `thicknessSamples` 逐点变厚度
-3. 维护 `unshared` 边组
+1. 读 `inputMode`，只走对应分支（缺输入则报错，不回退到其它模式）
+2. `outline`：闭合轮廓 ±half；可选 `thicknessSamples`
+3. `columnsJson` / `spineEdge`：列 × 行焊接 loft（`profileMode` = zAt）
+4. 维护 `unshared` 边组
 
-> 典型连接：`CreateSpline(closed) → OutlineSolid → ProjectTexture → Output`  
-> 列 loft：`OutlineSolid(columnsJson=stations_loft, rows=8, profileMode=blade)`
+> `inputMode=outline`：`CreateSpline(closed) → OutlineSolid.outline`  
+> `inputMode=columnsJson`：`OutlineSolid(columnsJson=…, rows=8, profileMode=blade)`  
+> `inputMode=spineEdge`：`CreateSpline(spine)+CreateSpline(edge) → OutlineSolid`
 
 ---
 

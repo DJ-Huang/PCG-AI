@@ -124,6 +124,46 @@ void test_outline_solid_columns_blade()
     expect(vol > 0.0, "blade column loft has positive volume");
 }
 
+void test_outline_solid_spine_edge_matches_columns()
+{
+    // Graph path: spine=(x,y_top,half_z), edge=(x,y_bot,half_z)
+    PcgSpline spine;
+    spine.closed = false;
+    spine.points = {{0.0, 0.01, 0.005}, {0.05, 0.012, 0.004}, {0.1, 0.006, 0.001}};
+    PcgSpline edge;
+    edge.closed = false;
+    edge.points = {{0.0, -0.01, 0.005}, {0.05, -0.008, 0.004}, {0.1, 0.0, 0.001}};
+
+    auto from_pins = columns_from_spine_edge(spine, edge, 0.01);
+    expect(from_pins.size() == 3, "spine/edge produce 3 stations");
+    expect(std::fabs(from_pins[1].y_top - 0.012) < 1e-12, "spine y → y_top");
+    expect(std::fabs(from_pins[1].y_bot + 0.008) < 1e-12, "edge y → y_bot");
+    expect(std::fabs(from_pins[1].half_z - 0.004) < 1e-12, "spine z → half_z");
+
+    OutlineSolidOptions a;
+    a.rows = 4;
+    a.profile_mode = "blade";
+    a.columns = from_pins;
+    OutlineSolidOptions b = a;
+    b.columns = {
+        {0.0, 0.01, -0.01, 0.005},
+        {0.05, 0.012, -0.008, 0.004},
+        {0.1, 0.006, 0.0, 0.001},
+    };
+    PcgSpline unused;
+    auto ga = outline_solid_from_spline(unused, a);
+    auto gb = outline_solid_from_spline(unused, b);
+    expect(ga.points().size() == gb.points().size(), "spine/edge loft same point count as columnsJson");
+    expect(ga.faces().size() == gb.faces().size(), "spine/edge loft same face count as columnsJson");
+    for (size_t i = 0; i < ga.points().size(); ++i) {
+        const auto& pa = ga.points()[i];
+        const auto& pb = gb.points()[i];
+        expect(std::fabs(pa.x - pb.x) < 1e-12 && std::fabs(pa.y - pb.y) < 1e-12 &&
+                   std::fabs(pa.z - pb.z) < 1e-12,
+               "spine/edge loft vertex-identical to columnsJson path");
+    }
+}
+
 } // namespace
 
 int main()
@@ -131,6 +171,7 @@ int main()
     test_outline_solid_outward_normals();
     test_outline_solid_thickness_samples();
     test_outline_solid_columns_blade();
+    test_outline_solid_spine_edge_matches_columns();
 
     const char* body_graph = R"({
       "version":"1.0",
@@ -217,6 +258,7 @@ int main()
           "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":0.1,\"y\":0,\"z\":0},{\"x\":0.1,\"y\":0.04,\"z\":0},{\"x\":0,\"y\":0.04,\"z\":0}]"
         }},
         {"id":"solid","type":"OutlineSolid","data":{
+          "inputMode":"outline",
           "thickness":0.008,"thicknessAxis":"z",
           "frontGroup":"front","backGroup":"back","rimGroup":"rim"
         }},

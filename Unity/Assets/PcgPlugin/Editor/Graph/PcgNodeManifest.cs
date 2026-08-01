@@ -15,6 +15,9 @@ namespace DJTechEditor.PCG.Graph
         public string label;
         public string pinType;
         public bool variadic;
+        public string visibleWhenProperty;
+        public string visibleWhenEquals;
+        public List<string> visibleWhenOneOf;
     }
 
     public class ManifestPropertyOption
@@ -555,13 +558,33 @@ namespace DJTechEditor.PCG.Graph
             return def;
         }
 
-        private static ManifestPinDef ParsePin(Dictionary<string, object> pin) => new()
+        private static ManifestPinDef ParsePin(Dictionary<string, object> pin)
         {
-            id = GetString(pin, "id"),
-            label = GetString(pin, "label", GetString(pin, "id")),
-            pinType = GetString(pin, "pinType", "SpatialPoint"),
-            variadic = pin.TryGetValue("variadic", out var v) && Convert.ToBoolean(v, CultureInfo.InvariantCulture),
-        };
+            var def = new ManifestPinDef
+            {
+                id = GetString(pin, "id"),
+                label = GetString(pin, "label", GetString(pin, "id")),
+                pinType = GetString(pin, "pinType", "SpatialPoint"),
+                variadic = pin.TryGetValue("variadic", out var v) &&
+                           Convert.ToBoolean(v, CultureInfo.InvariantCulture),
+            };
+            if (pin.TryGetValue("visibleWhen", out var visibleObj) &&
+                visibleObj is Dictionary<string, object> visibleDict)
+            {
+                def.visibleWhenProperty = GetString(visibleDict, "property");
+                def.visibleWhenEquals = GetString(visibleDict, "equals");
+                if (visibleDict.TryGetValue("oneOf", out var oneOfObj) && oneOfObj is List<object> oneOfList)
+                {
+                    def.visibleWhenOneOf = new List<string>();
+                    foreach (var item in oneOfList)
+                    {
+                        if (item != null)
+                            def.visibleWhenOneOf.Add(item.ToString());
+                    }
+                }
+            }
+            return def;
+        }
 
         private static object ParseDefault(Dictionary<string, object> prop)
         {

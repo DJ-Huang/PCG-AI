@@ -5824,12 +5824,25 @@
       "type": "OutlineSolid",
       "displayName": "Outline Solid",
       "category": "Mesh",
-      "description": "Closed planar outline × thickness → welded solid, or columnsJson×rows loft with zAt profile (constant/slab/blade). Prefer over micro-cylinder BooleanMesh chains for knife/plate bodies.",
+      "description": "Welded solid from closed outline, columnsJson, or spine+edge stations. Select path with inputMode (no auto-detect). Prefer over micro-cylinder BooleanMesh chains for knife/plate bodies.",
       "inputs": [
         {
           "id": "outline",
           "label": "Outline",
-          "pinType": "SpatialSpline"
+          "pinType": "SpatialSpline",
+          "visibleWhen": { "property": "inputMode", "equals": "outline" }
+        },
+        {
+          "id": "spine",
+          "label": "Spine",
+          "pinType": "SpatialSpline",
+          "visibleWhen": { "property": "inputMode", "equals": "spineEdge" }
+        },
+        {
+          "id": "edge",
+          "label": "Edge",
+          "pinType": "SpatialSpline",
+          "visibleWhen": { "property": "inputMode", "equals": "spineEdge" }
         }
       ],
       "outputs": [
@@ -5857,12 +5870,24 @@
         }
       ],
       "properties": {
+        "inputMode": {
+          "type": "enum",
+          "default": "outline",
+          "displayName": "Input Mode",
+          "description": "Explicit input path. outline = closed spline extrusion; columnsJson = stations JSON; spineEdge = paired spine/edge polylines.",
+          "uiHint": "radio",
+          "options": [
+            { "value": "outline", "label": "Outline" },
+            { "value": "columnsJson", "label": "Columns JSON" },
+            { "value": "spineEdge", "label": "Spine / Edge" }
+          ]
+        },
         "thickness": {
           "type": "number",
           "default": 0.01,
           "minimum": 0.0001,
           "displayName": "Thickness",
-          "description": "Constant full thickness along thicknessAxis when thicknessSamples is empty (meters)."
+          "description": "Full thickness (m). Outline mode default; also fallback half_z for column modes."
         },
         "thicknessAxis": {
           "type": "enum",
@@ -5878,26 +5903,36 @@
           "type": "string",
           "default": "[]",
           "displayName": "Thickness Samples",
-          "description": "JSON array of full thickness per outline vertex (meters). Empty = use thickness. Length must match outline ring."
+          "description": "JSON array of full thickness per outline vertex (meters). Empty = use thickness.",
+          "visibleWhen": { "property": "inputMode", "equals": "outline" }
         },
         "columnsJson": {
           "type": "string",
           "default": "[]",
           "displayName": "Columns JSON",
-          "description": "JSON array of {x,y_top,y_bot,half_z} stations. Non-empty → column×row loft (img2threejs loft); outline pin unused."
+          "description": "JSON array of {x,y_top,y_bot,half_z} stations.",
+          "visibleWhen": { "property": "inputMode", "equals": "columnsJson" }
         },
         "rows": {
           "type": "integer",
           "default": 0,
           "minimum": 0,
           "displayName": "Rows",
-          "description": "Interior rows for columnsJson loft (cosine-graded t). 0 → treated as 1 band. Ignored for closed-outline extrusion."
+          "description": "Interior rows for column loft (cosine-graded t). 0 → 1 band.",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
         },
         "profileMode": {
           "type": "enum",
           "default": "constant",
           "displayName": "Profile Mode",
-          "description": "zAt across t for columnsJson: constant, slab (handle roll), blade (grind + spine roll).",
+          "description": "zAt across t: constant, slab, blade.",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          },
           "options": [
             { "value": "constant", "label": "Constant" },
             { "value": "slab", "label": "Slab" },
@@ -5909,14 +5944,22 @@
           "default": 0.08,
           "minimum": 0.0,
           "maximum": 1.0,
-          "displayName": "Spine Roll Frac"
+          "displayName": "Spine Roll Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
         },
         "handleRollFrac": {
           "type": "number",
           "default": 0.12,
           "minimum": 0.0,
           "maximum": 1.0,
-          "displayName": "Handle Roll Frac"
+          "displayName": "Handle Roll Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
         },
         "edgeFrac": {
           "type": "number",
@@ -5924,21 +5967,33 @@
           "minimum": 0.0,
           "maximum": 1.0,
           "displayName": "Edge Frac",
-          "description": "Thickness retained at outline edge for slab/blade roll (fraction of half_z)."
+          "description": "Thickness retained at outline edge for slab/blade roll (fraction of half_z).",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
         },
         "grindStartFrac": {
           "type": "number",
           "default": 0.35,
           "minimum": 0.0,
           "maximum": 1.0,
-          "displayName": "Grind Start Frac"
+          "displayName": "Grind Start Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
         },
         "edgeBevelFrac": {
           "type": "number",
           "default": 0.92,
           "minimum": 0.0,
           "maximum": 1.0,
-          "displayName": "Edge Bevel Frac"
+          "displayName": "Edge Bevel Frac",
+          "visibleWhen": {
+            "property": "inputMode",
+            "oneOf": ["columnsJson", "spineEdge"]
+          }
         },
         "frontGroup": {
           "type": "string",

@@ -111,4 +111,11 @@ data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
 data::PcgGeometry outline_solid_from_spline(const data::PcgSpline& outline,
                                             const OutlineSolidOptions& options);
 
+/// Build column stations from paired open polylines (graph-authoring path).
+/// Convention (thicknessAxis == "z"): spine=(x,y_top,half_z), edge=(x,y_bot,half_z).
+/// Point counts must match; x prefers spine.x; half_z prefers spine.z > 0 else edge.z else fallback.
+std::vector<OutlineColumn> columns_from_spine_edge(const data::PcgSpline& spine,
+                                                   const data::PcgSpline& edge,
+                                                   double fallback_half_z);
+
 } // namespace pcg::internal::elements

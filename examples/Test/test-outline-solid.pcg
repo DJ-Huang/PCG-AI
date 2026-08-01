@@ -4,7 +4,10 @@
     {
       "id": "outline",
       "type": "CreateSpline",
-      "position": { "x": 0, "y": 0 },
+      "position": {
+        "x": 0,
+        "y": 0
+      },
       "data": {
         "mode": "polyline",
         "closed": true,
@@ -15,19 +18,26 @@
     {
       "id": "solid",
       "type": "OutlineSolid",
-      "position": { "x": 0, "y": 220 },
+      "position": {
+        "x": 0,
+        "y": 220
+      },
       "data": {
         "thickness": 0.01,
         "thicknessAxis": "z",
         "frontGroup": "front",
         "backGroup": "back",
-        "rimGroup": "rim"
+        "rimGroup": "rim",
+        "inputMode": "outline"
       }
     },
     {
       "id": "out",
       "type": "Output",
-      "position": { "x": 0, "y": 440 },
+      "position": {
+        "x": 0,
+        "y": 440
+      },
       "data": {}
     }
   ],

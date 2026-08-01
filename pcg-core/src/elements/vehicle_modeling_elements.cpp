@@ -265,49 +265,71 @@ public:
         options.back_group = ctx.node->data.value("backGroup", std::string("back"));
         options.rim_group = ctx.node->data.value("rimGroup", std::string("rim"));
 
-        try {
-            const auto samples =
-                nlohmann::json::parse(ctx.node->data.value("thicknessSamples", std::string("[]")));
-            if (samples.is_array()) {
-                for (const auto& v : samples) {
-                    if (v.is_number())
-                        options.thickness_samples.push_back(v.get<double>());
-                }
-            }
-        } catch (...) {
-        }
-
-        try {
-            const auto cols =
-                nlohmann::json::parse(ctx.node->data.value("columnsJson", std::string("[]")));
-            if (cols.is_array()) {
-                for (const auto& item : cols) {
-                    if (!item.is_object()) continue;
-                    OutlineColumn col;
-                    col.x = item.value("x", 0.0);
-                    col.y_top = item.value("y_top", item.value("yTop", 0.0));
-                    col.y_bot = item.value("y_bot", item.value("yBot", 0.0));
-                    col.half_z = item.value("half_z", item.value("halfZ", options.thickness * 0.5));
-                    options.columns.push_back(col);
-                }
-            }
-        } catch (...) {
-        }
+        const std::string input_mode =
+            ctx.node->data.value("inputMode", std::string("outline"));
 
         data::PcgSpline outline;
-        if (options.columns.empty()) {
+        if (input_mode == "spineEdge") {
+            const data::PcgSplineData* spine_data = ctx.inputs.find_splines("spine");
+            const data::PcgSplineData* edge_data = ctx.inputs.find_splines("edge");
+            if (!spine_data || !edge_data || spine_data->splines().empty() ||
+                edge_data->splines().empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "OutlineSolid inputMode=spineEdge requires spine and edge splines");
+            options.columns = columns_from_spine_edge(spine_data->splines().front(),
+                                                     edge_data->splines().front(),
+                                                     options.thickness * 0.5);
+            if (options.columns.size() < 2)
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "OutlineSolid spine/edge need ≥2 points and equal counts "
+                                "(polyline stations; z encodes half_z)");
+        } else if (input_mode == "columnsJson") {
+            try {
+                const auto cols =
+                    nlohmann::json::parse(ctx.node->data.value("columnsJson", std::string("[]")));
+                if (cols.is_array()) {
+                    for (const auto& item : cols) {
+                        if (!item.is_object()) continue;
+                        OutlineColumn col;
+                        col.x = item.value("x", 0.0);
+                        col.y_top = item.value("y_top", item.value("yTop", 0.0));
+                        col.y_bot = item.value("y_bot", item.value("yBot", 0.0));
+                        col.half_z =
+                            item.value("half_z", item.value("halfZ", options.thickness * 0.5));
+                        options.columns.push_back(col);
+                    }
+                }
+            } catch (...) {
+            }
+            if (options.columns.size() < 2)
+                return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                                "OutlineSolid inputMode=columnsJson needs ≥2 stations in columnsJson");
+        } else if (input_mode == "outline") {
+            try {
+                const auto samples = nlohmann::json::parse(
+                    ctx.node->data.value("thicknessSamples", std::string("[]")));
+                if (samples.is_array()) {
+                    for (const auto& v : samples) {
+                        if (v.is_number())
+                            options.thickness_samples.push_back(v.get<double>());
+                    }
+                }
+            } catch (...) {
+            }
             const auto splines =
                 get_splines_input(ctx, "outline", "OutlineSolid missing outline spline");
             if (splines.splines().empty())
                 return fail_ctx(ctx, PCG_ERR_EXECUTION, "OutlineSolid outline spline is empty");
             outline = splines.splines().front();
+        } else {
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "OutlineSolid inputMode must be outline | columnsJson | spineEdge");
         }
 
         auto geometry = outline_solid_from_spline(outline, options);
         if (geometry.points().empty())
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
-                            "OutlineSolid needs closed outline (≥3 pts) + thickness, "
-                            "or columnsJson (≥2 stations) with half_z > 0");
+                            "OutlineSolid produced empty geometry for the selected inputMode");
         emit_geometry(ctx, std::move(geometry));
         return PCG_OK;
     }

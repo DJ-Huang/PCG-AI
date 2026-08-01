@@ -774,6 +774,34 @@ data::PcgGeometry outline_solid_from_columns(const std::vector<OutlineColumn>& c
 
 } // namespace
 
+std::vector<OutlineColumn> columns_from_spine_edge(const data::PcgSpline& spine,
+                                                   const data::PcgSpline& edge,
+                                                   double fallback_half_z)
+{
+    std::vector<OutlineColumn> columns;
+    if (spine.points.size() < 2 || spine.points.size() != edge.points.size())
+        return columns;
+    columns.reserve(spine.points.size());
+    const double fb = fallback_half_z > 0.0 ? fallback_half_z : 0.0;
+    for (size_t i = 0; i < spine.points.size(); ++i) {
+        const auto& s = spine.points[i];
+        const auto& e = edge.points[i];
+        OutlineColumn col;
+        col.x = s.x;
+        col.y_top = s.y;
+        col.y_bot = e.y;
+        // Encode half-thickness in Z of the station polylines (XY = silhouette).
+        if (s.z > 0.0)
+            col.half_z = s.z;
+        else if (e.z > 0.0)
+            col.half_z = e.z;
+        else
+            col.half_z = fb;
+        columns.push_back(col);
+    }
+    return columns;
+}
+
 data::PcgGeometry outline_solid_from_spline(const data::PcgSpline& outline,
                                             const OutlineSolidOptions& options)
 {
