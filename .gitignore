@@ -27,3 +27,4 @@ url-content-out/
 .codely-cli/settings.json
 Plan/
 mem-log/
+tmp/

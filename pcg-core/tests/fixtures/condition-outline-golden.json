@@ -1,0 +1,250 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "noop",
+      "tags": ["noop", "open"],
+      "win": 1,
+      "eps": 0.0,
+      "protectSpans": [],
+      "input": {
+        "splines": [
+          {
+            "closed": false,
+            "attributes": { "tag": "noop" },
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 1.0, "z": 0.0 },
+              { "x": 3.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": false,
+            "attributes": { "tag": "noop" },
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 1.0, "z": 0.0 },
+              { "x": 3.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "smooth_open",
+      "tags": ["smooth", "open"],
+      "win": 3,
+      "eps": 0.0,
+      "protectSpans": [],
+      "input": {
+        "splines": [
+          {
+            "closed": false,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": false,
+            "points": [
+              { "x": 0.3333333333333333, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.6666666666666665, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "rdp_noise",
+      "tags": ["rdp", "open"],
+      "win": 1,
+      "eps": 0.1,
+      "protectSpans": [],
+      "input": {
+        "splines": [
+          {
+            "closed": false,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.05, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 0.05, "z": 0.0 },
+              { "x": 4.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": false,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 4.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "protect_blocks_rdp",
+      "tags": ["protect", "rdp", "open"],
+      "win": 1,
+      "eps": 0.1,
+      "protectSpans": [{ "start": 2, "end": 2 }],
+      "input": {
+        "splines": [
+          {
+            "closed": false,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.05, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 0.05, "z": 0.0 },
+              { "x": 4.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": false,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 4.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "protect_blocks_smooth",
+      "tags": ["protect", "smooth", "open"],
+      "win": 3,
+      "eps": 0.0,
+      "protectSpans": [{ "start": 1, "end": 3 }],
+      "input": {
+        "splines": [
+          {
+            "closed": false,
+            "attributes": { "keep": true },
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 1.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 1.0, "z": 0.0 },
+              { "x": 4.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": false,
+            "attributes": { "keep": true },
+            "points": [
+              { "x": 0.3333333333333333, "y": 0.3333333333333333, "z": 0.0 },
+              { "x": 1.0, "y": 1.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 1.0, "z": 0.0 },
+              { "x": 3.6666666666666665, "y": 0.3333333333333333, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "closed_seam_protect",
+      "tags": ["protect", "closed", "seam"],
+      "win": 1,
+      "eps": 0.05,
+      "protectSpans": [{ "start": 7, "end": 1 }],
+      "input": {
+        "splines": [
+          {
+            "closed": true,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.01, "z": 0.0 },
+              { "x": 3.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 1.0, "z": 0.0 },
+              { "x": 1.5, "y": 1.01, "z": 0.0 },
+              { "x": 0.0, "y": 1.0, "z": 0.0 },
+              { "x": 0.0, "y": 0.5, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": true,
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 0.0, "z": 0.0 },
+              { "x": 3.0, "y": 1.0, "z": 0.0 },
+              { "x": 0.0, "y": 1.0, "z": 0.0 },
+              { "x": 0.0, "y": 0.5, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "closed_duplicate_smooth",
+      "tags": ["closed", "duplicate-closing-point", "smooth", "protect"],
+      "win": 3,
+      "eps": 0.0,
+      "protectSpans": [{ "start": 4, "end": 1 }],
+      "input": {
+        "splines": [
+          {
+            "closed": true,
+            "attributes": { "tag": "explicit-close" },
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 1.0, "z": 0.0 },
+              { "x": 0.0, "y": 1.0, "z": 0.0 },
+              { "x": 0.0, "y": 0.0, "z": 0.0 }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "splines": [
+          {
+            "closed": true,
+            "attributes": { "tag": "explicit-close" },
+            "points": [
+              { "x": 0.0, "y": 0.0, "z": 0.0 },
+              { "x": 2.0, "y": 0.0, "z": 0.0 },
+              { "x": 1.3333333333333333, "y": 0.6666666666666666, "z": 0.0 },
+              { "x": 0.6666666666666666, "y": 0.6666666666666666, "z": 0.0 }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

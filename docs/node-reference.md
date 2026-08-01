@@ -70,6 +70,7 @@
   - [CreateSpline](#createspline)
   - [CreateBezierSpline](#createbezierspline)
   - [ResampleSpline](#resamplespline)
+  - [ConditionOutline](#conditionoutline)
   - [SampleAlongSpline](#samplealongspline)
   - [SweepAlongSpline](#sweepalongspline)
   - [ExtrudeAlongSpline](#extrudealongspline)
@@ -1618,6 +1619,59 @@ blast_short → StaticMeshSpawner(short) ─┘
   "data": { "mode": "spacing", "spacing": 2.0 }
 }
 ```
+
+---
+
+### ConditionOutline
+
+**类别**：Spline
+
+**功能**：对输入 `SpatialSpline` 先做窗口平滑，再做 RDP 简化。`protectSpans` 用**输入点索引闭区间**保护特征点（不是 Group）。默认 `win=1`、`eps=0` 为 no-op；进入实际处理时，closed spline 的显式重复首点会被规范化为 `closed=true` 且不重复首点。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `in` | Spline | `SpatialSpline` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Spline | `SpatialSpline` |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `win` | integer | 1 | 奇数 ≥ 1 | 平滑窗口；`1` 禁用平滑 |
+| `eps` | number | 0.0 | ≥ 0 | RDP 点到线段距离阈值；`0` 禁用简化（不因共线隐式删点） |
+| `protectSpans` | string(JSON) | `[]` | — | `[{start,end},…]` 输入点索引闭区间；跨 seam（`start>end`）仅允许 closed；索引按规范化前输入解释 |
+
+**执行逻辑**：
+1. 校验 `win`（奇数）、`eps`（有限且 ≥0）、`protectSpans` JSON/索引
+2. 每条 spline 独立处理；保留顺序、`closed`、curve attributes
+3. 点数 < 3 或参数 no-op → 原样输出；实际处理时 closed 输入若首尾重复，先移除末尾重复点，末点保护映射到逻辑首点
+4. 平滑：仅更新未保护点；open 端点邻域 clamp，closed 环绕；输出不产生非重合 seam
+5. RDP：保护点与 open 端点为锚；相邻锚点片段上按 `distance <= eps` 可删
+6. **非目标**：弧长重采样、自交修复、point attribute 插值、转 columns
+
+**用法示例**：
+
+```json
+{
+  "id": "condition",
+  "type": "ConditionOutline",
+  "position": { "x": 0, "y": 220 },
+  "data": {
+    "win": 3,
+    "eps": 0.002,
+    "protectSpans": "[{\"start\":0,\"end\":2}]"
+  }
+}
+```
+
+> 典型连接：`CreateSpline(closed) → ConditionOutline → OutlineSolid(inputMode=outline)`。
 
 ---
 
@@ -3732,6 +3786,7 @@ CopyAttributes(tag, values=tree/rock)
 |------|---------|---------|
 | `test-cylinder.pcg` | `CreateCylinderMesh → Output` | 圆柱生成、顶点/索引数、cap winding |
 | `test-outline-solid.pcg` | `CreateSpline → OutlineSolid → Output` | 闭合轮廓×厚度焊接实体、front/back/rim |
+| `test-condition-outline.pcg` | `CreateSpline → ConditionOutline → Output` | 平滑/RDP/protectSpans；JSON spline sink |
 | `test-revolve-bevel.pcg` | `CreateSpline → RevolveMesh → BevelMesh → Output` | 回转体生成、BevelMesh 几何链保持 |
 | `test-spiral-sweep.pcg` | `CreateSpiralSpline → SweepAlongSpline → Output` | 螺旋线采样、Sweep 扫掠 |
 | `test-color-uv-material.pcg` | `CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output` | RGBA colors（含 alpha）、UV0、material metadata 跨 native boundary 传递 |

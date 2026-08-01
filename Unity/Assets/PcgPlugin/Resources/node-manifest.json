@@ -5821,6 +5821,48 @@
       }
     },
     {
+      "type": "ConditionOutline",
+      "displayName": "Condition Outline",
+      "category": "Spline",
+      "description": "Smooth then RDP-simplify SpatialSpline outlines. protectSpans are input-point index closed intervals (not Groups). Defaults are no-op. Active processing canonicalizes an explicit duplicate closing point on closed splines. Does not resample, repair self-intersections, or convert to columns.",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Spline",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Spline",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "properties": {
+        "win": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "displayName": "Smooth Window",
+          "description": "Odd window size >= 1. 1 disables smoothing."
+        },
+        "eps": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0.0,
+          "displayName": "RDP Epsilon",
+          "description": "Max point-to-segment distance kept by RDP. 0 disables simplification (no collinear collapse)."
+        },
+        "protectSpans": {
+          "type": "string",
+          "default": "[]",
+          "displayName": "Protect Spans",
+          "description": "JSON array of {start,end} input-point index closed intervals. Protected points are not smoothed or deleted; indices refer to the input before closing-point canonicalization. Cross-seam (start>end) only on closed splines."
+        }
+      }
+    },
+    {
       "type": "OutlineSolid",
       "displayName": "Outline Solid",
       "category": "Mesh",
