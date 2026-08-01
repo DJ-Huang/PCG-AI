@@ -207,6 +207,14 @@ namespace DJTechRuntime.PCG
                     return false;
                 }
 
+                var instanceDefinition =
+                    PcgSubgraphParameterResolver.CreateResolvedInstanceDefinition(definition, node);
+                if (instanceDefinition == null)
+                {
+                    error = "Subgraph instance definition is null: " + subgraphId;
+                    return false;
+                }
+
                 stack.Add(subgraphId);
                 var childParent = new ParentScopeContext
                 {
@@ -216,13 +224,13 @@ namespace DJTechRuntime.PCG
                     Instances = instances,
                 };
                 if (!ExpandScope(
-                        definition.nodes ?? new List<PcgGraphNodeRecord>(),
-                        definition.edges ?? new List<PcgGraphEdgeRecord>(),
+                        instanceDefinition.nodes ?? new List<PcgGraphNodeRecord>(),
+                        instanceDefinition.edges ?? new List<PcgGraphEdgeRecord>(),
                         prefix + node.id + "/",
                         definitions,
                         stack,
                         childParent,
-                        definition,
+                        instanceDefinition,
                         rootInstances,
                         out var child,
                         out error))
@@ -231,7 +239,7 @@ namespace DJTechRuntime.PCG
 
                 output.Nodes.AddRange(child.Nodes);
                 output.Edges.AddRange(child.Edges);
-                foreach (var input in definition.inputs ?? Enumerable.Empty<PcgSubgraphPort>())
+                foreach (var input in instanceDefinition.inputs ?? Enumerable.Empty<PcgSubgraphPort>())
                 {
                     if (input != null && !string.IsNullOrEmpty(input.id))
                         child.DeclaredInputs.Add(input.id);

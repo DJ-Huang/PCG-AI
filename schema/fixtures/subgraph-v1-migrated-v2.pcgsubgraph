@@ -1,0 +1,28 @@
+{
+  "version": "2.0",
+  "name": "Golden V1 Migrated",
+  "contentHash": "fd4517a0a04519484b86da4e26791319395d6168ea919d9a27adb75a856d0c78",
+  "inputs": [ {"id": "in_1", "name": "Input 1", "pinType": "Any", "anchorPlaced": true, "anchorX": -200, "anchorY": 0} ],
+  "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ],
+  "parameters": [
+  ],
+  "nodes": [
+    {
+      "id": "subgraph_input",
+      "type": "SubgraphInput",
+      "position": { "x": -200, "y": 0 },
+      "data": {}
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": { "x": 0, "y": 160 },
+      "data": {"label": "Output"}
+    }
+  ],
+  "edges": [
+    {"id": "iface_passthrough", "source": "subgraph_input", "target": "output", "sourceHandle": "in_1", "targetHandle": "in"}
+  ],
+  "subgraphs": [
+  ]
+}

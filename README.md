@@ -29,7 +29,7 @@ Web React Flow 编辑器 → Graph JSON → C++ 核心 → Unity 场景预览。
 | **Node.js** | 18+ | 仅 Web 编辑器需要；macOS / Windows / Linux 均可 |
 | **Visual Studio 2022** | x64 工具链 | 编译 `pcg-core`；**仅 Windows** |
 | **CMake** | 3.20+ | 与 VS 2022 配合 |
-| **Unity** | 2022.3+ | 已用 Tuanjie 1.6.x 验证；**建议 Windows**（原生插件为 Win64） |
+| **Unity** | 2022.3+ | 已用 Tuanjie 1.6.x 验证；cook 需要可访问的本机 `pcg-server` |
 
 > **macOS 用户**：用 `pcg-server` 跑 C++ cook（无需向 Unity 拷贝 dylib）。见 `docs/pcg-server.md`。
 
@@ -39,7 +39,7 @@ Web React Flow 编辑器 → Graph JSON → C++ 核心 → Unity 场景预览。
 
 ```
 PCG-AI/
-├── pcg-core/              C++ 核心（CMake，DLL + LIB 双产物）
+├── pcg-core/              C++ 核心（CMake，供 pcg-server 链接）
 │   ├── include/pcg_api.h    对外 C API（唯一公开接口）
 │   ├── src/                 实现
 │   ├── tests/               冒烟测试
@@ -62,8 +62,7 @@ PCG-AI/
 ├── Unity/                 Unity 工程（PcgPlugin）
 │   └── Assets/PcgPlugin/
 │       ├── Runtime/         PcgNative、PcgGraphLoader、PcgPreview
-│       ├── Editor/          菜单、Graph 监视、IL2CPP 链接
-│       └── Plugins/x86_64/  PcgCore.dll / PcgCore.lib
+│       └── Editor/          菜单、Graph 监视、HTTP cook 设置
 │
 ├── scripts/               Windows 构建与校验脚本（PowerShell）
 ├── examples/              分发用示例图
@@ -73,7 +72,7 @@ PCG-AI/
 **数据流：**
 
 ```
-Web 画布编辑 → Graph JSON → pcg-core 执行 → Unity Gizmo 预览
+Web 画布编辑 → Graph JSON → pcg-server（HTTP）→ Unity Gizmo 预览
 ```
 
 ---
@@ -153,7 +152,7 @@ npm run lint     # oxlint 检查
 
 | 菜单 | 作用 |
 |------|------|
-| **PCG → Print PcgCore Version** | 验证原生库已加载；Console 应输出 `pcg-core 0.1.0`（M0 里程碑） |
+| **PCG → Print pcg-server Version** | 显示当前 HTTP cook 服务端版本 |
 | **PCG → Settings** | 配置监视路径、自动重载等 |
 | **PCG → Set Watched Graph…** | 选择要监视的 `.pcg` 文件 |
 | **PCG → Reload Watched Graph** | 手动重新执行监视中的图并更新预览 |
@@ -163,11 +162,10 @@ npm run lint     # oxlint 检查
 
 执行图后，场景中会出现 **PCG Preview** 对象，Scene 视图显示青色球体 Gizmo 表示生成点。
 
-### 验证 M0（原生库就绪）
+### 验证 cook 后端
 
-1. 完成 [C++ 核心编译](#c-核心编译windows) 并将 `PcgCore.dll` 复制到 `Plugins/x86_64/`。
-2. 重启 Unity（若 DLL 曾被占用）。
-3. **PCG → Server → Health Check** / **PCG → Print pcg-server Version** → 显示版本即后端连通。
+1. 构建并启动 [pcg-server](#c-核心--cook-后端)。
+2. **PCG → Server → Health Check** / **PCG → Print pcg-server Version** → 显示版本即后端连通。
 
 ---
 
@@ -260,7 +258,7 @@ npm run dev
 
 ### Player 构建说明
 
-本期 Player **不**静态链接 `PcgCore`；Editor cook 依赖本机 `pcg-server`。发布校验仍可用：
+Player 不静态链接或随包复制 `PcgCore`。`PcgRuntimeRunner` 只能请求同机、已启动的外置 `pcg-server`，且 Player 中服务地址固定为默认 localhost；它不是离线或自包含 cook 方案。发布校验仍可用：
 
 ```powershell
 .\scripts\verify-release-package.ps1 -PlayerBuildPath "Build\Windows"
@@ -269,9 +267,7 @@ npm run dev
 **发布包不应包含：**
 
 - `PcgCore.dll` / `libPcgCore.dylib`（已从 Unity Plugins 移除）
-- 任何 `pcg-core` 的 `.cpp` 源码  
-
-静态符号通过 `PcgCore.lib` 链入 `GameAssembly.dll`。
+- 任何 `pcg-core` 的 `.cpp` 源码
 
 ---
 
@@ -308,7 +304,7 @@ Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 
 ### Player / IL2CPP
 
-本期 Player 不链入 `PcgCore`；cook 仅 Editor + localhost `pcg-server`。
+Player 不链入 `PcgCore`；若需运行时 cook，必须部署同机 localhost `pcg-server`，并输入已 bake 的 flat v2 graph。
 
 ---
 
@@ -317,8 +313,8 @@ Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 | 资源 | 说明 |
 |------|------|
 | `.github/workflows/pcg-core-ci.yml` | Windows `windows-latest`：Release 构建 + `ctest` |
-| `scripts/build-pcg-core.ps1` | Windows：配置、编译、可选测试与拷贝到 Unity |
-| `scripts/build-pcg-core.sh` | macOS：配置、编译、可选测试与拷贝到 Unity |
+| `scripts/build-pcg-core.ps1` | Windows：配置、编译与可选测试 |
+| `scripts/build-pcg-core.sh` | macOS：配置、编译与可选测试 |
 | `scripts/verify-release-package.ps1` | IL2CPP 构建产物校验 |
 
 ---
@@ -327,7 +323,7 @@ Graph 契约定义：`schema/graph-schema.json`（版本 `1.0`）。
 
 | 里程碑 | 验收方式 |
 |--------|----------|
-| **M0** | Unity：**PCG → Print PcgCore Version** → Console 输出 `pcg-core 0.1.0` |
+| **M0** | Unity：**PCG → Server → Health Check** → 服务端可达 |
 | **M2** | Web **Send to Unity** → Unity **Reload Watched Graph** → Scene Gizmo 更新 |
 | **M2.5** | Unity **Graph Editor** Run + JSON↔Web round-trip + `ctest` 绿 |
 | **M3** | IL2CPP Windows 构建 + `verify-release-package.ps1` 通过 + Player 日志正常 |

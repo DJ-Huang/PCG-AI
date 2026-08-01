@@ -102,67 +102,6 @@ namespace DJTechRuntime.PCG
             return repaired;
         }
 
-        private enum Direction
-        {
-            Input,
-            Output,
-        }
-
-        private bool TryInferPortsFromInterfaceEdges(Direction direction)
-        {
-            var interfaceNodeType = direction == Direction.Input
-                ? PcgStructuralNodeTypes.SubgraphInput
-                : PcgStructuralNodeTypes.SubgraphOutput;
-            var interfaceNodeId = nodes?
-                .FirstOrDefault(node => node?.type == interfaceNodeType)?.id;
-            if (string.IsNullOrEmpty(interfaceNodeId))
-                return false;
-
-            var inferred = new List<PcgSubgraphPort>();
-            foreach (var edge in edges ?? Enumerable.Empty<PcgGraphEdgeRecord>())
-            {
-                if (edge == null)
-                    continue;
-                if (direction == Direction.Input &&
-                    edge.source == interfaceNodeId &&
-                    !string.IsNullOrEmpty(edge.sourceHandle))
-                {
-                    inferred.Add(new PcgSubgraphPort
-                    {
-                        id = edge.sourceHandle,
-                        name = edge.sourceHandle,
-                        pinType = "Any",
-                    });
-                }
-                else if (direction == Direction.Output &&
-                         edge.target == interfaceNodeId &&
-                         !string.IsNullOrEmpty(edge.targetHandle))
-                {
-                    inferred.Add(new PcgSubgraphPort
-                    {
-                        id = edge.targetHandle,
-                        name = edge.targetHandle,
-                        pinType = "Any",
-                    });
-                }
-            }
-
-            if (inferred.Count == 0)
-                return false;
-
-            var target = direction == Direction.Input ? inputs : outputs;
-            var seen = new HashSet<string>(target.Select(port => port.id), StringComparer.Ordinal);
-            foreach (var port in inferred)
-            {
-                if (seen.Contains(port.id))
-                    continue;
-                target.Add(port);
-                seen.Add(port.id);
-            }
-
-            return inferred.Count > 0;
-        }
-
         private void ApplyDefaultPassthroughInterface()
         {
             const string defaultInputId = "in_1";

@@ -22,6 +22,11 @@ namespace DJTechRuntime.PCG
             if (doc.version == PcgSubgraphAssetMigration.Version20)
                 doc.contentHash = PcgSubgraphAssetContentHash.Compute(doc);
 
+            return ToCanonicalJson(doc, pretty);
+        }
+
+        internal static string ToCanonicalJson(PcgSubgraphAssetDocument doc, bool pretty)
+        {
             var indent = pretty ? "  " : "";
             var nl = pretty ? "\n" : "";
             var sb = new StringBuilder(512);

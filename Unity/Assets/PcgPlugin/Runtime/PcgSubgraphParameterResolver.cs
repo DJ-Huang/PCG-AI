@@ -6,63 +6,22 @@ using System.Linq;
 namespace DJTechRuntime.PCG
 {
     /// <summary>
-    /// Applies subgraph-local parameter definitions and per-instance overrides to internal node data
-    /// before execution flattening.
+    /// Resolves subgraph-local parameters onto a private definition copy for one instance.
     /// </summary>
     public static class PcgSubgraphParameterResolver
     {
-        public static void ApplyInstanceOverrides(PcgGraphDocument document)
+        internal static PcgSubgraphDefinition CreateResolvedInstanceDefinition(
+            PcgSubgraphDefinition definition,
+            PcgGraphNodeRecord instance)
         {
-            if (document?.subgraphs == null || document.subgraphs.Count == 0)
-                return;
+            var resolved = definition?.Clone();
+            if (resolved == null)
+                return null;
 
-            var definitions = BuildDefinitionMap(document.subgraphs);
-            ApplyScope(document.nodes, definitions);
-            foreach (var definition in document.subgraphs)
-            {
-                if (definition?.nodes == null)
-                    continue;
-                ApplyScope(definition.nodes, definitions);
-            }
-        }
-
-        private static Dictionary<string, PcgSubgraphDefinition> BuildDefinitionMap(
-            IEnumerable<PcgSubgraphDefinition> definitions)
-        {
-            var map = new Dictionary<string, PcgSubgraphDefinition>(StringComparer.Ordinal);
-            foreach (var definition in definitions ?? Enumerable.Empty<PcgSubgraphDefinition>())
-            {
-                if (definition == null || string.IsNullOrEmpty(definition.id))
-                    continue;
-                map[definition.id] = definition;
-            }
-
-            return map;
-        }
-
-        private static void ApplyScope(
-            List<PcgGraphNodeRecord> nodes,
-            Dictionary<string, PcgSubgraphDefinition> definitions)
-        {
-            if (nodes == null)
-                return;
-
-            foreach (var node in nodes)
-            {
-                if (node == null || node.type != PcgStructuralNodeTypes.Subgraph)
-                    continue;
-
-                var definitionId = node.data?.GetRaw("subgraphId")?.ToString() ?? "";
-                if (string.IsNullOrEmpty(definitionId) ||
-                    !definitions.TryGetValue(definitionId, out var definition))
-                {
-                    continue;
-                }
-
-                ApplyDefinitionParameters(
-                    definition,
-                    PcgSubgraphInstanceParameterStorage.ReadOverrides(node.data));
-            }
+            ApplyDefinitionParameters(
+                resolved,
+                PcgSubgraphInstanceParameterStorage.ReadOverrides(instance?.data));
+            return resolved;
         }
 
         internal static void ApplyDefinitionParameters(

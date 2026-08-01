@@ -165,48 +165,6 @@ DeleteOptions parse_delete_options_impl(const nlohmann::json& data)
     return options;
 }
 
-bool json_number(const nlohmann::json& value, double& out)
-{
-    if (value.is_number()) {
-        out = value.get<double>();
-        return true;
-    }
-    if (value.is_boolean()) {
-        out = value.get<bool>() ? 1.0 : 0.0;
-        return true;
-    }
-    return false;
-}
-
-double indexed_curve_u(size_t index, size_t count)
-{
-    return count <= 1 ? 0.0 : static_cast<double>(index) / static_cast<double>(count - 1);
-}
-
-std::vector<double> spline_curve_u(const data::PcgSpline& spline)
-{
-    std::vector<double> result(spline.points.size(), 0.0);
-    if (spline.points.size() < 2)
-        return result;
-    double length = 0.0;
-    for (size_t i = 1; i < spline.points.size(); ++i) {
-        const double dx = spline.points[i].x - spline.points[i - 1].x;
-        const double dy = spline.points[i].y - spline.points[i - 1].y;
-        const double dz = spline.points[i].z - spline.points[i - 1].z;
-        length += std::sqrt(dx * dx + dy * dy + dz * dz);
-        result[i] = length;
-    }
-    if (length > 1e-12) {
-        for (double& value : result)
-            value /= length;
-    } else {
-        const double denominator = static_cast<double>(spline.points.size() - 1);
-        for (size_t i = 0; i < result.size(); ++i)
-            result[i] = static_cast<double>(i) / denominator;
-    }
-    return result;
-}
-
 data::PcgVec3 normalize_vec(data::PcgVec3 v)
 {
     const double len = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DJTechEditor.PCG.Graph;
@@ -358,7 +359,36 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(parsed.version, Is.EqualTo(PcgSubgraphAssetMigration.Version20));
             Assert.That(parsed.parameters, Has.Count.EqualTo(1));
             Assert.That(parsed.parameters[0].id, Is.EqualTo("width"));
-            Assert.That(string.IsNullOrEmpty(parsed.contentHash), Is.False);
+            Assert.That(parsed.contentHash, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(PcgSubgraphAssetSerializer.ToJson(parsed, pretty: false), Is.EqualTo(json));
+
+            asset.nodes.Single(node => node.id == "box").data.SetRaw("width", 3f);
+            var changedJson = PcgSubgraphAssetSerializer.ToJson(asset, pretty: false);
+            Assert.That(changedJson, Is.Not.EqualTo(json));
+            Assert.That(asset.contentHash, Is.Not.EqualTo(parsed.contentHash));
+        }
+
+        [Test]
+        public void SubgraphAsset_V1Migration_SavesAsV2WithStableHash()
+        {
+            const string legacyJson = @"{
+  ""version"": ""1.0"",
+  ""name"": ""Legacy"",
+  ""inputs"": [],
+  ""outputs"": [{ ""id"": ""out_1"", ""name"": ""Output"", ""pinType"": ""Any"" }],
+  ""nodes"": [{ ""id"": ""box"", ""type"": ""CreateBoxMesh"", ""position"": { ""x"": 0, ""y"": 0 }, ""data"": {} }],
+  ""edges"": [],
+  ""subgraphs"": []
+}";
+
+            Assert.That(PcgSubgraphAssetSerializer.TryFromJson(legacyJson, out var migrated, out var error),
+                Is.True, error);
+            var firstSave = PcgSubgraphAssetSerializer.ToJson(migrated, pretty: false);
+            var secondSave = PcgSubgraphAssetSerializer.ToJson(migrated, pretty: false);
+
+            Assert.That(migrated.version, Is.EqualTo(PcgSubgraphAssetMigration.Version20));
+            Assert.That(migrated.contentHash, Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(secondSave, Is.EqualTo(firstSave));
         }
 
         [Test]
@@ -395,7 +425,7 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
-        public void SubgraphParameterResolver_AppliesInstanceOverrideToInternalNode()
+        public void SubgraphFlattener_AppliesInstanceOverrideToInternalNode()
         {
             var definition = new PcgSubgraphDefinition
             {
@@ -440,8 +470,71 @@ namespace DJTechEditor.PCG.Tests
                 subgraphs = { definition },
             };
 
-            PcgSubgraphParameterResolver.ApplyInstanceOverrides(document);
-            Assert.That(definition.nodes[0].data.GetRaw("width")?.ToString(), Is.EqualTo("4.5"));
+            Assert.That(PcgGraphFlattener.TryFlattenForExecution(document, out var flat, out var error),
+                Is.True, error);
+            Assert.That(flat.nodes.Single(node => node.id == "inst/box").data.GetRaw("width")?.ToString(),
+                Is.EqualTo("4.5"));
+            Assert.That(definition.nodes[0].data.GetRaw("width"), Is.Null);
+        }
+
+        [Test]
+        public void ExecutionDocumentBuilder_IsolatesOverridesForMultipleInstances()
+        {
+            var definition = new PcgSubgraphDefinition
+            {
+                id = "sg",
+                parameters =
+                {
+                    new PcgGraphParameter
+                    {
+                        id = "width",
+                        name = "Width",
+                        type = "number",
+                        defaultValue = "1",
+                        targetNode = "box",
+                        targetProperty = "width",
+                    },
+                },
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "box",
+                        type = "CreateBoxMesh",
+                        data = new PcgNodeData(),
+                    },
+                },
+            };
+            var instanceA = new PcgNodeData();
+            instanceA.SetRaw("subgraphId", "sg");
+            PcgSubgraphInstanceParameterStorage.SetOverrideValue(instanceA, definition.parameters[0], 1f);
+            var instanceB = new PcgNodeData();
+            instanceB.SetRaw("subgraphId", "sg");
+            PcgSubgraphInstanceParameterStorage.SetOverrideValue(instanceB, definition.parameters[0], 5f);
+            var document = new PcgGraphDocument
+            {
+                nodes =
+                {
+                    new PcgGraphNodeRecord { id = "instA", type = PcgStructuralNodeTypes.Subgraph, data = instanceA },
+                    new PcgGraphNodeRecord { id = "instB", type = PcgStructuralNodeTypes.Subgraph, data = instanceB },
+                },
+                subgraphs = { definition },
+            };
+
+            Assert.That(PcgExecutionDocumentBuilder.TryBuild(document, null, out var flat, out _, out var error),
+                Is.True, error);
+            Assert.That(Convert.ToSingle(flat.nodes.Single(node => node.id == "instA/box").data.GetRaw("width")),
+                Is.EqualTo(1f));
+            Assert.That(Convert.ToSingle(flat.nodes.Single(node => node.id == "instB/box").data.GetRaw("width")),
+                Is.EqualTo(5f));
+
+            document.nodes.Reverse();
+            Assert.That(PcgExecutionDocumentBuilder.TryBuild(document, null, out var reversed, out _, out error),
+                Is.True, error);
+            Assert.That(Convert.ToSingle(reversed.nodes.Single(node => node.id == "instA/box").data.GetRaw("width")),
+                Is.EqualTo(1f));
+            Assert.That(Convert.ToSingle(reversed.nodes.Single(node => node.id == "instB/box").data.GetRaw("width")),
+                Is.EqualTo(5f));
         }
 
         [Test]

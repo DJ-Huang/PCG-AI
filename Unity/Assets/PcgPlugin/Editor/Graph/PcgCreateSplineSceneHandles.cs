@@ -35,7 +35,6 @@ namespace DJTechEditor.PCG.Graph
         private static bool s_HandleHot;
         private static PcgGraphView s_DragGraphView;
         private static PcgGraphEditorWindow s_DragWindow;
-        private static bool s_TangentDragActive;
         private static ManualSplineDragMode s_ManualSplineDragMode;
         private static string s_ManualSplineDragNodeId;
         private static Vector2 s_ManualSplineDragStartMouse;
@@ -57,11 +56,9 @@ namespace DJTechEditor.PCG.Graph
         }
 
         private static bool s_PcgModeActive;
-        // Temporary diagnostic stage. ToolLifecycleOnly restores only the PCG tool
-        // save/restore path; every SceneView callback, overlay, selection lock and
-        // renderer visibility change remains disabled until the regression is isolated.
         private enum DiagnosticSceneViewStage
         {
+            Production,
             FullIsolation,
             ToolLifecycleOnly,
             ReadOnlyStatusOverlay,
@@ -72,8 +69,8 @@ namespace DJTechEditor.PCG.Graph
             PcgCoreSceneGui,
         }
 
-        private const DiagnosticSceneViewStage DiagnosticStage =
-            DiagnosticSceneViewStage.PcgCoreSceneGui;
+        private static readonly DiagnosticSceneViewStage DiagnosticStage =
+            DiagnosticSceneViewStage.Production;
         private static PcgGraphEditorWindow s_ActiveWindow;
         private static PcgGraphComponent s_ActiveComponent;
 
@@ -81,15 +78,17 @@ namespace DJTechEditor.PCG.Graph
         internal static bool IsPcgModeActive => s_PcgModeActive;
         internal static bool IsSceneViewInputIsolated =>
             s_PcgModeActive &&
+            DiagnosticStage != DiagnosticSceneViewStage.Production &&
             DiagnosticStage != DiagnosticSceneViewStage.CoreSceneGuiShell &&
             DiagnosticStage != DiagnosticSceneViewStage.CoreShellWithGroupUi &&
             DiagnosticStage != DiagnosticSceneViewStage.PcgCoreSceneGui;
 
         /// <summary>
-        /// Keeps independent Stamp/Mask/Match Size SceneView callbacks out of the
-        /// current diagnostic stage while the core PCG SceneView pipeline is tested.
+        /// Independent SceneView tools remain enabled during the full PCG pipeline.
+        /// Isolation is limited to explicitly selected diagnostic stages.
         /// </summary>
-        internal static bool IsExternalSceneHandleIsolation => s_PcgModeActive;
+        internal static bool IsExternalSceneHandleIsolation =>
+            s_PcgModeActive && DiagnosticStage != DiagnosticSceneViewStage.Production;
 
         /// <summary>Component locked for Scene View edits in PCG Mode; null when inactive.</summary>
         internal static PcgGraphComponent ActivePcgModeComponent => s_ActiveComponent;
@@ -188,7 +187,6 @@ namespace DJTechEditor.PCG.Graph
         private static string s_GroupListFilter = "*";
         private static Vector2 s_GroupListScroll;
         private static readonly List<GroupInfo> s_AvailableGroups = new();
-        private static string s_LastParsedJson;
 
         // Houdini viewport group highlight (prim selection orange)
         private static readonly Color s_GroupFaceFill = new(1f, 0.45f, 0.08f, 0.28f);
@@ -811,7 +809,6 @@ namespace DJTechEditor.PCG.Graph
                 s_GroupListFilter = "*";
                 s_GroupListScroll = Vector2.zero;
                 s_AvailableGroups.Clear();
-                s_LastParsedJson = null;
                 s_SelectionGuard = false;
 
                 try
@@ -1212,7 +1209,6 @@ namespace DJTechEditor.PCG.Graph
                     tangentWorldPositions[i * 2 + 1] = wp - dirLocalWorld;
 
                     BeginSplineDrag(graphView, window);
-                    s_TangentDragActive = true;
                     WriteTangentsToNode(node, tangents);
                     changed = true;
                 }
@@ -1236,7 +1232,6 @@ namespace DJTechEditor.PCG.Graph
                     tangentWorldPositions[i * 2 + 1] = wp - dirLocalWorld;
 
                     BeginSplineDrag(graphView, window);
-                    s_TangentDragActive = true;
                     WriteTangentsToNode(node, tangents);
                     changed = true;
                 }
@@ -2626,7 +2621,6 @@ namespace DJTechEditor.PCG.Graph
 
             s_DragActive = false;
             s_HandleHot = false;
-            s_TangentDragActive = false;
             s_DragGraphView = null;
             s_DragWindow = null;
         }
@@ -2641,7 +2635,6 @@ namespace DJTechEditor.PCG.Graph
             EndManualSplineDrag();
             s_DragActive = false;
             s_HandleHot = false;
-            s_TangentDragActive = false;
             s_DragGraphView = null;
             s_DragWindow = null;
         }

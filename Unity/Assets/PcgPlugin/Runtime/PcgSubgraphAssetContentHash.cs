@@ -13,7 +13,7 @@ namespace DJTechRuntime.PCG
 
             var clone = document.Clone();
             clone.contentHash = "";
-            var json = PcgSubgraphAssetSerializer.ToJson(clone, pretty: false);
+            var json = PcgSubgraphAssetSerializer.ToCanonicalJson(clone, pretty: false);
             using var sha = SHA256.Create();
             var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(json));
             return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();

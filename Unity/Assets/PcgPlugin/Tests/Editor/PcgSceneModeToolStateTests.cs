@@ -45,6 +45,24 @@ namespace DJTechEditor.PCG.Tests
         }
 
         [Test]
+        public void PcgMode_ProductionStage_LeavesExternalSceneHandlesEnabled()
+        {
+            var type = typeof(PcgCreateSplineSceneHandles);
+            var modeActive = type.GetField("s_PcgModeActive", BindingFlags.Static | BindingFlags.NonPublic);
+            var originalModeActive = modeActive.GetValue(null);
+
+            try
+            {
+                modeActive.SetValue(null, true);
+                Assert.IsFalse(PcgCreateSplineSceneHandles.IsExternalSceneHandleIsolation);
+            }
+            finally
+            {
+                modeActive.SetValue(null, originalModeActive);
+            }
+        }
+
+        [Test]
         public void ExitingPcgMode_ClearsStampDragStateWithoutCooking()
         {
             var type = typeof(PcgStampOverlaySceneHandles);
