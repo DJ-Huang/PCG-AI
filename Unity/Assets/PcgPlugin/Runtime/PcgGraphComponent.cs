@@ -44,6 +44,12 @@ namespace DJTechRuntime.PCG
         private float editModeCookInterval = 0.15f;
         [SerializeField] private bool enableAsyncCookInEditor = true;
 
+        /// <summary>
+        /// When true, Editor cook skips live Graph Editor document and uses on-disk .pcg
+        /// (Agent / MCP default for reproducible reviews). Live preview remains available when false.
+        /// </summary>
+        [SerializeField] private bool preferAssetJson = false;
+
         [SerializeField]
         private List<PcgParameterOverride> m_ParameterOverrides = new();
 
@@ -232,6 +238,15 @@ namespace DJTechRuntime.PCG
 
         public bool IsAsyncCookInProgress => m_AsyncCookInProgress;
         public string LastAsyncCookStatus => m_LastAsyncCookStatus;
+
+        /// <summary>
+        /// Prefer on-disk graph JSON over an open Graph Editor live document when cooking.
+        /// </summary>
+        public bool PreferAssetJson
+        {
+            get => preferAssetJson;
+            set => preferAssetJson = value;
+        }
 
         /// <summary>
         /// Edit Mode: <see cref="PcgCookMode.EveryFrame"/> is downgraded to

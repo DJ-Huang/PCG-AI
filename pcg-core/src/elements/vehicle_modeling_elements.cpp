@@ -243,6 +243,35 @@ public:
     }
 };
 
+class OutlineSolidElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "OutlineSolid"; }
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "OutlineSolid missing node");
+
+        const auto splines =
+            get_splines_input(ctx, "outline", "OutlineSolid missing outline spline");
+        if (splines.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "OutlineSolid outline spline is empty");
+
+        OutlineSolidOptions options;
+        options.thickness = ctx.node->data.value("thickness", 0.01);
+        options.thickness_axis = ctx.node->data.value("thicknessAxis", std::string("z"));
+        options.front_group = ctx.node->data.value("frontGroup", std::string("front"));
+        options.back_group = ctx.node->data.value("backGroup", std::string("back"));
+        options.rim_group = ctx.node->data.value("rimGroup", std::string("rim"));
+
+        auto geometry = outline_solid_from_spline(splines.splines().front(), options);
+        if (geometry.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                            "OutlineSolid needs a closed outline (≥3 points) and thickness > 0");
+        emit_geometry(ctx, std::move(geometry));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_vehicle_modeling_elements(
@@ -255,6 +284,7 @@ void register_vehicle_modeling_elements(
     map.emplace("PolyExtrude", std::make_unique<PolyExtrudeElement>());
     map.emplace("CopyMesh", std::make_unique<CopyMeshElement>());
     map.emplace("ShellMesh", std::make_unique<ShellMeshElement>());
+    map.emplace("OutlineSolid", std::make_unique<OutlineSolidElement>());
 }
 
 } // namespace pcg::internal::elements

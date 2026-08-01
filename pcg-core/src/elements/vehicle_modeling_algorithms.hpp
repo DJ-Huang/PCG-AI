@@ -64,6 +64,15 @@ struct ShellMeshOptions {
     std::string rim_group = "shell_rim";
 };
 
+/// Closed planar outline × thickness along an axis → welded solid (img2threejs loft(outline,zAt)).
+struct OutlineSolidOptions {
+    double thickness = 0.01;
+    std::string thickness_axis = "z";
+    std::string front_group = "front";
+    std::string back_group = "back";
+    std::string rim_group = "rim";
+};
+
 data::PcgGeometry loft_splines(const std::vector<data::PcgSpline>& profiles,
                                const LoftMeshOptions& options);
 data::PcgGeometry mirror_geometry(const data::PcgGeometry& input,
@@ -76,5 +85,7 @@ data::PcgGeometry copy_geometry(const data::PcgGeometry& input,
                                 const CopyMeshOptions& options);
 data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
                                  const ShellMeshOptions& options);
+data::PcgGeometry outline_solid_from_spline(const data::PcgSpline& outline,
+                                            const OutlineSolidOptions& options);
 
 } // namespace pcg::internal::elements

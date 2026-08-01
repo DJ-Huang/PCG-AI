@@ -3,6 +3,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -318,6 +319,56 @@ int main()
                         ++top_triangle_count;
             }
             expect(top_triangle_count == 2, "graph8: top quad maps to two top-material triangles");
+        }
+    }
+
+    // --- Test 9: ProjectTexture reference crop SSOT (not mesh AABB) ---
+    {
+        // Box spans X∈[0,0.1], Y∈[0,0.1], Z∈[-0.05,0.05] after translate.
+        // Crop frame is X∈[0,1], Y∈[0,1] → tip corner world (0.1,0.1) → UV (0.1,0.1).
+        // Mesh-AABB mode would map that corner to UV (1,1).
+        const char* graph = R"({
+          "version": "1.0",
+          "nodes": [
+            {"id": "tex", "type": "ImageTexture", "position": {"x":0,"y":0},
+             "data": {"repeatX": 1.0, "repeatY": 1.0}},
+            {"id": "box", "type": "CreateBoxMesh", "position": {"x":0,"y":200},
+             "data": {"width": 0.1, "height": 0.1, "depth": 0.1}},
+            {"id": "xf", "type": "TransformMesh", "position": {"x":200,"y":200},
+             "data": {"translate": {"x": 0.05, "y": 0.05, "z": 0.0},
+                      "scale": {"x": 1.0, "y": 1.0, "z": 1.0}}},
+            {"id": "proj", "type": "ProjectTexture", "position": {"x":400,"y":0},
+             "data": {"direction": "z", "scaleU": 1.0, "scaleV": 1.0,
+                      "offsetU": 0.0, "offsetV": 0.0,
+                      "useReferenceBounds": true,
+                      "refMinU": 0.0, "refMaxU": 1.0,
+                      "refMinV": 0.0, "refMaxV": 1.0}},
+            {"id": "out", "type": "Output", "position": {"x":600,"y":0}, "data": {}}
+          ],
+          "edges": [
+            {"id": "e0", "source": "box", "target": "xf", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e1", "source": "tex", "target": "proj", "sourceHandle": "out", "targetHandle": "texture"},
+            {"id": "e2", "source": "xf", "target": "proj", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e3", "source": "proj", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+          ]
+        })";
+        auto r = execute_graph(graph, 42);
+        expect(r.code == PCG_OK, "graph9: crop ProjectTexture succeeds");
+        expect((read_flags(r.mesh_buf) & 0x4u) != 0, "graph9: binary has uvs flag");
+
+        pcg::internal::data::PcgMeshData mesh;
+        const bool parsed = pcg::internal::data::read_mesh_binary(
+            r.mesh_buf.data(), static_cast<int>(r.mesh_buf.size()), mesh);
+        expect(parsed && mesh.has_uvs(), "graph9: mesh parses with uvs");
+        if (parsed && mesh.has_uvs()) {
+            double max_u = -1e9, max_v = -1e9;
+            for (const auto& uv : mesh.uvs()) {
+                max_u = std::max(max_u, uv.u);
+                max_v = std::max(max_v, uv.v);
+            }
+            // Corner at world ~0.1 maps into crop [0,1] → ~0.1, not AABB-normalized 1.0
+            expect(max_u < 0.25 && max_u > 0.05, "graph9: max U follows crop (~0.1), not AABB");
+            expect(max_v < 0.25 && max_v > 0.05, "graph9: max V follows crop (~0.1), not AABB");
         }
     }
 

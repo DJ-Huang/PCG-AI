@@ -103,6 +103,7 @@
   - [BendMesh](#bendmesh)
   - [MergeMesh](#mergemesh)
   - [BooleanMesh](#booleanmesh)
+  - [OutlineSolid](#outlinesolid)
   - [CreateCylinderMesh](#createcylindermesh)
   - [RevolveMesh](#revolvemesh)
 - [Geometry 类别](#geometry-类别)
@@ -2825,10 +2826,12 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `detriangulate` | enum | `"all"` | 去三角化：`all`（按输入面来源重建）/ `unchanged`（仅重建未被切割的输入面）/ `none`（保留三角） |
 | `weldEpsilon` | number | 0.0001 | 焊接容差（≥ 1e-8） |
 | `triangleBudget` | integer | 500000 | 三角形数量上限（≥ 1000） |
+| `timeoutMs` | integer | 0 | 墙钟超时（毫秒）。`0` = 不超时。在交线候选循环中 best-effort 中止，返回可观测错误（或见 `onFailure`） |
+| `onFailure` | enum | `"error"` | `error`：cook 失败并带明确消息（cancel/timeout/budget）；`passthroughA`：输出 A 并继续（避免空结果，失败细节仅在 `error` 路径可见） |
 
 **执行逻辑**：
 1. 读取两个输入网格，按 `weldEpsilon` 焊接重合顶点
-2. 计算两网格的相交线，将面沿交线切割
+2. 计算两网格的相交线，将面沿交线切割（循环中响应 `ctx.is_cancel_requested` 与 `timeoutMs`）
 3. 根据 `operation` 选择保留的面：
    - `union`：保留 A 外部 + B 外部的面
    - `intersect`：保留 A 内部 + B 内部的面
@@ -2837,8 +2840,12 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 4. 根据 `treatAAs`/`treatBAs` 调整整/表面模式下的内部/外部判定
 5. `detriangulate` 按 Houdini Boolean 语义重建输入面：`all` 只合并来自同一输入 polygon 的相邻三角；`unchanged` 进一步排除被交线切割的输入面；A-B seam 边不会被跨越
 6. 标记输出组（a_inside_b / a_outside_b / b_inside_a / b_outside_a / ab_seams）
-7. 若三角形数超过 `triangleBudget`，报错终止
+7. 若三角形数超过 `triangleBudget`，或 cancel/timeout，报错终止（除非 `onFailure=passthroughA`）
 8. 输出布尔运算结果网格
+
+**稳定性提示**：
+- 多 cutter / 高密度交线可能很慢；设 `timeoutMs` 并确保失败路径可观测（默认 `onFailure=error`），不要依赖静默挂死。
+- **不要**用一长串亚毫米 `CreateCylinderMesh` cutter 作为 jimping/锯齿的唯一手段；优先 `OutlineSolid` / 剖面包络，或更大、更少的 cutter。
 
 **用法示例**：
 
@@ -2852,12 +2859,59 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
     "treatAAs": "solid",
     "treatBAs": "solid",
     "detriangulate": "all",
-    "weldEpsilon": 0.0001
+    "weldEpsilon": 0.0001,
+    "timeoutMs": 30000,
+    "onFailure": "error"
   }
 }
 ```
 
 > 典型连接：`GetMeshData(A) + CreateBoxMesh(B) → BooleanMesh(subtract) → Output`，从实体中挖洞/开槽。
+
+---
+
+### OutlineSolid
+
+**类别**：Mesh
+
+**功能**：闭合平面轮廓样条 × 厚度 → 焊接实体（front / back / rim 面组）。用于刀身/板片类参考图投影主体，替代「薄挤出 + 大量微圆柱 Boolean」的不稳定路径。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `outline` | Outline | `SpatialSpline` |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Mesh | `SpatialMesh` |
+
+**输出组**：
+
+| 组名 | 域 | 说明 |
+|------|-----|------|
+| `front` | face | 厚度轴正侧盖面（可用 `frontGroup` 改名） |
+| `back` | face | 厚度轴负侧盖面 |
+| `rim` | face | 侧面环面 |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `thickness` | number | 0.01 | 沿 `thicknessAxis` 的总厚度（m），≥ 0.0001 |
+| `thicknessAxis` | enum | `"z"` | `x` / `y` / `z` |
+| `frontGroup` | string | `"front"` | 前盖面组名 |
+| `backGroup` | string | `"back"` | 后盖面组名 |
+| `rimGroup` | string | `"rim"` | 侧面组名 |
+
+**执行逻辑**：
+1. 读取闭合轮廓（≥3 点；重复闭合点会被丢弃）
+2. 沿轴偏移 ±thickness/2 生成前后环，共享焊接顶点索引
+3. 前/后面 + 每段 rim 四边形；维护 `unshared` 边组
+
+> 典型连接：`CreateSpline(closed) → OutlineSolid → ProjectTexture → Output`
 
 ---
 
@@ -3505,8 +3559,8 @@ CreateSpline ──(profile)──┘
 
 | 属性 | 类型 | 默认值 | 范围 | 说明 |
 |------|------|--------|------|------|
-| radius | number | 1.0 | ≥ 0.001 | 半径 |
-| height | number | 2.0 | ≥ 0.001 | 高度 |
+| radius | number | 1.0 | ≥ 0.001 | 半径。实用下限约 0.001 m；亚毫米 cutter 做 jimping/锯齿再进 `BooleanMesh` 不稳定，优先 `OutlineSolid` 剖面包络或更大 cutter |
+| height | number | 2.0 | ≥ 0.001 | 高度。避免把「一串微圆柱 Boolean」当作唯一微细节手段 |
 | radialSegments | integer | 16 | 3–128 | 圆周分段 |
 | heightSegments | integer | 1 | 1–64 | 高度分段 |
 | capTop | boolean | true | | 顶盖 |
@@ -3666,6 +3720,7 @@ CopyAttributes(tag, values=tree/rock)
 | 文件 | 测试链路 | 验证内容 |
 |------|---------|---------|
 | `test-cylinder.pcg` | `CreateCylinderMesh → Output` | 圆柱生成、顶点/索引数、cap winding |
+| `test-outline-solid.pcg` | `CreateSpline → OutlineSolid → Output` | 闭合轮廓×厚度焊接实体、front/back/rim |
 | `test-revolve-bevel.pcg` | `CreateSpline → RevolveMesh → BevelMesh → Output` | 回转体生成、BevelMesh 几何链保持 |
 | `test-spiral-sweep.pcg` | `CreateSpiralSpline → SweepAlongSpline → Output` | 螺旋线采样、Sweep 扫掠 |
 | `test-color-uv-material.pcg` | `CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output` | RGBA colors（含 alpha）、UV0、material metadata 跨 native boundary 传递 |

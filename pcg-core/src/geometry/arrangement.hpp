@@ -49,6 +49,8 @@ enum class BooleanErrorType {
     TriangleBudgetExceeded,
     SelfIntersectionUnresolved,
     InvalidInput,
+    Cancelled,
+    Timeout,
 };
 
 /// Result of a boolean operation.
@@ -69,6 +71,10 @@ struct BooleanOptions {
     DetriangulateMode detriangulate = DetriangulateMode::All;
     double weld_epsilon = 0.0001;
     int triangle_budget = 500000;
+    /// 0 = no wall-clock timeout. Checked between intersection pairs (best-effort).
+    int timeout_ms = 0;
+    /// Optional cancel callback (cook cancel / Esc). Checked with timeout.
+    bool (*is_cancel_requested)() = nullptr;
 };
 
 /// Output group names (Houdini-aligned).

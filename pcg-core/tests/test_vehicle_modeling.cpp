@@ -1,8 +1,16 @@
 #include "pcg_api.h"
+#include "data/pcg_geometry.hpp"
+#include "data/pcg_mesh_data.hpp"
+#include "data/pcg_spline_data.hpp"
+#include "elements/vehicle_modeling_algorithms.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+
+using namespace pcg::internal::data;
+using namespace pcg::internal::elements;
 
 namespace {
 
@@ -35,10 +43,50 @@ Result execute(const char* graph)
     return result;
 }
 
+double signed_volume(const PcgMeshData& mesh)
+{
+    double vol = 0.0;
+    const auto& v = mesh.vertices();
+    for (size_t i = 0; i + 2 < mesh.triangles().size(); i += 3) {
+        const auto& a = v[static_cast<size_t>(mesh.triangles()[i])];
+        const auto& b = v[static_cast<size_t>(mesh.triangles()[i + 1])];
+        const auto& c = v[static_cast<size_t>(mesh.triangles()[i + 2])];
+        vol += (a.x * (b.y * c.z - b.z * c.y) + a.y * (b.z * c.x - b.x * c.z) +
+                a.z * (b.x * c.y - b.y * c.x)) /
+               6.0;
+    }
+    return vol;
+}
+
+void test_outline_solid_outward_normals()
+{
+    // CCW rectangle in XY; thickness along Z. Outward windings → positive volume.
+    PcgSpline outline;
+    outline.closed = true;
+    outline.points = {
+        {0.0, 0.0, 0.0},
+        {0.1, 0.0, 0.0},
+        {0.1, 0.04, 0.0},
+        {0.0, 0.04, 0.0},
+    };
+    OutlineSolidOptions opts;
+    opts.thickness = 0.008;
+    opts.thickness_axis = "z";
+    auto geo = outline_solid_from_spline(outline, opts);
+    expect(!geo.points().empty(), "outline solid produces geometry");
+    expect(geo.faces().size() == 6, "front+back+4 rim faces");
+    const double vol = signed_volume(triangulate_geometry(geo));
+    expect(vol > 0.0, "outline solid rim/front windings are outward (positive volume)");
+    const double expected = 0.1 * 0.04 * 0.008;
+    expect(std::fabs(vol - expected) < 1e-6, "outline solid volume matches L*W*T");
+}
+
 } // namespace
 
 int main()
 {
+    test_outline_solid_outward_normals();
+
     const char* body_graph = R"({
       "version":"1.0",
       "nodes":[
@@ -115,6 +163,32 @@ int main()
     expect(detail.kind == PCG_RESULT_KIND_MESH, "compact detail graph returns a mesh");
     expect(detail.vertices > 0 && detail.indices > 0,
            "compact detail graph produces geometry");
+
+    const char* outline_graph = R"({
+      "version":"1.0",
+      "nodes":[
+        {"id":"outline","type":"CreateSpline","data":{
+          "mode":"polyline","closed":true,"subdivisions":1,
+          "controlPoints":"[{\"x\":0,\"y\":0,\"z\":0},{\"x\":0.1,\"y\":0,\"z\":0},{\"x\":0.1,\"y\":0.04,\"z\":0},{\"x\":0,\"y\":0.04,\"z\":0}]"
+        }},
+        {"id":"solid","type":"OutlineSolid","data":{
+          "thickness":0.008,"thicknessAxis":"z",
+          "frontGroup":"front","backGroup":"back","rimGroup":"rim"
+        }},
+        {"id":"out","type":"Output","data":{}}
+      ],
+      "edges":[
+        {"id":"e0","source":"outline","target":"solid","sourceHandle":"out","targetHandle":"outline"},
+        {"id":"e1","source":"solid","target":"out","sourceHandle":"out","targetHandle":"in"}
+      ]
+    })";
+    const Result outline = execute(outline_graph);
+    expect(outline.code == PCG_OK,
+           outline.error[0] == '\0' ? "outline solid graph executes" : outline.error);
+    expect(outline.kind == PCG_RESULT_KIND_MESH, "outline solid returns a mesh");
+    // 4 outline pts × 2 rings = 8 verts; front+back+4 rim quads → triangulated > 0
+    expect(outline.vertices >= 8 && outline.indices >= 12,
+           "outline solid produces welded plate geometry");
 
     std::printf("PASS: compact vehicle modeling graph regressions\n");
     return 0;

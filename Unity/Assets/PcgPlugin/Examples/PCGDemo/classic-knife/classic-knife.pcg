@@ -5,7 +5,7 @@
       "id": "p_scale_u",
       "name": "FadeScaleU",
       "type": "number",
-      "default": -1.0,
+      "default": 1.0,
       "exposed": true,
       "targetNode": "project_fade",
       "targetProperty": "scaleU",
@@ -29,7 +29,7 @@
       "id": "p_off_u",
       "name": "FadeOffsetU",
       "type": "number",
-      "default": 1.0,
+      "default": 0.0,
       "exposed": true,
       "targetNode": "project_fade",
       "targetProperty": "offsetU",
@@ -87,10 +87,15 @@
       "data": {
         "__nodeTitle": "Body Planar Fade UV",
         "direction": "z",
-        "scaleU": -1.0,
+        "scaleU": 1.0,
         "scaleV": 1.0,
-        "offsetU": 1.0,
-        "offsetV": 0.0
+        "offsetU": 0.0,
+        "offsetV": 0.0,
+        "useReferenceBounds": true,
+        "refMinU": 0.24476,
+        "refMaxU": 0.0,
+        "refMinV": -0.01663,
+        "refMaxV": 0.01663
       }
     },
     {

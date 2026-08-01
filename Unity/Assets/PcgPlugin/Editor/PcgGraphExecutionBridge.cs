@@ -9,11 +9,18 @@ namespace DJTechEditor.PCG
 {
     /// <summary>
     /// When PcgGraphComponent runs in the Editor, prefer the live Graph Editor document
-    /// (includes unsaved ImageTexture assignments) over the on-disk .pcg file.
+    /// (includes unsaved ImageTexture assignments) over the on-disk .pcg file —
+    /// unless <see cref="SessionPreferAssetJson"/> or the component's PreferAssetJson is set.
     /// </summary>
     [InitializeOnLoad]
     public static class PcgGraphExecutionBridge
     {
+        /// <summary>
+        /// Session-wide override for Agent/MCP cooks: when true, always use on-disk .pcg
+        /// even if a Graph Editor window is open for the same asset.
+        /// </summary>
+        public static bool SessionPreferAssetJson { get; set; }
+
         /// <summary>
         /// Root-scope Subgraph instance node id → flat node id that sourced its first output,
         /// captured by the most recent <see cref="BuildExecutionJson"/>. Read by the Graph
@@ -61,6 +68,18 @@ namespace DJTechEditor.PCG
             var assetPath = AssetDatabase.GetAssetPath(component.GraphAsset);
             if (string.IsNullOrEmpty(assetPath))
                 return null;
+
+            // Node Preview always needs the live Graph Editor document + truncated cook.
+            // PreferAssetJson/SessionPreferAssetJson only apply to full-graph Output cooks.
+            var preferAsset = !IsNodePreviewActive(component) &&
+                (SessionPreferAssetJson || component.PreferAssetJson);
+            if (preferAsset)
+            {
+                Debug.Log(
+                    $"[PCG] preferAssetJson: using on-disk asset for '{assetPath}' " +
+                    $"(session={SessionPreferAssetJson}, component={component.PreferAssetJson}).");
+                return null;
+            }
 
             var assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
             foreach (var window in Resources.FindObjectsOfTypeAll<PcgGraphEditorWindow>())

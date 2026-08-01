@@ -22,6 +22,7 @@ namespace DJTechEditor.PCG
         private SerializedProperty m_ScatterPointMeshProp;
         private SerializedProperty m_ScatterDisplayModeProp;
         private SerializedProperty m_EnableAsyncCookInEditorProp;
+        private SerializedProperty m_PreferAssetJsonProp;
         private SerializedProperty m_ShowStampOverlaysProp;
         private SerializedProperty m_ShowMaskOverlayProp;
         private SerializedProperty m_MaskOverlayLayerProp;
@@ -44,6 +45,7 @@ namespace DJTechEditor.PCG
             m_ScatterPointMeshProp = serializedObject.FindProperty("scatterPointMesh");
             m_ScatterDisplayModeProp = serializedObject.FindProperty("scatterDisplayMode");
             m_EnableAsyncCookInEditorProp = serializedObject.FindProperty("enableAsyncCookInEditor");
+            m_PreferAssetJsonProp = serializedObject.FindProperty("preferAssetJson");
             m_ShowStampOverlaysProp = serializedObject.FindProperty("showStampOverlays");
             m_ShowMaskOverlayProp = serializedObject.FindProperty("showMaskOverlay");
             m_MaskOverlayLayerProp = serializedObject.FindProperty("maskOverlayLayer");
@@ -94,6 +96,16 @@ namespace DJTechEditor.PCG
                 EditorGUILayout.PropertyField(
                     m_EnableAsyncCookInEditorProp,
                     new GUIContent("Async Cook In Editor", "Run cook in background thread; Esc cancels current cook."));
+                if (m_PreferAssetJsonProp != null)
+                {
+                    EditorGUILayout.PropertyField(
+                        m_PreferAssetJsonProp,
+                        new GUIContent(
+                            "Prefer Asset JSON",
+                            "Full-graph cook uses on-disk .pcg even if Graph Editor is open (Agent/MCP reviews). " +
+                            "Turn off while authoring so Inspector/Graph edits recook. " +
+                            "Node Preview always uses the live Graph Editor document."));
+                }
             }
             if (m_ShowStampOverlaysProp != null)
             {

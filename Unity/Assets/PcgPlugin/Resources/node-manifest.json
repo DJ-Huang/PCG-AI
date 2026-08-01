@@ -5821,6 +5821,77 @@
       }
     },
     {
+      "type": "OutlineSolid",
+      "displayName": "Outline Solid",
+      "category": "Mesh",
+      "description": "Closed planar outline × thickness → welded solid (front/back/rim face groups). Prefer over micro-cylinder BooleanMesh chains for knife/plate bodies.",
+      "inputs": [
+        {
+          "id": "outline",
+          "label": "Outline",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputGroups": [
+        {
+          "name": "front",
+          "domain": "face",
+          "label": "Front face"
+        },
+        {
+          "name": "back",
+          "domain": "face",
+          "label": "Back face"
+        },
+        {
+          "name": "rim",
+          "domain": "face",
+          "label": "Rim faces"
+        }
+      ],
+      "properties": {
+        "thickness": {
+          "type": "number",
+          "default": 0.01,
+          "minimum": 0.0001,
+          "displayName": "Thickness",
+          "description": "Solid thickness along thicknessAxis (meters)."
+        },
+        "thicknessAxis": {
+          "type": "enum",
+          "default": "z",
+          "displayName": "Thickness Axis",
+          "options": [
+            { "value": "x", "label": "X" },
+            { "value": "y", "label": "Y" },
+            { "value": "z", "label": "Z" }
+          ]
+        },
+        "frontGroup": {
+          "type": "string",
+          "default": "front",
+          "displayName": "Front Group"
+        },
+        "backGroup": {
+          "type": "string",
+          "default": "back",
+          "displayName": "Back Group"
+        },
+        "rimGroup": {
+          "type": "string",
+          "default": "rim",
+          "displayName": "Rim Group"
+        }
+      }
+    },
+    {
       "type": "SweepAlongSpline",
       "displayName": "Sweep Along Spline",
       "category": "Spline",
@@ -7931,6 +8002,23 @@
           "type": "integer",
           "default": 500000,
           "minimum": 1000
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "Timeout (ms)",
+          "description": "0 = no timeout. Best-effort wall-clock abort during intersection; returns observable error (or passthrough A)."
+        },
+        "onFailure": {
+          "type": "enum",
+          "default": "error",
+          "displayName": "On Failure",
+          "description": "error = fail cook with message (cancel/timeout/budget). passthroughA = emit mesh A and continue (avoid silent hang).",
+          "options": [
+            { "value": "error", "label": "Error (observable)" },
+            { "value": "passthroughA", "label": "Passthrough A" }
+          ]
         }
       }
     },
@@ -8004,12 +8092,14 @@
         "radius": {
           "type": "number",
           "default": 1.0,
-          "minimum": 0.001
+          "minimum": 0.001,
+          "description": "Practical min ~0.001 m. Sub-mm cutters for jimping/scallops via BooleanMesh are unstable — prefer OutlineSolid profile envelopes or larger cutters."
         },
         "height": {
           "type": "number",
           "default": 2.0,
-          "minimum": 0.001
+          "minimum": 0.001,
+          "description": "Practical min ~0.001 m. Avoid chaining tiny cylinders as the only micro-detail strategy."
         },
         "radialSegments": {
           "type": "integer",
@@ -8413,12 +8503,11 @@
         "scaleU": {
           "type": "number",
           "default": 1.0,
-          "minimum": 0.001
+          "description": "Deprecated for mirror: prefer flipping refMinU/refMaxU (crop SSOT). Negative retained for compatibility."
         },
         "scaleV": {
           "type": "number",
-          "default": 1.0,
-          "minimum": 0.001
+          "default": 1.0
         },
         "offsetU": {
           "type": "number",
@@ -8427,6 +8516,36 @@
         "offsetV": {
           "type": "number",
           "default": 0.0
+        },
+        "useReferenceBounds": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Use Reference Bounds",
+          "description": "When true, planar UV uses refMin/Max world crop (textureCrop SSOT) instead of mesh AABB."
+        },
+        "refMinU": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Ref Min U",
+          "description": "World-space min along projection U axis (e.g. X when direction=Z)."
+        },
+        "refMaxU": {
+          "type": "number",
+          "default": 1.0,
+          "displayName": "Ref Max U",
+          "description": "World-space max along projection U axis."
+        },
+        "refMinV": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Ref Min V",
+          "description": "World-space min along projection V axis (e.g. Y when direction=Z)."
+        },
+        "refMaxV": {
+          "type": "number",
+          "default": 1.0,
+          "displayName": "Ref Max V",
+          "description": "World-space max along projection V axis."
         }
       }
     },

@@ -643,4 +643,79 @@ data::PcgGeometry shell_geometry(const data::PcgGeometry& input,
     return output;
 }
 
+namespace {
+
+data::PcgVec3 axis_unit(const std::string& axis)
+{
+    if (axis == "x") return {1.0, 0.0, 0.0};
+    if (axis == "y") return {0.0, 1.0, 0.0};
+    return {0.0, 0.0, 1.0};
+}
+
+} // namespace
+
+data::PcgGeometry outline_solid_from_spline(const data::PcgSpline& outline,
+                                            const OutlineSolidOptions& options)
+{
+    data::PcgGeometry output;
+    if (options.thickness <= 0.0 || outline.points.size() < 3)
+        return output;
+
+    std::vector<data::PcgVec3> ring;
+    ring.reserve(outline.points.size());
+    for (const auto& pt : outline.points)
+        ring.push_back({pt.x, pt.y, pt.z});
+
+    // Drop duplicate closing vertex on closed polylines.
+    if (ring.size() >= 2) {
+        const auto& a = ring.front();
+        const auto& b = ring.back();
+        const double dx = a.x - b.x;
+        const double dy = a.y - b.y;
+        const double dz = a.z - b.z;
+        if (dx * dx + dy * dy + dz * dz <= 1e-16)
+            ring.pop_back();
+    }
+    if (ring.size() < 3)
+        return output;
+
+    const data::PcgVec3 axis = axis_unit(options.thickness_axis);
+    const double half = options.thickness * 0.5;
+    const int n = static_cast<int>(ring.size());
+
+    // Front (+half) then back (-half); rim shares these welded point indices.
+    for (const auto& p : ring)
+        output.points_mut().push_back(add(p, scale(axis, half)));
+    for (const auto& p : ring)
+        output.points_mut().push_back(add(p, scale(axis, -half)));
+
+    std::vector<int> front(static_cast<size_t>(n));
+    std::vector<int> back(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) {
+        front[static_cast<size_t>(i)] = i;
+        // Reverse winding on back so normals face outward.
+        back[static_cast<size_t>(i)] = n + (n - 1 - i);
+    }
+
+    const int front_face = static_cast<int>(output.faces().size());
+    output.faces_mut().push_back(front);
+    output.groups().add(geometry::GroupDomain::Face, options.front_group, front_face);
+
+    const int back_face = static_cast<int>(output.faces().size());
+    output.faces_mut().push_back(back);
+    output.groups().add(geometry::GroupDomain::Face, options.back_group, back_face);
+
+    for (int i = 0; i < n; ++i) {
+        const int j = (i + 1) % n;
+        const int rim_face = static_cast<int>(output.faces().size());
+        // Outward rim for CCW outline (viewed along +thicknessAxis):
+        // front-i → back-i → back-j → front-j. Previous {i,j,n+j,n+i} pointed inward.
+        output.faces_mut().push_back({i, n + i, n + j, j});
+        output.groups().add(geometry::GroupDomain::Face, options.rim_group, rim_face);
+    }
+
+    data::maintain_unshared_edge_group(output);
+    return output;
+}
+
 } // namespace pcg::internal::elements
