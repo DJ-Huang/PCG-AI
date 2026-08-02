@@ -1,0 +1,8291 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "back_wall",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Back Wall",
+        "width": 0.185,
+        "height": 0.096,
+        "depth": 0.028
+      }
+    },
+    {
+      "id": "back_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 0.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Back Bevel",
+        "amount": 0.006,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "back_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 0.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Back Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.081,
+          -0.06
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "left_wall",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -320.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Left Wall",
+        "width": 0.028,
+        "height": 0.096,
+        "depth": 0.148
+      }
+    },
+    {
+      "id": "left_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -320.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Left Bevel",
+        "amount": 0.005,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "left_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": -320.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Left Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -0.0785,
+          0.081,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "right_wall",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 320.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Right Wall",
+        "width": 0.028,
+        "height": 0.096,
+        "depth": 0.148
+      }
+    },
+    {
+      "id": "right_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 320.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Right Bevel",
+        "amount": 0.005,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "right_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 320.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Right Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0.0785,
+          0.081,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "front_top",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 640.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Front Top Rail",
+        "width": 0.185,
+        "height": 0.02,
+        "depth": 0.028
+      }
+    },
+    {
+      "id": "front_top_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 640.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Front Top Bevel",
+        "amount": 0.0022,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "front_top_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 640.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Front Top Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.119,
+          0.06
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "front_bot",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 960.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Front Bot Rail",
+        "width": 0.185,
+        "height": 0.02,
+        "depth": 0.028
+      }
+    },
+    {
+      "id": "front_bot_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 960.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Front Bot Bevel",
+        "amount": 0.0022,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "front_bot_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 960.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Front Bot Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.043000000000000003,
+          0.06
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "front_l",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -640.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Front Left Pillar",
+        "width": 0.028499999999999998,
+        "height": 0.056,
+        "depth": 0.028
+      }
+    },
+    {
+      "id": "front_l_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": -640.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Front L Bevel",
+        "amount": 0.0022,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "front_l_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": -640.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Front L Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -0.07825,
+          0.081,
+          0.06
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "front_r",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1280.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Front Right Pillar",
+        "width": 0.028499999999999998,
+        "height": 0.056,
+        "depth": 0.028
+      }
+    },
+    {
+      "id": "front_r_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1280.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Front R Bevel",
+        "amount": 0.0022,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "front_r_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1280.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Front R Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0.07825,
+          0.081,
+          0.06
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "body_floor",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 0.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Body Floor",
+        "width": 0.125,
+        "height": 0.005,
+        "depth": 0.088
+      }
+    },
+    {
+      "id": "body_floor_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 0.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Body Floor Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.036000000000000004,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "body_ceil",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -960.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Body Ceiling",
+        "width": 0.125,
+        "height": 0.005,
+        "depth": 0.088
+      }
+    },
+    {
+      "id": "body_ceil_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": -960.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Body Ceiling Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.126,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "shell_walls",
+      "type": "MergeMesh",
+      "position": {
+        "x": 0.0,
+        "y": 800.0
+      },
+      "data": {
+        "__nodeTitle": "Shell Walls"
+      }
+    },
+    {
+      "id": "body_wood",
+      "type": "VertexColor",
+      "position": {
+        "x": 0.0,
+        "y": 960.0
+      },
+      "data": {
+        "__nodeTitle": "Body Wood",
+        "r": 0.35,
+        "g": 0.2,
+        "b": 0.1,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "body_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 0.0,
+        "y": 1120.0
+      },
+      "data": {
+        "__nodeTitle": "Body Mat",
+        "group": "",
+        "materialName": "WoodDark"
+      }
+    },
+    {
+      "id": "lid_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1600.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Lid Box",
+        "width": 0.185,
+        "height": 0.024,
+        "depth": 0.148
+      }
+    },
+    {
+      "id": "lid_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1600.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Lid Bevel",
+        "amount": 0.0055,
+        "segments": 3,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "lid_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1600.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Lid Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.14450000000000002,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "lid_wood",
+      "type": "VertexColor",
+      "position": {
+        "x": 1600.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Lid Wood",
+        "r": 0.26,
+        "g": 0.13,
+        "b": 0.06,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "lid_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1600.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Lid Mat",
+        "group": "",
+        "materialName": "WoodDark"
+      }
+    },
+    {
+      "id": "base_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1920.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Base Box",
+        "width": 0.1887,
+        "height": 0.02,
+        "depth": 0.15095999999999998
+      }
+    },
+    {
+      "id": "base_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1920.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Base Bevel",
+        "amount": 0.005,
+        "segments": 2,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "base_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1920.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Base Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.023,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "base_wood",
+      "type": "VertexColor",
+      "position": {
+        "x": 1920.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Base Wood",
+        "r": 0.2,
+        "g": 0.1,
+        "b": 0.04,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "base_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1920.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Base Mat",
+        "group": "",
+        "materialName": "WoodDark"
+      }
+    },
+    {
+      "id": "frame_t",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2560.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Top",
+        "width": 0.128,
+        "height": 0.0022,
+        "depth": 0.0022
+      }
+    },
+    {
+      "id": "frame_b",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2880.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Bot",
+        "width": 0.128,
+        "height": 0.0022,
+        "depth": 0.0022
+      }
+    },
+    {
+      "id": "frame_l",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 3200.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Left",
+        "width": 0.0022,
+        "height": 0.056,
+        "depth": 0.0022
+      }
+    },
+    {
+      "id": "frame_r",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 3520.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Right",
+        "width": 0.0022,
+        "height": 0.056,
+        "depth": 0.0022
+      }
+    },
+    {
+      "id": "frame_t_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2560.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Top Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.1079,
+          0.073
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "frame_b_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2880.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Bot Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.0541,
+          0.073
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "frame_l_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3200.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Left Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -0.0629,
+          0.081,
+          0.073
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "frame_r_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3520.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Right Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0.0629,
+          0.081,
+          0.073
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "frame_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 2560.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Merge"
+      }
+    },
+    {
+      "id": "frame_brass",
+      "type": "VertexColor",
+      "position": {
+        "x": 2560.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Brass",
+        "r": 0.96,
+        "g": 0.78,
+        "b": 0.3,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "frame_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2560.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Frame Mat",
+        "group": "",
+        "materialName": "Brass"
+      }
+    },
+    {
+      "id": "shell_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 0.0,
+        "y": 1280.0
+      },
+      "data": {
+        "__nodeTitle": "Shell Merge"
+      }
+    },
+    {
+      "id": "drum",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Music Drum",
+        "radius": 0.02,
+        "height": 0.09,
+        "radialSegments": 36,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true
+      }
+    },
+    {
+      "id": "drum_orient",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Drum Orient",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "pin_proto",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 3840.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Pin Proto",
+        "width": 0.0032,
+        "height": 0.0032,
+        "depth": 0.0032
+      }
+    },
+    {
+      "id": "pin_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3840.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Pin On Drum",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0.0228,
+          0.0,
+          0.0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "drum_pins",
+      "type": "CopyMesh",
+      "position": {
+        "x": 3840.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Drum Pins",
+        "mode": "circular",
+        "count": 12,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0
+      }
+    },
+    {
+      "id": "pin_rows",
+      "type": "CopyMesh",
+      "position": {
+        "x": 3840.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Pin Rows",
+        "mode": "linear",
+        "count": 7,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 0.012,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0
+      }
+    },
+    {
+      "id": "pin_rows_center",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3840.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Pin Rows Center",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          -0.036,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "pins_orient",
+      "type": "TransformMesh",
+      "position": {
+        "x": 3840.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Pins Orient",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "pins_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Pins Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -0.014,
+          0.083,
+          0.054
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "drum_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Drum+Pins"
+      }
+    },
+    {
+      "id": "drum_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Drum Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -0.014,
+          0.083,
+          0.054
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "drum_brass",
+      "type": "VertexColor",
+      "position": {
+        "x": 4160.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Drum Brass",
+        "r": 0.92,
+        "g": 0.72,
+        "b": 0.28,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "drum_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 4160.0,
+        "y": 800.0
+      },
+      "data": {
+        "__nodeTitle": "Drum Mat",
+        "group": "",
+        "materialName": "Brass"
+      }
+    },
+    {
+      "id": "gear_disk",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 4480.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Disk",
+        "radius": 0.012,
+        "height": 0.0035,
+        "radialSegments": 20,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true
+      }
+    },
+    {
+      "id": "gear_tooth",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 4800.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Tooth",
+        "width": 0.0028,
+        "height": 0.0035,
+        "depth": 0.0045
+      }
+    },
+    {
+      "id": "gear_tooth_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4800.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Tooth Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.012,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "gear_teeth",
+      "type": "CopyMesh",
+      "position": {
+        "x": 4800.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Teeth",
+        "mode": "circular",
+        "count": 14,
+        "axis": "y",
+        "angle": 360,
+        "translateX": 0,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0
+      }
+    },
+    {
+      "id": "gear_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 4480.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Merge"
+      }
+    },
+    {
+      "id": "gear_orient",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4480.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Orient",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "gear_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 4480.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -0.042,
+          0.083,
+          0.046
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "gear_brass",
+      "type": "VertexColor",
+      "position": {
+        "x": 4480.0,
+        "y": 800.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Brass",
+        "r": 0.88,
+        "g": 0.68,
+        "b": 0.24,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "gear_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 4480.0,
+        "y": 960.0
+      },
+      "data": {
+        "__nodeTitle": "Gear Mat",
+        "group": "",
+        "materialName": "Brass"
+      }
+    },
+    {
+      "id": "comb_tooth",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 5120.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Comb Tooth",
+        "width": 0.0018,
+        "height": 0.042,
+        "depth": 0.014
+      }
+    },
+    {
+      "id": "comb_teeth",
+      "type": "CopyMesh",
+      "position": {
+        "x": 5120.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Comb Teeth",
+        "mode": "linear",
+        "count": 24,
+        "axis": "x",
+        "angle": 360,
+        "translateX": 0.0029,
+        "translateY": 0,
+        "translateZ": 0,
+        "centerX": 0,
+        "centerY": 0,
+        "centerZ": 0
+      }
+    },
+    {
+      "id": "comb_place",
+      "type": "TransformMesh",
+      "position": {
+        "x": 5120.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Comb Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0.028,
+          0.078,
+          0.052
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "comb_steel",
+      "type": "VertexColor",
+      "position": {
+        "x": 5120.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Comb Steel",
+        "r": 0.78,
+        "g": 0.8,
+        "b": 0.84,
+        "a": 1.0,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "comb_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 5120.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Comb Mat",
+        "group": "",
+        "materialName": "Steel"
+      }
+    },
+    {
+      "id": "mech_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 1120.0
+      },
+      "data": {
+        "__nodeTitle": "Mechanism Merge"
+      }
+    },
+    {
+      "id": "assembly_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 4160.0,
+        "y": 1920.0
+      },
+      "data": {
+        "__nodeTitle": "Music Box Assembly"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 4160.0,
+        "y": 2080.0
+      },
+      "data": {
+        "__nodeTitle": "Output",
+        "label": "MusicBox"
+      }
+    },
+    {
+      "id": "sg_hardware",
+      "type": "Subgraph",
+      "position": {
+        "x": 5760,
+        "y": 1600
+      },
+      "data": {
+        "__nodeTitle": "Hardware",
+        "subgraphId": "hardware"
+      }
+    },
+    {
+      "id": "sg_inlays",
+      "type": "Subgraph",
+      "position": {
+        "x": 8640,
+        "y": 1600
+      },
+      "data": {
+        "__nodeTitle": "Inlays",
+        "subgraphId": "inlays"
+      }
+    },
+    {
+      "id": "sg_feet",
+      "type": "Subgraph",
+      "position": {
+        "x": 9600,
+        "y": 800
+      },
+      "data": {
+        "__nodeTitle": "Feet",
+        "subgraphId": "feet"
+      }
+    },
+    {
+      "id": "glass",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 5440.0,
+        "y": 0.0
+      },
+      "data": {
+        "__nodeTitle": "Glass Pane",
+        "width": 0.12,
+        "height": 0.048,
+        "depth": 0.0005
+      }
+    },
+    {
+      "id": "glass_b",
+      "type": "BevelMesh",
+      "position": {
+        "x": 5440.0,
+        "y": 160.0
+      },
+      "data": {
+        "__nodeTitle": "Glass Bevel",
+        "amount": 0.0004,
+        "segments": 1,
+        "limitMethod": "angle",
+        "angleLimit": 50,
+        "offsetType": "offset"
+      }
+    },
+    {
+      "id": "glass_p",
+      "type": "TransformMesh",
+      "position": {
+        "x": 5440.0,
+        "y": 320.0
+      },
+      "data": {
+        "__nodeTitle": "Glass Place",
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.081,
+          0.073
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "glass_color",
+      "type": "VertexColor",
+      "position": {
+        "x": 5440.0,
+        "y": 480.0
+      },
+      "data": {
+        "__nodeTitle": "Glass Tint",
+        "r": 0.9,
+        "g": 0.93,
+        "b": 0.97,
+        "a": 0.08,
+        "emission": 0,
+        "emissionColorR": 1,
+        "emissionColorG": 1,
+        "emissionColorB": 1
+      }
+    },
+    {
+      "id": "glass_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 5440.0,
+        "y": 640.0
+      },
+      "data": {
+        "__nodeTitle": "Glass Mat",
+        "group": "",
+        "materialName": "Glass"
+      }
+    },
+    {
+      "id": "body_uv",
+      "type": "UVTexture",
+      "position": {
+        "x": -320.0,
+        "y": 960.0
+      },
+      "data": {
+        "__nodeTitle": "Body UV",
+        "projection": "planar",
+        "axis": "z",
+        "scaleU": 0.7,
+        "scaleV": 0.7,
+        "offsetU": 0.0,
+        "offsetV": 0.0
+      }
+    },
+    {
+      "id": "lid_uv",
+      "type": "UVTexture",
+      "position": {
+        "x": 1920.0,
+        "y": 800.0
+      },
+      "data": {
+        "__nodeTitle": "Lid UV",
+        "projection": "planar",
+        "axis": "y",
+        "scaleU": 0.65,
+        "scaleV": 0.65,
+        "offsetU": 0.0,
+        "offsetV": 0.0
+      }
+    },
+    {
+      "id": "base_uv",
+      "type": "UVTexture",
+      "position": {
+        "x": 2240.0,
+        "y": 800.0
+      },
+      "data": {
+        "__nodeTitle": "Base UV",
+        "projection": "planar",
+        "axis": "y",
+        "scaleU": 0.55,
+        "scaleV": 0.55,
+        "offsetU": 0.0,
+        "offsetV": 0.0
+      }
+    },
+    {
+      "id": "pins_steel",
+      "type": "VertexColor",
+      "position": {
+        "x": 4160.0,
+        "y": 800.0
+      },
+      "data": {
+        "__nodeTitle": "Pins Steel",
+        "r": 0.85,
+        "g": 0.87,
+        "b": 0.9,
+        "a": 1.0,
+        "emission": 0.15,
+        "emissionColorR": 0.9,
+        "emissionColorG": 0.9,
+        "emissionColorB": 0.95
+      }
+    },
+    {
+      "id": "pins_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 4160.0,
+        "y": 960.0
+      },
+      "data": {
+        "__nodeTitle": "Pins Mat",
+        "group": "",
+        "materialName": "Steel"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "back_wall",
+      "target": "back_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e2",
+      "source": "back_bevel",
+      "target": "back_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e3",
+      "source": "left_wall",
+      "target": "left_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e4",
+      "source": "left_bevel",
+      "target": "left_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e5",
+      "source": "right_wall",
+      "target": "right_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e6",
+      "source": "right_bevel",
+      "target": "right_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e7",
+      "source": "front_top",
+      "target": "front_top_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e8",
+      "source": "front_top_b",
+      "target": "front_top_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e9",
+      "source": "front_bot",
+      "target": "front_bot_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e10",
+      "source": "front_bot_b",
+      "target": "front_bot_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e11",
+      "source": "front_l",
+      "target": "front_l_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e12",
+      "source": "front_l_b",
+      "target": "front_l_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e13",
+      "source": "front_r",
+      "target": "front_r_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e14",
+      "source": "front_r_b",
+      "target": "front_r_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e15",
+      "source": "body_floor",
+      "target": "body_floor_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e16",
+      "source": "body_ceil",
+      "target": "body_ceil_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e17",
+      "source": "back_place",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e18",
+      "source": "left_place",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e19",
+      "source": "right_place",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e20",
+      "source": "front_top_p",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e21",
+      "source": "front_bot_p",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e22",
+      "source": "front_l_p",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e23",
+      "source": "front_r_p",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e24",
+      "source": "body_floor_p",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e25",
+      "source": "body_ceil_p",
+      "target": "shell_walls",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e26",
+      "source": "shell_walls",
+      "target": "body_uv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e27",
+      "source": "body_wood",
+      "target": "body_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e28",
+      "source": "lid_box",
+      "target": "lid_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e29",
+      "source": "lid_bevel",
+      "target": "lid_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e30",
+      "source": "lid_place",
+      "target": "lid_uv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e31",
+      "source": "lid_wood",
+      "target": "lid_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e32",
+      "source": "base_box",
+      "target": "base_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e33",
+      "source": "base_bevel",
+      "target": "base_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e34",
+      "source": "base_place",
+      "target": "base_uv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e35",
+      "source": "base_wood",
+      "target": "base_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e39",
+      "source": "frame_t",
+      "target": "frame_t_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e40",
+      "source": "frame_b",
+      "target": "frame_b_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e41",
+      "source": "frame_l",
+      "target": "frame_l_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e42",
+      "source": "frame_r",
+      "target": "frame_r_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e43",
+      "source": "frame_t_p",
+      "target": "frame_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e44",
+      "source": "frame_b_p",
+      "target": "frame_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e45",
+      "source": "frame_l_p",
+      "target": "frame_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e46",
+      "source": "frame_r_p",
+      "target": "frame_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e47",
+      "source": "frame_merge",
+      "target": "frame_brass",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e48",
+      "source": "frame_brass",
+      "target": "frame_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e49",
+      "source": "body_mat",
+      "target": "shell_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e50",
+      "source": "lid_mat",
+      "target": "shell_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e51",
+      "source": "base_mat",
+      "target": "shell_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e53",
+      "source": "frame_mat",
+      "target": "shell_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e54",
+      "source": "drum",
+      "target": "drum_orient",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e55",
+      "source": "pin_proto",
+      "target": "pin_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e56",
+      "source": "pin_place",
+      "target": "drum_pins",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_pin_center_orient",
+      "source": "pin_rows_center",
+      "target": "pins_orient",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e58",
+      "source": "drum_orient",
+      "target": "drum_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e60",
+      "source": "drum_merge",
+      "target": "drum_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e61",
+      "source": "drum_place",
+      "target": "drum_brass",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e62",
+      "source": "drum_brass",
+      "target": "drum_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e63",
+      "source": "gear_tooth",
+      "target": "gear_tooth_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e64",
+      "source": "gear_tooth_place",
+      "target": "gear_teeth",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e65",
+      "source": "gear_disk",
+      "target": "gear_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e66",
+      "source": "gear_teeth",
+      "target": "gear_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e67",
+      "source": "gear_merge",
+      "target": "gear_orient",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e68",
+      "source": "gear_orient",
+      "target": "gear_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e69",
+      "source": "gear_place",
+      "target": "gear_brass",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e70",
+      "source": "gear_brass",
+      "target": "gear_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e71",
+      "source": "comb_tooth",
+      "target": "comb_teeth",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e72",
+      "source": "comb_teeth",
+      "target": "comb_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e73",
+      "source": "comb_place",
+      "target": "comb_steel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e74",
+      "source": "comb_steel",
+      "target": "comb_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e75",
+      "source": "drum_mat",
+      "target": "mech_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e76",
+      "source": "gear_mat",
+      "target": "mech_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e77",
+      "source": "comb_mat",
+      "target": "mech_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e142",
+      "source": "shell_merge",
+      "target": "assembly_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e143",
+      "source": "mech_merge",
+      "target": "assembly_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e147",
+      "source": "assembly_merge",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sg_hardware_asm",
+      "source": "sg_hardware",
+      "target": "assembly_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sg_inlays_asm",
+      "source": "sg_inlays",
+      "target": "assembly_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sg_feet_asm",
+      "source": "sg_feet",
+      "target": "assembly_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_glass_b",
+      "source": "glass",
+      "target": "glass_b",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_glass_p",
+      "source": "glass_b",
+      "target": "glass_p",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_glass_c",
+      "source": "glass_p",
+      "target": "glass_color",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_glass_m",
+      "source": "glass_color",
+      "target": "glass_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_body_uv",
+      "source": "body_uv",
+      "target": "body_wood",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_lid_uv",
+      "source": "lid_uv",
+      "target": "lid_wood",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_base_uv",
+      "source": "base_uv",
+      "target": "base_wood",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_glass_asm",
+      "source": "glass_mat",
+      "target": "assembly_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_drum_pins_rows",
+      "source": "drum_pins",
+      "target": "pin_rows",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_pin_rows_center",
+      "source": "pin_rows",
+      "target": "pin_rows_center",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_pins_orient_place",
+      "source": "pins_orient",
+      "target": "pins_place",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_pins_place_steel",
+      "source": "pins_place",
+      "target": "pins_steel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_pins_steel_mat",
+      "source": "pins_steel",
+      "target": "pins_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_pins_mat_mech",
+      "source": "pins_mat",
+      "target": "mech_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "p_box_w",
+      "name": "BoxWidth",
+      "type": "number",
+      "default": 0.185,
+      "exposed": true,
+      "targetNode": "back_wall",
+      "targetProperty": "width",
+      "hasRange": true,
+      "min": 0.12,
+      "max": 0.4
+    },
+    {
+      "id": "p_box_d",
+      "name": "BoxDepth",
+      "type": "number",
+      "default": 0.148,
+      "exposed": true,
+      "targetNode": "left_wall",
+      "targetProperty": "depth",
+      "hasRange": true,
+      "min": 0.08,
+      "max": 0.25
+    },
+    {
+      "id": "p_box_h",
+      "name": "BoxHeight",
+      "type": "number",
+      "default": 0.096,
+      "exposed": true,
+      "targetNode": "back_wall",
+      "targetProperty": "height",
+      "hasRange": true,
+      "min": 0.04,
+      "max": 0.15
+    },
+    {
+      "id": "p_win_w",
+      "name": "WindowWidth",
+      "type": "number",
+      "default": 0.128,
+      "exposed": true,
+      "targetNode": "frame_t",
+      "targetProperty": "width",
+      "hasRange": true,
+      "min": 0.08,
+      "max": 0.2
+    },
+    {
+      "id": "p_comb",
+      "name": "CombTeeth",
+      "type": "integer",
+      "default": 24,
+      "exposed": true,
+      "targetNode": "comb_teeth",
+      "targetProperty": "count",
+      "hasRange": true,
+      "min": 8,
+      "max": 32
+    },
+    {
+      "id": "p_bevel",
+      "name": "BevelAmount",
+      "type": "number",
+      "default": 0.006,
+      "exposed": true,
+      "targetNode": "back_bevel",
+      "targetProperty": "amount",
+      "hasRange": true,
+      "min": 0.002,
+      "max": 0.02
+    }
+  ],
+  "subgraphs": [
+    {
+      "id": "hardware",
+      "name": "Hardware",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "key_loop",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 200.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Key Boss",
+            "radius": 0.0085,
+            "height": 0.0045,
+            "radialSegments": 16,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "key_shaft",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 520.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Key Shaft",
+            "radius": 0.0036,
+            "height": 0.05,
+            "radialSegments": 14,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "key_wing_a",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 840.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Key Wing A",
+            "radius": 0.017,
+            "height": 0.0032,
+            "radialSegments": 24,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "key_wing_b",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Key Wing B",
+            "radius": 0.017,
+            "height": 0.0032,
+            "radialSegments": 24,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "key_loop_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Key Boss Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.004,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              90
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "key_shaft_orient",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Key Shaft Orient",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              90
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "key_wing_a_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Wing A Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.032,
+              0.012,
+              0
+            ],
+            "rotation": [
+              90,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "key_wing_b_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Wing B Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.032,
+              -0.012,
+              0
+            ],
+            "rotation": [
+              90,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "key_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 520.0,
+            "y": 320.0
+          },
+          "data": {
+            "__nodeTitle": "Key Merge"
+          }
+        },
+        {
+          "id": "key_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 480.0
+          },
+          "data": {
+            "__nodeTitle": "Key Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.098,
+              0.081,
+              0.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "key_brass",
+          "type": "VertexColor",
+          "position": {
+            "x": 520.0,
+            "y": 640.0
+          },
+          "data": {
+            "__nodeTitle": "Key Brass",
+            "r": 0.98,
+            "g": 0.8,
+            "b": 0.32,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "key_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 520.0,
+            "y": 800.0
+          },
+          "data": {
+            "__nodeTitle": "Key Mat",
+            "group": "",
+            "materialName": "Brass"
+          }
+        },
+        {
+          "id": "hinge_proto",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 520.0,
+            "y": 960.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge Proto",
+            "width": 0.032,
+            "height": 0.004,
+            "depth": 0.014
+          }
+        },
+        {
+          "id": "hinge_l_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 1120.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge L Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.036,
+              0.156,
+              -0.07
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "hinge_r_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840.0,
+            "y": 1120.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge R Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.036,
+              0.156,
+              -0.07
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "hinge_l_brass",
+          "type": "VertexColor",
+          "position": {
+            "x": 200.0,
+            "y": 1280.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge L Brass",
+            "r": 0.98,
+            "g": 0.8,
+            "b": 0.32,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "hinge_r_brass",
+          "type": "VertexColor",
+          "position": {
+            "x": 840.0,
+            "y": 1280.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge R Brass",
+            "r": 0.98,
+            "g": 0.8,
+            "b": 0.32,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "hinge_l_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 200.0,
+            "y": 1440.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge L Mat",
+            "group": "",
+            "materialName": "Brass"
+          }
+        },
+        {
+          "id": "hinge_r_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 840.0,
+            "y": 1440.0
+          },
+          "data": {
+            "__nodeTitle": "Hinge R Mat",
+            "group": "",
+            "materialName": "Brass"
+          }
+        },
+        {
+          "id": "hw_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 520.0,
+            "y": 1600.0
+          },
+          "data": {
+            "__nodeTitle": "Hardware Merge"
+          }
+        },
+        {
+          "id": "hardware_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 520.0,
+            "y": 1760.0
+          },
+          "data": {
+            "__nodeTitle": "Hardware Out"
+          }
+        },
+        {
+          "id": "key_plate",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": -120.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Key Base Plate",
+            "radius": 0.0175,
+            "height": 0.003,
+            "radialSegments": 28,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "key_plate_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": -120.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Key Plate Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.001,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              90
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "hinge_barrel",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 1600,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel",
+            "radius": 0.0028,
+            "height": 0.026,
+            "radialSegments": 12,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "hinge_barrel_l",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1600,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel L",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.036,
+              0.156,
+              -0.076
+            ],
+            "rotation": [
+              0,
+              0,
+              90
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "hinge_barrel_r",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1600,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel R",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.036,
+              0.156,
+              -0.076
+            ],
+            "rotation": [
+              0,
+              0,
+              90
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "hinge_barrel_l_brass",
+          "type": "VertexColor",
+          "position": {
+            "x": 1600,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel L Brass",
+            "r": 0.78,
+            "g": 0.58,
+            "b": 0.28,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "hinge_barrel_l_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1600,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel L Mat",
+            "group": "",
+            "materialName": "Brass"
+          }
+        },
+        {
+          "id": "hinge_barrel_r_brass",
+          "type": "VertexColor",
+          "position": {
+            "x": 1920,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel R Brass",
+            "r": 0.78,
+            "g": 0.58,
+            "b": 0.28,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "hinge_barrel_r_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1920,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Hinge Barrel R Mat",
+            "group": "",
+            "materialName": "Brass"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e78",
+          "source": "key_shaft",
+          "target": "key_shaft_orient",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e79",
+          "source": "key_loop",
+          "target": "key_loop_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e80",
+          "source": "key_wing_a",
+          "target": "key_wing_a_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e81",
+          "source": "key_wing_b",
+          "target": "key_wing_b_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e82",
+          "source": "key_shaft_orient",
+          "target": "key_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e83",
+          "source": "key_loop_place",
+          "target": "key_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e84",
+          "source": "key_wing_a_place",
+          "target": "key_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e85",
+          "source": "key_wing_b_place",
+          "target": "key_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e86",
+          "source": "key_merge",
+          "target": "key_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e87",
+          "source": "key_place",
+          "target": "key_brass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e88",
+          "source": "key_brass",
+          "target": "key_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e89",
+          "source": "hinge_proto",
+          "target": "hinge_l_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e90",
+          "source": "hinge_proto",
+          "target": "hinge_r_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e91",
+          "source": "hinge_l_place",
+          "target": "hinge_l_brass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e92",
+          "source": "hinge_l_brass",
+          "target": "hinge_l_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e93",
+          "source": "hinge_r_place",
+          "target": "hinge_r_brass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e94",
+          "source": "hinge_r_brass",
+          "target": "hinge_r_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e95",
+          "source": "key_mat",
+          "target": "hw_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e96",
+          "source": "hinge_l_mat",
+          "target": "hw_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e97",
+          "source": "hinge_r_mat",
+          "target": "hw_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hardware_out",
+          "source": "hw_merge",
+          "target": "hardware_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_plate_p",
+          "source": "key_plate",
+          "target": "key_plate_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_plate_m",
+          "source": "key_plate_place",
+          "target": "key_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_hinge_barrel_l",
+          "source": "hinge_barrel",
+          "target": "hinge_barrel_l",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_l_hinge_barrel_l_brass",
+          "source": "hinge_barrel_l",
+          "target": "hinge_barrel_l_brass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_l_brass_hinge_barrel_l_mat",
+          "source": "hinge_barrel_l_brass",
+          "target": "hinge_barrel_l_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_l_mat_hw_merge",
+          "source": "hinge_barrel_l_mat",
+          "target": "hw_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_hinge_barrel_r",
+          "source": "hinge_barrel",
+          "target": "hinge_barrel_r",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_r_hinge_barrel_r_brass",
+          "source": "hinge_barrel_r",
+          "target": "hinge_barrel_r_brass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_r_brass_hinge_barrel_r_mat",
+          "source": "hinge_barrel_r_brass",
+          "target": "hinge_barrel_r_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_hinge_barrel_r_mat_hw_merge",
+          "source": "hinge_barrel_r_mat",
+          "target": "hw_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "inlays",
+      "name": "Inlays",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "inlay_vert",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Vert",
+            "width": 0.0009,
+            "height": 0.052,
+            "depth": 0.00085
+          }
+        },
+        {
+          "id": "inlay_v_copy",
+          "type": "CopyMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Vert Triple",
+            "mode": "linear",
+            "count": 3,
+            "axis": "x",
+            "angle": 360,
+            "translateX": 0.003,
+            "translateY": 0,
+            "translateZ": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0
+          }
+        },
+        {
+          "id": "inlay_fl",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 320.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay FL",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.077,
+              0.081,
+              0.0738
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "inlay_fr",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1480.0,
+            "y": 320.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay FR",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.069,
+              0.081,
+              0.0738
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "inlay_base_line",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 480.0
+          },
+          "data": {
+            "__nodeTitle": "Base Inlay Line",
+            "width": 0.168,
+            "height": 0.0009,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "inlay_base_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 640.0
+          },
+          "data": {
+            "__nodeTitle": "Base Inlay Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0,
+              0.0385,
+              0.0732
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "lid_border_l",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200.0,
+            "y": 800.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border L",
+            "width": 0.0009,
+            "height": 0.0009,
+            "depth": 0.092
+          }
+        },
+        {
+          "id": "lid_border_f",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 520.0,
+            "y": 800.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border F",
+            "width": 0.128,
+            "height": 0.0009,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "lid_border_b",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1480.0,
+            "y": 800.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border B",
+            "width": 0.128,
+            "height": 0.0009,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "lid_border_r",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1800.0,
+            "y": 800.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border R",
+            "width": 0.0009,
+            "height": 0.0009,
+            "depth": 0.092
+          }
+        },
+        {
+          "id": "lid_bl_p",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 960.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border L Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.078,
+              0.1588,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "lid_bf_p",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 960.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border F Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0,
+              0.1588,
+              0.058
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "lid_bb_p",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1480.0,
+            "y": 960.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border B Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0,
+              0.1588,
+              -0.058
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "lid_br_p",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1800.0,
+            "y": 960.0
+          },
+          "data": {
+            "__nodeTitle": "Lid Border R Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.078,
+              0.1588,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "inlay_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 1280.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Merge"
+          }
+        },
+        {
+          "id": "inlay_brass",
+          "type": "VertexColor",
+          "position": {
+            "x": 1160.0,
+            "y": 1440.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Brass",
+            "r": 0.98,
+            "g": 0.82,
+            "b": 0.35,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "inlay_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1160.0,
+            "y": 1600.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Mat",
+            "group": "",
+            "materialName": "BrassInlay"
+          }
+        },
+        {
+          "id": "inlays_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200,
+            "y": 2080.0
+          },
+          "data": {
+            "__nodeTitle": "Inlays Out"
+          }
+        },
+        {
+          "id": "inlay_side",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200.0,
+            "y": 400.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Side Vert",
+            "width": 0.00085,
+            "height": 0.052,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "inlay_side_copy",
+          "type": "CopyMesh",
+          "position": {
+            "x": 200.0,
+            "y": 560.0
+          },
+          "data": {
+            "__nodeTitle": "Side Vert Pair",
+            "mode": "linear",
+            "count": 2,
+            "axis": "z",
+            "angle": 360,
+            "translateX": 0,
+            "translateY": 0,
+            "translateZ": 0.003,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0
+          }
+        },
+        {
+          "id": "inlay_sl",
+          "type": "TransformMesh",
+          "position": {
+            "x": 40.0,
+            "y": 720.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Side L",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.0916,
+              0.081,
+              0.05
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "inlay_sr",
+          "type": "TransformMesh",
+          "position": {
+            "x": 360.0,
+            "y": 720.0
+          },
+          "data": {
+            "__nodeTitle": "Inlay Side R",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.0916,
+              0.081,
+              0.05
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_hx",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 6400.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop H",
+            "width": 0.012,
+            "height": 0.0009,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "sc_vz",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 6720.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop V",
+            "width": 0.0009,
+            "height": 0.0009,
+            "depth": 0.012
+          }
+        },
+        {
+          "id": "sc_hi",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 7040.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop H In",
+            "width": 0.0085,
+            "height": 0.0009,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "sc_vi",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 7360.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop V In",
+            "width": 0.0009,
+            "height": 0.0009,
+            "depth": 0.0085
+          }
+        },
+        {
+          "id": "sc_fl_ho",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6400.0,
+            "y": 200.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fl ho",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.071,
+              0.1588,
+              0.058
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fl_vo",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6720.0,
+            "y": 200.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fl vo",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.078,
+              0.1588,
+              0.065
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fl_hi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7040.0,
+            "y": 200.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fl hi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.061,
+              0.1588,
+              0.048
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fl_vi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7360.0,
+            "y": 200.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fl vi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.066,
+              0.1588,
+              0.053
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fr_ho",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6400.0,
+            "y": 360.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fr ho",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.071,
+              0.1588,
+              0.058
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fr_vo",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6720.0,
+            "y": 360.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fr vo",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.078,
+              0.1588,
+              0.065
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fr_hi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7040.0,
+            "y": 360.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fr hi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.061,
+              0.1588,
+              0.048
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fr_vi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7360.0,
+            "y": 360.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop fr vi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.066,
+              0.1588,
+              0.053
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_bl_ho",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6400.0,
+            "y": 520.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop bl ho",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.071,
+              0.1588,
+              -0.058
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_bl_vo",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6720.0,
+            "y": 520.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop bl vo",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.078,
+              0.1588,
+              -0.065
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_bl_hi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7040.0,
+            "y": 520.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop bl hi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.061,
+              0.1588,
+              -0.048
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_bl_vi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7360.0,
+            "y": 520.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop bl vi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.066,
+              0.1588,
+              -0.053
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_br_ho",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6400.0,
+            "y": 680.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop br ho",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.071,
+              0.1588,
+              -0.058
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_br_vo",
+          "type": "TransformMesh",
+          "position": {
+            "x": 6720.0,
+            "y": 680.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop br vo",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.078,
+              0.1588,
+              -0.065
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_br_hi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7040.0,
+            "y": 680.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop br hi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.061,
+              0.1588,
+              -0.048
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_br_vi",
+          "type": "TransformMesh",
+          "position": {
+            "x": 7360.0,
+            "y": 680.0
+          },
+          "data": {
+            "__nodeTitle": "Scallop br vi",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.066,
+              0.1588,
+              -0.053
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_diag",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 2400,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Scallop Diag",
+            "width": 0.01,
+            "height": 0.0009,
+            "depth": 0.0009
+          }
+        },
+        {
+          "id": "sc_fl_d",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2400,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Scallop sc_fl_d",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.068,
+              0.1588,
+              0.048
+            ],
+            "rotation": [
+              0,
+              45,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_fr_d",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2400,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Scallop sc_fr_d",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.068,
+              0.1588,
+              0.048
+            ],
+            "rotation": [
+              0,
+              -45,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_bl_d",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2400,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Scallop sc_bl_d",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.068,
+              0.1588,
+              -0.048
+            ],
+            "rotation": [
+              0,
+              -45,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "sc_br_d",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2400,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Scallop sc_br_d",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.068,
+              0.1588,
+              -0.048
+            ],
+            "rotation": [
+              0,
+              45,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e98",
+          "source": "inlay_vert",
+          "target": "inlay_v_copy",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e99",
+          "source": "inlay_v_copy",
+          "target": "inlay_fl",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e100",
+          "source": "inlay_v_copy",
+          "target": "inlay_fr",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e101",
+          "source": "inlay_base_line",
+          "target": "inlay_base_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e102",
+          "source": "lid_border_f",
+          "target": "lid_bf_p",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e103",
+          "source": "lid_border_b",
+          "target": "lid_bb_p",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e104",
+          "source": "lid_border_l",
+          "target": "lid_bl_p",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e105",
+          "source": "lid_border_r",
+          "target": "lid_br_p",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e114",
+          "source": "inlay_fl",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e115",
+          "source": "inlay_fr",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e116",
+          "source": "inlay_base_place",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e117",
+          "source": "lid_bf_p",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e118",
+          "source": "lid_bb_p",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e119",
+          "source": "lid_bl_p",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e120",
+          "source": "lid_br_p",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e129",
+          "source": "inlay_merge",
+          "target": "inlay_brass",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e130",
+          "source": "inlay_brass",
+          "target": "inlay_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_inlays_out",
+          "source": "inlay_mat",
+          "target": "inlays_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_side_c",
+          "source": "inlay_side",
+          "target": "inlay_side_copy",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_side_l",
+          "source": "inlay_side_copy",
+          "target": "inlay_sl",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_side_r",
+          "source": "inlay_side_copy",
+          "target": "inlay_sr",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_side_lm",
+          "source": "inlay_sl",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_side_rm",
+          "source": "inlay_sr",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_ho_s",
+          "source": "sc_hx",
+          "target": "sc_fl_ho",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_ho_m",
+          "source": "sc_fl_ho",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_vo_s",
+          "source": "sc_vz",
+          "target": "sc_fl_vo",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_vo_m",
+          "source": "sc_fl_vo",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_hi_s",
+          "source": "sc_hi",
+          "target": "sc_fl_hi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_hi_m",
+          "source": "sc_fl_hi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_vi_s",
+          "source": "sc_vi",
+          "target": "sc_fl_vi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_vi_m",
+          "source": "sc_fl_vi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_ho_s",
+          "source": "sc_hx",
+          "target": "sc_fr_ho",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_ho_m",
+          "source": "sc_fr_ho",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_vo_s",
+          "source": "sc_vz",
+          "target": "sc_fr_vo",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_vo_m",
+          "source": "sc_fr_vo",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_hi_s",
+          "source": "sc_hi",
+          "target": "sc_fr_hi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_hi_m",
+          "source": "sc_fr_hi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_vi_s",
+          "source": "sc_vi",
+          "target": "sc_fr_vi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_vi_m",
+          "source": "sc_fr_vi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_ho_s",
+          "source": "sc_hx",
+          "target": "sc_bl_ho",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_ho_m",
+          "source": "sc_bl_ho",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_vo_s",
+          "source": "sc_vz",
+          "target": "sc_bl_vo",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_vo_m",
+          "source": "sc_bl_vo",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_hi_s",
+          "source": "sc_hi",
+          "target": "sc_bl_hi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_hi_m",
+          "source": "sc_bl_hi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_vi_s",
+          "source": "sc_vi",
+          "target": "sc_bl_vi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_vi_m",
+          "source": "sc_bl_vi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_ho_s",
+          "source": "sc_hx",
+          "target": "sc_br_ho",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_ho_m",
+          "source": "sc_br_ho",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_vo_s",
+          "source": "sc_vz",
+          "target": "sc_br_vo",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_vo_m",
+          "source": "sc_br_vo",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_hi_s",
+          "source": "sc_hi",
+          "target": "sc_br_hi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_hi_m",
+          "source": "sc_br_hi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_vi_s",
+          "source": "sc_vi",
+          "target": "sc_br_vi",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_vi_m",
+          "source": "sc_br_vi",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_diag_sc_fl_d",
+          "source": "sc_diag",
+          "target": "sc_fl_d",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fl_d_inlay_merge",
+          "source": "sc_fl_d",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_diag_sc_fr_d",
+          "source": "sc_diag",
+          "target": "sc_fr_d",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_fr_d_inlay_merge",
+          "source": "sc_fr_d",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_diag_sc_bl_d",
+          "source": "sc_diag",
+          "target": "sc_bl_d",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_bl_d_inlay_merge",
+          "source": "sc_bl_d",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_diag_sc_br_d",
+          "source": "sc_diag",
+          "target": "sc_br_d",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sc_br_d_inlay_merge",
+          "source": "sc_br_d",
+          "target": "inlay_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "feet",
+      "name": "Feet",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "foot_cyl",
+          "type": "CreateCylinderMesh",
+          "position": {
+            "x": 680.0,
+            "y": 0.0
+          },
+          "data": {
+            "__nodeTitle": "Foot Cylinder",
+            "radius": 0.0135,
+            "height": 0.014,
+            "radialSegments": 18,
+            "heightSegments": 1,
+            "capTop": true,
+            "capBottom": true
+          }
+        },
+        {
+          "id": "foot_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 680.0,
+            "y": 160.0
+          },
+          "data": {
+            "__nodeTitle": "Foot Bevel",
+            "amount": 0.005,
+            "segments": 4,
+            "limitMethod": "angle",
+            "angleLimit": 50,
+            "offsetType": "offset"
+          }
+        },
+        {
+          "id": "foot_wood",
+          "type": "VertexColor",
+          "position": {
+            "x": 680.0,
+            "y": 320.0
+          },
+          "data": {
+            "__nodeTitle": "Foot Wood",
+            "r": 0.18,
+            "g": 0.09,
+            "b": 0.04,
+            "a": 1.0,
+            "emission": 0,
+            "emissionColorR": 1,
+            "emissionColorG": 1,
+            "emissionColorB": 1
+          }
+        },
+        {
+          "id": "foot_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 680.0,
+            "y": 480.0
+          },
+          "data": {
+            "__nodeTitle": "Foot Mat",
+            "group": "",
+            "materialName": "WoodDark"
+          }
+        },
+        {
+          "id": "foot_fl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200.0,
+            "y": 640.0
+          },
+          "data": {
+            "__nodeTitle": "FL Foot Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.0745,
+              0.0065,
+              0.055999999999999994
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "foot_fr_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 520.0,
+            "y": 640.0
+          },
+          "data": {
+            "__nodeTitle": "FR Foot Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.0745,
+              0.0065,
+              0.055999999999999994
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "foot_rl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840.0,
+            "y": 640.0
+          },
+          "data": {
+            "__nodeTitle": "RL Foot Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              -0.0745,
+              0.0065,
+              -0.055999999999999994
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "foot_rr_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1160.0,
+            "y": 640.0
+          },
+          "data": {
+            "__nodeTitle": "RR Foot Place",
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0.0745,
+              0.0065,
+              -0.055999999999999994
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post"
+          }
+        },
+        {
+          "id": "feet_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 680.0,
+            "y": 800.0
+          },
+          "data": {
+            "__nodeTitle": "Feet Merge"
+          }
+        },
+        {
+          "id": "feet_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 680.0,
+            "y": 960.0
+          },
+          "data": {
+            "__nodeTitle": "Feet Out"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e131",
+          "source": "foot_cyl",
+          "target": "foot_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e132",
+          "source": "foot_bevel",
+          "target": "foot_wood",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e133",
+          "source": "foot_wood",
+          "target": "foot_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e134",
+          "source": "foot_mat",
+          "target": "foot_fl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e135",
+          "source": "foot_mat",
+          "target": "foot_fr_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e136",
+          "source": "foot_mat",
+          "target": "foot_rl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e137",
+          "source": "foot_mat",
+          "target": "foot_rr_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e138",
+          "source": "foot_fl_place",
+          "target": "feet_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e139",
+          "source": "foot_fr_place",
+          "target": "feet_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e140",
+          "source": "foot_rl_place",
+          "target": "feet_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e141",
+          "source": "foot_rr_place",
+          "target": "feet_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_feet_out",
+          "source": "feet_merge",
+          "target": "feet_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,519 @@
+{
+  "version": "3.0",
+  "nodes": [
+    {
+      "id": "ground",
+      "type": "CreateGridMesh",
+      "position": { "x": 840, "y": 0 },
+      "data": {"sizeX": 48, "sizeY": 48, "rows": 1, "cols": 1, "plane": "xz", "__nodeTitle": "City Ground"}
+    },
+    {
+      "id": "foreach_begin",
+      "type": "ForEachBegin",
+      "position": { "x": 840, "y": 880 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": "ForEach Building Lot"}
+    },
+    {
+      "id": "lots",
+      "type": "LotSubdivision",
+      "position": { "x": 778.5, "y": 480 },
+      "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "boundingBox", "__nodeTitle": "Building Lots iter=2"}
+    },
+    {
+      "id": "shrink_lots",
+      "type": "PrimitiveTransform",
+      "position": { "x": 549, "y": 586 },
+      "data": {"scale": 0.85, "faceGroup": "lots", "__nodeTitle": "Shrink Lots 0.85"}
+    },
+    {
+      "id": "floors_attrs",
+      "type": "AttributeWrangle",
+      "position": { "x": 840, "y": 827 },
+      "data": {"group": "", "groupType": "guess", "runOver": "primitives", "expression": "@bucket = ((@P.x * 13 + @P.z * 17) % 10 + 10) % 10; @numFloors = (@bucket < 2) * 3 + (@bucket >= 2 && @bucket < 7) * 2 + (@bucket >= 7) * 1; @height = @numFloors * chf(\"floorH\"); @roofType = ((@P.x * 3 + @P.z * 5) % 2 + 2) % 2; @hasFireEscape = (@numFloors > 2) * (((( @P.x * 11 + @P.z * 23) % 10 + 10) % 10) < 7); @hasBalcony = (@numFloors >= 2) * (1 - @hasFireEscape) * (((( @P.x * 17 + @P.z * 19) % 10 + 10) % 10) < 5);", "parameters": "{\"floorH\":2.8}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "Assign Floors"}
+    },
+    {
+      "id": "n111",
+      "type": "PrimitiveTransform",
+      "position": { "x": 1054, "y": 804 },
+      "data": {"scale": 0.84, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
+    },
+    {
+      "id": "shrink_blocks",
+      "type": "PrimitiveTransform",
+      "position": { "x": 840, "y": 318.5 },
+      "data": {"scale": 0.75, "faceGroup": "lots", "__nodeTitle": "Shrink Blocks 0.75"}
+    },
+    {
+      "id": "n101",
+      "type": "SortGeometry",
+      "position": { "x": 848.5, "y": 521 },
+      "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "proximity", "primitiveSeed": 0, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "floors_wrangle",
+      "type": "AttributeWrangle",
+      "position": { "x": 848.5, "y": 597.5 },
+      "data": {"group": "", "groupType": "guess", "runOver": "primitives", "expression": "@group.park = ((@primnum + 1) % 5 == 0);", "parameters": "{}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "park_group"}
+    },
+    {
+      "id": "keep_built",
+      "type": "Split",
+      "position": { "x": 848.5, "y": 659.5 },
+      "data": {"group": "park", "groupType": "guess", "invertSelection": true, "deleteUnusedGroups": false, "__nodeTitle": "split4"}
+    },
+    {
+      "id": "n102",
+      "type": "LotSubdivision",
+      "position": { "x": 840, "y": 725 },
+      "data": {"minSize": 2, "iterations": 2, "irregularity": 0.2, "seed": 0, "alignment": "longestEdge", "__nodeTitle": "Lot Subdivision Building lots"}
+    },
+    {
+      "id": "blocks",
+      "type": "LotSubdivision",
+      "position": { "x": 840, "y": 160 },
+      "data": {"minSize": 0.1, "iterations": 4, "irregularity": 0.35, "seed": 2.3, "alignment": "longestEdge", "__nodeTitle": "City Blocks iter=3"}
+    },
+    {
+      "id": "n104",
+      "type": "Carve",
+      "position": { "x": 1173, "y": 978 },
+      "data": {"group": "", "arcLengthU": true, "useFirstU": true, "uStart": 0, "uStartAttrib": "", "useSecondU": true, "uEnd": 1, "uEndAttrib": "", "useFirstV": true, "vStart": 0.25, "vStartAttrib": "", "useSecondV": true, "vEnd": 0.75, "vEndAttrib": "", "location": "breakpoints", "uDivisions": 1, "vDivisions": 2, "cutAtAllInternalUBreakpoints": true, "cutAtAllInternalVBreakpoints": true, "operation": "cut", "keepInside": true, "keepOutside": false, "extractType": "curves3d", "keepOriginal": false, "onlyAtBreakpoints": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n107",
+      "type": "Resample",
+      "position": { "x": 1173, "y": 1039.5 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": false, "maxSegmentLength": 0.1, "useMaxSegments": true, "maxSegments": 2, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": ""}
+    },
+    {
+      "id": "n105",
+      "type": "Resample",
+      "position": { "x": 1330, "y": 804 },
+      "data": {"group": "", "maintainPrimitiveOrder": false, "levelOfDetail": 1, "resampleByPolygonEdge": false, "method": "evenLength", "measure": "arc", "useMaxSegmentLength": true, "maxSegmentLength": 0.3, "useMaxSegments": false, "maxSegments": 10, "allowAttributeOverride": true, "evenLastSegmentSameLength": true, "maintainLastVertex": false, "randomizeFirstSegmentLength": false, "createOnlyPoints": false, "treatPolygonsAs": "straight", "outputAsSubdivisionCurves": false, "writeDistanceAttr": false, "distanceAttribute": "ptdist", "writeTangentAttr": false, "tangentAttribute": "tangentu", "writeCurveUAttr": false, "curveUAttribute": "curveu", "writeCurveNumAttr": false, "curveNumAttribute": "curvenum", "__nodeTitle": "Resample Outer Ring"}
+    },
+    {
+      "id": "n106",
+      "type": "GroupCreate",
+      "position": { "x": 1339.5, "y": 978 },
+      "data": {"outputGroup": "streetFacingPoints", "domain": "point", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "n108",
+      "type": "GroupTransfer",
+      "position": { "x": 1268.5, "y": 1128.5 },
+      "data": {"transferPrimitiveGroups": false, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "streetFacingPoints", "pointGroupPrefix": "", "transferEdgeGroups": false, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "overwrite", "enableDistanceThreshold": true, "distanceThreshold": 1.5, "createEmptyGroups": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n110",
+      "type": "GroupPromote",
+      "position": { "x": 1268.5, "y": 1189 },
+      "data": {"numberOfPromotions": 1, "convertFrom": "point", "to": "edge", "groupName": "streetFacingPoints", "newName": "streetFacingEdges", "keepOriginalGroup": false, "includeOnlyOnBoundary": true, "includeUnsharedEdges": true, "includeAllUnsharedCurveEdges": true, "useConnectivityAttribute": false, "connectivityAttribute": "uv", "connectivityAttributeTolerance": 0.0001, "includeAllPrimitivesSharingAttributeBoundaryPoints": false, "includeOnlyEntirelyContained": true, "includeOnlyPrimitivesSharingEdge": false, "removeDegenerateBridges": false, "outputAsIntegerAttribute": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n103",
+      "type": "ConvertLine",
+      "position": { "x": 1173, "y": 902 },
+      "data": {"group": "", "connectPath": true, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "mode": "unshared", "edgeGroup": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n118",
+      "type": "TransformMesh",
+      "position": { "x": 1212.5, "y": 1573.5 },
+      "data": {"group": "", "groupType": "guess", "transformOrder": "srt", "rotateOrder": "xyz", "translate": [0,0,0], "rotation": [0,0,0], "scale": [1,1,1], "shear": [0,0,0], "uniformScale": 2, "pivotTranslate": [0,0,0], "pivotRotate": [0,0,0], "preTransformOrder": "srt", "preRotateOrder": "xyz", "preTranslate": [0,0,0], "preRotate": [0,0,0], "preScale": [1,1,1], "preShear": [0,0,0], "recomputePointNormals": false, "preserveNormalLength": true, "invertTransform": false, "outputTransform": false, "outputAttribute": "xform", "outputMultiplyOrder": "post", "attributes": "*", "recomputeAffectedNormals": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n119",
+      "type": "AttributeWrangle",
+      "position": { "x": 1256.5, "y": 1660 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "@pct = chramp(\"remapPct\", rand(@iteration * 12));\nv@brickCd = vector(chramp(\"brick\", @pct));\nv@paint1Cd = vector(chramp(\"paint1\", @pct));\nv@paint2Cd = vector(chramp(\"paint2\", @pct));\nv@stoneCd = vector(chramp(\"stone\", @pct));\nv@wallCd = vector(chramp(\"wall\", @pct));", "parameters": "{}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{\"remapPct\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.0,0.0,0.0]},{\"t\":0.65,\"color\":[0.25,0.25,0.25]},{\"t\":1.0,\"color\":[1.0,1.0,1.0]}]},\"brick\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.12,0.06,0.04]},{\"t\":0.17,\"color\":[0.22,0.10,0.06]},{\"t\":0.33,\"color\":[0.35,0.14,0.08]},{\"t\":0.5,\"color\":[0.48,0.18,0.10]},{\"t\":0.67,\"color\":[0.55,0.22,0.12]},{\"t\":0.83,\"color\":[0.60,0.24,0.13]},{\"t\":1.0,\"color\":[0.65,0.26,0.14]}]},\"paint1\":{\"interpolation\":\"constant\",\"keys\":[{\"t\":0.0,\"color\":[0.10,0.09,0.08]},{\"t\":0.07,\"color\":[0.18,0.15,0.12]},{\"t\":0.13,\"color\":[0.25,0.22,0.18]},{\"t\":0.20,\"color\":[0.32,0.28,0.22]},{\"t\":0.27,\"color\":[0.20,0.24,0.22]},{\"t\":0.33,\"color\":[0.15,0.22,0.20]},{\"t\":0.40,\"color\":[0.18,0.26,0.24]},{\"t\":0.47,\"color\":[0.22,0.30,0.22]},{\"t\":0.53,\"color\":[0.35,0.32,0.18]},{\"t\":0.60,\"color\":[0.42,0.36,0.20]},{\"t\":0.67,\"color\":[0.30,0.26,0.16]},{\"t\":0.73,\"color\":[0.24,0.22,0.14]},{\"t\":0.80,\"color\":[0.20,0.20,0.18]},{\"t\":0.87,\"color\":[0.26,0.24,0.16]},{\"t\":0.93,\"color\":[0.30,0.28,0.14]},{\"t\":1.0,\"color\":[0.247,0.427,0.270]}]},\"paint2\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.45,0.44,0.42]},{\"t\":0.08,\"color\":[0.38,0.37,0.35]},{\"t\":0.15,\"color\":[0.32,0.31,0.30]},{\"t\":0.23,\"color\":[0.28,0.30,0.28]},{\"t\":0.31,\"color\":[0.25,0.28,0.26]},{\"t\":0.38,\"color\":[0.35,0.32,0.26]},{\"t\":0.46,\"color\":[0.48,0.36,0.22]},{\"t\":0.54,\"color\":[0.52,0.38,0.24]},{\"t\":0.62,\"color\":[0.40,0.30,0.20]},{\"t\":0.69,\"color\":[0.30,0.22,0.16]},{\"t\":0.77,\"color\":[0.22,0.18,0.14]},{\"t\":0.85,\"color\":[0.15,0.12,0.10]},{\"t\":1.0,\"color\":[0.043,0.080,0.031]}]},\"stone\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.72,0.70,0.66]},{\"t\":0.25,\"color\":[0.62,0.58,0.52]},{\"t\":0.5,\"color\":[0.52,0.46,0.40]},{\"t\":0.75,\"color\":[0.42,0.36,0.30]},{\"t\":1.0,\"color\":[0.35,0.30,0.26]}]},\"wall\":{\"interpolation\":\"linear\",\"keys\":[{\"t\":0.0,\"color\":[0.55,0.52,0.48]},{\"t\":0.33,\"color\":[0.62,0.58,0.52]},{\"t\":0.67,\"color\":[0.48,0.44,0.40]},{\"t\":1.0,\"color\":[0.40,0.36,0.32]}]}}", "__nodeTitle": "palette"}
+    },
+    {
+      "id": "n120",
+      "type": "AttributeWrangle",
+      "position": { "x": 1256.5, "y": 1782 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "@randVal = rand(@iteration);\n@numFloors = (@randVal < 0.2) * 3 + (@randVal >= 0.2 && @randVal < 0.7) * 2 + (@randVal >= 0.7 && @randVal < 0.9) * 1;", "parameters": "{}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "number_of_floors"}
+    },
+    {
+      "id": "n123",
+      "type": "MeasureMesh",
+      "position": { "x": 1434, "y": 1805.5 },
+      "data": {"group": "", "elementType": "primitives", "measure": "perimeter", "accumulate": "perElement", "pieceAttribute": "class", "refineToConnected": true, "usePositionAttribute": false, "positionAttribute": "P", "useMinimum": false, "minimum": -1, "useMaximum": false, "maximum": 1, "useWidth": true, "width": 6, "widthScale": "mad", "centerType": "median", "centerFixed": 0, "colorRamp": "{\"interpolation\":\"linear\",\"keys\":[{\"t\":0,\"color\":[0,0,1]},{\"t\":0.5,\"color\":[1,1,1]},{\"t\":1,\"color\":[1,0,0]}]}", "vectorScale": 1, "attributeName": "length", "useTotalAttribute": false, "totalAttributeName": "totalperimeter", "useRangeGroup": false, "rangeGroup": "inrange", "bakeVisualizedRange": false, "useRemapRange": false, "remapMin": 0, "remapMax": 1, "__nodeTitle": ""}
+    },
+    {
+      "id": "n122",
+      "type": "ConvertLine",
+      "position": { "x": 1434, "y": 1744.5 },
+      "data": {"group": "streetFacingEdges", "connectPath": false, "maxDistance": 0.0001, "connectOnlyToOtherEndPoints": false, "makeIsolatedLoopsClosed": false, "computeLength": false, "lengthAttribute": "restlength", "keepGroupOrder": false, "removeUnusedPoints": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n124",
+      "type": "SortGeometry",
+      "position": { "x": 1434, "y": 1865.5 },
+      "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "attribute", "primitiveSeed": 0, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "length", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n125",
+      "type": "Delete",
+      "position": { "x": 1434, "y": 1947.5 },
+      "data": {"group": "0", "deleteNonSelected": true, "entity": "primitives", "geometryType": "all", "numberEnable": true, "numberMode": "pattern", "numberPattern": "!*", "numberRangeStart": 0, "numberRangeEnd": 0, "numberSelectOf": 1, "numberSelectOffset": 0, "numberExpression": "@ptnum == 0", "boundingEnable": false, "boundingType": "box", "boundingCenterX": 0, "boundingCenterY": 0, "boundingCenterZ": 0, "boundingSizeX": 1, "boundingSizeY": 1, "boundingSizeZ": 1, "boundingRadius": 1, "normalEnable": false, "normalDirX": 0, "normalDirY": 1, "normalDirZ": 0, "normalSpread": 180, "degenerateDuplicatePoints": false, "degenerateZeroArea": false, "degenerateOpenFacePerimeter": false, "degenerateTolerance": 0.0001, "randomEnable": false, "randomSeed": 0, "randomSeedAttribute": "", "randomPercent": 100, "keepPoints": false, "deleteUnusedGroups": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n112",
+      "type": "GroupTransfer",
+      "position": { "x": 1063, "y": 1272 },
+      "data": {"transferPrimitiveGroups": true, "primitiveGroups": "", "primitiveGroupPrefix": "", "transferPointGroups": true, "pointGroups": "", "pointGroupPrefix": "", "transferEdgeGroups": true, "edgeGroups": "", "edgeGroupPrefix": "", "groupNameConflict": "skip", "enableDistanceThreshold": true, "distanceThreshold": 10, "createEmptyGroups": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n113",
+      "type": "SortGeometry",
+      "position": { "x": 1063, "y": 1356.5 },
+      "data": {"pointGroup": "", "pointMethod": "nochange", "pointSeed": 0, "pointOffset": 1, "pointProximityX": 0, "pointProximityY": 0, "pointProximityZ": 0, "pointVectorX": 0, "pointVectorY": 1, "pointVectorZ": 0, "pointAttributeName": "", "pointComponent": 0, "pointOrderingAttribute": "sort_index", "reversePoints": false, "pointSortIndices": false, "pointCombineSortIndices": true, "primitiveGroup": "", "primitiveMethod": "random", "primitiveSeed": 3, "primitiveOffset": 1, "primitiveProximityX": 0, "primitiveProximityY": 0, "primitiveProximityZ": 0, "primitiveVectorX": 0, "primitiveVectorY": 1, "primitiveVectorZ": 0, "primitiveAttributeName": "", "primitiveComponent": 0, "primitiveOrderingAttribute": "sort_index", "reversePrimitives": false, "primitiveSortIndices": false, "primitiveCombineSortIndices": true, "optimizeVertexOrder": true, "__nodeTitle": ""}
+    },
+    {
+      "id": "n114",
+      "type": "ForEachBegin",
+      "position": { "x": 1063, "y": 1429.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n115",
+      "type": "MatchSize",
+      "position": { "x": 1056.5, "y": 1490.5 },
+      "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "center", "targetJustifyX": "same", "offsetX": 0, "justifyY": "center", "targetJustifyY": "same", "offsetY": 0, "justifyZ": "center", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": true, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
+    },
+    {
+      "id": "n116",
+      "type": "ForEachEnd",
+      "position": { "x": 1380, "y": 2523.5 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": ""}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": { "x": 1380, "y": 2595.5 },
+      "data": {"label": "Lot City Procedural", "__nodeTitle": "Procedural Out"}
+    },
+    {
+      "id": "n128",
+      "type": "AttributeWrangle",
+      "position": { "x": 1438, "y": 2145.5 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// find how many street facing edges\nint numStreetFacing = nedgesgroup(0, \"streetFacingEdges\");\n// if streetFacing > 2 and no fire escape, then has an available side for vines\nif(numStreetFacing >= 2 && @numFloors > 1 && @hasFireEscape==0 && rand(buildingIter*22) < 0.6) {\n  @hasVines = 1;\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_vines"}
+    },
+    {
+      "id": "n127",
+      "type": "AttributeWrangle",
+      "position": { "x": 1438, "y": 2035.5 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// find how many street facing edges\nint numStreetFacing = nedgesgroup(0, \"streetFacingEdges\");\n// if > 2, then has an available side for being a fire escape\n// also check if more than 2 floors, looks goofy on short buildings lol\nif(numStreetFacing >= 2 && @numFloors > 2 && rand(buildingIter*20) < 0.5)\n{\n  @hasFireEscape = 1;\n}\n// if too narrow for fire escape, then override\nfloat lengthSide = length(getbbox_size(1));\nif(lengthSide < 1.25) {\n  @hasFireEscape = 0;\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_fire_escape"}
+    },
+    {
+      "id": "n133",
+      "type": "Split",
+      "position": { "x": 1567.5, "y": 2572.5 },
+      "data": {"group": "fireEscape", "groupType": "guess", "invertSelection": false, "deleteUnusedGroups": false, "__nodeTitle": ""}
+    },
+    {
+      "id": "n135",
+      "type": "AttributeTransfer",
+      "position": { "x": 1567.5, "y": 2730 },
+      "data": {"sourceGroup": "", "sourceGroupType": "primitives", "destinationGroup": "", "destinationGroupType": "primitives", "transferDetail": true, "detailAttributes": "xform", "transferPrimitives": false, "primitiveAttributes": "*", "transferPoints": false, "pointAttributes": "*", "transferVertices": false, "vertexAttributes": "*", "copyLocalVariables": true, "allowPAttribute": false, "kernelFunction": "elendt", "kernelRadius": 10, "maxSampleCount": 1, "enableDistanceThreshold": true, "distanceThreshold": 10, "blendWidth": 0, "uniformBias": 0.5, "__nodeTitle": "apply_matchsize_xform_to_fireescape"}
+    },
+    {
+      "id": "n129",
+      "type": "AttributeWrangle",
+      "position": { "x": 1438, "y": 2255.5 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "int buildingIter = chi(\"buildingIter\");\n// if doesn't have fire escape, random chance of having balcony (less likely for 2 floor)\nif(@hasFireEscape == 0) {\n  if(@numFloors == 2 && rand(buildingIter*17) < 0.5) {\n    @hasBalcony = 1;\n  } else if(@numFloors > 2 && rand(buildingIter*17) < 0.8) {\n    @hasBalcony = 1;\n  }\n}", "parameters": "{\"buildingIter\":{\"expr\":\"@iteration\",\"value\":0}}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": "choose_balcony"}
+    },
+    {
+      "id": "n142",
+      "type": "ForEachEnd",
+      "position": { "x": 1854, "y": 2664 },
+      "data": {"gatherMethod": "merge", "__nodeTitle": "For Each End"}
+    },
+    {
+      "id": "n137",
+      "type": "ForEachBegin",
+      "position": { "x": 1854, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n132",
+      "type": "AttributeWrangle",
+      "position": { "x": 1567, "y": 2515 },
+      "data": {"group": "", "groupType": "guess", "runOver": "detail", "expression": "// 0 = windowed\n// 1 = shop\n\nint buildingIter = chi(\"buildingIter\");\nint floorIter = chi(\"floorIter\");\n\nif(floorIter == 0) {\n    @floorType = 1;\n} else {\n    @floorType = 0;\n}", "parameters": "{\"buildingIter\": 3, \"floorIter\": 0}", "attributesToCreate": "", "enforcePrototypes": false, "ramps": "{}", "__nodeTitle": ""}
+    },
+    {
+      "id": "n134",
+      "type": "MatchSize",
+      "position": { "x": 1620, "y": 2648 },
+      "data": {"group": "", "groupType": "guess", "justifyWith": "inputIfWired", "useGroupsForBounds": false, "sourceGroup": "", "sourceGroupType": "guess", "targetGroup": "", "targetGroupType": "guess", "targetPosition": [0,0,0], "targetSize": [1,1,1], "translate": true, "justifyX": "none", "targetJustifyX": "same", "offsetX": 0, "justifyY": "max", "targetJustifyY": "same", "offsetY": 0.05, "justifyZ": "none", "targetJustifyZ": "same", "offsetZ": 0, "scaleToFit": false, "uniformScale": true, "scaleAxis": "bestFit", "scaleX": true, "scaleY": true, "scaleZ": true, "restoreTransform": false, "restoreAttribute": "xform", "stashTransform": true, "stashAttribute": "xform", "__nodeTitle": ""}
+    },
+    {
+      "id": "n130",
+      "type": "GroupCreate",
+      "position": { "x": 1567.5, "y": 2356 },
+      "data": {"outputGroup": "base", "domain": "face", "initialMerge": "replace", "enableBaseGroup": true, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": false, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": ""}
+    },
+    {
+      "id": "n131",
+      "type": "ForEachBegin",
+      "position": { "x": 1567, "y": 2437.5 },
+      "data": {"method": "primitive", "pieceAttribute": "piece", "iterations": 1, "iterationsAttribute": "", "__nodeTitle": ""}
+    },
+    {
+      "id": "n138",
+      "type": "GroupDelete",
+      "position": { "x": 1854, "y": 2503.5 },
+      "data": {"deletions": "[{\"enabled\":true,\"groupType\":\"any\",\"groupNames\":\"base\"}]", "deleteUnusedGroups": false, "__nodeTitle": "Group Delete"}
+    },
+    {
+      "id": "n150",
+      "type": "SubgraphAsset",
+      "position": { "x": 1854, "y": 2572.5 },
+      "data": {"assetGuid": "8d391b5e3d47e485894c06db29e0c113", "__nodeTitle": "", "resolvedAssetSchemaVersion": 2.0},
+      "subgraphInterface": {
+        "name": "Windows_floor",
+        "inputs": [ {"id": "in_1", "name": "GroupDelete", "pinType": "Any", "anchorPlaced": true, "anchorX": -161, "anchorY": -110}, {"id": "c7dda454563a4322b80c63bedf99da0b", "name": "in_2", "pinType": "Any", "anchorPlaced": true, "anchorX": -381.5, "anchorY": 90} ],
+        "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ]
+      }
+    }
+  ],
+  "edges": [
+    {"id": "e0", "source": "ground", "target": "blocks", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1", "source": "blocks", "target": "shrink_blocks", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e2", "source": "shrink_blocks", "target": "lots", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e3", "source": "lots", "target": "shrink_lots", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e5", "source": "floors_wrangle", "target": "keep_built", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e6", "source": "floors_attrs", "target": "foreach_begin", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e9413", "source": "shrink_blocks", "target": "n101", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e9414", "source": "n101", "target": "floors_wrangle", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e111206", "source": "keep_built", "target": "n102", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e111207", "source": "n102", "target": "floors_attrs", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e114122", "source": "n103", "target": "n104", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139347", "source": "n105", "target": "n106", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139348", "source": "n104", "target": "n107", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e139349", "source": "n107", "target": "n108", "sourceHandle": "out", "targetHandle": "target"},
+    {"id": "e139350", "source": "n106", "target": "n108", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e143004", "source": "n108", "target": "n110", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e111936", "source": "n102", "target": "n111", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e157598", "source": "n111", "target": "n103", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e_ground_outline", "source": "shrink_blocks", "target": "n105", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e598847", "source": "n110", "target": "n112", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e598848", "source": "n111", "target": "n112", "sourceHandle": "out", "targetHandle": "target"},
+    {"id": "e598849", "source": "n112", "target": "n113", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e598850", "source": "n113", "target": "n114", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e598851", "source": "n114", "target": "n115", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e609307", "source": "n129", "target": "n116", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e609308", "source": "n116", "target": "out", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e614575", "source": "n115", "target": "n118", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e620880", "source": "n118", "target": "n119", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e620881", "source": "n119", "target": "n120", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e625679", "source": "n119", "target": "n122", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e653838", "source": "n122", "target": "n123", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e653839", "source": "n123", "target": "n124", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e675779", "source": "n124", "target": "n125", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e785039", "source": "n120", "target": "n127", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e785040", "source": "n125", "target": "n127", "sourceHandle": "out", "targetHandle": "in1"},
+    {"id": "e785041", "source": "n127", "target": "n128", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e785042", "source": "n128", "target": "n129", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e851868", "source": "n129", "target": "n130", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e851869", "source": "n130", "target": "n131", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e851870", "source": "n131", "target": "n132", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e859683", "source": "n132", "target": "n133", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e987099", "source": "n133", "target": "n134", "sourceHandle": "rest", "targetHandle": "source"},
+    {"id": "e987100", "source": "n133", "target": "n135", "sourceHandle": "out", "targetHandle": "target"},
+    {"id": "e987101", "source": "n134", "target": "n135", "sourceHandle": "out", "targetHandle": "source"},
+    {"id": "e1003038", "source": "n129", "target": "n137", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1003039", "source": "n137", "target": "n138", "sourceHandle": "out", "targetHandle": "in"},
+    {"id": "e1006941", "source": "n138", "target": "n150", "sourceHandle": "out", "targetHandle": "in_1"},
+    {"id": "e1016618", "source": "n150", "target": "n142", "sourceHandle": "out_1", "targetHandle": "in"}
+  ],
+  "parameters": [
+    {"id": "p_block_iter", "name": "blockIterations", "type": "integer", "default": 4, "exposed": true, "targetNode": "blocks", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 8},
+    {"id": "p_lot_iter", "name": "lotIterations", "type": "integer", "default": 2, "exposed": true, "targetNode": "lots", "targetProperty": "iterations", "hasRange": true, "min": 0, "max": 6},
+    {"id": "p_lot_min", "name": "lotMinSize", "type": "number", "default": 2, "exposed": true, "targetNode": "lots", "targetProperty": "minSize", "hasRange": true, "min": 0.5, "max": 8},
+    {"id": "p_block_shrink", "name": "blockShrink", "type": "number", "default": 0.75, "exposed": true, "targetNode": "shrink_blocks", "targetProperty": "scale", "hasRange": true, "min": 0.5, "max": 1},
+    {"id": "p_lot_shrink", "name": "lotShrink", "type": "number", "default": 0.85, "exposed": true, "targetNode": "shrink_lots", "targetProperty": "scale", "hasRange": true, "min": 0.5, "max": 1},
+    {"id": "p_win_spacing", "name": "windowSpacing", "type": "number", "default": 1.25, "exposed": true, "targetNode": "win_pts", "targetProperty": "spacing", "hasRange": true, "min": 0.3, "max": 2},
+    {"id": "p_lift", "name": "buildingLift", "type": "number", "default": 0.18, "exposed": true, "targetNode": "lift_bldgs", "targetProperty": "translateY", "hasRange": true, "min": 0, "max": 1}
+  ],
+  "subgraphs": [
+    {
+      "id": "city_roads",
+      "name": "City Roads",
+      "inputs": [ {"id": "in_1", "name": "Input 1", "pinType": "Any", "anchorPlaced": true, "anchorX": -20, "anchorY": 0} ],
+      "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
+      "parameters": [
+      ],
+      "nodes": [
+        {
+          "id": "road_a",
+          "type": "CreateSpline",
+          "position": { "x": 200, "y": 0 },
+          "data": {"mode": "polyline", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":-22,\"y\":0.20,\"z\":-8},{\"x\":22,\"y\":0.20,\"z\":-8}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Road A Path"}
+        },
+        {
+          "id": "road_b",
+          "type": "CreateSpline",
+          "position": { "x": 520, "y": 0 },
+          "data": {"mode": "polyline", "closed": false, "subdivisions": 1, "startX": 0, "startY": 0, "startZ": 0, "endX": 40, "endY": 0, "endZ": 0, "controlPoints": "[{\"x\":6,\"y\":0.20,\"z\":-22},{\"x\":6,\"y\":0.20,\"z\":22}]", "editPlane": "xz", "sceneOffsetX": 0, "sceneOffsetY": 0, "sceneOffsetZ": 0, "__nodeTitle": "Road B Path"}
+        },
+        {
+          "id": "road_sweep_a",
+          "type": "SweepAlongSpline",
+          "position": { "x": 200, "y": 160 },
+          "data": {"surfaceShape": "rectangle", "profileWidth": 3.2, "profileHeight": 0.12, "radius": 1, "columns": 16, "sampleSpacing": 1, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Road Sweep A"}
+        },
+        {
+          "id": "road_sweep_b",
+          "type": "SweepAlongSpline",
+          "position": { "x": 520, "y": 160 },
+          "data": {"surfaceShape": "rectangle", "profileWidth": 3.2, "profileHeight": 0.12, "radius": 1, "columns": 16, "sampleSpacing": 1, "capStart": true, "capEnd": true, "upX": 0, "upY": 1, "upZ": 0, "twist": 0, "profileRoll": 0, "scaleStart": 1, "scaleEnd": 1, "profilePlane": "xy", "shadeMode": "auto", "cuspAngle": 30, "__nodeTitle": "Road Sweep B"}
+        },
+        {
+          "id": "road_bevel_a",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 320 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.03, "segments": 1, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Road Bevel A"}
+        },
+        {
+          "id": "road_bevel_b",
+          "type": "BevelMesh",
+          "position": { "x": 520, "y": 320 },
+          "data": {"edgeGroup": "", "offsetType": "offset", "amount": 0.03, "segments": 1, "limitMethod": "angle", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": false, "excludeGroups": "cap_start,cap_end", "__nodeTitle": "Road Bevel B"}
+        },
+        {
+          "id": "merge_roads",
+          "type": "MergeMesh",
+          "position": { "x": 360, "y": 480 },
+          "data": {"__nodeTitle": "Merge Roads"}
+        },
+        {
+          "id": "mat_roads",
+          "type": "AssignMaterial",
+          "position": { "x": 360, "y": 640 },
+          "data": {"group": "", "materialName": "road", "__nodeTitle": "Mat Roads"}
+        },
+        {
+          "id": "roads_out",
+          "type": "Output",
+          "position": { "x": 360, "y": 800 },
+          "data": {"label": "Output", "__nodeTitle": "Roads Out"}
+        },
+        {
+          "id": "subgraph_input",
+          "type": "SubgraphInput",
+          "position": { "x": -20, "y": 0 },
+          "data": {}
+        }
+      ],
+      "edges": [
+        {"id": "e_ra_sw", "source": "road_a", "target": "road_sweep_a", "sourceHandle": "out", "targetHandle": "backbone"},
+        {"id": "e_rb_sw", "source": "road_b", "target": "road_sweep_b", "sourceHandle": "out", "targetHandle": "backbone"},
+        {"id": "e_swa_bv", "source": "road_sweep_a", "target": "road_bevel_a", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_swb_bv", "source": "road_sweep_b", "target": "road_bevel_b", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_bva_m", "source": "road_bevel_a", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_bvb_m", "source": "road_bevel_b", "target": "merge_roads", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_m_mat", "source": "merge_roads", "target": "mat_roads", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mat_out", "source": "mat_roads", "target": "roads_out", "sourceHandle": "out", "targetHandle": "in"}
+      ]
+    },
+    {
+      "id": "city_pads",
+      "name": "City Pads",
+      "inputs": [ {"id": "lots", "name": "Lots", "pinType": "Any", "anchorPlaced": true, "anchorX": -20, "anchorY": 0}, {"id": "roads", "name": "Roads", "pinType": "Any", "anchorPlaced": true, "anchorX": -20, "anchorY": 90} ],
+      "outputs": [ {"id": "mesh", "name": "Mesh", "pinType": "SpatialMesh"} ],
+      "parameters": [
+      ],
+      "nodes": [
+        {
+          "id": "in_lots",
+          "type": "SubgraphInput",
+          "position": { "x": 200, "y": 0 },
+          "data": {"__nodeTitle": "Lots In"}
+        },
+        {
+          "id": "in_roads",
+          "type": "SubgraphInput",
+          "position": { "x": 520, "y": 0 },
+          "data": {"__nodeTitle": "Roads In"}
+        },
+        {
+          "id": "pads",
+          "type": "PolyExtrude",
+          "position": { "x": 200, "y": 160 },
+          "data": {"faceGroup": "", "distance": 0.18, "inset": 0.08, "keepOriginal": false, "topGroup": "extrude_top", "sideGroup": "extrude_side", "distanceAttribute": "", "__nodeTitle": "Extrude Pads"}
+        },
+        {
+          "id": "pad_rim",
+          "type": "GroupCreate",
+          "position": { "x": 200, "y": 320 },
+          "data": {"outputGroup": "pad_rim", "domain": "edge", "initialMerge": "replace", "enableBaseGroup": false, "baseGroup": "", "enableBounding": false, "enableNormals": false, "directionX": 0, "directionY": 1, "directionZ": 0, "spreadAngle": 30, "enableEdges": true, "mode": "angle", "minEdgeAngle": 30, "includeUnshared": false, "fromFaceGroup": "extrude_top", "fromEdgeGroup": "", "enableRandom": false, "randomChance": 1, "randomSeed": 0, "__nodeTitle": "Pad Rim Edges"}
+        },
+        {
+          "id": "pad_bevel",
+          "type": "BevelMesh",
+          "position": { "x": 200, "y": 480 },
+          "data": {"edgeGroup": "pad_rim", "offsetType": "offset", "amount": 0.04, "segments": 2, "limitMethod": "none", "angleLimit": 30, "profile": 0.5, "miterOuter": "sharp", "miterInner": "sharp", "vmeshMethod": "adj", "clampOverlap": true, "method": "edge", "excludeUnshared": true, "excludeGroups": "", "__nodeTitle": "Pad Bevel"}
+        },
+        {
+          "id": "pad_bool",
+          "type": "BooleanMesh",
+          "position": { "x": 360, "y": 640 },
+          "data": {"operation": "subtract", "treatAAs": "solid", "treatBAs": "surface", "useSelf": false, "detriangulate": "all", "weldEpsilon": 0.0001, "triangleBudget": 500000, "__nodeTitle": "Pad Cut Roads"}
+        },
+        {
+          "id": "mat_pad",
+          "type": "AssignMaterial",
+          "position": { "x": 360, "y": 800 },
+          "data": {"group": "", "materialName": "lot_pad", "__nodeTitle": "Mat Lot Pads"}
+        },
+        {
+          "id": "pads_out",
+          "type": "Output",
+          "position": { "x": 360, "y": 960 },
+          "data": {"label": "Output", "__nodeTitle": "Pads Out"}
+        }
+      ],
+      "edges": [
+        {"id": "e_in_pads", "source": "in_lots", "target": "pads", "sourceHandle": "lots", "targetHandle": "in"},
+        {"id": "e_pads_rim", "source": "pads", "target": "pad_rim", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_rim_bv", "source": "pad_rim", "target": "pad_bevel", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_bv_bool", "source": "pad_bevel", "target": "pad_bool", "sourceHandle": "out", "targetHandle": "a"},
+        {"id": "e_rd_bool", "source": "in_roads", "target": "pad_bool", "sourceHandle": "roads", "targetHandle": "b"},
+        {"id": "e_bool_mat", "source": "pad_bool", "target": "mat_pad", "sourceHandle": "out", "targetHandle": "in"},
+        {"id": "e_mat_out", "source": "mat_pad", "target": "pads_out", "sourceHandle": "out", "targetHandle": "in"}
+      ]
+    },
+    {
+      "id": "subgraph_4",
+      "name": "Subgraph 4",
+      "inputs": [ {"id": "in_1", "name": "in", "pinType": "Any", "anchorPlaced": true, "anchorX": -161.5, "anchorY": 0} ],
+      "outputs": [ {"id": "out_1", "name": "Output", "pinType": "Any"} ],
+      "parameters": [
+      ],
+      "nodes": [
+        {
+          "id": "n146",
+          "type": "Carve",
+          "position": { "x": -161, "y": 109.5 },
+          "data": {"group": "", "arcLengthU": true, "useFirstU": true, "uStart": 0, "uStartAttrib": "", "useSecondU": true, "uEnd": 1, "uEndAttrib": "", "useFirstV": true, "vStart": 0.25, "vStartAttrib": "", "useSecondV": true, "vEnd": 0.75, "vEndAttrib": "", "location": "breakpoints", "uDivisions": 1, "vDivisions": 2, "cutAtAllInternalUBreakpoints": true, "cutAtAllInternalVBreakpoints": true, "operation": "cut", "keepInside": true, "keepOutside": false, "extractType": "curves3d", "keepOriginal": false, "onlyAtBreakpoints": false, "__nodeTitle": ""}
+        },
+        {
+          "id": "n147",
+          "type": "SubgraphInput",
+          "position": { "x": 1854, "y": 2412.5 },
+          "data": {}
+        },
+        {
+          "id": "n148",
+          "type": "Output",
+          "position": { "x": 1854, "y": 2732.5 },
+          "data": {"label": "Output"}
+        }
+      ],
+      "edges": [
+        {"id": "e1006129", "source": "n147", "target": "n146", "sourceHandle": "in_1", "targetHandle": "in"}
+      ]
+    }
+  ]
+}

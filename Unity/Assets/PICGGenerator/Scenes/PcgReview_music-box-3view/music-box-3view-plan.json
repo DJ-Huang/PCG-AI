@@ -1,0 +1,796 @@
+{
+  "schemaVersion": 1,
+  "targetName": "Music Box 3-View",
+  "sourceImage": "/Users/djhuang/PCG-AI-cursor/Unity/Assets/PICGGenerator/Scenes/PcgReview_music-box-3view/music-box-reference-3view.png",
+  "pcgPath": "/Users/djhuang/PCG-AI-cursor/Unity/Assets/PICGGenerator/Scenes/PcgReview_music-box-3view/music-box-3view.pcg",
+  "complexity": "complex",
+  "objectClass": {
+    "primaryType": "music_box",
+    "primaryDomain": "prop",
+    "notes": "Classical wooden music box with front mechanism window, brass key, hinges, inlays; three-view orthographic reference."
+  },
+  "qualityContract": {
+    "qualityBar": "complex",
+    "definitionOfDone": [
+      "Front/side/top silhouette matches reference proportions (~0.22x0.12x0.13 m)",
+      "Macro parts present: lid, body+window, base, feetx4, drum+comb, key, hinges, inlays",
+      "Front window cut reveals drum and comb; no solid face blocking mechanism",
+      "Per-part BevelMesh before MergeMesh (no post-merge blind bevel)",
+      "Materials differentiated: wood / brass / steel / glass via VertexColor+AssignMaterial"
+    ],
+    "minimumMacroParts": 5,
+    "minimumMesoParts": 10,
+    "minimumDetails": 12,
+    "reviewViewpoints": [
+      "front",
+      "side",
+      "top",
+      "three-quarter"
+    ]
+  },
+  "detailInventory": {
+    "targetMinDetails": 12,
+    "details": [
+      {
+        "id": "rounded-shell",
+        "kind": "bevel",
+        "region": "lid/body/base corners",
+        "mapsTo": {
+          "nodeId": "body_bevel",
+          "property": "amount"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "front-window",
+        "kind": "hole",
+        "region": "body front",
+        "mapsTo": {
+          "nodeId": "body_window_bool",
+          "property": "operation"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "window-frame",
+        "kind": "trim",
+        "region": "window border",
+        "mapsTo": {
+          "nodeId": "window_frame",
+          "property": "width"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "glass-pane",
+        "kind": "panel",
+        "region": "window",
+        "mapsTo": {
+          "nodeId": "glass_pane",
+          "property": "depth"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "music-drum",
+        "kind": "cylinder",
+        "region": "mechanism left",
+        "mapsTo": {
+          "nodeId": "drum",
+          "property": "radius"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "drum-pins",
+        "kind": "fastener",
+        "region": "drum surface",
+        "mapsTo": {
+          "nodeId": "drum_pins",
+          "property": "count"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "comb-teeth",
+        "kind": "array",
+        "region": "mechanism right",
+        "mapsTo": {
+          "nodeId": "comb_teeth",
+          "property": "count"
+        },
+        "confidence": 0.95
+      },
+      {
+        "id": "gear",
+        "kind": "disk",
+        "region": "drum left end",
+        "mapsTo": {
+          "nodeId": "gear_disk",
+          "property": "radius"
+        },
+        "confidence": 0.8
+      },
+      {
+        "id": "winding-key",
+        "kind": "hardware",
+        "region": "right side",
+        "mapsTo": {
+          "nodeId": "key_shaft",
+          "property": "height"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "hinges",
+        "kind": "hardware",
+        "region": "lid rear",
+        "mapsTo": {
+          "nodeId": "hinge_proto",
+          "property": "width"
+        },
+        "confidence": 0.9
+      },
+      {
+        "id": "corner-inlays",
+        "kind": "linework",
+        "region": "front corners",
+        "mapsTo": {
+          "nodeId": "inlay_vert",
+          "property": "width"
+        },
+        "confidence": 0.85
+      },
+      {
+        "id": "lid-border",
+        "kind": "linework",
+        "region": "lid top scalloped",
+        "mapsTo": {
+          "nodeId": "lid_border_sweep",
+          "property": "sampleSpacing"
+        },
+        "confidence": 0.8
+      },
+      {
+        "id": "turned-feet",
+        "kind": "revolve",
+        "region": "base corners",
+        "mapsTo": {
+          "nodeId": "fl_foot",
+          "property": "subgraphId"
+        },
+        "confidence": 0.9
+      }
+    ],
+    "note": "Identity details mapped to real node ids."
+  },
+  "modules": [
+    {
+      "id": "shell",
+      "name": "Shell",
+      "subgraph": false,
+      "parts": [
+        "lid",
+        "body",
+        "window",
+        "glass",
+        "base"
+      ]
+    },
+    {
+      "id": "mechanism",
+      "name": "Mechanism",
+      "subgraph": false,
+      "parts": [
+        "drum",
+        "pins",
+        "comb",
+        "gear"
+      ]
+    },
+    {
+      "id": "hardware",
+      "name": "Hardware",
+      "subgraph": false,
+      "parts": [
+        "key",
+        "hinges"
+      ]
+    },
+    {
+      "id": "inlays",
+      "name": "Inlays",
+      "subgraph": false,
+      "parts": [
+        "corner pillars",
+        "lid border",
+        "base line"
+      ]
+    },
+    {
+      "id": "foot",
+      "name": "Foot",
+      "subgraph": true,
+      "reused": 4,
+      "parts": [
+        "turned foot"
+      ]
+    }
+  ],
+  "unknownsToResolve": [
+    "exact cavity wall thickness",
+    "rear face details"
+  ],
+  "localRuleHits": [
+    "pcg/graph-contract",
+    "pcg/assembly-bevel",
+    "pcg/project-engineering"
+  ],
+  "buildPasses": [
+    {
+      "id": "module-plan",
+      "status": "done",
+      "acceptance": [
+        "Module table recorded (nameable parts, Subgraph yes/no)",
+        "qualityContract.definitionOfDone is reference-specific (not generic)"
+      ],
+      "componentRefs": [
+        "shell",
+        "mechanism",
+        "hardware",
+        "inlays",
+        "foot"
+      ]
+    },
+    {
+      "id": "blockout",
+      "status": "done",
+      "acceptance": [
+        "Macro parts present as node chains or Subgraph stubs",
+        "Overall proportions stated in meters",
+        "Render or SceneView screenshot for silhouette review"
+      ],
+      "componentRefs": [
+        "shell",
+        "mechanism",
+        "hardware",
+        "inlays",
+        "feet"
+      ]
+    },
+    {
+      "id": "structural",
+      "status": "done",
+      "acceptance": [
+        "Meso parts and attachments wired",
+        "No floating parts without TransformMesh placement"
+      ],
+      "componentRefs": []
+    },
+    {
+      "id": "form-refinement",
+      "status": "done",
+      "acceptance": [
+        "Correct primitive family per part (Sweep/Revolve/Box)",
+        "Profiles match reference cross-sections"
+      ],
+      "componentRefs": []
+    },
+    {
+      "id": "bevel-pass",
+      "status": "done",
+      "acceptance": [
+        "Per-part BevelMesh before MergeMesh",
+        "Bevel amounts scaled to each part (not one post-merge amount)"
+      ],
+      "componentRefs": []
+    },
+    {
+      "id": "assembly",
+      "status": "done",
+      "acceptance": [
+        "MergeMesh → Output complete",
+        "Lane layout / Subgraph packaging if soft triggers fire"
+      ],
+      "componentRefs": []
+    },
+    {
+      "id": "material-pass",
+      "status": "done",
+      "acceptance": [
+        "AssignMaterial / VertexColor / UV on named parts",
+        "Identity finish zones mapped (not flat memory colors)"
+      ],
+      "componentRefs": []
+    },
+    {
+      "id": "parameters",
+      "status": "done",
+      "acceptance": [
+        "parameters[] synced with target node data defaults",
+        "ask_user completed when Graph Parameters needed"
+      ],
+      "componentRefs": []
+    },
+    {
+      "id": "validation",
+      "status": "done",
+      "acceptance": [
+        "validate_pcg.py exits 0",
+        "Layout / __nodeTitle / Merge→Bevel warnings addressed"
+      ],
+      "componentRefs": []
+    }
+  ],
+  "selfCorrectLoop": {
+    "visualAcceptance": {
+      "threshold": 0.7
+    },
+    "maxCyclesPerPass": 6
+  },
+  "reviewHistory": [
+    {
+      "passId": "blockout",
+      "timestamp": "2026-08-01T11:03:33.954366+00:00",
+      "fidelity": 0.55,
+      "action": "refine-graph",
+      "summary": "Macro shell/feet/key present but solid body hid window/mechanism; Boolean cut ineffective. Rewriting shell as open-front wall frame.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.55,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_blockout.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_blockout.png"
+      }
+    },
+    {
+      "passId": "structural",
+      "timestamp": "2026-08-01T11:03:34.084530+00:00",
+      "fidelity": 0.72,
+      "action": "continue",
+      "summary": "Open-front wall shell exposes window; drum/comb/key/hinges/feet assembled. Clay preview (vertex color weak). Lid border + inlays present. Proportions ~0.22x0.12x0.13m.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.72,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_pass2.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_pass2b.png"
+      }
+    },
+    {
+      "passId": "blockout",
+      "timestamp": "2026-08-01T11:06:15.553951+00:00",
+      "fidelity": 0.74,
+      "action": "continue",
+      "summary": "Open-front shell + mechanism/hardware/inlays/feet cook OK (3666 verts). Macro silhouette, key, hinges, feet match; window opening present; clay shading (vertex color not lit). Mechanism visibility limited in clay preview.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.74,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_final.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "form-refinement",
+      "timestamp": "2026-08-01T11:11:02.607338+00:00",
+      "fidelity": 0.78,
+      "action": "continue",
+      "summary": "Thicker walls, ceiling, lid borders, mechanism forward; open window without opaque glass. Clay preview still uniform blue; silhouette matches chest+key+feet.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.78,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_done_tq.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "bevel-pass",
+      "timestamp": "2026-08-01T11:11:02.646839+00:00",
+      "fidelity": 0.8,
+      "action": "continue",
+      "summary": "Per-part BevelMesh on shell/lid/base/feet before merge; rail bevels reduced.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.8,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_done_tq.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "assembly",
+      "timestamp": "2026-08-01T11:11:02.685693+00:00",
+      "fidelity": 0.8,
+      "action": "continue",
+      "summary": "Shell+mech+hardware/inlays/feet Subgraphs merge to Output; proportions ~0.22x0.12x0.13m.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.8,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_done_tq.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "material-pass",
+      "timestamp": "2026-08-01T11:11:02.726334+00:00",
+      "fidelity": 0.7,
+      "action": "continue",
+      "summary": "VertexColor wood/brass/steel assigned; AssignMaterial names set. No Unity .mat assets created (graph-contract ask). Clay SceneView still washes colors.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.7,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_done_tq.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "parameters",
+      "timestamp": "2026-08-01T11:11:02.767403+00:00",
+      "fidelity": 0.85,
+      "action": "continue",
+      "summary": "Graph Parameters BoxWidth/Depth/Height WindowWidth CombTeeth BevelAmount exposed and synced.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.85,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_done_tq.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-08-01T11:11:02.808382+00:00",
+      "fidelity": 0.82,
+      "action": "stop",
+      "summary": "validate_pcg OK; Unity sync cook 3872 verts; DoD met for prop blockout+assembly. Residual: clay color wash, no glass pane in merge, photoreal wood not in scope.",
+      "matched": [],
+      "mismatches": [],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.82,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_done_tq.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "material-pass",
+      "timestamp": "2026-08-01T11:20:51.296037+00:00",
+      "fidelity": 0.86,
+      "action": "continue",
+      "summary": "Bound URP Lit materials (WoodDark/Brass/BrassInlay/Steel/Glass); restored thin front glass; cook 3932 verts / 5 submeshes with correct slot bindings.",
+      "matched": [
+        "wood body+lid+base colors",
+        "brass frame/key/inlays",
+        "steel comb",
+        "transparent glass window showing mechanism"
+      ],
+      "mismatches": [
+        "no wood-grain albedo",
+        "inlays thicker than reference lines",
+        "key lacks circular base plate",
+        "lid border less scalloped"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.86,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_materials.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_materials.png"
+      }
+    },
+    {
+      "passId": "form-refinement",
+      "timestamp": "2026-08-01T11:26:34.865936+00:00",
+      "fidelity": 0.88,
+      "action": "continue",
+      "summary": "Detail polish: wood grain UV+albedo, thinner triple corner inlays + side wraps, key base plate, rounder bevels, raised lid brass border.",
+      "matched": [
+        "horizontal wood grain on body/lid",
+        "brass key with base flange",
+        "front glass+mechanism",
+        "bun feet",
+        "vertical corner inlay clusters"
+      ],
+      "mismatches": [
+        "aspect still wider than squat reference",
+        "lid scallop corners simplified",
+        "no photoreal grain variation"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.88,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_detail.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_detail.png"
+      }
+    },
+    {
+      "passId": "form-refinement",
+      "timestamp": "2026-08-01T12:02:40.619945+00:00",
+      "fidelity": 0.9,
+      "action": "continue",
+      "summary": "Proportion pass: W/D/H tightened to squat 0.185x0.148x0.16; lid border shortened with stepped scallop corners; window/mech/key/feet retargeted.",
+      "matched": [
+        "squatter silhouette",
+        "wood grain",
+        "glass+mech",
+        "brass key",
+        "lid border with notched corners",
+        "bun feet"
+      ],
+      "mismatches": [
+        "vertical corner rounding still softer than reference",
+        "inlay lines still geometric strips not flush carved"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.9,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_prop.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_prop.png"
+      }
+    },
+    {
+      "passId": "form-refinement",
+      "timestamp": "2026-08-01T15:20:04.892446+00:00",
+      "fidelity": 0.84,
+      "action": "continue",
+      "summary": "Gap close: window+mech visible (drum/comb), thinner bevels, glass last-slot alpha, softer wood map; still below classical reference polish.",
+      "matched": [
+        "front opening shows brass drum + steel comb",
+        "squat proportions",
+        "key+feet present",
+        "glass slot restored"
+      ],
+      "mismatches": [
+        "wood still flat vs photo grain",
+        "lid brass border weak in SceneView",
+        "key/hinge readability",
+        "not photoreal classical finish"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.84,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_gap.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_gap.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-08-01T15:30:14.534655+00:00",
+      "fidelity": 0.87,
+      "action": "stop",
+      "summary": "Final delivery: music box with window+mech, glass, brass key/inlays, wood materials; classical photoreal still approximate.",
+      "matched": [
+        "squat proportions",
+        "front window with drum+comb",
+        "transparent glass",
+        "brass key plate",
+        "lid brass border",
+        "feet",
+        "materials bound"
+      ],
+      "mismatches": [
+        "wood grain not photoreal",
+        "lid scallop corners approximate",
+        "brass inlays geometric not flush-carved"
+      ],
+      "planFixes": [],
+      "graphFixes": [],
+      "cookFixes": [],
+      "aiVisionScore": 0.87,
+      "aiVisionNotes": "",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "",
+      "visualEvidence": {
+        "referenceScreenshot": null,
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_final.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-08-01T15:38:15.091194+00:00",
+      "fidelity": 0.9,
+      "action": "stop",
+      "summary": "Glass specular fixed (alpha~0.01, low smoothness); front view shows transparent window with drum+comb; wood map softened; brass key/inlays readable. Residual vs classical ref: lid scallops approximate, drum pins simplified, key plate less ornate.",
+      "matched": [
+        "chest silhouette",
+        "front window cut",
+        "transparent glass",
+        "drum+comb visible",
+        "winding key",
+        "feet",
+        "wood/brass/steel/glass materials",
+        "lid brass border"
+      ],
+      "mismatches": [
+        "lid scallop corners approximate",
+        "drum pins low-res",
+        "key mounting plate weak",
+        "brass brighter than aged ref",
+        "inlay not flush-carved"
+      ],
+      "planFixes": [],
+      "graphFixes": [
+        "Glass VertexColor alpha lowered"
+      ],
+      "cookFixes": [
+        "Glass.mat alpha 0.01 + disable specular/reflections",
+        "soft WoodGrain.png"
+      ],
+      "aiVisionScore": 0.9,
+      "aiVisionNotes": "Front: glass clear, drum+comb readable. 3/4: shell+inlays+key OK; photoreal classical polish still approximate.",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "front",
+      "visualEvidence": {
+        "referenceScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/Assets/PICGGenerator/Scenes/PcgReview_music-box-3view/music-box-reference-3view.png",
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_front_glass.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_final.png"
+      }
+    },
+    {
+      "passId": "validation",
+      "timestamp": "2026-08-01T15:50:43.713352+00:00",
+      "fidelity": 0.95,
+      "action": "stop",
+      "summary": "Reached 0.95: radial drum pins (Steel) visible through glass; key+plate+hinges readable; thinner brass inlays+scallop corners; aged brass mats; softer wood UV on Z. Residual micro: scallop still geometric vs hand-drawn curl; wood still procedural.",
+      "matched": [
+        "front window+glass",
+        "drum pins studs",
+        "steel comb",
+        "winding key",
+        "hinges",
+        "vertical brass triples",
+        "lid border+corner motifs",
+        "feet",
+        "wood/brass/steel/glass slots"
+      ],
+      "mismatches": [
+        "scallop curls still angular",
+        "wood banding mild residual",
+        "hinge blocks simple vs ref"
+      ],
+      "planFixes": [],
+      "graphFixes": [
+        "pin radial CopyMesh axis fix",
+        "pins Steel separate from drum",
+        "denser pin rows",
+        "key proud",
+        "BrassInlay",
+        "hinge barrels"
+      ],
+      "cookFixes": [
+        "aged Brass/BrassInlay/Steel",
+        "softer WoodGrain",
+        "body UV planar Z"
+      ],
+      "aiVisionScore": 0.95,
+      "aiVisionNotes": "Front: pins on drum clear, comb, key, inlays, glass. Matches classical macro+meso; micro polish remains.",
+      "visualAcceptanceThreshold": 0.7,
+      "cameraView": "front",
+      "visualEvidence": {
+        "referenceScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/Assets/PICGGenerator/Scenes/PcgReview_music-box-3view/music-box-reference-3view.png",
+        "renderScreenshot": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/SceneView_music-box-3view_r95g_front.png",
+        "comparisonImage": "/Users/djhuang/PCG-AI-cursor/Unity/screenshots/cmp_music-box-3view_r95.png"
+      }
+    }
+  ],
+  "sculptPipeline": {
+    "passOrder": [
+      "module-plan",
+      "blockout",
+      "structural",
+      "form-refinement",
+      "bevel-pass",
+      "assembly",
+      "material-pass",
+      "parameters",
+      "validation"
+    ],
+    "completed": [
+      "module-plan",
+      "blockout",
+      "structural",
+      "form-refinement",
+      "bevel-pass",
+      "assembly",
+      "material-pass",
+      "parameters",
+      "validation"
+    ],
+    "current": "complete"
+  },
+  "authoringInstruction": "Fill objectClass, qualityContract, detailInventory, and modules from the reference before writing .pcg nodes. Use report_pass.py for the next command.",
+  "notes": [
+    "2026-08-01 materials+glass: created WoodDark/Brass/BrassInlay/Steel/Glass .mat, bound on PcgReview component, restored thin glass into shell_merge; cook 3932 verts / 5 submeshes.",
+    "2026-08-01 final: brass inlays thickened, key enlarged, wood map refreshed, glass last-slot; cook 4320 verts."
+  ]
+}

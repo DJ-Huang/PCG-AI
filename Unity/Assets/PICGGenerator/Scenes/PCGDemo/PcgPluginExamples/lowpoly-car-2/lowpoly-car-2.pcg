@@ -1,0 +1,1150 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "arch_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -460,
+        "y": 0
+      },
+      "data": {
+        "width": 0.8,
+        "height": 0.5,
+        "depth": 0.4
+      }
+    },
+    {
+      "id": "body_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -240,
+        "y": 0
+      },
+      "data": {
+        "width": 5.0,
+        "height": 0.6,
+        "depth": 1.8
+      }
+    },
+    {
+      "id": "wheel_path",
+      "type": "CreateSpline",
+      "position": {
+        "x": -20,
+        "y": 0
+      },
+      "data": {
+        "mode": "line",
+        "closed": false,
+        "subdivisions": 1,
+        "controlPoints": "[{\"x\":0,\"y\":0,\"z\":-0.15},{\"x\":0,\"y\":0,\"z\":0.15}]",
+        "editPlane": "none"
+      }
+    },
+    {
+      "id": "cab_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 2.0,
+        "height": 0.85,
+        "depth": 1.5
+      }
+    },
+    {
+      "id": "bed_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 420,
+        "y": 0
+      },
+      "data": {
+        "width": 2.7,
+        "height": 0.5,
+        "depth": 0.08
+      }
+    },
+    {
+      "id": "bed_back_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 540,
+        "y": 0
+      },
+      "data": {
+        "width": 0.08,
+        "height": 0.5,
+        "depth": 1.8
+      }
+    },
+    {
+      "id": "window_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 640,
+        "y": 0
+      },
+      "data": {
+        "width": 1.6,
+        "height": 0.35,
+        "depth": 1.7
+      }
+    },
+    {
+      "id": "detail_box",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 860,
+        "y": 0
+      },
+      "data": {
+        "width": 1.0,
+        "height": 1.0,
+        "depth": 1.0
+      }
+    },
+    {
+      "id": "arch_fl_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -460,
+        "y": 160
+      },
+      "data": {
+        "translateX": 1.5,
+        "translateY": 0.35,
+        "translateZ": 0.75
+      }
+    },
+    {
+      "id": "body_subdiv",
+      "type": "SubdivideMesh",
+      "position": {
+        "x": -240,
+        "y": 160
+      },
+      "data": {
+        "levels": 1
+      }
+    },
+    {
+      "id": "wheel_sweep",
+      "type": "SweepAlongSpline",
+      "position": {
+        "x": -20,
+        "y": 160
+      },
+      "data": {
+        "surfaceShape": "circle",
+        "radius": 0.42,
+        "columns": 16,
+        "sampleSpacing": 0.3,
+        "capStart": true,
+        "capEnd": true,
+        "upX": 0,
+        "upY": 1,
+        "upZ": 0,
+        "scaleStart": 1.0,
+        "scaleEnd": 1.0,
+        "profilePlane": "xy"
+      }
+    },
+    {
+      "id": "cab_subdiv",
+      "type": "SubdivideMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "levels": 1
+      }
+    },
+    {
+      "id": "bed_wall_l_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 420,
+        "y": 160
+      },
+      "data": {
+        "translateX": -1.15,
+        "translateY": 1.1,
+        "translateZ": 0.86
+      }
+    },
+    {
+      "id": "window_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 640,
+        "y": 160
+      },
+      "data": {
+        "translateX": 0.3,
+        "translateY": 0.2
+      }
+    },
+    {
+      "id": "bumper_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 860,
+        "y": 160
+      },
+      "data": {
+        "scaleX": 0.2,
+        "scaleY": 0.3,
+        "scaleZ": 1.85,
+        "translateX": 2.6,
+        "translateY": 0.45
+      }
+    },
+    {
+      "id": "arch_fr_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -460,
+        "y": 320
+      },
+      "data": {
+        "translateX": 1.5,
+        "translateY": 0.35,
+        "translateZ": -0.75
+      }
+    },
+    {
+      "id": "body_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": -240,
+        "y": 320
+      },
+      "data": {
+        "method": "edge",
+        "amount": 0.04,
+        "segments": 2,
+        "angleLimit": 40
+      }
+    },
+    {
+      "id": "wheel_fl_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -20,
+        "y": 320
+      },
+      "data": {
+        "translateX": 1.5,
+        "translateY": 0.42,
+        "translateZ": 0.75
+      }
+    },
+    {
+      "id": "cab_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "method": "edge",
+        "amount": 0.04,
+        "segments": 2,
+        "angleLimit": 40
+      }
+    },
+    {
+      "id": "bed_wall_r_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 420,
+        "y": 320
+      },
+      "data": {
+        "translateX": -1.15,
+        "translateY": 1.1,
+        "translateZ": -0.86
+      }
+    },
+    {
+      "id": "headlight_l_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 640,
+        "y": 320
+      },
+      "data": {
+        "scaleX": 0.15,
+        "scaleY": 0.2,
+        "scaleZ": 0.25,
+        "translateX": 2.51,
+        "translateY": 0.7,
+        "translateZ": 0.5
+      }
+    },
+    {
+      "id": "mirror_l_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 860,
+        "y": 320
+      },
+      "data": {
+        "scaleX": 0.1,
+        "scaleY": 0.1,
+        "scaleZ": 0.15,
+        "translateX": 1.3,
+        "translateY": 1.55,
+        "translateZ": 0.8
+      }
+    },
+    {
+      "id": "arch_rl_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -460,
+        "y": 480
+      },
+      "data": {
+        "translateX": -1.5,
+        "translateY": 0.35,
+        "translateZ": 0.75
+      }
+    },
+    {
+      "id": "body_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -240,
+        "y": 480
+      },
+      "data": {
+        "translateY": 0.55
+      }
+    },
+    {
+      "id": "wheel_fr_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -20,
+        "y": 480
+      },
+      "data": {
+        "translateX": 1.5,
+        "translateY": 0.42,
+        "translateZ": -0.75
+      }
+    },
+    {
+      "id": "cab_cut_window",
+      "type": "BooleanMesh",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {
+        "operation": "subtract"
+      }
+    },
+    {
+      "id": "bed_wall_back_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 540,
+        "y": 480
+      },
+      "data": {
+        "translateX": -2.46,
+        "translateY": 1.1
+      }
+    },
+    {
+      "id": "headlight_r_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 640,
+        "y": 480
+      },
+      "data": {
+        "scaleX": 0.15,
+        "scaleY": 0.2,
+        "scaleZ": 0.25,
+        "translateX": 2.51,
+        "translateY": 0.7,
+        "translateZ": -0.5
+      }
+    },
+    {
+      "id": "mirror_r_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 860,
+        "y": 480
+      },
+      "data": {
+        "scaleX": 0.1,
+        "scaleY": 0.1,
+        "scaleZ": 0.15,
+        "translateX": 1.3,
+        "translateY": 1.55,
+        "translateZ": -0.8
+      }
+    },
+    {
+      "id": "arch_rr_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -460,
+        "y": 640
+      },
+      "data": {
+        "translateX": -1.5,
+        "translateY": 0.35,
+        "translateZ": -0.75
+      }
+    },
+    {
+      "id": "wheel_rl_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -20,
+        "y": 640
+      },
+      "data": {
+        "translateX": -1.5,
+        "translateY": 0.42,
+        "translateZ": 0.75
+      }
+    },
+    {
+      "id": "cab_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 640
+      },
+      "data": {
+        "translateX": 1.2,
+        "translateY": 1.25
+      }
+    },
+    {
+      "id": "grille_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": 860,
+        "y": 640
+      },
+      "data": {
+        "scaleX": 0.08,
+        "scaleY": 0.3,
+        "scaleZ": 0.6,
+        "translateX": 2.51,
+        "translateY": 0.7
+      }
+    },
+    {
+      "id": "wheel_rr_t",
+      "type": "TransformMesh",
+      "position": {
+        "x": -20,
+        "y": 800
+      },
+      "data": {
+        "translateX": -1.5,
+        "translateY": 0.42,
+        "translateZ": -0.75
+      }
+    },
+    {
+      "id": "merge_arch",
+      "type": "MergeMesh",
+      "position": {
+        "x": -460,
+        "y": 960
+      },
+      "data": {}
+    },
+    {
+      "id": "body_cut_arches",
+      "type": "BooleanMesh",
+      "position": {
+        "x": -350,
+        "y": 1120
+      },
+      "data": {
+        "operation": "subtract"
+      }
+    },
+    {
+      "id": "merge_all",
+      "type": "MergeMesh",
+      "position": {
+        "x": 100,
+        "y": 1280
+      },
+      "data": {}
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 100,
+        "y": 1440
+      },
+      "data": {
+        "label": "LowPolyCar2"
+      }
+    },
+    {
+      "id": "mat_body_cut_arches",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -350,
+        "y": 1200
+      },
+      "data": {
+        "group": "",
+        "materialName": "body",
+        "__nodeTitle": "Mat body"
+      }
+    },
+    {
+      "id": "mat_cab_t_1",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 200,
+        "y": 720
+      },
+      "data": {
+        "group": "",
+        "materialName": "cab",
+        "__nodeTitle": "Mat cab"
+      }
+    },
+    {
+      "id": "mat_bed_wall_l_t_2",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 420,
+        "y": 240
+      },
+      "data": {
+        "group": "",
+        "materialName": "bed",
+        "__nodeTitle": "Mat bed"
+      }
+    },
+    {
+      "id": "mat_bed_wall_r_t_3",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 420,
+        "y": 400
+      },
+      "data": {
+        "group": "",
+        "materialName": "bed",
+        "__nodeTitle": "Mat bed"
+      }
+    },
+    {
+      "id": "mat_bed_wall_back_t_4",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 540,
+        "y": 560
+      },
+      "data": {
+        "group": "",
+        "materialName": "bed",
+        "__nodeTitle": "Mat bed"
+      }
+    },
+    {
+      "id": "mat_wheel_fl_t_5",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -20,
+        "y": 400
+      },
+      "data": {
+        "group": "",
+        "materialName": "wheel",
+        "__nodeTitle": "Mat wheel"
+      }
+    },
+    {
+      "id": "mat_wheel_fr_t_6",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -20,
+        "y": 560
+      },
+      "data": {
+        "group": "",
+        "materialName": "wheel",
+        "__nodeTitle": "Mat wheel"
+      }
+    },
+    {
+      "id": "mat_wheel_rl_t_7",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -20,
+        "y": 720
+      },
+      "data": {
+        "group": "",
+        "materialName": "wheel",
+        "__nodeTitle": "Mat wheel"
+      }
+    },
+    {
+      "id": "mat_wheel_rr_t_8",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -20,
+        "y": 880
+      },
+      "data": {
+        "group": "",
+        "materialName": "wheel",
+        "__nodeTitle": "Mat wheel"
+      }
+    },
+    {
+      "id": "mat_bumper_t_9",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 860,
+        "y": 240
+      },
+      "data": {
+        "group": "",
+        "materialName": "detail",
+        "__nodeTitle": "Mat detail"
+      }
+    },
+    {
+      "id": "mat_headlight_l_t_10",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 640,
+        "y": 400
+      },
+      "data": {
+        "group": "",
+        "materialName": "light",
+        "__nodeTitle": "Mat light"
+      }
+    },
+    {
+      "id": "mat_headlight_r_t_11",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 640,
+        "y": 560
+      },
+      "data": {
+        "group": "",
+        "materialName": "light",
+        "__nodeTitle": "Mat light"
+      }
+    },
+    {
+      "id": "mat_mirror_l_t_12",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 860,
+        "y": 400
+      },
+      "data": {
+        "group": "",
+        "materialName": "detail",
+        "__nodeTitle": "Mat detail"
+      }
+    },
+    {
+      "id": "mat_mirror_r_t_13",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 860,
+        "y": 560
+      },
+      "data": {
+        "group": "",
+        "materialName": "detail",
+        "__nodeTitle": "Mat detail"
+      }
+    },
+    {
+      "id": "mat_grille_t_14",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 860,
+        "y": 720
+      },
+      "data": {
+        "group": "",
+        "materialName": "detail",
+        "__nodeTitle": "Mat detail"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "arch_box",
+      "target": "arch_fl_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e2",
+      "source": "arch_box",
+      "target": "arch_fr_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e3",
+      "source": "arch_box",
+      "target": "arch_rl_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e4",
+      "source": "arch_box",
+      "target": "arch_rr_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e5",
+      "source": "body_box",
+      "target": "body_subdiv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e6",
+      "source": "wheel_path",
+      "target": "wheel_sweep",
+      "sourceHandle": "out",
+      "targetHandle": "backbone"
+    },
+    {
+      "id": "e7",
+      "source": "cab_box",
+      "target": "cab_subdiv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e8",
+      "source": "bed_box",
+      "target": "bed_wall_l_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e9",
+      "source": "bed_box",
+      "target": "bed_wall_r_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e10",
+      "source": "bed_back_box",
+      "target": "bed_wall_back_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e11",
+      "source": "window_box",
+      "target": "window_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e12",
+      "source": "detail_box",
+      "target": "bumper_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e13",
+      "source": "detail_box",
+      "target": "headlight_l_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e14",
+      "source": "detail_box",
+      "target": "headlight_r_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e15",
+      "source": "detail_box",
+      "target": "mirror_l_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e16",
+      "source": "detail_box",
+      "target": "mirror_r_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e17",
+      "source": "detail_box",
+      "target": "grille_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e18",
+      "source": "wheel_sweep",
+      "target": "wheel_fl_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e19",
+      "source": "wheel_sweep",
+      "target": "wheel_fr_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e20",
+      "source": "wheel_sweep",
+      "target": "wheel_rl_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e21",
+      "source": "wheel_sweep",
+      "target": "wheel_rr_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e22",
+      "source": "body_subdiv",
+      "target": "body_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e23",
+      "source": "cab_subdiv",
+      "target": "cab_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e24",
+      "source": "body_bevel",
+      "target": "body_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e25",
+      "source": "cab_bevel",
+      "target": "cab_cut_window",
+      "sourceHandle": "out",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e26",
+      "source": "window_t",
+      "target": "cab_cut_window",
+      "sourceHandle": "out",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e27",
+      "source": "cab_cut_window",
+      "target": "cab_t",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e28",
+      "source": "arch_fl_t",
+      "target": "merge_arch",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e29",
+      "source": "arch_fr_t",
+      "target": "merge_arch",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e30",
+      "source": "arch_rl_t",
+      "target": "merge_arch",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e31",
+      "source": "arch_rr_t",
+      "target": "merge_arch",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e32",
+      "source": "body_t",
+      "target": "body_cut_arches",
+      "sourceHandle": "out",
+      "targetHandle": "a"
+    },
+    {
+      "id": "e33",
+      "source": "merge_arch",
+      "target": "body_cut_arches",
+      "sourceHandle": "out",
+      "targetHandle": "b"
+    },
+    {
+      "id": "e_mat_body_cut_arches_in",
+      "source": "body_cut_arches",
+      "target": "mat_body_cut_arches",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_cab_t_1_in",
+      "source": "cab_t",
+      "target": "mat_cab_t_1",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bed_wall_l_t_2_in",
+      "source": "bed_wall_l_t",
+      "target": "mat_bed_wall_l_t_2",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bed_wall_r_t_3_in",
+      "source": "bed_wall_r_t",
+      "target": "mat_bed_wall_r_t_3",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bed_wall_back_t_4_in",
+      "source": "bed_wall_back_t",
+      "target": "mat_bed_wall_back_t_4",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_fl_t_5_in",
+      "source": "wheel_fl_t",
+      "target": "mat_wheel_fl_t_5",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_fr_t_6_in",
+      "source": "wheel_fr_t",
+      "target": "mat_wheel_fr_t_6",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_rl_t_7_in",
+      "source": "wheel_rl_t",
+      "target": "mat_wheel_rl_t_7",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_rr_t_8_in",
+      "source": "wheel_rr_t",
+      "target": "mat_wheel_rr_t_8",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bumper_t_9_in",
+      "source": "bumper_t",
+      "target": "mat_bumper_t_9",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_headlight_l_t_10_in",
+      "source": "headlight_l_t",
+      "target": "mat_headlight_l_t_10",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_headlight_r_t_11_in",
+      "source": "headlight_r_t",
+      "target": "mat_headlight_r_t_11",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_mirror_l_t_12_in",
+      "source": "mirror_l_t",
+      "target": "mat_mirror_l_t_12",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_mirror_r_t_13_in",
+      "source": "mirror_r_t",
+      "target": "mat_mirror_r_t_13",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_grille_t_14_in",
+      "source": "grille_t",
+      "target": "mat_grille_t_14",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e49",
+      "source": "merge_all",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_body_cut_arches_out",
+      "source": "mat_body_cut_arches",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_cab_t_1_out",
+      "source": "mat_cab_t_1",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bed_wall_l_t_2_out",
+      "source": "mat_bed_wall_l_t_2",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bed_wall_r_t_3_out",
+      "source": "mat_bed_wall_r_t_3",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bed_wall_back_t_4_out",
+      "source": "mat_bed_wall_back_t_4",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_fl_t_5_out",
+      "source": "mat_wheel_fl_t_5",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_fr_t_6_out",
+      "source": "mat_wheel_fr_t_6",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_rl_t_7_out",
+      "source": "mat_wheel_rl_t_7",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_wheel_rr_t_8_out",
+      "source": "mat_wheel_rr_t_8",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_bumper_t_9_out",
+      "source": "mat_bumper_t_9",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_headlight_l_t_10_out",
+      "source": "mat_headlight_l_t_10",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_headlight_r_t_11_out",
+      "source": "mat_headlight_r_t_11",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_mirror_l_t_12_out",
+      "source": "mat_mirror_l_t_12",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_mirror_r_t_13_out",
+      "source": "mat_mirror_r_t_13",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_grille_t_14_out",
+      "source": "mat_grille_t_14",
+      "target": "merge_all",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

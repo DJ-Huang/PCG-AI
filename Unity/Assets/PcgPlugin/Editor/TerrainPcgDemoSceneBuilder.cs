@@ -13,9 +13,9 @@ namespace DJTechEditor.PCG
         private const string TerrainDataPath = DemoDirectory + "/TerrainPcgDemoTerrain.asset";
         private const string ScenePath = "Assets/Scenes/TerrainDemo.scene";
         private const string GenerateGraphPath =
-            "Assets/PcgPlugin/Examples/PCGDemo/terrain-binding-demo.pcg";
+            "Assets/PICGGenerator/Scenes/PCGDemo/PcgPluginExamples/terrain-binding-demo.pcg";
         private const string HostImportGraphPath =
-            "Assets/PcgPlugin/Examples/PCGDemo/terrain-host-import-demo.pcg";
+            "Assets/PICGGenerator/Scenes/PCGDemo/PcgPluginExamples/terrain-host-import-demo.pcg";
 
         private static string PendingMarkerPath =>
             Path.Combine(

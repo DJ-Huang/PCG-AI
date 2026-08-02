@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "outline",
+      "type": "CreateSpline",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Explicit Closed Outline",
+        "mode": "polyline",
+        "closed": true,
+        "subdivisions": 1,
+        "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":2,\"y\":0,\"z\":0},{\"x\":2,\"y\":1,\"z\":0},{\"x\":0,\"y\":1,\"z\":0},{\"x\":0,\"y\":0,\"z\":0}]"
+      }
+    },
+    {
+      "id": "condition",
+      "type": "ConditionOutline",
+      "position": {
+        "x": 0,
+        "y": 220
+      },
+      "data": {
+        "__nodeTitle": "Smooth Protected Seam",
+        "win": 3,
+        "eps": 0.0,
+        "protectSpans": "[{\"start\":4,\"end\":1}]"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 0,
+        "y": 440
+      },
+      "data": {
+        "__nodeTitle": "Conditioned Output"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "outline",
+      "target": "condition",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e1",
+      "source": "condition",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

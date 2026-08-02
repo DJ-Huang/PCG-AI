@@ -1,0 +1,832 @@
+{
+  "version": "1.0",
+  "name": "Medium Pitched-Roof Building",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "mesh",
+      "name": "Mesh",
+      "pinType": "SpatialMesh"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "mp_body",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -800,
+        "y": 0
+      },
+      "data": {
+        "width": 3.8,
+        "height": 6.4,
+        "depth": 3.8,
+        "__nodeTitle": "Medium 2-Story Body"
+      }
+    },
+    {
+      "id": "mp_body_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": -800,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.12,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Body Bevel"
+      }
+    },
+    {
+      "id": "mp_body_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -800,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_teal",
+        "__nodeTitle": "Teal Body"
+      }
+    },
+    {
+      "id": "mp_plinth",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": -480,
+        "y": 0
+      },
+      "data": {
+        "width": 4.0,
+        "height": 0.4,
+        "depth": 4.0,
+        "__nodeTitle": "Shop Plinth"
+      }
+    },
+    {
+      "id": "mp_plinth_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": -480,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.05,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Plinth Bevel"
+      }
+    },
+    {
+      "id": "mp_plinth_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": -480,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Plinth Trim"
+      }
+    },
+    {
+      "id": "mp_plinth_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": -480,
+        "y": 480
+      },
+      "data": {
+        "translateY": -2.8,
+        "__nodeTitle": "Plinth At Grade"
+      }
+    },
+    {
+      "id": "mp_base",
+      "type": "CreateSpline",
+      "position": {
+        "x": -160,
+        "y": 0
+      },
+      "data": {
+        "mode": "polyline",
+        "closed": true,
+        "controlPoints": "[{\"x\":-2,\"y\":0,\"z\":-2},{\"x\":2,\"y\":0,\"z\":-2},{\"x\":2,\"y\":0,\"z\":2},{\"x\":-2,\"y\":0,\"z\":2}]",
+        "__nodeTitle": "Roof Eave Profile"
+      }
+    },
+    {
+      "id": "mp_top",
+      "type": "CreateSpline",
+      "position": {
+        "x": 160,
+        "y": 0
+      },
+      "data": {
+        "mode": "polyline",
+        "closed": true,
+        "controlPoints": "[{\"x\":-0.35,\"y\":1.15,\"z\":-0.35},{\"x\":0.35,\"y\":1.15,\"z\":-0.35},{\"x\":0.35,\"y\":1.15,\"z\":0.35},{\"x\":-0.35,\"y\":1.15,\"z\":0.35}]",
+        "__nodeTitle": "Roof Ridge Profile"
+      }
+    },
+    {
+      "id": "mp_roof",
+      "type": "LoftMesh",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "data": {
+        "columns": 16,
+        "sortAxis": "y",
+        "closedProfile": true,
+        "capStart": true,
+        "capEnd": true,
+        "__nodeTitle": "Pitched Roof"
+      }
+    },
+    {
+      "id": "mp_roof_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "data": {
+        "amount": 0.08,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Roof Bevel"
+      }
+    },
+    {
+      "id": "mp_roof_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 0,
+        "y": 480
+      },
+      "data": {
+        "group": "",
+        "materialName": "roof_tile",
+        "__nodeTitle": "Roof Tile"
+      }
+    },
+    {
+      "id": "mp_roof_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 0,
+        "y": 640
+      },
+      "data": {
+        "translateY": 3.0,
+        "__nodeTitle": "Roof Place"
+      }
+    },
+    {
+      "id": "mp_shop",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 480,
+        "y": 0
+      },
+      "data": {
+        "width": 1.0,
+        "height": 2.1,
+        "depth": 0.1,
+        "__nodeTitle": "Shop Glass Bay"
+      }
+    },
+    {
+      "id": "mp_shop_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 480,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "materialName": "window_glow",
+        "__nodeTitle": "Shop Glass"
+      }
+    },
+    {
+      "id": "mp_shop_pair",
+      "type": "CopyMesh",
+      "position": {
+        "x": 480,
+        "y": 320
+      },
+      "data": {
+        "mode": "linear",
+        "count": 2,
+        "axis": "x",
+        "translateX": 2.3,
+        "__nodeTitle": "Shop Bays"
+      }
+    },
+    {
+      "id": "mp_shop_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 480,
+        "y": 480
+      },
+      "data": {
+        "translateX": -1.15,
+        "translateY": -2.05,
+        "translateZ": 1.95,
+        "__nodeTitle": "Shopfront Place"
+      }
+    },
+    {
+      "id": "mp_door",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 800,
+        "y": 0
+      },
+      "data": {
+        "width": 0.9,
+        "height": 2.1,
+        "depth": 0.12,
+        "__nodeTitle": "Road-Facing Door"
+      }
+    },
+    {
+      "id": "mp_door_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 800,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "materialName": "plaster_cream",
+        "__nodeTitle": "Door Material"
+      }
+    },
+    {
+      "id": "mp_door_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 800,
+        "y": 320
+      },
+      "data": {
+        "translateY": -2.05,
+        "translateZ": 1.96,
+        "__nodeTitle": "Door On Local +Z"
+      }
+    },
+    {
+      "id": "mp_win",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1120,
+        "y": 0
+      },
+      "data": {
+        "width": 0.9,
+        "height": 1.35,
+        "depth": 0.1,
+        "__nodeTitle": "Upper Window"
+      }
+    },
+    {
+      "id": "mp_win_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1120,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.04,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Window Bevel"
+      }
+    },
+    {
+      "id": "mp_win_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1120,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "window_glow",
+        "__nodeTitle": "Upper Glass"
+      }
+    },
+    {
+      "id": "mp_front",
+      "type": "CopyMesh",
+      "position": {
+        "x": 1120,
+        "y": 480
+      },
+      "data": {
+        "mode": "linear",
+        "count": 3,
+        "axis": "x",
+        "translateX": 1.25,
+        "__nodeTitle": "Front Upper Bays"
+      }
+    },
+    {
+      "id": "mp_front_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1120,
+        "y": 640
+      },
+      "data": {
+        "translateX": -1.25,
+        "translateY": 0.55,
+        "translateZ": 1.96,
+        "__nodeTitle": "Front Upper Facade"
+      }
+    },
+    {
+      "id": "mp_balcony",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1440,
+        "y": 0
+      },
+      "data": {
+        "width": 1.8,
+        "height": 0.12,
+        "depth": 0.65,
+        "__nodeTitle": "Front Balcony"
+      }
+    },
+    {
+      "id": "mp_balcony_bv",
+      "type": "BevelMesh",
+      "position": {
+        "x": 1440,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.04,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Balcony Bevel"
+      }
+    },
+    {
+      "id": "mp_balcony_mat",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1440,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": "trim",
+        "__nodeTitle": "Balcony Rail"
+      }
+    },
+    {
+      "id": "mp_balcony_xf",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1440,
+        "y": 480
+      },
+      "data": {
+        "translateY": 1.1,
+        "translateZ": 2.35,
+        "__nodeTitle": "Balcony Place"
+      }
+    },
+    {
+      "id": "mp_bal_rail",
+      "type": "CreateBoxMesh",
+      "position": {"x": 1760, "y": 0},
+      "data": {"width": 1.9, "height": 0.1, "depth": 0.1, "__nodeTitle": "Balcony Front Rail"}
+    },
+    {
+      "id": "mp_bal_rail_bv",
+      "type": "BevelMesh",
+      "position": {"x": 1760, "y": 160},
+      "data": {"amount": 0.025, "segments": 1, "clampOverlap": true, "__nodeTitle": "Balcony Rail Bevel"}
+    },
+    {
+      "id": "mp_bal_rail_mat",
+      "type": "AssignMaterial",
+      "position": {"x": 1760, "y": 320},
+      "data": {"group": "", "materialName": "trim", "__nodeTitle": "Balcony Rail Metal"}
+    },
+    {
+      "id": "mp_bal_rail_xf",
+      "type": "TransformMesh",
+      "position": {"x": 1760, "y": 480},
+      "data": {"translateY": 1.58, "translateZ": 2.7, "__nodeTitle": "Balcony Rail Place"}
+    },
+    {
+      "id": "mp_bal_post",
+      "type": "CreateBoxMesh",
+      "position": {"x": 2080, "y": 0},
+      "data": {"width": 0.1, "height": 0.85, "depth": 0.1, "__nodeTitle": "Balcony Rail Post"}
+    },
+    {
+      "id": "mp_bal_post_bv",
+      "type": "BevelMesh",
+      "position": {"x": 2080, "y": 160},
+      "data": {"amount": 0.025, "segments": 1, "clampOverlap": true, "__nodeTitle": "Rail Post Bevel"}
+    },
+    {
+      "id": "mp_bal_post_mat",
+      "type": "AssignMaterial",
+      "position": {"x": 2080, "y": 320},
+      "data": {"group": "", "materialName": "trim", "__nodeTitle": "Rail Post Metal"}
+    },
+    {
+      "id": "mp_bal_posts",
+      "type": "CopyMesh",
+      "position": {"x": 2080, "y": 480},
+      "data": {"mode": "linear", "count": 3, "axis": "x", "translateX": 0.9, "__nodeTitle": "Balcony Vertical Posts"}
+    },
+    {
+      "id": "mp_bal_posts_xf",
+      "type": "TransformMesh",
+      "position": {"x": 2080, "y": 640},
+      "data": {"translateX": -0.9, "translateY": 1.18, "translateZ": 2.7, "__nodeTitle": "Balcony Posts Place"}
+    },
+    {
+      "id": "mp_awning",
+      "type": "CreateBoxMesh",
+      "position": {"x": 2400, "y": 0},
+      "data": {"width": 3.1, "height": 0.14, "depth": 0.6, "__nodeTitle": "Shop Canopy"}
+    },
+    {
+      "id": "mp_awning_bv",
+      "type": "BevelMesh",
+      "position": {"x": 2400, "y": 160},
+      "data": {"amount": 0.05, "segments": 2, "clampOverlap": true, "__nodeTitle": "Canopy Bevel"}
+    },
+    {
+      "id": "mp_awning_mat",
+      "type": "AssignMaterial",
+      "position": {"x": 2400, "y": 320},
+      "data": {"group": "", "materialName": "roof_green", "__nodeTitle": "Shop Canopy Material"}
+    },
+    {
+      "id": "mp_awning_xf",
+      "type": "TransformMesh",
+      "position": {"x": 2400, "y": 480},
+      "data": {"translateY": -0.62, "translateZ": 2.28, "__nodeTitle": "Shop Canopy +Z"}
+    },
+    {
+      "id": "mp_door_frame",
+      "type": "CreateBoxMesh",
+      "position": {"x": 2720, "y": 0},
+      "data": {"width": 1.18, "height": 2.36, "depth": 0.08, "__nodeTitle": "Door Surround"}
+    },
+    {
+      "id": "mp_door_frame_bv",
+      "type": "BevelMesh",
+      "position": {"x": 2720, "y": 160},
+      "data": {"amount": 0.04, "segments": 2, "clampOverlap": true, "__nodeTitle": "Door Surround Bevel"}
+    },
+    {
+      "id": "mp_door_frame_mat",
+      "type": "AssignMaterial",
+      "position": {"x": 2720, "y": 320},
+      "data": {"group": "", "materialName": "trim", "__nodeTitle": "Door Surround Trim"}
+    },
+    {
+      "id": "mp_door_frame_xf",
+      "type": "TransformMesh",
+      "position": {"x": 2720, "y": 480},
+      "data": {"translateY": -2.02, "translateZ": 1.9, "__nodeTitle": "Door Surround +Z"}
+    },
+    {
+      "id": "mp_win_frame",
+      "type": "CreateBoxMesh",
+      "position": {"x": 3040, "y": 0},
+      "data": {"width": 1.12, "height": 1.58, "depth": 0.08, "__nodeTitle": "Window Surround"}
+    },
+    {
+      "id": "mp_win_frame_bv",
+      "type": "BevelMesh",
+      "position": {"x": 3040, "y": 160},
+      "data": {"amount": 0.04, "segments": 2, "clampOverlap": true, "__nodeTitle": "Window Surround Bevel"}
+    },
+    {
+      "id": "mp_win_frame_mat",
+      "type": "AssignMaterial",
+      "position": {"x": 3040, "y": 320},
+      "data": {"group": "", "materialName": "trim", "__nodeTitle": "Window Surround Trim"}
+    },
+    {
+      "id": "mp_win_frames",
+      "type": "CopyMesh",
+      "position": {"x": 3040, "y": 480},
+      "data": {"mode": "linear", "count": 3, "axis": "x", "translateX": 1.25, "__nodeTitle": "Window Surround Bays"}
+    },
+    {
+      "id": "mp_win_frames_xf",
+      "type": "TransformMesh",
+      "position": {"x": 3040, "y": 640},
+      "data": {"translateX": -1.25, "translateY": 0.55, "translateZ": 1.9, "__nodeTitle": "Window Surround Place"}
+    },
+    {"id":"mp_mullion","type":"CreateBoxMesh","position":{"x":3360,"y":0},"data":{"width":0.08,"height":1.15,"depth":0.07,"__nodeTitle":"Medium Window Mullion"}},
+    {"id":"mp_mullion_mat","type":"AssignMaterial","position":{"x":3360,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Medium Mullion Trim"}},
+    {"id":"mp_mullions","type":"CopyMesh","position":{"x":3360,"y":320},"data":{"mode":"linear","count":3,"axis":"x","translateX":1.25,"__nodeTitle":"Medium Window Mullions"}},
+    {"id":"mp_mullions_xf","type":"TransformMesh","position":{"x":3360,"y":480},"data":{"translateX":-1.25,"translateY":0.55,"translateZ":2.02,"__nodeTitle":"Medium Mullions Place"}},
+    {"id":"mp_door_panel","type":"CreateBoxMesh","position":{"x":3680,"y":0},"data":{"width":0.64,"height":0.62,"depth":0.05,"__nodeTitle":"Medium Door Panel"}},
+    {"id":"mp_door_panel_mat","type":"AssignMaterial","position":{"x":3680,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Medium Door Panel Trim"}},
+    {"id":"mp_door_panels","type":"CopyMesh","position":{"x":3680,"y":320},"data":{"mode":"linear","count":2,"axis":"y","translateY":0.82,"__nodeTitle":"Medium Door Panels"}},
+    {"id":"mp_door_panels_xf","type":"TransformMesh","position":{"x":3680,"y":480},"data":{"translateY":-2.0,"translateZ":2.02,"__nodeTitle":"Medium Door Panels +Z"}},
+    {"id":"mp_handle","type":"CreateBoxMesh","position":{"x":4000,"y":0},"data":{"width":0.08,"height":0.12,"depth":0.08,"__nodeTitle":"Medium Door Handle"}},
+    {"id":"mp_handle_mat","type":"AssignMaterial","position":{"x":4000,"y":160},"data":{"group":"","materialName":"trim","__nodeTitle":"Medium Handle Metal"}},
+    {"id":"mp_handle_xf","type":"TransformMesh","position":{"x":4000,"y":320},"data":{"translateX":0.28,"translateY":-2.02,"translateZ":2.07,"__nodeTitle":"Medium Handle +Z"}},
+    {
+      "id": "mp_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 320,
+        "y": 1120
+      },
+      "data": {
+        "__nodeTitle": "Medium Building Assembly"
+      }
+    },
+    {
+      "id": "mp_lift",
+      "type": "TransformMesh",
+      "position": {
+        "x": 320,
+        "y": 1280
+      },
+      "data": {
+        "translateY": 3.2,
+        "__nodeTitle": "Set Base Y Zero"
+      }
+    },
+    {
+      "id": "mp_out",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 320,
+        "y": 1440
+      },
+      "data": {
+        "__nodeTitle": "Medium Building Out"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "a1",
+      "source": "mp_body",
+      "target": "mp_body_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a2",
+      "source": "mp_body_bv",
+      "target": "mp_body_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a3",
+      "source": "mp_plinth",
+      "target": "mp_plinth_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a4",
+      "source": "mp_plinth_bv",
+      "target": "mp_plinth_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a5",
+      "source": "mp_plinth_mat",
+      "target": "mp_plinth_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a6",
+      "source": "mp_base",
+      "target": "mp_roof",
+      "sourceHandle": "out",
+      "targetHandle": "profiles"
+    },
+    {
+      "id": "a7",
+      "source": "mp_top",
+      "target": "mp_roof",
+      "sourceHandle": "out",
+      "targetHandle": "profiles"
+    },
+    {
+      "id": "a8",
+      "source": "mp_roof",
+      "target": "mp_roof_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a9",
+      "source": "mp_roof_bv",
+      "target": "mp_roof_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a10",
+      "source": "mp_roof_mat",
+      "target": "mp_roof_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a11",
+      "source": "mp_shop",
+      "target": "mp_shop_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a12",
+      "source": "mp_shop_mat",
+      "target": "mp_shop_pair",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a13",
+      "source": "mp_shop_pair",
+      "target": "mp_shop_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a14",
+      "source": "mp_door",
+      "target": "mp_door_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a15",
+      "source": "mp_door_mat",
+      "target": "mp_door_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a16",
+      "source": "mp_win",
+      "target": "mp_win_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a17",
+      "source": "mp_win_bv",
+      "target": "mp_win_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a18",
+      "source": "mp_win_mat",
+      "target": "mp_front",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a19",
+      "source": "mp_front",
+      "target": "mp_front_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a20",
+      "source": "mp_balcony",
+      "target": "mp_balcony_bv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a21",
+      "source": "mp_balcony_bv",
+      "target": "mp_balcony_mat",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a22",
+      "source": "mp_balcony_mat",
+      "target": "mp_balcony_xf",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {"id":"a25","source":"mp_bal_rail","target":"mp_bal_rail_bv","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a26","source":"mp_bal_rail_bv","target":"mp_bal_rail_mat","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a27","source":"mp_bal_rail_mat","target":"mp_bal_rail_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a28","source":"mp_bal_post","target":"mp_bal_post_bv","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a29","source":"mp_bal_post_bv","target":"mp_bal_post_mat","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a30","source":"mp_bal_post_mat","target":"mp_bal_posts","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a31","source":"mp_bal_posts","target":"mp_bal_posts_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a32","source":"mp_awning","target":"mp_awning_bv","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a33","source":"mp_awning_bv","target":"mp_awning_mat","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a34","source":"mp_awning_mat","target":"mp_awning_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a35","source":"mp_door_frame","target":"mp_door_frame_bv","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a36","source":"mp_door_frame_bv","target":"mp_door_frame_mat","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a37","source":"mp_door_frame_mat","target":"mp_door_frame_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a38","source":"mp_win_frame","target":"mp_win_frame_bv","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a39","source":"mp_win_frame_bv","target":"mp_win_frame_mat","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a40","source":"mp_win_frame_mat","target":"mp_win_frames","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a41","source":"mp_win_frames","target":"mp_win_frames_xf","sourceHandle":"out","targetHandle":"in"},
+    {"id":"a42","source":"mp_mullion","target":"mp_mullion_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a43","source":"mp_mullion_mat","target":"mp_mullions","sourceHandle":"out","targetHandle":"in"},{"id":"a44","source":"mp_mullions","target":"mp_mullions_xf","sourceHandle":"out","targetHandle":"in"},{"id":"a45","source":"mp_door_panel","target":"mp_door_panel_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a46","source":"mp_door_panel_mat","target":"mp_door_panels","sourceHandle":"out","targetHandle":"in"},{"id":"a47","source":"mp_door_panels","target":"mp_door_panels_xf","sourceHandle":"out","targetHandle":"in"},{"id":"a48","source":"mp_handle","target":"mp_handle_mat","sourceHandle":"out","targetHandle":"in"},{"id":"a49","source":"mp_handle_mat","target":"mp_handle_xf","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "m1",
+      "source": "mp_body_mat",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m2",
+      "source": "mp_plinth_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m3",
+      "source": "mp_roof_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m4",
+      "source": "mp_shop_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m5",
+      "source": "mp_door_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m6",
+      "source": "mp_front_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "m7",
+      "source": "mp_balcony_xf",
+      "target": "mp_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {"id":"m8","source":"mp_bal_rail_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m9","source":"mp_bal_posts_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m10","source":"mp_awning_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m11","source":"mp_door_frame_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m12","source":"mp_win_frames_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},
+    {"id":"m13","source":"mp_mullions_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m14","source":"mp_door_panels_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},{"id":"m15","source":"mp_handle_xf","target":"mp_merge","sourceHandle":"out","targetHandle":"in"},
+    {
+      "id": "a23",
+      "source": "mp_merge",
+      "target": "mp_lift",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "a24",
+      "source": "mp_lift",
+      "target": "mp_out",
+      "sourceHandle": "out",
+      "targetHandle": "mesh"
+    }
+  ],
+  "subgraphs": []
+}
