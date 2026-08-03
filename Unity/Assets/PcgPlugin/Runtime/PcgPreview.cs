@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -20,14 +21,37 @@ namespace DJTechRuntime.PCG
 
         private readonly List<Vector3> _points = new();
         private readonly List<List<Vector3>> _splines = new();
+        private readonly List<IReadOnlyList<Vector3>> _splineViews = new();
         private Mesh _mesh;
         private MeshFilter _meshFilter;
         private MeshRenderer _meshRenderer;
+
+        /// <summary>Monotonic geometry generation used by the Editor preview cache.</summary>
+        public int Revision { get; private set; }
+
+        /// <summary>Read-only point snapshot for the Editor renderer.</summary>
+        public IReadOnlyList<Vector3> Points => _points;
+
+        /// <summary>Read-only spline snapshots for the Editor renderer.</summary>
+        public IReadOnlyList<IReadOnlyList<Vector3>> Splines => _splineViews;
+
+        public float GizmoSize => gizmoSize;
+        public Color GizmoColor => gizmoColor;
+        public Color SplineColor => splineColor;
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Editor bridge for the batched Scene View renderer. Returning true means the
+        /// bridge handled the draw, including an intentional fail-closed fallback.
+        /// </summary>
+        public static Func<PcgPreview, Camera, bool> EditorDrawPreview;
+#endif
 
         public void ClearAll()
         {
             _points.Clear();
             _splines.Clear();
+            _splineViews.Clear();
             SetMesh(null);
         }
 
@@ -38,35 +62,52 @@ namespace DJTechRuntime.PCG
         {
             _points.Clear();
             _splines.Clear();
+            _splineViews.Clear();
+            IncrementRevision();
         }
 
         public void SetPoints(IEnumerable<Vector3> points)
         {
             _points.Clear();
             _splines.Clear();
+            _splineViews.Clear();
             // Do not clear shared MeshFilter — GraphComponent owns Lit mesh preview.
             // RuntimeRunner / replacement paths must ClearAll() before switching result kinds.
-            _points.AddRange(points);
+            if (points != null)
+                _points.AddRange(points);
+            IncrementRevision();
         }
 
         public void SetSplines(IEnumerable<List<Vector3>> splines)
         {
             _points.Clear();
             _splines.Clear();
+            _splineViews.Clear();
             if (splines != null)
-                _splines.AddRange(splines);
+            {
+                foreach (var spline in splines)
+                {
+                    var copy = spline != null ? new List<Vector3>(spline) : new List<Vector3>();
+                    _splines.Add(copy);
+                    _splineViews.Add(copy.AsReadOnly());
+                }
+            }
+            IncrementRevision();
         }
 
         public void SetMesh(Mesh mesh)
         {
             _points.Clear();
             _splines.Clear();
+            _splineViews.Clear();
             _mesh = mesh;
             EnsureMeshComponents();
             _meshFilter.sharedMesh = mesh;
 
             if (_meshRenderer != null)
                 _meshRenderer.enabled = mesh != null;
+
+            IncrementRevision();
         }
 
         private void EnsureMeshComponents()
@@ -88,6 +129,15 @@ namespace DJTechRuntime.PCG
 
         private void OnDrawGizmos()
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying &&
+                EditorDrawPreview != null &&
+                EditorDrawPreview(this, Camera.current))
+            {
+                return;
+            }
+#endif
+
             Gizmos.color = gizmoColor;
             foreach (var p in _points)
                 Gizmos.DrawSphere(transform.TransformPoint(p), gizmoSize);
@@ -107,6 +157,14 @@ namespace DJTechRuntime.PCG
                             world);
                     }
                 }
+            }
+        }
+
+        private void IncrementRevision()
+        {
+            unchecked
+            {
+                Revision++;
             }
         }
     }
