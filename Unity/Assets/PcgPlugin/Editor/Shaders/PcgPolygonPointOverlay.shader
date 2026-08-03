@@ -6,7 +6,6 @@ Shader "Hidden/PcgPolygonPointOverlay"
         _PointSize ("Point Size", Float) = 8
         _UseWorldSize ("Use World Size", Float) = 0
         _Viewport ("Viewport", Vector) = (1, 1, 0, 0)
-        _DepthBias ("Depth Bias", Float) = 0.0005
         [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("ZTest", Float) = 4
     }
 
@@ -18,6 +17,8 @@ Shader "Hidden/PcgPolygonPointOverlay"
         {
             ZWrite Off
             ZTest [_ZTest]
+            // Use the smallest raster depth adjustment for coplanar points.
+            Offset 0, -1
             Blend SrcAlpha OneMinusSrcAlpha
             Cull Off
 
@@ -47,7 +48,6 @@ Shader "Hidden/PcgPolygonPointOverlay"
             float _PointSize;
             float _UseWorldSize;
             float4 _Viewport;
-            float _DepthBias;
 
             v2f vert(appdata v)
             {
@@ -68,12 +68,6 @@ Shader "Hidden/PcgPolygonPointOverlay"
                     // _PointSize is the full diameter in physical pixels.
                     o.pos.xy += v.corner * (_PointSize / _Viewport.xy) * centerClip.w;
                 }
-
-                #if defined(UNITY_REVERSED_Z)
-                    o.pos.z += _DepthBias * o.pos.w;
-                #else
-                    o.pos.z -= _DepthBias * o.pos.w;
-                #endif
 
                 o.corner = v.corner;
                 o.color = v.color * _Color;

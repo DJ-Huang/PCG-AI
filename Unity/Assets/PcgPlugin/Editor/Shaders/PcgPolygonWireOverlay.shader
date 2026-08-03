@@ -5,7 +5,6 @@ Shader "Hidden/PcgPolygonWireOverlay"
         _Color ("Color", Color) = (0, 0, 0, 1)
         _LineWidth ("Line Width", Float) = 2
         _Viewport ("Viewport", Vector) = (1, 1, 0, 0)
-        _DepthBias ("Depth Bias", Float) = 0.0005
         [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("ZTest", Float) = 4
         [Enum(Off, 0, On, 1)] _ZWrite ("ZWrite", Float) = 0
     }
@@ -21,6 +20,9 @@ Shader "Hidden/PcgPolygonWireOverlay"
             // renderer disables this for AlwaysOnTop group highlights.
             ZWrite [_ZWrite]
             ZTest [_ZTest]
+            // Keep coplanar overlays ahead by one device depth unit without
+            // turning the offset into a distance-scaled clip-space shift.
+            Offset 0, -1
             Blend SrcAlpha OneMinusSrcAlpha
             Cull Off
 
@@ -48,7 +50,6 @@ Shader "Hidden/PcgPolygonWireOverlay"
             float4 _Color;
             float _LineWidth;
             float4 _Viewport;
-            float _DepthBias;
 
             v2f vert(appdata v)
             {
@@ -108,12 +109,6 @@ Shader "Hidden/PcgPolygonWireOverlay"
                 float4 centerClip = lerp(startClip, endClip, along);
                 centerClip.xy = centerNdc * centerClip.w + offsetNdc * centerClip.w;
 
-                #if defined(UNITY_REVERSED_Z)
-                    centerClip.z += _DepthBias * centerClip.w;
-                #else
-                    centerClip.z -= _DepthBias * centerClip.w;
-                #endif
-
                 o.pos = centerClip;
                 o.corner = v.corner;
                 o.lineLengthPixels = lengthPixels;
@@ -134,6 +129,7 @@ Shader "Hidden/PcgPolygonWireOverlay"
                 float distanceToLine = length(float2(capPixels, sidePixels)) - radiusPixels;
                 float aa = max(fwidth(distanceToLine), 1e-4);
                 float coverage = 1.0 - smoothstep(-aa, aa, distanceToLine);
+                clip(coverage - 1e-4);
                 return fixed4(_Color.rgb, _Color.a * coverage);
             }
             ENDCG

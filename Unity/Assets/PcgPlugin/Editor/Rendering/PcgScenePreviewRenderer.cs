@@ -23,7 +23,6 @@ namespace DJTechEditor.PCG.Rendering
 
         private const string LineShaderName = "Hidden/PcgPolygonWireOverlay";
         private const string PointShaderName = "Hidden/PcgPolygonPointOverlay";
-        private const float DepthBias = 0.0005f;
 
         private static readonly Dictionary<CacheKey, CacheEntry> s_Cache = new();
         private static readonly HashSet<int> s_WarnedFallbacks = new();
@@ -37,7 +36,6 @@ namespace DJTechEditor.PCG.Rendering
         private static readonly int s_PointSizeId = Shader.PropertyToID("_PointSize");
         private static readonly int s_UseWorldSizeId = Shader.PropertyToID("_UseWorldSize");
         private static readonly int s_ViewportId = Shader.PropertyToID("_Viewport");
-        private static readonly int s_DepthBiasId = Shader.PropertyToID("_DepthBias");
         private static readonly int s_ZTestId = Shader.PropertyToID("_ZTest");
         private static readonly int s_ZWriteId = Shader.PropertyToID("_ZWrite");
 
@@ -323,6 +321,23 @@ namespace DJTechEditor.PCG.Rendering
                 GetPreviewEntry(preview);
         }
 
+        internal static CompareFunction ResolveDepthCompare(
+            bool alwaysOnTop,
+            bool usesReversedZBuffer)
+        {
+            if (alwaysOnTop)
+                return CompareFunction.Always;
+
+            return usesReversedZBuffer
+                ? CompareFunction.GreaterEqual
+                : CompareFunction.LessEqual;
+        }
+
+        private static CompareFunction ResolveDepthCompare(bool alwaysOnTop)
+        {
+            return ResolveDepthCompare(alwaysOnTop, SystemInfo.usesReversedZBuffer);
+        }
+
         private static CacheEntry GetPolygonEntry(
             PcgGraphComponent owner,
             PcgPolygonPreviewData preview)
@@ -559,10 +574,9 @@ namespace DJTechEditor.PCG.Rendering
                 s_LineMaterial.SetVector(
                     s_ViewportId,
                     new Vector4(Mathf.Max(1, camera.pixelWidth), Mathf.Max(1, camera.pixelHeight), 0f, 0f));
-                s_LineMaterial.SetFloat(s_DepthBiasId, DepthBias);
-                s_LineMaterial.SetInt(s_ZTestId, (int)(style.AlwaysOnTop
-                    ? CompareFunction.Always
-                    : CompareFunction.LessEqual));
+                s_LineMaterial.SetInt(
+                    s_ZTestId,
+                    (int)ResolveDepthCompare(style.AlwaysOnTop));
                 s_LineMaterial.SetInt(s_ZWriteId, style.AlwaysOnTop ? 0 : 1);
                 if (!s_LineMaterial.SetPass(0))
                 {
@@ -600,10 +614,9 @@ namespace DJTechEditor.PCG.Rendering
                 s_PointMaterial.SetVector(
                     s_ViewportId,
                     new Vector4(Mathf.Max(1, camera.pixelWidth), Mathf.Max(1, camera.pixelHeight), 0f, 0f));
-                s_PointMaterial.SetFloat(s_DepthBiasId, DepthBias);
-                s_PointMaterial.SetInt(s_ZTestId, (int)(style.AlwaysOnTop
-                    ? CompareFunction.Always
-                    : CompareFunction.LessEqual));
+                s_PointMaterial.SetInt(
+                    s_ZTestId,
+                    (int)ResolveDepthCompare(style.AlwaysOnTop));
                 if (!s_PointMaterial.SetPass(0))
                 {
                     return DrawPointFallback(entry, localToWorld, style);
@@ -639,9 +652,7 @@ namespace DJTechEditor.PCG.Rendering
             try
             {
                 Handles.color = style.Color;
-                Handles.zTest = style.AlwaysOnTop
-                    ? CompareFunction.Always
-                    : CompareFunction.LessEqual;
+                Handles.zTest = ResolveDepthCompare(style.AlwaysOnTop);
                 Handles.DrawLines(world);
             }
             finally
@@ -674,9 +685,7 @@ namespace DJTechEditor.PCG.Rendering
             var previousZTest = Handles.zTest;
             try
             {
-                Handles.zTest = style.AlwaysOnTop
-                    ? CompareFunction.Always
-                    : CompareFunction.LessEqual;
+                Handles.zTest = ResolveDepthCompare(style.AlwaysOnTop);
                 for (var i = 0; i < centers.Length; i++)
                 {
                     var world = localToWorld.MultiplyPoint(centers[i]);
