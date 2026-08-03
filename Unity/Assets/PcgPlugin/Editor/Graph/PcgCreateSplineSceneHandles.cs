@@ -671,6 +671,7 @@ namespace DJTechEditor.PCG.Graph
                 window.GraphView.RefreshSceneEditContext();
                 window.GraphView.SetSceneMode(SceneEditLevel.Object, SceneEditDomain.None);
                 window.GraphView.EnsureMatchSizeScenePreview();
+                window.EnsureDefaultOutputPreview();
             }
 
             s_OthersDisplay = OthersDisplayMode.HideOthers;

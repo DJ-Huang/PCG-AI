@@ -20,8 +20,8 @@ Shader "Hidden/PcgPolygonWireOverlay"
             // renderer disables this for AlwaysOnTop group highlights.
             ZWrite [_ZWrite]
             ZTest [_ZTest]
-            // Keep coplanar overlays ahead by one device depth unit without
-            // turning the offset into a distance-scaled clip-space shift.
+            // ShaderLab maps this semantic pull-toward-camera offset across
+            // forward and reversed depth APIs without a distance-scaled bias.
             Offset 0, -1
             Blend SrcAlpha OneMinusSrcAlpha
             Cull Off
@@ -50,7 +50,6 @@ Shader "Hidden/PcgPolygonWireOverlay"
             float4 _Color;
             float _LineWidth;
             float4 _Viewport;
-
             v2f vert(appdata v)
             {
                 v2f o;

@@ -23,6 +23,7 @@ namespace DJTechEditor.PCG.Rendering
 
         private const string LineShaderName = "Hidden/PcgPolygonWireOverlay";
         private const string PointShaderName = "Hidden/PcgPolygonPointOverlay";
+        private const string DepthShaderName = "Hidden/PcgPolygonDepthOnly";
 
         private static readonly Dictionary<CacheKey, CacheEntry> s_Cache = new();
         private static readonly HashSet<int> s_WarnedFallbacks = new();
@@ -41,8 +42,10 @@ namespace DJTechEditor.PCG.Rendering
 
         private static Material s_LineMaterial;
         private static Material s_PointMaterial;
+        private static Material s_DepthMaterial;
         private static bool s_LineShaderWarningIssued;
         private static bool s_PointShaderWarningIssued;
+        private static bool s_DepthShaderWarningIssued;
         private static double s_LastPruneTime;
         private static int s_RebuildCount;
         private static int s_UploadCount;
@@ -158,6 +161,7 @@ namespace DJTechEditor.PCG.Rendering
             s_WarnedFallbacks.Clear();
             s_LineShaderWarningIssued = false;
             s_PointShaderWarningIssued = false;
+            s_DepthShaderWarningIssued = false;
             s_RebuildCount = 0;
             s_UploadCount = 0;
             s_DrawCount = 0;
@@ -195,6 +199,7 @@ namespace DJTechEditor.PCG.Rendering
 
             DestroyMaterial(ref s_LineMaterial);
             DestroyMaterial(ref s_PointMaterial);
+            DestroyMaterial(ref s_DepthMaterial);
         }
 
         internal static bool DrawPolygon(
@@ -209,7 +214,11 @@ namespace DJTechEditor.PCG.Rendering
                 return false;
 
             var entry = GetPolygonEntry(owner, preview);
-            var handled = true;
+            // SceneView may enter its GUI overlay phase without preserving usable
+            // opaque depth. The generated Mesh and PolygonPreview are applied from
+            // the same cook result, so this source-owned prepass supplies matching
+            // surface depth without rebuilding or uploading preview geometry.
+            var handled = DrawSurfaceDepth(owner, anchor.localToWorldMatrix, camera);
             if (drawEdges)
             {
                 handled &= DrawEdges(
@@ -333,9 +342,33 @@ namespace DJTechEditor.PCG.Rendering
                 : CompareFunction.LessEqual;
         }
 
-        private static CompareFunction ResolveDepthCompare(bool alwaysOnTop)
+        internal static CompareFunction ResolveDepthCompare(
+            bool alwaysOnTop,
+            Matrix4x4 projection,
+            float nearDistance,
+            float farDistance)
         {
-            return ResolveDepthCompare(alwaysOnTop, SystemInfo.usesReversedZBuffer);
+            if (alwaysOnTop)
+                return CompareFunction.Always;
+
+            var nearClip = projection * new Vector4(0f, 0f, -nearDistance, 1f);
+            var farClip = projection * new Vector4(0f, 0f, -farDistance, 1f);
+            var nearDepth = nearClip.z / nearClip.w;
+            var farDepth = farClip.z / farClip.w;
+            return nearDepth >= farDepth
+                ? CompareFunction.GreaterEqual
+                : CompareFunction.LessEqual;
+        }
+
+        private static CompareFunction ResolveDepthCompare(bool alwaysOnTop, Camera camera)
+        {
+            var nearDistance = Mathf.Max(camera.nearClipPlane, 0.0001f);
+            var farDistance = Mathf.Max(nearDistance * 2f, camera.farClipPlane);
+            return ResolveDepthCompare(
+                alwaysOnTop,
+                camera.projectionMatrix,
+                nearDistance,
+                farDistance);
         }
 
         private static CacheEntry GetPolygonEntry(
@@ -565,7 +598,7 @@ namespace DJTechEditor.PCG.Rendering
             {
                 if (!EnsureLineMaterial())
                 {
-                    return DrawEdgeFallback(entry, localToWorld, style);
+                    return DrawEdgeFallback(entry, localToWorld, camera, style);
                 }
 
                 var ppp = Mathf.Max(0.01f, EditorGUIUtility.pixelsPerPoint);
@@ -576,11 +609,11 @@ namespace DJTechEditor.PCG.Rendering
                     new Vector4(Mathf.Max(1, camera.pixelWidth), Mathf.Max(1, camera.pixelHeight), 0f, 0f));
                 s_LineMaterial.SetInt(
                     s_ZTestId,
-                    (int)ResolveDepthCompare(style.AlwaysOnTop));
+                    (int)ResolveDepthCompare(style.AlwaysOnTop, camera));
                 s_LineMaterial.SetInt(s_ZWriteId, style.AlwaysOnTop ? 0 : 1);
                 if (!s_LineMaterial.SetPass(0))
                 {
-                    return DrawEdgeFallback(entry, localToWorld, style);
+                    return DrawEdgeFallback(entry, localToWorld, camera, style);
                 }
 
                 Graphics.DrawMeshNow(entry.EdgeMesh, localToWorld);
@@ -602,7 +635,7 @@ namespace DJTechEditor.PCG.Rendering
             {
                 if (!EnsurePointMaterial())
                 {
-                    return DrawPointFallback(entry, localToWorld, style);
+                    return DrawPointFallback(entry, localToWorld, camera, style);
                 }
 
                 var ppp = Mathf.Max(0.01f, EditorGUIUtility.pixelsPerPoint);
@@ -616,10 +649,10 @@ namespace DJTechEditor.PCG.Rendering
                     new Vector4(Mathf.Max(1, camera.pixelWidth), Mathf.Max(1, camera.pixelHeight), 0f, 0f));
                 s_PointMaterial.SetInt(
                     s_ZTestId,
-                    (int)ResolveDepthCompare(style.AlwaysOnTop));
+                    (int)ResolveDepthCompare(style.AlwaysOnTop, camera));
                 if (!s_PointMaterial.SetPass(0))
                 {
-                    return DrawPointFallback(entry, localToWorld, style);
+                    return DrawPointFallback(entry, localToWorld, camera, style);
                 }
 
                 Graphics.DrawMeshNow(entry.PointMesh, localToWorld);
@@ -631,6 +664,7 @@ namespace DJTechEditor.PCG.Rendering
         private static bool DrawEdgeFallback(
             CacheEntry entry,
             Matrix4x4 localToWorld,
+            Camera camera,
             DrawStyle style)
         {
             s_FallbackCount++;
@@ -652,7 +686,7 @@ namespace DJTechEditor.PCG.Rendering
             try
             {
                 Handles.color = style.Color;
-                Handles.zTest = ResolveDepthCompare(style.AlwaysOnTop);
+                Handles.zTest = ResolveDepthCompare(style.AlwaysOnTop, camera);
                 Handles.DrawLines(world);
             }
             finally
@@ -667,6 +701,7 @@ namespace DJTechEditor.PCG.Rendering
         private static bool DrawPointFallback(
             CacheEntry entry,
             Matrix4x4 localToWorld,
+            Camera camera,
             DrawStyle style)
         {
             s_FallbackCount++;
@@ -685,7 +720,7 @@ namespace DJTechEditor.PCG.Rendering
             var previousZTest = Handles.zTest;
             try
             {
-                Handles.zTest = ResolveDepthCompare(style.AlwaysOnTop);
+                Handles.zTest = ResolveDepthCompare(style.AlwaysOnTop, camera);
                 for (var i = 0; i < centers.Length; i++)
                 {
                     var world = localToWorld.MultiplyPoint(centers[i]);
@@ -751,6 +786,53 @@ namespace DJTechEditor.PCG.Rendering
             s_PointMaterial = new Material(shader)
             {
                 name = "PcgScenePreviewPointMaterial",
+                hideFlags = HideFlags.HideAndDontSave,
+            };
+            return true;
+        }
+
+        private static bool DrawSurfaceDepth(
+            PcgGraphComponent owner,
+            Matrix4x4 localToWorld,
+            Camera camera)
+        {
+            var surfaceMesh = owner.GetComponent<MeshFilter>()?.sharedMesh;
+            if (surfaceMesh == null || surfaceMesh.vertexCount == 0)
+                return true;
+
+            if (!EnsureDepthMaterial())
+                return false;
+
+            s_DepthMaterial.SetInt(
+                s_ZTestId,
+                (int)ResolveDepthCompare(alwaysOnTop: false, camera));
+            if (!s_DepthMaterial.SetPass(0))
+                return false;
+
+            Graphics.DrawMeshNow(surfaceMesh, localToWorld);
+            s_DrawCount++;
+            return true;
+        }
+
+        private static bool EnsureDepthMaterial()
+        {
+            if (s_DepthMaterial != null)
+                return true;
+
+            var shader = Shader.Find(DepthShaderName);
+            if (shader == null)
+            {
+                if (!s_DepthShaderWarningIssued)
+                {
+                    Debug.LogWarning($"[PCG] Scene preview depth shader unavailable: {DepthShaderName}");
+                    s_DepthShaderWarningIssued = true;
+                }
+                return false;
+            }
+
+            s_DepthMaterial = new Material(shader)
+            {
+                name = "PcgScenePreviewDepthMaterial",
                 hideFlags = HideFlags.HideAndDontSave,
             };
             return true;

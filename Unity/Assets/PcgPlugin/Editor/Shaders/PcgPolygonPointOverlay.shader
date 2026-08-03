@@ -48,7 +48,6 @@ Shader "Hidden/PcgPolygonPointOverlay"
             float _PointSize;
             float _UseWorldSize;
             float4 _Viewport;
-
             v2f vert(appdata v)
             {
                 v2f o;

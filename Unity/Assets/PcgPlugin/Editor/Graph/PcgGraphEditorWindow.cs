@@ -162,6 +162,49 @@ namespace DJTechEditor.PCG.Graph
             OnPreviewNodeChanged();
         }
 
+        /// <summary>
+        /// PCG Mode needs an explicit preview target to request polygon geometry for
+        /// Scene View points and edges. When the user has not chosen a node, preview
+        /// the root Output through the same path as the node Preview button.
+        /// </summary>
+        public bool EnsureDefaultOutputPreview()
+        {
+            if (!string.IsNullOrEmpty(m_PreviewNodeId))
+                return false;
+
+            var outputNode = ResolveDefaultOutputNode(ExportLiveDocument());
+            if (outputNode == null)
+                return false;
+
+            var displayTitle = outputNode.data?.GetRaw("__nodeTitle")?.ToString();
+            if (string.IsNullOrEmpty(displayTitle))
+                displayTitle = outputNode.data?.GetRaw("label")?.ToString();
+            if (string.IsNullOrEmpty(displayTitle))
+                displayTitle = "Output";
+
+            SetPreviewNode(outputNode.id, $"{displayTitle} ({outputNode.type})");
+            return true;
+        }
+
+        internal static PcgGraphNodeRecord ResolveDefaultOutputNode(PcgGraphDocument document)
+        {
+            if (document?.nodes == null)
+                return null;
+
+            var outputs = document.nodes
+                .Where(node => node != null && node.type == "Output")
+                .ToList();
+            if (outputs.Count == 0)
+                return null;
+
+            // Canonical graphs contain one Output. For a temporarily malformed live
+            // graph, prefer the connected Output so entering PCG Mode still previews
+            // useful geometry while integrity repair catches up.
+            return outputs.FirstOrDefault(output =>
+                       document.edges?.Any(edge => edge != null && edge.target == output.id) == true)
+                   ?? outputs[0];
+        }
+
         public void ClearNodePreview(bool silent = false)
         {
             if (string.IsNullOrEmpty(m_PreviewNodeId))

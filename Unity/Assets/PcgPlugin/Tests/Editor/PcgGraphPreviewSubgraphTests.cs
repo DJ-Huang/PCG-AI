@@ -9,6 +9,41 @@ namespace DJTechEditor.PCG.Tests
     public sealed class PcgGraphPreviewSubgraphTests
     {
         [Test]
+        public void ResolveDefaultOutputNode_PrefersConnectedRootOutput()
+        {
+            var disconnected = new PcgGraphNodeRecord { id = "out_empty", type = "Output" };
+            var connected = new PcgGraphNodeRecord { id = "out_final", type = "Output" };
+            var document = new PcgGraphDocument
+            {
+                nodes =
+                {
+                    disconnected,
+                    new PcgGraphNodeRecord { id = "mesh", type = "CreateBoxMesh" },
+                    connected,
+                },
+                edges =
+                {
+                    new PcgGraphEdgeRecord { id = "e1", source = "mesh", target = "out_final" },
+                },
+            };
+
+            Assert.That(
+                PcgGraphEditorWindow.ResolveDefaultOutputNode(document),
+                Is.SameAs(connected));
+        }
+
+        [Test]
+        public void ResolveDefaultOutputNode_WithoutOutput_ReturnsNull()
+        {
+            var document = new PcgGraphDocument
+            {
+                nodes = { new PcgGraphNodeRecord { id = "mesh", type = "CreateBoxMesh" } },
+            };
+
+            Assert.That(PcgGraphEditorWindow.ResolveDefaultOutputNode(document), Is.Null);
+        }
+
+        [Test]
         public void PreviewCook_SubgraphOutputInsideForEach_KeepsPreviewSinkForOpenForEach()
         {
             var liveDoc = new PcgGraphDocument
