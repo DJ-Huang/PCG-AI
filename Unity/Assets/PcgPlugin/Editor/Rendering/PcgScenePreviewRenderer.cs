@@ -39,6 +39,7 @@ namespace DJTechEditor.PCG.Rendering
         private static readonly int s_ViewportId = Shader.PropertyToID("_Viewport");
         private static readonly int s_DepthBiasId = Shader.PropertyToID("_DepthBias");
         private static readonly int s_ZTestId = Shader.PropertyToID("_ZTest");
+        private static readonly int s_ZWriteId = Shader.PropertyToID("_ZWrite");
 
         private static Material s_LineMaterial;
         private static Material s_PointMaterial;
@@ -562,6 +563,7 @@ namespace DJTechEditor.PCG.Rendering
                 s_LineMaterial.SetInt(s_ZTestId, (int)(style.AlwaysOnTop
                     ? CompareFunction.Always
                     : CompareFunction.LessEqual));
+                s_LineMaterial.SetInt(s_ZWriteId, style.AlwaysOnTop ? 0 : 1);
                 if (!s_LineMaterial.SetPass(0))
                 {
                     return DrawEdgeFallback(entry, localToWorld, style);

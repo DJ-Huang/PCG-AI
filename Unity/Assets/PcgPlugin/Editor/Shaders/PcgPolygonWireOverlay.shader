@@ -7,6 +7,7 @@ Shader "Hidden/PcgPolygonWireOverlay"
         _Viewport ("Viewport", Vector) = (1, 1, 0, 0)
         _DepthBias ("Depth Bias", Float) = 0.0005
         [Enum(UnityEngine.Rendering.CompareFunction)] _ZTest ("ZTest", Float) = 4
+        [Enum(Off, 0, On, 1)] _ZWrite ("ZWrite", Float) = 0
     }
 
     SubShader
@@ -15,7 +16,10 @@ Shader "Hidden/PcgPolygonWireOverlay"
 
         Pass
         {
-            ZWrite Off
+            // Depth-aware polygon edges write their expanded line depth so a
+            // nearer edge can occlude a farther edge at crossings. The
+            // renderer disables this for AlwaysOnTop group highlights.
+            ZWrite [_ZWrite]
             ZTest [_ZTest]
             Blend SrcAlpha OneMinusSrcAlpha
             Cull Off
@@ -51,8 +55,16 @@ Shader "Hidden/PcgPolygonWireOverlay"
                 v2f o;
                 float4 startClip = UnityObjectToClipPos(float4(v.startLocal, 1.0));
                 float4 endClip = UnityObjectToClipPos(float4(v.endLocal, 1.0));
+#if defined(UNITY_REVERSED_Z)
+                // Reversed-Z clip space puts the near plane at +W. Keep the
+                // signed distance positive for visible endpoints so the same
+                // interpolation path works on both Z conventions.
+                float startDistance = UNITY_NEAR_CLIP_VALUE * startClip.w - startClip.z;
+                float endDistance = UNITY_NEAR_CLIP_VALUE * endClip.w - endClip.z;
+#else
                 float startDistance = startClip.z - UNITY_NEAR_CLIP_VALUE * startClip.w;
                 float endDistance = endClip.z - UNITY_NEAR_CLIP_VALUE * endClip.w;
+#endif
                 bool startVisible = startDistance >= 0.0;
                 bool endVisible = endDistance >= 0.0;
 
