@@ -40,7 +40,14 @@ namespace DJTechRuntime.PCG
 
         private static HttpClient CreateClient()
         {
-            var client = new HttpClient();
+            // Force Meshy through Clash mixed-port. System DIRECT cannot reach
+            // api.meshy.ai from this network; browser works only via proxy.
+            var handler = new HttpClientHandler
+            {
+                UseProxy = true,
+                Proxy = new System.Net.WebProxy("http://127.0.0.1:7897"),
+            };
+            var client = new HttpClient(handler);
             client.Timeout = TimeSpan.FromMinutes(15);
             return client;
         }

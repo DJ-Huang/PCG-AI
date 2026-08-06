@@ -285,6 +285,8 @@ namespace DJTechEditor.PCG.Graph
                     ShowManifestProperties(manifestNode);
                     if (manifestNode.NodeType == "ExportFBX")
                         m_Body.Add(CreateFbxExportActions(manifestNode));
+                    if (manifestNode.NodeType == PcgMeshyResolver.NodeType)
+                        m_Body.Add(CreateMeshyGenerateSection(manifestNode));
                 }
 
                 if (node is PcgExternalSubgraphNodeView externalSubgraph)
@@ -2859,6 +2861,168 @@ namespace DJTechEditor.PCG.Graph
                     whiteSpace = WhiteSpace.Normal,
                 },
             });
+            return container;
+        }
+
+        
+        private VisualElement CreateMeshyGenerateSection(PcgManifestNodeView node)
+        {
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 8,
+                    paddingTop = 8,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.3f, 0.3f, 0.3f),
+                },
+            };
+
+            var statusLabel = new Label
+            {
+                style =
+                {
+                    fontSize = 9,
+                    whiteSpace = WhiteSpace.Normal,
+                    marginBottom = 4,
+                    display = DisplayStyle.None,
+                },
+            };
+            container.Add(statusLabel);
+
+            var progressBar = new ProgressBar
+            {
+                lowValue = 0f,
+                highValue = 1f,
+                style = { marginBottom = 4, display = DisplayStyle.None },
+            };
+            container.Add(progressBar);
+
+            var button = new Button
+            {
+                style =
+                {
+                    height = 28,
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                },
+            };
+            container.Add(button);
+
+            container.Add(new Label("Calls the Meshy API and caches the GLB into Library/PCG/MeshyCache. Consumes API credits.")
+            {
+                style =
+                {
+                    color = new Color(0.55f, 0.7f, 0.55f),
+                    fontSize = 9,
+                    marginTop = 4,
+                    whiteSpace = WhiteSpace.Normal,
+                },
+            });
+
+            void RefreshIdleUi()
+            {
+                var state = PcgMeshyGenerateController.GetState(node.NodeId);
+                var hasCache = PcgMeshyResolver.TryGetCachedModelPath(
+                    node.NodeId, node.CollectData(), out var cachePath);
+
+                button.text = hasCache ? "Regenerate" : "Generate";
+                button.tooltip = hasCache
+                    ? "Call the Meshy API again and overwrite the cached GLB."
+                    : "Create a Meshy Image-to-3D task and download the GLB.";
+                progressBar.style.display = DisplayStyle.None;
+
+                if (!string.IsNullOrEmpty(state.Error))
+                {
+                    statusLabel.text = state.Error;
+                    statusLabel.style.color = new Color(0.9f, 0.45f, 0.4f);
+                    statusLabel.style.display = DisplayStyle.Flex;
+                }
+                else if (state.Succeeded && !string.IsNullOrEmpty(state.ModelPath))
+                {
+                    statusLabel.text = $"Cached → {state.ModelPath}";
+                    statusLabel.style.color = new Color(0.55f, 0.7f, 0.55f);
+                    statusLabel.style.display = DisplayStyle.Flex;
+                }
+                else if (hasCache)
+                {
+                    statusLabel.text = $"Cached → {cachePath}";
+                    statusLabel.style.color = new Color(0.6f, 0.6f, 0.6f);
+                    statusLabel.style.display = DisplayStyle.Flex;
+                }
+                else
+                {
+                    statusLabel.style.display = DisplayStyle.None;
+                }
+            }
+
+            var wasRunning = false;
+            button.clicked += () =>
+            {
+                if (PcgMeshyGenerateController.IsRunning(node.NodeId))
+                {
+                    PcgMeshyGenerateController.Cancel(node.NodeId);
+                    return;
+                }
+
+                PcgMeshyGenerateController.Begin(node.NodeId, node.CollectData(), path =>
+                {
+                    m_GraphView.WithUndo("Meshy 3D Generate", () =>
+                    {
+                        node.SetPropertyValue("path", path);
+                        node.SetPropertyValue("projectRoot", "");
+                    });
+                    NotifyGraphChanged();
+                    if (m_CurrentNode == node)
+                        ShowNode(node);
+                });
+
+                if (PcgMeshyGenerateController.IsRunning(node.NodeId))
+                {
+                    wasRunning = true;
+                    button.text = "Cancel";
+                    progressBar.style.display = DisplayStyle.Flex;
+                    statusLabel.style.display = DisplayStyle.None;
+                }
+                else
+                {
+                    RefreshIdleUi();
+                }
+            };
+
+            container.schedule.Execute(() =>
+            {
+                var state = PcgMeshyGenerateController.GetState(node.NodeId);
+                if (state.Running)
+                {
+                    wasRunning = true;
+                    button.text = "Cancel";
+                    progressBar.style.display = DisplayStyle.Flex;
+                    progressBar.value = Mathf.Clamp01(state.Progress);
+                    progressBar.title = state.Message ?? "";
+                    return;
+                }
+
+                if (wasRunning)
+                {
+                    wasRunning = false;
+                    if (m_CurrentNode == node)
+                        ShowNode(node);
+                    else
+                        RefreshIdleUi();
+                }
+            }).Every(100);
+
+            RefreshIdleUi();
+            var initial = PcgMeshyGenerateController.GetState(node.NodeId);
+            if (initial.Running)
+            {
+                wasRunning = true;
+                button.text = "Cancel";
+                progressBar.style.display = DisplayStyle.Flex;
+                progressBar.value = Mathf.Clamp01(initial.Progress);
+                progressBar.title = initial.Message ?? "";
+                statusLabel.style.display = DisplayStyle.None;
+            }
             return container;
         }
 

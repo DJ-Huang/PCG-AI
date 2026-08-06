@@ -82,36 +82,16 @@ namespace DJTechRuntime.PCG
         private static bool TryEnsureCachedModel(
             PcgGraphNodeRecord node, out string absolutePath, out string error)
         {
-            absolutePath = null;
             error = null;
 
             var force = ReadBool(node.data, "forceRegenerate", false);
-            var cacheKey = BuildCacheKey(node);
-            absolutePath = GetCachePath(cacheKey);
+            absolutePath = GetCachePath(BuildCacheKey(node.id, node.data));
 
             if (!force && File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0)
                 return true;
 
-            if (!PcgMeshySettings.HasApiKey)
-            {
-                error =
-                    $"Meshy3DGenerator '{node.id}': API key missing. " +
-                    "Open PCG → Settings (or Project Settings → PCG AI) and enter your Meshy API key.";
+            if (!TryBuildGenerateRequest(node.id, node.data, out var request, out _, out error))
                 return false;
-            }
-
-            if (!TryBuildImageDataUri(node, out var dataUri, out error))
-                return false;
-
-            var request = new PcgMeshyClient.GenerateRequest
-            {
-                ImageDataUri = dataUri,
-                AiModel = node.data.GetRaw("aiModel")?.ToString() ?? "latest",
-                EnablePbr = ReadBool(node.data, "enablePbr", false),
-                ShouldTexture = ReadBool(node.data, "shouldTexture", true),
-                ShouldRemesh = ReadBool(node.data, "shouldRemesh", true),
-                TargetPolycount = ReadInt(node.data, "targetPolycount", 30000),
-            };
 
             try
             {
@@ -140,27 +120,76 @@ namespace DJTechRuntime.PCG
             }
         }
 
+        /// <summary>
+        /// Main-thread prep for an explicit Meshy generation (inspector Generate button):
+        /// resolves the cache path, validates the API key and builds the request.
+        /// Does NOT consult the local cache — callers decide whether an existing
+        /// file is acceptable; an explicit Generate always calls the API again.
+        /// </summary>
+        public static bool TryBuildGenerateRequest(
+            string nodeId,
+            PcgNodeData data,
+            out PcgMeshyClient.GenerateRequest request,
+            out string absolutePath,
+            out string error)
+        {
+            request = default;
+            error = null;
+            data ??= new PcgNodeData();
+            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
+
+            if (!PcgMeshySettings.HasApiKey)
+            {
+                error =
+                    $"Meshy3DGenerator '{nodeId}': API key missing. " +
+                    "Open PCG → Settings (or Project Settings → PCG AI) and enter your Meshy API key.";
+                return false;
+            }
+
+            if (!TryBuildImageDataUri(nodeId, data, out var dataUri, out error))
+                return false;
+
+            request = new PcgMeshyClient.GenerateRequest
+            {
+                ImageDataUri = dataUri,
+                AiModel = data.GetRaw("aiModel")?.ToString() ?? "latest",
+                EnablePbr = ReadBool(data, "enablePbr", false),
+                ShouldTexture = ReadBool(data, "shouldTexture", true),
+                ShouldRemesh = ReadBool(data, "shouldRemesh", true),
+                TargetPolycount = ReadInt(data, "targetPolycount", 30000),
+            };
+            return true;
+        }
+
+        /// <summary>Resolves the deterministic cache path and reports whether a valid file exists.</summary>
+        public static bool TryGetCachedModelPath(string nodeId, PcgNodeData data, out string absolutePath)
+        {
+            data ??= new PcgNodeData();
+            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
+            return File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0;
+        }
+
         private static bool TryBuildImageDataUri(
-            PcgGraphNodeRecord node, out string dataUri, out string error)
+            string nodeId, PcgNodeData data, out string dataUri, out string error)
         {
             dataUri = null;
             error = null;
 
-            var imageUrl = node.data.GetRaw("imageUrl")?.ToString();
+            var imageUrl = data?.GetRaw("imageUrl")?.ToString()?.Trim();
             if (!string.IsNullOrWhiteSpace(imageUrl) &&
                 (imageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                  imageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
                  imageUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase)))
             {
-                dataUri = imageUrl.Trim();
+                dataUri = imageUrl;
                 return true;
             }
 
-            var stored = node.data.GetRaw("texture")?.ToString();
+            var stored = data?.GetRaw("texture")?.ToString();
             if (string.IsNullOrWhiteSpace(stored))
             {
                 error =
-                    $"Meshy3DGenerator '{node.id}': assign a Source Image (texture) " +
+                    $"Meshy3DGenerator '{nodeId}': assign a Source Image (texture) " +
                     "or set imageUrl to a public / data URI.";
                 return false;
             }
@@ -168,7 +197,7 @@ namespace DJTechRuntime.PCG
             var source = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
             if (source == null)
             {
-                error = $"Meshy3DGenerator '{node.id}': failed to load texture '{stored}'.";
+                error = $"Meshy3DGenerator '{nodeId}': failed to load texture '{stored}'.";
                 return false;
             }
 
@@ -178,7 +207,7 @@ namespace DJTechRuntime.PCG
                 var png = readable.EncodeToPNG();
                 if (png == null || png.Length == 0)
                 {
-                    error = $"Meshy3DGenerator '{node.id}': EncodeToPNG failed.";
+                    error = $"Meshy3DGenerator '{nodeId}': EncodeToPNG failed.";
                     return false;
                 }
 
@@ -234,20 +263,20 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private static string BuildCacheKey(PcgGraphNodeRecord node)
+        private static string BuildCacheKey(string nodeId, PcgNodeData data)
         {
             var sb = new StringBuilder(256);
-            sb.Append(node.id).Append('|');
-            sb.Append(node.data.GetRaw("texture")?.ToString() ?? "").Append('|');
-            sb.Append(node.data.GetRaw("imageUrl")?.ToString() ?? "").Append('|');
-            sb.Append(node.data.GetRaw("aiModel")?.ToString() ?? "latest").Append('|');
-            sb.Append(ReadBool(node.data, "enablePbr", false)).Append('|');
-            sb.Append(ReadBool(node.data, "shouldTexture", true)).Append('|');
-            sb.Append(ReadBool(node.data, "shouldRemesh", true)).Append('|');
-            sb.Append(ReadInt(node.data, "targetPolycount", 30000));
+            sb.Append(nodeId).Append('|');
+            sb.Append(data?.GetRaw("texture")?.ToString() ?? "").Append('|');
+            sb.Append(data?.GetRaw("imageUrl")?.ToString() ?? "").Append('|');
+            sb.Append(data?.GetRaw("aiModel")?.ToString() ?? "latest").Append('|');
+            sb.Append(ReadBool(data, "enablePbr", false)).Append('|');
+            sb.Append(ReadBool(data, "shouldTexture", true)).Append('|');
+            sb.Append(ReadBool(data, "shouldRemesh", true)).Append('|');
+            sb.Append(ReadInt(data, "targetPolycount", 30000));
 
             // Include source image bytes so texture edits invalidate the cache.
-            var stored = node.data.GetRaw("texture")?.ToString();
+            var stored = data?.GetRaw("texture")?.ToString();
             if (!string.IsNullOrWhiteSpace(stored))
             {
                 var tex = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
