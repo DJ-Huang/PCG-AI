@@ -14,6 +14,7 @@ namespace DJTechEditor.PCG
         private string _graphPath = "";
         private string _watchedPath = "";
         private bool _autoReload = true;
+        private string _meshyApiKey = "";
         private PcgScatterDisplayMode _defaultScatterDisplayMode = PcgScatterDisplayMode.MergedMesh;
 
         [MenuItem("PCG/Settings")]
@@ -28,6 +29,7 @@ namespace DJTechEditor.PCG
             _watchedPath = PcgGraphWatcher.WatchedPath;
             _autoReload = PcgGraphWatcher.AutoReload;
             _graphPath = _watchedPath;
+            _meshyApiKey = PcgMeshySettings.ApiKey;
             _defaultScatterDisplayMode = PcgProjectSettings.DefaultScatterDisplayMode;
         }
 
@@ -111,6 +113,28 @@ namespace DJTechEditor.PCG
                     component.SetScatterDisplayMode(_defaultScatterDisplayMode);
                 }
             }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Meshy (Image to 3D)", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            _meshyApiKey = EditorGUILayout.PasswordField(
+                new GUIContent(
+                    "Meshy API Key",
+                    "Cached locally via EditorPrefs. Required by Meshy 3D Generator nodes."),
+                _meshyApiKey);
+            if (EditorGUI.EndChangeCheck())
+                PcgMeshySettings.ApiKey = _meshyApiKey;
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Clear API Key", GUILayout.Width(120)))
+            {
+                PcgMeshySettings.ClearApiKey();
+                _meshyApiKey = "";
+            }
+            EditorGUILayout.LabelField(
+                PcgMeshySettings.HasApiKey ? "Key cached on this machine" : "No key set",
+                EditorStyles.miniLabel);
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();

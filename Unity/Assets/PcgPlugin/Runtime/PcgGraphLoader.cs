@@ -45,6 +45,12 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgPreviewSplineBinding> previewSplineBindings)
         {
             var assetSw = System.Diagnostics.Stopwatch.StartNew();
+            if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
+            {
+                Debug.LogError($"[PCG] {meshyError}");
+                return null;
+            }
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {
@@ -102,6 +108,12 @@ namespace DJTechRuntime.PCG
             if (!PcgGraphExecutionPolicy.TryPrepareJson(json, out json, out var prepareError))
             {
                 Debug.LogError($"[PCG] Failed to prepare graph for execution: {prepareError}");
+                return null;
+            }
+
+            if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
+            {
+                Debug.LogError($"[PCG] {meshyError}");
                 return null;
             }
 

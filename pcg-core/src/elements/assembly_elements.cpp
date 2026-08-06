@@ -8,11 +8,66 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
+#include <string>
 
 namespace pcg::internal::elements {
 namespace {
 
 // Use shared optional_geometry_input from element_utils.hpp (Geometry/Mesh/Spline/Point).
+
+PcgResultCode execute_import_like(PcgContext& ctx, const char* label)
+{
+    if (!ctx.node)
+        return fail_ctx(ctx, PCG_ERR_EXECUTION, (std::string(label) + " missing node").c_str());
+
+    ImportMeshOptions options;
+    options.scale = ctx.node->data.value("scale", 1.0);
+    options.axis_conversion = ctx.node->data.value("axisConversion", "none");
+    if (!std::isfinite(options.scale) || options.scale <= 1.0e-9)
+        return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                        (std::string(label) + " scale must be finite and greater than zero").c_str());
+    if (options.axis_conversion != "none" && options.axis_conversion != "zUpToYUp" &&
+        options.axis_conversion != "yUpToZUp")
+        return fail_ctx(ctx, PCG_ERR_EXECUTION,
+                        (std::string(label) + " axisConversion is invalid").c_str());
+
+    data::PcgGeometry geometry;
+    if (ctx.meshes) {
+        if (const auto* runtime_mesh = ctx.meshes->find(ctx.node->id)) {
+            geometry = data::geometry_from_mesh(*runtime_mesh);
+            data::GeometryAffineTransform transform;
+            const double scale = options.scale;
+            if (options.axis_conversion == "zUpToYUp") {
+                transform.linear = {scale, 0.0, 0.0,
+                                    0.0, 0.0, scale,
+                                    0.0, -scale, 0.0};
+            } else if (options.axis_conversion == "yUpToZUp") {
+                transform.linear = {scale, 0.0, 0.0,
+                                    0.0, 0.0, -scale,
+                                    0.0, scale, 0.0};
+            } else {
+                transform.linear = {scale, 0.0, 0.0,
+                                    0.0, scale, 0.0,
+                                    0.0, 0.0, scale};
+            }
+            for (auto& point : geometry.points_mut())
+                point = data::transform_position(transform, point);
+            data::transform_geometry_attributes(geometry, transform);
+            emit_geometry(ctx, std::move(geometry));
+            return PCG_OK;
+        }
+    }
+
+    std::string error;
+    if (!import_geometry_file(resolve_asset_path(ctx.node->data), options, geometry, error)) {
+        if (error.rfind("ImportMesh", 0) == 0)
+            error.replace(0, std::strlen("ImportMesh"), label);
+        return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+    }
+    emit_geometry(ctx, std::move(geometry));
+    return PCG_OK;
+}
 
 class ImportMeshElement final : public IPcgElement {
 public:
@@ -20,52 +75,18 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        if (!ctx.node)
-            return fail_ctx(ctx, PCG_ERR_EXECUTION, "ImportMesh missing node");
+        return execute_import_like(ctx, "ImportMesh");
+    }
+};
 
-        ImportMeshOptions options;
-        options.scale = ctx.node->data.value("scale", 1.0);
-        options.axis_conversion = ctx.node->data.value("axisConversion", "none");
-        if (!std::isfinite(options.scale) || options.scale <= 1.0e-9)
-            return fail_ctx(ctx, PCG_ERR_EXECUTION,
-                            "ImportMesh scale must be finite and greater than zero");
-        if (options.axis_conversion != "none" && options.axis_conversion != "zUpToYUp" &&
-            options.axis_conversion != "yUpToZUp")
-            return fail_ctx(ctx, PCG_ERR_EXECUTION,
-                            "ImportMesh axisConversion is invalid");
+class Meshy3DGeneratorElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "Meshy3DGenerator"; }
 
-        data::PcgGeometry geometry;
-        if (ctx.meshes) {
-            if (const auto* runtime_mesh = ctx.meshes->find(ctx.node->id)) {
-                geometry = data::geometry_from_mesh(*runtime_mesh);
-                data::GeometryAffineTransform transform;
-                const double scale = options.scale;
-                if (options.axis_conversion == "zUpToYUp") {
-                    transform.linear = {scale, 0.0, 0.0,
-                                        0.0, 0.0, scale,
-                                        0.0, -scale, 0.0};
-                } else if (options.axis_conversion == "yUpToZUp") {
-                    transform.linear = {scale, 0.0, 0.0,
-                                        0.0, 0.0, -scale,
-                                        0.0, scale, 0.0};
-                } else {
-                    transform.linear = {scale, 0.0, 0.0,
-                                        0.0, scale, 0.0,
-                                        0.0, 0.0, scale};
-                }
-                for (auto& point : geometry.points_mut())
-                    point = data::transform_position(transform, point);
-                data::transform_geometry_attributes(geometry, transform);
-                emit_geometry(ctx, std::move(geometry));
-                return PCG_OK;
-            }
-        }
-
-        std::string error;
-        if (!import_geometry_file(resolve_asset_path(ctx.node->data), options, geometry, error))
-            return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
-        emit_geometry(ctx, std::move(geometry));
-        return PCG_OK;
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        // Unity PcgMeshyResolver downloads/caches GLB and injects absolute path before cook.
+        return execute_import_like(ctx, "Meshy3DGenerator");
     }
 };
 
@@ -219,6 +240,7 @@ void register_assembly_elements(
     std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("ImportMesh", std::make_unique<ImportMeshElement>());
+    map.emplace("Meshy3DGenerator", std::make_unique<Meshy3DGeneratorElement>());
     map.emplace("MatchSize", std::make_unique<MatchSizeElement>());
     map.emplace("BendMesh", std::make_unique<BendMeshElement>());
     map.emplace("LotSubdivision", std::make_unique<LotSubdivisionElement>());

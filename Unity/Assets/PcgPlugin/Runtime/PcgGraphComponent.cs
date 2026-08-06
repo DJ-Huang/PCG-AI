@@ -674,6 +674,12 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
+            {
+                Debug.LogError($"[PCG] {meshyError}", this);
+                return false;
+            }
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {

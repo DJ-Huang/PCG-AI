@@ -328,7 +328,7 @@ uint64_t compute_node_input_hash(const GraphNode& node,
             h = hash_combine(h, hash_mesh(*mesh));
     }
 
-    if (node.type == "ImportMesh") {
+    if (node.type == "ImportMesh" || node.type == "Meshy3DGenerator") {
         if (meshes) {
             if (const data::PcgMeshData* mesh = meshes->find(node.id))
                 h = hash_combine(h, hash_mesh(*mesh));

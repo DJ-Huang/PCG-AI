@@ -7231,6 +7231,109 @@
       }
     },
     {
+      "type": "Meshy3DGenerator",
+      "displayName": "Meshy 3D Generator",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "texture": {
+          "type": "texture2d",
+          "displayName": "Source Image",
+          "default": ""
+        },
+        "imageUrl": {
+          "type": "string",
+          "displayName": "Image URL (optional)",
+          "default": "",
+          "uiHint": "Public URL or data URI. Overrides Source Image when set."
+        },
+        "aiModel": {
+          "type": "enum",
+          "displayName": "AI Model",
+          "default": "latest",
+          "options": [
+            {
+              "value": "latest",
+              "label": "latest (Meshy 6)"
+            },
+            {
+              "value": "meshy-6",
+              "label": "meshy-6"
+            },
+            {
+              "value": "meshy-5",
+              "label": "meshy-5"
+            }
+          ]
+        },
+        "shouldTexture": {
+          "type": "boolean",
+          "displayName": "Generate Texture",
+          "default": true
+        },
+        "enablePbr": {
+          "type": "boolean",
+          "displayName": "Enable PBR",
+          "default": false
+        },
+        "shouldRemesh": {
+          "type": "boolean",
+          "displayName": "Remesh",
+          "default": true
+        },
+        "targetPolycount": {
+          "type": "integer",
+          "displayName": "Target Polycount",
+          "default": 30000,
+          "minimum": 100,
+          "maximum": 300000
+        },
+        "scale": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 1e-06
+        },
+        "axisConversion": {
+          "type": "enum",
+          "displayName": "Axis Conversion",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "None"
+            },
+            {
+              "value": "zUpToYUp",
+              "label": "Z Up to Y Up"
+            },
+            {
+              "value": "yUpToZUp",
+              "label": "Y Up to Z Up"
+            }
+          ]
+        },
+        "forceRegenerate": {
+          "type": "boolean",
+          "displayName": "Force Regenerate",
+          "default": false,
+          "uiHint": "Ignore local Meshy cache and call the API again."
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Cached Model Path",
+          "default": "",
+          "uiHint": "Filled automatically on cook (Library/PCG/MeshyCache)."
+        }
+      }
+    },
+    {
       "type": "MatchSize",
       "displayName": "Match Size",
       "category": "Mesh",

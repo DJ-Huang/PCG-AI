@@ -124,6 +124,27 @@ void test_import_mesh(const std::filesystem::path& fixture)
     };
     const auto graph_result = execute_geometry_graph(graph);
     expect(near(size_of(graph_result).x, 4.0), "ImportMesh graph scale");
+
+    const auto meshy_graph = nlohmann::json{
+        {"version", "2.0"},
+        {"nodes", nlohmann::json::array({
+            {{"id", "meshy"}, {"type", "Meshy3DGenerator"},
+             {"position", {{"x", 0.0}, {"y", 0.0}}},
+             {"data", {{"path", fixture.string()}, {"scale", 1.0}}}},
+            {{"id", "output"}, {"type", "Output"},
+             {"position", {{"x", 200.0}, {"y", 0.0}}},
+             {"data", nlohmann::json::object()}},
+        })},
+        {"edges", nlohmann::json::array({
+            {{"id", "meshy-output"}, {"source", "meshy"}, {"target", "output"},
+             {"sourceHandle", "out"},
+             {"targetHandle", "in"}, {"sourcePinType", "SpatialMesh"},
+             {"targetPinType", "Any"}},
+        })},
+    };
+    const auto meshy_result = execute_geometry_graph(meshy_graph);
+    expect(meshy_result.points().size() == imported.points().size(),
+           "Meshy3DGenerator loads cached mesh path like ImportMesh");
 }
 
 void test_match_size()

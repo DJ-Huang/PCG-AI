@@ -100,6 +100,7 @@
   - [CopyMesh](#copymesh)
   - [ShellMesh](#shellmesh)
   - [ImportMesh](#importmesh)
+  - [Meshy3DGenerator](#meshy3dgenerator)
   - [MatchSize](#matchsize)
   - [BendMesh](#bendmesh)
   - [MergeMesh](#mergemesh)
@@ -2747,6 +2748,30 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
 
 文件不存在、格式不支持、没有 polygon 或 Assimp 校验失败都会返回包含路径/Assimp 原因的明确错误。Cook cache 的输入指纹包含规范化路径、文件大小和修改时间，因此替换外部资产会使节点失效重算。
+
+### Meshy3DGenerator
+
+**功能**：通过 Meshy Image-to-3D API 从参考图生成网格。Unity Editor 在 cook 前调用云端、下载 GLB 到本地缓存，再以与 `ImportMesh` 相同的路径加载为 `PcgGeometry`。
+
+**输入 Pin**：无。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `texture` | `""` | Source Image（`texture2d`） |
+| `imageUrl` | `""` | 可选公网 URL / data URI；有值时覆盖 texture |
+| `aiModel` | `latest` | `latest` / `meshy-6` / `meshy-5` |
+| `shouldTexture` | true | 是否生成贴图 |
+| `enablePbr` | false | 是否生成 PBR 贴图 |
+| `shouldRemesh` | true | 是否 remesh |
+| `targetPolycount` | 30000 | Remesh 目标面数 |
+| `scale` | 1.0 | 导入缩放 |
+| `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
+| `forceRegenerate` | false | 忽略本地缓存并重新请求 API |
+| `path` | `""` | 缓存绝对路径（cook 前由 Resolver 注入） |
+
+API Key 在 **PCG → Settings** / Project Settings → PCG AI 中配置，存本机 `EditorPrefs`（`PCG.Meshy.ApiKey`）。完整说明、缓存路径与后续 Tripo 等扩展清单见 [`third-party-image-to-3d.md`](./third-party-image-to-3d.md)。
 
 ### MatchSize
 

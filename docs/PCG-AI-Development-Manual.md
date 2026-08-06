@@ -805,6 +805,8 @@ Unity Editor 通过 localhost `pcg-server` 执行 C++（HTTP）。**不要**再�
 
 见 `docs/pcg-server.md`。Player 本期不链入 `PcgCore.lib`。
 
+第三方图生 3D（Meshy / 后续 Tripo 等）说明与扩展清单见 `docs/third-party-image-to-3d.md`。
+
 ---
 
 ## 9. 构建与测试
