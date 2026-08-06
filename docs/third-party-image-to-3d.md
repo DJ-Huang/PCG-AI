@@ -12,8 +12,10 @@ PCG-AI 把云端「图生 3D」厂商接入成 **Graph 节点**：Editor 侧负�
 |------|------|
 | 密钥不进工程 | API Key 只存本机 `EditorPrefs`，不写 `PcgProjectSettings.asset` / `.pcg` |
 | 网络不进 C++ | 长轮询、HTTPS、Credits 全在 Unity Editor；C++ 只读本地文件 |
-| 缓存可复用 | 成功结果落在 `Library/PCG/<Vendor>Cache/`，同参数再 cook 不扣费 |
-| 节点形态统一 | 无输入 pin，输出 `SpatialMesh`；cook 前注入绝对 `path`，执行侧与 `ImportMesh` 同路径 |
+| 缓存可复用 | 成功结果落在 `Library/PCG/<Vendor>Cache/`；同参数再 cook / preview 只读缓存、不扣费 |
+| 禁止自动生成 | Preview / OnParameterChange / Run **从不**调云端；只有 Inspector **Generate** 才请求 API |
+| 保存进工程 | Generate 成功后弹窗保存到 `Assets/`（勾选的 GLB/FBX 等同名写入）；节点 `path` 记主文件（优先 GLB）；下次打开 / cook 默认加载 |
+| 节点形态统一 | 无输入 pin，输出 `SpatialMesh`；cook 前注入已解析的绝对 `path`，执行侧与 `ImportMesh` 同路径 |
 
 ```text
 Source Image / URL
@@ -70,7 +72,8 @@ Source Image / URL
 3. 图中添加 **Meshy 3D Generator**。
 4. 指定 **Source Image**（项目内 `Texture2D`），或填 **Image URL**（公网 URL / `data:` URI；URL 优先）。
 5. 按需调整模型 / PBR / Remesh / Polycount / Scale / Axis。
-6. Cook。首次会弹进度条并请求 Meshy；成功后缓存 GLB，并把路径写入节点的 `path`（仅执行 JSON，不强制改盘上的 `.pcg` 作者数据）。
+6. 在节点 Inspector 底部勾选 **Save formats**（GLB / FBX，可多选），再点 **Generate**。Meshy 按勾选格式生成；下载后弹窗保存到 `Assets/`（同名多扩展名）。`path` 优先记 GLB，否则记 FBX。
+7. 之后 Preview / Cook / 重新打开图，默认加载已保存的 `path`。取消保存时：若已有旧路径则保留；否则临时用 MeshyCache。
 
 ### 节点属性
 
@@ -85,8 +88,8 @@ Source Image / URL
 | `targetPolycount` | `30000` | Remesh 目标面数（100–300000） |
 | `scale` | `1.0` | 导入缩放 |
 | `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
-| `forceRegenerate` | `false` | 忽略本地缓存，重新调用 API |
-| `path` | `""` | 缓存绝对路径；由 Resolver 在 cook 前注入 |
+| `forceRegenerate` | `false` | 遗留开关；cook/preview 忽略（从不调 API）。重新生成请点 Generate |
+| `path` | `""` | 保存后的模型路径（`Assets/….glb`）；Generate→Save 写入，cook 优先加载 |
 
 ### 缓存
 
@@ -114,7 +117,8 @@ Source Image / URL
 | `assign a Source Image` | 指定 texture 或合法 `imageUrl` |
 | 任务 FAILED / Credits | 查 [Meshy 控制台](https://www.meshy.ai/settings/api)；失败任务通常退还 Credits |
 | cook 报未知节点 | 重建并重启 `pcg-server`（`scripts/build-pcg-server.sh`） |
-| 想强制重跑 | 勾选 `forceRegenerate`，或删对应 `MeshyCache` 文件 |
+| 想强制重跑 | 点 Inspector **Regenerate**，保存覆盖（或另存） |
+| 改参数就 cook 报错 | 无已保存/`MeshyCache` 模型时不会自动生成；点 Generate 并保存后再 preview |
 
 ---
 
@@ -133,8 +137,9 @@ Source Image / URL
    - `PcgTripoClient`：create → poll → download（对齐该厂商文档）  
 
 3. **Resolver**  
-   - `PcgTripoResolver.TryPrepareForCook`  
+   - `PcgTripoResolver.TryPrepareForCook`（**仅注入本地 path，禁止在 cook/preview 调 API**；优先用户保存路径，其次 vendor cache）  
    - 缓存目录：`Library/PCG/TripoCache/`  
+   - Inspector **Generate** async action：下载后 **SaveFilePanelInProject** 保存到 `Assets/`，写入节点 `path`（对齐 `PcgMeshyGenerateAction`）  
    - 在 `PcgGraphComponent` / `PcgGraphLoader` / FBX export 路径里与 Meshy 一样、在 collect assets 之前调用  
 
 4. **Manifest**  

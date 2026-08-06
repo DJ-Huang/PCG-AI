@@ -2,43 +2,23 @@
   "version": "1.0",
   "nodes": [
     {
-      "id": "meshy_cup",
-      "type": "Meshy3DGenerator",
-      "position": { "x": 0, "y": 0 },
-      "data": {
-        "texture": "Assets/PICGGenerator/Scenes/PCGReview_ThirdPartyAPI/T_meshy_cup_reference.png",
-        "imageUrl": "",
-        "aiModel": "latest",
-        "shouldTexture": true,
-        "enablePbr": false,
-        "shouldRemesh": true,
-        "targetPolycount": 30000,
-        "scale": 1.0,
-        "axisConversion": "none",
-        "forceRegenerate": false,
-        "path": "",
-        "__nodeTitle": "Meshy Cup"
-      }
-    },
-    {
       "id": "output",
       "type": "Output",
       "position": { "x": 0, "y": 280 },
-      "data": {
-        "label": "Output",
-        "__nodeTitle": "Output"
-      }
+      "data": {"label": "Output", "__nodeTitle": "Output"}
+    },
+    {
+      "id": "meshy_cup",
+      "type": "Meshy3DGenerator",
+      "position": { "x": 0, "y": 0 },
+      "data": {"texture": "Assets/PICGGenerator/Scenes/PcgReview_m9-bayonet/T_m9-bayonet_side_albedo.png", "imageUrl": "", "aiModel": "latest", "shouldTexture": true, "enablePbr": false, "shouldRemesh": true, "targetPolycount": 3000, "scale": 1, "axisConversion": "none", "forceRegenerate": false, "path": "/Users/djhuang/PCG-AI-cursor/Unity/Library/PCG/MeshyCache/4eb2bfb3358c54daa9f153cf3bdad730cd32cff4895917f268afa97dd1ba477c.glb", "__nodeTitle": "Meshy Cup", "projectRoot": "", "saveFbx": false}
     }
   ],
   "edges": [
-    {
-      "id": "e_meshy_output",
-      "source": "meshy_cup",
-      "target": "output",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    }
+    {"id": "e_meshy_output", "source": "meshy_cup", "target": "output", "sourceHandle": "out", "targetHandle": "in"}
   ],
-  "parameters": [],
-  "subgraphs": []
+  "parameters": [
+  ],
+  "subgraphs": [
+  ]
 }

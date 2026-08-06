@@ -7323,13 +7323,13 @@
           "type": "boolean",
           "displayName": "Force Regenerate",
           "default": false,
-          "uiHint": "Ignore local Meshy cache and call the API again."
+          "uiHint": "Unused by cook/preview (they never call the API). Click Generate to recreate the GLB."
         },
         "path": {
           "type": "string",
-          "displayName": "Cached Model Path",
+          "displayName": "Saved Model Path",
           "default": "",
-          "uiHint": "Filled automatically on cook (Library/PCG/MeshyCache)."
+          "uiHint": "Set by Generate→Save (Assets/….glb). Cook/preview load this file; never auto-generate."
         }
       }
     },

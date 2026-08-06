@@ -8,8 +8,9 @@ using UnityEngine;
 namespace DJTechRuntime.PCG
 {
     /// <summary>
-    /// Before cook: for each Meshy3DGenerator node, ensure a cached GLB exists and
-    /// inject its absolute path into execution JSON (ImportMesh-compatible).
+    /// Before cook: for each Meshy3DGenerator node, resolve a local GLB (user-saved
+    /// Assets path preferred, else MeshyCache) and inject its absolute path into
+    /// execution JSON. Never calls the Meshy API — Generate (+ Save) is explicit.
     /// </summary>
     public static class PcgMeshyResolver
     {
@@ -64,9 +65,11 @@ namespace DJTechRuntime.PCG
                     continue;
 
                 node.data ??= new PcgNodeData();
-                if (!TryEnsureCachedModel(node, out var absolutePath, out error))
+                if (!TryResolveModelForCook(node.id, node.data, out var absolutePath, out error))
                     return false;
 
+                // Execution JSON always gets an absolute path (ImportMesh-compatible).
+                // Authoring may keep a project-relative Assets/… path from Generate→Save.
                 var previous = node.data.GetRaw("path")?.ToString() ?? "";
                 if (!string.Equals(previous, absolutePath, StringComparison.Ordinal))
                 {
@@ -79,45 +82,86 @@ namespace DJTechRuntime.PCG
             return true;
         }
 
-        private static bool TryEnsureCachedModel(
-            PcgGraphNodeRecord node, out string absolutePath, out string error)
+        /// <summary>
+        /// Prefer the user-saved model path, then the deterministic MeshyCache file.
+        /// Never calls the API — Generate is the only cloud entry point.
+        /// </summary>
+        public static bool TryResolveModelForCook(
+            string nodeId, PcgNodeData data, out string absolutePath, out string error)
         {
             error = null;
+            data ??= new PcgNodeData();
 
-            var force = ReadBool(node.data, "forceRegenerate", false);
-            absolutePath = GetCachePath(BuildCacheKey(node.id, node.data));
-
-            if (!force && File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0)
+            if (TryGetSavedModelPath(data, out absolutePath))
                 return true;
 
-            if (!TryBuildGenerateRequest(node.id, node.data, out var request, out _, out error))
+            absolutePath = GetCachePath(
+                BuildCacheKey(nodeId ?? "", data),
+                PcgMeshySaveFormats.Primary(PcgMeshySaveFormats.ReadSelected(data)));
+
+            if (File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0)
+                return true;
+
+            // Fall back across known formats for this cache key (e.g. FBX-only generate).
+            foreach (var format in PcgMeshySaveFormats.Supported)
+            {
+                var candidate = GetCachePath(BuildCacheKey(nodeId ?? "", data), format);
+                if (File.Exists(candidate) && new FileInfo(candidate).Length > 0)
+                {
+                    absolutePath = candidate;
+                    return true;
+                }
+            }
+
+            error =
+                $"Meshy3DGenerator '{nodeId}': no saved/cached model. " +
+                "Click Generate, save the model into the project, then cook/preview " +
+                "(preview / auto cook never generate).";
+            absolutePath = null;
+            return false;
+        }
+
+        /// <summary>
+        /// True when <c>path</c> resolves to an existing non-empty model file
+        /// (project-relative Assets/… or absolute, including a prior MeshyCache path).
+        /// </summary>
+        public static bool TryGetSavedModelPath(PcgNodeData data, out string absolutePath)
+        {
+            absolutePath = null;
+            data ??= new PcgNodeData();
+            var stored = data.GetRaw("path")?.ToString()?.Trim();
+            if (string.IsNullOrWhiteSpace(stored))
                 return false;
 
-            try
-            {
-                UnityEditor.EditorUtility.DisplayProgressBar(
-                    "Meshy 3D Generator", $"Node {node.id}", 0.05f);
-                var result = PcgMeshyClient.GenerateAndDownload(
-                    request,
-                    absolutePath,
-                    default,
-                    (msg, t) => UnityEditor.EditorUtility.DisplayProgressBar(
-                        "Meshy 3D Generator", msg, t));
-                if (!result.Ok)
-                {
-                    error = $"Meshy3DGenerator '{node.id}': {result.Error}";
-                    return false;
-                }
+            absolutePath = ResolveStoredAbsolutePath(stored, data.GetRaw("projectRoot")?.ToString());
+            return !string.IsNullOrEmpty(absolutePath) &&
+                   File.Exists(absolutePath) &&
+                   new FileInfo(absolutePath).Length > 0;
+        }
 
-                Debug.Log(
-                    $"[PCG] Meshy3DGenerator '{node.id}' cached → {absolutePath}" +
-                    (result.ConsumedCredits > 0 ? $" (credits={result.ConsumedCredits})" : ""));
-                return true;
-            }
-            finally
-            {
-                UnityEditor.EditorUtility.ClearProgressBar();
-            }
+        public static string GetUnityProjectRoot()
+        {
+            var parent = Directory.GetParent(Application.dataPath);
+            return parent != null ? Path.GetFullPath(parent.FullName) : Path.GetFullPath(Application.dataPath);
+        }
+
+        public static string ResolveProjectAbsolutePath(string projectRelativeOrAbsolute)
+        {
+            return ResolveStoredAbsolutePath(projectRelativeOrAbsolute, projectRoot: null);
+        }
+
+        private static string ResolveStoredAbsolutePath(string stored, string projectRoot)
+        {
+            if (string.IsNullOrWhiteSpace(stored))
+                return null;
+
+            stored = stored.Trim().Replace('\\', '/');
+            if (Path.IsPathRooted(stored))
+                return Path.GetFullPath(stored);
+
+            if (string.IsNullOrWhiteSpace(projectRoot))
+                projectRoot = GetUnityProjectRoot();
+            return Path.GetFullPath(Path.Combine(projectRoot, stored.Replace('/', Path.DirectorySeparatorChar)));
         }
 
         /// <summary>
@@ -136,7 +180,10 @@ namespace DJTechRuntime.PCG
             request = default;
             error = null;
             data ??= new PcgNodeData();
-            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
+            var formats = PcgMeshySaveFormats.ReadSelected(data);
+            absolutePath = GetCachePath(
+                BuildCacheKey(nodeId ?? "", data),
+                PcgMeshySaveFormats.Primary(formats));
 
             if (!PcgMeshySettings.HasApiKey)
             {
@@ -157,6 +204,7 @@ namespace DJTechRuntime.PCG
                 ShouldTexture = ReadBool(data, "shouldTexture", true),
                 ShouldRemesh = ReadBool(data, "shouldRemesh", true),
                 TargetPolycount = ReadInt(data, "targetPolycount", 30000),
+                TargetFormats = formats,
             };
             return true;
         }
@@ -165,8 +213,20 @@ namespace DJTechRuntime.PCG
         public static bool TryGetCachedModelPath(string nodeId, PcgNodeData data, out string absolutePath)
         {
             data ??= new PcgNodeData();
-            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
-            return File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0;
+            var key = BuildCacheKey(nodeId ?? "", data);
+            absolutePath = GetCachePath(key, PcgMeshySaveFormats.Primary(PcgMeshySaveFormats.ReadSelected(data)));
+            if (File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0)
+                return true;
+            foreach (var format in PcgMeshySaveFormats.Supported)
+            {
+                var candidate = GetCachePath(key, format);
+                if (File.Exists(candidate) && new FileInfo(candidate).Length > 0)
+                {
+                    absolutePath = candidate;
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static bool TryBuildImageDataUri(
@@ -310,10 +370,13 @@ namespace DJTechRuntime.PCG
             return sha.ComputeHash(bytes);
         }
 
-        private static string GetCachePath(string cacheKey)
+        private static string GetCachePath(string cacheKey, string format = PcgMeshySaveFormats.Glb)
         {
+            if (string.IsNullOrWhiteSpace(format))
+                format = PcgMeshySaveFormats.Glb;
+            format = format.Trim().TrimStart('.').ToLowerInvariant();
             var root = Path.Combine(Application.dataPath, "..", "Library", "PCG", "MeshyCache");
-            return Path.GetFullPath(Path.Combine(root, cacheKey + ".glb"));
+            return Path.GetFullPath(Path.Combine(root, cacheKey + "." + format));
         }
 
         private static bool ReadBool(PcgNodeData data, string key, bool fallback)

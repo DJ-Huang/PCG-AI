@@ -2751,7 +2751,7 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 
 ### Meshy3DGenerator
 
-**功能**：通过 Meshy Image-to-3D API 从参考图生成网格。Unity Editor 在 cook 前调用云端、下载 GLB 到本地缓存，再以与 `ImportMesh` 相同的路径加载为 `PcgGeometry`。
+**功能**：通过 Meshy Image-to-3D API 从参考图生成网格。Inspector 勾选 GLB/FBX 后 **Generate** 调云端并弹窗保存；cook / preview / 下次打开只加载保存路径，再以与 `ImportMesh` 相同的方式加载为 `PcgGeometry`。
 
 **输入 Pin**：无。
 
@@ -2768,8 +2768,8 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `targetPolycount` | 30000 | Remesh 目标面数 |
 | `scale` | 1.0 | 导入缩放 |
 | `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
-| `forceRegenerate` | false | 忽略本地缓存并重新请求 API |
-| `path` | `""` | 缓存绝对路径（cook 前由 Resolver 注入） |
+| `forceRegenerate` | false | 遗留；cook 忽略。重新生成请点 Generate |
+| `path` | `""` | 保存后的模型路径（Generate→Save 写入；cook 优先加载） |
 
 API Key 在 **PCG → Settings** / Project Settings → PCG AI 中配置，存本机 `EditorPrefs`（`PCG.Meshy.ApiKey`）。完整说明、缓存路径与后续 Tripo 等扩展清单见 [`third-party-image-to-3d.md`](./third-party-image-to-3d.md)。
 

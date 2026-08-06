@@ -1,3 +1,4 @@
+using System.IO;
 using DJTechRuntime.PCG;
 using NUnit.Framework;
 using UnityEditor;
@@ -20,6 +21,140 @@ namespace DJTechEditor.PCG.Tests
             EditorPrefs.SetString(PcgMeshySettings.PrefKeyApiKey, m_PreviousKey ?? "");
             // Refresh static cache used by ApiKey getter.
             PcgMeshySettings.ApiKey = m_PreviousKey ?? "";
+        }
+
+        [Test]
+        public void TryPrepareForCook_WithoutCache_FailsWithGenerateHint()
+        {
+            var data = new PcgNodeData();
+            data.SetRaw("imageUrl", "https://example.com/cup.png");
+            data.SetRaw("forceRegenerate", true);
+
+            var json = PcgGraphSerializer.ToJson(new PcgGraphDocument
+            {
+                nodes =
+                {
+                    new PcgGraphNodeRecord
+                    {
+                        id = "nodeA",
+                        type = PcgMeshyResolver.NodeType,
+                        data = data,
+                    },
+                },
+            });
+
+            Assert.That(PcgMeshyResolver.TryPrepareForCook(ref json, out var error), Is.False);
+            Assert.That(error, Does.Contain("Generate"));
+            Assert.That(error, Does.Contain("never generate"));
+        }
+
+        [Test]
+        public void TryPrepareForCook_WithSavedPath_UsesPathWithoutMatchingCache()
+        {
+            PcgMeshySettings.ClearApiKey();
+
+            var tempDir = Path.Combine(Path.GetTempPath(), "pcg-meshy-tests");
+            Directory.CreateDirectory(tempDir);
+            var saved = Path.Combine(tempDir, "saved-cup.glb");
+            File.WriteAllBytes(saved, new byte[] { 0x67, 0x6C, 0x54, 0x46 });
+
+            try
+            {
+                var data = new PcgNodeData();
+                data.SetRaw("imageUrl", "https://example.com/cup.png");
+                data.SetRaw("path", saved);
+
+                var json = PcgGraphSerializer.ToJson(new PcgGraphDocument
+                {
+                    nodes =
+                    {
+                        new PcgGraphNodeRecord
+                        {
+                            id = "nodeA",
+                            type = PcgMeshyResolver.NodeType,
+                            data = data,
+                        },
+                    },
+                });
+
+                Assert.That(
+                    PcgMeshyResolver.TryPrepareForCook(ref json, out var error),
+                    Is.True,
+                    error);
+                Assert.That(PcgGraphSerializer.TryFromJson(json, out var doc, out error), Is.True, error);
+                Assert.That(
+                    Path.GetFullPath(doc.nodes[0].data.GetRaw("path")?.ToString() ?? ""),
+                    Is.EqualTo(Path.GetFullPath(saved)));
+            }
+            finally
+            {
+                if (File.Exists(saved))
+                    File.Delete(saved);
+            }
+        }
+
+        [Test]
+        public void TryGetSavedModelPath_ResolvesProjectRelativeUnderAssets()
+        {
+            var projectRoot = PcgMeshyResolver.GetUnityProjectRoot();
+            var relative = "Assets/PCG_MeshyResolverTest_Temp.glb";
+            var absolute = Path.Combine(projectRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(absolute));
+            File.WriteAllBytes(absolute, new byte[] { 0x67, 0x6C, 0x54, 0x46 });
+
+            try
+            {
+                var data = new PcgNodeData();
+                data.SetRaw("path", relative);
+                Assert.That(PcgMeshyResolver.TryGetSavedModelPath(data, out var resolved), Is.True);
+                Assert.That(Path.GetFullPath(resolved), Is.EqualTo(Path.GetFullPath(absolute)));
+            }
+            finally
+            {
+                if (File.Exists(absolute))
+                    File.Delete(absolute);
+            }
+        }
+
+        [Test]
+        public void TryPrepareForCook_WithCache_InjectsPathWithoutApiKey()
+        {
+            PcgMeshySettings.ClearApiKey();
+
+            var data = new PcgNodeData();
+            data.SetRaw("imageUrl", "https://example.com/cup.png");
+            PcgMeshyResolver.TryGetCachedModelPath("nodeA", data, out var cachePath);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(cachePath));
+            File.WriteAllBytes(cachePath, new byte[] { 0x67, 0x6C, 0x54, 0x46 });
+
+            try
+            {
+                var json = PcgGraphSerializer.ToJson(new PcgGraphDocument
+                {
+                    nodes =
+                    {
+                        new PcgGraphNodeRecord
+                        {
+                            id = "nodeA",
+                            type = PcgMeshyResolver.NodeType,
+                            data = data,
+                        },
+                    },
+                });
+
+                Assert.That(
+                    PcgMeshyResolver.TryPrepareForCook(ref json, out var error),
+                    Is.True,
+                    error);
+                Assert.That(PcgGraphSerializer.TryFromJson(json, out var doc, out error), Is.True, error);
+                Assert.That(doc.nodes[0].data.GetRaw("path")?.ToString(), Is.EqualTo(cachePath));
+            }
+            finally
+            {
+                if (File.Exists(cachePath))
+                    File.Delete(cachePath);
+            }
         }
 
         [Test]
@@ -72,8 +207,35 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(request.ShouldTexture, Is.False);
             Assert.That(request.ShouldRemesh, Is.True);
             Assert.That(request.TargetPolycount, Is.EqualTo(12000));
+            Assert.That(request.TargetFormats, Is.Not.Null);
+            Assert.That(request.TargetFormats, Does.Contain("glb"));
             Assert.That(path, Does.EndWith(".glb"));
             Assert.That(path, Does.Contain("MeshyCache"));
+        }
+
+        [Test]
+        public void TryBuildGenerateRequest_RespectsSaveFormatToggles()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("imageUrl", "https://example.com/cup.png");
+            data.SetRaw("saveGlb", false);
+            data.SetRaw("saveFbx", true);
+
+            var ok = PcgMeshyResolver.TryBuildGenerateRequest(
+                "nodeA", data, out var request, out var path, out var error);
+
+            Assert.That(ok, Is.True, error);
+            Assert.That(request.TargetFormats, Is.EquivalentTo(new[] { "fbx" }));
+            Assert.That(path, Does.EndWith(".fbx"));
+        }
+
+        [Test]
+        public void ReadSelected_DefaultsToGlbOnly()
+        {
+            var selected = PcgMeshySaveFormats.ReadSelected(new PcgNodeData());
+            Assert.That(selected, Is.EquivalentTo(new[] { "glb" }));
         }
 
         [Test]

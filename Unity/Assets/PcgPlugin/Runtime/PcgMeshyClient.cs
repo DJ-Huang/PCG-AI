@@ -10,7 +10,7 @@ using UnityEngine;
 namespace DJTechRuntime.PCG
 {
     /// <summary>
-    /// Thin Meshy Image-to-3D HTTP client (create → poll → download GLB).
+    /// Thin Meshy Image-to-3D HTTP client (create → poll → download selected formats).
     /// </summary>
     public static class PcgMeshyClient
     {
@@ -27,13 +27,18 @@ namespace DJTechRuntime.PCG
             public bool ShouldTexture;
             public bool ShouldRemesh;
             public int TargetPolycount;
+            /// <summary>Meshy target_formats (e.g. glb, fbx). Empty → glb only.</summary>
+            public List<string> TargetFormats;
         }
 
         public struct GenerateResult
         {
             public bool Ok;
             public string TaskId;
+            /// <summary>Primary model path used for cook (prefers GLB).</summary>
             public string ModelPath;
+            /// <summary>All downloaded cache paths keyed by format (glb/fbx/…).</summary>
+            public Dictionary<string, string> ModelPathsByFormat;
             public string Error;
             public int ConsumedCredits;
         }
@@ -54,11 +59,14 @@ namespace DJTechRuntime.PCG
 
         public static GenerateResult GenerateAndDownload(
             GenerateRequest request,
-            string outputGlbPath,
+            string outputPrimaryPath,
             CancellationToken cancellationToken = default,
             Action<string, float> progress = null)
         {
-            var result = new GenerateResult();
+            var result = new GenerateResult
+            {
+                ModelPathsByFormat = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            };
             if (string.IsNullOrWhiteSpace(PcgMeshySettings.ApiKey))
             {
                 result.Error = "Meshy API key is empty. Set it in PCG → Settings or Project Settings → PCG AI.";
@@ -71,16 +79,17 @@ namespace DJTechRuntime.PCG
                 return result;
             }
 
-            if (string.IsNullOrWhiteSpace(outputGlbPath))
+            if (string.IsNullOrWhiteSpace(outputPrimaryPath))
             {
                 result.Error = "Meshy output path is empty.";
                 return result;
             }
 
+            var formats = NormalizeFormats(request.TargetFormats);
             try
             {
                 progress?.Invoke("Creating Meshy task…", 0.05f);
-                var taskId = CreateImageTo3dTask(request, cancellationToken);
+                var taskId = CreateImageTo3dTask(request, formats, cancellationToken);
                 if (string.IsNullOrEmpty(taskId))
                 {
                     result.Error = "Meshy create task returned no task id.";
@@ -103,17 +112,48 @@ namespace DJTechRuntime.PCG
                 }
 
                 result.ConsumedCredits = ReadDictInt(taskJson, "consumed_credits");
-                var modelUrl = ReadNestedString(taskJson, "model_urls", "glb");
-                if (string.IsNullOrEmpty(modelUrl))
+                var dir = Path.GetDirectoryName(outputPrimaryPath);
+                var baseName = Path.GetFileNameWithoutExtension(outputPrimaryPath);
+                if (string.IsNullOrEmpty(baseName))
                 {
-                    result.Error = "Meshy task succeeded but model_urls.glb is missing.";
+                    result.Error = "Meshy output path has no file name.";
                     return result;
                 }
 
-                progress?.Invoke("Downloading GLB…", 0.95f);
-                DownloadFile(modelUrl, outputGlbPath, cancellationToken);
+                for (var i = 0; i < formats.Count; i++)
+                {
+                    var format = formats[i];
+                    var modelUrl = ReadNestedString(taskJson, "model_urls", format);
+                    if (string.IsNullOrEmpty(modelUrl))
+                    {
+                        result.Error =
+                            $"Meshy task succeeded but model_urls.{format} is missing " +
+                            $"(requested formats: {string.Join(", ", formats)}).";
+                        return result;
+                    }
+
+                    var dest = Path.Combine(
+                        dir ?? "",
+                        baseName + "." + format.ToLowerInvariant());
+                    progress?.Invoke(
+                        $"Downloading {format.ToUpperInvariant()}…",
+                        0.9f + 0.08f * ((i + 1f) / formats.Count));
+                    DownloadFile(modelUrl, dest, cancellationToken);
+                    result.ModelPathsByFormat[format.ToLowerInvariant()] = dest;
+                }
+
+                var primary = PcgMeshySaveFormats.Primary(formats);
+                if (!result.ModelPathsByFormat.TryGetValue(primary, out var primaryPath))
+                {
+                    foreach (var kvp in result.ModelPathsByFormat)
+                    {
+                        primaryPath = kvp.Value;
+                        break;
+                    }
+                }
+
                 result.Ok = true;
-                result.ModelPath = outputGlbPath;
+                result.ModelPath = primaryPath;
                 progress?.Invoke("Done", 1f);
                 return result;
             }
@@ -129,7 +169,27 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        private static string CreateImageTo3dTask(GenerateRequest request, CancellationToken ct)
+        private static List<string> NormalizeFormats(List<string> formats)
+        {
+            var result = new List<string>();
+            if (formats != null)
+            {
+                foreach (var raw in formats)
+                {
+                    if (string.IsNullOrWhiteSpace(raw))
+                        continue;
+                    var format = raw.Trim().ToLowerInvariant();
+                    if (!result.Contains(format))
+                        result.Add(format);
+                }
+            }
+            if (result.Count == 0)
+                result.Add(PcgMeshySaveFormats.Glb);
+            return result;
+        }
+
+        private static string CreateImageTo3dTask(
+            GenerateRequest request, List<string> formats, CancellationToken ct)
         {
             var body = new Dictionary<string, object>
             {
@@ -138,7 +198,7 @@ namespace DJTechRuntime.PCG
                 ["enable_pbr"] = request.EnablePbr,
                 ["should_texture"] = request.ShouldTexture,
                 ["should_remesh"] = request.ShouldRemesh,
-                ["target_formats"] = new List<object> { "glb" },
+                ["target_formats"] = new List<object>(formats),
             };
             if (request.ShouldRemesh && request.TargetPolycount > 0)
                 body["target_polycount"] = request.TargetPolycount;

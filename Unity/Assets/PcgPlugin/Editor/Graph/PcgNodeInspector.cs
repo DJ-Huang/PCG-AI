@@ -32,6 +32,14 @@ namespace DJTechEditor.PCG.Graph
         // Active tab keyed by node id for manifest tabs layout.
         private static readonly Dictionary<string, string> s_ActiveTabSection = new();
 
+        // Bottom action sections appended after manifest properties, dispatched by node type.
+        // New node actions register one line here; async actions use CreateAsyncNodeActionSection.
+        private static readonly (string nodeType, Func<PcgNodeInspector, PcgManifestNodeView, VisualElement> create)[] s_BottomActionSections =
+        {
+            ("ExportFBX", (self, node) => self.CreateFbxExportActions(node)),
+            (PcgMeshyResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyGenerateAction.Def)),
+        };
+
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
         {
             m_GraphView = graphView;
@@ -283,10 +291,14 @@ namespace DJTechEditor.PCG.Graph
                 if (node is PcgManifestNodeView manifestNode)
                 {
                     ShowManifestProperties(manifestNode);
-                    if (manifestNode.NodeType == "ExportFBX")
-                        m_Body.Add(CreateFbxExportActions(manifestNode));
-                    if (manifestNode.NodeType == PcgMeshyResolver.NodeType)
-                        m_Body.Add(CreateMeshyGenerateSection(manifestNode));
+                    foreach (var (nodeType, create) in s_BottomActionSections)
+                    {
+                        if (manifestNode.NodeType != nodeType)
+                            continue;
+                        var section = create(this, manifestNode);
+                        if (section != null)
+                            m_Body.Add(section);
+                    }
                 }
 
                 if (node is PcgExternalSubgraphNodeView externalSubgraph)
@@ -2865,7 +2877,13 @@ namespace DJTechEditor.PCG.Graph
         }
 
         
-        private VisualElement CreateMeshyGenerateSection(PcgManifestNodeView node)
+        /// <summary>
+        /// Generic bottom section for node async actions (button + progress bar +
+        /// status line, cancel while running). Node-specific behavior lives in the
+        /// <see cref="PcgAsyncNodeActionDef"/>; this method only wires UI to
+        /// <see cref="PcgNodeAsyncActionController"/> state.
+        /// </summary>
+        private VisualElement CreateAsyncNodeActionSection(PcgManifestNodeView node, PcgAsyncNodeActionDef def)
         {
             var container = new VisualElement
             {
@@ -2898,6 +2916,13 @@ namespace DJTechEditor.PCG.Graph
             };
             container.Add(progressBar);
 
+            if (def.BuildExtraUi != null)
+            {
+                var extra = def.BuildExtraUi(node, () => m_GraphView?.NotifyDocumentChanged());
+                if (extra != null)
+                    container.Add(extra);
+            }
+
             var button = new Button
             {
                 style =
@@ -2908,27 +2933,27 @@ namespace DJTechEditor.PCG.Graph
             };
             container.Add(button);
 
-            container.Add(new Label("Calls the Meshy API and caches the GLB into Library/PCG/MeshyCache. Consumes API credits.")
+            if (!string.IsNullOrEmpty(def.Caption))
             {
-                style =
+                container.Add(new Label(def.Caption)
                 {
-                    color = new Color(0.55f, 0.7f, 0.55f),
-                    fontSize = 9,
-                    marginTop = 4,
-                    whiteSpace = WhiteSpace.Normal,
-                },
-            });
+                    style =
+                    {
+                        color = new Color(0.55f, 0.7f, 0.55f),
+                        fontSize = 9,
+                        marginTop = 4,
+                        whiteSpace = WhiteSpace.Normal,
+                    },
+                });
+            }
 
             void RefreshIdleUi()
             {
-                var state = PcgMeshyGenerateController.GetState(node.NodeId);
-                var hasCache = PcgMeshyResolver.TryGetCachedModelPath(
-                    node.NodeId, node.CollectData(), out var cachePath);
+                var state = PcgNodeAsyncActionController.GetState(node.NodeId, def.ActionId);
+                var view = def.GetIdleView(node, state);
 
-                button.text = hasCache ? "Regenerate" : "Generate";
-                button.tooltip = hasCache
-                    ? "Call the Meshy API again and overwrite the cached GLB."
-                    : "Create a Meshy Image-to-3D task and download the GLB.";
+                button.text = view.ButtonLabel;
+                button.tooltip = view.ButtonTooltip;
                 progressBar.style.display = DisplayStyle.None;
 
                 if (!string.IsNullOrEmpty(state.Error))
@@ -2937,16 +2962,12 @@ namespace DJTechEditor.PCG.Graph
                     statusLabel.style.color = new Color(0.9f, 0.45f, 0.4f);
                     statusLabel.style.display = DisplayStyle.Flex;
                 }
-                else if (state.Succeeded && !string.IsNullOrEmpty(state.ModelPath))
+                else if (!string.IsNullOrEmpty(view.StatusText))
                 {
-                    statusLabel.text = $"Cached → {state.ModelPath}";
-                    statusLabel.style.color = new Color(0.55f, 0.7f, 0.55f);
-                    statusLabel.style.display = DisplayStyle.Flex;
-                }
-                else if (hasCache)
-                {
-                    statusLabel.text = $"Cached → {cachePath}";
-                    statusLabel.style.color = new Color(0.6f, 0.6f, 0.6f);
+                    statusLabel.text = view.StatusText;
+                    statusLabel.style.color = view.StatusTone == PcgNodeActionStatusTone.Success
+                        ? new Color(0.55f, 0.7f, 0.55f)
+                        : new Color(0.6f, 0.6f, 0.6f);
                     statusLabel.style.display = DisplayStyle.Flex;
                 }
                 else
@@ -2958,25 +2979,27 @@ namespace DJTechEditor.PCG.Graph
             var wasRunning = false;
             button.clicked += () =>
             {
-                if (PcgMeshyGenerateController.IsRunning(node.NodeId))
+                if (PcgNodeAsyncActionController.IsRunning(node.NodeId, def.ActionId))
                 {
-                    PcgMeshyGenerateController.Cancel(node.NodeId);
+                    PcgNodeAsyncActionController.Cancel(node.NodeId, def.ActionId);
                     return;
                 }
 
-                PcgMeshyGenerateController.Begin(node.NodeId, node.CollectData(), path =>
-                {
-                    m_GraphView.WithUndo("Meshy 3D Generate", () =>
+                PcgNodeAsyncActionController.Begin(
+                    node.NodeId,
+                    def.ActionId,
+                    () => def.Prepare(node.NodeId, node.CollectData()),
+                    payload =>
                     {
-                        node.SetPropertyValue("path", path);
-                        node.SetPropertyValue("projectRoot", "");
+                        m_GraphView.WithUndo(
+                            def.UndoLabel ?? def.ActionId,
+                            () => def.Apply?.Invoke(node, payload));
+                        NotifyGraphChanged();
+                        if (m_CurrentNode == node)
+                            ShowNode(node);
                     });
-                    NotifyGraphChanged();
-                    if (m_CurrentNode == node)
-                        ShowNode(node);
-                });
 
-                if (PcgMeshyGenerateController.IsRunning(node.NodeId))
+                if (PcgNodeAsyncActionController.IsRunning(node.NodeId, def.ActionId))
                 {
                     wasRunning = true;
                     button.text = "Cancel";
@@ -2991,7 +3014,7 @@ namespace DJTechEditor.PCG.Graph
 
             container.schedule.Execute(() =>
             {
-                var state = PcgMeshyGenerateController.GetState(node.NodeId);
+                var state = PcgNodeAsyncActionController.GetState(node.NodeId, def.ActionId);
                 if (state.Running)
                 {
                     wasRunning = true;
@@ -3013,7 +3036,7 @@ namespace DJTechEditor.PCG.Graph
             }).Every(100);
 
             RefreshIdleUi();
-            var initial = PcgMeshyGenerateController.GetState(node.NodeId);
+            var initial = PcgNodeAsyncActionController.GetState(node.NodeId, def.ActionId);
             if (initial.Running)
             {
                 wasRunning = true;
