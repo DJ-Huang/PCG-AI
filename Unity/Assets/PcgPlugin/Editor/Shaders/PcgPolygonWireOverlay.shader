@@ -15,10 +15,12 @@ Shader "Hidden/PcgPolygonWireOverlay"
 
         Pass
         {
-            // Depth-aware polygon edges write their expanded line depth so a
-            // nearer edge can occlude a farther edge at crossings. The
-            // renderer disables this for AlwaysOnTop group highlights.
-            ZWrite [_ZWrite]
+            // The line is a screen-space-expanded quad, so its outer pixels do
+            // not have the source surface's exact depth. Writing that
+            // approximate depth makes the visible width depend on view angle
+            // and distance. Depth testing against the existing surface is
+            // still retained; the overlay must not replace it.
+            ZWrite Off
             ZTest [_ZTest]
             // ShaderLab maps this semantic pull-toward-camera offset across
             // forward and reversed depth APIs without a distance-scaled bias.

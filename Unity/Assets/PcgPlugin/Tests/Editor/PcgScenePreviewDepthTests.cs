@@ -37,12 +37,12 @@ namespace DJTechEditor.PCG.Tests
 
             AssertShaderDepthContract(wire, requireCoverageDiscard: true);
             AssertShaderDepthContract(point, requireCoverageDiscard: false);
-            Assert.That(wire, Does.Contain("ZWrite [_ZWrite]"));
+            Assert.That(wire, Does.Contain("ZWrite Off"));
             Assert.That(point, Does.Contain("ZWrite Off"));
             Assert.That(renderer, Does.Not.Contain("DepthBias"));
             Assert.That(renderer, Does.Not.Contain("0.0005"));
             Assert.That(renderer, Does.Contain("ResolveDepthCompare(style.AlwaysOnTop, camera)"));
-            Assert.That(renderer, Does.Contain("s_LineMaterial.SetInt(s_ZWriteId, style.AlwaysOnTop ? 0 : 1)"));
+            Assert.That(renderer, Does.Contain("s_LineMaterial.SetInt(s_ZWriteId, 0)"));
         }
 
         [Test]

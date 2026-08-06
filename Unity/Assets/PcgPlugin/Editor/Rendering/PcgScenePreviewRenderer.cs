@@ -610,7 +610,10 @@ namespace DJTechEditor.PCG.Rendering
                 s_LineMaterial.SetInt(
                     s_ZTestId,
                     (int)ResolveDepthCompare(style.AlwaysOnTop, camera));
-                s_LineMaterial.SetInt(s_ZWriteId, style.AlwaysOnTop ? 0 : 1);
+                // Screen-space line expansion is not a valid surface-depth
+                // representation. Keep the existing depth buffer authoritative
+                // so grazing-angle edges do not self-occlude and look thinner.
+                s_LineMaterial.SetInt(s_ZWriteId, 0);
                 if (!s_LineMaterial.SetPass(0))
                 {
                     return DrawEdgeFallback(entry, localToWorld, camera, style);
