@@ -18,6 +18,7 @@ import {
   disposeObject3D,
   dragPoint,
   gizmoLengthForCamera,
+  gizmoLineRadiusForCamera,
   pickAxisGizmo,
   pickControlPoint,
   rescaleAxisGizmo,
@@ -90,6 +91,26 @@ export default function PreviewViewport({
   splineEditRef.current = splineEdit;
   selectedIndexRef.current = selectedIndex;
 
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const focusPreview = useCallback(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+    const edit = splineEditRef.current;
+    const sel = selectedIndexRef.current;
+
+    if (edit && sel >= 0 && sel < edit.controlPoints.length) {
+      focusCameraOnTarget(ctx.camera, ctx.controls, unityToThree(edit.controlPoints[sel]));
+      return;
+    }
+
+    const previewData = dataRef.current;
+    if (!previewData) return;
+    const positions = collectFitPositions(previewData, edit?.controlPoints);
+    if (positions.length > 0) fitCamera(ctx.camera, ctx.controls, positions);
+  }, []);
+
   const syncSplineHandles = useCallback((points: readonly Vec3[], selected: number) => {
     const ctx = sceneRef.current;
     if (!ctx) return;
@@ -110,8 +131,13 @@ export default function PreviewViewport({
         pos,
         ctx.renderer.domElement.clientHeight,
       );
+      const lineRadius = gizmoLineRadiusForCamera(
+        ctx.camera,
+        pos,
+        ctx.renderer.domElement.clientHeight,
+      );
       ctx.gizmoLength = gizmoLen;
-      const gizmo = buildAxisGizmo(pos, gizmoLen);
+      const gizmo = buildAxisGizmo(pos, gizmoLen, lineRadius);
       rescaleAxisGizmo(gizmo, gizmoLen);
       ctx.handles.add(gizmo);
     }
@@ -266,6 +292,7 @@ export default function PreviewViewport({
             event.clientX,
             event.clientY,
             rect,
+            axisPick.planeNormal,
           );
           ctx.controls.enabled = false;
           ctx.renderer.domElement.setPointerCapture(event.pointerId);
@@ -333,6 +360,8 @@ export default function PreviewViewport({
     };
 
     const canvas = renderer.domElement;
+    const focusContainer = () => container.focus({ preventScroll: true });
+    canvas.addEventListener('pointerdown', focusContainer);
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
     canvas.addEventListener('pointerup', onPointerUp);
@@ -341,6 +370,7 @@ export default function PreviewViewport({
     return () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
+      canvas.removeEventListener('pointerdown', focusContainer);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
@@ -353,7 +383,24 @@ export default function PreviewViewport({
       renderer.domElement.remove();
       sceneRef.current = null;
     };
-  }, [syncSplineHandles]);
+  }, [syncSplineHandles, focusPreview]);
+
+  // F — frame selection (or full preview) when the preview panel has focus.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'f' && e.key !== 'F') return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
+      if (!container.contains(target) && document.activeElement !== container) return;
+      e.preventDefault();
+      e.stopPropagation();
+      focusPreview();
+    };
+    container.addEventListener('keydown', onKeyDown);
+    return () => container.removeEventListener('keydown', onKeyDown);
+  }, [focusPreview]);
 
   // ── Content rebuild on new cook data ─────────────────
   useEffect(() => {
@@ -468,7 +515,13 @@ export default function PreviewViewport({
           ×
         </button>
       </div>
-      <div ref={containerRef} className="pcg-preview__canvas" />
+      <div
+        ref={containerRef}
+        className="pcg-preview__canvas"
+        tabIndex={0}
+        title="Click to focus · F to frame selection"
+        onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
+      />
       <div className="pcg-preview__footer">
         <span className="pcg-preview__stats">{stats}</span>
         {data && (
@@ -604,6 +657,23 @@ function collectFitPositions(data: PreviewData, controlPoints?: readonly Vec3[])
     }
   }
   return new Float32Array(chunks);
+}
+
+function focusCameraOnTarget(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  target: THREE.Vector3,
+  radius = 0.015,
+) {
+  controls.target.copy(target);
+  const offset = camera.position.clone().sub(controls.target);
+  if (offset.lengthSq() < 1e-8) offset.set(0.7, 0.6, 0.7);
+  offset.normalize().multiplyScalar(Math.max(radius * 8, 0.08));
+  camera.position.copy(target).add(offset);
+  camera.near = Math.max(offset.length() / 500, 0.0001);
+  camera.far = Math.max(offset.length() * 200, 10);
+  camera.updateProjectionMatrix();
+  controls.update();
 }
 
 function fitCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, positions: Float32Array) {

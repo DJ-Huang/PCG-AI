@@ -1,12 +1,13 @@
-// previewSplineGizmo.ts — Screen-space control points + XYZ axis gizmo for spline edit.
-// Mirrors Unity PcgCreateSplineSceneHandles manual position handle (axis pick + drag).
+// previewSplineGizmo.ts — Screen-space control points + Unity-style position handle.
+// Visual parity: thin RGB axes + cone caps, XY/XZ/YZ plane quads, center cube.
 
 import * as THREE from 'three';
 import type { Vec3 } from './splineControlPoints';
 
-export type AxisDragMode = 'free' | 'x' | 'y' | 'z';
+export type AxisDragMode = 'free' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz';
 
-export const AXIS_COLORS = { x: 0xff5555, y: 0x55ff55, z: 0x5599ff } as const;
+/** Unity Handles.x/y/zAxisColor approximations */
+export const AXIS_COLORS = { x: 0xdc3838, y: 0x6bd968, z: 0x4fa8e0 } as const;
 
 const UNSELECTED_POINT_PX = 4;
 const SELECTED_POINT_PX = 7;
@@ -23,7 +24,21 @@ export function threeToUnity(v: THREE.Vector3): Vec3 {
   return { x: v.x, y: v.y, z: -v.z };
 }
 
-/** ~50px on screen — matches Unity HandleUtility.GetHandleSize feel. */
+/** ~3.5px screen-space shaft radius (Unity DrawAAPolyLine ≈ 3px). */
+export function gizmoLineRadiusForCamera(
+  camera: THREE.PerspectiveCamera,
+  worldPos: THREE.Vector3,
+  canvasHeight: number,
+  targetPx = 3.5,
+): number {
+  if (canvasHeight <= 0) return 0.001;
+  const distance = Math.max(camera.position.distanceTo(worldPos), 1e-6);
+  const fovRad = (camera.fov * Math.PI) / 180;
+  const worldPerPixel = (2 * distance * Math.tan(fovRad / 2)) / canvasHeight;
+  return targetPx * worldPerPixel * 0.5;
+}
+
+/** ~80% of handle size, same as Unity GetHandleSize * 0.8 target in screen px. */
 export function gizmoLengthForCamera(
   camera: THREE.PerspectiveCamera,
   worldPos: THREE.Vector3,
@@ -35,11 +50,6 @@ export function gizmoLengthForCamera(
   const fovRad = (camera.fov * Math.PI) / 180;
   const worldPerPixel = (2 * distance * Math.tan(fovRad / 2)) / canvasHeight;
   return targetPx * worldPerPixel;
-}
-
-/** @deprecated Use gizmoLengthForCamera — kept for scene-radius fallback only. */
-export function gizmoLengthForScene(sceneRadius: number): number {
-  return Math.max(sceneRadius * 0.22, sceneRadius * 0.04);
 }
 
 /** Screen-space control points — fixed pixel size, no world-scale overlap. */
@@ -92,44 +102,141 @@ export function updateControlPointCloud(
   mat.size = selectedIndex >= 0 ? SELECTED_POINT_PX : UNSELECTED_POINT_PX;
 }
 
-/** RGB axis arrows at `position` (three.js world space). `length` = full arrow span. */
-export function buildAxisGizmo(position: THREE.Vector3, length: number): THREE.Group {
+function alignCylinderY(mesh: THREE.Mesh, dir: THREE.Vector3, halfLen: number): void {
+  mesh.position.copy(dir.clone().multiplyScalar(halfLen));
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+}
+
+function axisMaterial(color: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color,
+    depthTest: false,
+    depthWrite: false,
+    transparent: true,
+  });
+}
+
+function addAxis(
+  group: THREE.Group,
+  mode: AxisDragMode,
+  dir: THREE.Vector3,
+  color: number,
+  length: number,
+  lineRadius: number,
+): void {
+  const capH = length * 0.16;
+  const capR = Math.max(capH * 0.38, lineRadius * 2.2);
+  const shaftR = lineRadius;
+  const shaftLen = Math.max(length - capH, length * 0.5);
+
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 8),
+    axisMaterial(color),
+  );
+  alignCylinderY(shaft, dir, shaftLen * 0.5);
+  shaft.userData = { kind: 'axis', mode };
+  group.add(shaft);
+
+  const tip = dir.clone().multiplyScalar(length);
+  const head = new THREE.Mesh(
+    new THREE.ConeGeometry(capR, capH, 12),
+    axisMaterial(color),
+  );
+  head.position.copy(tip).add(dir.clone().multiplyScalar(-capH * 0.5));
+  head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  head.userData = { kind: 'axis', mode };
+  group.add(head);
+}
+
+function addPlaneHandle(
+  group: THREE.Group,
+  mode: AxisDragMode,
+  normal: THREE.Vector3,
+  tangentA: THREE.Vector3,
+  tangentB: THREE.Vector3,
+  color: number,
+  length: number,
+): void {
+  const half = length * 0.1;
+  const center = tangentA
+    .clone()
+    .multiplyScalar(half)
+    .add(tangentB.clone().multiplyScalar(half));
+  const geo = new THREE.PlaneGeometry(half * 2, half * 2);
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(center);
+  const basis = new THREE.Matrix4().makeBasis(
+    tangentA.clone().normalize(),
+    tangentB.clone().normalize(),
+    normal.clone().normalize(),
+  );
+  mesh.quaternion.setFromRotationMatrix(basis);
+  mesh.userData = { kind: 'plane', mode, normal: normal.clone() };
+  group.add(mesh);
+}
+
+/** Unity-style position handle at `position` (three.js world). `length` = axis span. */
+export function buildAxisGizmo(
+  position: THREE.Vector3,
+  length: number,
+  lineRadius: number,
+): THREE.Group {
   const group = new THREE.Group();
   group.position.copy(position);
   group.userData.kind = 'axis-gizmo';
   group.userData.baseLength = length;
+  group.renderOrder = 999;
 
-  const axes: Array<{ mode: AxisDragMode; dir: THREE.Vector3; color: number }> = [
-    { mode: 'x', dir: new THREE.Vector3(1, 0, 0), color: AXIS_COLORS.x },
-    { mode: 'y', dir: new THREE.Vector3(0, 1, 0), color: AXIS_COLORS.y },
-    { mode: 'z', dir: new THREE.Vector3(0, 0, 1), color: AXIS_COLORS.z },
-  ];
+  addAxis(group, 'x', new THREE.Vector3(1, 0, 0), AXIS_COLORS.x, length, lineRadius);
+  addAxis(group, 'y', new THREE.Vector3(0, 1, 0), AXIS_COLORS.y, length, lineRadius);
+  addAxis(group, 'z', new THREE.Vector3(0, 0, 1), AXIS_COLORS.z, length, lineRadius);
 
-  const headRadius = length * 0.028;
-  const headHeight = length * 0.05;
-  const shaftEnd = length * 0.82;
+  addPlaneHandle(
+    group,
+    'yz',
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(0, 0, 1),
+    AXIS_COLORS.x,
+    length,
+  );
+  addPlaneHandle(
+    group,
+    'xz',
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 0, 1),
+    AXIS_COLORS.y,
+    length,
+  );
+  addPlaneHandle(
+    group,
+    'xy',
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 1, 0),
+    AXIS_COLORS.z,
+    length,
+  );
 
-  for (const { mode, dir, color } of axes) {
-    const end = dir.clone().multiplyScalar(shaftEnd);
-    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), end]);
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));
-    line.userData = { kind: 'axis', mode, dir: dir.clone(), length };
-    group.add(line);
-
-    const tip = dir.clone().multiplyScalar(length);
-    const head = new THREE.Mesh(
-      new THREE.ConeGeometry(headRadius, headHeight, 6),
-      new THREE.MeshBasicMaterial({ color }),
-    );
-    head.position.copy(tip).add(dir.clone().multiplyScalar(-headHeight * 0.5));
-    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
-    head.userData = { kind: 'axis', mode, dir: dir.clone(), length };
-    group.add(head);
-  }
-
+  const cubeSize = length * 0.13;
   const center = new THREE.Mesh(
-    new THREE.SphereGeometry(length * 0.032, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffaa44 }),
+    new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize),
+    new THREE.MeshBasicMaterial({
+      color: 0xd8d8d8,
+      transparent: true,
+      opacity: 0.75,
+      depthTest: false,
+      depthWrite: false,
+    }),
   );
   center.userData = { kind: 'axis-center' };
   group.add(center);
@@ -137,10 +244,10 @@ export function buildAxisGizmo(position: THREE.Vector3, length: number): THREE.G
   return group;
 }
 
-/** Keep gizmo ~constant screen size when the camera moves/zooms. */
 export function rescaleAxisGizmo(group: THREE.Group, length: number): void {
   const base = (group.userData.baseLength as number) || 1;
-  group.scale.setScalar(length / base);
+  const s = length / base;
+  group.scale.set(s, s, s);
   group.userData.currentLength = length;
 }
 
@@ -201,9 +308,21 @@ export interface AxisPickResult {
   axis: THREE.Vector3;
   screenAxis: THREE.Vector2;
   worldPerPixel: number;
+  planeNormal?: THREE.Vector3;
 }
 
-/** Pick XYZ axis arrow or center (free) on the active gizmo. */
+const PLANE_SPECS: Array<{
+  mode: AxisDragMode;
+  normal: THREE.Vector3;
+  tanA: THREE.Vector3;
+  tanB: THREE.Vector3;
+}> = [
+  { mode: 'yz', normal: new THREE.Vector3(1, 0, 0), tanA: new THREE.Vector3(0, 1, 0), tanB: new THREE.Vector3(0, 0, 1) },
+  { mode: 'xz', normal: new THREE.Vector3(0, 1, 0), tanA: new THREE.Vector3(1, 0, 0), tanB: new THREE.Vector3(0, 0, 1) },
+  { mode: 'xy', normal: new THREE.Vector3(0, 0, 1), tanA: new THREE.Vector3(1, 0, 0), tanB: new THREE.Vector3(0, 1, 0) },
+];
+
+/** Pick plane quad, center cube, or XYZ axis (Unity position-handle order). */
 export function pickAxisGizmo(
   camera: THREE.PerspectiveCamera,
   rect: DOMRect,
@@ -217,7 +336,42 @@ export function pickAxisGizmo(
   const center = toScreen(gizmoWorldPos, camera, rect);
   if (!center.visible) return null;
 
-  if (Math.hypot(mx - center.x, my - center.y) <= 10) {
+  const planeHalf = gizmoLength * 0.1;
+  for (const spec of PLANE_SPECS) {
+    const worldCenter = gizmoWorldPos
+      .clone()
+      .add(spec.tanA.clone().multiplyScalar(planeHalf))
+      .add(spec.tanB.clone().multiplyScalar(planeHalf));
+    const sc = toScreen(worldCenter, camera, rect);
+    if (!sc.visible) continue;
+    const cornerA = toScreen(
+      worldCenter.clone().add(spec.tanA.clone().multiplyScalar(planeHalf)),
+      camera,
+      rect,
+    );
+    const cornerB = toScreen(
+      worldCenter.clone().add(spec.tanB.clone().multiplyScalar(planeHalf)),
+      camera,
+      rect,
+    );
+    const pickR = Math.max(
+      8,
+      Math.hypot(cornerA.x - sc.x, cornerA.y - sc.y),
+      Math.hypot(cornerB.x - sc.x, cornerB.y - sc.y),
+    );
+    if (Math.hypot(mx - sc.x, my - sc.y) <= pickR) {
+      return {
+        mode: spec.mode,
+        axis: new THREE.Vector3(),
+        screenAxis: new THREE.Vector2(),
+        worldPerPixel: 0,
+        planeNormal: spec.normal.clone(),
+      };
+    }
+  }
+
+  const cubePickR = Math.max(10, gizmoLength * 0.13 * 0.6 * (rect.width / 400));
+  if (Math.hypot(mx - center.x, my - center.y) <= cubePickR) {
     return { mode: 'free', axis: new THREE.Vector3(), screenAxis: new THREE.Vector2(), worldPerPixel: 0 };
   }
 
@@ -228,7 +382,8 @@ export function pickAxisGizmo(
   ];
 
   let best: AxisPickResult | null = null;
-  let bestDist = 10;
+  let bestDist = 9;
+  const skip = gizmoLength * 0.12;
   for (const { mode, dir } of axes) {
     const endWorld = gizmoWorldPos.clone().add(dir.clone().multiplyScalar(gizmoLength));
     const end = toScreen(endWorld, camera, rect);
@@ -236,10 +391,17 @@ export function pickAxisGizmo(
     const projX = end.x - center.x;
     const projY = end.y - center.y;
     const projLen = Math.hypot(projX, projY);
-    if (projLen < 8) continue;
+    if (projLen < 10) continue;
     const ux = projX / projLen;
     const uy = projY / projLen;
-    const d = distToSegment(mx, my, center.x + ux * 8, center.y + uy * 8, end.x, end.y);
+    const d = distToSegment(
+      mx,
+      my,
+      center.x + ux * skip,
+      center.y + uy * skip,
+      end.x,
+      end.y,
+    );
     if (d < bestDist) {
       bestDist = d;
       best = {
@@ -266,6 +428,14 @@ export interface DragState {
   livePoints: Vec3[];
 }
 
+function dragPlaneForMode(mode: AxisDragMode, point: THREE.Vector3): THREE.Plane {
+  if (mode === 'xy') return new THREE.Plane(new THREE.Vector3(0, 0, 1), -point.z);
+  if (mode === 'xz') return new THREE.Plane(new THREE.Vector3(0, 1, 0), -point.y);
+  if (mode === 'yz') return new THREE.Plane(new THREE.Vector3(1, 0, 0), -point.x);
+  const normal = new THREE.Vector3();
+  return new THREE.Plane(normal, 0);
+}
+
 export function beginDrag(
   index: number,
   points: readonly Vec3[],
@@ -277,17 +447,28 @@ export function beginDrag(
   clientX: number,
   clientY: number,
   rect: DOMRect,
+  planeNormal?: THREE.Vector3,
 ): DragState {
   const startPointThree = unityToThree(points[index]);
-  const normal = new THREE.Vector3();
-  camera.getWorldDirection(normal);
-  const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, startPointThree);
+  let plane: THREE.Plane;
+  if (mode === 'xy' || mode === 'xz' || mode === 'yz') {
+    plane = dragPlaneForMode(mode, startPointThree);
+  } else if (mode === 'free') {
+    const normal = new THREE.Vector3();
+    camera.getWorldDirection(normal);
+    plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, startPointThree);
+  } else {
+    plane = new THREE.Plane();
+  }
+
   const planeHit = startPointThree.clone();
-  if (mode === 'free') {
+  if (mode === 'free' || mode === 'xy' || mode === 'xz' || mode === 'yz') {
     const ray = screenRay(camera, rect, clientX, clientY);
     const hit = new THREE.Vector3();
     if (ray.intersectPlane(plane, hit)) planeHit.copy(hit);
   }
+  void planeNormal;
+
   return {
     index,
     mode,
@@ -312,7 +493,7 @@ export function dragPoint(
   const mx = clientX - rect.left;
   const my = clientY - rect.top;
 
-  if (drag.mode === 'free') {
+  if (drag.mode === 'free' || drag.mode === 'xy' || drag.mode === 'xz' || drag.mode === 'yz') {
     const ray = screenRay(camera, rect, clientX, clientY);
     const hit = new THREE.Vector3();
     if (!ray.intersectPlane(drag.plane, hit)) return drag.livePoints[drag.index];

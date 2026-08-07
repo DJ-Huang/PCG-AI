@@ -378,6 +378,7 @@ function PcgEditor() {
         e.preventDefault();
         openSearchAt(window.innerWidth / 2, window.innerHeight / 2);
       } else if (e.key === 'f' || e.key === 'F') {
+        if ((e.target as HTMLElement).closest('.pcg-preview')) return;
         e.preventDefault();
         fitView({ duration: 200 });
       } else if (e.key === 'p' || e.key === 'P') {
