@@ -1,0 +1,109 @@
+// previewCook.ts — Cook the current graph via pcg-server (through the Vite
+// dev-server /api/cook proxy) and parse the binary result for the preview
+// viewport. Requires `npm run dev` and a running pcg-server.
+
+import type { GraphJson } from './graphSchema';
+import {
+  parseCookResult,
+  parseGeometryBinary,
+  parseMeshBinary,
+  parsePointBinary,
+  PcgExecuteKind,
+  type CookResult,
+  type ParsedGeometry,
+  type ParsedMesh,
+} from './cookResult';
+
+export interface PreviewData {
+  /** Polygon geometry (edges/points modes) when the graph outputs faces. */
+  geometry: ParsedGeometry | null;
+  /** Render mesh (flat-shading corner vertices) when the graph outputs faces. */
+  mesh: ParsedMesh | null;
+  /** Scatter point cloud when the graph outputs points only. */
+  scatterPoints: Float32Array | null;
+  cook: CookResult;
+}
+
+export interface PreviewResponse {
+  ok: boolean;
+  data?: PreviewData;
+  error?: string;
+}
+
+export async function cookGraphPreview(
+  graph: GraphJson,
+  seed: number,
+  signal?: AbortSignal,
+): Promise<PreviewResponse> {
+  try {
+    const form = new FormData();
+    const meta = JSON.stringify({
+      seed,
+      api_version: 1,
+      job_id: crypto.randomUUID().replaceAll('-', ''),
+    });
+    form.append('meta', new Blob([meta], { type: 'application/json' }));
+    form.append('graph', new Blob([JSON.stringify(graph)], { type: 'application/json' }));
+
+    const res = await fetch('/api/cook', { method: 'POST', body: form, signal });
+    if (!res.ok) {
+      const text = await res.text();
+      let message = text;
+      try {
+        const parsed = JSON.parse(text) as { error?: string };
+        if (parsed.error) message = parsed.error;
+      } catch {
+        // non-JSON error body — keep raw text
+      }
+      return { ok: false, error: `HTTP ${res.status}: ${message}` };
+    }
+
+    const buffer = await res.arrayBuffer();
+    const cook = parseCookResult(buffer);
+    if (cook.code !== 0) {
+      return { ok: false, error: cook.error || `Cook failed (code ${cook.code})` };
+    }
+
+    let geometry: ParsedGeometry | null = null;
+    if (cook.geometry.length > 0) {
+      geometry = parseGeometryBinary(cook.geometry);
+    }
+    let mesh: ParsedMesh | null = null;
+    if (cook.mesh.length > 0) {
+      mesh = parseMeshBinary(cook.mesh);
+    }
+    let scatterPoints: Float32Array | null = null;
+    if (cook.points.length > 0) {
+      scatterPoints = parsePointBinary(cook.points);
+    }
+    if (!geometry && !mesh && !scatterPoints && cook.kind === PcgExecuteKind.Json) {
+      return { ok: false, error: 'Graph produced JSON output only — nothing to preview.' };
+    }
+
+    return { ok: true, data: { geometry, mesh, scatterPoints, cook } };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { ok: false, error: 'aborted' };
+    }
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function cancelCook(): Promise<void> {
+  try {
+    await fetch('/api/cook-cancel', { method: 'POST' });
+  } catch {
+    // best-effort; server may already be gone
+  }
+}
+
+export async function checkCookServer(): Promise<{ ok: boolean; version?: string }> {
+  try {
+    const res = await fetch('/api/cook-health');
+    if (!res.ok) return { ok: false };
+    const data = (await res.json()) as { ok?: boolean; version?: string };
+    return { ok: data.ok === true, version: data.version };
+  } catch {
+    return { ok: false };
+  }
+}

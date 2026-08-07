@@ -485,6 +485,103 @@
   padding: 40px 12px;
 }
 
+/* ── Preview viewport (right panel, three.js) ───────── */
+
+.pcg-preview {
+  width: 420px;
+  min-width: 320px;
+  background: #252525;
+  border-left: 1px solid #1b1b1b;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pcg-preview__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #1b1b1b;
+  color: #d4d4d4;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.pcg-preview__mode {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #a0a0a0;
+  cursor: pointer;
+}
+
+.pcg-preview__btn {
+  margin-left: auto;
+  padding: 2px 10px !important;
+  font-size: 11px !important;
+  background: #3c3c3c !important;
+  border: 1px solid #1f1f1f !important;
+  border-radius: 3px !important;
+  color: #ccc !important;
+  cursor: pointer;
+}
+
+.pcg-preview__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pcg-preview__close {
+  margin-left: 0;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  padding: 2px 8px !important;
+}
+
+.pcg-preview__canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pcg-preview__canvas canvas {
+  display: block;
+}
+
+.pcg-preview__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 12px;
+  background: #2d2d2d;
+  border-top: 1px solid #1b1b1b;
+  font-size: 11px;
+  color: #8a8a8a;
+  flex-shrink: 0;
+}
+
+.pcg-preview__error {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 36px;
+  padding: 8px 10px;
+  background: rgba(74, 42, 42, 0.95);
+  border: 1px solid #6a3a3a;
+  border-radius: 4px;
+  color: #f0b0b0;
+  font-size: 11px;
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
 /* ── Node (ManifestNode) — Unity-style compact pill ────── */
 
 .pcg-node {

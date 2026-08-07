@@ -40,6 +40,8 @@ import Blackboard from './Blackboard';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
+import PreviewViewport from './PreviewViewport';
+import { cookGraphPreview, cancelCook, checkCookServer, type PreviewData } from './previewCook';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -81,6 +83,11 @@ function PcgEditor() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
   const [status, setStatus] = useState('');
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
@@ -518,6 +525,57 @@ function PcgEditor() {
     }
   };
 
+  // ── Preview cook ────────────────────────────────────
+
+  const requestPreviewCook = useCallback(async () => {
+    previewAbortRef.current?.abort();
+    void cancelCook();
+    const abort = new AbortController();
+    previewAbortRef.current = abort;
+
+    setPreviewLoading(true);
+    setPreviewError(null);
+    const graph = exportGraph(nodes, edges, parameters, subgraphs);
+    const result = await cookGraphPreview(graph, 42, abort.signal);
+    if (previewAbortRef.current !== abort) return; // superseded by a newer cook
+    setPreviewLoading(false);
+    if (result.ok && result.data) {
+      setPreviewData(result.data);
+    } else if (result.error !== 'aborted') {
+      setPreviewError(result.error ?? 'Cook failed');
+    }
+  }, [nodes, edges, parameters, subgraphs]);
+
+  const togglePreview = useCallback(async () => {
+    if (showPreview) {
+      previewAbortRef.current?.abort();
+      void cancelCook();
+      setShowPreview(false);
+      return;
+    }
+    setShowPreview(true);
+    setPreviewError(null);
+    const health = await checkCookServer();
+    if (!health.ok) {
+      setPreviewError('pcg-server unreachable — start it with scripts/run-pcg-server.sh, then press Re-cook.');
+    }
+    // Initial cook is fired by the debounced effect below (showPreview change).
+  }, [showPreview]);
+
+  // Debounced re-cook on graph/selection change while the panel is open.
+  // Coalesces edits; never cooks per keystroke.
+  const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!showPreview) return;
+    if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+    previewDebounceRef.current = setTimeout(() => {
+      void requestPreviewCook();
+    }, 600);
+    return () => {
+      if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+    };
+  }, [showPreview, selectedNode, requestPreviewCook]);
+
   // ── Render ──────────────────────────────────────────
 
   return (
@@ -544,6 +602,14 @@ function PcgEditor() {
           title="Toggle Inspector (I)"
         >
           Inspector
+        </button>
+        <button
+          type="button"
+          className={showPreview ? 'pcg-toolbar__toggle--active' : ''}
+          onClick={() => void togglePreview()}
+          title="Toggle 3D Preview (requires pcg-server)"
+        >
+          Preview
         </button>
         <span className="pcg-toolbar__separator" />
         <input
@@ -618,6 +684,15 @@ function PcgEditor() {
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}
+          />
+        )}
+        {showPreview && (
+          <PreviewViewport
+            data={previewData}
+            loading={previewLoading}
+            error={previewError}
+            onRefresh={() => void requestPreviewCook()}
+            onClose={() => void togglePreview()}
           />
         )}
       </div>

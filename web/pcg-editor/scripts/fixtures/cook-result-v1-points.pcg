@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "n2",
+      "type": "SpawnPoints",
+      "position": { "x": 0, "y": 0 },
+      "data": { "count": 100, "radius": 10.0 }
+    },
+    {
+      "id": "n3",
+      "type": "PlaceInScene",
+      "position": { "x": 300, "y": 0 },
+      "data": { "prefab": "", "scale": 1.0 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n2",
+      "target": "n3",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}
