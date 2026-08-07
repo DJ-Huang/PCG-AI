@@ -37,6 +37,8 @@ import {
 } from './nodeManifest';
 import { useUndoRedo } from './useUndoRedo';
 import Blackboard from './Blackboard';
+import AgentPanel from './agent/AgentPanel';
+import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './agent/agentCommands';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
@@ -88,6 +90,7 @@ function PcgEditor() {
   const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
+  const [showAgent, setShowAgent] = useState(true);
   const [showInspector, setShowInspector] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -306,6 +309,60 @@ function PcgEditor() {
       );
     },
     [setNodes, commit],
+  );
+
+  // ── Agent graph ops (actions dispatched from the agent panel) ──
+
+  const agentOps = useMemo<AgentGraphOps>(
+    () => ({
+      addNode: (nodeType, position) => {
+        if (!getNodeTypeDefs(nodeType)) {
+          throw new Error(`unknown node type "${nodeType}"`);
+        }
+        const newId = `n${++nodeCounter}`;
+        const pos = position ?? screenToFlowPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+        setNodes((nds) => [
+          ...nds,
+          { id: newId, type: nodeType, position: pos, data: { ...defaultData(nodeType) } },
+        ]);
+        return newId;
+      },
+      connectNodes: (source, target, sourceHandle, targetHandle) => {
+        const sourceNode = nodes.find((n) => n.id === source);
+        const targetNode = nodes.find((n) => n.id === target);
+        if (!sourceNode) throw new Error(`source node "${source}" not found`);
+        if (!targetNode) throw new Error(`target node "${target}" not found`);
+        const outPin = getNodeTypeDefs(sourceNode.type ?? '')?.outputs[0];
+        const inPin = getNodeTypeDefs(targetNode.type ?? '')?.inputs[0];
+        const conn: Connection = {
+          source,
+          target,
+          sourceHandle: sourceHandle ?? outPin?.id ?? null,
+          targetHandle: targetHandle ?? inPin?.id ?? null,
+        };
+        if (!validateConnection(conn)) {
+          throw new Error(`invalid connection ${source} → ${target}`);
+        }
+        setEdges((eds) => addEdge(conn, eds));
+      },
+      setNodeParam: (nodeId, key, value) => {
+        if (!nodes.some((n) => n.id === nodeId)) {
+          throw new Error(`node "${nodeId}" not found`);
+        }
+        setNodes((nds) =>
+          nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [key]: value } } : n)),
+        );
+      },
+    }),
+    [nodes, setNodes, setEdges, screenToFlowPosition, validateConnection],
+  );
+
+  const applyAgentActions = useCallback(
+    (actions: AgentAction[]) => dispatchAgentActions(actions, agentOps, commit),
+    [agentOps, commit],
   );
 
   // ── Promote to parameter ───────────────────────────
@@ -694,6 +751,14 @@ function PcgEditor() {
         <span className="pcg-toolbar__spacer" />
         <button
           type="button"
+          className={showAgent ? 'pcg-toolbar__toggle--active' : ''}
+          onClick={() => setShowAgent((v) => !v)}
+          title="Toggle Agent panel"
+        >
+          Agent
+        </button>
+        <button
+          type="button"
           className={showBlackboard ? 'pcg-toolbar__toggle--active' : ''}
           onClick={() => setShowBlackboard((v) => !v)}
           title="Toggle Parameters (P)"
@@ -731,6 +796,7 @@ function PcgEditor() {
 
       {/* Main: three-panel layout */}
       <div className="pcg-main">
+        {showAgent && <AgentPanel onApplyActions={applyAgentActions} />}
         {showBlackboard && (
           <Blackboard
             parameters={parameters}

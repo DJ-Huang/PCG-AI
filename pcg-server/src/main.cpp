@@ -1,4 +1,5 @@
 #include "cook_service.hpp"
+#include "agent_service.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -26,7 +27,9 @@ int ParsePort(int argc, char** argv, int fallback) {
                 << "  POST /v1/cancel\n"
                 << "  POST /v1/validate\n"
                 << "  POST /v1/cache/clear\n"
-                << "  POST /v1/export-fbx\n";
+                << "  POST /v1/export-fbx\n"
+                << "  POST /v1/agent/chat (mock agent; Bearer PCG_AGENT_TOKEN when set)\n"
+                << "  GET  /v1/agent/health\n";
             std::exit(0);
         }
     }
@@ -59,6 +62,8 @@ int main(int argc, char** argv) {
     svr.Post("/v1/cancel", pcg_server::HandleCancel);
     svr.Post("/v1/validate", pcg_server::HandleValidate);
     svr.Post("/v1/cache/clear", pcg_server::HandleCacheClear);
+    svr.Post("/v1/agent/chat", pcg_server::HandleAgentChat);
+    svr.Get("/v1/agent/health", pcg_server::HandleAgentHealth);
     svr.Post("/v1/export-fbx", pcg_server::HandleExportFbx);
 
     svr.set_payload_max_length(512ull * 1024ull * 1024ull);

@@ -20,6 +20,9 @@ function proxyToPcgServer(
   if (req.headers['content-length'] !== undefined) {
     headers['content-length'] = req.headers['content-length'];
   }
+  if (req.headers.authorization) {
+    headers.authorization = req.headers.authorization;
+  }
   const upstream = http.request(
     {
       host: PCG_SERVER_HOST,
@@ -77,6 +80,20 @@ function cookProxyPlugin(): Plugin {
           return;
         }
         proxyToPcgServer(req, res, '/v1/health');
+      });
+      server.middlewares.use('/api/agent/chat', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/agent/chat');
+      });
+      server.middlewares.use('/api/agent/health', (req, res, next) => {
+        if (req.method !== 'GET') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/agent/health');
       });
     },
   };
