@@ -1591,3 +1591,36 @@
   font-size: 8px;
   color: #556;
 }
+
+/* ── Scrollbars (flat, trackless) ────────────────────── */
+
+.pcg-app * {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3b3d transparent;
+}
+
+.pcg-app ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.pcg-app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pcg-app ::-webkit-scrollbar-thumb {
+  background: #3a3b3d;
+  border-radius: 5px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.pcg-app ::-webkit-scrollbar-thumb:hover {
+  background: #4a4b4e;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.pcg-app ::-webkit-scrollbar-corner {
+  background: transparent;
+}
