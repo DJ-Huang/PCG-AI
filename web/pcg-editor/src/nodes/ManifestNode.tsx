@@ -3,12 +3,30 @@
 // Unity-style: compact pill with tiny port dots on top/bottom edges, title label to the right.
 // Fields are NOT rendered on the node — editing happens in the Inspector panel.
 
-import { useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { useState, useContext, useRef, useEffect } from 'react';
+import { Handle, Position, NodeToolbar, type NodeProps } from '@xyflow/react';
 import { getNodeTypeDefs, getPinTypeColor } from '../nodeManifest';
+import { NodeActionsContext } from '../nodeActions';
 
-export default function ManifestNode({ type, selected, data }: NodeProps) {
+export default function ManifestNode({ id, type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { onInfo, onPreview } = useContext(NodeActionsContext);
+
+  // The toolbar is portaled outside the node DOM, so hide on a short delay:
+  // moving the pointer from the node onto the toolbar must not dismiss it.
+  const showToolbar = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setHovered(true);
+  };
+  const scheduleHideToolbar = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setHovered(false), 250);
+  };
+  useEffect(() => () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
 
   const def = getNodeTypeDefs(type ?? '');
   if (!def) {
@@ -44,7 +62,46 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
   const inactiveGroups = producedGroups.filter((g) => g.condition);
 
   return (
-    <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}>
+    <div
+      className="pcg-node-wrapper"
+      onMouseEnter={showToolbar}
+      onMouseLeave={scheduleHideToolbar}
+    >
+      {/* Hover toolbar — Unity PCG style: info + per-node preview */}
+      <NodeToolbar
+        isVisible={hovered}
+        position={Position.Top}
+        offset={6}
+        className="pcg-node-toolbar"
+        onMouseEnter={showToolbar}
+        onMouseLeave={scheduleHideToolbar}
+      >
+        <button
+          type="button"
+          className="nodrag pcg-node-toolbar__btn"
+          title="Node info"
+          onClick={(e) => {
+            e.stopPropagation();
+            onInfo(id);
+          }}
+        >
+          ℹ
+        </button>
+        <button
+          type="button"
+          className="nodrag pcg-node-toolbar__btn"
+          title={def.outputs.length > 0 ? 'Preview this node' : 'No output to preview'}
+          disabled={def.outputs.length === 0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview(id);
+          }}
+        >
+          ▶
+        </button>
+      </NodeToolbar>
+
+      <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}>
       {/* Pill + port dots stack (ports stay centered on the pill) */}
       <div className="pcg-node__stack">
         {def.inputs.length > 0 && (
@@ -120,6 +177,7 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -17,11 +17,15 @@ interface PreviewViewportProps {
   error: string | null;
   onRefresh: () => void;
   onClose: () => void;
+  /** Display name of the node being previewed; null/undefined = full-graph cook. */
+  targetLabel?: string | null;
+  /** Clear the per-node target and re-cook the full graph. */
+  onResetTarget?: () => void;
 }
 
 type DisplayMode = 'mesh' | 'edges' | 'points';
 
-export default function PreviewViewport({ data, loading, error, onRefresh, onClose }: PreviewViewportProps) {
+export default function PreviewViewport({ data, loading, error, onRefresh, onClose, targetLabel, onResetTarget }: PreviewViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -155,6 +159,21 @@ export default function PreviewViewport({ data, loading, error, onRefresh, onClo
     <div className="pcg-preview">
       <div className="pcg-preview__header">
         <span>Preview</span>
+        {targetLabel && (
+          <span className="pcg-preview__target" title={`Previewing node: ${targetLabel}`}>
+            ▶ {targetLabel}
+            {onResetTarget && (
+              <button
+                type="button"
+                className="pcg-preview__target-reset"
+                onClick={onResetTarget}
+                title="Back to full-graph preview"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        )}
         <label className="pcg-preview__mode">
           <input type="checkbox" checked={modes.includes('mesh')} onChange={() => toggleMode('mesh')} />
           Mesh

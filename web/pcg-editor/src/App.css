@@ -544,6 +544,33 @@
   padding: 2px 8px !important;
 }
 
+.pcg-preview__target {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #54c8bc;
+  background: #243a38;
+  border: 1px solid #2d4f4b;
+  border-radius: 3px;
+}
+
+.pcg-preview__target-reset {
+  background: none;
+  border: none;
+  color: #54c8bc;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 1px;
+  cursor: pointer;
+}
+
+.pcg-preview__target-reset:hover {
+  color: #fff;
+}
+
 .pcg-preview__canvas {
   flex: 1;
   min-height: 0;
@@ -1120,8 +1147,68 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   font-size: 11px;
   color: #ccc;
-  pointer-events: none;
   overflow: hidden;
+}
+
+.pcg-node-info-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pcg-node-info-panel__close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.pcg-node-info-panel__close:hover {
+  opacity: 1;
+}
+
+/* ── Node hover toolbar (info / per-node preview) ───── */
+
+.pcg-node-wrapper {
+  position: relative;
+}
+
+.pcg-node-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: #2d2d2d;
+  border: 1px solid #1b1b1b;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.pcg-node-toolbar__btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: #3c3c3c;
+  border: 1px solid #1f1f1f;
+  border-radius: 3px;
+  color: #ccc;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pcg-node-toolbar__btn:hover:not(:disabled) {
+  background: #4a4a4a;
+  color: #fff;
+}
+
+.pcg-node-toolbar__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .pcg-node-info-panel__header {

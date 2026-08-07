@@ -30,6 +30,65 @@ export interface PreviewResponse {
   error?: string;
 }
 
+/** Must match pcg-core graph_executor kPreviewSinkNodeId (and Unity PcgGraphPreviewSubgraph). */
+export const PREVIEW_SINK_NODE_ID = '__pcg_preview_sink__';
+
+/**
+ * Builds an upstream-only cook graph for per-node preview: the target node plus
+ * all transitive upstream nodes/edges, terminated by the preview sink that
+ * pcg-core recognizes. Mirrors Unity PcgGraphPreviewSubgraph.TryBuildUpstream.
+ * Returns null when the target node is not in the graph.
+ */
+export function buildPreviewCookGraph(
+  graph: GraphJson,
+  targetNodeId: string,
+  sourceHandle: string,
+): GraphJson | null {
+  const target = graph.nodes.find((n) => n.id === targetNodeId);
+  if (!target) return null;
+
+  const included = new Set<string>([targetNodeId]);
+  const queue: string[] = [targetNodeId];
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    for (const edge of graph.edges) {
+      if (edge.target !== nodeId || included.has(edge.source)) continue;
+      included.add(edge.source);
+      queue.push(edge.source);
+    }
+  }
+
+  const nodes = graph.nodes.filter((n) => included.has(n.id)).map((n) => ({ ...n }));
+  const edges = graph.edges
+    .filter((e) => included.has(e.source) && included.has(e.target))
+    .map((e) => ({ ...e }));
+  const parameters = (graph.parameters ?? []).filter(
+    (p) => p.targetNode && included.has(p.targetNode),
+  );
+
+  nodes.push({
+    id: PREVIEW_SINK_NODE_ID,
+    type: 'Output',
+    position: { ...target.position },
+    data: {},
+  });
+  edges.push({
+    id: `${PREVIEW_SINK_NODE_ID}_edge`,
+    source: targetNodeId,
+    target: PREVIEW_SINK_NODE_ID,
+    sourceHandle,
+    targetHandle: 'in',
+  });
+
+  return {
+    version: graph.version,
+    nodes,
+    edges,
+    parameters,
+    subgraphs: graph.subgraphs,
+  };
+}
+
 export async function cookGraphPreview(
   graph: GraphJson,
   seed: number,

@@ -2,7 +2,7 @@
 // Features: manifest-driven nodes, Inspector, Blackboard, port drag-to-search,
 // node search, Copy Raw Data, undo/redo, keyboard shortcuts.
 
-import { useCallback, useRef, useState, useEffect, type ChangeEvent } from 'react';
+import { useCallback, useRef, useState, useEffect, useMemo, type ChangeEvent } from 'react';
 import {
   ReactFlow,
   Background,
@@ -41,7 +41,8 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport from './PreviewViewport';
-import { cookGraphPreview, cancelCook, checkCookServer, type PreviewData } from './previewCook';
+import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, type PreviewData } from './previewCook';
+import { NodeActionsContext } from './nodeActions';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -92,14 +93,14 @@ function PcgEditor() {
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>('');
-  const [hoveredNode, setHoveredNode] = useState<{ node: Node; x: number; y: number } | null>(null);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [infoNode, setInfoNode] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [previewTargetNodeId, setPreviewTargetNodeId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const connectingNodeId = useRef<string | null>(null);
   const connectingHandleId = useRef<string | null>(null);
   const connectingHandleType = useRef<'source' | 'target' | null>(null);
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition, flowToScreenPosition, fitView } = useReactFlow();
 
   const { commit, undo, redo, beginDrag, endDrag, canUndo, canRedo } = useUndoRedo(
     nodes,
@@ -263,23 +264,25 @@ function PcgEditor() {
     setSelectedNode(node);
   }, []);
 
-  // ── Node hover → Node Info panel (300ms delay) ─────
-  const onNodeMouseEnter: NodeMouseHandler = useCallback((event, node) => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => {
-      setHoveredNode({ node, x: event.clientX + 16, y: event.clientY + 8 });
-    }, 300);
-  }, []);
+  // ── Node hover toolbar actions (info / per-node preview) ──
 
-  const onNodeMouseLeave: NodeMouseHandler = useCallback(() => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setHoveredNode(null);
-  }, []);
+  const handleNodeInfo = useCallback(
+    (nodeId: string) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      setInfoNode((prev) => {
+        if (prev?.nodeId === nodeId) return null;
+        const anchor = flowToScreenPosition({ x: node.position.x + 200, y: node.position.y });
+        return { nodeId, x: anchor.x, y: anchor.y };
+      });
+    },
+    [nodes, flowToScreenPosition],
+  );
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setContextMenu(null);
-    setHoveredNode(null);
+    setInfoNode(null);
   }, []);
 
   // ── Node data update (from Inspector) ──────────────
@@ -502,6 +505,8 @@ function PcgEditor() {
     setParameters([]);
     setSubgraphs([]);
     setSelectedNode(null);
+    setInfoNode(null);
+    setPreviewTargetNodeId(null);
     setCurrentFilename('');
     nodeCounter = 100;
     setStatus('New graph created');
@@ -527,8 +532,9 @@ function PcgEditor() {
 
   // ── Preview cook ────────────────────────────────────
 
-  const requestPreviewCook = useCallback(async () => {
+  const requestPreviewCook = useCallback(async (targetOverride?: string | null) => {
     if (nodes.length === 0) return;
+    const target = targetOverride === undefined ? previewTargetNodeId : targetOverride;
     previewAbortRef.current?.abort();
     void cancelCook();
     const abort = new AbortController();
@@ -536,7 +542,19 @@ function PcgEditor() {
 
     setPreviewLoading(true);
     setPreviewError(null);
-    const graph = exportGraph(nodes, edges, parameters, subgraphs);
+    let graph = exportGraph(nodes, edges, parameters, subgraphs);
+    if (target) {
+      const targetNode = nodes.find((n) => n.id === target);
+      const outputPin = targetNode ? getNodeTypeDefs(targetNode.type ?? '')?.outputs[0] : undefined;
+      const previewGraph =
+        targetNode && outputPin ? buildPreviewCookGraph(graph, target, outputPin.id) : null;
+      if (previewGraph) {
+        graph = previewGraph;
+      } else {
+        // Preview target was deleted — fall back to the full graph.
+        setPreviewTargetNodeId(null);
+      }
+    }
     const result = await cookGraphPreview(graph, 42, abort.signal);
     if (previewAbortRef.current !== abort) return; // superseded by a newer cook
     setPreviewLoading(false);
@@ -545,7 +563,7 @@ function PcgEditor() {
     } else if (result.error !== 'aborted') {
       setPreviewError(result.error ?? 'Cook failed');
     }
-  }, [nodes, edges, parameters, subgraphs]);
+  }, [nodes, edges, parameters, subgraphs, previewTargetNodeId]);
 
   const openPreview = useCallback(async () => {
     setShowPreview(true);
@@ -573,6 +591,29 @@ function PcgEditor() {
     void openPreview();
   }, [openPreview]);
 
+  const handleNodePreview = useCallback(
+    (nodeId: string) => {
+      setPreviewTargetNodeId(nodeId);
+      if (!showPreview) {
+        void openPreview();
+      }
+      void requestPreviewCook(nodeId);
+    },
+    [showPreview, openPreview, requestPreviewCook],
+  );
+
+  const nodeActions = useMemo(
+    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview }),
+    [handleNodeInfo, handleNodePreview],
+  );
+
+  const previewTargetLabel = (() => {
+    if (!previewTargetNodeId) return null;
+    const node = nodes.find((n) => n.id === previewTargetNodeId);
+    if (!node) return null;
+    return getNodeTypeDefs(node.type ?? '')?.displayName ?? node.type ?? previewTargetNodeId;
+  })();
+
   // Debounced re-cook on graph/selection change while the panel is open.
   // Coalesces edits; never cooks per keystroke.
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -590,6 +631,7 @@ function PcgEditor() {
   // ── Render ──────────────────────────────────────────
 
   return (
+    <NodeActionsContext.Provider value={nodeActions}>
     <div className="pcg-app">
       {/* Toolbar — aligned with Unity: left=New/Save/Save As/Show in Project, right=Parameters/Inspector */}
       <div className="pcg-toolbar">
@@ -657,8 +699,6 @@ function PcgEditor() {
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
             onNodeClick={onNodeClick}
-            onNodeMouseEnter={onNodeMouseEnter}
-            onNodeMouseLeave={onNodeMouseLeave}
             onPaneClick={onPaneClick}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
@@ -704,6 +744,15 @@ function PcgEditor() {
             error={previewError}
             onRefresh={() => void requestPreviewCook()}
             onClose={() => void togglePreview()}
+            targetLabel={previewTargetLabel}
+            onResetTarget={
+              previewTargetNodeId
+                ? () => {
+                    setPreviewTargetNodeId(null);
+                    void requestPreviewCook(null);
+                  }
+                : undefined
+            }
           />
         )}
       </div>
@@ -716,16 +765,21 @@ function PcgEditor() {
         </>
       )}
 
-      {/* Floating: Node Info Panel */}
-      {hoveredNode && (
-        <NodeInfoPanel
-          node={hoveredNode.node}
-          nodes={nodes}
-          edges={edges}
-          x={hoveredNode.x}
-          y={hoveredNode.y}
-        />
-      )}
+      {/* Floating: Node Info Panel (pinned via hover toolbar ℹ) */}
+      {infoNode &&
+        (() => {
+          const node = nodes.find((n) => n.id === infoNode.nodeId);
+          return node ? (
+            <NodeInfoPanel
+              node={node}
+              nodes={nodes}
+              edges={edges}
+              x={infoNode.x}
+              y={infoNode.y}
+              onClose={() => setInfoNode(null)}
+            />
+          ) : null;
+        })()}
 
       {/* Floating: Context Menu */}
       {contextMenu && (
@@ -746,6 +800,7 @@ function PcgEditor() {
         </>
       )}
     </div>
+    </NodeActionsContext.Provider>
   );
 }
 
