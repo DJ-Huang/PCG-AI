@@ -310,4 +310,189 @@ namespace DJTechEditor.PCG.Graph
             return bool.TryParse(raw.ToString(), out var parsed) ? parsed : fallback;
         }
     }
+
+    /// <summary>
+    /// Tripo3DGenerator bottom action: the only path that calls the Tripo API.
+    /// On success, prompts to save GLB into Assets/ and records the path on the node.
+    /// </summary>
+    public static class PcgTripoGenerateAction
+    {
+        public static readonly PcgAsyncNodeActionDef Def = new()
+        {
+            ActionId = "TripoGenerate",
+            UndoLabel = "Tripo 3D Generate",
+            Caption =
+                "Calls Tripo Image-to-3D, then prompts to save GLB into Assets/. " +
+                "Cook/preview load the saved path (never call the API).",
+            GetIdleView = GetIdleView,
+            Prepare = Prepare,
+            Apply = Apply,
+        };
+
+        private static PcgNodeActionIdleView GetIdleView(
+            PcgManifestNodeView node, PcgNodeAsyncActionController.State state)
+        {
+            var data = node.CollectData();
+            var hasSaved = PcgTripoResolver.TryGetSavedModelPath(data, out var savedPath);
+            var hasCache = PcgTripoResolver.TryGetCachedModelPath(node.NodeId, data, out var cachePath);
+            var hasModel = hasSaved || hasCache;
+
+            var view = new PcgNodeActionIdleView
+            {
+                ButtonLabel = hasModel ? "Regenerate" : "Generate",
+                ButtonTooltip = hasModel
+                    ? "Call Tripo again, then save GLB."
+                    : "Create Tripo Image-to-3D (GLB) and save.",
+            };
+
+            if (state.Succeeded && !string.IsNullOrEmpty(state.Payload))
+            {
+                view.StatusText = hasSaved
+                    ? $"Saved → {FormatDisplayPath(savedPath)}"
+                    : $"Cached → {state.Payload}";
+                view.StatusTone = PcgNodeActionStatusTone.Success;
+            }
+            else if (hasSaved)
+            {
+                view.StatusText = $"Saved → {FormatDisplayPath(savedPath)}";
+                view.StatusTone = PcgNodeActionStatusTone.Muted;
+            }
+            else if (hasCache)
+            {
+                view.StatusText = $"Cached → {cachePath}";
+                view.StatusTone = PcgNodeActionStatusTone.Muted;
+            }
+            return view;
+        }
+
+        private static PcgNodeAsyncActionController.PrepareResult Prepare(string nodeId, PcgNodeData data)
+        {
+            if (!PcgTripoResolver.TryBuildGenerateRequest(nodeId, data, out var request, out var path, out var error))
+                return PcgNodeAsyncActionController.PrepareResult.Failure(error);
+
+            return PcgNodeAsyncActionController.PrepareResult.Success((ct, report) =>
+            {
+                var result = PcgTripoClient.GenerateAndDownload(request, path, ct, report);
+                if (!result.Ok)
+                    return PcgNodeAsyncActionController.WorkResult.Failure(result.Error);
+
+                var log =
+                    $"[PCG] Tripo3DGenerator '{nodeId}' downloaded GLB → {result.ModelPath}" +
+                    (result.ConsumedCredits > 0 ? $" (credits={result.ConsumedCredits})" : "");
+                return PcgNodeAsyncActionController.WorkResult.Success(result.ModelPath, log);
+            });
+        }
+
+        private static void Apply(PcgManifestNodeView node, string cachePayload)
+        {
+            if (string.IsNullOrWhiteSpace(cachePayload) || !File.Exists(cachePayload))
+            {
+                Debug.LogError($"[PCG] Tripo Generate finished but cache file is missing: {cachePayload}");
+                return;
+            }
+
+            if (TryPromptAndSave(node, cachePayload, out var projectRelativePath))
+            {
+                node.SetPropertyValue("path", projectRelativePath);
+                node.SetPropertyValue("projectRoot", "");
+                return;
+            }
+
+            if (PcgTripoResolver.TryGetSavedModelPath(node.CollectData(), out _))
+            {
+                Debug.Log("[PCG] Tripo save canceled — keeping the previously saved model path.");
+                return;
+            }
+
+            node.SetPropertyValue("path", cachePayload);
+            node.SetPropertyValue("projectRoot", "");
+            Debug.Log("[PCG] Tripo save canceled — using temporary TripoCache path for this session.");
+        }
+
+        private static bool TryPromptAndSave(
+            PcgManifestNodeView node, string cachePayload, out string projectRelativePath)
+        {
+            projectRelativePath = null;
+            var data = node.CollectData();
+            var current = data.GetRaw("path")?.ToString()?.Replace('\\', '/') ?? "";
+            var defaultName = "TripoModel";
+            var defaultFolder = "Assets";
+
+            if (!string.IsNullOrWhiteSpace(current) &&
+                current.StartsWith("Assets/", System.StringComparison.OrdinalIgnoreCase))
+            {
+                defaultFolder = Path.GetDirectoryName(current)?.Replace('\\', '/') ?? "Assets";
+                defaultName = Path.GetFileNameWithoutExtension(current);
+            }
+            else
+            {
+                var title = data.GetRaw("__nodeTitle")?.ToString();
+                if (!string.IsNullOrWhiteSpace(title))
+                    defaultName = SanitizeFilename(title);
+                else if (!string.IsNullOrWhiteSpace(node.NodeId))
+                    defaultName = SanitizeFilename("Tripo_" + node.NodeId);
+            }
+
+            if (string.IsNullOrWhiteSpace(defaultFolder) ||
+                !defaultFolder.StartsWith("Assets", System.StringComparison.OrdinalIgnoreCase))
+                defaultFolder = "Assets";
+
+            var savePath = EditorUtility.SaveFilePanelInProject(
+                "Save Tripo Model",
+                defaultName,
+                "glb",
+                "Choose a GLB path under Assets/.",
+                defaultFolder);
+            if (string.IsNullOrEmpty(savePath))
+                return false;
+
+            savePath = savePath.Replace('\\', '/');
+            try
+            {
+                var absoluteDest = PcgTripoResolver.ResolveProjectAbsolutePath(savePath);
+                var dir = Path.GetDirectoryName(absoluteDest);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+                File.Copy(cachePayload, absoluteDest, overwrite: true);
+                AssetDatabase.ImportAsset(savePath);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PCG] Failed to save Tripo model: {ex.Message}");
+                return false;
+            }
+
+            projectRelativePath = savePath;
+            Debug.Log($"[PCG] Tripo3DGenerator '{node.NodeId}' saved → {savePath}");
+            return true;
+        }
+
+        private static string FormatDisplayPath(string absolutePath)
+        {
+            var projectRoot = PcgTripoResolver.GetUnityProjectRoot();
+            if (string.IsNullOrEmpty(projectRoot) || string.IsNullOrEmpty(absolutePath))
+                return absolutePath;
+            try
+            {
+                var relative = Path.GetRelativePath(projectRoot, absolutePath).Replace('\\', '/');
+                if (!relative.StartsWith("..", System.StringComparison.Ordinal))
+                    return relative;
+            }
+            catch (System.Exception)
+            {
+                // Fall through to absolute.
+            }
+            return absolutePath;
+        }
+
+        private static string SanitizeFilename(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "TripoModel";
+            foreach (var c in Path.GetInvalidFileNameChars())
+                value = value.Replace(c, '_');
+            value = value.Trim();
+            return string.IsNullOrEmpty(value) ? "TripoModel" : value;
+        }
+    }
 }

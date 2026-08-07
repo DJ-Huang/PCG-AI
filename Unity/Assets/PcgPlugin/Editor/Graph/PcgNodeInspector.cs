@@ -38,6 +38,7 @@ namespace DJTechEditor.PCG.Graph
         {
             ("ExportFBX", (self, node) => self.CreateFbxExportActions(node)),
             (PcgMeshyResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyGenerateAction.Def)),
+            (PcgTripoResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgTripoGenerateAction.Def)),
         };
 
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)

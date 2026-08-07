@@ -65,6 +65,9 @@ namespace DJTechEditor.PCG
             if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
                 return Fail(meshyError);
 
+            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
+                return Fail(tripoError);
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             var meshes = PcgMeshResolver.CollectFromGraphJson(
                 json,

@@ -680,6 +680,12 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
+            {
+                Debug.LogError($"[PCG] {tripoError}", this);
+                return false;
+            }
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {

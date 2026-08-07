@@ -90,6 +90,16 @@ public:
     }
 };
 
+class Tripo3DGeneratorElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "Tripo3DGenerator"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        return execute_import_like(ctx, "Tripo3DGenerator");
+    }
+};
+
 class MatchSizeElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "MatchSize"; }
@@ -241,6 +251,7 @@ void register_assembly_elements(
 {
     map.emplace("ImportMesh", std::make_unique<ImportMeshElement>());
     map.emplace("Meshy3DGenerator", std::make_unique<Meshy3DGeneratorElement>());
+    map.emplace("Tripo3DGenerator", std::make_unique<Tripo3DGeneratorElement>());
     map.emplace("MatchSize", std::make_unique<MatchSizeElement>());
     map.emplace("BendMesh", std::make_unique<BendMeshElement>());
     map.emplace("LotSubdivision", std::make_unique<LotSubdivisionElement>());

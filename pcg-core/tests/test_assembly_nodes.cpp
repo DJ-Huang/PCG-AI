@@ -145,6 +145,27 @@ void test_import_mesh(const std::filesystem::path& fixture)
     const auto meshy_result = execute_geometry_graph(meshy_graph);
     expect(meshy_result.points().size() == imported.points().size(),
            "Meshy3DGenerator loads cached mesh path like ImportMesh");
+
+    const auto tripo_graph = nlohmann::json{
+        {"version", "2.0"},
+        {"nodes", nlohmann::json::array({
+            {{"id", "tripo"}, {"type", "Tripo3DGenerator"},
+             {"position", {{"x", 0.0}, {"y", 0.0}}},
+             {"data", {{"path", fixture.string()}, {"scale", 1.0}}}},
+            {{"id", "output"}, {"type", "Output"},
+             {"position", {{"x", 200.0}, {"y", 0.0}}},
+             {"data", nlohmann::json::object()}},
+        })},
+        {"edges", nlohmann::json::array({
+            {{"id", "tripo-output"}, {"source", "tripo"}, {"target", "output"},
+             {"sourceHandle", "out"},
+             {"targetHandle", "in"}, {"sourcePinType", "SpatialMesh"},
+             {"targetPinType", "Any"}},
+        })},
+    };
+    const auto tripo_result = execute_geometry_graph(tripo_graph);
+    expect(tripo_result.points().size() == imported.points().size(),
+           "Tripo3DGenerator loads cached mesh path like ImportMesh");
 }
 
 void test_match_size()

@@ -51,6 +51,12 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
+            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
+            {
+                Debug.LogError($"[PCG] {tripoError}");
+                return null;
+            }
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {
@@ -114,6 +120,12 @@ namespace DJTechRuntime.PCG
             if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
             {
                 Debug.LogError($"[PCG] {meshyError}");
+                return null;
+            }
+
+            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
+            {
+                Debug.LogError($"[PCG] {tripoError}");
                 return null;
             }
 

@@ -135,6 +135,8 @@ namespace DJTechEditor.PCG.Graph
                     entry.State.Error = prepared.Error ?? "Prepare failed.";
                     entry.State.Succeeded = false;
                 }
+                Debug.LogError(
+                    $"[PCG] Action prepare failed ({actionId} on '{nodeId}'):\n{prepared.Error}");
                 return;
             }
 
@@ -226,7 +228,7 @@ namespace DJTechEditor.PCG.Graph
             if (finished != null)
             {
                 foreach (var kvp in finished)
-                    FinalizeEntry(kvp.Value);
+                    FinalizeEntry(kvp.Key, kvp.Value);
             }
 
             if (!anyRunning && finished == null)
@@ -236,7 +238,7 @@ namespace DJTechEditor.PCG.Graph
             }
         }
 
-        private static void FinalizeEntry(Entry entry)
+        private static void FinalizeEntry(string entryKey, Entry entry)
         {
             WorkResult result;
             try
@@ -267,7 +269,11 @@ namespace DJTechEditor.PCG.Graph
             }
 
             if (!result.Ok)
+            {
+                Debug.LogError(
+                    $"[PCG] Action failed ({entryKey}):\n{result.Error}");
                 return;
+            }
 
             if (!string.IsNullOrEmpty(result.LogOnSuccess))
                 Debug.Log(result.LogOnSuccess);

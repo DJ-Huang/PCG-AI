@@ -38,4 +38,53 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(EditorPrefs.GetString(PcgMeshySettings.PrefKeyApiKey, ""), Is.EqualTo(""));
         }
     }
+
+    public class PcgThirdPartyHttpSettingsTests
+    {
+        private bool m_PreviousUseProxy;
+        private string m_PreviousProxyUrl;
+
+        [SetUp]
+        public void SetUp()
+        {
+            m_PreviousUseProxy = EditorPrefs.GetBool(PcgThirdPartyHttpSettings.PrefKeyUseHttpProxy, true);
+            m_PreviousProxyUrl = EditorPrefs.GetString(
+                PcgThirdPartyHttpSettings.PrefKeyProxyUrl,
+                PcgThirdPartyHttpSettings.DefaultProxyUrl);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            EditorPrefs.SetBool(PcgThirdPartyHttpSettings.PrefKeyUseHttpProxy, m_PreviousUseProxy);
+            EditorPrefs.SetString(PcgThirdPartyHttpSettings.PrefKeyProxyUrl, m_PreviousProxyUrl ?? "");
+            PcgThirdPartyHttpSettings.UseHttpProxy = m_PreviousUseProxy;
+            PcgThirdPartyHttpSettings.ProxyUrl = m_PreviousProxyUrl ?? "";
+        }
+
+        [Test]
+        public void ProxySettings_PersistInEditorPrefs()
+        {
+            PcgThirdPartyHttpSettings.UseHttpProxy = false;
+            PcgThirdPartyHttpSettings.ProxyUrl = "http://127.0.0.1:7890";
+            Assert.That(PcgThirdPartyHttpSettings.UseHttpProxy, Is.False);
+            Assert.That(PcgThirdPartyHttpSettings.ProxyUrl, Is.EqualTo("http://127.0.0.1:7890"));
+            Assert.That(
+                EditorPrefs.GetBool(PcgThirdPartyHttpSettings.PrefKeyUseHttpProxy, true),
+                Is.False);
+            Assert.That(
+                EditorPrefs.GetString(PcgThirdPartyHttpSettings.PrefKeyProxyUrl, ""),
+                Is.EqualTo("http://127.0.0.1:7890"));
+
+            var handler = PcgThirdPartyHttpSettings.CreateHttpClientHandler();
+            Assert.That(handler.UseProxy, Is.False);
+
+            PcgThirdPartyHttpSettings.UseHttpProxy = true;
+            PcgThirdPartyHttpSettings.ProxyUrl = "http://127.0.0.1:7897";
+            handler = PcgThirdPartyHttpSettings.CreateHttpClientHandler();
+            Assert.That(handler.UseProxy, Is.True);
+            Assert.That(handler.Proxy?.GetProxy(new System.Uri("https://api.meshy.ai")).ToString(),
+                Is.EqualTo("http://127.0.0.1:7897/"));
+        }
+    }
 }

@@ -122,6 +122,53 @@ Source Image / URL
 
 ---
 
+## Tripo 3D Generator
+
+| 项 | 值 |
+|----|-----|
+| 节点类型 | `Tripo3DGenerator` |
+| 显示名 | Tripo 3D Generator |
+| 分类 | Mesh |
+| 官方文档 | [Tripo OpenAPI](https://docs.tripo3d.ai/get-started/overview.html) |
+| Base URL | `https://openapi.tripo3d.ai/v3` |
+| 创建任务 | `POST /v3/generation/image-to-model` |
+| 查询任务 | `GET /v3/tasks/:id` |
+| 上传图片 | `POST /v3/files`（本地 texture 时） |
+
+### 用法
+
+与 Meshy 相同：Settings 填 Key → 图中添加节点 → 指定 Source Image / Image URL → Inspector **Generate** → 保存 GLB 到 `Assets/` → Preview / Cook。
+
+### 节点属性
+
+| 属性 | 默认 | 说明 |
+|------|------|------|
+| `texture` | `""` | Source Image |
+| `imageUrl` | `""` | 可选公网 URL / `data:` |
+| `modelVersion` | `v3.1-20260211` | `v3.1-20260211` / `P1-20260311` / `v2.5-20250123` |
+| `shouldTexture` | `true` | 是否生成贴图 |
+| `enablePbr` | `false` | PBR |
+| `faceLimit` | `30000` | 面数上限 |
+| `scale` | `1.0` | 导入缩放 |
+| `axisConversion` | `none` | 轴向转换 |
+| `path` | `""` | Generate→Save 写入的 GLB 路径 |
+
+### 缓存
+
+- 目录：`<Project>/Library/PCG/TripoCache/<sha256>.glb`
+
+### 相关代码
+
+| 职责 | 路径 |
+|------|------|
+| API Key | `PcgTripoSettings.cs` |
+| HTTP 客户端 | `PcgTripoClient.cs` |
+| Cook 前解析 | `PcgTripoResolver.cs` |
+| Inspector Generate | `PcgTripoGenerateAction.cs` |
+| C++ 元素 | `assembly_elements.cpp`（`Tripo3DGenerator`） |
+
+---
+
 ## 扩展下一厂商（例如 Tripo）
 
 按 Meshy 同构扩展即可，避免在 C++ 里写 HTTPS。
@@ -180,7 +227,7 @@ Source Image / URL
 | 厂商 | 节点 | 状态 |
 |------|------|------|
 | Meshy | `Meshy3DGenerator` | 已接入 |
-| Tripo | `Tripo3DGenerator` | 待做 |
+| Tripo | `Tripo3DGenerator` | 已接入 |
 | （其他） | — | 按上方清单追加 |
 
 ---

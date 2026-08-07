@@ -7334,6 +7334,98 @@
       }
     },
     {
+      "type": "Tripo3DGenerator",
+      "displayName": "Tripo 3D Generator",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "texture": {
+          "type": "texture2d",
+          "displayName": "Source Image",
+          "default": ""
+        },
+        "imageUrl": {
+          "type": "string",
+          "displayName": "Image URL (optional)",
+          "default": "",
+          "uiHint": "Public URL or data URI. Overrides Source Image when set."
+        },
+        "modelVersion": {
+          "type": "enum",
+          "displayName": "Model Version",
+          "default": "v3.1-20260211",
+          "options": [
+            {
+              "value": "v3.1-20260211",
+              "label": "v3.1-20260211 (H3 high fidelity)"
+            },
+            {
+              "value": "P1-20260311",
+              "label": "P1-20260311 (low poly)"
+            },
+            {
+              "value": "v2.5-20250123",
+              "label": "v2.5-20250123 (H2)"
+            }
+          ]
+        },
+        "shouldTexture": {
+          "type": "boolean",
+          "displayName": "Generate Texture",
+          "default": true
+        },
+        "enablePbr": {
+          "type": "boolean",
+          "displayName": "Enable PBR",
+          "default": false
+        },
+        "faceLimit": {
+          "type": "integer",
+          "displayName": "Face Limit",
+          "default": 30000,
+          "minimum": 48,
+          "maximum": 2000000
+        },
+        "scale": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 1e-06
+        },
+        "axisConversion": {
+          "type": "enum",
+          "displayName": "Axis Conversion",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "None"
+            },
+            {
+              "value": "zUpToYUp",
+              "label": "Z Up to Y Up"
+            },
+            {
+              "value": "yUpToZUp",
+              "label": "Y Up to Z Up"
+            }
+          ]
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Saved Model Path",
+          "default": "",
+          "uiHint": "Set by Generate→Save (Assets/….glb). Cook/preview load this file; never auto-generate."
+        }
+      }
+    },
+    {
       "type": "MatchSize",
       "displayName": "Match Size",
       "category": "Mesh",

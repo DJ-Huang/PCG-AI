@@ -15,6 +15,10 @@ namespace DJTechEditor.PCG
         private string _watchedPath = "";
         private bool _autoReload = true;
         private string _meshyApiKey = "";
+        private string _tripoApiKey = "";
+        private string _tripoApiRegion = PcgTripoSettings.ApiRegionGlobal;
+        private bool _useHttpProxy = PcgThirdPartyHttpSettings.UseHttpProxy;
+        private string _proxyUrl = PcgThirdPartyHttpSettings.ProxyUrl;
         private PcgScatterDisplayMode _defaultScatterDisplayMode = PcgScatterDisplayMode.MergedMesh;
 
         [MenuItem("PCG/Settings")]
@@ -30,6 +34,10 @@ namespace DJTechEditor.PCG
             _autoReload = PcgGraphWatcher.AutoReload;
             _graphPath = _watchedPath;
             _meshyApiKey = PcgMeshySettings.ApiKey;
+            _tripoApiKey = PcgTripoSettings.ApiKey;
+            _tripoApiRegion = PcgTripoSettings.ApiRegion;
+            _useHttpProxy = PcgThirdPartyHttpSettings.UseHttpProxy;
+            _proxyUrl = PcgThirdPartyHttpSettings.ProxyUrl;
             _defaultScatterDisplayMode = PcgProjectSettings.DefaultScatterDisplayMode;
         }
 
@@ -116,6 +124,29 @@ namespace DJTechEditor.PCG
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Third-Party API (HTTP Proxy)", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            _useHttpProxy = EditorGUILayout.Toggle(
+                new GUIContent(
+                    "Use HTTP Proxy",
+                    "Route Meshy / Tripo HTTP through a local proxy (e.g. Clash mixed port). " +
+                    "Disable for direct connection when the proxy is off."),
+                _useHttpProxy);
+            if (_useHttpProxy)
+            {
+                _proxyUrl = EditorGUILayout.TextField(
+                    new GUIContent(
+                        "Proxy URL",
+                        "Example: http://127.0.0.1:7897 (Clash Verge mixed port)."),
+                    _proxyUrl);
+            }
+            if (EditorGUI.EndChangeCheck())
+            {
+                PcgThirdPartyHttpSettings.UseHttpProxy = _useHttpProxy;
+                PcgThirdPartyHttpSettings.ProxyUrl = _proxyUrl;
+            }
+
+            EditorGUILayout.Space();
             EditorGUILayout.LabelField("Meshy (Image to 3D)", EditorStyles.boldLabel);
             EditorGUI.BeginChangeCheck();
             _meshyApiKey = EditorGUILayout.PasswordField(
@@ -134,6 +165,44 @@ namespace DJTechEditor.PCG
             }
             EditorGUILayout.LabelField(
                 PcgMeshySettings.HasApiKey ? "Key cached on this machine" : "No key set",
+                EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Tripo (Image to 3D)", EditorStyles.boldLabel);
+            EditorGUI.BeginChangeCheck();
+            _tripoApiKey = EditorGUILayout.PasswordField(
+                new GUIContent(
+                    "Tripo API Key",
+                    "Cached locally via EditorPrefs. Required by Tripo 3D Generator nodes."),
+                _tripoApiKey);
+            if (EditorGUI.EndChangeCheck())
+                PcgTripoSettings.ApiKey = _tripoApiKey;
+
+            EditorGUI.BeginChangeCheck();
+            var tripoRegionIndex = EditorGUILayout.Popup(
+                new GUIContent(
+                    "Tripo API Region",
+                    "China keys from platform.tripo3d.com require the China endpoint. " +
+                    "Global uses openapi.tripo3d.ai."),
+                _tripoApiRegion == PcgTripoSettings.ApiRegionChina ? 1 : 0,
+                new[] { "Global (openapi.tripo3d.ai)", "China (openapi.tripo3d.com)" });
+            if (EditorGUI.EndChangeCheck())
+            {
+                _tripoApiRegion = tripoRegionIndex == 1
+                    ? PcgTripoSettings.ApiRegionChina
+                    : PcgTripoSettings.ApiRegionGlobal;
+                PcgTripoSettings.ApiRegion = _tripoApiRegion;
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Clear API Key", GUILayout.Width(120)))
+            {
+                PcgTripoSettings.ClearApiKey();
+                _tripoApiKey = "";
+            }
+            EditorGUILayout.LabelField(
+                PcgTripoSettings.HasApiKey ? "Key cached on this machine" : "No key set",
                 EditorStyles.miniLabel);
             EditorGUILayout.EndHorizontal();
 

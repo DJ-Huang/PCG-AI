@@ -406,4 +406,360 @@ namespace DJTechRuntime.PCG
         }
 #endif
     }
+    public static class PcgTripoResolver
+    {
+        public const string NodeType = "Tripo3DGenerator";
+
+        public static bool TryPrepareForCook(ref string json, out string error)
+        {
+            error = null;
+            if (string.IsNullOrWhiteSpace(json))
+                return true;
+            if (json.IndexOf(NodeType, StringComparison.Ordinal) < 0)
+                return true;
+
+#if !UNITY_EDITOR
+            error = "Tripo3DGenerator requires the Unity Editor.";
+            return false;
+#else
+            if (!PcgGraphSerializer.TryFromJson(json, out var doc, out error))
+                return false;
+
+            var changed = false;
+            if (!PrepareNodes(doc.nodes, ref changed, out error))
+                return false;
+            if (doc.subgraphs != null)
+            {
+                foreach (var subgraph in doc.subgraphs)
+                {
+                    if (subgraph == null)
+                        continue;
+                    if (!PrepareNodes(subgraph.nodes, ref changed, out error))
+                        return false;
+                }
+            }
+
+            if (changed)
+                json = PcgGraphSerializer.ToJson(doc, pretty: false);
+            return true;
+#endif
+        }
+
+#if UNITY_EDITOR
+        private static bool PrepareNodes(
+            List<PcgGraphNodeRecord> nodes, ref bool changed, out string error)
+        {
+            error = null;
+            if (nodes == null)
+                return true;
+
+            foreach (var node in nodes)
+            {
+                if (node == null || node.type != NodeType || string.IsNullOrEmpty(node.id))
+                    continue;
+
+                node.data ??= new PcgNodeData();
+                if (!TryResolveModelForCook(node.id, node.data, out var absolutePath, out error))
+                    return false;
+
+                var previous = node.data.GetRaw("path")?.ToString() ?? "";
+                if (!string.Equals(previous, absolutePath, StringComparison.Ordinal))
+                {
+                    node.data.SetRaw("path", absolutePath);
+                    node.data.SetRaw("projectRoot", "");
+                    changed = true;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool TryResolveModelForCook(
+            string nodeId, PcgNodeData data, out string absolutePath, out string error)
+        {
+            error = null;
+            data ??= new PcgNodeData();
+
+            if (TryGetSavedModelPath(data, out absolutePath))
+                return true;
+
+            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
+            if (File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0)
+                return true;
+
+            error =
+                $"Tripo3DGenerator '{nodeId}': no saved/cached model. " +
+                "Click Generate, save the model into the project, then cook/preview " +
+                "(preview / auto cook never generate).";
+            absolutePath = null;
+            return false;
+        }
+
+        public static bool TryGetSavedModelPath(PcgNodeData data, out string absolutePath)
+        {
+            absolutePath = null;
+            data ??= new PcgNodeData();
+            var stored = data.GetRaw("path")?.ToString()?.Trim();
+            if (string.IsNullOrWhiteSpace(stored))
+                return false;
+
+            absolutePath = ResolveStoredAbsolutePath(stored, data.GetRaw("projectRoot")?.ToString());
+            return !string.IsNullOrEmpty(absolutePath) &&
+                   File.Exists(absolutePath) &&
+                   new FileInfo(absolutePath).Length > 0;
+        }
+
+        public static string GetUnityProjectRoot()
+        {
+            var parent = Directory.GetParent(Application.dataPath);
+            return parent != null ? Path.GetFullPath(parent.FullName) : Path.GetFullPath(Application.dataPath);
+        }
+
+        public static string ResolveProjectAbsolutePath(string projectRelativeOrAbsolute)
+        {
+            return ResolveStoredAbsolutePath(projectRelativeOrAbsolute, projectRoot: null);
+        }
+
+        private static string ResolveStoredAbsolutePath(string stored, string projectRoot)
+        {
+            if (string.IsNullOrWhiteSpace(stored))
+                return null;
+
+            stored = stored.Trim().Replace('\\', '/');
+            if (Path.IsPathRooted(stored))
+                return Path.GetFullPath(stored);
+
+            if (string.IsNullOrWhiteSpace(projectRoot))
+                projectRoot = GetUnityProjectRoot();
+            return Path.GetFullPath(Path.Combine(projectRoot, stored.Replace('/', Path.DirectorySeparatorChar)));
+        }
+
+        public static bool TryBuildGenerateRequest(
+            string nodeId,
+            PcgNodeData data,
+            out PcgTripoClient.GenerateRequest request,
+            out string absolutePath,
+            out string error)
+        {
+            request = default;
+            error = null;
+            data ??= new PcgNodeData();
+            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
+
+            if (!PcgTripoSettings.HasApiKey)
+            {
+                error =
+                    $"Tripo3DGenerator '{nodeId}': API key missing. " +
+                    "Open PCG → Settings (or Project Settings → PCG AI) and enter your Tripo API key.";
+                return false;
+            }
+
+            var apiKey = PcgTripoSettings.ApiKey?.Trim() ?? "";
+            if (apiKey.StartsWith("msy_", StringComparison.OrdinalIgnoreCase))
+            {
+                error =
+                    $"Tripo3DGenerator '{nodeId}': the cached key looks like a Meshy key (msy_…). " +
+                    "Enter a Tripo API key in PCG → Settings → Tripo (Image to 3D).";
+                return false;
+            }
+
+            if (!TryBuildImageInput(nodeId, data, out var imageUrl, out var imageBytes, out var extension, out error))
+                return false;
+
+            request = new PcgTripoClient.GenerateRequest
+            {
+                ApiKey = apiKey,
+                ImageUrl = imageUrl,
+                ImageBytes = imageBytes,
+                ImageExtension = extension,
+                ModelVersion = data.GetRaw("modelVersion")?.ToString() ?? "v3.1-20260211",
+                Texture = ReadBool(data, "shouldTexture", true),
+                Pbr = ReadBool(data, "enablePbr", false),
+                FaceLimit = ReadInt(data, "faceLimit", 30000),
+            };
+            return true;
+        }
+
+        public static bool TryGetCachedModelPath(string nodeId, PcgNodeData data, out string absolutePath)
+        {
+            data ??= new PcgNodeData();
+            absolutePath = GetCachePath(BuildCacheKey(nodeId ?? "", data));
+            return File.Exists(absolutePath) && new FileInfo(absolutePath).Length > 0;
+        }
+
+        private static bool TryBuildImageInput(
+            string nodeId,
+            PcgNodeData data,
+            out string imageUrl,
+            out byte[] imageBytes,
+            out string extension,
+            out string error)
+        {
+            imageUrl = null;
+            imageBytes = null;
+            extension = "png";
+            error = null;
+
+            var url = data?.GetRaw("imageUrl")?.ToString()?.Trim();
+            if (!string.IsNullOrWhiteSpace(url) &&
+                (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                 url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                 url.StartsWith("data:", StringComparison.OrdinalIgnoreCase)))
+            {
+                imageUrl = url;
+                extension = url.StartsWith("data:image/jpeg", StringComparison.OrdinalIgnoreCase) ? "jpg" : "png";
+                return true;
+            }
+
+            var stored = data?.GetRaw("texture")?.ToString();
+            if (string.IsNullOrWhiteSpace(stored))
+            {
+                error =
+                    $"Tripo3DGenerator '{nodeId}': assign a Source Image (texture) " +
+                    "or set imageUrl to a public / data URI.";
+                return false;
+            }
+
+            var source = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
+            if (source == null)
+            {
+                error = $"Tripo3DGenerator '{nodeId}': failed to load texture '{stored}'.";
+                return false;
+            }
+
+            var readable = EnsureReadable(source);
+            try
+            {
+                imageBytes = readable.EncodeToPNG();
+                if (imageBytes == null || imageBytes.Length == 0)
+                {
+                    error = $"Tripo3DGenerator '{nodeId}': EncodeToPNG failed.";
+                    return false;
+                }
+                extension = "png";
+                return true;
+            }
+            finally
+            {
+                if (readable != source)
+                    UnityEngine.Object.DestroyImmediate(readable);
+            }
+        }
+
+        private static Texture2D EnsureReadable(Texture2D source)
+        {
+            if (source.isReadable && CanEncodeToPng(source.format))
+                return source;
+
+            var rt = RenderTexture.GetTemporary(
+                source.width, source.height, 0, RenderTextureFormat.ARGB32);
+            var prev = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(source, rt);
+                RenderTexture.active = rt;
+                var copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+                copy.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+                copy.Apply();
+                return copy;
+            }
+            finally
+            {
+                RenderTexture.active = prev;
+                RenderTexture.ReleaseTemporary(rt);
+            }
+        }
+
+        private static bool CanEncodeToPng(TextureFormat format)
+        {
+            switch (format)
+            {
+                case TextureFormat.ARGB32:
+                case TextureFormat.RGBA32:
+                case TextureFormat.RGB24:
+                case TextureFormat.Alpha8:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static string BuildCacheKey(string nodeId, PcgNodeData data)
+        {
+            var sb = new StringBuilder(256);
+            sb.Append(nodeId).Append('|');
+            sb.Append(data?.GetRaw("texture")?.ToString() ?? "").Append('|');
+            sb.Append(data?.GetRaw("imageUrl")?.ToString() ?? "").Append('|');
+            sb.Append(data?.GetRaw("modelVersion")?.ToString() ?? "v3.1-20260211").Append('|');
+            sb.Append(ReadBool(data, "enablePbr", false)).Append('|');
+            sb.Append(ReadBool(data, "shouldTexture", true)).Append('|');
+            sb.Append(ReadInt(data, "faceLimit", 30000));
+
+            var stored = data?.GetRaw("texture")?.ToString();
+            if (!string.IsNullOrWhiteSpace(stored))
+            {
+                var tex = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
+                if (tex != null)
+                {
+                    var readable = EnsureReadable(tex);
+                    try
+                    {
+                        var png = readable.EncodeToPNG();
+                        if (png != null)
+                            sb.Append('|').Append(Convert.ToBase64String(ComputeSha256(png)));
+                    }
+                    finally
+                    {
+                        if (readable != tex)
+                            UnityEngine.Object.DestroyImmediate(readable);
+                    }
+                }
+            }
+
+            var hash = ComputeSha256(Encoding.UTF8.GetBytes(sb.ToString()));
+            var hex = new StringBuilder(hash.Length * 2);
+            foreach (var b in hash)
+                hex.Append(b.ToString("x2"));
+            return hex.ToString();
+        }
+
+        private static byte[] ComputeSha256(byte[] bytes)
+        {
+            using var sha = SHA256.Create();
+            return sha.ComputeHash(bytes);
+        }
+
+        private static string GetCachePath(string cacheKey)
+        {
+            var root = Path.Combine(Application.dataPath, "..", "Library", "PCG", "TripoCache");
+            return Path.GetFullPath(Path.Combine(root, cacheKey + ".glb"));
+        }
+
+        private static bool ReadBool(PcgNodeData data, string key, bool fallback)
+        {
+            var raw = data?.GetRaw(key);
+            if (raw == null)
+                return fallback;
+            if (raw is bool b)
+                return b;
+            return bool.TryParse(raw.ToString(), out var parsed) ? parsed : fallback;
+        }
+
+        private static int ReadInt(PcgNodeData data, string key, int fallback)
+        {
+            var raw = data?.GetRaw(key);
+            if (raw == null)
+                return fallback;
+            if (raw is int i)
+                return i;
+            if (raw is long l)
+                return (int)l;
+            if (raw is double d)
+                return (int)d;
+            if (raw is float f)
+                return (int)f;
+            return int.TryParse(raw.ToString(), out var parsed) ? parsed : fallback;
+        }
+#endif
+    }
 }
