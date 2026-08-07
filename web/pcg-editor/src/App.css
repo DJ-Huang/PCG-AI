@@ -571,6 +571,15 @@
   color: #fff;
 }
 
+.pcg-preview__spline-hint {
+  font-size: 11px;
+  color: #40d9ff;
+  padding: 2px 6px;
+  border: 1px solid #2a6a7a;
+  border-radius: 3px;
+  background: #1a3038;
+}
+
 .pcg-preview__canvas {
   flex: 1;
   min-height: 0;

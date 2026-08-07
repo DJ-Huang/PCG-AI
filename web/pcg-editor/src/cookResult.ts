@@ -263,6 +263,16 @@ export interface ParsedMesh {
   indexCount: number;
 }
 
+/** Cook-result spline polyline (pcg-core PcgSplineData::to_json). */
+export interface ParsedSpline {
+  points: Float32Array; // xyz per control/sample point
+  closed: boolean;
+}
+
+export interface ParsedSplines {
+  splines: ParsedSpline[];
+}
+
 const MESH_FLAG_NORMALS = 0x1;
 const MESH_FLAG_COLORS = 0x2;
 const MESH_FLAG_UVS = 0x4;
@@ -318,6 +328,38 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
   const uvs = (flags & MESH_FLAG_UVS) !== 0 ? readFloatBlock(vertexCount * 2, 'uvs') : null;
 
   return { positions, indices, normals, colors, uvs, vertexCount, indexCount };
+}
+
+/** Parse spline payload from cook-result JSON blob (Unity PcgResultParser.TryParseSplines). */
+export function parseSplineJson(json: string): ParsedSplines | null {
+  if (!json.trim()) return null;
+  try {
+    const payload = JSON.parse(json) as { splines?: unknown };
+    if (!Array.isArray(payload.splines)) return null;
+
+    const splines: ParsedSpline[] = [];
+    for (const entry of payload.splines) {
+      if (!entry || typeof entry !== 'object') continue;
+      const rec = entry as { points?: unknown; closed?: unknown };
+      if (!Array.isArray(rec.points) || rec.points.length === 0) continue;
+
+      const positions = new Float32Array(rec.points.length * 3);
+      for (let i = 0; i < rec.points.length; i++) {
+        const pt = rec.points[i] as Record<string, unknown> | null;
+        positions[i * 3] = Number(pt?.x) || 0;
+        positions[i * 3 + 1] = Number(pt?.y) || 0;
+        positions[i * 3 + 2] = Number(pt?.z) || 0;
+      }
+      splines.push({
+        points: positions,
+        closed: rec.closed === true,
+      });
+    }
+
+    return splines.length > 0 ? { splines } : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

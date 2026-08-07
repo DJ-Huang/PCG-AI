@@ -40,9 +40,14 @@ import Blackboard from './Blackboard';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
-import PreviewViewport from './PreviewViewport';
+import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
 import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, type PreviewData } from './previewCook';
 import { NodeActionsContext } from './nodeActions';
+import {
+  getEffectiveControlPoints,
+  isSplineAuthoringNode,
+  serializeControlPoints,
+} from './splineControlPoints';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -618,6 +623,43 @@ function PcgEditor() {
     return getNodeTypeDefs(node.type ?? '')?.displayName ?? node.type ?? previewTargetNodeId;
   })();
 
+  const splineEditNode = useMemo(() => {
+    const candidateIds = [previewTargetNodeId, selectedNode?.id].filter(Boolean) as string[];
+    for (const id of candidateIds) {
+      const node = nodes.find((n) => n.id === id);
+      if (node?.type && isSplineAuthoringNode(node.type)) return node;
+    }
+    return null;
+  }, [nodes, previewTargetNodeId, selectedNode?.id]);
+
+  const splineEdit = useMemo((): SplineEditContext | null => {
+    if (!splineEditNode) return null;
+    const data = splineEditNode.data as Record<string, unknown>;
+    const controlPoints = getEffectiveControlPoints(data);
+    if (controlPoints.length === 0) return null;
+    return {
+      nodeId: splineEditNode.id,
+      controlPoints,
+      closed: data.closed === true,
+      onControlPointsChange: () => {},
+    };
+  }, [splineEditNode]);
+
+  const handleSplineControlPointsChange = useCallback(
+    (nodeId: string, points: ReturnType<typeof getEffectiveControlPoints>) => {
+      updateNodeData(nodeId, { controlPoints: serializeControlPoints(points) });
+    },
+    [updateNodeData],
+  );
+
+  const splineEditForViewport = useMemo((): SplineEditContext | null => {
+    if (!splineEdit) return null;
+    return {
+      ...splineEdit,
+      onControlPointsChange: (points) => handleSplineControlPointsChange(splineEdit.nodeId, points),
+    };
+  }, [splineEdit, handleSplineControlPointsChange]);
+
   // Debounced re-cook on graph/selection change while the panel is open.
   // Coalesces edits; never cooks per keystroke.
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -754,6 +796,7 @@ function PcgEditor() {
             onRefresh={() => void requestPreviewCook()}
             onClose={() => void togglePreview()}
             targetLabel={previewTargetLabel}
+            splineEdit={splineEditForViewport}
             onResetTarget={
               previewTargetNodeId
                 ? () => {

@@ -8,10 +8,12 @@ import {
   parseGeometryBinary,
   parseMeshBinary,
   parsePointBinary,
+  parseSplineJson,
   PcgExecuteKind,
   type CookResult,
   type ParsedGeometry,
   type ParsedMesh,
+  type ParsedSplines,
 } from './cookResult';
 
 export interface PreviewData {
@@ -21,6 +23,8 @@ export interface PreviewData {
   mesh: ParsedMesh | null;
   /** Scatter point cloud when the graph outputs points only. */
   scatterPoints: Float32Array | null;
+  /** Spline polylines when the graph outputs SpatialSpline data. */
+  splines: ParsedSplines | null;
   cook: CookResult;
 }
 
@@ -135,11 +139,18 @@ export async function cookGraphPreview(
     if (cook.points.length > 0) {
       scatterPoints = parsePointBinary(cook.points);
     }
-    if (!geometry && !mesh && !scatterPoints && cook.kind === PcgExecuteKind.Json) {
-      return { ok: false, error: 'Graph produced JSON output only — nothing to preview.' };
+    let splines: ParsedSplines | null = null;
+    if (cook.json) {
+      splines = parseSplineJson(cook.json);
+    }
+    if (!geometry && !mesh && !scatterPoints && !splines) {
+      if (cook.kind === PcgExecuteKind.Json) {
+        return { ok: false, error: 'Graph produced JSON output only — nothing to preview.' };
+      }
+      return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
     }
 
-    return { ok: true, data: { geometry, mesh, scatterPoints, cook } };
+    return { ok: true, data: { geometry, mesh, scatterPoints, splines, cook } };
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       return { ok: false, error: 'aborted' };
