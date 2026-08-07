@@ -593,6 +593,10 @@ function PcgEditor() {
 
   const handleNodePreview = useCallback(
     (nodeId: string) => {
+      // The target change retriggers the debounced effect below; skip its next
+      // run since the direct cook here already covers it (avoids a duplicate
+      // request whose cache-hit stats would mask the real exec numbers).
+      skipDebounceRef.current = true;
       setPreviewTargetNodeId(nodeId);
       if (!showPreview) {
         void openPreview();
@@ -617,8 +621,13 @@ function PcgEditor() {
   // Debounced re-cook on graph/selection change while the panel is open.
   // Coalesces edits; never cooks per keystroke.
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipDebounceRef = useRef(false);
   useEffect(() => {
     if (!showPreview) return;
+    if (skipDebounceRef.current) {
+      skipDebounceRef.current = false;
+      return;
+    }
     if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
     previewDebounceRef.current = setTimeout(() => {
       void requestPreviewCook();
@@ -748,6 +757,7 @@ function PcgEditor() {
             onResetTarget={
               previewTargetNodeId
                 ? () => {
+                    skipDebounceRef.current = true;
                     setPreviewTargetNodeId(null);
                     void requestPreviewCook(null);
                   }
