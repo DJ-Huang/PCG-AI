@@ -25,7 +25,8 @@ import ManifestNode from './nodes/ManifestNode';
 import { defaultData } from './graphSchema';
 import type { GraphParameter, GraphSubgraph } from './graphSchema';
 import { exportGraph, downloadGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
-import { importGraphFromFile, syncNodeCounterFromNodes } from './importGraph';
+import { importGraphFromFile, parseGraphJson, syncNodeCounterFromNodes } from './importGraph';
+import { clearEditorSession, loadEditorSession, saveEditorSession } from './editorSession';
 import { isValidConnection } from './connectionValidation';
 import {
   getNodeTypeDefs,
@@ -83,11 +84,32 @@ const initialEdges: Edge[] = [
 
 let nodeCounter = 100;
 
+function restoreEditorSession() {
+  const session = loadEditorSession();
+  if (!session) return null;
+  const result = parseGraphJson(JSON.stringify(session.graph));
+  if (!result.ok) {
+    clearEditorSession();
+    return null;
+  }
+  nodeCounter = session.nodeCounter;
+  return {
+    nodes: result.nodes,
+    edges: result.edges,
+    parameters: result.parameters,
+    subgraphs: result.subgraphs,
+    filename: session.filename,
+  };
+}
+
 function PcgEditor() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [parameters, setParameters] = useState<GraphParameter[]>([]);
-  const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>([]);
+  const restoredRef = useRef(restoreEditorSession());
+  const restored = restoredRef.current;
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(restored?.nodes ?? initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(restored?.edges ?? initialEdges);
+  const [parameters, setParameters] = useState<GraphParameter[]>(restored?.parameters ?? []);
+  const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>(restored?.subgraphs ?? []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
   const [showAgent, setShowAgent] = useState(true);
@@ -97,10 +119,14 @@ function PcgEditor() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(
+    restored
+      ? `Restored last session${restored.filename ? `: ${restored.filename}` : ''} (${restored.nodes.length} nodes)`
+      : '',
+  );
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
-  const [currentFilename, setCurrentFilename] = useState<string>('');
+  const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
   const [infoNode, setInfoNode] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const [previewTargetNodeId, setPreviewTargetNodeId] = useState<string | null>(null);
 
@@ -572,6 +598,7 @@ function PcgEditor() {
     setPreviewTargetNodeId(null);
     setCurrentFilename('');
     nodeCounter = 100;
+    clearEditorSession();
     setStatus('New graph created');
   };
 
@@ -647,6 +674,28 @@ function PcgEditor() {
     }
     await openPreview();
   }, [showPreview, openPreview]);
+
+  // Persist editor session to localStorage (debounced). Skip the first render so
+  // a fresh visit with no prior session does not overwrite with the default graph.
+  const skipPersistRef = useRef(true);
+  useEffect(() => {
+    if (skipPersistRef.current) {
+      skipPersistRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (nodes.length === 0 && !currentFilename) {
+        clearEditorSession();
+        return;
+      }
+      saveEditorSession({
+        graph: exportGraph(nodes, edges, parameters, subgraphs),
+        filename: currentFilename,
+        nodeCounter,
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [nodes, edges, parameters, subgraphs, currentFilename]);
 
   // Preview panel is always-on: open it once on mount.
   // StrictMode double-invocation is safe — the health-check is idempotent.
