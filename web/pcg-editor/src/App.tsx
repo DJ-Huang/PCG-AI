@@ -6,6 +6,7 @@ import { useCallback, useRef, useState, useEffect, type ChangeEvent } from 'reac
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   ReactFlowProvider,
@@ -78,8 +79,8 @@ function PcgEditor() {
   const [parameters, setParameters] = useState<GraphParameter[]>([]);
   const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [showBlackboard, setShowBlackboard] = useState(true);
-  const [showInspector, setShowInspector] = useState(true);
+  const [showBlackboard, setShowBlackboard] = useState(false);
+  const [showInspector, setShowInspector] = useState(false);
   const [status, setStatus] = useState('');
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
@@ -364,6 +365,12 @@ function PcgEditor() {
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         fitView({ duration: 200 });
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        setShowBlackboard((v) => !v);
+      } else if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        setShowInspector((v) => !v);
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -585,15 +592,15 @@ function PcgEditor() {
             fitView
             deleteKeyCode={['Delete', 'Backspace']}
           >
-            <Background />
+            <Background variant={BackgroundVariant.Lines} gap={24} color="#2b2b2b" />
             <Controls />
-            <MiniMap />
+            <MiniMap pannable zoomable />
           </ReactFlow>
 
           {/* Status bar */}
           <div className="pcg-status-bar">
             <span>{nodes.length} nodes · {edges.length} edges · {parameters.length} params · {subgraphs.length} subgraphs</span>
-            <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit</span>
+            <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit · P: Parameters · I: Inspector</span>
             {(canUndo || canRedo) && (
               <span className="pcg-status-bar__undo">
                 <button type="button" onClick={undo} disabled={!canUndo} className="pcg-status-bar__btn">↶ Undo</button>

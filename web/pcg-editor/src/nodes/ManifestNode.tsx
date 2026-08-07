@@ -1,12 +1,11 @@
 // ManifestNode.tsx — Generic manifest-driven node component.
 // All node types use this single component; ports and colors are read from node-manifest.json.
-// Layout: Input ports (top, horizontal) → Header → Body → Output ports (bottom, horizontal).
-// Houdini-style: each port is an independent colored dot on the node's top/bottom edge.
-// Nodes that produce groups show a compact "🔗 N groups" badge with hover popup.
+// Unity-style: compact pill with tiny port dots on top/bottom edges, title label to the right.
+// Fields are NOT rendered on the node — editing happens in the Inspector panel.
 
 import { useState } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { getNodeTypeDefs, getCategoryColor, getPinTypeColor } from '../nodeManifest';
+import { getNodeTypeDefs, getPinTypeColor } from '../nodeManifest';
 
 export default function ManifestNode({ type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
@@ -15,12 +14,11 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
   if (!def) {
     return (
       <div className="pcg-node pcg-node--unknown">
-        <div className="pcg-node__header">Unknown: {type}</div>
+        <div className="pcg-node__title">Unknown: {type}</div>
       </div>
     );
   }
 
-  const color = getCategoryColor(def.category);
   const nodeData = data as Record<string, unknown>;
 
   // Collect group names this node produces (for badge display)
@@ -46,34 +44,48 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
   const inactiveGroups = producedGroups.filter((g) => g.condition);
 
   return (
-    <div
-      className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}
-      style={{ borderColor: color }}
-    >
-      {/* Input ports — horizontal row at top edge */}
-      {def.inputs.length > 0 && (
-        <div className="pcg-node__ports-top">
-          {def.inputs.map((pin) => (
-            <div key={pin.id} className="pcg-node__port-item">
+    <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}>
+      {/* Pill + port dots stack (ports stay centered on the pill) */}
+      <div className="pcg-node__stack">
+        {def.inputs.length > 0 && (
+          <div className="pcg-node__ports pcg-node__ports--top">
+            {def.inputs.map((pin) => (
               <Handle
+                key={pin.id}
                 type="target"
                 position={Position.Top}
                 id={pin.id}
                 className="pcg-node__handle"
                 style={{ background: getPinTypeColor(pin.pinType) }}
+                title={pin.label}
               />
-              <span className="pcg-node__port-label">{pin.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {/* Header */}
-      <div className="pcg-node__header" style={{ background: color }}>
-        {def.displayName}
+        <div className="pcg-node__pill" />
+
+        {def.outputs.length > 0 && (
+          <div className="pcg-node__ports pcg-node__ports--bottom">
+            {def.outputs.map((pin) => (
+              <Handle
+                key={pin.id}
+                type="source"
+                position={Position.Bottom}
+                id={pin.id}
+                className="pcg-node__handle"
+                style={{ background: getPinTypeColor(pin.pinType) }}
+                title={pin.label}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Group output badge — compact */}
+      {/* Title to the right of the pill, Unity-style */}
+      <div className="pcg-node__title">{def.displayName}</div>
+
+      {/* Group output badge — compact chip with hover popup */}
       {producedGroups.length > 0 && (
         <div
           className="pcg-node__group-badge"
@@ -81,7 +93,7 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
           onMouseLeave={() => setShowGroupPopup(false)}
         >
           <span className="pcg-node__group-badge-count">
-            🔗 {activeGroups.length} group{activeGroups.length !== 1 ? 's' : ''}
+            🔗{activeGroups.length}
           </span>
           {showGroupPopup && (
             <div className="pcg-node__group-badge-popup">
@@ -106,35 +118,6 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Properties summary (read-only, editing in Inspector) */}
-      {Object.keys(def.properties).length > 0 && (
-        <div className="pcg-node__props-summary">
-          {Object.keys(def.properties).map((key) => (
-            <div key={key} className="pcg-node__prop-line">
-              {key}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Output ports — horizontal row at bottom edge */}
-      {def.outputs.length > 0 && (
-        <div className="pcg-node__ports-bottom">
-          {def.outputs.map((pin) => (
-            <div key={pin.id} className="pcg-node__port-item">
-              <span className="pcg-node__port-label">{pin.label}</span>
-              <Handle
-                type="source"
-                position={Position.Bottom}
-                id={pin.id}
-                className="pcg-node__handle"
-                style={{ background: getPinTypeColor(pin.pinType) }}
-              />
-            </div>
-          ))}
         </div>
       )}
     </div>

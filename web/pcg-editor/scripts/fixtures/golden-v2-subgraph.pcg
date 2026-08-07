@@ -1,0 +1,118 @@
+{
+  "version": "2.0",
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "sizeX": 1.5,
+        "sizeY": 2.0,
+        "sizeZ": 0.5,
+        "legacyCustomKey": "keep-me"
+      }
+    },
+    {
+      "id": "n2",
+      "type": "AttributeTransfer",
+      "position": { "x": 320, "y": 0 },
+      "data": {
+        "transferDetail": true,
+        "detailAttributes": "area,perimeter",
+        "transferPoints": false,
+        "pointAttributes": "*",
+        "enableDistanceThreshold": true,
+        "distanceThreshold": 12.5
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n2",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialGeometry"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "p1",
+      "name": "Box Width",
+      "type": "number",
+      "default": 1.5,
+      "exposed": true,
+      "targetNode": "n1",
+      "targetProperty": "sizeX",
+      "hasRange": true,
+      "min": 0.1,
+      "max": 10
+    }
+  ],
+  "subgraphs": [
+    {
+      "id": "sg1",
+      "name": "inner",
+      "inputs": [
+        {
+          "id": "in1",
+          "name": "geometry",
+          "pinType": "SpatialGeometry",
+          "anchorPlaced": true,
+          "anchorX": -260.5,
+          "anchorY": 90
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out1",
+          "name": "geometry",
+          "pinType": "SpatialMesh",
+          "anchorPlaced": true,
+          "anchorX": 420.25,
+          "anchorY": 180
+        }
+      ],
+      "nodes": [
+        {
+          "id": "sn1",
+          "type": "TransformMesh",
+          "position": { "x": 100, "y": 100 },
+          "data": {
+            "translateX": 0.25,
+            "subgraphOnlyKey": "preserve-me"
+          }
+        }
+      ],
+      "edges": [],
+      "parameters": [
+        {
+          "id": "sp1",
+          "name": "Inner Scale",
+          "type": "number",
+          "default": 2.0,
+          "exposed": true,
+          "targetNode": "sn1",
+          "targetProperty": "uniformScale",
+          "hasRange": true,
+          "min": 0.01,
+          "max": 100
+        },
+        {
+          "id": "sp2",
+          "name": "Inner Label",
+          "type": "string",
+          "default": "inner",
+          "exposed": false,
+          "targetNode": "sn1",
+          "targetProperty": "namePrefix",
+          "hasRange": false,
+          "min": 0,
+          "max": 1
+        }
+      ]
+    }
+  ]
+}
