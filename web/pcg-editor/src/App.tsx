@@ -83,7 +83,7 @@ function PcgEditor() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -528,6 +528,7 @@ function PcgEditor() {
   // ── Preview cook ────────────────────────────────────
 
   const requestPreviewCook = useCallback(async () => {
+    if (nodes.length === 0) return;
     previewAbortRef.current?.abort();
     void cancelCook();
     const abort = new AbortController();
@@ -546,13 +547,7 @@ function PcgEditor() {
     }
   }, [nodes, edges, parameters, subgraphs]);
 
-  const togglePreview = useCallback(async () => {
-    if (showPreview) {
-      previewAbortRef.current?.abort();
-      void cancelCook();
-      setShowPreview(false);
-      return;
-    }
+  const openPreview = useCallback(async () => {
     setShowPreview(true);
     setPreviewError(null);
     const health = await checkCookServer();
@@ -560,7 +555,23 @@ function PcgEditor() {
       setPreviewError('pcg-server unreachable — start it with scripts/run-pcg-server.sh, then press Re-cook.');
     }
     // Initial cook is fired by the debounced effect below (showPreview change).
-  }, [showPreview]);
+  }, []);
+
+  const togglePreview = useCallback(async () => {
+    if (showPreview) {
+      previewAbortRef.current?.abort();
+      void cancelCook();
+      setShowPreview(false);
+      return;
+    }
+    await openPreview();
+  }, [showPreview, openPreview]);
+
+  // Preview panel is always-on: open it once on mount.
+  // StrictMode double-invocation is safe — the health-check is idempotent.
+  useEffect(() => {
+    void openPreview();
+  }, [openPreview]);
 
   // Debounced re-cook on graph/selection change while the panel is open.
   // Coalesces edits; never cooks per keystroke.
