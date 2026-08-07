@@ -46,6 +46,13 @@ namespace DJTechEditor.PCG.Graph
         /// <summary>Main-thread prep; return Failure to abort with an error status line.</summary>
         public Func<string, PcgNodeData, PcgNodeAsyncActionController.PrepareResult> Prepare;
 
+        /// <summary>
+        /// Optional main-thread prep with editor context (window + node view). When set,
+        /// the inspector prefers it over <see cref="Prepare"/> — needed by actions that
+        /// must cook the node's upstream input before going background (Meshy mesh ops).
+        /// </summary>
+        public Func<PcgManifestNodeView, PcgGraphEditorWindow, PcgNodeAsyncActionController.PrepareResult> PrepareWithWindow;
+
         /// <summary>Main-thread success write-back; runs inside the inspector's undo scope.</summary>
         public Action<PcgManifestNodeView, string> Apply;
 

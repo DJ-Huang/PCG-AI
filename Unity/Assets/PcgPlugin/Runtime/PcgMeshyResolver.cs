@@ -196,9 +196,25 @@ namespace DJTechRuntime.PCG
             if (!TryBuildImageDataUri(nodeId, data, out var dataUri, out error))
                 return false;
 
+            var extraDataUris = new List<string>();
+            foreach (var key in ExtraTextureKeys)
+            {
+                if (!TryBuildImageDataUri(nodeId, data, key, null, out var extraUri, out var extraError))
+                {
+                    // Optional slot: skip when unassigned, fail when assigned but unreadable.
+                    if (extraError == null)
+                        continue;
+                    error = extraError;
+                    return false;
+                }
+                if (!string.IsNullOrEmpty(extraUri))
+                    extraDataUris.Add(extraUri);
+            }
+
             request = new PcgMeshyClient.GenerateRequest
             {
                 ImageDataUri = dataUri,
+                ExtraImageDataUris = extraDataUris,
                 AiModel = data.GetRaw("aiModel")?.ToString() ?? "latest",
                 EnablePbr = ReadBool(data, "enablePbr", false),
                 ShouldTexture = ReadBool(data, "shouldTexture", true),
@@ -229,13 +245,27 @@ namespace DJTechRuntime.PCG
             return false;
         }
 
+        /// <summary>Optional extra view slots (texture2/3/4) — switch to multi-image endpoint.</summary>
+        internal static readonly string[] ExtraTextureKeys = { "texture2", "texture3", "texture4" };
+
         private static bool TryBuildImageDataUri(
             string nodeId, PcgNodeData data, out string dataUri, out string error)
+        {
+            return TryBuildImageDataUri(nodeId, data, "texture", "imageUrl", out dataUri, out error);
+        }
+
+        /// <summary>
+        /// Builds a URL/data-URI for one image slot. Unassigned optional slots
+        /// (urlKey == null) return dataUri == null with error == null.
+        /// </summary>
+        internal static bool TryBuildImageDataUri(
+            string nodeId, PcgNodeData data, string textureKey, string urlKey,
+            out string dataUri, out string error)
         {
             dataUri = null;
             error = null;
 
-            var imageUrl = data?.GetRaw("imageUrl")?.ToString()?.Trim();
+            var imageUrl = urlKey != null ? data?.GetRaw(urlKey)?.ToString()?.Trim() : null;
             if (!string.IsNullOrWhiteSpace(imageUrl) &&
                 (imageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                  imageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
@@ -245,9 +275,11 @@ namespace DJTechRuntime.PCG
                 return true;
             }
 
-            var stored = data?.GetRaw("texture")?.ToString();
+            var stored = textureKey != null ? data?.GetRaw(textureKey)?.ToString() : null;
             if (string.IsNullOrWhiteSpace(stored))
             {
+                if (urlKey == null)
+                    return true; // optional extra slot unassigned
                 error =
                     $"Meshy3DGenerator '{nodeId}': assign a Source Image (texture) " +
                     "or set imageUrl to a public / data URI.";
@@ -261,18 +293,23 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            dataUri = EncodeTextureToPngDataUri(source, out error);
+            if (dataUri == null && string.IsNullOrEmpty(error))
+                error = $"Meshy3DGenerator '{nodeId}': EncodeToPNG failed.";
+            return dataUri != null;
+        }
+
+        /// <summary>Encodes any project texture (even GPU-compressed) to a PNG data URI.</summary>
+        internal static string EncodeTextureToPngDataUri(Texture2D source, out string error)
+        {
+            error = null;
             var readable = EnsureReadable(source);
             try
             {
                 var png = readable.EncodeToPNG();
                 if (png == null || png.Length == 0)
-                {
-                    error = $"Meshy3DGenerator '{nodeId}': EncodeToPNG failed.";
-                    return false;
-                }
-
-                dataUri = "data:image/png;base64," + Convert.ToBase64String(png);
-                return true;
+                    return null;
+                return "data:image/png;base64," + Convert.ToBase64String(png);
             }
             finally
             {
@@ -329,6 +366,8 @@ namespace DJTechRuntime.PCG
             sb.Append(nodeId).Append('|');
             sb.Append(data?.GetRaw("texture")?.ToString() ?? "").Append('|');
             sb.Append(data?.GetRaw("imageUrl")?.ToString() ?? "").Append('|');
+            foreach (var key in ExtraTextureKeys)
+                sb.Append(data?.GetRaw(key)?.ToString() ?? "").Append('|');
             sb.Append(data?.GetRaw("aiModel")?.ToString() ?? "latest").Append('|');
             sb.Append(ReadBool(data, "enablePbr", false)).Append('|');
             sb.Append(ReadBool(data, "shouldTexture", true)).Append('|');
@@ -336,28 +375,37 @@ namespace DJTechRuntime.PCG
             sb.Append(ReadInt(data, "targetPolycount", 30000));
 
             // Include source image bytes so texture edits invalidate the cache.
-            var stored = data?.GetRaw("texture")?.ToString();
-            if (!string.IsNullOrWhiteSpace(stored))
-            {
-                var tex = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
-                if (tex != null)
-                {
-                    var readable = EnsureReadable(tex);
-                    try
-                    {
-                        var png = readable.EncodeToPNG();
-                        if (png != null)
-                            sb.Append('|').Append(Convert.ToBase64String(ComputeSha256(png)));
-                    }
-                    finally
-                    {
-                        if (readable != tex)
-                            UnityEngine.Object.DestroyImmediate(readable);
-                    }
-                }
-            }
+            AppendTextureHash(sb, data?.GetRaw("texture")?.ToString());
+            foreach (var key in ExtraTextureKeys)
+                AppendTextureHash(sb, data?.GetRaw(key)?.ToString());
 
-            var hash = ComputeSha256(Encoding.UTF8.GetBytes(sb.ToString()));
+            return ComputeSha256Hex(Encoding.UTF8.GetBytes(sb.ToString()));
+        }
+
+        private static void AppendTextureHash(StringBuilder sb, string stored)
+        {
+            if (string.IsNullOrWhiteSpace(stored))
+                return;
+            var tex = PcgTextureAssetUtil.LoadTextureFromStorage(stored);
+            if (tex == null)
+                return;
+            var readable = EnsureReadable(tex);
+            try
+            {
+                var png = readable.EncodeToPNG();
+                if (png != null)
+                    sb.Append('|').Append(Convert.ToBase64String(ComputeSha256(png)));
+            }
+            finally
+            {
+                if (readable != tex)
+                    UnityEngine.Object.DestroyImmediate(readable);
+            }
+        }
+
+        internal static string ComputeSha256Hex(byte[] bytes)
+        {
+            var hash = ComputeSha256(bytes);
             var hex = new StringBuilder(hash.Length * 2);
             foreach (var b in hash)
                 hex.Append(b.ToString("x2"));
@@ -370,7 +418,7 @@ namespace DJTechRuntime.PCG
             return sha.ComputeHash(bytes);
         }
 
-        private static string GetCachePath(string cacheKey, string format = PcgMeshySaveFormats.Glb)
+        internal static string GetCachePath(string cacheKey, string format = PcgMeshySaveFormats.Glb)
         {
             if (string.IsNullOrWhiteSpace(format))
                 format = PcgMeshySaveFormats.Glb;
@@ -379,7 +427,7 @@ namespace DJTechRuntime.PCG
             return Path.GetFullPath(Path.Combine(root, cacheKey + "." + format));
         }
 
-        private static bool ReadBool(PcgNodeData data, string key, bool fallback)
+        internal static bool ReadBool(PcgNodeData data, string key, bool fallback)
         {
             var raw = data?.GetRaw(key);
             if (raw == null)
@@ -389,7 +437,7 @@ namespace DJTechRuntime.PCG
             return bool.TryParse(raw.ToString(), out var parsed) ? parsed : fallback;
         }
 
-        private static int ReadInt(PcgNodeData data, string key, int fallback)
+        internal static int ReadInt(PcgNodeData data, string key, int fallback)
         {
             var raw = data?.GetRaw(key);
             if (raw == null)

@@ -45,15 +45,9 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgPreviewSplineBinding> previewSplineBindings)
         {
             var assetSw = System.Diagnostics.Stopwatch.StartNew();
-            if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
+            if (!PcgThirdPartyResolvers.TryPrepareAll(ref json, out var thirdPartyError))
             {
-                Debug.LogError($"[PCG] {meshyError}");
-                return null;
-            }
-
-            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
-            {
-                Debug.LogError($"[PCG] {tripoError}");
+                Debug.LogError($"[PCG] {thirdPartyError}");
                 return null;
             }
 
@@ -117,15 +111,9 @@ namespace DJTechRuntime.PCG
                 return null;
             }
 
-            if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
+            if (!PcgThirdPartyResolvers.TryPrepareAll(ref json, out var thirdPartyError))
             {
-                Debug.LogError($"[PCG] {meshyError}");
-                return null;
-            }
-
-            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
-            {
-                Debug.LogError($"[PCG] {tripoError}");
+                Debug.LogError($"[PCG] {thirdPartyError}");
                 return null;
             }
 

@@ -100,6 +100,37 @@ public:
     }
 };
 
+class MeshyTextTo3DElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "MeshyTextTo3D"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        // Unity PcgMeshyTextTo3DResolver downloads/caches GLB and injects absolute path before cook.
+        return execute_import_like(ctx, "MeshyTextTo3D");
+    }
+};
+
+class MeshyMeshOpsElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "MeshyMeshOps"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        return execute_import_like(ctx, "MeshyMeshOps");
+    }
+};
+
+class MeshyRetextureElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "MeshyRetexture"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        return execute_import_like(ctx, "MeshyRetexture");
+    }
+};
+
 class MatchSizeElement final : public IPcgElement {
 public:
     const char* type_name() const override { return "MatchSize"; }
@@ -252,6 +283,9 @@ void register_assembly_elements(
     map.emplace("ImportMesh", std::make_unique<ImportMeshElement>());
     map.emplace("Meshy3DGenerator", std::make_unique<Meshy3DGeneratorElement>());
     map.emplace("Tripo3DGenerator", std::make_unique<Tripo3DGeneratorElement>());
+    map.emplace("MeshyTextTo3D", std::make_unique<MeshyTextTo3DElement>());
+    map.emplace("MeshyMeshOps", std::make_unique<MeshyMeshOpsElement>());
+    map.emplace("MeshyRetexture", std::make_unique<MeshyRetextureElement>());
     map.emplace("MatchSize", std::make_unique<MatchSizeElement>());
     map.emplace("BendMesh", std::make_unique<BendMeshElement>());
     map.emplace("LotSubdivision", std::make_unique<LotSubdivisionElement>());

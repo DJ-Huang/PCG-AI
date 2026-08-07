@@ -7254,24 +7254,21 @@
           "default": "",
           "uiHint": "Public URL or data URI. Overrides Source Image when set."
         },
-        "aiModel": {
-          "type": "enum",
-          "displayName": "AI Model",
-          "default": "latest",
-          "options": [
-            {
-              "value": "latest",
-              "label": "latest (Meshy 6)"
-            },
-            {
-              "value": "meshy-6",
-              "label": "meshy-6"
-            },
-            {
-              "value": "meshy-5",
-              "label": "meshy-5"
-            }
-          ]
+        "texture2": {
+          "type": "texture2d",
+          "displayName": "Extra View 2 (optional)",
+          "default": "",
+          "uiHint": "Optional extra view of the same object. Any extra view switches to Multi-Image-to-3D (1–4 images)."
+        },
+        "texture3": {
+          "type": "texture2d",
+          "displayName": "Extra View 3 (optional)",
+          "default": ""
+        },
+        "texture4": {
+          "type": "texture2d",
+          "displayName": "Extra View 4 (optional)",
+          "default": ""
         },
         "shouldTexture": {
           "type": "boolean",
@@ -7324,6 +7321,585 @@
           "displayName": "Force Regenerate",
           "default": false,
           "uiHint": "Unused by cook/preview (they never call the API). Click Generate to recreate the GLB."
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Saved Model Path",
+          "default": "",
+          "uiHint": "Set by Generate→Save (Assets/….glb). Cook/preview load this file; never auto-generate."
+        }
+      }
+    },
+    {
+      "type": "MeshyTextTo3D",
+      "displayName": "Meshy Text To 3D",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "displayName": "Prompt",
+          "default": "",
+          "uiHint": "Text description of the 3D model to generate (max 600 chars)."
+        },
+        "aiModel": {
+          "type": "enum",
+          "displayName": "AI Model",
+          "default": "latest",
+          "options": [
+            {
+              "value": "latest",
+              "label": "latest (Meshy 6)"
+            },
+            {
+              "value": "meshy-6",
+              "label": "meshy-6"
+            },
+            {
+              "value": "meshy-5",
+              "label": "meshy-5"
+            }
+          ]
+        },
+        "modelType": {
+          "type": "enum",
+          "displayName": "Model Type",
+          "default": "standard",
+          "options": [
+            {
+              "value": "standard",
+              "label": "Standard"
+            },
+            {
+              "value": "lowpoly",
+              "label": "Low Poly"
+            }
+          ]
+        },
+        "shouldRemesh": {
+          "type": "boolean",
+          "displayName": "Remesh During Preview",
+          "default": true
+        },
+        "topology": {
+          "type": "enum",
+          "displayName": "Topology",
+          "default": "triangle",
+          "options": [
+            {
+              "value": "triangle",
+              "label": "Triangle"
+            },
+            {
+              "value": "quad",
+              "label": "Quad"
+            }
+          ]
+        },
+        "targetPolycount": {
+          "type": "number",
+          "displayName": "Target Polycount",
+          "default": 30000,
+          "minimum": 100,
+          "maximum": 300000
+        },
+        "poseMode": {
+          "type": "enum",
+          "displayName": "Pose Mode",
+          "default": "",
+          "options": [
+            {
+              "value": "",
+              "label": "None"
+            },
+            {
+              "value": "a-pose",
+              "label": "A-Pose"
+            },
+            {
+              "value": "t-pose",
+              "label": "T-Pose"
+            }
+          ]
+        },
+        "shouldTexture": {
+          "type": "boolean",
+          "displayName": "Generate PBR Texture",
+          "default": true,
+          "uiHint": "When on, Generate runs preview then refine (two API tasks)."
+        },
+        "enablePbr": {
+          "type": "boolean",
+          "displayName": "Enable PBR Maps",
+          "default": false
+        },
+        "textureResolution": {
+          "type": "enum",
+          "displayName": "Texture Resolution",
+          "default": "2k",
+          "options": [
+            {
+              "value": "1k",
+              "label": "1K"
+            },
+            {
+              "value": "2k",
+              "label": "2K"
+            },
+            {
+              "value": "4k",
+              "label": "4K"
+            }
+          ]
+        },
+        "texturePrompt": {
+          "type": "string",
+          "displayName": "Texture Prompt (optional)",
+          "default": ""
+        },
+        "removeLighting": {
+          "type": "boolean",
+          "displayName": "Remove Lighting",
+          "default": true
+        },
+        "forceRegenerate": {
+          "type": "boolean",
+          "displayName": "Force Regenerate",
+          "default": false,
+          "uiHint": "Unused by cook/preview (they never call the API). Click Generate to recreate the GLB."
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Saved Model Path",
+          "default": "",
+          "uiHint": "Set by Generate→Save (Assets/….glb). Cook/preview load this file; never auto-generate."
+        }
+      }
+    },
+    {
+      "type": "MeshyMeshOps",
+      "displayName": "Meshy Mesh Ops",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "operation": {
+          "type": "enum",
+          "displayName": "Operation",
+          "default": "remesh",
+          "options": [
+            {
+              "value": "remesh",
+              "label": "Remesh (v1)"
+            },
+            {
+              "value": "resize",
+              "label": "Resize (v1)"
+            },
+            {
+              "value": "uvUnwrap",
+              "label": "UV Unwrap (v1, GLB only)"
+            }
+          ]
+        },
+        "topology": {
+          "type": "enum",
+          "displayName": "Topology (remesh)",
+          "default": "triangle",
+          "options": [
+            {
+              "value": "triangle",
+              "label": "Triangle"
+            },
+            {
+              "value": "quad",
+              "label": "Quad"
+            }
+          ]
+        },
+        "targetPolycount": {
+          "type": "number",
+          "displayName": "Target Polycount (remesh)",
+          "default": 30000,
+          "minimum": 100,
+          "maximum": 300000
+        },
+        "resizeMode": {
+          "type": "enum",
+          "displayName": "Resize Mode",
+          "default": "height",
+          "options": [
+            {
+              "value": "height",
+              "label": "Height"
+            },
+            {
+              "value": "longestSide",
+              "label": "Longest Side"
+            },
+            {
+              "value": "auto",
+              "label": "Auto (AI-estimated)"
+            }
+          ]
+        },
+        "resizeHeight": {
+          "type": "number",
+          "displayName": "Resize Height",
+          "default": 1.0,
+          "minimum": 1e-06
+        },
+        "resizeLongestSide": {
+          "type": "number",
+          "displayName": "Resize Longest Side",
+          "default": 1.0,
+          "minimum": 1e-06
+        },
+        "originAt": {
+          "type": "enum",
+          "displayName": "Origin At (resize)",
+          "default": "bottom",
+          "options": [
+            {
+              "value": "bottom",
+              "label": "Bottom"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            }
+          ]
+        },
+        "forceRegenerate": {
+          "type": "boolean",
+          "displayName": "Force Regenerate",
+          "default": false,
+          "uiHint": "Unused by cook/preview (they never call the API). Click Generate to recreate the GLB."
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Saved Model Path",
+          "default": "",
+          "uiHint": "Set by Generate→Save (Assets/….glb). Cook/preview load this file; never auto-generate."
+        }
+      }
+    },
+    {
+      "type": "MeshyRetexture",
+      "displayName": "Meshy Retexture",
+      "category": "Mesh",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "styleMode": {
+          "type": "enum",
+          "displayName": "Style Mode",
+          "default": "text",
+          "options": [
+            {
+              "value": "text",
+              "label": "Text Prompt"
+            },
+            {
+              "value": "image",
+              "label": "Style Image"
+            }
+          ]
+        },
+        "textStylePrompt": {
+          "type": "string",
+          "displayName": "Text Style Prompt",
+          "default": "",
+          "uiHint": "Text description of the desired texture style (text mode)."
+        },
+        "styleImage": {
+          "type": "texture2d",
+          "displayName": "Style Image (image mode)",
+          "default": ""
+        },
+        "styleImageUrl": {
+          "type": "string",
+          "displayName": "Style Image URL (optional)",
+          "default": "",
+          "uiHint": "Public URL or data URI. Overrides Style Image when set."
+        },
+        "aiModel": {
+          "type": "enum",
+          "displayName": "AI Model",
+          "default": "latest",
+          "options": [
+            {
+              "value": "latest",
+              "label": "latest (Meshy 6)"
+            },
+            {
+              "value": "meshy-6",
+              "label": "meshy-6"
+            },
+            {
+              "value": "meshy-5",
+              "label": "meshy-5"
+            }
+          ]
+        },
+        "enableOriginalUv": {
+          "type": "boolean",
+          "displayName": "Keep Original UV",
+          "default": false
+        },
+        "enablePbr": {
+          "type": "boolean",
+          "displayName": "Enable PBR Maps",
+          "default": false
+        },
+        "textureResolution": {
+          "type": "enum",
+          "displayName": "Texture Resolution",
+          "default": "2k",
+          "options": [
+            {
+              "value": "1k",
+              "label": "1K"
+            },
+            {
+              "value": "2k",
+              "label": "2K"
+            },
+            {
+              "value": "4k",
+              "label": "4K"
+            }
+          ]
+        },
+        "removeLighting": {
+          "type": "boolean",
+          "displayName": "Remove Lighting",
+          "default": true
+        },
+        "forceRegenerate": {
+          "type": "boolean",
+          "displayName": "Force Regenerate",
+          "default": false,
+          "uiHint": "Unused by cook/preview (they never call the API). Click Generate to recreate the GLB."
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Saved Model Path",
+          "default": "",
+          "uiHint": "Set by Generate→Save (Assets/….glb). Cook/preview load this file; never auto-generate."
+        }
+      }
+    },
+    {
+      "type": "MeshyImageGen",
+      "displayName": "Meshy Image Gen",
+      "category": "Texture",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "texture",
+          "label": "Texture",
+          "pinType": "Texture"
+        }
+      ],
+      "properties": {
+        "mode": {
+          "type": "enum",
+          "displayName": "Mode",
+          "default": "textToImage",
+          "options": [
+            {
+              "value": "textToImage",
+              "label": "Text to Image"
+            },
+            {
+              "value": "imageToImage",
+              "label": "Image to Image"
+            }
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "displayName": "Prompt",
+          "default": ""
+        },
+        "aiModel": {
+          "type": "string",
+          "displayName": "AI Model",
+          "default": "nano-banana"
+        },
+        "aspectRatio": {
+          "type": "enum",
+          "displayName": "Aspect Ratio",
+          "default": "1:1",
+          "options": [
+            {
+              "value": "1:1",
+              "label": "1:1"
+            },
+            {
+              "value": "16:9",
+              "label": "16:9"
+            },
+            {
+              "value": "9:16",
+              "label": "9:16"
+            },
+            {
+              "value": "4:3",
+              "label": "4:3"
+            },
+            {
+              "value": "3:4",
+              "label": "3:4"
+            }
+          ]
+        },
+        "generateMultiView": {
+          "type": "boolean",
+          "displayName": "Generate Multi View",
+          "default": false
+        },
+        "referenceImage": {
+          "type": "texture2d",
+          "displayName": "Reference Image (i2i)",
+          "default": "",
+          "uiHint": "Required for Image to Image unless a Reference Image URL is set."
+        },
+        "referenceImageUrl": {
+          "type": "string",
+          "displayName": "Reference Image URL (optional)",
+          "default": "",
+          "uiHint": "Public URL or data URI. Overrides Reference Image when set."
+        },
+        "forceRegenerate": {
+          "type": "boolean",
+          "displayName": "Force Regenerate",
+          "default": false,
+          "uiHint": "Unused by cook/preview. Click Generate to create the image."
+        },
+        "path": {
+          "type": "string",
+          "displayName": "Saved Image Path",
+          "default": "",
+          "uiHint": "Set by Generate→Save (Assets/….png)."
+        }
+      }
+    },
+    {
+      "type": "Tripo3DGenerator",
+      "displayName": "Tripo 3D Generator",
+      "category": "Mesh",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "texture": {
+          "type": "texture2d",
+          "displayName": "Source Image",
+          "default": ""
+        },
+        "imageUrl": {
+          "type": "string",
+          "displayName": "Image URL (optional)",
+          "default": "",
+          "uiHint": "Public URL or data URI. Overrides Source Image when set."
+        },
+        "modelVersion": {
+          "type": "enum",
+          "displayName": "Model Version",
+          "default": "v3.1-20260211",
+          "options": [
+            {
+              "value": "v3.1-20260211",
+              "label": "v3.1-20260211 (H3 high fidelity)"
+            },
+            {
+              "value": "P1-20260311",
+              "label": "P1-20260311 (low poly)"
+            },
+            {
+              "value": "v2.5-20250123",
+              "label": "v2.5-20250123 (H2)"
+            }
+          ]
+        },
+        "shouldTexture": {
+          "type": "boolean",
+          "displayName": "Generate Texture",
+          "default": true
+        },
+        "enablePbr": {
+          "type": "boolean",
+          "displayName": "Enable PBR",
+          "default": false
+        },
+        "faceLimit": {
+          "type": "integer",
+          "displayName": "Face Limit",
+          "default": 30000,
+          "minimum": 48,
+          "maximum": 2000000
+        },
+        "scale": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 1e-06
+        },
+        "axisConversion": {
+          "type": "enum",
+          "displayName": "Axis Conversion",
+          "default": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "None"
+            },
+            {
+              "value": "zUpToYUp",
+              "label": "Z Up to Y Up"
+            },
+            {
+              "value": "yUpToZUp",
+              "label": "Y Up to Z Up"
+            }
+          ]
         },
         "path": {
           "type": "string",

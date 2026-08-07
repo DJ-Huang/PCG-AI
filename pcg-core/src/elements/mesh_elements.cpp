@@ -256,6 +256,26 @@ public:
     }
 };
 
+class MeshyImageGenElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "MeshyImageGen"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        // Pixels are injected by the Unity texture runtime keyed on this node id,
+        // same as ImageTexture; Generate (editor) bakes the image to a PNG first.
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "MeshyImageGen missing node");
+
+        nlohmann::json out{
+            {"kind", "texture"},
+            {"slotId", ctx.node->id},
+        };
+        ctx.outputs.add("out", data::PcgDataType::Param, std::move(out));
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 class CreateCylinderMeshElement final : public IPcgElement {
@@ -334,6 +354,7 @@ void register_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcg
     map.emplace("BevelMesh", std::make_unique<BevelMeshElement>());
     map.emplace("MeshNoiseDeform", std::make_unique<MeshNoiseDeformElement>());
     map.emplace("ImageTexture", std::make_unique<ImageTextureElement>());
+    map.emplace("MeshyImageGen", std::make_unique<MeshyImageGenElement>());
 }
 
 } // namespace pcg::internal::elements

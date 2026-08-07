@@ -674,15 +674,9 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
-            if (!PcgMeshyResolver.TryPrepareForCook(ref json, out var meshyError))
+            if (!PcgThirdPartyResolvers.TryPrepareAll(ref json, out var thirdPartyError))
             {
-                Debug.LogError($"[PCG] {meshyError}", this);
-                return false;
-            }
-
-            if (!PcgTripoResolver.TryPrepareForCook(ref json, out var tripoError))
-            {
-                Debug.LogError($"[PCG] {tripoError}", this);
+                Debug.LogError($"[PCG] {thirdPartyError}", this);
                 return false;
             }
 

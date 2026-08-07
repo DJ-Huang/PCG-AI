@@ -226,9 +226,22 @@ Source Image / URL
 
 | 厂商 | 节点 | 状态 |
 |------|------|------|
-| Meshy | `Meshy3DGenerator` | 已接入 |
+| Meshy | `Meshy3DGenerator`（图生 3D，支持 1–4 张多视图） | 已接入 |
+| Meshy | `MeshyTextTo3D`（文生 3D v2，Generate 自动 preview→refine） | 已接入 |
+| Meshy | `MeshyMeshOps`（remesh / resize / uv-unwrap，GLB 输入） | 已接入 |
+| Meshy | `MeshyRetexture`（文本/风格图重贴图，GLB 输入） | 已接入 |
+| Meshy | `MeshyImageGen`（文生图/图生图，Texture 输出） | 已接入 |
 | Tripo | `Tripo3DGenerator` | 已接入 |
 | （其他） | — | 按上方清单追加 |
+
+### Meshy 新节点要点
+
+- **同一契约**：Generate 是唯一云端入口；cook/preview/auto-cook 只读本地 `path`（或缓存），永不调 API；无 Key 但有缓存仍可 cook。
+- **GLB 输入节点**（`MeshyMeshOps` / `MeshyRetexture`）：Generate 时先把上游 `in` 边 cook 成几何，用 `PcgGlbWriter`（纯 C# glTF 2.0 导出）打成 GLB data URI 再提交。uv-unwrap 的 `model_url` 仅支持 `.glb`；resize/uv-unwrap 强制只产 GLB（仅 remesh 走 GLB/FBX 开关）。
+- **`MeshyTextTo3D`**：`/openapi/v2/text-to-3d`，`shouldTexture=true` 时一次 Generate 串联 preview + refine 两个任务；`false` 只跑 preview（白模）。
+- **`MeshyImageGen`**：输出 Texture pin，像素走 TextureRuntime（与 `ImageTexture` 同槽位机制），可直接喂给 `MeshNoiseDeform` 等纹理消费端；Generate 先把 PNG 存盘。
+- **`Meshy3DGenerator` 多视图**：`texture2/3/4` 任一赋值即自动切 `/openapi/v1/multi-image-to-3d`（1–4 张）。
+- 实现文件：`Runtime/PcgMeshyExtraResolvers.cs`（4 个 resolver + `PcgThirdPartyResolvers.TryPrepareAll` 统一链）、`Editor/Graph/PcgMeshyExtraGenerateActions.cs`（4 个 Generate action）、`Runtime/PcgGlbWriter.cs`、`Editor/PcgMeshyUpstreamExport.cs`。
 
 ---
 

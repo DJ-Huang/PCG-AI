@@ -49,10 +49,22 @@ namespace DJTechRuntime.PCG
             foreach (var nodeId in connectedTextureNodeIds)
             {
                 var node = doc.nodes.FirstOrDefault(n => n.id == nodeId);
-                if (node == null || node.type != "ImageTexture")
+                if (node == null ||
+                    (node.type != "ImageTexture" && node.type != PcgMeshyImageGenResolver.NodeType))
                 {
                     sb.AppendLine(
-                        $"- Texture input is wired from '{nodeId}', but that node is missing or not an ImageTexture.");
+                        $"- Texture input is wired from '{nodeId}', but that node is missing or not an ImageTexture/MeshyImageGen.");
+                    continue;
+                }
+
+                if (node.type == PcgMeshyImageGenResolver.NodeType)
+                {
+                    if (!uploadedIds.Contains(nodeId))
+                    {
+                        sb.AppendLine(
+                            $"- MeshyImageGen node '{nodeId}': no saved/cached image pixels. " +
+                            "Click Generate on the node, save the image, then cook again.");
+                    }
                     continue;
                 }
 

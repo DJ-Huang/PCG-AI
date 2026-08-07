@@ -39,6 +39,10 @@ namespace DJTechEditor.PCG.Graph
             ("ExportFBX", (self, node) => self.CreateFbxExportActions(node)),
             (PcgMeshyResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyGenerateAction.Def)),
             (PcgTripoResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgTripoGenerateAction.Def)),
+            (PcgMeshyTextTo3DResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyTextTo3DGenerateAction.Def)),
+            (PcgMeshyMeshOpsResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyMeshOpsGenerateAction.Def)),
+            (PcgMeshyRetextureResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyRetextureGenerateAction.Def)),
+            (PcgMeshyImageGenResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyImageGenGenerateAction.Def)),
         };
 
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
@@ -2989,7 +2993,9 @@ namespace DJTechEditor.PCG.Graph
                 PcgNodeAsyncActionController.Begin(
                     node.NodeId,
                     def.ActionId,
-                    () => def.Prepare(node.NodeId, node.CollectData()),
+                    () => def.PrepareWithWindow != null
+                        ? def.PrepareWithWindow(node, m_GraphView.HostWindow as PcgGraphEditorWindow)
+                        : def.Prepare(node.NodeId, node.CollectData()),
                     payload =>
                     {
                         m_GraphView.WithUndo(

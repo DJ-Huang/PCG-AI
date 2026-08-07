@@ -10,12 +10,22 @@ using UnityEngine;
 namespace DJTechRuntime.PCG
 {
     /// <summary>
-    /// Thin Meshy Image-to-3D HTTP client (create → poll → download selected formats).
+    /// Thin Meshy HTTP client. All endpoints share one task pipeline
+    /// (create → poll → download); endpoint paths are constants here so
+    /// v1/v2 URL drift is caught in one place (unit tests assert them).
     /// </summary>
     public static class PcgMeshyClient
     {
         public const string DefaultBaseUrl = "https://api.meshy.ai";
         public const string ImageTo3dPath = "/openapi/v1/image-to-3d";
+        public const string MultiImageTo3dPath = "/openapi/v1/multi-image-to-3d";
+        public const string TextTo3dPath = "/openapi/v2/text-to-3d";
+        public const string RemeshPath = "/openapi/v1/remesh";
+        public const string ResizePath = "/openapi/v1/resize";
+        public const string UvUnwrapPath = "/openapi/v1/uv-unwrap";
+        public const string RetexturePath = "/openapi/v1/retexture";
+        public const string TextToImagePath = "/openapi/v1/text-to-image";
+        public const string ImageToImagePath = "/openapi/v1/image-to-image";
 
         private static HttpClient Http =>
             PcgThirdPartyHttpSettings.GetHttpClient(TimeSpan.FromMinutes(15));
@@ -23,6 +33,8 @@ namespace DJTechRuntime.PCG
         public struct GenerateRequest
         {
             public string ImageDataUri;
+            /// <summary>Optional extra views (URL / data URI). 2+ total images → multi-image endpoint.</summary>
+            public List<string> ExtraImageDataUris;
             public string AiModel;
             public bool EnablePbr;
             public bool ShouldTexture;
@@ -50,6 +62,330 @@ namespace DJTechRuntime.PCG
             CancellationToken cancellationToken = default,
             Action<string, float> progress = null)
         {
+            var images = new List<string>();
+            if (!string.IsNullOrWhiteSpace(request.ImageDataUri))
+                images.Add(request.ImageDataUri.Trim());
+            if (request.ExtraImageDataUris != null)
+            {
+                foreach (var extra in request.ExtraImageDataUris)
+                {
+                    if (!string.IsNullOrWhiteSpace(extra))
+                        images.Add(extra.Trim());
+                }
+            }
+
+            var result = ValidateBasic(outputPrimaryPath, images.Count == 0 ? "Meshy image is empty." : null);
+            if (result.HasValue)
+                return result.Value;
+            if (images.Count > 4)
+                return Failure("Meshy multi-image supports at most 4 images (1–4).");
+
+            var formats = NormalizeFormats(request.TargetFormats);
+            var multi = images.Count > 1;
+            var body = new Dictionary<string, object>
+            {
+                ["ai_model"] = string.IsNullOrWhiteSpace(request.AiModel) ? "latest" : request.AiModel,
+                ["enable_pbr"] = request.EnablePbr,
+                ["should_texture"] = request.ShouldTexture,
+                ["should_remesh"] = request.ShouldRemesh,
+                ["target_formats"] = new List<object>(formats),
+            };
+            if (multi)
+                body["image_urls"] = new List<object>(images);
+            else
+                body["image_url"] = images[0];
+            if (request.ShouldRemesh && request.TargetPolycount > 0)
+                body["target_polycount"] = request.TargetPolycount;
+
+            return RunTaskToModel(
+                multi ? MultiImageTo3dPath : ImageTo3dPath,
+                body, formats, outputPrimaryPath, cancellationToken, progress);
+        }
+
+        public struct TextTo3dRequest
+        {
+            public string Prompt;
+            public string AiModel;
+            /// <summary>standard | lowpoly (lowpoly skips remesh/polycount/topology).</summary>
+            public string ModelType;
+            public bool ShouldRemesh;
+            public string Topology;
+            public int TargetPolycount;
+            /// <summary>"" | a-pose | t-pose.</summary>
+            public string PoseMode;
+            /// <summary>false → preview only (untextured mesh); true → preview then refine.</summary>
+            public bool ShouldTexture;
+            public bool EnablePbr;
+            /// <summary>2k | 4k | 8k (4k/8k need meshy-6/latest).</summary>
+            public string TextureResolution;
+            public string TexturePrompt;
+            public bool RemoveLighting;
+            public List<string> TargetFormats;
+        }
+
+        /// <summary>Text-to-3D v2: preview task, then refine task chained via preview_task_id.</summary>
+        public static GenerateResult GenerateTextTo3d(
+            TextTo3dRequest request,
+            string outputPrimaryPath,
+            CancellationToken cancellationToken = default,
+            Action<string, float> progress = null)
+        {
+            var result = ValidateBasic(
+                outputPrimaryPath,
+                string.IsNullOrWhiteSpace(request.Prompt) ? "Meshy text-to-3d prompt is empty." : null);
+            if (result.HasValue)
+                return result.Value;
+            if (request.Prompt != null && request.Prompt.Length > 600)
+                return Failure("Meshy text-to-3d prompt exceeds 600 characters.");
+
+            var formats = NormalizeFormats(request.TargetFormats);
+            var lowpoly = string.Equals(request.ModelType, "lowpoly", StringComparison.OrdinalIgnoreCase);
+            var previewSpan = request.ShouldTexture ? 0.45f : 1f;
+            try
+            {
+                var previewBody = new Dictionary<string, object>
+                {
+                    ["mode"] = "preview",
+                    ["prompt"] = request.Prompt.Trim(),
+                    ["model_type"] = lowpoly ? "lowpoly" : "standard",
+                    ["target_formats"] = new List<object>(formats),
+                };
+                if (!lowpoly)
+                {
+                    previewBody["ai_model"] =
+                        string.IsNullOrWhiteSpace(request.AiModel) ? "latest" : request.AiModel;
+                    previewBody["should_remesh"] = request.ShouldRemesh;
+                    if (!string.IsNullOrWhiteSpace(request.Topology))
+                        previewBody["topology"] = request.Topology;
+                    if (request.ShouldRemesh && request.TargetPolycount > 0)
+                        previewBody["target_polycount"] = request.TargetPolycount;
+                }
+                if (!string.IsNullOrWhiteSpace(request.PoseMode))
+                    previewBody["pose_mode"] = request.PoseMode;
+
+                progress?.Invoke("Creating Meshy preview task…", 0.03f);
+                var previewId = CreateTask(TextTo3dPath, previewBody, cancellationToken);
+                var previewJson = PollUntilDone(
+                    TextTo3dPath, previewId, cancellationToken,
+                    ScaleProgress(progress, 0.05f, previewSpan - 0.1f));
+                if (!TryReadSucceeded(previewJson, out var previewError))
+                    return Failure($"Meshy preview task failed: {previewError}");
+
+                if (!request.ShouldTexture)
+                {
+                    var previewResult = new GenerateResult
+                    {
+                        TaskId = previewId,
+                        ConsumedCredits = ReadDictInt(previewJson, "consumed_credits"),
+                    };
+                    return DownloadFormats(
+                        previewResult, previewJson, formats, outputPrimaryPath,
+                        cancellationToken, ScaleProgress(progress, 0.85f, 0.15f));
+                }
+
+                progress?.Invoke("Creating Meshy refine task…", previewSpan + 0.02f);
+                var refineBody = new Dictionary<string, object>
+                {
+                    ["mode"] = "refine",
+                    ["preview_task_id"] = previewId,
+                    ["enable_pbr"] = request.EnablePbr,
+                    ["remove_lighting"] = request.RemoveLighting,
+                    ["target_formats"] = new List<object>(formats),
+                };
+                if (!string.IsNullOrWhiteSpace(request.TextureResolution))
+                    refineBody["texture_resolution"] = request.TextureResolution;
+                if (!string.IsNullOrWhiteSpace(request.TexturePrompt))
+                    refineBody["texture_prompt"] = request.TexturePrompt.Trim();
+                if (!string.IsNullOrWhiteSpace(request.AiModel))
+                    refineBody["ai_model"] = request.AiModel;
+
+                var refineId = CreateTask(TextTo3dPath, refineBody, cancellationToken);
+                var refineJson = PollUntilDone(
+                    TextTo3dPath, refineId, cancellationToken,
+                    ScaleProgress(progress, previewSpan + 0.05f, 0.85f - previewSpan));
+                if (!TryReadSucceeded(refineJson, out var refineError))
+                    return Failure($"Meshy refine task failed: {refineError}");
+
+                var refineResult = new GenerateResult
+                {
+                    TaskId = refineId,
+                    ConsumedCredits =
+                        ReadDictInt(previewJson, "consumed_credits") +
+                        ReadDictInt(refineJson, "consumed_credits"),
+                };
+                return DownloadFormats(
+                    refineResult, refineJson, formats, outputPrimaryPath,
+                    cancellationToken, ScaleProgress(progress, 0.9f, 0.1f));
+            }
+            catch (OperationCanceledException)
+            {
+                return Failure("Meshy request canceled.");
+            }
+            catch (Exception ex)
+            {
+                return Failure(ex.GetBaseException().Message);
+            }
+        }
+
+        public const string MeshOpRemesh = "remesh";
+        public const string MeshOpResize = "resize";
+        public const string MeshOpUvUnwrap = "uvUnwrap";
+
+        public struct MeshOpsRequest
+        {
+            /// <summary>MeshOpRemesh | MeshOpResize | MeshOpUvUnwrap.</summary>
+            public string Operation;
+            /// <summary>data:application/octet-stream;base64,… (GLB bytes from upstream cook).</summary>
+            public string ModelDataUri;
+            public string Topology;
+            public int TargetPolycount;
+            /// <summary>height | longestSide | auto (resize only).</summary>
+            public string ResizeMode;
+            public double ResizeHeight;
+            public double ResizeLongestSide;
+            /// <summary>bottom | center (resize only).</summary>
+            public string OriginAt;
+            /// <summary>Remesh target_formats; resize/uv-unwrap always produce GLB.</summary>
+            public List<string> TargetFormats;
+        }
+
+        public static GenerateResult GenerateMeshOp(
+            MeshOpsRequest request,
+            string outputPrimaryPath,
+            CancellationToken cancellationToken = default,
+            Action<string, float> progress = null)
+        {
+            var result = ValidateBasic(
+                outputPrimaryPath,
+                string.IsNullOrWhiteSpace(request.ModelDataUri) ? "Meshy mesh-op input model is empty." : null);
+            if (result.HasValue)
+                return result.Value;
+
+            string endpoint;
+            var body = new Dictionary<string, object>
+            {
+                ["model_url"] = request.ModelDataUri,
+            };
+            List<string> formats;
+            switch (request.Operation)
+            {
+                case MeshOpRemesh:
+                    endpoint = RemeshPath;
+                    formats = NormalizeFormats(request.TargetFormats);
+                    body["target_formats"] = new List<object>(formats);
+                    if (!string.IsNullOrWhiteSpace(request.Topology))
+                        body["topology"] = request.Topology;
+                    if (request.TargetPolycount > 0)
+                        body["target_polycount"] = request.TargetPolycount;
+                    break;
+                case MeshOpResize:
+                    endpoint = ResizePath;
+                    formats = new List<string> { PcgMeshySaveFormats.Glb };
+                    switch (request.ResizeMode)
+                    {
+                        case "longestSide":
+                            if (request.ResizeLongestSide <= 0)
+                                return Failure("Meshy resize longest side must be greater than zero.");
+                            body["resize_longest_side"] = request.ResizeLongestSide;
+                            break;
+                        case "auto":
+                            body["auto_size"] = true;
+                            break;
+                        default:
+                            if (request.ResizeHeight <= 0)
+                                return Failure("Meshy resize height must be greater than zero.");
+                            body["resize_height"] = request.ResizeHeight;
+                            break;
+                    }
+                    if (!string.IsNullOrWhiteSpace(request.OriginAt))
+                        body["origin_at"] = request.OriginAt;
+                    break;
+                case MeshOpUvUnwrap:
+                    endpoint = UvUnwrapPath;
+                    formats = new List<string> { PcgMeshySaveFormats.Glb };
+                    break;
+                default:
+                    return Failure($"Meshy mesh-op '{request.Operation}' is not supported.");
+            }
+
+            return RunTaskToModel(endpoint, body, formats, outputPrimaryPath, cancellationToken, progress);
+        }
+
+        public struct RetextureRequest
+        {
+            /// <summary>data:application/octet-stream;base64,… (GLB bytes from upstream cook).</summary>
+            public string ModelDataUri;
+            public string TextStylePrompt;
+            /// <summary>Optional style image (URL / data URI). Takes precedence over the text prompt.</summary>
+            public string ImageStyleDataUri;
+            public string AiModel;
+            public bool EnableOriginalUv;
+            public bool EnablePbr;
+            public string TextureResolution;
+            public bool RemoveLighting;
+            public List<string> TargetFormats;
+        }
+
+        public static GenerateResult GenerateRetexture(
+            RetextureRequest request,
+            string outputPrimaryPath,
+            CancellationToken cancellationToken = default,
+            Action<string, float> progress = null)
+        {
+            var invalid =
+                string.IsNullOrWhiteSpace(request.ModelDataUri)
+                    ? "Meshy retexture input model is empty."
+                    : string.IsNullOrWhiteSpace(request.TextStylePrompt) &&
+                      string.IsNullOrWhiteSpace(request.ImageStyleDataUri)
+                        ? "Meshy retexture needs a style prompt or a style image."
+                        : null;
+            var result = ValidateBasic(outputPrimaryPath, invalid);
+            if (result.HasValue)
+                return result.Value;
+            if (string.IsNullOrWhiteSpace(request.TextStylePrompt) == false &&
+                request.TextStylePrompt.Length > 600)
+                return Failure("Meshy retexture style prompt exceeds 600 characters.");
+
+            var formats = NormalizeFormats(request.TargetFormats);
+            var body = new Dictionary<string, object>
+            {
+                ["model_url"] = request.ModelDataUri,
+                ["ai_model"] = string.IsNullOrWhiteSpace(request.AiModel) ? "latest" : request.AiModel,
+                ["enable_original_uv"] = request.EnableOriginalUv,
+                ["enable_pbr"] = request.EnablePbr,
+                ["remove_lighting"] = request.RemoveLighting,
+                ["target_formats"] = new List<object>(formats),
+            };
+            if (!string.IsNullOrWhiteSpace(request.ImageStyleDataUri))
+                body["image_style_url"] = request.ImageStyleDataUri;
+            else
+                body["text_style_prompt"] = request.TextStylePrompt.Trim();
+            if (!string.IsNullOrWhiteSpace(request.TextureResolution))
+                body["texture_resolution"] = request.TextureResolution;
+
+            return RunTaskToModel(RetexturePath, body, formats, outputPrimaryPath, cancellationToken, progress);
+        }
+
+        public struct ImageGenRequest
+        {
+            /// <summary>false → text-to-image; true → image-to-image (needs reference images).</summary>
+            public bool ImageToImage;
+            /// <summary>nano-banana | nano-banana-2 | nano-banana-pro | gpt-image-2.</summary>
+            public string AiModel;
+            public string Prompt;
+            public string AspectRatio;
+            public bool GenerateMultiView;
+            /// <summary>Image-to-image references (URL / data URI), 1–5.</summary>
+            public List<string> ReferenceImageDataUris;
+        }
+
+        /// <summary>Text/image-to-image. Downloads the first generated image as PNG.</summary>
+        public static GenerateResult GenerateImage(
+            ImageGenRequest request,
+            string outputImagePath,
+            CancellationToken cancellationToken = default,
+            Action<string, float> progress = null)
+        {
             var result = new GenerateResult
             {
                 ModelPathsByFormat = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -59,88 +395,79 @@ namespace DJTechRuntime.PCG
                 result.Error = "Meshy API key is empty. Set it in PCG → Settings or Project Settings → PCG AI.";
                 return result;
             }
-
-            if (string.IsNullOrWhiteSpace(request.ImageDataUri))
+            if (string.IsNullOrWhiteSpace(request.Prompt))
             {
-                result.Error = "Meshy image is empty.";
+                result.Error = "Meshy image prompt is empty.";
                 return result;
             }
-
-            if (string.IsNullOrWhiteSpace(outputPrimaryPath))
+            if (string.IsNullOrWhiteSpace(outputImagePath))
             {
                 result.Error = "Meshy output path is empty.";
                 return result;
             }
 
-            var formats = NormalizeFormats(request.TargetFormats);
+            var references = new List<string>();
+            if (request.ReferenceImageDataUris != null)
+            {
+                foreach (var reference in request.ReferenceImageDataUris)
+                {
+                    if (!string.IsNullOrWhiteSpace(reference))
+                        references.Add(reference.Trim());
+                }
+            }
+            if (request.ImageToImage && references.Count == 0)
+            {
+                result.Error = "Meshy image-to-image needs at least one reference image.";
+                return result;
+            }
+            if (references.Count > 5)
+            {
+                result.Error = "Meshy image-to-image supports at most 5 reference images.";
+                return result;
+            }
+
             try
             {
-                progress?.Invoke("Creating Meshy task…", 0.05f);
-                var taskId = CreateImageTo3dTask(request, formats, cancellationToken);
-                if (string.IsNullOrEmpty(taskId))
+                var endpoint = request.ImageToImage ? ImageToImagePath : TextToImagePath;
+                var body = new Dictionary<string, object>
                 {
-                    result.Error = "Meshy create task returned no task id.";
-                    return result;
+                    ["ai_model"] = string.IsNullOrWhiteSpace(request.AiModel) ? "nano-banana" : request.AiModel,
+                    ["prompt"] = request.Prompt.Trim(),
+                };
+                if (request.GenerateMultiView)
+                {
+                    body["generate_multi_view"] = true;
                 }
-
-                result.TaskId = taskId;
-                progress?.Invoke($"Meshy task {taskId}…", 0.1f);
-
-                var taskJson = PollUntilDone(taskId, cancellationToken, progress);
-                var status = ReadDictString(taskJson, "status");
-                if (!string.Equals(status, "SUCCEEDED", StringComparison.OrdinalIgnoreCase))
+                else if (!string.IsNullOrWhiteSpace(request.AspectRatio))
                 {
-                    var taskError = ReadDictString(taskJson, "task_error")
-                                    ?? ReadNestedString(taskJson, "task_error", "message")
-                                    ?? status
-                                    ?? "FAILED";
-                    result.Error = $"Meshy task failed: {taskError}";
+                    body["aspect_ratio"] = request.AspectRatio;
+                }
+                if (request.ImageToImage)
+                    body["reference_image_urls"] = new List<object>(references);
+
+                progress?.Invoke("Creating Meshy image task…", 0.05f);
+                var taskId = CreateTask(endpoint, body, cancellationToken);
+                result.TaskId = taskId;
+                var taskJson = PollUntilDone(
+                    endpoint, taskId, cancellationToken, ScaleProgress(progress, 0.1f, 0.75f));
+                if (!TryReadSucceeded(taskJson, out var taskError))
+                {
+                    result.Error = $"Meshy image task failed: {taskError}";
                     return result;
                 }
 
                 result.ConsumedCredits = ReadDictInt(taskJson, "consumed_credits");
-                var dir = Path.GetDirectoryName(outputPrimaryPath);
-                var baseName = Path.GetFileNameWithoutExtension(outputPrimaryPath);
-                if (string.IsNullOrEmpty(baseName))
+                var imageUrl = ReadFirstStringListEntry(taskJson, "image_urls");
+                if (string.IsNullOrEmpty(imageUrl))
                 {
-                    result.Error = "Meshy output path has no file name.";
+                    result.Error = "Meshy image task succeeded but image_urls is empty.";
                     return result;
                 }
 
-                for (var i = 0; i < formats.Count; i++)
-                {
-                    var format = formats[i];
-                    var modelUrl = ReadNestedString(taskJson, "model_urls", format);
-                    if (string.IsNullOrEmpty(modelUrl))
-                    {
-                        result.Error =
-                            $"Meshy task succeeded but model_urls.{format} is missing " +
-                            $"(requested formats: {string.Join(", ", formats)}).";
-                        return result;
-                    }
-
-                    var dest = Path.Combine(
-                        dir ?? "",
-                        baseName + "." + format.ToLowerInvariant());
-                    progress?.Invoke(
-                        $"Downloading {format.ToUpperInvariant()}…",
-                        0.9f + 0.08f * ((i + 1f) / formats.Count));
-                    DownloadFile(modelUrl, dest, cancellationToken);
-                    result.ModelPathsByFormat[format.ToLowerInvariant()] = dest;
-                }
-
-                var primary = PcgMeshySaveFormats.Primary(formats);
-                if (!result.ModelPathsByFormat.TryGetValue(primary, out var primaryPath))
-                {
-                    foreach (var kvp in result.ModelPathsByFormat)
-                    {
-                        primaryPath = kvp.Value;
-                        break;
-                    }
-                }
-
+                progress?.Invoke("Downloading image…", 0.92f);
+                DownloadFile(imageUrl, outputImagePath, cancellationToken);
                 result.Ok = true;
-                result.ModelPath = primaryPath;
+                result.ModelPath = outputImagePath;
                 progress?.Invoke("Done", 1f);
                 return result;
             }
@@ -175,32 +502,162 @@ namespace DJTechRuntime.PCG
             return result;
         }
 
-        private static string CreateImageTo3dTask(
-            GenerateRequest request, List<string> formats, CancellationToken ct)
-        {
-            var body = new Dictionary<string, object>
+        private static GenerateResult Failure(string error) =>
+            new()
             {
-                ["image_url"] = request.ImageDataUri,
-                ["ai_model"] = string.IsNullOrWhiteSpace(request.AiModel) ? "latest" : request.AiModel,
-                ["enable_pbr"] = request.EnablePbr,
-                ["should_texture"] = request.ShouldTexture,
-                ["should_remesh"] = request.ShouldRemesh,
-                ["target_formats"] = new List<object>(formats),
+                Error = error,
+                ModelPathsByFormat = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             };
-            if (request.ShouldRemesh && request.TargetPolycount > 0)
-                body["target_polycount"] = request.TargetPolycount;
 
+        /// <summary>Returns a failed result when the API key / output path / input is invalid.</summary>
+        private static GenerateResult? ValidateBasic(string outputPrimaryPath, string inputError)
+        {
+            if (string.IsNullOrWhiteSpace(PcgMeshySettings.ApiKey))
+                return Failure("Meshy API key is empty. Set it in PCG → Settings or Project Settings → PCG AI.");
+            if (inputError != null)
+                return Failure(inputError);
+            if (string.IsNullOrWhiteSpace(outputPrimaryPath))
+                return Failure("Meshy output path is empty.");
+            return null;
+        }
+
+        private static Action<string, float> ScaleProgress(
+            Action<string, float> progress, float windowBase, float windowSpan)
+        {
+            if (progress == null)
+                return null;
+            return (message, t) => progress(message, windowBase + Mathf.Clamp01(t) * windowSpan);
+        }
+
+        /// <summary>Create → poll → verify SUCCEEDED → download all requested model formats.</summary>
+        private static GenerateResult RunTaskToModel(
+            string endpointPath,
+            Dictionary<string, object> body,
+            List<string> formats,
+            string outputPrimaryPath,
+            CancellationToken ct,
+            Action<string, float> progress)
+        {
+            try
+            {
+                progress?.Invoke("Creating Meshy task…", 0.05f);
+                var taskId = CreateTask(endpointPath, body, ct);
+                var taskJson = PollUntilDone(
+                    endpointPath, taskId, ct, ScaleProgress(progress, 0.1f, 0.75f));
+                if (!TryReadSucceeded(taskJson, out var taskError))
+                    return Failure($"Meshy task failed: {taskError}");
+
+                var result = new GenerateResult
+                {
+                    TaskId = taskId,
+                    ConsumedCredits = ReadDictInt(taskJson, "consumed_credits"),
+                };
+                return DownloadFormats(
+                    result, taskJson, formats, outputPrimaryPath, ct,
+                    ScaleProgress(progress, 0.88f, 0.12f));
+            }
+            catch (OperationCanceledException)
+            {
+                return Failure("Meshy request canceled.");
+            }
+            catch (Exception ex)
+            {
+                return Failure(ex.GetBaseException().Message);
+            }
+        }
+
+        private static bool TryReadSucceeded(Dictionary<string, object> taskJson, out string error)
+        {
+            error = null;
+            var status = ReadDictString(taskJson, "status");
+            if (string.Equals(status, "SUCCEEDED", StringComparison.OrdinalIgnoreCase))
+                return true;
+            error = ReadDictString(taskJson, "task_error")
+                    ?? ReadNestedString(taskJson, "task_error", "message")
+                    ?? status
+                    ?? "FAILED";
+            return false;
+        }
+
+        /// <summary>Downloads each requested format next to <paramref name="outputPrimaryPath"/>.</summary>
+        private static GenerateResult DownloadFormats(
+            GenerateResult result,
+            Dictionary<string, object> taskJson,
+            List<string> formats,
+            string outputPrimaryPath,
+            CancellationToken ct,
+            Action<string, float> progress)
+        {
+            result.ModelPathsByFormat ??=
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var dir = Path.GetDirectoryName(outputPrimaryPath);
+            var baseName = Path.GetFileNameWithoutExtension(outputPrimaryPath);
+            if (string.IsNullOrEmpty(baseName))
+            {
+                result.Error = "Meshy output path has no file name.";
+                return result;
+            }
+
+            for (var i = 0; i < formats.Count; i++)
+            {
+                var format = formats[i];
+                var modelUrl = ReadNestedString(taskJson, "model_urls", format);
+                if (string.IsNullOrEmpty(modelUrl))
+                {
+                    result.Error =
+                        $"Meshy task succeeded but model_urls.{format} is missing " +
+                        $"(requested formats: {string.Join(", ", formats)}).";
+                    return result;
+                }
+
+                var dest = Path.Combine(
+                    dir ?? "",
+                    baseName + "." + format.ToLowerInvariant());
+                progress?.Invoke(
+                    $"Downloading {format.ToUpperInvariant()}…",
+                    formats.Count == 1 ? 0.5f : (float)i / (formats.Count - 1));
+                DownloadFile(modelUrl, dest, ct);
+                result.ModelPathsByFormat[format.ToLowerInvariant()] = dest;
+            }
+
+            var primary = PcgMeshySaveFormats.Primary(formats);
+            if (!result.ModelPathsByFormat.TryGetValue(primary, out var primaryPath))
+            {
+                foreach (var kvp in result.ModelPathsByFormat)
+                {
+                    primaryPath = kvp.Value;
+                    break;
+                }
+            }
+
+            result.Ok = true;
+            result.ModelPath = primaryPath;
+            progress?.Invoke("Done", 1f);
+            return result;
+        }
+
+        private static string CreateTask(
+            string endpointPath, Dictionary<string, object> body, CancellationToken ct)
+        {
             using var content = new StringContent(
                 PcgMiniJson.Serialize(body), Encoding.UTF8, "application/json");
-            using var msg = new HttpRequestMessage(HttpMethod.Post, DefaultBaseUrl + ImageTo3dPath);
+            using var msg = new HttpRequestMessage(HttpMethod.Post, DefaultBaseUrl + endpointPath);
             msg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", PcgMeshySettings.ApiKey);
             msg.Content = content;
 
             using var response = Http.SendAsync(msg, ct).GetAwaiter().GetResult();
             var responseBody = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
+            {
+                if ((int)response.StatusCode == 404 && endpointPath == UvUnwrapPath)
+                {
+                    throw new InvalidOperationException(
+                        "Meshy UV Unwrap is not enabled for this account (HTTP 404). " +
+                        "It is a gray-release feature — contact Meshy support to enable it.");
+                }
                 throw new InvalidOperationException(
-                    $"Meshy create HTTP {(int)response.StatusCode}: {Truncate(responseBody, 400)}");
+                    $"Meshy create {endpointPath} HTTP {(int)response.StatusCode}: {Truncate(responseBody, 400)}");
+            }
 
             var parsed = PcgMiniJson.Deserialize(responseBody) as Dictionary<string, object>;
             if (parsed == null)
@@ -215,11 +672,12 @@ namespace DJTechRuntime.PCG
         }
 
         private static Dictionary<string, object> PollUntilDone(
+            string endpointPath,
             string taskId,
             CancellationToken ct,
             Action<string, float> progress)
         {
-            var url = $"{DefaultBaseUrl}{ImageTo3dPath}/{taskId}";
+            var url = $"{DefaultBaseUrl}{endpointPath}/{taskId}";
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
@@ -230,13 +688,13 @@ namespace DJTechRuntime.PCG
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 if (!response.IsSuccessStatusCode)
                     throw new InvalidOperationException(
-                        $"Meshy poll HTTP {(int)response.StatusCode}: {Truncate(body, 400)}");
+                        $"Meshy poll {endpointPath} HTTP {(int)response.StatusCode}: {Truncate(body, 400)}");
 
                 var parsed = PcgMiniJson.Deserialize(body) as Dictionary<string, object>
                              ?? throw new InvalidOperationException("Meshy poll response is not a JSON object.");
                 var status = ReadDictString(parsed, "status") ?? "";
                 var prog = ReadDictFloat(parsed, "progress");
-                progress?.Invoke($"Meshy {status} ({prog:0}%)", Mathf.Clamp01(0.1f + prog * 0.008f));
+                progress?.Invoke($"Meshy {status} ({prog:0}%)", Mathf.Clamp01(prog / 100f));
 
                 if (string.Equals(status, "SUCCEEDED", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(status, "FAILED", StringComparison.OrdinalIgnoreCase) ||
@@ -302,6 +760,20 @@ namespace DJTechRuntime.PCG
                 return null;
             if (nested is Dictionary<string, object> nestedDict)
                 return ReadDictString(nestedDict, fieldKey);
+            return null;
+        }
+
+        private static string ReadFirstStringListEntry(Dictionary<string, object> dict, string key)
+        {
+            if (dict == null || !dict.TryGetValue(key, out var value) || value == null)
+                return null;
+            if (value is List<object> list && list.Count > 0 && list[0] != null)
+                return list[0].ToString();
+            if (value is System.Collections.IEnumerable enumerable && value is not string)
+            {
+                foreach (var entry in enumerable)
+                    return entry?.ToString();
+            }
             return null;
         }
 

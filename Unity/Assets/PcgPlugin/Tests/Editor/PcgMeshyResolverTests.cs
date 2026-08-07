@@ -281,5 +281,234 @@ namespace DJTechEditor.PCG.Tests
             Assert.That(pathB, Is.Not.EqualTo(pathA1));
             Assert.That(pathC, Is.Not.EqualTo(pathA1));
         }
+
+        [Test]
+        public void EndpointConstants_MatchMeshyDocumentedPaths()
+        {
+            Assert.That(PcgMeshyClient.ImageTo3dPath, Is.EqualTo("/openapi/v1/image-to-3d"));
+            Assert.That(PcgMeshyClient.MultiImageTo3dPath, Is.EqualTo("/openapi/v1/multi-image-to-3d"));
+            Assert.That(PcgMeshyClient.TextTo3dPath, Is.EqualTo("/openapi/v2/text-to-3d"));
+            Assert.That(PcgMeshyClient.RemeshPath, Is.EqualTo("/openapi/v1/remesh"));
+            Assert.That(PcgMeshyClient.ResizePath, Is.EqualTo("/openapi/v1/resize"));
+            Assert.That(PcgMeshyClient.UvUnwrapPath, Is.EqualTo("/openapi/v1/uv-unwrap"));
+            Assert.That(PcgMeshyClient.RetexturePath, Is.EqualTo("/openapi/v1/retexture"));
+            Assert.That(PcgMeshyClient.TextToImagePath, Is.EqualTo("/openapi/v1/text-to-image"));
+            Assert.That(PcgMeshyClient.ImageToImagePath, Is.EqualTo("/openapi/v1/image-to-image"));
+        }
+
+        [Test]
+        public void TextTo3D_TryBuildGenerateRequest_WithoutApiKey_FailsWithKeyError()
+        {
+            PcgMeshySettings.ClearApiKey();
+
+            var ok = PcgMeshyTextTo3DResolver.TryBuildGenerateRequest(
+                "nodeA", new PcgNodeData(), out _, out _, out var error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(error, Does.Contain("API key missing"));
+        }
+
+        [Test]
+        public void TextTo3D_TryBuildGenerateRequest_RequiresPrompt()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var ok = PcgMeshyTextTo3DResolver.TryBuildGenerateRequest(
+                "nodeA", new PcgNodeData(), out _, out _, out var error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(error, Does.Contain("Prompt"));
+        }
+
+        [Test]
+        public void TextTo3D_TryBuildGenerateRequest_BuildsDefaults()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("prompt", "a monster mask");
+
+            var ok = PcgMeshyTextTo3DResolver.TryBuildGenerateRequest(
+                "nodeA", data, out var request, out var path, out var error);
+
+            Assert.That(ok, Is.True, error);
+            Assert.That(request.Prompt, Is.EqualTo("a monster mask"));
+            Assert.That(request.AiModel, Is.EqualTo("latest"));
+            Assert.That(request.ModelType, Is.EqualTo("standard"));
+            Assert.That(request.ShouldRemesh, Is.True);
+            Assert.That(request.Topology, Is.EqualTo("triangle"));
+            Assert.That(request.TargetPolycount, Is.EqualTo(30000));
+            Assert.That(request.ShouldTexture, Is.True);
+            Assert.That(request.TextureResolution, Is.EqualTo("2k"));
+            Assert.That(request.RemoveLighting, Is.True);
+            Assert.That(path, Does.EndWith(".glb"));
+            Assert.That(path, Does.Contain("MeshyCache"));
+        }
+
+        [Test]
+        public void MeshOps_FormatsFor_OnlyRemeshHonorsSaveToggles()
+        {
+            var remesh = new PcgNodeData();
+            remesh.SetRaw("operation", "remesh");
+            remesh.SetRaw("saveGlb", false);
+            remesh.SetRaw("saveFbx", true);
+            Assert.That(
+                PcgMeshyMeshOpsResolver.FormatsFor(remesh),
+                Is.EquivalentTo(new[] { "fbx" }));
+
+            var resize = new PcgNodeData();
+            resize.SetRaw("operation", "resize");
+            resize.SetRaw("saveGlb", false);
+            resize.SetRaw("saveFbx", true);
+            Assert.That(
+                PcgMeshyMeshOpsResolver.FormatsFor(resize),
+                Is.EquivalentTo(new[] { "glb" }));
+
+            var uv = new PcgNodeData();
+            uv.SetRaw("operation", "uvUnwrap");
+            Assert.That(
+                PcgMeshyMeshOpsResolver.FormatsFor(uv),
+                Is.EquivalentTo(new[] { "glb" }));
+        }
+
+        [Test]
+        public void MeshOps_TryBuildGenerateRequest_RequiresUpstreamModel()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var ok = PcgMeshyMeshOpsResolver.TryBuildGenerateRequest(
+                "nodeA", new PcgNodeData(), null, out _, out _, out var error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(error, Does.Contain("upstream"));
+        }
+
+        [Test]
+        public void MeshOps_TryBuildGenerateRequest_ResizeHeightMustBePositive()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("operation", "resize");
+            data.SetRaw("resizeMode", "height");
+            data.SetRaw("resizeHeight", 0.0);
+
+            var ok = PcgMeshyMeshOpsResolver.TryBuildGenerateRequest(
+                "nodeA", data, "data:application/octet-stream;base64,AAAA",
+                out _, out _, out var error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(error, Does.Contain("Resize Height"));
+        }
+
+        [Test]
+        public void MeshOps_TryBuildGenerateRequest_RemeshBuildsRequest()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("operation", "remesh");
+            data.SetRaw("topology", "quad");
+            data.SetRaw("targetPolycount", 5000);
+
+            var ok = PcgMeshyMeshOpsResolver.TryBuildGenerateRequest(
+                "nodeA", data, "data:application/octet-stream;base64,AAAA",
+                out var request, out var path, out var error);
+
+            Assert.That(ok, Is.True, error);
+            Assert.That(request.Operation, Is.EqualTo("remesh"));
+            Assert.That(request.Topology, Is.EqualTo("quad"));
+            Assert.That(request.TargetPolycount, Is.EqualTo(5000));
+            Assert.That(path, Does.EndWith(".glb"));
+        }
+
+        [Test]
+        public void Retexture_TryBuildGenerateRequest_RequiresStylePrompt()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var ok = PcgMeshyRetextureResolver.TryBuildGenerateRequest(
+                "nodeA", new PcgNodeData(), "data:application/octet-stream;base64,AAAA",
+                out _, out _, out var error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(error, Does.Contain("Text Style Prompt"));
+        }
+
+        [Test]
+        public void Retexture_TryBuildGenerateRequest_TextStyleBuildsRequest()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("textStylePrompt", "rusty metal");
+            data.SetRaw("enablePbr", true);
+
+            var ok = PcgMeshyRetextureResolver.TryBuildGenerateRequest(
+                "nodeA", data, "data:application/octet-stream;base64,AAAA",
+                out var request, out var path, out var error);
+
+            Assert.That(ok, Is.True, error);
+            Assert.That(request.TextStylePrompt, Is.EqualTo("rusty metal"));
+            Assert.That(request.ImageStyleDataUri, Is.Null);
+            Assert.That(request.EnablePbr, Is.True);
+            Assert.That(path, Does.EndWith(".glb"));
+        }
+
+        [Test]
+        public void ImageGen_TryBuildGenerateRequest_TextToImageBuildsRequest()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("prompt", "stone wall, seamless");
+
+            var ok = PcgMeshyImageGenResolver.TryBuildGenerateRequest(
+                "nodeA", data, out var request, out var path, out var error);
+
+            Assert.That(ok, Is.True, error);
+            Assert.That(request.ImageToImage, Is.False);
+            Assert.That(request.Prompt, Is.EqualTo("stone wall, seamless"));
+            Assert.That(request.AiModel, Is.EqualTo("nano-banana"));
+            Assert.That(request.AspectRatio, Is.EqualTo("1:1"));
+            Assert.That(request.ReferenceImageDataUris, Is.Empty);
+            Assert.That(path, Does.EndWith(".png"));
+        }
+
+        [Test]
+        public void ImageGen_TryBuildGenerateRequest_ImageToImageRequiresReference()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("mode", "imageToImage");
+            data.SetRaw("prompt", "make it rainy");
+
+            var ok = PcgMeshyImageGenResolver.TryBuildGenerateRequest(
+                "nodeA", data, out _, out _, out var error);
+
+            Assert.That(ok, Is.False);
+            Assert.That(error, Does.Contain("Reference Image"));
+        }
+
+        [Test]
+        public void ImageGen_TryBuildGenerateRequest_ImageToImageWithUrl()
+        {
+            PcgMeshySettings.ApiKey = "msy_test_key";
+
+            var data = new PcgNodeData();
+            data.SetRaw("mode", "imageToImage");
+            data.SetRaw("prompt", "make it rainy");
+            data.SetRaw("referenceImageUrl", "https://example.com/street.png");
+
+            var ok = PcgMeshyImageGenResolver.TryBuildGenerateRequest(
+                "nodeA", data, out var request, out _, out var error);
+
+            Assert.That(ok, Is.True, error);
+            Assert.That(request.ImageToImage, Is.True);
+            Assert.That(
+                request.ReferenceImageDataUris,
+                Is.EquivalentTo(new[] { "https://example.com/street.png" }));
+        }
     }
 }
