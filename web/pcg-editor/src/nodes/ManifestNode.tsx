@@ -6,14 +6,14 @@
 import { useState, useContext, useRef, useEffect } from 'react';
 import { Handle, Position, NodeToolbar, type NodeProps } from '@xyflow/react';
 import { getNodeTypeDefs, getPinTypeColor } from '../nodeManifest';
-import { NodeActionsContext } from '../nodeActions';
+import { NodeActionsContext, useIsPreviewTarget } from '../nodeActions';
 
 export default function ManifestNode({ id, type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
   const [hovered, setHovered] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { onInfo, onPreview, previewTargetId } = useContext(NodeActionsContext);
-  const previewing = previewTargetId === id;
+  const { onInfo, onPreview } = useContext(NodeActionsContext);
+  const previewing = useIsPreviewTarget(id);
 
   // The toolbar is portaled outside the node DOM, so hide on a short delay:
   // moving the pointer from the node onto the toolbar must not dismiss it.

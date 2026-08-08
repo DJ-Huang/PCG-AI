@@ -34,6 +34,17 @@ export interface PreviewData {
   /** Source heightfield when the graph outputs terrain data. */
   heightfield: ParsedHeightField | null;
   cook: CookResult;
+  /** Client-side phase timings; filled by cookGraphPreview (absent in contract tests). */
+  timings?: PreviewTimings;
+}
+
+export interface PreviewTimings {
+  /** fetch → body downloaded: server wall clock + network/transfer. */
+  fetchMs: number;
+  /** parseCookResult: header, JSON summary decode, blob slicing. */
+  parseCookMs: number;
+  /** Binary payloads → preview data (geometry/mesh/points/heightfield/splines). */
+  buildDataMs: number;
 }
 
 export interface PreviewResponse {
@@ -244,6 +255,7 @@ export async function cookGraphPreview(
     form.append('meta', new Blob([meta], { type: 'application/json' }));
     form.append('graph', new Blob([JSON.stringify(graph)], { type: 'application/json' }));
 
+    const fetchStart = performance.now();
     const res = await fetch('/api/cook', { method: 'POST', body: form, signal });
     if (!res.ok) {
       const text = await res.text();
@@ -258,8 +270,19 @@ export async function cookGraphPreview(
     }
 
     const buffer = await res.arrayBuffer();
+    const fetchEnd = performance.now();
     const cook = parseCookResult(buffer);
-    return buildPreviewDataFromCook(cook);
+    const parseEnd = performance.now();
+    const response = buildPreviewDataFromCook(cook);
+    const buildEnd = performance.now();
+    if (response.data) {
+      response.data.timings = {
+        fetchMs: fetchEnd - fetchStart,
+        parseCookMs: parseEnd - fetchEnd,
+        buildDataMs: buildEnd - parseEnd,
+      };
+    }
+    return response;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       return { ok: false, error: 'aborted' };

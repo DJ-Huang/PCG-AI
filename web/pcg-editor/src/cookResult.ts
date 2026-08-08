@@ -59,6 +59,19 @@ export interface ParsedGeometry {
 
 const utf8 = new TextDecoder();
 
+// Block reinterpret helpers: the wire format is little-endian and every
+// supported platform (macOS/Windows, x64/arm64) is little-endian, so copying a
+// byte range into a fresh aligned buffer and viewing it as typed elements is
+// value-identical to per-element DataView reads, at memcpy speed. Callers
+// bounds-check before calling; slice() guarantees a 4-aligned fresh buffer.
+function copyFloat32(source: Uint8Array, byteOffset: number, count: number): Float32Array {
+  return new Float32Array(source.slice(byteOffset, byteOffset + count * 4).buffer);
+}
+
+function copyUint32(source: Uint8Array, byteOffset: number, count: number): Uint32Array {
+  return new Uint32Array(source.slice(byteOffset, byteOffset + count * 4).buffer);
+}
+
 function readBlob(view: DataView, state: { offset: number }): Uint8Array {
   if (state.offset + 4 > view.byteLength) throw new Error('Truncated blob length');
   const len = view.getUint32(state.offset, true);
@@ -164,46 +177,26 @@ export function parseGeometryBinary(data: Uint8Array): ParsedGeometry {
       if (chunkSize !== pointCount * 12) {
         throw new Error(`POINTS chunk bytes mismatch: ${chunkSize} != ${pointCount * 12}`);
       }
-      positions = new Float32Array(pointCount * 3);
-      for (let i = 0; i < pointCount * 3; i++) {
-        positions[i] = view.getFloat32(offset + i * 4, true);
-      }
+      positions = copyFloat32(data, offset, pointCount * 3);
     } else if (chunkId === CHUNK_FACE_OFFSETS) {
       if (faceOffsets) throw new Error('Duplicate FACE_OFFSETS chunk');
       if (chunkSize !== faceCount * 4) {
         throw new Error(`FACE_OFFSETS chunk bytes mismatch: ${chunkSize} != ${faceCount * 4}`);
       }
-      faceOffsets = new Uint32Array(faceCount);
-      for (let i = 0; i < faceCount; i++) {
-        faceOffsets[i] = view.getUint32(offset + i * 4, true);
-      }
+      faceOffsets = copyUint32(data, offset, faceCount);
     } else if (chunkId === CHUNK_FACE_INDICES) {
       if (faceIndices) throw new Error('Duplicate FACE_INDICES chunk');
       if (chunkSize % 4 !== 0) throw new Error('FACE_INDICES chunk size not a multiple of 4');
-      const count = chunkSize / 4;
-      faceIndices = new Uint32Array(count);
-      for (let i = 0; i < count; i++) {
-        faceIndices[i] = view.getUint32(offset + i * 4, true);
-      }
+      faceIndices = copyUint32(data, offset, chunkSize / 4);
     } else if (chunkId === CHUNK_TRIANGULATION) {
       if (chunkSize % 4 !== 0) throw new Error('TRIANGULATION chunk size not a multiple of 4');
-      const count = chunkSize / 4;
-      triangles = new Uint32Array(count);
-      for (let i = 0; i < count; i++) {
-        triangles[i] = view.getUint32(offset + i * 4, true);
-      }
+      triangles = copyUint32(data, offset, chunkSize / 4);
     } else if (chunkId === CHUNK_COLORS) {
       if (chunkSize % 16 !== 0) throw new Error('COLORS chunk size not a multiple of 16');
-      colors = new Float32Array(chunkSize / 4);
-      for (let i = 0; i < colors.length; i++) {
-        colors[i] = view.getFloat32(offset + i * 4, true);
-      }
+      colors = copyFloat32(data, offset, chunkSize / 4);
     } else if (chunkId === CHUNK_UVS) {
       if (chunkSize % 8 !== 0) throw new Error('UVS chunk size not a multiple of 8');
-      uvs = new Float32Array(chunkSize / 4);
-      for (let i = 0; i < uvs.length; i++) {
-        uvs[i] = view.getFloat32(offset + i * 4, true);
-      }
+      uvs = copyFloat32(data, offset, chunkSize / 4);
     }
     // GROUPS / MATERIAL / ATTRIBUTES / unknown chunks: skip by size.
 
@@ -246,11 +239,7 @@ export function parsePointBinary(data: Uint8Array): Float32Array {
   const pointCount = view.getUint32(8, true);
   const positionsBytes = pointCount * 12;
   if (16 + positionsBytes > data.byteLength) throw new Error('Point binary positions truncated');
-  const positions = new Float32Array(pointCount * 3);
-  for (let i = 0; i < pointCount * 3; i++) {
-    positions[i] = view.getFloat32(16 + i * 4, true);
-  }
-  return positions;
+  return copyFloat32(data, 16, pointCount * 3);
 }
 
 // Mesh binary ('PCGM', pcg_mesh_binary.cpp): flat-shading duplicated vertices
@@ -337,23 +326,14 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
 
   const need = offset + vertexCount * 12 + indexCount * 4;
   if (need > data.byteLength) throw new Error('Mesh binary positions/indices truncated');
-  const positions = new Float32Array(vertexCount * 3);
-  for (let i = 0; i < vertexCount * 3; i++) {
-    positions[i] = view.getFloat32(offset + i * 4, true);
-  }
+  const positions = copyFloat32(data, offset, vertexCount * 3);
   offset += vertexCount * 12;
-  const indices = new Uint32Array(indexCount);
-  for (let i = 0; i < indexCount; i++) {
-    indices[i] = view.getUint32(offset + i * 4, true);
-  }
+  const indices = copyUint32(data, offset, indexCount);
   offset += indexCount * 4;
 
   const readFloatBlock = (count: number, what: string): Float32Array => {
     if (offset + count * 4 > data.byteLength) throw new Error(`Mesh binary ${what} truncated`);
-    const out = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      out[i] = view.getFloat32(offset + i * 4, true);
-    }
+    const out = copyFloat32(data, offset, count);
     offset += count * 4;
     return out;
   };
@@ -371,10 +351,6 @@ function readU32(view: DataView, offset: number): number {
 
 function readI32(view: DataView, offset: number): number {
   return view.getInt32(offset, true);
-}
-
-function readF32(view: DataView, offset: number): number {
-  return view.getFloat32(offset, true);
 }
 
 function readF64(view: DataView, offset: number): number {
@@ -431,11 +407,8 @@ export function parseHeightFieldBinary(data: Uint8Array): ParsedHeightField {
     }
     const name = utf8.decode(data.subarray(offset, offset + nameBytes));
     offset += nameBytes;
-    const values = new Float32Array(valueCount);
-    for (let v = 0; v < valueCount; v++) {
-      values[v] = readF32(view, offset);
-      offset += 4;
-    }
+    const values = copyFloat32(data, offset, valueCount);
+    offset += valueCount * 4;
     layers.push({ name, tupleSize, values });
   }
 

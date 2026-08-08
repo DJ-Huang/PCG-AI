@@ -85,6 +85,8 @@ export default function PreviewViewport({
   const [modes, setModes] = useState<DisplayMode[]>(['mesh']);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [width, setWidth] = useState(420);
+  const [sceneMs, setSceneMs] = useState(0);
+  const sceneTimedDataRef = useRef<PreviewData | null>(null);
 
   const onResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -426,6 +428,7 @@ export default function PreviewViewport({
 
   // ── Content rebuild on new cook data ─────────────────
   useEffect(() => {
+    const rebuildStart = performance.now();
     const ctx = sceneRef.current;
     if (!ctx) return;
     disposeGroup(ctx.content);
@@ -458,6 +461,11 @@ export default function PreviewViewport({
     }
 
     applyModes(ctx.content, modes, data.splines != null);
+    // Only new cook data counts — spline-handle rebuilds reuse the same payload.
+    if (data !== sceneTimedDataRef.current) {
+      sceneTimedDataRef.current = data;
+      setSceneMs(performance.now() - rebuildStart);
+    }
   }, [data, splineEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -544,8 +552,8 @@ export default function PreviewViewport({
       <div className="pcg-preview__footer">
         <span className="pcg-preview__stats">{stats}</span>
         {data && (
-          <span className="pcg-preview__perf">
-            {data.cook.graphExecuteMs.toFixed(1)} ms · {data.cook.nodesExecuted} nodes
+          <span className="pcg-preview__perf" title="exec: server graph execute · wall: fetch+server total · bin: server binary write · js: client parse+build · scene: three.js rebuild">
+            {data.cook.graphExecuteMs.toFixed(0)}ms exec · {data.timings ? data.timings.fetchMs.toFixed(0) : '?'}ms wall · {data.cook.binaryWriteMs.toFixed(0)}ms bin · {data.timings ? (data.timings.parseCookMs + data.timings.buildDataMs).toFixed(0) : '?'}ms js · {sceneMs.toFixed(0)}ms scene · {data.cook.nodesExecuted} nodes
           </span>
         )}
       </div>

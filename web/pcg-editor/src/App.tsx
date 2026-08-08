@@ -46,7 +46,7 @@ import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
 import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
-import { NodeActionsContext } from './nodeActions';
+import { NodeActionsContext, getPreviewTargetId, setPreviewTargetId, usePreviewTargetId } from './nodeActions';
 import {
   getEffectiveControlPoints,
   isSplineAuthoringNode,
@@ -130,7 +130,7 @@ function PcgEditor() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
-  const [previewTargetNodeId, setPreviewTargetNodeId] = useState<string | null>(null);
+  const previewTargetNodeId = usePreviewTargetId();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const connectingNodeId = useRef<string | null>(null);
@@ -590,7 +590,7 @@ function PcgEditor() {
     setSubgraphs([]);
     setSelectedNode(null);
     setInfoNodeId(null);
-    setPreviewTargetNodeId(null);
+    setPreviewTargetId(null);
     setCurrentFilename('');
     nodeCounter = 100;
     clearEditorSession();
@@ -619,7 +619,10 @@ function PcgEditor() {
 
   const requestPreviewCook = useCallback(async (targetOverride?: string | null) => {
     if (nodes.length === 0) return;
-    const target = targetOverride === undefined ? previewTargetNodeId : targetOverride;
+    // Read the target from the store (not React state) so this callback's identity
+    // stays stable across ▶ clicks — a new identity would propagate through
+    // NodeActionsContext and re-render every node.
+    const target = targetOverride === undefined ? getPreviewTargetId() : targetOverride;
     previewAbortRef.current?.abort();
     const previousJobId = previewJobIdRef.current;
     if (previousJobId) {
@@ -642,7 +645,7 @@ function PcgEditor() {
         graph = previewGraph;
       } else {
         // Preview target was deleted — fall back to the full graph.
-        setPreviewTargetNodeId(null);
+        setPreviewTargetId(null);
       }
     } else {
       graph = prepareGraphForPreviewCook(graph);
@@ -655,7 +658,7 @@ function PcgEditor() {
     } else if (result.error !== 'aborted') {
       setPreviewError(result.error ?? 'Cook failed');
     }
-  }, [nodes, edges, parameters, subgraphs, previewTargetNodeId]);
+  }, [nodes, edges, parameters, subgraphs]);
 
   const openPreview = useCallback(async () => {
     setShowPreview(true);
@@ -710,28 +713,29 @@ function PcgEditor() {
 
   const handleNodePreview = useCallback(
     (nodeId: string) => {
-      // The target change retriggers the debounced effect below; skip its next
-      // run since the direct cook here already covers it (avoids a duplicate
-      // request whose cache-hit stats would mask the real exec numbers).
-      skipDebounceRef.current = true;
-      if (nodeId === previewTargetNodeId) {
+      if (nodeId === getPreviewTargetId()) {
         // Clicking ▶ on the current target clears it — back to full-graph preview.
-        setPreviewTargetNodeId(null);
+        setPreviewTargetId(null);
         void requestPreviewCook(null);
         return;
       }
-      setPreviewTargetNodeId(nodeId);
+      setPreviewTargetId(nodeId);
       if (!showPreview) {
+        // Opening the panel flips showPreview, which retriggers the debounced
+        // effect below; skip its next run since the direct cook here already
+        // covers it. (With the panel already open the effect does not re-run —
+        // the target lives outside its deps — so nothing needs skipping.)
+        skipDebounceRef.current = true;
         void openPreview();
       }
       void requestPreviewCook(nodeId);
     },
-    [showPreview, previewTargetNodeId, openPreview, requestPreviewCook],
+    [showPreview, openPreview, requestPreviewCook],
   );
 
   const nodeActions = useMemo(
-    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview, previewTargetId: previewTargetNodeId }),
-    [handleNodeInfo, handleNodePreview, previewTargetNodeId],
+    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview }),
+    [handleNodeInfo, handleNodePreview],
   );
 
   const splineEditNode = useMemo(() => {
