@@ -1,0 +1,792 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "shape_toy",
+      "type": "ImportMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Source: Rubber Toy",
+        "path": "",
+        "scale": 3.0,
+        "axisConversion": "none"
+      }
+    },
+    {
+      "id": "shape_toy_tform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "__nodeTitle": "Scale Rubber Toy",
+        "translate": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3,
+          3,
+          3
+        ],
+        "uniformScale": 3.0
+      }
+    },
+    {
+      "id": "shape_teapot",
+      "type": "ImportMesh",
+      "position": {
+        "x": 560,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Source: Teapot",
+        "path": "",
+        "scale": 1.0,
+        "axisConversion": "none"
+      }
+    },
+    {
+      "id": "shape_teapot_tform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 560,
+        "y": 160
+      },
+      "data": {
+        "__nodeTitle": "Scale Teapot",
+        "translate": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          3,
+          3,
+          3
+        ],
+        "uniformScale": 3.0
+      }
+    },
+    {
+      "id": "shape_switch",
+      "type": "Switch",
+      "position": {
+        "x": 380,
+        "y": 320
+      },
+      "data": {
+        "__nodeTitle": "Shape Switch",
+        "index": 0
+      }
+    },
+    {
+      "id": "match_size",
+      "type": "MatchSize",
+      "position": {
+        "x": 380,
+        "y": 480
+      },
+      "data": {
+        "__nodeTitle": "Match Size (Ground)",
+        "justifyWith": "inputIfWired",
+        "justifyY": "min",
+        "targetJustifyY": "same",
+        "justifyX": "none",
+        "justifyZ": "none",
+        "scaleToFit": false,
+        "translate": true
+      }
+    },
+    {
+      "id": "color_solid",
+      "type": "VertexColor",
+      "position": {
+        "x": 380,
+        "y": 640
+      },
+      "data": {
+        "__nodeTitle": "Solid Color (Red)",
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0,
+        "emission": 0.0
+      }
+    },
+    {
+      "id": "texture_uv",
+      "type": "UVTexture",
+      "position": {
+        "x": 740,
+        "y": 640
+      },
+      "data": {
+        "__nodeTitle": "UV Texture",
+        "projection": "planar",
+        "axis": "y",
+        "scaleU": 1.0,
+        "scaleV": 1.0,
+        "offsetU": 0.0,
+        "offsetV": 0.0
+      }
+    },
+    {
+      "id": "texture_project",
+      "type": "ProjectTexture",
+      "position": {
+        "x": 380,
+        "y": 800
+      },
+      "data": {
+        "__nodeTitle": "Project Texture",
+        "direction": "y",
+        "scaleU": 1.0,
+        "scaleV": 1.0,
+        "offsetU": 0.0,
+        "offsetV": 0.0,
+        "useReferenceBounds": false
+      }
+    },
+    {
+      "id": "color_switch",
+      "type": "Switch",
+      "position": {
+        "x": 380,
+        "y": 960
+      },
+      "data": {
+        "__nodeTitle": "Color Switch (Look)",
+        "index": 0
+      }
+    },
+    {
+      "id": "points_vol",
+      "type": "PointsFromVolume",
+      "position": {
+        "x": 380,
+        "y": 1120
+      },
+      "data": {
+        "__nodeTitle": "Points From Volume",
+        "pointSeparation": 0.2,
+        "jitter": 0.0,
+        "seed": 0,
+        "shellOnly": false
+      }
+    },
+    {
+      "id": "brick_proto",
+      "type": "Subgraph",
+      "position": {
+        "x": 920,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Brick Prototype",
+        "subgraphId": "single_brick"
+      }
+    },
+    {
+      "id": "copy_static",
+      "type": "CopyMeshToPoints",
+      "position": {
+        "x": 740,
+        "y": 1280
+      },
+      "data": {
+        "__nodeTitle": "Copy Bricks To Points (Static)"
+      }
+    },
+    {
+      "id": "sort_points",
+      "type": "SortGeometry",
+      "position": {
+        "x": 380,
+        "y": 1280
+      },
+      "data": {
+        "__nodeTitle": "Sort Points (Bottom-Up)",
+        "pointMethod": "vector",
+        "pointVectorX": 0.0,
+        "pointVectorY": 1.0,
+        "pointVectorZ": 0.0,
+        "reversePoints": false
+      }
+    },
+    {
+      "id": "group_range",
+      "type": "GroupByRange",
+      "position": {
+        "x": 380,
+        "y": 1440
+      },
+      "data": {
+        "__nodeTitle": "Group By Range (Animation)",
+        "groupName": "hide_points",
+        "entity": "points",
+        "rangeType": "startLength",
+        "start": 0,
+        "length": 20,
+        "end": 0,
+        "selectOf": 1,
+        "offset": 0
+      }
+    },
+    {
+      "id": "blast_anim",
+      "type": "Blast",
+      "position": {
+        "x": 380,
+        "y": 1600
+      },
+      "data": {
+        "__nodeTitle": "Blast (Reveal Animation)",
+        "entity": "points",
+        "group": "hide_points",
+        "expression": "@ptnum >= 0",
+        "parameters": "{}",
+        "deleteNonSelected": true,
+        "removeUnusedPoints": true
+      }
+    },
+    {
+      "id": "copy_anim",
+      "type": "CopyMeshToPoints",
+      "position": {
+        "x": 560,
+        "y": 1760
+      },
+      "data": {
+        "__nodeTitle": "Copy Bricks To Points (Animated)"
+      }
+    },
+    {
+      "id": "anim_switch",
+      "type": "Switch",
+      "position": {
+        "x": 560,
+        "y": 1920
+      },
+      "data": {
+        "__nodeTitle": "Animation Switch",
+        "index": 0
+      }
+    },
+    {
+      "id": "assign_material",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 560,
+        "y": 2080
+      },
+      "data": {
+        "__nodeTitle": "Assign Brick Material",
+        "materialName": "brick_plastic"
+      }
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": {
+        "x": 560,
+        "y": 2240
+      },
+      "data": {
+        "__nodeTitle": "Output",
+        "label": "Brickified Shape"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_toy_tform",
+      "source": "shape_toy",
+      "target": "shape_toy_tform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_teapot_tform",
+      "source": "shape_teapot",
+      "target": "shape_teapot_tform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_toy_switch",
+      "source": "shape_toy_tform",
+      "target": "shape_switch",
+      "sourceHandle": "out",
+      "targetHandle": "in0"
+    },
+    {
+      "id": "e_teapot_switch",
+      "source": "shape_teapot_tform",
+      "target": "shape_switch",
+      "sourceHandle": "out",
+      "targetHandle": "in1"
+    },
+    {
+      "id": "e_switch_match",
+      "source": "shape_switch",
+      "target": "match_size",
+      "sourceHandle": "out",
+      "targetHandle": "source"
+    },
+    {
+      "id": "e_match_solid",
+      "source": "match_size",
+      "target": "color_solid",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_match_uv",
+      "source": "match_size",
+      "target": "texture_uv",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_uv_project",
+      "source": "texture_uv",
+      "target": "texture_project",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_solid_cswitch",
+      "source": "color_solid",
+      "target": "color_switch",
+      "sourceHandle": "out",
+      "targetHandle": "in0"
+    },
+    {
+      "id": "e_project_cswitch",
+      "source": "texture_project",
+      "target": "color_switch",
+      "sourceHandle": "out",
+      "targetHandle": "in1"
+    },
+    {
+      "id": "e_cswitch_points",
+      "source": "color_switch",
+      "target": "points_vol",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_brick_proto",
+      "source": "brick_proto",
+      "target": "copy_static",
+      "sourceHandle": "mesh",
+      "targetHandle": "prototype"
+    },
+    {
+      "id": "e_points_copy_static",
+      "source": "points_vol",
+      "target": "copy_static",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    },
+    {
+      "id": "e_points_sort",
+      "source": "points_vol",
+      "target": "sort_points",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_sort_group",
+      "source": "sort_points",
+      "target": "group_range",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_group_blast",
+      "source": "group_range",
+      "target": "blast_anim",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_brick_proto_anim",
+      "source": "brick_proto",
+      "target": "copy_anim",
+      "sourceHandle": "mesh",
+      "targetHandle": "prototype"
+    },
+    {
+      "id": "e_blast_copy_anim",
+      "source": "blast_anim",
+      "target": "copy_anim",
+      "sourceHandle": "out",
+      "targetHandle": "points"
+    },
+    {
+      "id": "e_static_aswitch",
+      "source": "copy_static",
+      "target": "anim_switch",
+      "sourceHandle": "out",
+      "targetHandle": "in0"
+    },
+    {
+      "id": "e_anim_aswitch",
+      "source": "copy_anim",
+      "target": "anim_switch",
+      "sourceHandle": "out",
+      "targetHandle": "in1"
+    },
+    {
+      "id": "e_aswitch_mat",
+      "source": "anim_switch",
+      "target": "assign_material",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_mat_output",
+      "source": "assign_material",
+      "target": "output",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "shape",
+      "name": "shape",
+      "label": "Shape",
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 1,
+      "targetNode": "shape_switch",
+      "targetProperty": "index"
+    },
+    {
+      "id": "look",
+      "name": "look",
+      "label": "Look",
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 1,
+      "targetNode": "color_switch",
+      "targetProperty": "index"
+    },
+    {
+      "id": "pointSeparation",
+      "name": "pointSeparation",
+      "label": "Point Separation",
+      "type": "number",
+      "default": 0.2,
+      "minimum": 0.01,
+      "maximum": 2.0,
+      "targetNode": "points_vol",
+      "targetProperty": "pointSeparation"
+    },
+    {
+      "id": "seed",
+      "name": "seed",
+      "label": "Seed",
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 100,
+      "targetNode": "points_vol",
+      "targetProperty": "seed"
+    },
+    {
+      "id": "animate",
+      "name": "animate",
+      "label": "Animate Bricks",
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 1,
+      "targetNode": "anim_switch",
+      "targetProperty": "index"
+    },
+    {
+      "id": "buildSpeed",
+      "name": "buildSpeed",
+      "label": "Build Speed",
+      "type": "integer",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 500,
+      "targetNode": "group_range",
+      "targetProperty": "length"
+    }
+  ],
+  "subgraphs": [
+    {
+      "id": "single_brick",
+      "name": "Single Brick",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Brick Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "brick_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Brick Box",
+            "width": 0.2,
+            "height": 0.2,
+            "depth": 0.2
+          }
+        },
+        {
+          "id": "top_faces",
+          "type": "GroupCreate",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Select Top Faces",
+            "outputGroup": "top_faces",
+            "domain": "face",
+            "enableNormals": true,
+            "directionX": 0.0,
+            "directionY": 1.0,
+            "directionZ": 0.0,
+            "spreadAngle": 10.0
+          }
+        },
+        {
+          "id": "inset_top",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Inset Top (Stud Base)",
+            "faceGroup": "top_faces",
+            "inset": 0.04,
+            "distance": 0.0,
+            "topGroup": "stud_base"
+          }
+        },
+        {
+          "id": "extrude_stud",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 200,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Extrude Stud",
+            "faceGroup": "stud_base",
+            "inset": 0.0,
+            "distance": 0.05,
+            "topGroup": "stud_top"
+          }
+        },
+        {
+          "id": "bottom_faces",
+          "type": "GroupCreate",
+          "position": {
+            "x": 200,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Select Bottom Faces",
+            "outputGroup": "bottom_faces",
+            "domain": "face",
+            "enableNormals": true,
+            "directionX": 0.0,
+            "directionY": -1.0,
+            "directionZ": 0.0,
+            "spreadAngle": 10.0
+          }
+        },
+        {
+          "id": "inset_bottom",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 200,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Inset Bottom",
+            "faceGroup": "bottom_faces",
+            "inset": 0.025,
+            "distance": 0.0,
+            "topGroup": "bottom_inset"
+          }
+        },
+        {
+          "id": "extrude_bottom",
+          "type": "PolyExtrude",
+          "position": {
+            "x": 200,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "Extrude Bottom Down",
+            "faceGroup": "bottom_inset",
+            "inset": 0.0,
+            "distance": -0.175
+          }
+        },
+        {
+          "id": "bevel_edges",
+          "type": "GroupCreate",
+          "position": {
+            "x": 200,
+            "y": 1120
+          },
+          "data": {
+            "__nodeTitle": "Select Bevel Edges",
+            "outputGroup": "bevel_edges",
+            "domain": "edge",
+            "enableEdges": true,
+            "mode": "angle",
+            "minEdgeAngle": 60.0
+          }
+        },
+        {
+          "id": "bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200,
+            "y": 1280
+          },
+          "data": {
+            "__nodeTitle": "Bevel Edges",
+            "edgeGroup": "bevel_edges",
+            "amount": 0.006,
+            "segments": 3,
+            "profile": 0.5
+          }
+        },
+        {
+          "id": "subdiv",
+          "type": "SubdivideMesh",
+          "position": {
+            "x": 200,
+            "y": 1440
+          },
+          "data": {
+            "__nodeTitle": "Subdivide (Smooth)",
+            "levels": 1,
+            "method": "catmullClark"
+          }
+        },
+        {
+          "id": "brick_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "Brick Output"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "ie_box_topfaces",
+          "source": "brick_box",
+          "target": "top_faces",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_topfaces_inset",
+          "source": "top_faces",
+          "target": "inset_top",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_inset_extrude",
+          "source": "inset_top",
+          "target": "extrude_stud",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_extrude_bottomf",
+          "source": "extrude_stud",
+          "target": "bottom_faces",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_bottomf_insetb",
+          "source": "bottom_faces",
+          "target": "inset_bottom",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_insetb_extrudeb",
+          "source": "inset_bottom",
+          "target": "extrude_bottom",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_extrudeb_bevele",
+          "source": "extrude_bottom",
+          "target": "bevel_edges",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_bevele_bevel",
+          "source": "bevel_edges",
+          "target": "bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_bevel_subdiv",
+          "source": "bevel",
+          "target": "subdiv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "ie_subdiv_out",
+          "source": "subdiv",
+          "target": "brick_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        }
+      ]
+    }
+  ]
+}

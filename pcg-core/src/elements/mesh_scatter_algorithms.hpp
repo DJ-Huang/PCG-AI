@@ -49,4 +49,21 @@ struct PointRelaxOptions {
 data::PcgPointData relax_points(const data::PcgPointData& input,
                                 const PointRelaxOptions& options);
 
+struct PointsFromVolumeOptions {
+    double point_separation = 0.5;
+    double jitter = 0.0;
+    int seed = 0;
+    bool shell_only = false;
+    bool (*is_cancel_requested)() = nullptr;
+};
+
+/// Generate points inside a mesh volume by voxelizing the AABB and testing
+/// voxel-center containment via ray casting. shell_only restricts output
+/// to voxels adjacent to the mesh surface.
+data::PcgPointData sample_mesh_volume(const data::PcgMeshData& mesh,
+                                       const PointsFromVolumeOptions& options);
+
+data::PcgPointData sample_mesh_volume(const data::PcgGeometry& geometry,
+                                       const PointsFromVolumeOptions& options);
+
 } // namespace pcg::internal::elements

@@ -532,4 +532,233 @@ data::PcgPointData relax_points(const data::PcgPointData& input,
     return output;
 }
 
+// ── Points From Volume ────────────────────────────────────────────────────
+
+namespace {
+
+struct VolumeTriangle {
+    double v0[3];
+    double v1[3];
+    double v2[3];
+};
+
+// Moller-Trumbore ray-triangle intersection. Returns true if the ray
+// (origin + t*dir, dir = +X with tiny Y/Z skew to avoid shared-edge double-count)
+// hits the triangle. Uses double-precision eps.
+bool ray_hits_triangle_x(const double origin[3], const VolumeTriangle& tri)
+{
+    // Skew the ray direction slightly off-axis to avoid passing through
+    // shared triangle edges, which would cause double-counting.
+    // Asymmetric Y/Z skew so diagonal y==z rays don't stay on the diagonal.
+    const double dir[3] = {1.0, 1.7e-4, 3.1e-4};
+    const double e1x = tri.v1[0] - tri.v0[0];
+    const double e1y = tri.v1[1] - tri.v0[1];
+    const double e1z = tri.v1[2] - tri.v0[2];
+    const double e2x = tri.v2[0] - tri.v0[0];
+    const double e2y = tri.v2[1] - tri.v0[1];
+    const double e2z = tri.v2[2] - tri.v0[2];
+
+    // h = cross(dir, e2)
+    const double hx = dir[1] * e2z - dir[2] * e2y;
+    const double hy = dir[2] * e2x - dir[0] * e2z;
+    const double hz = dir[0] * e2y - dir[1] * e2x;
+
+    const double a = e1x * hx + e1y * hy + e1z * hz;
+    if (std::abs(a) < 1e-14)
+        return false;
+
+    const double inv_a = 1.0 / a;
+    const double sx = origin[0] - tri.v0[0];
+    const double sy = origin[1] - tri.v0[1];
+    const double sz = origin[2] - tri.v0[2];
+
+    // u = dot(s, h) * inv_a
+    const double u = (sx * hx + sy * hy + sz * hz) * inv_a;
+    if (u < -1e-10 || u > 1.0 + 1e-10)
+        return false;
+
+    // q = cross(s, e1)
+    const double qx = sy * e1z - sz * e1y;
+    const double qy = sz * e1x - sx * e1z;
+    const double qz = sx * e1y - sy * e1x;
+
+    // v = dot(dir, q) * inv_a
+    const double v = (dir[0] * qx + dir[1] * qy + dir[2] * qz) * inv_a;
+    if (v < -1e-10 || u + v > 1.0 + 1e-10)
+        return false;
+
+    const double t = (e2x * qx + e2y * qy + e2z * qz) * inv_a;
+    return t > 1e-10;
+}
+
+bool point_inside_mesh(const double origin[3], const std::vector<VolumeTriangle>& tris)
+{
+    int crossings = 0;
+    for (const auto& tri : tris) {
+        if (ray_hits_triangle_x(origin, tri))
+            ++crossings;
+    }
+    return (crossings & 1) != 0;
+}
+
+std::vector<VolumeTriangle> build_volume_triangles(const data::PcgMeshData& mesh)
+{
+    const auto& verts = mesh.vertices();
+    const auto& tris = mesh.triangles();
+    std::vector<VolumeTriangle> out;
+    out.reserve(tris.size() / 3);
+    for (size_t t = 0; t + 2 < tris.size(); t += 3) {
+        const int i0 = tris[t];
+        const int i1 = tris[t + 1];
+        const int i2 = tris[t + 2];
+        if (i0 < 0 || i1 < 0 || i2 < 0 ||
+            static_cast<size_t>(i0) >= verts.size() ||
+            static_cast<size_t>(i1) >= verts.size() ||
+            static_cast<size_t>(i2) >= verts.size())
+            continue;
+        const auto& a = verts[static_cast<size_t>(i0)];
+        const auto& b = verts[static_cast<size_t>(i1)];
+        const auto& c = verts[static_cast<size_t>(i2)];
+        out.push_back({{a.x, a.y, a.z}, {b.x, b.y, b.z}, {c.x, c.y, c.z}});
+    }
+    return out;
+}
+
+std::vector<VolumeTriangle> build_volume_triangles(const data::PcgGeometry& geometry)
+{
+    std::vector<VolumeTriangle> out;
+    const auto& pts = geometry.points();
+    for (const auto& face : geometry.faces()) {
+        if (face.size() < 3)
+            continue;
+        const auto tri_indices = data::triangulate_face_corners(pts, face);
+        for (const auto& tri : tri_indices) {
+            const int i0 = face[static_cast<size_t>(tri[0])];
+            const int i1 = face[static_cast<size_t>(tri[1])];
+            const int i2 = face[static_cast<size_t>(tri[2])];
+            if (i0 < 0 || i1 < 0 || i2 < 0 ||
+                static_cast<size_t>(i0) >= pts.size() ||
+                static_cast<size_t>(i1) >= pts.size() ||
+                static_cast<size_t>(i2) >= pts.size())
+                continue;
+            const auto& a = pts[static_cast<size_t>(i0)];
+            const auto& b = pts[static_cast<size_t>(i1)];
+            const auto& c = pts[static_cast<size_t>(i2)];
+            out.push_back({{a.x, a.y, a.z}, {b.x, b.y, b.z}, {c.x, c.y, c.z}});
+        }
+    }
+    return out;
+}
+
+data::PcgPointData sample_volume_from_triangles(
+    const std::vector<VolumeTriangle>& tris,
+    const PointsFromVolumeOptions& options)
+{
+    data::PcgPointData points;
+    if (tris.empty() || options.point_separation <= 0.0)
+        return points;
+
+    // Compute AABB.
+    double minx = 1e300, miny = 1e300, minz = 1e300;
+    double maxx = -1e300, maxy = -1e300, maxz = -1e300;
+    for (const auto& tri : tris) {
+        for (int v = 0; v < 3; ++v) {
+            const double* p = v == 0 ? tri.v0 : (v == 1 ? tri.v1 : tri.v2);
+            minx = std::min(minx, p[0]); maxx = std::max(maxx, p[0]);
+            miny = std::min(miny, p[1]); maxy = std::max(maxy, p[1]);
+            minz = std::min(minz, p[2]); maxz = std::max(maxz, p[2]);
+        }
+    }
+
+    const double cell = options.point_separation;
+    const int nx = std::max(1, static_cast<int>(std::ceil((maxx - minx) / cell)));
+    const int ny = std::max(1, static_cast<int>(std::ceil((maxy - miny) / cell)));
+    const int nz = std::max(1, static_cast<int>(std::ceil((maxz - minz) / cell)));
+
+    // Cap voxel count to prevent runaway memory.
+    if (static_cast<int64_t>(nx) * ny * nz > 50'000'000)
+        return points;
+
+    // Mark inside voxels.
+    std::vector<uint8_t> inside(static_cast<size_t>(nx) * ny * nz, 0);
+    for (int iz = 0; iz < nz; ++iz) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            return points;
+        for (int iy = 0; iy < ny; ++iy) {
+            for (int ix = 0; ix < nx; ++ix) {
+                const double origin[3] = {
+                    minx + (ix + 0.5) * cell,
+                    miny + (iy + 0.5) * cell,
+                    minz + (iz + 0.5) * cell,
+                };
+                const size_t idx = static_cast<size_t>(ix) + static_cast<size_t>(ny) * (iy + static_cast<size_t>(nz) * iz);
+                if (point_inside_mesh(origin, tris))
+                    inside[idx] = 1;
+            }
+        }
+    }
+
+    // For shell_only: keep only voxels that have at least one 6-neighbor outside.
+    auto is_inside = [&](int ix, int iy, int iz) -> bool {
+        if (ix < 0 || ix >= nx || iy < 0 || iy >= ny || iz < 0 || iz >= nz)
+            return false;
+        return inside[static_cast<size_t>(ix) + static_cast<size_t>(ny) * (iy + static_cast<size_t>(nz) * iz)] != 0;
+    };
+
+    uint32_t rng = mix_seed(options.seed, nx * 31 + ny * 17 + nz);
+
+    for (int iz = 0; iz < nz; ++iz) {
+        if (options.is_cancel_requested && options.is_cancel_requested())
+            return points;
+        for (int iy = 0; iy < ny; ++iy) {
+            for (int ix = 0; ix < nx; ++ix) {
+                const size_t idx = static_cast<size_t>(ix) + static_cast<size_t>(ny) * (iy + static_cast<size_t>(nz) * iz);
+                if (!inside[idx])
+                    continue;
+
+                if (options.shell_only) {
+                    const bool has_outside_neighbor =
+                        !is_inside(ix - 1, iy, iz) || !is_inside(ix + 1, iy, iz) ||
+                        !is_inside(ix, iy - 1, iz) || !is_inside(ix, iy + 1, iz) ||
+                        !is_inside(ix, iy, iz - 1) || !is_inside(ix, iy, iz + 1);
+                    if (!has_outside_neighbor)
+                        continue;
+                }
+
+                double px = minx + (ix + 0.5) * cell;
+                double py = miny + (iy + 0.5) * cell;
+                double pz = minz + (iz + 0.5) * cell;
+
+                if (options.jitter > 0.0) {
+                    px += (rand01(rng) - 0.5) * options.jitter;
+                    py += (rand01(rng) - 0.5) * options.jitter;
+                    pz += (rand01(rng) - 0.5) * options.jitter;
+                }
+
+                data::PcgPoint point;
+                point.x = px;
+                point.y = py;
+                point.z = pz;
+                points.add_point(point);
+            }
+        }
+    }
+
+    return points;
+}
+
+} // namespace
+
+data::PcgPointData sample_mesh_volume(const data::PcgMeshData& mesh,
+                                       const PointsFromVolumeOptions& options)
+{
+    return sample_volume_from_triangles(build_volume_triangles(mesh), options);
+}
+
+data::PcgPointData sample_mesh_volume(const data::PcgGeometry& geometry,
+                                       const PointsFromVolumeOptions& options)
+{
+    return sample_volume_from_triangles(build_volume_triangles(geometry), options);
+}
+
 } // namespace pcg::internal::elements

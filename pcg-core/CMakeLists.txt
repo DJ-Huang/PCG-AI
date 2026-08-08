@@ -405,6 +405,11 @@ target_link_libraries(test_point_relax PRIVATE PcgCoreStatic nlohmann_json::nloh
 target_include_directories(test_point_relax PRIVATE src)
 add_test(NAME test_point_relax COMMAND test_point_relax WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_points_from_volume tests/test_points_from_volume.cpp)
+target_link_libraries(test_points_from_volume PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_points_from_volume PRIVATE src)
+add_test(NAME test_points_from_volume COMMAND test_points_from_volume WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_facade_foundation tests/test_facade_foundation.cpp)
 target_link_libraries(test_facade_foundation PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_facade_foundation PRIVATE src)

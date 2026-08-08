@@ -107,6 +107,42 @@ public:
     }
 };
 
+class PointsFromVolumeElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "PointsFromVolume"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "PointsFromVolume missing node");
+
+        PointsFromVolumeOptions opts;
+        opts.point_separation = std::max(0.001, ctx.node->data.value("pointSeparation", 0.5));
+        opts.jitter = std::max(0.0, ctx.node->data.value("jitter", 0.0));
+        opts.seed = mix_seed(ctx.graph_seed, ctx.node->data.value("seed", 0));
+        opts.shell_only = ctx.node->data.value("shellOnly", false);
+        opts.is_cancel_requested = ctx.is_cancel_requested;
+
+        if (ctx.inputs.find_geometry("in") != nullptr) {
+            const data::PcgGeometry geometry =
+                get_geometry_input(ctx, "in", "PointsFromVolume missing mesh input");
+            if (geometry.points().empty() || geometry.faces().empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, "PointsFromVolume mesh has no triangles");
+            emit_points(ctx, sample_mesh_volume(geometry, opts));
+        } else {
+            const data::PcgMeshData mesh =
+                get_mesh_input(ctx, "in", "PointsFromVolume missing mesh input");
+            if (mesh.vertices().empty() || mesh.triangles().size() < 3)
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, "PointsFromVolume mesh has no triangles");
+            emit_points(ctx, sample_mesh_volume(mesh, opts));
+        }
+
+        if (ctx.is_cancel_requested && ctx.is_cancel_requested())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "Execution cancelled");
+        return PCG_OK;
+    }
+};
+
 } // namespace
 
 void register_mesh_scatter_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
@@ -114,6 +150,7 @@ void register_mesh_scatter_elements(std::unordered_map<std::string, std::unique_
     map.emplace("GetMeshData", std::make_unique<GetMeshDataElement>());
     map.emplace("SampleMeshSurface", std::make_unique<SampleMeshSurfaceElement>());
     map.emplace("PointRelax", std::make_unique<PointRelaxElement>());
+    map.emplace("PointsFromVolume", std::make_unique<PointsFromVolumeElement>());
 }
 
 } // namespace pcg::internal::elements
