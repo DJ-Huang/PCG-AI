@@ -1174,7 +1174,6 @@ function PcgEditor() {
             loading={previewLoading}
             error={previewError}
             onRefresh={() => void requestPreviewCook()}
-            onClose={() => void togglePreview()}
             splineEdit={splineEditForViewport}
           />
         )}

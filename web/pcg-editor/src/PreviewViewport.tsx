@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines } from './cookResult';
 import type { PreviewData } from './previewCook';
@@ -27,6 +28,16 @@ import {
   updateControlPointCloud,
   type DragState,
 } from './previewSplineGizmo';
+import SolidShadingPopover, {
+  DEFAULT_MATCAP_ID,
+  type SolidLighting,
+} from './preview/SolidShadingPopover';
+import {
+  disposeMatcapLibrary,
+  loadMatcapTexture,
+  preloadMatcap,
+  type MatcapId,
+} from './preview/matcapLibrary';
 import type { Vec3 } from './splineControlPoints';
 
 export interface SplineEditContext {
@@ -41,11 +52,13 @@ interface PreviewViewportProps {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
-  onClose: () => void;
   splineEdit?: SplineEditContext | null;
 }
 
-type DisplayMode = 'mesh' | 'edges' | 'points';
+type ShadingMode = 'wireframe' | 'solid' | 'material' | 'rendered';
+
+const XRAY_OPACITY = 0.35;
+const STUDIO_ENV_INTENSITY = 0.55;
 
 const SPLINE_CURVE_COLOR = 0x4de66a;
 const CONTROL_LINE_COLOR = 0xffd933;
@@ -68,7 +81,6 @@ export default function PreviewViewport({
   loading,
   error,
   onRefresh,
-  onClose,
   splineEdit,
 }: PreviewViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,8 +93,18 @@ export default function PreviewViewport({
     handles: THREE.Group;
     gizmoLength: number;
     selectedIndex: number;
+    envMap: THREE.Texture | null;
+    matcapTexture: THREE.Texture | null;
+    pmremGenerator: THREE.PMREMGenerator | null;
   } | null>(null);
-  const [modes, setModes] = useState<DisplayMode[]>(['mesh']);
+  const [shadingMode, setShadingMode] = useState<ShadingMode>('solid');
+  const [solidLighting, setSolidLighting] = useState<SolidLighting>('flat');
+  const [matcapId, setMatcapId] = useState<MatcapId>(DEFAULT_MATCAP_ID);
+  const [xrayEnabled, setXrayEnabled] = useState(false);
+  const [solidPopoverOpen, setSolidPopoverOpen] = useState(false);
+  const shadingRef = useRef({ shadingMode, solidLighting, xrayEnabled, matcapId });
+  shadingRef.current = { shadingMode, solidLighting, xrayEnabled, matcapId };
+  const solidPopoverRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [width, setWidth] = useState(420);
   const [sceneMs, setSceneMs] = useState(0);
@@ -117,6 +139,10 @@ export default function PreviewViewport({
   dataRef.current = data;
 
   const hasAutoFramedRef = useRef(false);
+
+  useEffect(() => {
+    preloadMatcap(DEFAULT_MATCAP_ID);
+  }, []);
 
   const focusPreview = useCallback(() => {
     const ctx = sceneRef.current;
@@ -175,7 +201,13 @@ export default function PreviewViewport({
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x1e1e1e);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    const envMap = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 5000);
@@ -206,7 +238,14 @@ export default function PreviewViewport({
       handles,
       gizmoLength: 0.5,
       selectedIndex: -1,
+      envMap,
+      matcapTexture: null,
+      pmremGenerator,
     };
+
+    loadMatcapTexture(DEFAULT_MATCAP_ID).then((tex) => {
+      if (sceneRef.current) sceneRef.current.matcapTexture = tex;
+    });
 
     const resize = () => {
       const w = container.clientWidth;
@@ -400,6 +439,9 @@ export default function PreviewViewport({
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
       controls.dispose();
+      pmremGenerator.dispose();
+      envMap.dispose();
+      disposeMatcapLibrary();
       disposeGroup(content);
       disposeObject3D(handles);
       handles.clear();
@@ -460,7 +502,15 @@ export default function PreviewViewport({
       hasAutoFramedRef.current = true;
     }
 
-    applyModes(ctx.content, modes, data.splines != null);
+    const { shadingMode, solidLighting, xrayEnabled } = shadingRef.current;
+    applyShading(
+      ctx.content,
+      shadingMode,
+      solidLighting,
+      xrayEnabled,
+      ctx.envMap,
+      ctx.matcapTexture,
+    );
     // Only new cook data counts — spline-handle rebuilds reuse the same payload.
     if (data !== sceneTimedDataRef.current) {
       sceneTimedDataRef.current = data;
@@ -486,12 +536,47 @@ export default function PreviewViewport({
   }, [splineEdit?.nodeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (sceneRef.current) applyModes(sceneRef.current.content, modes, data?.splines != null);
-  }, [modes, data?.splines]);
+    const ctx = sceneRef.current;
+    if (!ctx) return;
 
-  const toggleMode = (mode: DisplayMode) => {
-    setModes((prev) => (prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode]));
-  };
+    const runShading = () => {
+      const { shadingMode, solidLighting, xrayEnabled } = shadingRef.current;
+      applyShading(
+        ctx.content,
+        shadingMode,
+        solidLighting,
+        xrayEnabled,
+        ctx.envMap,
+        ctx.matcapTexture,
+      );
+    };
+
+    if (shadingMode === 'solid' && solidLighting === 'matcap') {
+      loadMatcapTexture(matcapId).then((tex) => {
+        if (!sceneRef.current) return;
+        sceneRef.current.matcapTexture = tex;
+        runShading();
+      });
+    } else {
+      runShading();
+    }
+  }, [shadingMode, solidLighting, xrayEnabled, matcapId]);
+
+  useEffect(() => {
+    if (shadingMode !== 'solid') setSolidPopoverOpen(false);
+  }, [shadingMode]);
+
+  useEffect(() => {
+    if (!solidPopoverOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (solidPopoverRef.current?.contains(e.target as Node)) return;
+      setSolidPopoverOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [solidPopoverOpen]);
+
+  const xrayActive = xrayEnabled && (shadingMode === 'wireframe' || shadingMode === 'solid');
 
   const geometry = data?.geometry ?? null;
   const splineCount = data?.splines?.splines.length ?? 0;
@@ -514,65 +599,225 @@ export default function PreviewViewport({
         onMouseDown={onResizeStart}
         title="Drag to resize"
       />
-      <div className="pcg-preview__header">
-        {splineEdit && (
+      {splineEdit && (
+        <div className="pcg-preview__header">
           <span
             className="pcg-preview__spline-hint"
             title="Click a control point, then drag center (free) or RGB axes (X/Y/Z)"
           >
             {selectedIndex >= 0 ? 'Drag axis or center' : 'Click control point'}
           </span>
-        )}
-        <label className="pcg-preview__mode">
-          <input type="checkbox" checked={modes.includes('mesh')} onChange={() => toggleMode('mesh')} />
-          Mesh
-        </label>
-        <label className="pcg-preview__mode">
-          <input type="checkbox" checked={modes.includes('edges')} onChange={() => toggleMode('edges')} />
-          Edges
-        </label>
-        <label className="pcg-preview__mode">
-          <input type="checkbox" checked={modes.includes('points')} onChange={() => toggleMode('points')} />
-          Points
-        </label>
-        <button type="button" className="pcg-preview__btn" onClick={onRefresh} disabled={loading}>
+        </div>
+      )}
+      <div className="pcg-preview__viewport">
+        <div
+          ref={containerRef}
+          className="pcg-preview__canvas"
+          tabIndex={0}
+          title="Click to focus · F to frame selection"
+          onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
+        />
+        <div className="pcg-preview__shading-bar" role="toolbar" aria-label="Viewport shading">
+          <button
+            type="button"
+            className={`pcg-preview__shading-xray${xrayActive ? ' is-active' : ''}`}
+            title="X-Ray"
+            disabled={shadingMode !== 'wireframe' && shadingMode !== 'solid'}
+            aria-pressed={xrayActive}
+            onClick={() => setXrayEnabled((v) => !v)}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+              <rect x="1" y="1" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="5" y="5" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 1.5" />
+            </svg>
+          </button>
+          <div className="pcg-preview__shading-modes" role="radiogroup" aria-label="Shading mode">
+            <button
+              type="button"
+              className={`pcg-preview__shading-mode${shadingMode === 'wireframe' ? ' is-active' : ''}`}
+              title="Wireframe"
+              aria-pressed={shadingMode === 'wireframe'}
+              onClick={() => setShadingMode('wireframe')}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1" />
+                <ellipse cx="8" cy="8" rx="6.5" ry="2.5" fill="none" stroke="currentColor" strokeWidth="0.8" />
+                <ellipse cx="8" cy="8" rx="2.5" ry="6.5" fill="none" stroke="currentColor" strokeWidth="0.8" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`pcg-preview__shading-mode${shadingMode === 'solid' ? ' is-active' : ''}`}
+              title="Solid"
+              aria-pressed={shadingMode === 'solid'}
+              onClick={() => setShadingMode('solid')}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                <circle cx="8" cy="8" r="6.5" fill="currentColor" opacity="0.85" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`pcg-preview__shading-mode${shadingMode === 'material' ? ' is-active' : ''}`}
+              title="Material Preview"
+              aria-pressed={shadingMode === 'material'}
+              onClick={() => setShadingMode('material')}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1" />
+                <path d="M2 2 L14 14 M14 2 L2 14" stroke="currentColor" strokeWidth="0.7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="pcg-preview__shading-mode"
+              title="Rendered — 后续实现"
+              disabled
+              aria-pressed={false}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                <circle cx="8" cy="8" r="6.5" fill="currentColor" opacity="0.5" />
+                <circle cx="5.5" cy="5.5" r="2" fill="currentColor" opacity="0.9" />
+              </svg>
+            </button>
+          </div>
+          <div className="pcg-preview__shading-popover-wrap" ref={solidPopoverRef}>
+            <button
+              type="button"
+              className={`pcg-preview__shading-chevron${shadingMode === 'solid' ? '' : ' is-disabled'}`}
+              title="Solid shading options"
+              disabled={shadingMode !== 'solid'}
+              aria-expanded={solidPopoverOpen}
+              onClick={() => setSolidPopoverOpen((v) => !v)}
+            >
+              ▾
+            </button>
+            {solidPopoverOpen && shadingMode === 'solid' && (
+              <SolidShadingPopover
+                solidLighting={solidLighting}
+                matcapId={matcapId}
+                onSolidLightingChange={setSolidLighting}
+                onMatcapIdChange={setMatcapId}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="pcg-preview__footer">
+        <div className="pcg-preview__footer-left">
+          <span className="pcg-preview__stats">{stats}</span>
+          {data && (
+            <span className="pcg-preview__perf" title="exec: server graph execute · wall: fetch+server total · bin: server binary write · js: client parse+build · scene: three.js rebuild">
+              {data.cook.graphExecuteMs.toFixed(0)}ms exec · {data.timings ? data.timings.fetchMs.toFixed(0) : '?'}ms wall · {data.cook.binaryWriteMs.toFixed(0)}ms bin · {data.timings ? (data.timings.parseCookMs + data.timings.buildDataMs).toFixed(0) : '?'}ms js · {sceneMs.toFixed(0)}ms scene · {data.cook.nodesExecuted} nodes
+            </span>
+          )}
+        </div>
+        <button type="button" className="pcg-preview__btn pcg-preview__recook" onClick={onRefresh} disabled={loading}>
           {loading ? 'Cooking…' : 'Re-cook'}
         </button>
-        <button type="button" className="pcg-preview__btn pcg-preview__close" onClick={onClose} title="Close preview">
-          ×
-        </button>
-      </div>
-      <div
-        ref={containerRef}
-        className="pcg-preview__canvas"
-        tabIndex={0}
-        title="Click to focus · F to frame selection"
-        onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
-      />
-      <div className="pcg-preview__footer">
-        <span className="pcg-preview__stats">{stats}</span>
-        {data && (
-          <span className="pcg-preview__perf" title="exec: server graph execute · wall: fetch+server total · bin: server binary write · js: client parse+build · scene: three.js rebuild">
-            {data.cook.graphExecuteMs.toFixed(0)}ms exec · {data.timings ? data.timings.fetchMs.toFixed(0) : '?'}ms wall · {data.cook.binaryWriteMs.toFixed(0)}ms bin · {data.timings ? (data.timings.parseCookMs + data.timings.buildDataMs).toFixed(0) : '?'}ms js · {sceneMs.toFixed(0)}ms scene · {data.cook.nodesExecuted} nodes
-          </span>
-        )}
       </div>
       {error && <div className="pcg-preview__error">{error}</div>}
     </div>
   );
 }
 
-function applyModes(group: THREE.Group, modes: DisplayMode[], hasSplines: boolean) {
+function applyShading(
+  group: THREE.Group,
+  shadingMode: ShadingMode,
+  solidLighting: SolidLighting,
+  xrayEnabled: boolean,
+  envMap: THREE.Texture | null,
+  matcapTexture: THREE.Texture | null,
+) {
   const hasMesh = group.children.some((c) => c.userData.kind === 'mesh');
+  const hasEdges = group.children.some((c) => c.userData.kind === 'edges');
+  const xrayActive = xrayEnabled && (shadingMode === 'wireframe' || shadingMode === 'solid');
+
   for (const child of group.children) {
     const kind = child.userData.kind as string;
-    if (kind === 'mesh') child.visible = modes.includes('mesh');
-    else if (kind === 'edges') child.visible = modes.includes('edges');
-    else if (kind === 'points') child.visible = modes.includes('points') || !hasMesh;
-    else if (kind === 'spline' || kind === 'control-line') child.visible = true;
+    if (kind === 'spline' || kind === 'control-line') {
+      child.visible = true;
+      continue;
+    }
+    if (kind === 'edges') {
+      child.visible = shadingMode === 'wireframe';
+      continue;
+    }
+    if (kind === 'points') {
+      child.visible = !hasMesh && shadingMode !== 'wireframe';
+      continue;
+    }
+    if (kind !== 'mesh' || !(child instanceof THREE.Mesh)) continue;
+
+    const mesh = child;
+    const hasVertexColors = mesh.geometry.hasAttribute('color');
+    const oldMaterial = mesh.material as THREE.Material;
+    oldMaterial.dispose();
+
+    if (shadingMode === 'wireframe') {
+      mesh.visible = !hasEdges;
+      if (hasEdges) continue;
+      const mat = new THREE.MeshBasicMaterial({
+        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
+        vertexColors: hasVertexColors,
+        wireframe: true,
+        side: THREE.DoubleSide,
+      });
+      applyXray(mat, xrayActive);
+      mesh.material = mat;
+      continue;
+    }
+
+    mesh.visible = true;
+    let mat: THREE.MeshStandardMaterial | THREE.MeshMatcapMaterial;
+    if (shadingMode === 'material') {
+      mat = new THREE.MeshStandardMaterial({
+        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
+        vertexColors: hasVertexColors,
+        roughness: 0.4,
+        metalness: 0.5,
+        envMap,
+        envMapIntensity: 1.0,
+        side: THREE.DoubleSide,
+      });
+    } else if (shadingMode === 'solid' && solidLighting === 'matcap' && matcapTexture) {
+      mat = new THREE.MeshMatcapMaterial({
+        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
+        vertexColors: hasVertexColors,
+        matcap: matcapTexture,
+        side: THREE.DoubleSide,
+      });
+    } else if (shadingMode === 'solid' && solidLighting === 'studio') {
+      mat = new THREE.MeshStandardMaterial({
+        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
+        vertexColors: hasVertexColors,
+        roughness: 0.45,
+        metalness: 0.15,
+        envMap,
+        envMapIntensity: STUDIO_ENV_INTENSITY,
+        side: THREE.DoubleSide,
+      });
+    } else {
+      mat = new THREE.MeshStandardMaterial({
+        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
+        vertexColors: hasVertexColors,
+        roughness: 0.85,
+        metalness: 0.05,
+        side: THREE.DoubleSide,
+      });
+    }
+    applyXray(mat, xrayActive);
+    mesh.material = mat;
   }
-  void hasSplines;
 }
+
+function applyXray(material: THREE.Material, active: boolean) {
+  if (!active) return;
+  material.transparent = true;
+  material.opacity = XRAY_OPACITY;
+  material.depthWrite = false;
+}
+
 
 function buildMeshObject(mesh: ParsedMesh, flipZ: (src: Float32Array) => Float32Array): THREE.Mesh {
   const geo = new THREE.BufferGeometry();

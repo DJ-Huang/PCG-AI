@@ -105,7 +105,6 @@ export default function ReviewPage() {
           loading={state.loading}
           error={state.error}
           onRefresh={cook}
-          onClose={() => {}}
         />
       </div>
     </div>
