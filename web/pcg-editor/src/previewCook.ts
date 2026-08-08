@@ -3,15 +3,21 @@
 // viewport. Requires `npm run dev` and a running pcg-server.
 
 import type { GraphJson } from './graphSchema';
+import { getOutputPinType } from './nodeManifest';
 import {
   parseCookResult,
   parseGeometryBinary,
   parseMeshBinary,
   parsePointBinary,
   parseSplineJson,
+  parseHeightFieldBinary,
+  buildHeightFieldPreviewMesh,
+  extractCookJsonText,
+  isHeightFieldCookJson,
   PcgExecuteKind,
   type CookResult,
   type ParsedGeometry,
+  type ParsedHeightField,
   type ParsedMesh,
   type ParsedSplines,
 } from './cookResult';
@@ -25,6 +31,8 @@ export interface PreviewData {
   scatterPoints: Float32Array | null;
   /** Spline polylines when the graph outputs SpatialSpline data. */
   splines: ParsedSplines | null;
+  /** Source heightfield when the graph outputs terrain data. */
+  heightfield: ParsedHeightField | null;
   cook: CookResult;
 }
 
@@ -36,6 +44,47 @@ export interface PreviewResponse {
 
 /** Must match pcg-core graph_executor kPreviewSinkNodeId (and Unity PcgGraphPreviewSubgraph). */
 export const PREVIEW_SINK_NODE_ID = '__pcg_preview_sink__';
+export const PREVIEW_CONVERT_NODE_ID = '__pcg_preview_convert__';
+
+function needsConvertHeightFieldPreview(nodeType: string, sourceHandle: string): boolean {
+  if (nodeType === 'ConvertHeightField') return false;
+  return getOutputPinType(nodeType, sourceHandle) === 'HeightField';
+}
+
+/** Full-graph preview: rasterize HeightField → Output through ConvertHeightField. */
+export function prepareGraphForPreviewCook(graph: GraphJson): GraphJson {
+  const output = graph.nodes.find((n) => n.type === 'Output');
+  if (!output) return graph;
+  const incoming = graph.edges.find((e) => e.target === output.id);
+  if (!incoming) return graph;
+  const source = graph.nodes.find((n) => n.id === incoming.source);
+  if (!source || !needsConvertHeightFieldPreview(source.type, incoming.sourceHandle ?? 'out')) {
+    return graph;
+  }
+
+  const nodes = graph.nodes.map((n) => ({ ...n }));
+  const edges = graph.edges.map((e) => ({ ...e }));
+  const incomingEdge = edges.find((e) => e.target === output.id);
+  if (!incomingEdge) return graph;
+
+  nodes.push({
+    id: PREVIEW_CONVERT_NODE_ID,
+    type: 'ConvertHeightField',
+    position: { ...output.position },
+    data: {},
+  });
+  incomingEdge.target = PREVIEW_CONVERT_NODE_ID;
+  incomingEdge.targetHandle = 'in';
+  edges.push({
+    id: `${PREVIEW_CONVERT_NODE_ID}_edge`,
+    source: PREVIEW_CONVERT_NODE_ID,
+    target: output.id,
+    sourceHandle: 'out',
+    targetHandle: 'in',
+  });
+
+  return { ...graph, nodes, edges };
+}
 
 /**
  * Builds an upstream-only cook graph for per-node preview: the target node plus
@@ -70,6 +119,26 @@ export function buildPreviewCookGraph(
     (p) => p.targetNode && included.has(p.targetNode),
   );
 
+  let previewSourceId = targetNodeId;
+  let previewSourceHandle = sourceHandle;
+  if (needsConvertHeightFieldPreview(target.type, sourceHandle)) {
+    previewSourceId = PREVIEW_CONVERT_NODE_ID;
+    previewSourceHandle = 'out';
+    nodes.push({
+      id: PREVIEW_CONVERT_NODE_ID,
+      type: 'ConvertHeightField',
+      position: { x: target.position.x, y: target.position.y + 80 },
+      data: {},
+    });
+    edges.push({
+      id: `${PREVIEW_CONVERT_NODE_ID}_in`,
+      source: targetNodeId,
+      target: PREVIEW_CONVERT_NODE_ID,
+      sourceHandle,
+      targetHandle: 'in',
+    });
+  }
+
   nodes.push({
     id: PREVIEW_SINK_NODE_ID,
     type: 'Output',
@@ -78,9 +147,9 @@ export function buildPreviewCookGraph(
   });
   edges.push({
     id: `${PREVIEW_SINK_NODE_ID}_edge`,
-    source: targetNodeId,
+    source: previewSourceId,
     target: PREVIEW_SINK_NODE_ID,
-    sourceHandle,
+    sourceHandle: previewSourceHandle,
     targetHandle: 'in',
   });
 
@@ -135,22 +204,45 @@ export async function cookGraphPreview(
     if (cook.mesh.length > 0) {
       mesh = parseMeshBinary(cook.mesh);
     }
+    let heightfield: ParsedHeightField | null = null;
+    if (cook.heightfield.length > 0) {
+      try {
+        heightfield = parseHeightFieldBinary(cook.heightfield);
+      } catch {
+        heightfield = null;
+      }
+    }
+    if (!mesh && heightfield) {
+      try {
+        mesh = buildHeightFieldPreviewMesh(heightfield);
+      } catch {
+        // fall through to summary-only error below
+      }
+    }
     let scatterPoints: Float32Array | null = null;
-    if (cook.points.length > 0) {
+    if (cook.points.length > 0 && cook.points[0] === 0x50) {
       scatterPoints = parsePointBinary(cook.points);
     }
     let splines: ParsedSplines | null = null;
-    if (cook.json) {
-      splines = parseSplineJson(cook.json);
+    const cookJson = extractCookJsonText(cook);
+    if (cookJson) {
+      splines = parseSplineJson(cookJson);
     }
     if (!geometry && !mesh && !scatterPoints && !splines) {
+      if (isHeightFieldCookJson(cookJson)) {
+        return {
+          ok: false,
+          error:
+            'Terrain cook succeeded but heightfield binary is missing — restart pcg-server and re-cook.',
+        };
+      }
       if (cook.kind === PcgExecuteKind.Json) {
         return { ok: false, error: 'Graph produced JSON output only — nothing to preview.' };
       }
       return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
     }
 
-    return { ok: true, data: { geometry, mesh, scatterPoints, splines, cook } };
+    return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, cook } };
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       return { ok: false, error: 'aborted' };

@@ -910,17 +910,17 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Preview target — green frame with a flowing highlight sweeping around it */
-.pcg-node--previewing {
+/* Preview target — green frame wrapping only the node pill (not the title) */
+.pcg-node--previewing .pcg-node__stack {
   position: relative;
 }
 
-.pcg-node--previewing::after {
+.pcg-node--previewing .pcg-node__stack::after {
   content: '';
   position: absolute;
   inset: -5px;
   border: 2px solid rgba(61, 220, 132, 0.35);
-  border-radius: 9px;
+  border-radius: 16px;
   pointer-events: none;
 }
 
@@ -930,12 +930,12 @@
   inherits: false;
 }
 
-.pcg-node--previewing::before {
+.pcg-node--previewing .pcg-node__stack::before {
   content: '';
   position: absolute;
   inset: -5px;
   padding: 2px;
-  border-radius: 9px;
+  border-radius: 16px;
   background: conic-gradient(
     from var(--pcg-flow-angle),
     transparent 0turn,

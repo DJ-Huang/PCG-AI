@@ -45,7 +45,7 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
-import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, type PreviewData } from './previewCook';
+import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, prepareGraphForPreviewCook, type PreviewData } from './previewCook';
 import { NodeActionsContext } from './nodeActions';
 import {
   getEffectiveControlPoints,
@@ -638,6 +638,8 @@ function PcgEditor() {
         // Preview target was deleted — fall back to the full graph.
         setPreviewTargetNodeId(null);
       }
+    } else {
+      graph = prepareGraphForPreviewCook(graph);
     }
     const result = await cookGraphPreview(graph, 42, abort.signal);
     if (previewAbortRef.current !== abort) return; // superseded by a newer cook

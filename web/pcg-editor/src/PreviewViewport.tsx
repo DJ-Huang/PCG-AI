@@ -489,6 +489,10 @@ export default function PreviewViewport({
   const splineCount = data?.splines?.splines.length ?? 0;
   const stats = geometry
     ? `${geometry.pointCount} pts · ${geometry.faceCount} faces · ${geometry.triangles.length / 3} tris`
+    : data?.mesh && data.heightfield
+      ? `${data.heightfield.resolutionX}×${data.heightfield.resolutionZ} terrain · ${data.mesh.vertexCount} verts`
+      : data?.mesh
+        ? `${data.mesh.vertexCount} verts · ${data.mesh.indexCount / 3} tris`
     : data?.scatterPoints
       ? `${data.scatterPoints.length / 3} scatter pts`
       : splineCount > 0

@@ -12,6 +12,8 @@ export const GEOMETRY_VERSION = 3;
 export const GEOMETRY_PREVIOUS_VERSION = 2;
 export const POINT_BINARY_MAGIC = 0x50544750; // 'PGTP'
 export const MESH_BINARY_MAGIC = 0x4d474350; // 'PCGM'
+export const HEIGHTFIELD_BINARY_MAGIC = 0x48474350; // 'PCGH'
+export const HEIGHTFIELD_BINARY_VERSION = 1;
 
 export const PcgExecuteKind = {
   None: 0,
@@ -263,6 +265,39 @@ export interface ParsedMesh {
   indexCount: number;
 }
 
+export const HeightFieldSampling = {
+  Center: 0,
+  Corner: 1,
+} as const;
+export type HeightFieldSampling = (typeof HeightFieldSampling)[keyof typeof HeightFieldSampling];
+
+export const HeightFieldOrientation = {
+  ZX: 0,
+  XY: 1,
+  YZ: 2,
+} as const;
+export type HeightFieldOrientation = (typeof HeightFieldOrientation)[keyof typeof HeightFieldOrientation];
+
+export interface ParsedHeightFieldLayer {
+  name: string;
+  tupleSize: number;
+  values: Float32Array;
+}
+
+/** Typed PCGH payload from pcg-core (pcg_heightfield_binary.cpp). */
+export interface ParsedHeightField {
+  resolutionX: number;
+  resolutionZ: number;
+  sizeX: number;
+  sizeZ: number;
+  centerX: number;
+  centerY: number;
+  centerZ: number;
+  sampling: HeightFieldSampling;
+  orientation: HeightFieldOrientation;
+  layers: ParsedHeightFieldLayer[];
+}
+
 /** Cook-result spline polyline (pcg-core PcgSplineData::to_json). */
 export interface ParsedSpline {
   points: Float32Array; // xyz per control/sample point
@@ -328,6 +363,263 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
   const uvs = (flags & MESH_FLAG_UVS) !== 0 ? readFloatBlock(vertexCount * 2, 'uvs') : null;
 
   return { positions, indices, normals, colors, uvs, vertexCount, indexCount };
+}
+
+function readU32(view: DataView, offset: number): number {
+  return view.getUint32(offset, true);
+}
+
+function readI32(view: DataView, offset: number): number {
+  return view.getInt32(offset, true);
+}
+
+function readF32(view: DataView, offset: number): number {
+  return view.getFloat32(offset, true);
+}
+
+function readF64(view: DataView, offset: number): number {
+  return view.getFloat64(offset, true);
+}
+
+/** Parse PCGH heightfield binary (pcg_heightfield_binary.cpp). */
+export function parseHeightFieldBinary(data: Uint8Array): ParsedHeightField {
+  if (data.byteLength < 72) throw new Error('HeightField binary payload is too small');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const magic = readU32(view, 0);
+  const version = readU32(view, 4);
+  if (magic !== HEIGHTFIELD_BINARY_MAGIC) {
+    throw new Error(`Invalid heightfield binary magic 0x${magic.toString(16).padStart(8, '0')}`);
+  }
+  if (version !== HEIGHTFIELD_BINARY_VERSION) {
+    throw new Error(`Unsupported heightfield binary version ${version}`);
+  }
+
+  const resolutionX = readI32(view, 8);
+  const resolutionZ = readI32(view, 12);
+  const layerCount = readI32(view, 16);
+  const sampling = readU32(view, 20) as HeightFieldSampling;
+  const orientation = readU32(view, 24) as HeightFieldOrientation;
+  const sizeX = readF64(view, 32);
+  const sizeZ = readF64(view, 40);
+  const centerX = readF64(view, 48);
+  const centerY = readF64(view, 56);
+  const centerZ = readF64(view, 64);
+
+  if (
+    resolutionX < 2 || resolutionZ < 2 || layerCount < 0 || layerCount > 4096 ||
+    sampling > HeightFieldSampling.Corner || orientation > HeightFieldOrientation.YZ ||
+    !Number.isFinite(sizeX) || !Number.isFinite(sizeZ) || sizeX <= 0 || sizeZ <= 0
+  ) {
+    throw new Error('HeightField binary metadata is invalid');
+  }
+
+  const sampleCount = resolutionX * resolutionZ;
+  const layers: ParsedHeightFieldLayer[] = [];
+  let offset = 72;
+  for (let i = 0; i < layerCount; i++) {
+    if (offset + 20 > data.byteLength) throw new Error(`HeightField layer ${i} header truncated`);
+    const nameBytes = readU32(view, offset); offset += 4;
+    const tupleSize = readI32(view, offset); offset += 4;
+    offset += 8; // border type + border value
+    const valueCount = readU32(view, offset); offset += 4;
+    if (
+      nameBytes === 0 || tupleSize <= 0 || tupleSize > 64 ||
+      valueCount !== sampleCount * tupleSize ||
+      offset + nameBytes + valueCount * 4 > data.byteLength
+    ) {
+      throw new Error(`HeightField layer ${i} metadata is invalid`);
+    }
+    const name = utf8.decode(data.subarray(offset, offset + nameBytes));
+    offset += nameBytes;
+    const values = new Float32Array(valueCount);
+    for (let v = 0; v < valueCount; v++) {
+      values[v] = readF32(view, offset);
+      offset += 4;
+    }
+    layers.push({ name, tupleSize, values });
+  }
+
+  return {
+    resolutionX,
+    resolutionZ,
+    sizeX,
+    sizeZ,
+    centerX,
+    centerY,
+    centerZ,
+    sampling,
+    orientation,
+    layers,
+  };
+}
+
+function heightFieldLayer(
+  heightfield: ParsedHeightField,
+  layerName: string,
+): ParsedHeightFieldLayer | null {
+  return heightfield.layers.find((layer) => layer.name === layerName && layer.tupleSize === 1) ?? null;
+}
+
+function heightFieldSpacing(heightfield: ParsedHeightField): { spacingX: number; spacingZ: number } {
+  const divisionsX =
+    heightfield.sampling === HeightFieldSampling.Corner
+      ? heightfield.resolutionX - 1
+      : heightfield.resolutionX;
+  const divisionsZ =
+    heightfield.sampling === HeightFieldSampling.Corner
+      ? heightfield.resolutionZ - 1
+      : heightfield.resolutionZ;
+  return {
+    spacingX: divisionsX > 0 ? heightfield.sizeX / divisionsX : 0,
+    spacingZ: divisionsZ > 0 ? heightfield.sizeZ / divisionsZ : 0,
+  };
+}
+
+/** World position of one heightfield sample (pcg_heightfield.cpp::sample_position). */
+export function heightFieldSamplePosition(
+  heightfield: ParsedHeightField,
+  x: number,
+  z: number,
+  height: number,
+): [number, number, number] {
+  const sampleOffset = heightfield.sampling === HeightFieldSampling.Center ? 0.5 : 0;
+  const { spacingX, spacingZ } = heightFieldSpacing(heightfield);
+  const u = -heightfield.sizeX * 0.5 + (x + sampleOffset) * spacingX;
+  const v = -heightfield.sizeZ * 0.5 + (z + sampleOffset) * spacingZ;
+  switch (heightfield.orientation) {
+    case HeightFieldOrientation.XY:
+      return [heightfield.centerX + u, heightfield.centerY + v, heightfield.centerZ + height];
+    case HeightFieldOrientation.YZ:
+      return [heightfield.centerX + height, heightfield.centerY + u, heightfield.centerZ + v];
+    case HeightFieldOrientation.ZX:
+    default:
+      return [heightfield.centerX + u, heightfield.centerY + height, heightfield.centerZ + v];
+  }
+}
+
+/**
+ * Convert a heightfield to a render mesh (ConvertHeightField density=1 parity).
+ * ponytail: preview caps at 512×512; full-res terrain should use ConvertHeightField in-graph.
+ */
+export function buildHeightFieldPreviewMesh(
+  heightfield: ParsedHeightField,
+  layerName = 'height',
+  maxSamples = 512,
+): ParsedMesh {
+  const heightLayer = heightFieldLayer(heightfield, layerName);
+  if (!heightLayer) {
+    throw new Error(`HeightField is missing scalar layer '${layerName}'`);
+  }
+
+  let { resolutionX, resolutionZ } = heightfield;
+  const sampleCount = resolutionX * resolutionZ;
+  if (sampleCount > maxSamples * maxSamples) {
+    const scale = Math.sqrt(sampleCount / (maxSamples * maxSamples));
+    resolutionX = Math.max(2, Math.round(resolutionX / scale));
+    resolutionZ = Math.max(2, Math.round(resolutionZ / scale));
+  }
+
+  const vertexCount = resolutionX * resolutionZ;
+  const positions = new Float32Array(vertexCount * 3);
+  const sampleHeight = (x: number, z: number): number => {
+    const gx = (x / Math.max(1, resolutionX - 1)) * (heightfield.resolutionX - 1);
+    const gz = (z / Math.max(1, resolutionZ - 1)) * (heightfield.resolutionZ - 1);
+    const x0 = Math.floor(gx);
+    const z0 = Math.floor(gz);
+    const tx = gx - x0;
+    const tz = gz - z0;
+    const idx = (ix: number, iz: number) => iz * heightfield.resolutionX + ix;
+    const fetch = (ix: number, iz: number) => heightLayer.values[idx(ix, iz)] ?? 0;
+    const v00 = fetch(x0, z0);
+    const v10 = fetch(Math.min(heightfield.resolutionX - 1, x0 + 1), z0);
+    const v01 = fetch(x0, Math.min(heightfield.resolutionZ - 1, z0 + 1));
+    const v11 = fetch(
+      Math.min(heightfield.resolutionX - 1, x0 + 1),
+      Math.min(heightfield.resolutionZ - 1, z0 + 1),
+    );
+    const vx0 = v00 + (v10 - v00) * tx;
+    const vx1 = v01 + (v11 - v01) * tx;
+    return vx0 + (vx1 - vx0) * tz;
+  };
+
+  const previewGrid = {
+    ...heightfield,
+    resolutionX,
+    resolutionZ,
+    sizeX: heightfield.sizeX,
+    sizeZ: heightfield.sizeZ,
+  };
+
+  for (let z = 0; z < resolutionZ; z++) {
+    for (let x = 0; x < resolutionX; x++) {
+      const height = sampleHeight(x, z);
+      const [px, py, pz] = heightFieldSamplePosition(previewGrid, x, z, height);
+      const o = (z * resolutionX + x) * 3;
+      positions[o] = px;
+      positions[o + 1] = py;
+      positions[o + 2] = pz;
+    }
+  }
+
+  const quadCount = (resolutionX - 1) * (resolutionZ - 1);
+  const indices = new Uint32Array(quadCount * 6);
+  let write = 0;
+  for (let z = 0; z + 1 < resolutionZ; z++) {
+    for (let x = 0; x + 1 < resolutionX; x++) {
+      const i00 = z * resolutionX + x;
+      const i10 = i00 + 1;
+      const i01 = (z + 1) * resolutionX + x;
+      const i11 = i01 + 1;
+      if (heightfield.orientation === HeightFieldOrientation.ZX) {
+        indices[write++] = i00;
+        indices[write++] = i01;
+        indices[write++] = i11;
+        indices[write++] = i00;
+        indices[write++] = i11;
+        indices[write++] = i10;
+      } else {
+        indices[write++] = i00;
+        indices[write++] = i10;
+        indices[write++] = i11;
+        indices[write++] = i00;
+        indices[write++] = i11;
+        indices[write++] = i01;
+      }
+    }
+  }
+
+  return {
+    positions,
+    indices,
+    normals: null,
+    colors: null,
+    uvs: null,
+    vertexCount,
+    indexCount: indices.length,
+  };
+}
+
+/** Recover cook JSON when pcg-server left the summary in the points blob. */
+export function extractCookJsonText(cook: CookResult): string {
+  if (cook.json.trim()) return cook.json;
+  if (cook.points.length > 0 && cook.points[0] === 0x7b) {
+    try {
+      return utf8.decode(cook.points);
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+export function isHeightFieldCookJson(json: string): boolean {
+  if (!json.trim()) return false;
+  try {
+    const payload = JSON.parse(json) as { kind?: unknown };
+    return payload.kind === 'heightfield';
+  } catch {
+    return false;
+  }
 }
 
 /** Parse spline payload from cook-result JSON blob (Unity PcgResultParser.TryParseSplines). */

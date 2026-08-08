@@ -130,6 +130,14 @@ size_t ComputeMeshBinaryPayloadSize(
         return 0;
     }
 
+    if (vertex_count <= 0 || index_count <= 0) {
+        vertex_count = ReadI32(mesh_buf.data() + 8);
+        index_count = ReadI32(mesh_buf.data() + 12);
+    }
+    if (vertex_count < 0 || index_count < 0) {
+        return 0;
+    }
+
     int header_size = 16;
     int normal_size = 0;
     int color_size = 0;
@@ -177,7 +185,7 @@ size_t ComputePointsPayloadSize(
         needed > 0 && static_cast<size_t>(needed) <= points_buf.size()) {
         return static_cast<size_t>(needed);
     }
-    return points_buf.size();
+    return 0;
 }
 
 struct OwnedTexture {
@@ -613,6 +621,9 @@ void HandleCook(const httplib::Request& req, httplib::Response& res) {
             std::memset(err_buf, 0, sizeof(err_buf));
             json_buf[0] = '\0';
             perf_buf[0] = '\0';
+            if (!points_buf.empty()) {
+                points_buf[0] = '\0';
+            }
             geometry_bytes = 0;
             heightfield_bytes = 0;
 
@@ -677,10 +688,25 @@ void HandleCook(const httplib::Request& req, httplib::Response& res) {
         }
     }
 
+    // Legacy mis-route: heightfield JSON summaries were left in points_buf while
+    // json_buf stayed empty. Recover before sizing outbound blobs.
+    if (rc == PCG_OK && json_buf[0] == '\0' && !points_buf.empty() && points_buf[0] == '{') {
+        const char* misplaced = reinterpret_cast<const char*>(points_buf.data());
+        const size_t text_len = strnlen(misplaced, points_buf.size());
+        if (text_len > 0 && text_len + 1 < json_buf.size()) {
+            std::memcpy(json_buf.data(), misplaced, text_len + 1);
+            std::memset(points_buf.data(), 0, text_len + 1);
+        }
+    }
+
     const size_t json_len =
         (json_buf.empty() || json_buf[0] == '\0') ? 0 : strnlen(json_buf.data(), json_buf.size());
     const size_t perf_len =
         (perf_buf.empty() || perf_buf[0] == '\0') ? 0 : strnlen(perf_buf.data(), perf_buf.size());
+    if (rc == PCG_OK && mesh_buf.size() >= 16 && ReadU32(mesh_buf.data()) == PCG_MESH_BINARY_MAGIC) {
+        vertex_count = ReadI32(mesh_buf.data() + 8);
+        index_count = ReadI32(mesh_buf.data() + 12);
+    }
     const size_t mesh_len =
         rc == PCG_OK ? ComputeMeshBinaryPayloadSize(mesh_buf, vertex_count, index_count) : 0;
     const size_t points_len =
@@ -698,7 +724,7 @@ void HandleCook(const httplib::Request& req, httplib::Response& res) {
         point_attr_flags,
         vertex_count,
         index_count,
-        std::string(err_buf),
+        rc == PCG_OK ? std::string() : std::string(err_buf),
         json_buf.data(),
         json_len,
         mesh_buf.data(),
