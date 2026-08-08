@@ -96,9 +96,15 @@ export default function Inspector({
     return current === normalizeVisible(vw.equals);
   };
 
+  const companionTargets = new Set<string>();
+  for (const prop of Object.values(def.properties)) {
+    if (prop.companionField) companionTargets.add(prop.companionField);
+  }
+
   const groupProps: [string, ManifestProperty][] = [];
   const regularProps: [string, ManifestProperty][] = [];
   for (const [key, prop] of Object.entries(def.properties)) {
+    if (companionTargets.has(key)) continue;
     if (!isPropVisible(prop)) continue;
     if (prop.type === 'groupSelect' || prop.type === 'groupMultiSelect' || prop.isGroupOutput) {
       groupProps.push([key, prop]);
@@ -116,6 +122,73 @@ export default function Inspector({
     const filteredGroups = prop.groupDomain
       ? filterGroupsByDomain(upstreamGroups, prop.groupDomain as GroupDomain)
       : upstreamGroups;
+
+    const companionKey = prop.type === 'boolean' ? prop.companionField : undefined;
+    const companionProp = companionKey ? def.properties[companionKey] : undefined;
+
+    if (companionKey && companionProp) {
+      const companionBinding = parameters.find(
+        (p) => p.targetNode === selectedNode.id && p.targetProperty === companionKey,
+      );
+      const companionValue = data[companionKey] ?? companionProp.default;
+      const companionGroups = companionProp.groupDomain
+        ? filterGroupsByDomain(upstreamGroups, companionProp.groupDomain as GroupDomain)
+        : upstreamGroups;
+      const toggled = Boolean(value);
+
+      return (
+        <div key={key} className="pcg-inspector__prop">
+          <div className="pcg-inspector__prop-header">
+            <span className="pcg-inspector__prop-label">{prop.displayName ?? key}</span>
+            <div className="pcg-inspector__prop-actions">
+              <button
+                type="button"
+                className="pcg-inspector__promote"
+                title="Promote to Parameter"
+                disabled={isBound}
+                onClick={() => onPromoteParameter(selectedNode.id, selectedNode.type!, key, prop)}
+              >
+                +
+              </button>
+              <select
+                className="pcg-inspector__bind-select"
+                value={binding?.id ?? ''}
+                onChange={(e) => onBindParameter(selectedNode.id, key, e.target.value || null)}
+              >
+                <option value="">(none)</option>
+                {parameters
+                  .filter((p) => typesCompatible(p.type, prop.type))
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+          <div className="pcg-inspector__prop-value pcg-inspector__toggle-row">
+            <PropertyEditor
+              prop={prop}
+              value={value}
+              disabled={isBound}
+              binding={binding}
+              availableGroups={filteredGroups}
+              onChange={(v) => handleValueChange(selectedNode.id, key, v)}
+            />
+            <div className="pcg-inspector__toggle-companion">
+              <PropertyEditor
+                prop={companionProp}
+                value={companionValue}
+                disabled={!toggled || !!companionBinding}
+                binding={companionBinding}
+                availableGroups={companionGroups}
+                onChange={(v) => handleValueChange(selectedNode.id, companionKey, v)}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div key={key} className="pcg-inspector__prop">
@@ -236,6 +309,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
             min={prop.minimum}
             max={prop.maximum}
             value={Number(value)}
+            disabled={disabled}
             onChange={(e) => onChange(Number(e.target.value))}
           />
         );
@@ -244,6 +318,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
         <input
           type="number"
           value={Number(value)}
+          disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
         />
       );
@@ -257,6 +332,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
             max={prop.maximum}
             step="0.01"
             value={Number(value)}
+            disabled={disabled}
             onChange={(e) => onChange(Number(e.target.value))}
           />
         );
@@ -266,6 +342,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
           type="number"
           step="0.1"
           value={Number(value)}
+          disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
         />
       );
@@ -275,6 +352,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
         <input
           type="checkbox"
           checked={Boolean(value)}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
       );
@@ -287,6 +365,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
               <button
                 key={opt.value}
                 type="button"
+                disabled={disabled}
                 className={`pcg-inspector__radio-btn${String(value) === opt.value ? ' pcg-inspector__radio-btn--active' : ''}`}
                 onClick={() => onChange(opt.value)}
               >
@@ -299,6 +378,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
       return (
         <select
           value={String(value)}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         >
           {prop.options?.map((opt) => (
@@ -314,6 +394,18 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
         <input
           type="text"
           value={String(value ?? '')}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      );
+
+    case 'texture2d':
+      return (
+        <input
+          type="text"
+          value={String(value ?? '')}
+          disabled={disabled}
+          placeholder="Texture path or URL"
           onChange={(e) => onChange(e.target.value)}
         />
       );
@@ -323,6 +415,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
         <GroupSelect
           value={String(value ?? '')}
           groups={availableGroups ?? []}
+          disabled={disabled}
           onChange={onChange}
         />
       );
@@ -332,6 +425,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
         <GroupMultiSelect
           value={String(value ?? '')}
           groups={availableGroups ?? []}
+          disabled={disabled}
           onChange={onChange}
         />
       );
@@ -352,6 +446,7 @@ function PropertyEditor({ prop, value, disabled, binding, availableGroups, onCha
                 type="number"
                 step="0.1"
                 value={components[index as 0 | 1 | 2]}
+                disabled={disabled}
                 onChange={(e) => setAxis(index as 0 | 1 | 2, Number(e.target.value))}
               />
             </label>
@@ -392,10 +487,12 @@ function parseVector3(value: unknown): [number, number, number] {
 function GroupSelect({
   value,
   groups,
+  disabled,
   onChange,
 }: {
   value: string;
   groups: AvailableGroup[];
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   const listId = useId();
@@ -406,6 +503,7 @@ function GroupSelect({
         type="text"
         list={listId}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder="(all or type name)"
         className="pcg-group-select__input"
@@ -443,10 +541,12 @@ function GroupSelect({
 function GroupMultiSelect({
   value,
   groups,
+  disabled,
   onChange,
 }: {
   value: string;
   groups: AvailableGroup[];
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   const selected = value.split(',').map((s) => s.trim()).filter(Boolean);
@@ -494,6 +594,7 @@ function GroupMultiSelect({
       <input
         type="text"
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Comma-separated group names"
         className="pcg-group-multiselect__text"

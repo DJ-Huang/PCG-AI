@@ -33,6 +33,9 @@ export interface GraphSubgraphPort {
   id: string;
   name: string;
   pinType: string;
+  anchorPlaced?: boolean;
+  anchorX?: number;
+  anchorY?: number;
 }
 
 export interface GraphSubgraph {
@@ -42,6 +45,7 @@ export interface GraphSubgraph {
   outputs: GraphSubgraphPort[];
   nodes: GraphNode[];
   edges: GraphEdge[];
+  parameters?: GraphParameter[];
 }
 
 // ── Parameters ─────────────────────────────────────────

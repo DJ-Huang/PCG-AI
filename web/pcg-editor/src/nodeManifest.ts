@@ -15,7 +15,8 @@ export type PropertyType =
   | 'enum'
   | 'groupSelect'
   | 'groupMultiSelect'
-  | 'vector3';
+  | 'vector3'
+  | 'texture2d';
 export type GroupDomain = 'edge' | 'face' | 'point' | 'vertex';
 
 export interface ManifestEnumOption {
@@ -39,6 +40,8 @@ export interface ManifestProperty {
     equals?: number | boolean | string;
     oneOf?: Array<number | boolean | string>;
   };
+  /** Boolean toggle companion: render the referenced property inline on the toggle row */
+  companionField?: string;
   /** For groupSelect/groupMultiSelect: filter available groups by domain */
   groupDomain?: GroupDomain;
   /** True for outputGroup-style properties that define a new group name */
@@ -90,6 +93,7 @@ const KNOWN_PROPERTY_TYPES: ReadonlySet<string> = new Set([
   'groupSelect',
   'groupMultiSelect',
   'vector3',
+  'texture2d',
 ]);
 
 function assertManifestContract(raw: typeof manifestJson): NodeManifest {

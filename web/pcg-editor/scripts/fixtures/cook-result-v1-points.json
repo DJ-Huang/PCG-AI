@@ -1,0 +1,8 @@
+{
+  "description": "SpawnPoints -> PlaceInScene (schema/example.pcg), seed=42. kind=3 (Points), 100 scatter points, no polygon geometry, no mesh.",
+  "kind": 3,
+  "code": 0,
+  "geometry": null,
+  "mesh": null,
+  "scatterPointCount": 100
+}

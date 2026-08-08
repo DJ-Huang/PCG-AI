@@ -62,6 +62,9 @@ namespace DJTechEditor.PCG
                 return Fail($"Failed to flatten export cook: {flattenError}");
             }
 
+            if (!PcgThirdPartyResolvers.TryPrepareAll(ref json, out var thirdPartyError))
+                return Fail(thirdPartyError);
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             var meshes = PcgMeshResolver.CollectFromGraphJson(
                 json,

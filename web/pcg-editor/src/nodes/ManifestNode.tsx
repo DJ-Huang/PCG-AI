@@ -1,26 +1,43 @@
 // ManifestNode.tsx — Generic manifest-driven node component.
 // All node types use this single component; ports and colors are read from node-manifest.json.
-// Layout: Input ports (top, horizontal) → Header → Body → Output ports (bottom, horizontal).
-// Houdini-style: each port is an independent colored dot on the node's top/bottom edge.
-// Nodes that produce groups show a compact "🔗 N groups" badge with hover popup.
+// Unity-style: compact pill with tiny port dots on top/bottom edges, title label to the right.
+// Fields are NOT rendered on the node — editing happens in the Inspector panel.
 
-import { useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { getNodeTypeDefs, getCategoryColor, getPinTypeColor } from '../nodeManifest';
+import { useState, useContext, useRef, useEffect } from 'react';
+import { Handle, Position, NodeToolbar, type NodeProps } from '@xyflow/react';
+import { getNodeTypeDefs, getPinTypeColor } from '../nodeManifest';
+import { NodeActionsContext } from '../nodeActions';
 
-export default function ManifestNode({ type, selected, data }: NodeProps) {
+export default function ManifestNode({ id, type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { onInfo, onPreview, previewTargetId } = useContext(NodeActionsContext);
+  const previewing = previewTargetId === id;
+
+  // The toolbar is portaled outside the node DOM, so hide on a short delay:
+  // moving the pointer from the node onto the toolbar must not dismiss it.
+  const showToolbar = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setHovered(true);
+  };
+  const scheduleHideToolbar = () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setHovered(false), 250);
+  };
+  useEffect(() => () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
 
   const def = getNodeTypeDefs(type ?? '');
   if (!def) {
     return (
       <div className="pcg-node pcg-node--unknown">
-        <div className="pcg-node__header">Unknown: {type}</div>
+        <div className="pcg-node__title">Unknown: {type}</div>
       </div>
     );
   }
 
-  const color = getCategoryColor(def.category);
   const nodeData = data as Record<string, unknown>;
 
   // Collect group names this node produces (for badge display)
@@ -47,33 +64,92 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
 
   return (
     <div
-      className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}
-      style={{ borderColor: color }}
+      className="pcg-node-wrapper"
+      onMouseEnter={showToolbar}
+      onMouseLeave={scheduleHideToolbar}
     >
-      {/* Input ports — horizontal row at top edge */}
-      {def.inputs.length > 0 && (
-        <div className="pcg-node__ports-top">
-          {def.inputs.map((pin) => (
-            <div key={pin.id} className="pcg-node__port-item">
+      {/* Hover toolbar — Unity PCG style: info + per-node preview */}
+      <NodeToolbar
+        isVisible={hovered}
+        position={Position.Top}
+        offset={6}
+        className="pcg-node-toolbar"
+        onMouseEnter={showToolbar}
+        onMouseLeave={scheduleHideToolbar}
+      >
+        <button
+          type="button"
+          className="nodrag pcg-node-toolbar__btn"
+          title="Node info"
+          onClick={(e) => {
+            e.stopPropagation();
+            onInfo(id);
+          }}
+        >
+          ℹ
+        </button>
+        <button
+          type="button"
+          className={`nodrag pcg-node-toolbar__btn${previewing ? ' pcg-node-toolbar__btn--previewing' : ''}`}
+          title={
+            def.outputs.length === 0
+              ? 'No output to preview'
+              : previewing
+                ? 'Clear node preview (back to full-graph preview)'
+                : 'Preview this node'
+          }
+          disabled={def.outputs.length === 0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview(id);
+          }}
+        >
+          ▶
+        </button>
+      </NodeToolbar>
+
+      <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}${previewing ? ' pcg-node--previewing' : ''}`}>
+      {/* Pill + port dots stack (ports stay centered on the pill) */}
+      <div className="pcg-node__stack">
+        {def.inputs.length > 0 && (
+          <div className="pcg-node__ports pcg-node__ports--top">
+            {def.inputs.map((pin) => (
               <Handle
+                key={pin.id}
                 type="target"
                 position={Position.Top}
                 id={pin.id}
                 className="pcg-node__handle"
                 style={{ background: getPinTypeColor(pin.pinType) }}
+                title={pin.label}
               />
-              <span className="pcg-node__port-label">{pin.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {/* Header */}
-      <div className="pcg-node__header" style={{ background: color }}>
-        {def.displayName}
+        <div className="pcg-node__pill" />
+
+        {def.outputs.length > 0 && (
+          <div className="pcg-node__ports pcg-node__ports--bottom">
+            {def.outputs.map((pin) => (
+              <Handle
+                key={pin.id}
+                type="source"
+                position={Position.Bottom}
+                id={pin.id}
+                className="pcg-node__handle"
+                style={{ background: getPinTypeColor(pin.pinType) }}
+                title={pin.label}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Group output badge — compact */}
+      {/* Title to the right of the pill, Unity-style */}
+      <div className="pcg-node__title">{def.displayName}</div>
+
+      {/* Group output badge — compact chip with hover popup */}
       {producedGroups.length > 0 && (
         <div
           className="pcg-node__group-badge"
@@ -81,7 +157,7 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
           onMouseLeave={() => setShowGroupPopup(false)}
         >
           <span className="pcg-node__group-badge-count">
-            🔗 {activeGroups.length} group{activeGroups.length !== 1 ? 's' : ''}
+            🔗{activeGroups.length}
           </span>
           {showGroupPopup && (
             <div className="pcg-node__group-badge-popup">
@@ -108,35 +184,7 @@ export default function ManifestNode({ type, selected, data }: NodeProps) {
           )}
         </div>
       )}
-
-      {/* Properties summary (read-only, editing in Inspector) */}
-      {Object.keys(def.properties).length > 0 && (
-        <div className="pcg-node__props-summary">
-          {Object.keys(def.properties).map((key) => (
-            <div key={key} className="pcg-node__prop-line">
-              {key}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Output ports — horizontal row at bottom edge */}
-      {def.outputs.length > 0 && (
-        <div className="pcg-node__ports-bottom">
-          {def.outputs.map((pin) => (
-            <div key={pin.id} className="pcg-node__port-item">
-              <span className="pcg-node__port-label">{pin.label}</span>
-              <Handle
-                type="source"
-                position={Position.Bottom}
-                id={pin.id}
-                className="pcg-node__handle"
-                style={{ background: getPinTypeColor(pin.pinType) }}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -73,6 +73,7 @@ namespace DJTechRuntime.PCG
         private bool m_AsyncCookInProgress;
         private CancellationTokenSource m_AsyncCookCts;
         private Task<AsyncCookResult> m_AsyncCookTask;
+        private string m_ActiveAsyncCookJobId;
         private int m_AsyncCookGeneration;
         private string m_LastAsyncCookStatus = "idle";
         private string m_LastCookKey;
@@ -674,6 +675,12 @@ namespace DJTechRuntime.PCG
                 return false;
             }
 
+            if (!PcgThirdPartyResolvers.TryPrepareAll(ref json, out var thirdPartyError))
+            {
+                Debug.LogError($"[PCG] {thirdPartyError}", this);
+                return false;
+            }
+
             var textures = PcgTextureResolver.CollectFromGraphJson(json);
             if (!PcgTextureGraphUtil.TryValidateTextureRequirements(json, textures, out var textureError))
             {
@@ -1148,6 +1155,8 @@ namespace DJTechRuntime.PCG
             m_AsyncCookGeneration++;
             var generation = m_AsyncCookGeneration;
             var localSeed = seed;
+            var jobId = Guid.NewGuid().ToString("N");
+            m_ActiveAsyncCookJobId = jobId;
             m_AsyncCookCts = new CancellationTokenSource();
             var token = m_AsyncCookCts.Token;
             m_AsyncCookTask = Task.Run(() =>
@@ -1158,7 +1167,7 @@ namespace DJTechRuntime.PCG
                 // ExecuteGraph performs parse + validation. Avoid a second native/HTTP
                 // round-trip and a second full JSON parse on every asynchronous preview cook.
                 var (execCode, execResult) = PcgCookBackend.ExecuteGraph(
-                    json, localSeed, textures, meshes, splines, heightfields);
+                    json, localSeed, textures, meshes, splines, heightfields, jobId);
                 if (execCode != PcgResultCode.Ok)
                 {
                     return AsyncCookResult.Failed(
@@ -1197,7 +1206,7 @@ namespace DJTechRuntime.PCG
             if (m_LastAsyncCookStatus == "cancelling")
                 return true;
 
-            PcgCookBackend.RequestCancel();
+            PcgCookBackend.RequestCancel(m_ActiveAsyncCookJobId);
             m_AsyncCookCts?.Cancel();
             // A completed result from the superseded request must never apply.
             m_AsyncCookGeneration++;
@@ -1220,11 +1229,12 @@ namespace DJTechRuntime.PCG
             // to finish. Dropping the Task reference without Wait races the next cook against
             // g_cook_cache / static cancel flag — Mesh may still apply, GeometryBinary often becomes 0
             // (cyan polygon wire empty on node Preview).
-            PcgCookBackend.RequestCancel();
+            PcgCookBackend.RequestCancel(m_ActiveAsyncCookJobId);
             m_AsyncCookCts?.Cancel();
 
             m_AsyncCookInProgress = false;
             m_AsyncCookTask = null;
+            m_ActiveAsyncCookJobId = null;
             // Invalidate generation so a late Pump cannot apply a raced result.
             m_AsyncCookGeneration++;
             var cts = m_AsyncCookCts;

@@ -1,0 +1,4264 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "foundation",
+      "type": "Subgraph",
+      "position": {
+        "x": -640,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Foundation",
+        "subgraphId": "foundation"
+      }
+    },
+    {
+      "id": "walls",
+      "type": "Subgraph",
+      "position": {
+        "x": -320,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Walls",
+        "subgraphId": "walls"
+      }
+    },
+    {
+      "id": "roof",
+      "type": "Subgraph",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Roof",
+        "subgraphId": "roof"
+      }
+    },
+    {
+      "id": "porch",
+      "type": "Subgraph",
+      "position": {
+        "x": 320,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Porch",
+        "subgraphId": "porch"
+      }
+    },
+    {
+      "id": "openings",
+      "type": "Subgraph",
+      "position": {
+        "x": 640,
+        "y": 0
+      },
+      "data": {
+        "__nodeTitle": "Openings",
+        "subgraphId": "openings"
+      }
+    },
+    {
+      "id": "cabin_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "data": {
+        "__nodeTitle": "Cabin Assembly"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "data": {
+        "__nodeTitle": "Output",
+        "label": "Mesh"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_foundation_merge",
+      "source": "foundation",
+      "target": "cabin_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_walls_merge",
+      "source": "walls",
+      "target": "cabin_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_roof_merge",
+      "source": "roof",
+      "target": "cabin_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_porch_merge",
+      "source": "porch",
+      "target": "cabin_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_openings_merge",
+      "source": "openings",
+      "target": "cabin_merge",
+      "sourceHandle": "mesh",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_merge_out",
+      "source": "cabin_merge",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [],
+  "subgraphs": [
+    {
+      "id": "foundation",
+      "name": "Foundation",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "found_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Foundation Box",
+            "width": 6.3,
+            "height": 0.5,
+            "depth": 7.8
+          }
+        },
+        {
+          "id": "found_subdiv",
+          "type": "SubdivideMesh",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Foundation Subdiv",
+            "levels": 1,
+            "method": "simple"
+          }
+        },
+        {
+          "id": "found_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Foundation Bevel",
+            "method": "edge",
+            "amount": 0.03,
+            "segments": 2,
+            "angleLimit": 40
+          }
+        },
+        {
+          "id": "found_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Foundation Place",
+            "translate": [
+              0,
+              0.25,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 320,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Foundation Out"
+          }
+        },
+        {
+          "id": "found_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 200,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Foundation UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.45,
+            "scaleV": 0.45,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "found_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 520,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Foundation Mat",
+            "group": "",
+            "materialName": "cabin_stone"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_found_sub",
+          "source": "found_box",
+          "target": "found_subdiv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_found_bev",
+          "source": "found_subdiv",
+          "target": "found_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_found_col_to_uv",
+          "source": "found_bevel",
+          "target": "found_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_found_pl_from_mat",
+          "source": "found_mat",
+          "target": "found_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sg_out",
+          "source": "found_place",
+          "target": "sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_found_uv_mat",
+          "source": "found_uv",
+          "target": "found_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "walls",
+      "name": "Walls",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "walls_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Walls Box",
+            "width": 6.0,
+            "height": 2.45,
+            "depth": 5.5
+          }
+        },
+        {
+          "id": "walls_subdiv",
+          "type": "SubdivideMesh",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Walls Subdiv",
+            "levels": 1,
+            "method": "simple"
+          }
+        },
+        {
+          "id": "walls_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Walls Bevel",
+            "method": "edge",
+            "amount": 0.04,
+            "segments": 2,
+            "angleLimit": 40
+          }
+        },
+        {
+          "id": "walls_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 200,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Walls Place",
+            "translate": [
+              0,
+              1.725,
+              -1.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 320,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Walls Out"
+          }
+        },
+        {
+          "id": "walls_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 200,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Walls UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.4,
+            "scaleV": 0.4,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "walls_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 520,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Walls Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_walls_sub",
+          "source": "walls_box",
+          "target": "walls_subdiv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_walls_bev",
+          "source": "walls_subdiv",
+          "target": "walls_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_walls_col_to_uv",
+          "source": "walls_bevel",
+          "target": "walls_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_walls_pl_from_mat",
+          "source": "walls_mat",
+          "target": "walls_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sg_out",
+          "source": "walls_place",
+          "target": "sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_walls_uv_mat",
+          "source": "walls_uv",
+          "target": "walls_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "roof",
+      "name": "Roof",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "chim_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "Chimney Box",
+            "width": 0.55,
+            "height": 1.6200000000000006,
+            "depth": 0.55
+          }
+        },
+        {
+          "id": "chim_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 520,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "Chimney Bevel",
+            "method": "edge",
+            "amount": 0.02,
+            "segments": 2,
+            "angleLimit": 40
+          }
+        },
+        {
+          "id": "chim_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1160,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "Chimney Place",
+            "translate": [
+              1.3,
+              4.72,
+              -2.35
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "roof_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 1800,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Roof Assembly"
+          }
+        },
+        {
+          "id": "sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 2120,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Roof Out"
+          }
+        },
+        {
+          "id": "gable_f_prof",
+          "type": "CreateSpline",
+          "position": {
+            "x": 200,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "gable_f Profile",
+            "mode": "polyline",
+            "closed": true,
+            "subdivisions": 1,
+            "controlPoints": "[{\"x\":-2.9,\"y\":0,\"z\":0},{\"x\":0,\"y\":0.98,\"z\":0},{\"x\":2.9,\"y\":0,\"z\":0},{\"x\":-2.9,\"y\":0,\"z\":0}]"
+          }
+        },
+        {
+          "id": "gable_f_path",
+          "type": "CreateSpline",
+          "position": {
+            "x": 200,
+            "y": 720
+          },
+          "data": {
+            "__nodeTitle": "gable_f Path",
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "controlPoints": "[{\"x\":0,\"y\":0,\"z\":-0.06},{\"x\":0,\"y\":0,\"z\":0.06}]",
+            "startX": 0,
+            "startY": 0,
+            "startZ": -0.06,
+            "endX": 0,
+            "endY": 0,
+            "endZ": 0.06
+          }
+        },
+        {
+          "id": "gable_f_sweep",
+          "type": "SweepAlongSpline",
+          "position": {
+            "x": 520,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "gable_f Sweep",
+            "surfaceShape": "crossSection",
+            "profilePlane": "xy",
+            "sampleSpacing": 0.05,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0
+          }
+        },
+        {
+          "id": "gable_f_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1160,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "gable_f Place",
+            "translate": [
+              0,
+              2.95,
+              1.82
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "gable_b_prof",
+          "type": "CreateSpline",
+          "position": {
+            "x": 200,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "gable_b Profile",
+            "mode": "polyline",
+            "closed": true,
+            "subdivisions": 1,
+            "controlPoints": "[{\"x\":-2.9,\"y\":0,\"z\":0},{\"x\":0,\"y\":0.98,\"z\":0},{\"x\":2.9,\"y\":0,\"z\":0},{\"x\":-2.9,\"y\":0,\"z\":0}]"
+          }
+        },
+        {
+          "id": "gable_b_path",
+          "type": "CreateSpline",
+          "position": {
+            "x": 200,
+            "y": 1040
+          },
+          "data": {
+            "__nodeTitle": "gable_b Path",
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "controlPoints": "[{\"x\":0,\"y\":0,\"z\":-0.06},{\"x\":0,\"y\":0,\"z\":0.06}]",
+            "startX": 0,
+            "startY": 0,
+            "startZ": -0.06,
+            "endX": 0,
+            "endY": 0,
+            "endZ": 0.06
+          }
+        },
+        {
+          "id": "gable_b_sweep",
+          "type": "SweepAlongSpline",
+          "position": {
+            "x": 520,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "gable_b Sweep",
+            "surfaceShape": "crossSection",
+            "profilePlane": "xy",
+            "sampleSpacing": 0.05,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0
+          }
+        },
+        {
+          "id": "gable_b_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1160,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "gable_b Place",
+            "translate": [
+              0,
+              2.95,
+              -3.82
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "roof_L_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Roof L Box",
+            "width": 3.55,
+            "height": 0.2,
+            "depth": 8.2
+          }
+        },
+        {
+          "id": "roof_L_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Roof L Place",
+            "translate": [
+              -1.72,
+              3.72,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              20.2656974709475
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "roof_R_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Roof R Box",
+            "width": 3.55,
+            "height": 0.2,
+            "depth": 8.2
+          }
+        },
+        {
+          "id": "roof_R_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Roof R Place",
+            "translate": [
+              1.72,
+              3.73,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              -20.2656974709475
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "ridge_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Ridge Cap",
+            "width": 0.4,
+            "height": 0.2,
+            "depth": 8.3
+          }
+        },
+        {
+          "id": "ridge_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Ridge Place",
+            "translate": [
+              0,
+              4.45,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "roof_L_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 520,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Roof L UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.55,
+            "scaleV": 0.55,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "roof_L_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 840,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Roof L Mat",
+            "group": "",
+            "materialName": "cabin_roof"
+          }
+        },
+        {
+          "id": "roof_R_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 520,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Roof R UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.55,
+            "scaleV": 0.55,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "roof_R_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 840,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Roof R Mat",
+            "group": "",
+            "materialName": "cabin_roof"
+          }
+        },
+        {
+          "id": "ridge_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 520,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Ridge UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.55,
+            "scaleV": 0.55,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "ridge_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 840,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Ridge Mat",
+            "group": "",
+            "materialName": "cabin_roof"
+          }
+        },
+        {
+          "id": "gable_f_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 840,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "gable_f UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.4,
+            "scaleV": 0.4,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "gable_f_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1160,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "gable_f Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "gable_b_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 840,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "gable_b UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.4,
+            "scaleV": 0.4,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "gable_b_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1160,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "gable_b Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "chim_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 840,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "Chimney UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "chim_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1160,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "Chimney Mat",
+            "group": "",
+            "materialName": "cabin_stone"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_chim_bev",
+          "source": "chim_box",
+          "target": "chim_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_chim_col_to_uv",
+          "source": "chim_bevel",
+          "target": "chim_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_chim_pl_from_mat",
+          "source": "chim_mat",
+          "target": "chim_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_chim_place_rm",
+          "source": "chim_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sg_out",
+          "source": "roof_merge",
+          "target": "sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_gable_f_path",
+          "source": "gable_f_path",
+          "target": "gable_f_sweep",
+          "sourceHandle": "out",
+          "targetHandle": "backbone"
+        },
+        {
+          "id": "e_gable_f_prof",
+          "source": "gable_f_prof",
+          "target": "gable_f_sweep",
+          "sourceHandle": "out",
+          "targetHandle": "profile"
+        },
+        {
+          "id": "e_gable_f_col_to_uv",
+          "source": "gable_f_sweep",
+          "target": "gable_f_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_f_pl_from_mat",
+          "source": "gable_f_mat",
+          "target": "gable_f_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_f_place_rm",
+          "source": "gable_f_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_b_path",
+          "source": "gable_b_path",
+          "target": "gable_b_sweep",
+          "sourceHandle": "out",
+          "targetHandle": "backbone"
+        },
+        {
+          "id": "e_gable_b_prof",
+          "source": "gable_b_prof",
+          "target": "gable_b_sweep",
+          "sourceHandle": "out",
+          "targetHandle": "profile"
+        },
+        {
+          "id": "e_gable_b_col_to_uv",
+          "source": "gable_b_sweep",
+          "target": "gable_b_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_b_pl_from_mat",
+          "source": "gable_b_mat",
+          "target": "gable_b_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_b_place_rm",
+          "source": "gable_b_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_L_col_to_uv",
+          "source": "roof_L_box",
+          "target": "roof_L_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_L_pl_from_mat",
+          "source": "roof_L_mat",
+          "target": "roof_L_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_R_col_to_uv",
+          "source": "roof_R_box",
+          "target": "roof_R_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_R_pl_from_mat",
+          "source": "roof_R_mat",
+          "target": "roof_R_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_ridge_col_to_uv",
+          "source": "ridge_box",
+          "target": "ridge_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_ridge_pl_from_mat",
+          "source": "ridge_mat",
+          "target": "ridge_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_L_place_rm",
+          "source": "roof_L_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_R_place_rm",
+          "source": "roof_R_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_ridge_place_rm",
+          "source": "ridge_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_L_uv_mat",
+          "source": "roof_L_uv",
+          "target": "roof_L_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_roof_R_uv_mat",
+          "source": "roof_R_uv",
+          "target": "roof_R_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_ridge_uv_mat",
+          "source": "ridge_uv",
+          "target": "ridge_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_f_uv_mat",
+          "source": "gable_f_uv",
+          "target": "gable_f_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gable_b_uv_mat",
+          "source": "gable_b_uv",
+          "target": "gable_b_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_chim_uv_mat",
+          "source": "chim_uv",
+          "target": "chim_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "porch",
+      "name": "Porch",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "deck_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Deck Box",
+            "width": 5.75,
+            "height": 0.09,
+            "depth": 1.8
+          }
+        },
+        {
+          "id": "deck_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Deck Place",
+            "translate": [
+              0,
+              0.545,
+              2.75
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "step0_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 320,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Step 1 Box",
+            "width": 1.6,
+            "height": 0.18,
+            "depth": 0.32
+          }
+        },
+        {
+          "id": "step0_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 320,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Step 1 Place",
+            "translate": [
+              0,
+              0.09,
+              4.5
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "step1_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 640,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Step 2 Box",
+            "width": 1.6,
+            "height": 0.18,
+            "depth": 0.32
+          }
+        },
+        {
+          "id": "step1_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 640,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Step 2 Place",
+            "translate": [
+              0,
+              0.27,
+              4.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "step2_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 960,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Step 3 Box",
+            "width": 1.6,
+            "height": 0.18,
+            "depth": 0.32
+          }
+        },
+        {
+          "id": "step2_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 960,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Step 3 Place",
+            "translate": [
+              0,
+              0.45,
+              3.86
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "rail_fl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1280,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Rail Fl Box",
+            "width": 2.05,
+            "height": 0.08,
+            "depth": 0.08
+          }
+        },
+        {
+          "id": "rail_fl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1280,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Rail Fl Place",
+            "translate": [
+              -1.85,
+              1.15,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "rail_fr_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1600,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Rail Fr Box",
+            "width": 2.05,
+            "height": 0.08,
+            "depth": 0.08
+          }
+        },
+        {
+          "id": "rail_fr_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1600,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Rail Fr Place",
+            "translate": [
+              1.85,
+              1.15,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "rail_sl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1920,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Rail Sl Box",
+            "width": 0.07,
+            "height": 0.07,
+            "depth": 0.9
+          }
+        },
+        {
+          "id": "rail_sl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1920,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Rail Sl Place",
+            "translate": [
+              -2.88,
+              1.14,
+              3.12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "rail_sr_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 2240,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Rail Sr Box",
+            "width": 0.07,
+            "height": 0.07,
+            "depth": 0.9
+          }
+        },
+        {
+          "id": "rail_sr_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2240,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Rail Sr Place",
+            "translate": [
+              2.88,
+              1.14,
+              3.12
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "post_fl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 2560,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Post Fl Box",
+            "width": 0.12,
+            "height": 0.72,
+            "depth": 0.12
+          }
+        },
+        {
+          "id": "post_fl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2560,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Post Fl Place",
+            "translate": [
+              -2.86,
+              0.9,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "post_fr_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 2880,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Post Fr Box",
+            "width": 0.12,
+            "height": 0.72,
+            "depth": 0.12
+          }
+        },
+        {
+          "id": "post_fr_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2880,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Post Fr Place",
+            "translate": [
+              2.86,
+              0.9,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "post_bl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 3200,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Post Bl Box",
+            "width": 0.12,
+            "height": 0.72,
+            "depth": 0.12
+          }
+        },
+        {
+          "id": "post_bl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 3200,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Post Bl Place",
+            "translate": [
+              -2.86,
+              0.9,
+              1.92
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "post_br_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 3520,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Post Br Box",
+            "width": 0.12,
+            "height": 0.72,
+            "depth": 0.12
+          }
+        },
+        {
+          "id": "post_br_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 3520,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Post Br Place",
+            "translate": [
+              2.86,
+              0.9,
+              1.92
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "bal_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 3840,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Bal Box",
+            "width": 0.05,
+            "height": 0.42,
+            "depth": 0.05
+          }
+        },
+        {
+          "id": "bal_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 3840,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Bal Place",
+            "translate": [
+              -2.65,
+              0.83,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "bal_copy",
+          "type": "CopyMesh",
+          "position": {
+            "x": 3840,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Bal L",
+            "mode": "linear",
+            "count": 5,
+            "axis": "x",
+            "translateX": 0.32,
+            "translateY": 0,
+            "translateZ": 0,
+            "angle": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0
+          }
+        },
+        {
+          "id": "balr_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 4160,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "BalR Box",
+            "width": 0.05,
+            "height": 0.42,
+            "depth": 0.05
+          }
+        },
+        {
+          "id": "balr_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 4160,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "BalR Place",
+            "translate": [
+              1.35,
+              0.83,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "balr_copy",
+          "type": "CopyMesh",
+          "position": {
+            "x": 4160,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Bal R",
+            "mode": "linear",
+            "count": 5,
+            "axis": "x",
+            "translateX": 0.32,
+            "translateY": 0,
+            "translateZ": 0,
+            "angle": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0
+          }
+        },
+        {
+          "id": "porch_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 1920,
+            "y": 800
+          },
+          "data": {
+            "__nodeTitle": "Porch Merge"
+          }
+        },
+        {
+          "id": "sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 2240,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "Porch Out"
+          }
+        },
+        {
+          "id": "rail_fl_bot_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "rail_fl_bot_box",
+            "width": 2.05,
+            "height": 0.08,
+            "depth": 0.08
+          }
+        },
+        {
+          "id": "rail_fl_bot_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "rail_fl_bot_place",
+            "translate": [
+              -1.85,
+              0.7,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "rail_fr_bot_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 200,
+            "y": 1680
+          },
+          "data": {
+            "__nodeTitle": "rail_fr_bot_box",
+            "width": 2.05,
+            "height": 0.08,
+            "depth": 0.08
+          }
+        },
+        {
+          "id": "rail_fr_bot_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 840,
+            "y": 1680
+          },
+          "data": {
+            "__nodeTitle": "rail_fr_bot_place",
+            "translate": [
+              1.85,
+              0.7,
+              3.66
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "deck_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 0,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Deck UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.35,
+            "scaleV": 0.35,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "deck_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 320,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Deck Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "step0_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 320,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Step 1 UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.4,
+            "scaleV": 0.4,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "step0_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 640,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Step 1 Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "step1_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 640,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Step 2 UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.4,
+            "scaleV": 0.4,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "step1_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 960,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Step 2 Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "step2_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 960,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Step 3 UV",
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.4,
+            "scaleV": 0.4,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "step2_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1280,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Step 3 Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "rail_fl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 1280,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Fl UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "rail_fl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1600,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Fl Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "rail_fr_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 1600,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Fr UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "rail_fr_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1920,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Fr Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "rail_sl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 1920,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Sl UV",
+            "projection": "planar",
+            "axis": "x",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "rail_sl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 2240,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Sl Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "rail_sr_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 2240,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Sr UV",
+            "projection": "planar",
+            "axis": "x",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "rail_sr_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 2560,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Rail Sr Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "rail_fl_bot_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 520,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "rail_fl_bot_boxc UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "rail_fl_bot_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 840,
+            "y": 1600
+          },
+          "data": {
+            "__nodeTitle": "rail_fl_bot_boxc Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "rail_fr_bot_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 520,
+            "y": 1680
+          },
+          "data": {
+            "__nodeTitle": "rail_fr_bot_boxc UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.5,
+            "scaleV": 0.5,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "rail_fr_bot_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 840,
+            "y": 1680
+          },
+          "data": {
+            "__nodeTitle": "rail_fr_bot_boxc Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "post_fl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 2560,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Fl UV",
+            "projection": "cylindrical",
+            "axis": "y",
+            "scaleU": 1.2,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "post_fl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 2880,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Fl Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "post_fr_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 2880,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Fr UV",
+            "projection": "cylindrical",
+            "axis": "y",
+            "scaleU": 1.2,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "post_fr_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 3200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Fr Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "post_bl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 3200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Bl UV",
+            "projection": "cylindrical",
+            "axis": "y",
+            "scaleU": 1.2,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "post_bl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 3520,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Bl Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "post_br_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 3520,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Br UV",
+            "projection": "cylindrical",
+            "axis": "y",
+            "scaleU": 1.2,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "post_br_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 3840,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Post Br Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "bal_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 3840,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Bal UV",
+            "projection": "cylindrical",
+            "axis": "y",
+            "scaleU": 1.5,
+            "scaleV": 0.8,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "bal_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 4160,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Bal Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "balr_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 4160,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "BalR UV",
+            "projection": "cylindrical",
+            "axis": "y",
+            "scaleU": 1.5,
+            "scaleV": 0.8,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "balr_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 4480,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "BalR Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_deck_col_to_uv",
+          "source": "deck_box",
+          "target": "deck_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_deck_pl_from_mat",
+          "source": "deck_mat",
+          "target": "deck_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step0_col_to_uv",
+          "source": "step0_box",
+          "target": "step0_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step0_pl_from_mat",
+          "source": "step0_mat",
+          "target": "step0_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step1_col_to_uv",
+          "source": "step1_box",
+          "target": "step1_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step1_pl_from_mat",
+          "source": "step1_mat",
+          "target": "step1_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step2_col_to_uv",
+          "source": "step2_box",
+          "target": "step2_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step2_pl_from_mat",
+          "source": "step2_mat",
+          "target": "step2_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_col_to_uv",
+          "source": "rail_fl_box",
+          "target": "rail_fl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_pl_from_mat",
+          "source": "rail_fl_mat",
+          "target": "rail_fl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_col_to_uv",
+          "source": "rail_fr_box",
+          "target": "rail_fr_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_pl_from_mat",
+          "source": "rail_fr_mat",
+          "target": "rail_fr_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sl_col_to_uv",
+          "source": "rail_sl_box",
+          "target": "rail_sl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sl_pl_from_mat",
+          "source": "rail_sl_mat",
+          "target": "rail_sl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sr_col_to_uv",
+          "source": "rail_sr_box",
+          "target": "rail_sr_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sr_pl_from_mat",
+          "source": "rail_sr_mat",
+          "target": "rail_sr_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fl_col_to_uv",
+          "source": "post_fl_box",
+          "target": "post_fl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fl_pl_from_mat",
+          "source": "post_fl_mat",
+          "target": "post_fl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fr_col_to_uv",
+          "source": "post_fr_box",
+          "target": "post_fr_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fr_pl_from_mat",
+          "source": "post_fr_mat",
+          "target": "post_fr_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_bl_col_to_uv",
+          "source": "post_bl_box",
+          "target": "post_bl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_bl_pl_from_mat",
+          "source": "post_bl_mat",
+          "target": "post_bl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_br_col_to_uv",
+          "source": "post_br_box",
+          "target": "post_br_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_br_pl_from_mat",
+          "source": "post_br_mat",
+          "target": "post_br_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bal_col_to_uv",
+          "source": "bal_box",
+          "target": "bal_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bal_pl_from_mat",
+          "source": "bal_mat",
+          "target": "bal_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_balc",
+          "source": "bal_place",
+          "target": "bal_copy",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_balr_col_to_uv",
+          "source": "balr_box",
+          "target": "balr_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_balr_pl_from_mat",
+          "source": "balr_mat",
+          "target": "balr_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_balrc",
+          "source": "balr_place",
+          "target": "balr_copy",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_deck_place_pm",
+          "source": "deck_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step0_place_pm",
+          "source": "step0_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step1_place_pm",
+          "source": "step1_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step2_place_pm",
+          "source": "step2_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_place_pm",
+          "source": "rail_fl_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_place_pm",
+          "source": "rail_fr_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sl_place_pm",
+          "source": "rail_sl_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sr_place_pm",
+          "source": "rail_sr_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fl_place_pm",
+          "source": "post_fl_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fr_place_pm",
+          "source": "post_fr_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_bl_place_pm",
+          "source": "post_bl_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_br_place_pm",
+          "source": "post_br_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bal_copy_pm",
+          "source": "bal_copy",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_balr_copy_pm",
+          "source": "balr_copy",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sg_out",
+          "source": "porch_merge",
+          "target": "sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_rail_fl_bot_box_col_to_uv",
+          "source": "rail_fl_bot_box",
+          "target": "rail_fl_bot_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_bot_box_pl_from_mat",
+          "source": "rail_fl_bot_mat",
+          "target": "rail_fl_bot_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_bot_place_pm",
+          "source": "rail_fl_bot_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_bot_box_col_to_uv",
+          "source": "rail_fr_bot_box",
+          "target": "rail_fr_bot_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_bot_box_pl_from_mat",
+          "source": "rail_fr_bot_mat",
+          "target": "rail_fr_bot_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_bot_place_pm",
+          "source": "rail_fr_bot_place",
+          "target": "porch_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_deck_uv_mat",
+          "source": "deck_uv",
+          "target": "deck_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step0_uv_mat",
+          "source": "step0_uv",
+          "target": "step0_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step1_uv_mat",
+          "source": "step1_uv",
+          "target": "step1_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_step2_uv_mat",
+          "source": "step2_uv",
+          "target": "step2_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_uv_mat",
+          "source": "rail_fl_uv",
+          "target": "rail_fl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_uv_mat",
+          "source": "rail_fr_uv",
+          "target": "rail_fr_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sl_uv_mat",
+          "source": "rail_sl_uv",
+          "target": "rail_sl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_sr_uv_mat",
+          "source": "rail_sr_uv",
+          "target": "rail_sr_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fl_bot_uv_mat",
+          "source": "rail_fl_bot_uv",
+          "target": "rail_fl_bot_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_rail_fr_bot_uv_mat",
+          "source": "rail_fr_bot_uv",
+          "target": "rail_fr_bot_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fl_uv_mat",
+          "source": "post_fl_uv",
+          "target": "post_fl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_fr_uv_mat",
+          "source": "post_fr_uv",
+          "target": "post_fr_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_bl_uv_mat",
+          "source": "post_bl_uv",
+          "target": "post_bl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_post_br_uv_mat",
+          "source": "post_br_uv",
+          "target": "post_br_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bal_uv_mat",
+          "source": "bal_uv",
+          "target": "bal_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_balr_uv_mat",
+          "source": "balr_uv",
+          "target": "balr_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "openings",
+      "name": "Openings",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "mesh",
+          "name": "Mesh",
+          "pinType": "Mesh"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "door_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Door Box",
+            "width": 1.0,
+            "height": 2.1,
+            "depth": 0.1
+          }
+        },
+        {
+          "id": "door_bevel",
+          "type": "BevelMesh",
+          "position": {
+            "x": 0,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Door Bevel",
+            "method": "edge",
+            "amount": 0.01,
+            "segments": 2,
+            "angleLimit": 40
+          }
+        },
+        {
+          "id": "door_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 0,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "Door Place",
+            "translate": [
+              0,
+              1.55,
+              1.92
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "door_panel_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 320,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Door Panel Box",
+            "width": 0.8,
+            "height": 1.75,
+            "depth": 0.04
+          }
+        },
+        {
+          "id": "door_panel_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 320,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Door Panel Place",
+            "translate": [
+              0,
+              1.55,
+              2.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "fwin_frm_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 640,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Frm Box",
+            "width": 1.0,
+            "height": 1.1,
+            "depth": 0.09
+          }
+        },
+        {
+          "id": "fwin_frm_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 640,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Frm Place",
+            "translate": [
+              -1.55,
+              1.75,
+              1.92
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "fwin_gl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 960,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Glass Box",
+            "width": 0.86,
+            "height": 0.9600000000000001,
+            "depth": 0.036
+          }
+        },
+        {
+          "id": "fwin_gl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 960,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Glass Place",
+            "translate": [
+              -1.55,
+              1.75,
+              1.96
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "fwin_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 800,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Win"
+          }
+        },
+        {
+          "id": "fwin_copy",
+          "type": "CopyMesh",
+          "position": {
+            "x": 800,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Front Win Copy",
+            "mode": "linear",
+            "count": 2,
+            "axis": "x",
+            "translateX": 3.1,
+            "translateY": 0,
+            "translateZ": 0,
+            "angle": 0,
+            "centerX": 0,
+            "centerY": 0,
+            "centerZ": 0
+          }
+        },
+        {
+          "id": "gwin_f_frm_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1600,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "GableF Frm Box",
+            "width": 0.55,
+            "height": 0.55,
+            "depth": 0.08
+          }
+        },
+        {
+          "id": "gwin_f_frm_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1600,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "GableF Frm Place",
+            "translate": [
+              0,
+              3.22,
+              1.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "gwin_f_gl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 1920,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "GableF Glass Box",
+            "width": 0.45000000000000007,
+            "height": 0.45000000000000007,
+            "depth": 0.032
+          }
+        },
+        {
+          "id": "gwin_f_gl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 1920,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "GableF Glass Place",
+            "translate": [
+              0,
+              3.22,
+              1.94
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "gwin_f_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 1760,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "GableF Win"
+          }
+        },
+        {
+          "id": "gwin_b_frm_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 2560,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "GableB Frm Box",
+            "width": 0.55,
+            "height": 0.55,
+            "depth": 0.08
+          }
+        },
+        {
+          "id": "gwin_b_frm_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2560,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "GableB Frm Place",
+            "translate": [
+              0,
+              3.22,
+              -3.9
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "gwin_b_gl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 2880,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "GableB Glass Box",
+            "width": 0.45000000000000007,
+            "height": 0.45000000000000007,
+            "depth": 0.032
+          }
+        },
+        {
+          "id": "gwin_b_gl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2880,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "GableB Glass Place",
+            "translate": [
+              0,
+              3.22,
+              -3.86
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "gwin_b_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 2720,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "GableB Win"
+          }
+        },
+        {
+          "id": "swin_frm_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 3520,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Side Frm Box",
+            "width": 0.1,
+            "height": 1.1,
+            "depth": 1.0
+          }
+        },
+        {
+          "id": "swin_frm_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 3520,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Side Frm Place",
+            "translate": [
+              3.16,
+              1.75,
+              -1.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "swin_gl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 3840,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "Side Glass Box",
+            "width": 0.04,
+            "height": 0.9600000000000001,
+            "depth": 0.86
+          }
+        },
+        {
+          "id": "swin_gl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 3840,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Side Glass Place",
+            "translate": [
+              3.22,
+              1.75,
+              -1.0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "swin_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 3680,
+            "y": 640
+          },
+          "data": {
+            "__nodeTitle": "Side Win"
+          }
+        },
+        {
+          "id": "bwin_frm_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 4480,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "BackWin Frm Box",
+            "width": 1.0,
+            "height": 1.1,
+            "depth": 0.09
+          }
+        },
+        {
+          "id": "bwin_frm_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 4480,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "BackWin Frm Place",
+            "translate": [
+              -1.5,
+              1.75,
+              -3.92
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "bwin_gl_box",
+          "type": "CreateBoxMesh",
+          "position": {
+            "x": 4800,
+            "y": 0
+          },
+          "data": {
+            "__nodeTitle": "BackWin Glass Box",
+            "width": 0.86,
+            "height": 0.9600000000000001,
+            "depth": 0.036
+          }
+        },
+        {
+          "id": "bwin_gl_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 4800,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "BackWin Glass Place",
+            "translate": [
+              -1.5,
+              1.75,
+              -3.88
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        },
+        {
+          "id": "bwin_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 4640,
+            "y": 480
+          },
+          "data": {
+            "__nodeTitle": "BackWin Win"
+          }
+        },
+        {
+          "id": "open_merge",
+          "type": "MergeMesh",
+          "position": {
+            "x": 2240,
+            "y": 960
+          },
+          "data": {
+            "__nodeTitle": "Openings Merge"
+          }
+        },
+        {
+          "id": "sg_out",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 2240,
+            "y": 1120
+          },
+          "data": {
+            "__nodeTitle": "Openings Out"
+          }
+        },
+        {
+          "id": "door_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 0,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Door UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.9,
+            "scaleV": 0.9,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "door_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 320,
+            "y": 320
+          },
+          "data": {
+            "__nodeTitle": "Door Mat",
+            "group": "",
+            "materialName": "cabin_door"
+          }
+        },
+        {
+          "id": "door_panel_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 320,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Door Panel UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 1.0,
+            "scaleV": 1.0,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "door_panel_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 640,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Door Panel Mat",
+            "group": "",
+            "materialName": "cabin_door"
+          }
+        },
+        {
+          "id": "fwin_frm_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 640,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Frm UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.6,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "fwin_frm_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 960,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Frm Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "fwin_gl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 960,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Glass UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 1.0,
+            "scaleV": 1.0,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "fwin_gl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1280,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "FrontWin Glass Mat",
+            "group": "",
+            "materialName": "cabin_glass"
+          }
+        },
+        {
+          "id": "gwin_f_frm_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 1600,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableF Frm UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.8,
+            "scaleV": 0.8,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "gwin_f_frm_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 1920,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableF Frm Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "gwin_f_gl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 1920,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableF Glass UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 1.0,
+            "scaleV": 1.0,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "gwin_f_gl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 2240,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableF Glass Mat",
+            "group": "",
+            "materialName": "cabin_glass"
+          }
+        },
+        {
+          "id": "gwin_b_frm_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 2560,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableB Frm UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.8,
+            "scaleV": 0.8,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "gwin_b_frm_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 2880,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableB Frm Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "gwin_b_gl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 2880,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableB Glass UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 1.0,
+            "scaleV": 1.0,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "gwin_b_gl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 3200,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "GableB Glass Mat",
+            "group": "",
+            "materialName": "cabin_glass"
+          }
+        },
+        {
+          "id": "swin_frm_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 3520,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Side Frm UV",
+            "projection": "planar",
+            "axis": "x",
+            "scaleU": 0.6,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "swin_frm_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 3840,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Side Frm Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "swin_gl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 3840,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Side Glass UV",
+            "projection": "planar",
+            "axis": "x",
+            "scaleU": 1.0,
+            "scaleV": 1.0,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "swin_gl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 4160,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "Side Glass Mat",
+            "group": "",
+            "materialName": "cabin_glass"
+          }
+        },
+        {
+          "id": "bwin_frm_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 4480,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "BackWin Frm UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 0.6,
+            "scaleV": 0.6,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "bwin_frm_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 4800,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "BackWin Frm Mat",
+            "group": "",
+            "materialName": "cabin_wood"
+          }
+        },
+        {
+          "id": "bwin_gl_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 4800,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "BackWin Glass UV",
+            "projection": "planar",
+            "axis": "z",
+            "scaleU": 1.0,
+            "scaleV": 1.0,
+            "offsetU": 0.0,
+            "offsetV": 0.0
+          }
+        },
+        {
+          "id": "bwin_gl_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 5120,
+            "y": 160
+          },
+          "data": {
+            "__nodeTitle": "BackWin Glass Mat",
+            "group": "",
+            "materialName": "cabin_glass"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_door_bev",
+          "source": "door_box",
+          "target": "door_bevel",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_col_to_uv",
+          "source": "door_bevel",
+          "target": "door_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_pl_from_mat",
+          "source": "door_mat",
+          "target": "door_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_panel_col_to_uv",
+          "source": "door_panel_box",
+          "target": "door_panel_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_panel_pl_from_mat",
+          "source": "door_panel_mat",
+          "target": "door_panel_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_frm_col_to_uv",
+          "source": "fwin_frm_box",
+          "target": "fwin_frm_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_frm_pl_from_mat",
+          "source": "fwin_frm_mat",
+          "target": "fwin_frm_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_gl_col_to_uv",
+          "source": "fwin_gl_box",
+          "target": "fwin_gl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_gl_pl_from_mat",
+          "source": "fwin_gl_mat",
+          "target": "fwin_gl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_fm",
+          "source": "fwin_frm_place",
+          "target": "fwin_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_gm",
+          "source": "fwin_gl_place",
+          "target": "fwin_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwc",
+          "source": "fwin_merge",
+          "target": "fwin_copy",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_frm_col_to_uv",
+          "source": "gwin_f_frm_box",
+          "target": "gwin_f_frm_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_frm_pl_from_mat",
+          "source": "gwin_f_frm_mat",
+          "target": "gwin_f_frm_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_gl_col_to_uv",
+          "source": "gwin_f_gl_box",
+          "target": "gwin_f_gl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_gl_pl_from_mat",
+          "source": "gwin_f_gl_mat",
+          "target": "gwin_f_gl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_fm",
+          "source": "gwin_f_frm_place",
+          "target": "gwin_f_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_gm",
+          "source": "gwin_f_gl_place",
+          "target": "gwin_f_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_frm_col_to_uv",
+          "source": "gwin_b_frm_box",
+          "target": "gwin_b_frm_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_frm_pl_from_mat",
+          "source": "gwin_b_frm_mat",
+          "target": "gwin_b_frm_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_gl_col_to_uv",
+          "source": "gwin_b_gl_box",
+          "target": "gwin_b_gl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_gl_pl_from_mat",
+          "source": "gwin_b_gl_mat",
+          "target": "gwin_b_gl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_fm",
+          "source": "gwin_b_frm_place",
+          "target": "gwin_b_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_gm",
+          "source": "gwin_b_gl_place",
+          "target": "gwin_b_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_frm_col_to_uv",
+          "source": "swin_frm_box",
+          "target": "swin_frm_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_frm_pl_from_mat",
+          "source": "swin_frm_mat",
+          "target": "swin_frm_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_gl_col_to_uv",
+          "source": "swin_gl_box",
+          "target": "swin_gl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_gl_pl_from_mat",
+          "source": "swin_gl_mat",
+          "target": "swin_gl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swf",
+          "source": "swin_frm_place",
+          "target": "swin_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swg",
+          "source": "swin_gl_place",
+          "target": "swin_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_frm_col_to_uv",
+          "source": "bwin_frm_box",
+          "target": "bwin_frm_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_frm_pl_from_mat",
+          "source": "bwin_frm_mat",
+          "target": "bwin_frm_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_gl_col_to_uv",
+          "source": "bwin_gl_box",
+          "target": "bwin_gl_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_gl_pl_from_mat",
+          "source": "bwin_gl_mat",
+          "target": "bwin_gl_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_fm",
+          "source": "bwin_frm_place",
+          "target": "bwin_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_gm",
+          "source": "bwin_gl_place",
+          "target": "bwin_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_place_om",
+          "source": "door_place",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_panel_place_om",
+          "source": "door_panel_place",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_copy_om",
+          "source": "fwin_copy",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_merge_om",
+          "source": "gwin_f_merge",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_merge_om",
+          "source": "gwin_b_merge",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_merge_om",
+          "source": "swin_merge",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_merge_om",
+          "source": "bwin_merge",
+          "target": "open_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_sg_out",
+          "source": "open_merge",
+          "target": "sg_out",
+          "sourceHandle": "out",
+          "targetHandle": "mesh"
+        },
+        {
+          "id": "e_door_uv_mat",
+          "source": "door_uv",
+          "target": "door_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_door_panel_uv_mat",
+          "source": "door_panel_uv",
+          "target": "door_panel_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_frm_uv_mat",
+          "source": "fwin_frm_uv",
+          "target": "fwin_frm_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_fwin_gl_uv_mat",
+          "source": "fwin_gl_uv",
+          "target": "fwin_gl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_frm_uv_mat",
+          "source": "gwin_f_frm_uv",
+          "target": "gwin_f_frm_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_f_gl_uv_mat",
+          "source": "gwin_f_gl_uv",
+          "target": "gwin_f_gl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_frm_uv_mat",
+          "source": "gwin_b_frm_uv",
+          "target": "gwin_b_frm_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_gwin_b_gl_uv_mat",
+          "source": "gwin_b_gl_uv",
+          "target": "gwin_b_gl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_frm_uv_mat",
+          "source": "swin_frm_uv",
+          "target": "swin_frm_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_swin_gl_uv_mat",
+          "source": "swin_gl_uv",
+          "target": "swin_gl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_frm_uv_mat",
+          "source": "bwin_frm_uv",
+          "target": "bwin_frm_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_bwin_gl_uv_mat",
+          "source": "bwin_gl_uv",
+          "target": "bwin_gl_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        }
+      ]
+    }
+  ]
+}

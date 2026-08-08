@@ -32,6 +32,19 @@ namespace DJTechEditor.PCG.Graph
         // Active tab keyed by node id for manifest tabs layout.
         private static readonly Dictionary<string, string> s_ActiveTabSection = new();
 
+        // Bottom action sections appended after manifest properties, dispatched by node type.
+        // New node actions register one line here; async actions use CreateAsyncNodeActionSection.
+        private static readonly (string nodeType, Func<PcgNodeInspector, PcgManifestNodeView, VisualElement> create)[] s_BottomActionSections =
+        {
+            ("ExportFBX", (self, node) => self.CreateFbxExportActions(node)),
+            (PcgMeshyResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyGenerateAction.Def)),
+            (PcgTripoResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgTripoGenerateAction.Def)),
+            (PcgMeshyTextTo3DResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyTextTo3DGenerateAction.Def)),
+            (PcgMeshyMeshOpsResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyMeshOpsGenerateAction.Def)),
+            (PcgMeshyRetextureResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyRetextureGenerateAction.Def)),
+            (PcgMeshyImageGenResolver.NodeType, (self, node) => self.CreateAsyncNodeActionSection(node, PcgMeshyImageGenGenerateAction.Def)),
+        };
+
         public PcgNodeInspector(PcgGraphView graphView, PcgGraphBlackboard blackboard)
         {
             m_GraphView = graphView;
@@ -283,8 +296,14 @@ namespace DJTechEditor.PCG.Graph
                 if (node is PcgManifestNodeView manifestNode)
                 {
                     ShowManifestProperties(manifestNode);
-                    if (manifestNode.NodeType == "ExportFBX")
-                        m_Body.Add(CreateFbxExportActions(manifestNode));
+                    foreach (var (nodeType, create) in s_BottomActionSections)
+                    {
+                        if (manifestNode.NodeType != nodeType)
+                            continue;
+                        var section = create(this, manifestNode);
+                        if (section != null)
+                            m_Body.Add(section);
+                    }
                 }
 
                 if (node is PcgExternalSubgraphNodeView externalSubgraph)
@@ -2859,6 +2878,181 @@ namespace DJTechEditor.PCG.Graph
                     whiteSpace = WhiteSpace.Normal,
                 },
             });
+            return container;
+        }
+
+        
+        /// <summary>
+        /// Generic bottom section for node async actions (button + progress bar +
+        /// status line, cancel while running). Node-specific behavior lives in the
+        /// <see cref="PcgAsyncNodeActionDef"/>; this method only wires UI to
+        /// <see cref="PcgNodeAsyncActionController"/> state.
+        /// </summary>
+        private VisualElement CreateAsyncNodeActionSection(PcgManifestNodeView node, PcgAsyncNodeActionDef def)
+        {
+            var container = new VisualElement
+            {
+                style =
+                {
+                    marginTop = 8,
+                    paddingTop = 8,
+                    borderTopWidth = 1,
+                    borderTopColor = new Color(0.3f, 0.3f, 0.3f),
+                },
+            };
+
+            var statusLabel = new Label
+            {
+                style =
+                {
+                    fontSize = 9,
+                    whiteSpace = WhiteSpace.Normal,
+                    marginBottom = 4,
+                    display = DisplayStyle.None,
+                },
+            };
+            container.Add(statusLabel);
+
+            var progressBar = new ProgressBar
+            {
+                lowValue = 0f,
+                highValue = 1f,
+                style = { marginBottom = 4, display = DisplayStyle.None },
+            };
+            container.Add(progressBar);
+
+            if (def.BuildExtraUi != null)
+            {
+                var extra = def.BuildExtraUi(node, () => m_GraphView?.NotifyDocumentChanged());
+                if (extra != null)
+                    container.Add(extra);
+            }
+
+            var button = new Button
+            {
+                style =
+                {
+                    height = 28,
+                    unityFontStyleAndWeight = FontStyle.Bold,
+                },
+            };
+            container.Add(button);
+
+            if (!string.IsNullOrEmpty(def.Caption))
+            {
+                container.Add(new Label(def.Caption)
+                {
+                    style =
+                    {
+                        color = new Color(0.55f, 0.7f, 0.55f),
+                        fontSize = 9,
+                        marginTop = 4,
+                        whiteSpace = WhiteSpace.Normal,
+                    },
+                });
+            }
+
+            void RefreshIdleUi()
+            {
+                var state = PcgNodeAsyncActionController.GetState(node.NodeId, def.ActionId);
+                var view = def.GetIdleView(node, state);
+
+                button.text = view.ButtonLabel;
+                button.tooltip = view.ButtonTooltip;
+                progressBar.style.display = DisplayStyle.None;
+
+                if (!string.IsNullOrEmpty(state.Error))
+                {
+                    statusLabel.text = state.Error;
+                    statusLabel.style.color = new Color(0.9f, 0.45f, 0.4f);
+                    statusLabel.style.display = DisplayStyle.Flex;
+                }
+                else if (!string.IsNullOrEmpty(view.StatusText))
+                {
+                    statusLabel.text = view.StatusText;
+                    statusLabel.style.color = view.StatusTone == PcgNodeActionStatusTone.Success
+                        ? new Color(0.55f, 0.7f, 0.55f)
+                        : new Color(0.6f, 0.6f, 0.6f);
+                    statusLabel.style.display = DisplayStyle.Flex;
+                }
+                else
+                {
+                    statusLabel.style.display = DisplayStyle.None;
+                }
+            }
+
+            var wasRunning = false;
+            button.clicked += () =>
+            {
+                if (PcgNodeAsyncActionController.IsRunning(node.NodeId, def.ActionId))
+                {
+                    PcgNodeAsyncActionController.Cancel(node.NodeId, def.ActionId);
+                    return;
+                }
+
+                PcgNodeAsyncActionController.Begin(
+                    node.NodeId,
+                    def.ActionId,
+                    () => def.PrepareWithWindow != null
+                        ? def.PrepareWithWindow(node, m_GraphView.HostWindow as PcgGraphEditorWindow)
+                        : def.Prepare(node.NodeId, node.CollectData()),
+                    payload =>
+                    {
+                        m_GraphView.WithUndo(
+                            def.UndoLabel ?? def.ActionId,
+                            () => def.Apply?.Invoke(node, payload));
+                        NotifyGraphChanged();
+                        if (m_CurrentNode == node)
+                            ShowNode(node);
+                    });
+
+                if (PcgNodeAsyncActionController.IsRunning(node.NodeId, def.ActionId))
+                {
+                    wasRunning = true;
+                    button.text = "Cancel";
+                    progressBar.style.display = DisplayStyle.Flex;
+                    statusLabel.style.display = DisplayStyle.None;
+                }
+                else
+                {
+                    RefreshIdleUi();
+                }
+            };
+
+            container.schedule.Execute(() =>
+            {
+                var state = PcgNodeAsyncActionController.GetState(node.NodeId, def.ActionId);
+                if (state.Running)
+                {
+                    wasRunning = true;
+                    button.text = "Cancel";
+                    progressBar.style.display = DisplayStyle.Flex;
+                    progressBar.value = Mathf.Clamp01(state.Progress);
+                    progressBar.title = state.Message ?? "";
+                    return;
+                }
+
+                if (wasRunning)
+                {
+                    wasRunning = false;
+                    if (m_CurrentNode == node)
+                        ShowNode(node);
+                    else
+                        RefreshIdleUi();
+                }
+            }).Every(100);
+
+            RefreshIdleUi();
+            var initial = PcgNodeAsyncActionController.GetState(node.NodeId, def.ActionId);
+            if (initial.Running)
+            {
+                wasRunning = true;
+                button.text = "Cancel";
+                progressBar.style.display = DisplayStyle.Flex;
+                progressBar.value = Mathf.Clamp01(initial.Progress);
+                progressBar.title = initial.Message ?? "";
+                statusLabel.style.display = DisplayStyle.None;
+            }
             return container;
         }
 

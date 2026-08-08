@@ -1,0 +1,16 @@
+{
+  "description": "CreateBoxMesh (2x2x2), seed=42. kind=2 (Mesh). geometry v3: 8 points, 6 quad faces, 24 face indices, 12 triangles (corner domain). mesh v3: 24 flat-shading vertices, 36 indices, no normals/colors/uvs.",
+  "kind": 2,
+  "code": 0,
+  "geometry": {
+    "pointCount": 8,
+    "faceCount": 6,
+    "faceIndexCount": 24,
+    "triangleCount": 12
+  },
+  "mesh": {
+    "vertexCount": 24,
+    "indexCount": 36
+  },
+  "scatterPointCount": 0
+}

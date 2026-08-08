@@ -42,7 +42,7 @@ namespace DJTechRuntime.PCG
 
         public static void ClearCookCache() => PcgCookClient.ClearCookCache();
 
-        public static void RequestCancel() => PcgCookClient.RequestCancel();
+        public static void RequestCancel(string jobId = null) => PcgCookClient.RequestCancel(jobId);
 
         public static void ClearCancel()
         {
@@ -77,7 +77,8 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines,
-            IReadOnlyList<PcgHeightFieldUpload> heightfields)
+            IReadOnlyList<PcgHeightFieldUpload> heightfields,
+            string jobId = null)
         {
             if (!TryValidateHeightFieldUploads(heightfields, out var heightFieldError))
             {
@@ -87,7 +88,7 @@ namespace DJTechRuntime.PCG
                 });
             }
 
-            return PcgCookClient.ExecuteGraph(json, seed, textures, meshes, splines, heightfields);
+            return PcgCookClient.ExecuteGraph(json, seed, textures, meshes, splines, heightfields, jobId);
         }
 
         private static bool TryValidateHeightFieldUploads(

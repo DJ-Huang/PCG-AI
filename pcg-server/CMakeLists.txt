@@ -32,6 +32,7 @@ set(PCG_FBX_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../pcg-fbx-exporter")
 add_executable(pcg-server
     src/main.cpp
     src/cook_service.cpp
+    src/agent_service.cpp
     "${PCG_FBX_DIR}/src/pcg_fbx_exporter.cpp"
     "${PCG_FBX_DIR}/src/geometry_binary_reader.cpp"
 )

@@ -331,7 +331,11 @@ function toGraphSubgraph(item: unknown, index: number): SubgraphParse {
         return { ok: false, error: `Subgraph "${id}" has an invalid or duplicate ${direction} port.` };
       }
       ids.add(portId);
-      ports.push({ id: portId, name: portName, pinType });
+      const parsed: GraphSubgraphPort = { id: portId, name: portName, pinType };
+      if (typeof port.anchorPlaced === 'boolean') parsed.anchorPlaced = port.anchorPlaced;
+      if (typeof port.anchorX === 'number') parsed.anchorX = port.anchorX;
+      if (typeof port.anchorY === 'number') parsed.anchorY = port.anchorY;
+      ports.push(parsed);
     }
     return { ok: true, ports };
   };
@@ -366,9 +370,26 @@ function toGraphSubgraph(item: unknown, index: number): SubgraphParse {
     edges.push(edge.edge);
   }
 
+  const parameters: GraphParameter[] = [];
+  if (Array.isArray(raw.parameters)) {
+    for (let paramIndex = 0; paramIndex < raw.parameters.length; paramIndex++) {
+      const param = toGraphParameter(raw.parameters[paramIndex], paramIndex);
+      if (!param.ok) return { ok: false, error: `Subgraph "${id}": ${param.error}` };
+      parameters.push(param.param);
+    }
+  }
+
   return {
     ok: true,
-    subgraph: { id, name, inputs: inputs.ports, outputs: outputs.ports, nodes, edges },
+    subgraph: {
+      id,
+      name,
+      inputs: inputs.ports,
+      outputs: outputs.ports,
+      nodes,
+      edges,
+      ...(parameters.length > 0 || Array.isArray(raw.parameters) ? { parameters } : {}),
+    },
   };
 }
 

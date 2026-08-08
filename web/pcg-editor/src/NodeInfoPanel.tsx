@@ -14,9 +14,10 @@ interface NodeInfoPanelProps {
   edges: Edge[];
   x: number;
   y: number;
+  onClose?: () => void;
 }
 
-export default function NodeInfoPanel({ node, nodes, edges, x, y }: NodeInfoPanelProps) {
+export default function NodeInfoPanel({ node, nodes, edges, x, y, onClose }: NodeInfoPanelProps) {
   const def = getNodeTypeDefs(node.type ?? '');
   const data = node.data as NodeData;
 
@@ -60,6 +61,16 @@ export default function NodeInfoPanel({ node, nodes, edges, x, y }: NodeInfoPane
       {/* Header */}
       <div className="pcg-node-info-panel__header" style={{ background: color }}>
         {def.displayName}
+        {onClose && (
+          <button
+            type="button"
+            className="pcg-node-info-panel__close"
+            onClick={onClose}
+            title="Close"
+          >
+            ×
+          </button>
+        )}
       </div>
       <div className="pcg-node-info-panel__type">
         {node.type} · {def.category}

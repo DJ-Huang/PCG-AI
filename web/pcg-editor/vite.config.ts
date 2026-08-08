@@ -1,10 +1,103 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import http from 'node:http';
 import { exec } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
+const PCG_SERVER_PORT = Number(process.env.PCG_SERVER_PORT) || 17890;
+const PCG_SERVER_HOST = '127.0.0.1';
+
+function proxyToPcgServer(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  serverPath: string,
+) {
+  const headers: Record<string, string> = {
+    'content-type': req.headers['content-type'] ?? 'application/octet-stream',
+  };
+  if (req.headers['content-length'] !== undefined) {
+    headers['content-length'] = req.headers['content-length'];
+  }
+  if (req.headers.authorization) {
+    headers.authorization = req.headers.authorization;
+  }
+  const upstream = http.request(
+    {
+      host: PCG_SERVER_HOST,
+      port: PCG_SERVER_PORT,
+      path: serverPath,
+      method: req.method,
+      headers,
+      timeout: 600_000,
+    },
+    (up) => {
+      res.statusCode = up.statusCode ?? 502;
+      if (up.headers['content-type']) {
+        res.setHeader('Content-Type', up.headers['content-type']);
+      }
+      up.pipe(res);
+    },
+  );
+  upstream.on('timeout', () => {
+    upstream.destroy(new Error('pcg-server request timed out'));
+  });
+  upstream.on('error', (err) => {
+    res.statusCode = 502;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(
+      JSON.stringify({
+        ok: false,
+        error: `pcg-server unreachable at ${PCG_SERVER_HOST}:${PCG_SERVER_PORT} (${err.message}). Start it with scripts/run-pcg-server.sh.`,
+      }),
+    );
+  });
+  req.pipe(upstream);
+}
+
+function cookProxyPlugin(): Plugin {
+  return {
+    name: 'pcg-cook-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/cook', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/cook');
+      });
+      server.middlewares.use('/api/cook-cancel', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/cancel');
+      });
+      server.middlewares.use('/api/cook-health', (req, res, next) => {
+        if (req.method !== 'GET') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/health');
+      });
+      server.middlewares.use('/api/agent/chat', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/agent/chat');
+      });
+      server.middlewares.use('/api/agent/health', (req, res, next) => {
+        if (req.method !== 'GET') {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, '/v1/agent/health');
+      });
+    },
+  };
+}
 
 function exportGraphPlugin(): Plugin {
   return {
@@ -110,5 +203,5 @@ function exportGraphPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), exportGraphPlugin()],
+  plugins: [react(), exportGraphPlugin(), cookProxyPlugin()],
 });

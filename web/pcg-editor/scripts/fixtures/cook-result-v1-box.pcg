@@ -1,0 +1,1 @@
+{"version": "1.0", "nodes": [{"id": "n1", "type": "CreateBoxMesh", "position": {"x": 50, "y": 150}, "data": {"width": 2.0, "height": 2.0, "depth": 2.0}}], "edges": [], "parameters": [], "subgraphs": []}
