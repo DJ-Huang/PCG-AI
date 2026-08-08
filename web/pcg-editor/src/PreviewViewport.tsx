@@ -32,6 +32,7 @@ import SolidShadingPopover, {
   DEFAULT_MATCAP_ID,
   type SolidLighting,
 } from './preview/SolidShadingPopover';
+import { createInfiniteGrid } from './preview/infiniteGrid';
 import {
   disposeMatcapLibrary,
   loadMatcapTexture,
@@ -200,7 +201,7 @@ export default function PreviewViewport({
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setClearColor(0x1e1e1e);
+    renderer.setClearColor(0x3d3d3d);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
@@ -221,7 +222,7 @@ export default function PreviewViewport({
     dir.position.set(4, 8, 5);
     scene.add(dir);
 
-    scene.add(new THREE.GridHelper(10, 20, 0x3a3a3a, 0x2a2a2a));
+    scene.add(createInfiniteGrid());
     scene.add(new THREE.AxesHelper(0.75));
 
     const content = new THREE.Group();
