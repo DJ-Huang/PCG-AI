@@ -6,7 +6,20 @@ Unity Editor talks to C++ only over HTTP. `PcgCore` / `PcgFbxExporter` dylib/dll
 
 ```bash
 ./scripts/build-pcg-server.sh
-./scripts/run-pcg-server.sh
+./scripts/run-pcg-server.sh   # stops any old listener on :17890, then starts
+```
+
+Or together:
+
+```bash
+./scripts/build-pcg-server.sh --run
+./scripts/run-pcg-web.sh      # always replaces pcg-server; reuses Vite if already up
+```
+
+Stop server only:
+
+```bash
+./scripts/stop-pcg-server.sh
 ```
 
 Default: `http://127.0.0.1:17890`

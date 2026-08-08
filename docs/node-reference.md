@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **119 种** PCG 节点。
+本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **134 种** PCG 节点。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -109,6 +109,7 @@
   - [CreateCylinderMesh](#createcylindermesh)
   - [RevolveMesh](#revolvemesh)
 - [Geometry 类别](#geometry-类别)
+  - [Add](#add)
   - [GroupCreate](#groupcreate)
   - [GroupCombine](#groupcombine)
   - [GroupPromote](#grouppromote)
@@ -641,7 +642,7 @@ HeightField → HeightFieldPattern / HeightFieldProject / HeightFieldMaskByObjec
 
 **类别**：Generation
 
-**功能**：在指定坐标位置生成一个或多个点，可选随机抖动。支持合并上游输入点。
+**功能**：在指定坐标位置生成一个或多个点，可选随机抖动。支持合并上游输入点。简单场景可改用 [`Add`](#add)（Houdini Add 对齐）。
 
 **输入 Pin**：
 
@@ -3043,6 +3044,70 @@ Inspector 中的 `groupSelect` / `groupMultiSelect` 属性会自动遍历上游 
 | `unshared` | edge | 总是 | 边界边（只有一侧面的边） |
 
 > `seam` 来源于截面轮廓形状，角度由路径曲率产生；`profile_corner` 来源于截面折角，角度由截面形状决定。Bevel 截面圆角时使用 `fromEdgeGroup=profile_corner`。
+
+---
+
+### Add
+
+**类别**：Geometry
+
+**功能**：对齐 Houdini Add SOP。在可选上游几何上追加显式点，并按点号模式创建 polygon/polyline primitive。支持「只保留点、删除 primitive」。
+
+**输入 Pin**：
+
+| Pin ID | 标签 | 类型 | 说明 |
+|--------|------|------|------|
+| `in` | Geometry | `SpatialMesh` | 可选。有输入时新点追加到现有点表末尾 |
+
+**输出 Pin**：
+
+| Pin ID | 标签 | 类型 |
+|--------|------|------|
+| `out` | Geometry | `SpatialMesh` |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `deletePrimitivesKeepPoints` | boolean | `false` | 删除所有 primitive，仅保留输入点 |
+| `points` | string (JSON) | `[{"enabled":true,"x":0,"y":0,"z":0,"w":1}]` | 点列表。每项含 `enabled`、`x/y/z/w`；`enabled=false` 的项跳过 |
+| `polygons` | string (multiline) | `""` | 每行一个 polygon 点号模式，语法对齐 Houdini **Polygons: By Pattern** |
+
+**Polygon 模式语法**（每行一个 primitive）：
+
+```
+0-3          → 点 0,1,2,3
+1 3-5 8      → 混合单点与范围
+0-15:2,3     → 步进范围（every/of）
+```
+
+**执行逻辑**：
+1. 读取可选 `in` 几何（mesh / geometry / point 均可转换）
+2. 若 `deletePrimitivesKeepPoints=true`，清空 `faces`，保留 `points`
+3. 遍历 `points[]` 中 `enabled=true` 的项，追加到点表
+4. 对 `polygons` 每非空行解析点号，生成一个 face（开放 polyline 亦用 face 存储，≥2 个点）
+5. 输出 `PcgGeometry`
+
+**用法示例**（单位 quad）：
+
+```json
+{
+  "id": "add_quad",
+  "type": "Add",
+  "position": { "x": 300, "y": 0 },
+  "data": {
+    "points": [
+      { "enabled": true, "x": 0, "y": 0, "z": 0 },
+      { "enabled": true, "x": 1, "y": 0, "z": 0 },
+      { "enabled": true, "x": 1, "y": 0, "z": 1 },
+      { "enabled": true, "x": 0, "y": 0, "z": 1 }
+    ],
+    "polygons": "0-3"
+  }
+}
+```
+
+> 典型连接：`Add → PolyExtrude` / `Add → BevelMesh`。随机撒点请用 `SpawnPoints`（对齐 Scatter），不要用 Add。
 
 ---
 

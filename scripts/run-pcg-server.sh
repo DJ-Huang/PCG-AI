@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Run an already-built pcg-server (or build first).
+# Replaces any existing listener on PCG_SERVER_PORT before starting.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PCG_SERVER_PORT:-17890}"
 BIN=""
+
+"$ROOT/scripts/stop-pcg-server.sh"
 
 for candidate in \
     "$ROOT/pcg-server/build/pcg-server" \

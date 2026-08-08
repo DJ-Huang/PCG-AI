@@ -87,6 +87,8 @@ set(PCG_CORE_SOURCES
     src/heightfield_runtime.cpp
     src/elements/mesh_algorithms.cpp
     src/elements/geometry_algorithms.cpp
+    src/elements/add_algorithms.cpp
+    src/elements/add_elements.cpp
     src/elements/geometry_elements.cpp
     src/elements/bevel_blender.cpp
     src/elements/bevel_diag.cpp
@@ -419,6 +421,11 @@ add_executable(test_topology_parity tests/test_topology_parity.cpp)
 target_link_libraries(test_topology_parity PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_topology_parity PRIVATE src)
 add_test(NAME test_topology_parity COMMAND test_topology_parity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_add tests/test_add.cpp)
+target_link_libraries(test_add PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_add PRIVATE src)
+add_test(NAME test_add COMMAND test_add WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 add_executable(test_review_2026_07_27 tests/test_review_2026_07_27.cpp)
 target_link_libraries(test_review_2026_07_27 PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)

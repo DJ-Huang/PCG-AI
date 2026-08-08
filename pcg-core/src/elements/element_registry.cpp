@@ -16,6 +16,7 @@
 #include "elements/assembly_elements.hpp"
 #include "elements/facade_foundation_elements.hpp"
 #include "elements/topology_parity_elements.hpp"
+#include "elements/add_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -195,6 +196,7 @@ void register_builtin_elements()
     register_phase42_elements(map);
     register_mesh_elements(map);
     register_geometry_elements(map);
+    register_add_elements(map);
     register_boolean_elements(map);
     register_mesh_scatter_elements(map);
     register_spline_elements(map);

@@ -56,19 +56,15 @@ find_pcg_server() {
     return 1
 }
 
-if port_listening "$PCG_PORT"; then
-    echo "[pcg-web] pcg-server already listening on http://127.0.0.1:${PCG_PORT}"
-else
-    if ! find_pcg_server; then
-        echo "[pcg-web] pcg-server not found; building..."
-        "$ROOT/scripts/build-pcg-server.sh"
-    fi
-    echo "[pcg-web] starting pcg-server on http://127.0.0.1:${PCG_PORT}"
-    "$ROOT/scripts/run-pcg-server.sh" &
-    SERVER_PID=$!
-    STARTED_SERVER=1
-    wait_http "http://127.0.0.1:${PCG_PORT}/v1/health" "pcg-server"
+if ! find_pcg_server; then
+    echo "[pcg-web] pcg-server not found; building..."
+    "$ROOT/scripts/build-pcg-server.sh"
 fi
+echo "[pcg-web] starting pcg-server on http://127.0.0.1:${PCG_PORT}"
+"$ROOT/scripts/run-pcg-server.sh" &
+SERVER_PID=$!
+STARTED_SERVER=1
+wait_http "http://127.0.0.1:${PCG_PORT}/v1/health" "pcg-server"
 
 if port_listening "$VITE_PORT"; then
     echo "[pcg-web] Vite already listening on http://${VITE_HOST}:${VITE_PORT}"

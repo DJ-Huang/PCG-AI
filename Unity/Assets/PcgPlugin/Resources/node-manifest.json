@@ -417,7 +417,7 @@
         {
           "id": "target",
           "label": "Target",
-          "pinType": "SpatialMesh"
+          "pinType": "Any"
         },
         {
           "id": "source",
@@ -428,8 +428,8 @@
       "outputs": [
         {
           "id": "out",
-          "label": "Mesh",
-          "pinType": "SpatialMesh"
+          "label": "Geometry",
+          "pinType": "Any"
         }
       ],
       "inspectorSections": [
@@ -4500,6 +4500,74 @@
       }
     },
     {
+      "type": "GroupByRange",
+      "displayName": "Group By Range",
+      "category": "Geometry",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Geometry",
+          "pinType": "Any"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Geometry",
+          "pinType": "Any"
+        }
+      ],
+      "properties": {
+        "groupName": {
+          "type": "string",
+          "displayName": "Group Name",
+          "default": "range_group"
+        },
+        "entity": {
+          "type": "enum",
+          "options": ["points", "primitives"],
+          "default": "points",
+          "displayName": "Entity"
+        },
+        "rangeType": {
+          "type": "enum",
+          "options": ["startLength", "startEnd", "everyN"],
+          "default": "startLength",
+          "displayName": "Range Type"
+        },
+        "start": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "Start"
+        },
+        "length": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 0,
+          "displayName": "Length"
+        },
+        "end": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "End"
+        },
+        "selectOf": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 1,
+          "displayName": "Select of"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "displayName": "Offset"
+        }
+      }
+    },
+    {
       "type": "GroupPromote",
       "displayName": "Group Promote",
       "category": "Geometry",
@@ -5020,6 +5088,48 @@
           "default": 0.0,
           "minimum": 0,
           "displayName": "Edge Margin"
+        }
+      }
+    },
+    {
+      "type": "PointsFromVolume",
+      "displayName": "Points From Volume",
+      "category": "Generation",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Points",
+          "pinType": "SpatialPoint"
+        }
+      ],
+      "properties": {
+        "pointSeparation": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.001,
+          "displayName": "Point Separation"
+        },
+        "jitter": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0,
+          "displayName": "Jitter"
+        },
+        "seed": {
+          "type": "integer",
+          "default": 0
+        },
+        "shellOnly": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Shell Only"
         }
       }
     },
@@ -10683,7 +10793,7 @@
         {
           "id": "in",
           "label": "Geometry",
-          "pinType": "SpatialGeometry"
+          "pinType": "Any"
         }
       ],
       "outputs": [

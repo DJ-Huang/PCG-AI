@@ -9,7 +9,7 @@
 |------|------|------|
 | Houdini **全部** SOP | **1040** | 官方文档索引（含模拟、绑定、Labs 等） |
 | **基础建模** SOP（本文清单） | **237** | 12 类建模常用子集 |
-| **PCG-AI** 节点 | **133** | `schema/node-manifest.json` |
+| **PCG-AI** 节点 | **134** | `schema/node-manifest.json` |
 
 ### 状态图例
 
@@ -22,8 +22,8 @@
 
 ### 覆盖率（基础建模 237 节点）
 
-- ✅ 完整：58
-- 部分：21
+- ✅ 完整：59
+- 部分：20
 - 组合：1
 - ❌ 无：157
 
@@ -35,7 +35,7 @@
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Add | `add` | `CreatePoints` / `SpawnPoints` | 部分 |
+| Add | `add` | `Add` | ✅ |
 | Box | `box` | `CreateBoxMesh` | ✅ |
 | Circle | `circle` | `CreateArcSpline` | 部分 |
 | Circle from Edges | `circlefromedges` | — | ❌ |
@@ -330,10 +330,11 @@
 
 ---
 
-## 二、PCG-AI 节点 → Houdini 反向对照（133）
+## 二、PCG-AI 节点 → Houdini 反向对照（134）
 
 | PCG 节点 | 类别 | Houdini SOP |
 |---|---|---|
+| `Add` | Geometry | `add` |
 | `AttributeTransfer` | Attribute | `attribtransfer` |
 | `AttributeWrangle` | Attribute | `attribwrangle` |
 | `ExtractCentroid` | Attribute | `extractcentroid` |
@@ -347,11 +348,11 @@
 | `Switch` | Flow | `switch` |
 | `SwitchIf` | Flow | `switchif` |
 | `CreatePointGrid` | Generation | `add` / `grid` |
-| `CreatePoints` | Generation | `add` |
+| `CreatePoints` | Generation | `add`（legacy 简化版） |
 | `PointRelax` | Generation | `relax` |
 | `PointsFromVolume` | Generation | `pointsfromvolume` |
 | `SampleMeshSurface` | Generation | `scatter` |
-| `SpawnPoints` | Generation | `add` / `scatter` |
+| `SpawnPoints` | Generation | `scatter` |
 | `SurfaceSampler` | Generation | `scatter` |
 | `FaceGroupByNormal` | Geometry | `group`（法线选择） |
 | `GroupByRange` | Geometry | `grouprange` |

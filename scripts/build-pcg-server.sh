@@ -63,5 +63,5 @@ fi
 echo "==> Built: $BIN"
 if $RUN; then
     echo "==> Starting pcg-server on port $PORT"
-    exec "$BIN" --port "$PORT"
+    PCG_SERVER_PORT="$PORT" exec "$ROOT/scripts/run-pcg-server.sh"
 fi
