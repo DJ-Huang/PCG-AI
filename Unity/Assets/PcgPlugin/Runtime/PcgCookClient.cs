@@ -182,14 +182,18 @@ namespace DJTechRuntime.PCG
             }
         }
 
-        public static void RequestCancel()
+        public static void RequestCancel(string jobId)
         {
+            if (string.IsNullOrEmpty(jobId))
+                return;
+
             try
             {
                 using var cts = new CancellationTokenSource(2000);
+                var body = Encoding.UTF8.GetBytes($"{{\"job_id\":\"{jobId}\"}}");
                 var task = s_Http.PostAsync(
                     BaseUrl + "/v1/cancel",
-                    new ByteArrayContent(Array.Empty<byte>()),
+                    new ByteArrayContent(body) { Headers = { { "Content-Type", "application/json" } } },
                     cts.Token);
                 task.Wait(cts.Token);
             }
@@ -205,12 +209,13 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines,
-            IReadOnlyList<PcgHeightFieldUpload> heightfields)
+            IReadOnlyList<PcgHeightFieldUpload> heightfields,
+            string jobId = null)
         {
             try
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                using var content = BuildMultipart(json, seed, textures, meshes, splines, heightfields);
+                using var content = BuildMultipart(json, seed, textures, meshes, splines, heightfields, jobId);
                 var responseTask = s_Http.PostAsync(BaseUrl + "/v1/cook", content);
                 responseTask.Wait();
                 var response = responseTask.Result;
@@ -257,10 +262,12 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines,
-            IReadOnlyList<PcgHeightFieldUpload> heightfields)
+            IReadOnlyList<PcgHeightFieldUpload> heightfields,
+            string jobId = null)
         {
             var form = new MultipartFormDataContent();
-            var meta = $"{{\"seed\":{seed},\"api_version\":1,\"job_id\":\"{Guid.NewGuid():N}\"}}";
+            var effectiveJobId = string.IsNullOrEmpty(jobId) ? Guid.NewGuid().ToString("N") : jobId;
+            var meta = $"{{\"seed\":{seed},\"api_version\":1,\"job_id\":\"{effectiveJobId}\"}}";
             form.Add(new StringContent(meta, Encoding.UTF8, "application/json"), "meta");
             form.Add(new StringContent(json ?? string.Empty, Encoding.UTF8, "application/json"), "graph");
 

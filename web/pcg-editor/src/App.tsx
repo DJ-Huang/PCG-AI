@@ -45,7 +45,7 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
-import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, prepareGraphForPreviewCook, type PreviewData } from './previewCook';
+import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
 import { NodeActionsContext } from './nodeActions';
 import {
   getEffectiveControlPoints,
@@ -120,6 +120,7 @@ function PcgEditor() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
+  const previewJobIdRef = useRef<string | null>(null);
   const [status, setStatus] = useState(
     restored
       ? `Restored last session${restored.filename ? `: ${restored.filename}` : ''} (${restored.nodes.length} nodes)`
@@ -620,9 +621,14 @@ function PcgEditor() {
     if (nodes.length === 0) return;
     const target = targetOverride === undefined ? previewTargetNodeId : targetOverride;
     previewAbortRef.current?.abort();
-    void cancelCook();
+    const previousJobId = previewJobIdRef.current;
+    if (previousJobId) {
+      await cancelCook(previousJobId);
+    }
     const abort = new AbortController();
     previewAbortRef.current = abort;
+    const jobId = newPreviewJobId();
+    previewJobIdRef.current = jobId;
 
     setPreviewLoading(true);
     setPreviewError(null);
@@ -641,7 +647,7 @@ function PcgEditor() {
     } else {
       graph = prepareGraphForPreviewCook(graph);
     }
-    const result = await cookGraphPreview(graph, 42, abort.signal);
+    const result = await cookGraphPreview(graph, 42, abort.signal, jobId);
     if (previewAbortRef.current !== abort) return; // superseded by a newer cook
     setPreviewLoading(false);
     if (result.ok && result.data) {
@@ -664,7 +670,10 @@ function PcgEditor() {
   const togglePreview = useCallback(async () => {
     if (showPreview) {
       previewAbortRef.current?.abort();
-      void cancelCook();
+      const jobId = previewJobIdRef.current;
+      if (jobId) {
+        await cancelCook(jobId);
+      }
       setShowPreview(false);
       return;
     }

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -31,6 +32,42 @@ constexpr int kMaxBinaryBuf = 256 * 1024 * 1024;
 constexpr int kMaxGrowRetries = 3;
 
 std::mutex g_cook_mutex;
+std::mutex g_job_state_mutex;
+std::string g_active_client_job_id;
+std::unordered_set<std::string> g_pending_client_job_ids;
+std::unordered_set<std::string> g_cancelled_queued_job_ids;
+
+bool ConsumeQueuedCancellation(const std::string& job_id) {
+    if (job_id.empty()) {
+        return false;
+    }
+    const auto it = g_cancelled_queued_job_ids.find(job_id);
+    if (it == g_cancelled_queued_job_ids.end()) {
+        return false;
+    }
+    g_cancelled_queued_job_ids.erase(it);
+    return true;
+}
+
+void RegisterPendingClientJob(const std::string& job_id) {
+    if (!job_id.empty()) {
+        g_pending_client_job_ids.insert(job_id);
+    }
+}
+
+void UnregisterPendingClientJob(const std::string& job_id) {
+    g_pending_client_job_ids.erase(job_id);
+}
+
+void SetActiveClientJobId(const std::string& job_id) {
+    g_active_client_job_id = job_id;
+}
+
+void ClearActiveClientJobId(const std::string& job_id) {
+    if (g_active_client_job_id == job_id) {
+        g_active_client_job_id.clear();
+    }
+}
 
 void AppendU32(std::vector<uint8_t>& out, uint32_t v) {
     out.push_back(static_cast<uint8_t>(v & 0xff));
@@ -242,6 +279,22 @@ std::string GetPartContent(const httplib::Request& req, const std::string& name)
         return part->content;
     }
     return req.get_param_value(name);
+}
+
+bool ParseCancelJobId(const std::string& text, std::string& job_id) {
+    job_id.clear();
+    if (text.empty()) {
+        return true;
+    }
+    try {
+        const auto j = nlohmann::json::parse(text);
+        if (j.contains("job_id") && j.at("job_id").is_string()) {
+            job_id = j.at("job_id").get<std::string>();
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 bool ParseMetaJson(const std::string& text, int& seed, std::string& job_id, std::string& error) {
@@ -501,10 +554,31 @@ std::vector<uint8_t> EncodeResult(
 
 }  // namespace
 
-void HandleCancel(const httplib::Request& /*req*/, httplib::Response& res) {
-    pcg_request_cancel();
+void HandleCancel(const httplib::Request& req, httplib::Response& res) {
+    std::string cancel_job_id;
+    if (!ParseCancelJobId(req.body, cancel_job_id)) {
+        res.status = 400;
+        res.set_content(R"({"error":"invalid cancel JSON"})", "application/json");
+        return;
+    }
+
+    bool canceled = false;
+    {
+        std::lock_guard<std::mutex> lock(g_job_state_mutex);
+        if (!cancel_job_id.empty() && cancel_job_id == g_active_client_job_id) {
+            pcg_request_cancel();
+            canceled = true;
+        } else if (!cancel_job_id.empty() &&
+                   g_pending_client_job_ids.count(cancel_job_id) > 0) {
+            g_cancelled_queued_job_ids.insert(cancel_job_id);
+            canceled = true;
+        }
+    }
+
     res.status = 200;
-    res.set_content(R"({"ok":true})", "application/json");
+    res.set_content(
+        nlohmann::json{{"ok", true}, {"canceled", canceled}}.dump(),
+        "application/json");
 }
 
 void HandleCook(const httplib::Request& req, httplib::Response& res) {
@@ -612,79 +686,113 @@ void HandleCook(const httplib::Request& req, httplib::Response& res) {
     int heightfield_bytes = 0;
     PcgCookStats stats{};
     PcgResultCode rc = PCG_ERR_EXECUTION;
+    bool cancelled_before_execute = false;
 
     {
-        std::lock_guard<std::mutex> lock(g_cook_mutex);
-        pcg_clear_cancel();
+        std::lock_guard<std::mutex> job_lock(g_job_state_mutex);
+        if (ConsumeQueuedCancellation(job_id)) {
+            cancelled_before_execute = true;
+        } else {
+            RegisterPendingClientJob(job_id);
+        }
+    }
 
-        for (int attempt = 0; attempt <= kMaxGrowRetries; ++attempt) {
-            std::memset(err_buf, 0, sizeof(err_buf));
-            json_buf[0] = '\0';
-            perf_buf[0] = '\0';
-            if (!points_buf.empty()) {
-                points_buf[0] = '\0';
+    if (cancelled_before_execute) {
+        std::snprintf(err_buf, kErrBufSize, "Cook cancelled");
+        rc = PCG_ERR_EXECUTION;
+    } else {
+        std::lock_guard<std::mutex> cook_lock(g_cook_mutex);
+
+        {
+            std::lock_guard<std::mutex> job_lock(g_job_state_mutex);
+            UnregisterPendingClientJob(job_id);
+            if (ConsumeQueuedCancellation(job_id)) {
+                cancelled_before_execute = true;
+            } else {
+                SetActiveClientJobId(job_id);
             }
-            geometry_bytes = 0;
-            heightfield_bytes = 0;
+        }
 
-            rc = pcg_execute_graph_v10(
-                graph_json.c_str(),
-                seed,
-                tex_slots.empty() ? nullptr : tex_slots.data(),
-                static_cast<int>(tex_slots.size()),
-                mesh_slots.empty() ? nullptr : mesh_slots.data(),
-                static_cast<int>(mesh_slots.size()),
-                spline_slots.empty() ? nullptr : spline_slots.data(),
-                static_cast<int>(spline_slots.size()),
-                hf_slots.empty() ? nullptr : hf_slots.data(),
-                static_cast<int>(hf_slots.size()),
-                &kind,
-                json_buf.data(),
-                static_cast<int>(json_buf.size()),
-                mesh_buf.data(),
-                static_cast<int>(mesh_buf.size()),
-                points_buf.data(),
-                static_cast<int>(points_buf.size()),
-                &point_count,
-                &point_attr_flags,
-                &vertex_count,
-                &index_count,
-                &stats,
-                perf_buf.data(),
-                static_cast<int>(perf_buf.size()),
-                geometry_buf.data(),
-                static_cast<int>(geometry_buf.size()),
-                &geometry_bytes,
-                heightfield_buf.data(),
-                static_cast<int>(heightfield_buf.size()),
-                &heightfield_bytes,
-                err_buf,
-                kErrBufSize);
+        if (cancelled_before_execute) {
+            std::snprintf(err_buf, kErrBufSize, "Cook cancelled");
+            rc = PCG_ERR_EXECUTION;
+        } else {
+            pcg_clear_cancel();
 
-            if (rc == PCG_OK) {
-                if (heightfield_bytes > static_cast<int>(heightfield_buf.size()) &&
-                    heightfield_bytes <= kMaxBinaryBuf) {
-                    heightfield_buf.assign(static_cast<size_t>(heightfield_bytes), 0);
+            for (int attempt = 0; attempt <= kMaxGrowRetries; ++attempt) {
+                std::memset(err_buf, 0, sizeof(err_buf));
+                json_buf[0] = '\0';
+                perf_buf[0] = '\0';
+                if (!points_buf.empty()) {
+                    points_buf[0] = '\0';
+                }
+                geometry_bytes = 0;
+                heightfield_bytes = 0;
+
+                rc = pcg_execute_graph_v10(
+                    graph_json.c_str(),
+                    seed,
+                    tex_slots.empty() ? nullptr : tex_slots.data(),
+                    static_cast<int>(tex_slots.size()),
+                    mesh_slots.empty() ? nullptr : mesh_slots.data(),
+                    static_cast<int>(mesh_slots.size()),
+                    spline_slots.empty() ? nullptr : spline_slots.data(),
+                    static_cast<int>(spline_slots.size()),
+                    hf_slots.empty() ? nullptr : hf_slots.data(),
+                    static_cast<int>(hf_slots.size()),
+                    &kind,
+                    json_buf.data(),
+                    static_cast<int>(json_buf.size()),
+                    mesh_buf.data(),
+                    static_cast<int>(mesh_buf.size()),
+                    points_buf.data(),
+                    static_cast<int>(points_buf.size()),
+                    &point_count,
+                    &point_attr_flags,
+                    &vertex_count,
+                    &index_count,
+                    &stats,
+                    perf_buf.data(),
+                    static_cast<int>(perf_buf.size()),
+                    geometry_buf.data(),
+                    static_cast<int>(geometry_buf.size()),
+                    &geometry_bytes,
+                    heightfield_buf.data(),
+                    static_cast<int>(heightfield_buf.size()),
+                    &heightfield_bytes,
+                    err_buf,
+                    kErrBufSize);
+
+                if (rc == PCG_OK) {
+                    if (heightfield_bytes > static_cast<int>(heightfield_buf.size()) &&
+                        heightfield_bytes <= kMaxBinaryBuf) {
+                        heightfield_buf.assign(static_cast<size_t>(heightfield_bytes), 0);
+                        continue;
+                    }
+                    break;
+                }
+
+                std::string err(err_buf);
+                std::string need_kind;
+                int need_bytes = 0;
+                if (!TryParseNeedBytes(err, need_kind, need_bytes) || need_bytes > kMaxBinaryBuf) {
+                    break;
+                }
+                if (need_kind == "points" && static_cast<int>(points_buf.size()) < need_bytes) {
+                    points_buf.assign(static_cast<size_t>(need_bytes), 0);
+                    continue;
+                }
+                if (need_kind == "mesh" && static_cast<int>(mesh_buf.size()) < need_bytes) {
+                    mesh_buf.assign(static_cast<size_t>(need_bytes), 0);
                     continue;
                 }
                 break;
             }
+        }
 
-            std::string err(err_buf);
-            std::string need_kind;
-            int need_bytes = 0;
-            if (!TryParseNeedBytes(err, need_kind, need_bytes) || need_bytes > kMaxBinaryBuf) {
-                break;
-            }
-            if (need_kind == "points" && static_cast<int>(points_buf.size()) < need_bytes) {
-                points_buf.assign(static_cast<size_t>(need_bytes), 0);
-                continue;
-            }
-            if (need_kind == "mesh" && static_cast<int>(mesh_buf.size()) < need_bytes) {
-                mesh_buf.assign(static_cast<size_t>(need_bytes), 0);
-                continue;
-            }
-            break;
+        {
+            std::lock_guard<std::mutex> job_lock(g_job_state_mutex);
+            ClearActiveClientJobId(job_id);
         }
     }
 

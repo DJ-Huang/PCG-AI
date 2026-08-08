@@ -13,10 +13,11 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<PcgTextureUpload> textures,
             IReadOnlyList<PcgMeshUpload> meshes,
             IReadOnlyList<PcgSplineUpload> splines,
-            IReadOnlyList<PcgHeightFieldUpload> heightfields) =>
-            PcgNative.ExecuteGraph(json, seed, textures, meshes, splines, heightfields);
+            IReadOnlyList<PcgHeightFieldUpload> heightfields,
+            string jobId = null) =>
+            PcgNative.ExecuteGraph(json, seed, textures, meshes, splines, heightfields, jobId);
 
-        public static void RequestCancel() => PcgNative.RequestCancel();
+        public static void RequestCancel(string jobId = null) => PcgNative.RequestCancel(jobId);
 
         public static void ClearCancel() => PcgNative.ClearCancel();
 

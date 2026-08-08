@@ -162,17 +162,84 @@ export function buildPreviewCookGraph(
   };
 }
 
+export function newPreviewJobId(): string {
+  return crypto.randomUUID().replaceAll('-', '');
+}
+
+/** Parse cook output into preview data (shared by live cook and contract tests). */
+export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
+  if (cook.code !== 0) {
+    return { ok: false, error: cook.error || `Cook failed (code ${cook.code})` };
+  }
+
+  let geometry: ParsedGeometry | null = null;
+  if (cook.geometry.length > 0) {
+    geometry = parseGeometryBinary(cook.geometry);
+  }
+  let mesh: ParsedMesh | null = null;
+  if (cook.mesh.length > 0) {
+    mesh = parseMeshBinary(cook.mesh);
+  }
+  let heightfield: ParsedHeightField | null = null;
+  let heightfieldParseError: string | null = null;
+  if (cook.heightfield.length > 0) {
+    try {
+      heightfield = parseHeightFieldBinary(cook.heightfield);
+    } catch (err) {
+      heightfieldParseError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  if (!mesh && heightfield) {
+    try {
+      mesh = buildHeightFieldPreviewMesh(heightfield);
+    } catch {
+      // fall through to summary-only error below
+    }
+  }
+  let scatterPoints: Float32Array | null = null;
+  if (cook.points.length > 0 && cook.points[0] === 0x50) {
+    scatterPoints = parsePointBinary(cook.points);
+  }
+  let splines: ParsedSplines | null = null;
+  const cookJson = extractCookJsonText(cook);
+  if (cookJson) {
+    splines = parseSplineJson(cookJson);
+  }
+  if (!geometry && !mesh && !scatterPoints && !splines) {
+    if (heightfieldParseError) {
+      return {
+        ok: false,
+        error: `Invalid heightfield payload: ${heightfieldParseError}`,
+      };
+    }
+    if (isHeightFieldCookJson(cookJson) && cook.heightfield.length === 0) {
+      return {
+        ok: false,
+        error:
+          'Terrain cook succeeded but heightfield binary is missing — restart pcg-server and re-cook.',
+      };
+    }
+    if (cook.kind === PcgExecuteKind.Json) {
+      return { ok: false, error: 'Graph produced JSON output only — nothing to preview.' };
+    }
+    return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
+  }
+
+  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, cook } };
+}
+
 export async function cookGraphPreview(
   graph: GraphJson,
   seed: number,
   signal?: AbortSignal,
+  jobId: string = newPreviewJobId(),
 ): Promise<PreviewResponse> {
   try {
     const form = new FormData();
     const meta = JSON.stringify({
       seed,
       api_version: 1,
-      job_id: crypto.randomUUID().replaceAll('-', ''),
+      job_id: jobId,
     });
     form.append('meta', new Blob([meta], { type: 'application/json' }));
     form.append('graph', new Blob([JSON.stringify(graph)], { type: 'application/json' }));
@@ -192,57 +259,7 @@ export async function cookGraphPreview(
 
     const buffer = await res.arrayBuffer();
     const cook = parseCookResult(buffer);
-    if (cook.code !== 0) {
-      return { ok: false, error: cook.error || `Cook failed (code ${cook.code})` };
-    }
-
-    let geometry: ParsedGeometry | null = null;
-    if (cook.geometry.length > 0) {
-      geometry = parseGeometryBinary(cook.geometry);
-    }
-    let mesh: ParsedMesh | null = null;
-    if (cook.mesh.length > 0) {
-      mesh = parseMeshBinary(cook.mesh);
-    }
-    let heightfield: ParsedHeightField | null = null;
-    if (cook.heightfield.length > 0) {
-      try {
-        heightfield = parseHeightFieldBinary(cook.heightfield);
-      } catch {
-        heightfield = null;
-      }
-    }
-    if (!mesh && heightfield) {
-      try {
-        mesh = buildHeightFieldPreviewMesh(heightfield);
-      } catch {
-        // fall through to summary-only error below
-      }
-    }
-    let scatterPoints: Float32Array | null = null;
-    if (cook.points.length > 0 && cook.points[0] === 0x50) {
-      scatterPoints = parsePointBinary(cook.points);
-    }
-    let splines: ParsedSplines | null = null;
-    const cookJson = extractCookJsonText(cook);
-    if (cookJson) {
-      splines = parseSplineJson(cookJson);
-    }
-    if (!geometry && !mesh && !scatterPoints && !splines) {
-      if (isHeightFieldCookJson(cookJson)) {
-        return {
-          ok: false,
-          error:
-            'Terrain cook succeeded but heightfield binary is missing — restart pcg-server and re-cook.',
-        };
-      }
-      if (cook.kind === PcgExecuteKind.Json) {
-        return { ok: false, error: 'Graph produced JSON output only — nothing to preview.' };
-      }
-      return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
-    }
-
-    return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, cook } };
+    return buildPreviewDataFromCook(cook);
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       return { ok: false, error: 'aborted' };
@@ -251,11 +268,20 @@ export async function cookGraphPreview(
   }
 }
 
-export async function cancelCook(): Promise<void> {
+export async function cancelCook(jobId: string): Promise<boolean> {
+  if (!jobId) return false;
   try {
-    await fetch('/api/cook-cancel', { method: 'POST' });
+    const res = await fetch('/api/cook-cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId }),
+    });
+    if (!res.ok) return false;
+    const data = (await res.json()) as { canceled?: boolean };
+    return data.canceled === true;
   } catch {
     // best-effort; server may already be gone
+    return false;
   }
 }
 
