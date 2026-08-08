@@ -962,6 +962,146 @@
   color: #e88;
 }
 
+/* Subgraph instance node — Structural purple tint (aligned with Unity category colors) */
+.pcg-node--subgraph .pcg-node__pill {
+  background: #453a5e;
+  border-color: #2a2140;
+}
+
+.pcg-node--subgraph.pcg-node--selected .pcg-node__pill {
+  border-color: #e8e8e8;
+}
+
+.pcg-node--missing .pcg-node__pill {
+  background: #4a2c2c;
+  border-color: #a33;
+}
+
+.pcg-node--missing .pcg-node__title {
+  color: #e88;
+}
+
+.pcg-node__type-subtitle {
+  display: block;
+  font-size: 9px;
+  font-weight: 400;
+  color: #8e8e9e;
+  line-height: 1.2;
+}
+
+.pcg-node__missing-badge {
+  color: #e05555;
+  font-size: 12px;
+  cursor: default;
+}
+
+/* Ghost pin — connected handle missing from the subgraph definition */
+.pcg-node__handle.react-flow__handle.pcg-node__handle--ghost {
+  background: transparent !important;
+  border: 1px dashed #e05555;
+  box-sizing: border-box;
+}
+
+/* Inspector: subgraph interface pins + stats */
+.pcg-inspector__pin-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.pcg-inspector__pin-dir {
+  color: #888;
+  width: 12px;
+  text-align: center;
+}
+
+.pcg-inspector__pin-label {
+  flex: 1;
+  color: #d4d4d4;
+}
+
+.pcg-inspector__pin-type {
+  color: #8e8e9e;
+  font-size: 10px;
+}
+
+.pcg-inspector__stat {
+  font-size: 11px;
+  color: #a6a6a6;
+  padding: 2px 0 6px;
+}
+
+/* Breadcrumb — subgraph navigation bar (Unity-style path) */
+.pcg-breadcrumb {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  background: rgba(28, 28, 32, 0.92);
+  border: 1px solid #3a3a44;
+  border-radius: 6px;
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.pcg-breadcrumb__segment {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pcg-breadcrumb__sep {
+  color: #666;
+  margin: 0 2px;
+}
+
+.pcg-breadcrumb__item {
+  background: none;
+  border: none;
+  color: #9ecfff;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pcg-breadcrumb__item:hover {
+  background: rgba(158, 207, 255, 0.12);
+}
+
+.pcg-breadcrumb__item--current {
+  color: #e8e8e8;
+  font-weight: 600;
+  cursor: default;
+}
+
+.pcg-breadcrumb__item--current:hover {
+  background: none;
+}
+
+.pcg-breadcrumb__hint {
+  margin-left: 12px;
+  color: #666;
+  font-size: 10px;
+}
+
+.pcg-status-bar__path {
+  color: #b89ae8;
+  font-weight: 600;
+}
+
+/* Interface node (SubgraphInput/Output) — dashed outline to read as structural */
+.pcg-node--interface .pcg-node__pill {
+  border-style: dashed;
+  border-color: #6a5a8e;
+}
+
 /* Title to the right of the pill, Unity-style */
 .pcg-node__title {
   font-size: 12px;

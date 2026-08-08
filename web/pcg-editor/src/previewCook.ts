@@ -2,8 +2,9 @@
 // dev-server /api/cook proxy) and parse the binary result for the preview
 // viewport. Requires `npm run dev` and a running pcg-server.
 
-import type { GraphJson } from './graphSchema';
+import type { GraphJson, GraphSubgraph } from './graphSchema';
 import { getOutputPinType } from './nodeManifest';
+import { isSubgraphInterfaceNode } from './subgraphs';
 import {
   parseCookResult,
   parseGeometryBinary,
@@ -175,6 +176,70 @@ export function buildPreviewCookGraph(
 
 export function newPreviewJobId(): string {
   return crypto.randomUUID().replaceAll('-', '');
+}
+
+/** Synthetic Output node id for cooking a subgraph interior in isolation. */
+export const SUBGRAPH_PREVIEW_OUTPUT_ID = '__pcg_subgraph_output__';
+
+/**
+ * Builds a cookable root graph from a subgraph interior: structural interface
+ * nodes (SubgraphInput/SubgraphOutput) are stripped, edges that fed the
+ * SubgraphOutput are rewired into a synthetic Output node, and edges from
+ * SubgraphInput are dropped (parent inputs are unbound when cooking the
+ * interior standalone). Nested Subgraph instances stay intact — pcg-core
+ * expands them via the accompanying subgraphs array.
+ */
+export function buildSubgraphCookGraph(
+  subgraph: GraphSubgraph,
+  subgraphs: GraphSubgraph[],
+): GraphJson {
+  const interfaceIds = new Set(
+    subgraph.nodes.filter((n) => isSubgraphInterfaceNode(n.type)).map((n) => n.id),
+  );
+  const outputIds = new Set(
+    subgraph.nodes.filter((n) => n.type === 'SubgraphOutput').map((n) => n.id),
+  );
+
+  const nodes = subgraph.nodes
+    .filter((n) => !interfaceIds.has(n.id))
+    .map((n) => ({ id: n.id, type: n.type, position: { ...n.position }, data: { ...n.data } }));
+
+  const edges: GraphJson['edges'] = [];
+  let feedsOutput = false;
+  for (const e of subgraph.edges) {
+    if (interfaceIds.has(e.source)) continue;
+    if (outputIds.has(e.target)) {
+      feedsOutput = true;
+      edges.push({
+        id: `${e.id}__subgraph_out`,
+        source: e.source,
+        target: SUBGRAPH_PREVIEW_OUTPUT_ID,
+        sourceHandle: e.sourceHandle,
+        targetHandle: 'in',
+      });
+      continue;
+    }
+    if (interfaceIds.has(e.target)) continue;
+    edges.push({ ...e });
+  }
+
+  if (feedsOutput) {
+    const anchor = subgraph.nodes.find((n) => n.type === 'SubgraphOutput');
+    nodes.push({
+      id: SUBGRAPH_PREVIEW_OUTPUT_ID,
+      type: 'Output',
+      position: anchor ? { ...anchor.position } : { x: 0, y: 0 },
+      data: {},
+    });
+  }
+
+  return {
+    version: '2.0',
+    nodes,
+    edges,
+    parameters: subgraph.parameters ?? [],
+    subgraphs,
+  };
 }
 
 /** Parse cook output into preview data (shared by live cook and contract tests). */

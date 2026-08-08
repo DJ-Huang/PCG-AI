@@ -13,6 +13,7 @@ import {
 } from './nodeManifest';
 import type { GraphParameter, ParameterType, NodeData } from './graphSchema';
 import { resolveUpstreamGroups, filterGroupsByDomain, type AvailableGroup } from './groupResolver';
+import { findSubgraph, getSubgraphId, getSubgraphNodeTitle, isSubgraphInterfaceNode, useCurrentSubgraph, useSubgraphs } from './subgraphs';
 
 interface InspectorProps {
   selectedNode: Node | null;
@@ -50,6 +51,8 @@ export default function Inspector({
     [onUpdateNodeData],
   );
 
+  const subgraphs = useSubgraphs();
+
   // Resolve available groups from upstream SpatialMesh connections (Houdini-style)
   const upstreamGroups = useMemo(
     () => selectedNode ? resolveUpstreamGroups(selectedNode.id, nodes, edges) : [],
@@ -63,6 +66,20 @@ export default function Inspector({
         <div className="pcg-panel__empty-hint">Select a node to inspect</div>
       </div>
     );
+  }
+
+  if (selectedNode.type === 'Subgraph') {
+    return (
+      <SubgraphInspector
+        node={selectedNode}
+        subgraphs={subgraphs}
+        onUpdateNodeData={onUpdateNodeData}
+      />
+    );
+  }
+
+  if (isSubgraphInterfaceNode(selectedNode.type)) {
+    return <InterfaceNodeInspector node={selectedNode} />;
   }
 
   const def = getNodeTypeDefs(selectedNode.type ?? '');
@@ -268,6 +285,156 @@ export default function Inspector({
             <div className="pcg-inspector__no-props">No properties</div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Subgraph Inspector ────────────────────────────────
+// Read-mostly view of an inline subgraph instance: editable instance title,
+// interface pins, and contents summary. Nested authoring stays in Unity.
+
+/** Structural interface node (SubgraphInput/SubgraphOutput) — no editable props. */
+function InterfaceNodeInspector({ node }: { node: Node }) {
+  const currentSubgraph = useCurrentSubgraph();
+  const isInput = node.type === 'SubgraphInput';
+  const pins = currentSubgraph
+    ? isInput
+      ? currentSubgraph.inputs
+      : currentSubgraph.outputs
+    : [];
+  const color = getCategoryColor('Structural');
+
+  return (
+    <div className="pcg-inspector">
+      <div className="pcg-inspector__title">Inspector</div>
+      <div className="pcg-inspector__node-header" style={{ background: color }}>
+        {isInput ? 'Subgraph Input' : 'Subgraph Output'}
+      </div>
+      <div className="pcg-inspector__node-type">{node.type} · Structural</div>
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Interface Pins</div>
+        {pins.map((pin) => (
+          <div key={pin.id} className="pcg-inspector__pin-row">
+            <span className="pcg-inspector__pin-dir">{isInput ? '←' : '→'}</span>
+            <span className="pcg-inspector__pin-label">{pin.name}</span>
+            <span className="pcg-inspector__pin-type">{pin.pinType || 'Any'}</span>
+          </div>
+        ))}
+        {pins.length === 0 && <div className="pcg-inspector__no-props">No interface pins</div>}
+        <div className="pcg-inspector__stat">Structural node — not deletable</div>
+      </div>
+    </div>
+  );
+}
+
+function SubgraphInspector({
+  node,
+  subgraphs,
+  onUpdateNodeData,
+}: {
+  node: Node;
+  subgraphs: ReturnType<typeof useSubgraphs>;
+  onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
+}) {
+  const data = node.data as NodeData;
+  const subgraphId = getSubgraphId(data);
+  const subgraph = findSubgraph(subgraphs, subgraphId);
+  const title = getSubgraphNodeTitle(data, subgraph);
+  const customTitle = typeof data.__nodeTitle === 'string' ? data.__nodeTitle : '';
+  const color = getCategoryColor('Structural');
+
+  if (!subgraph) {
+    return (
+      <div className="pcg-inspector">
+        <div className="pcg-inspector__title">Inspector</div>
+        <div className="pcg-inspector__node-header" style={{ background: color }}>
+          {title}
+        </div>
+        <div className="pcg-inspector__node-type">Subgraph · Structural</div>
+        <div className="pcg-inspector__section">
+          <div className="pcg-panel__empty-hint">
+            Missing subgraph definition: {subgraphId || '(no subgraphId set)'}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pcg-inspector">
+      <div className="pcg-inspector__title">Inspector</div>
+      <div className="pcg-inspector__node-header" style={{ background: color }}>
+        {subgraph.name || subgraph.id}
+      </div>
+      <div className="pcg-inspector__node-type">Subgraph · Structural</div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Instance</div>
+        <div className="pcg-inspector__props">
+          <div className="pcg-inspector__prop">
+            <div className="pcg-inspector__prop-header">
+              <span className="pcg-inspector__prop-label">Title</span>
+            </div>
+            <div className="pcg-inspector__prop-value">
+              <input
+                type="text"
+                value={customTitle}
+                placeholder={subgraph.name || subgraph.id}
+                onChange={(e) => onUpdateNodeData(node.id, { __nodeTitle: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="pcg-inspector__prop">
+            <div className="pcg-inspector__prop-header">
+              <span className="pcg-inspector__prop-label">Subgraph ID</span>
+            </div>
+            <div className="pcg-inspector__prop-value">
+              <input type="text" value={subgraph.id} readOnly disabled />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Interface</div>
+        {subgraph.inputs.map((pin) => (
+          <div key={pin.id} className="pcg-inspector__pin-row">
+            <span className="pcg-inspector__pin-dir">→</span>
+            <span className="pcg-inspector__pin-label">{pin.name}</span>
+            <span className="pcg-inspector__pin-type">Any</span>
+          </div>
+        ))}
+        {subgraph.outputs.map((pin) => (
+          <div key={pin.id} className="pcg-inspector__pin-row">
+            <span className="pcg-inspector__pin-dir">←</span>
+            <span className="pcg-inspector__pin-label">{pin.name}</span>
+            <span className="pcg-inspector__pin-type">{pin.pinType || 'Any'}</span>
+          </div>
+        ))}
+        {subgraph.inputs.length === 0 && subgraph.outputs.length === 0 && (
+          <div className="pcg-inspector__no-props">No interface pins</div>
+        )}
+      </div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Contents</div>
+        <div className="pcg-inspector__stat">
+          {subgraph.nodes.length} nodes · {subgraph.edges.length} edges
+          {subgraph.parameters && subgraph.parameters.length > 0
+            ? ` · ${subgraph.parameters.length} params`
+            : ''}
+        </div>
+        {subgraph.parameters && subgraph.parameters.length > 0 && (
+          <div className="pcg-inspector__props">
+            {subgraph.parameters.map((p) => (
+              <div key={p.id} className="pcg-inspector__pin-row">
+                <span className="pcg-inspector__pin-label">{p.name}</span>
+                <span className="pcg-inspector__pin-type">{p.type}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

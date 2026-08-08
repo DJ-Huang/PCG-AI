@@ -11,6 +11,8 @@ import {
   MiniMap,
   ReactFlowProvider,
   addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -18,21 +20,31 @@ import {
   type Connection,
   type Node,
   type Edge,
+  type NodeChange,
+  type EdgeChange,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import ManifestNode from './nodes/ManifestNode';
+import SubgraphNode, { SubgraphInterfaceNode } from './nodes/SubgraphNode';
 import { defaultData } from './graphSchema';
-import type { GraphParameter, GraphSubgraph } from './graphSchema';
+import type { GraphParameter, GraphSubgraph, GraphNode, GraphEdge } from './graphSchema';
 import { exportGraph, downloadGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
 import { importGraphFromFile, parseGraphJson, syncNodeCounterFromNodes } from './importGraph';
 import { clearEditorSession, loadEditorSession, saveEditorSession } from './editorSession';
 import { isValidConnection } from './connectionValidation';
 import {
+  SubgraphsContext,
+  CurrentSubgraphContext,
+  findSubgraph,
+  getSubgraphId,
+  isSubgraphInterfaceNode,
+  resolveInputPinType,
+  resolveOutputPinType,
+} from './subgraphs';
+import {
   getNodeTypeDefs,
-  getOutputPinType,
-  getInputPinType,
   getAllNodeTypes,
   type ManifestProperty,
   type PinType,
@@ -45,7 +57,7 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
-import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
+import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
 import { NodeActionsContext, getPreviewTargetId, setPreviewTargetId, usePreviewTargetId } from './nodeActions';
 import {
   getEffectiveControlPoints,
@@ -59,9 +71,11 @@ import './App.css';
 // instead of the real type, so nodes render as "Unknown".
 const nodeTypes = {
   ...Object.fromEntries(getAllNodeTypes().map((def) => [def.type, ManifestNode])),
-  // Dynamic subgraph pins are preserved by import/export. Full nested graph
-  // authoring is intentionally outside this editor's current scope.
-  Subgraph: ManifestNode,
+  // Subgraph instance pins derive from the referenced definition (see
+  // SubgraphNode); nested contents are preserved by import/export.
+  Subgraph: SubgraphNode,
+  SubgraphInput: SubgraphInterfaceNode,
+  SubgraphOutput: SubgraphInterfaceNode,
 };
 
 const initialNodes: Node[] = [
@@ -151,20 +165,211 @@ function PcgEditor() {
     setSubgraphs,
   );
 
+  // ── Subgraph navigation (nested editing) ────────────
+  // Single document state: root nodes/edges/parameters plus subgraphs (whose
+  // defs carry their own interior nodes/edges/parameters). editPath selects
+  // which graph the canvas shows; every mutation routes to the owning slice,
+  // so undo/redo, export, and session persist always see the whole document.
+
+  const [editPath, setEditPath] = useState<string[]>([]);
+  const currentSubgraphId = editPath.length > 0 ? editPath[editPath.length - 1] : null;
+  const currentSubgraph = useMemo(
+    () => (currentSubgraphId ? findSubgraph(subgraphs, currentSubgraphId) ?? null : null),
+    [subgraphs, currentSubgraphId],
+  );
+
+  const viewNodes = useMemo(
+    () => (currentSubgraph ? currentSubgraph.nodes : nodes) as Node[],
+    [currentSubgraph, nodes],
+  );
+  const viewEdges = useMemo(
+    () => (currentSubgraph ? currentSubgraph.edges : edges) as Edge[],
+    [currentSubgraph, edges],
+  );
+  const viewParameters = useMemo(
+    () => (currentSubgraph ? (currentSubgraph.parameters ?? []) : parameters),
+    [currentSubgraph, parameters],
+  );
+
+  /** Routes a nodes update to the root graph or the open subgraph definition. */
+  const setViewNodes = useCallback(
+    (updater: (nds: Node[]) => Node[]) => {
+      if (!currentSubgraphId) {
+        setNodes(updater);
+        return;
+      }
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? { ...sg, nodes: updater(sg.nodes as unknown as Node[]) as unknown as GraphNode[] }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, setNodes, setSubgraphs],
+  );
+
+  const setViewEdges = useCallback(
+    (updater: (eds: Edge[]) => Edge[]) => {
+      if (!currentSubgraphId) {
+        setEdges(updater);
+        return;
+      }
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? { ...sg, edges: updater(sg.edges as unknown as Edge[]) as unknown as GraphEdge[] }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, setEdges, setSubgraphs],
+  );
+
+  const setViewParameters = useCallback(
+    (next: GraphParameter[]) => {
+      if (!currentSubgraphId) {
+        setParameters(next);
+        return;
+      }
+      setSubgraphs((subs) =>
+        subs.map((sg) => (sg.id === currentSubgraphId ? { ...sg, parameters: next } : sg)),
+      );
+    },
+    [currentSubgraphId, setParameters, setSubgraphs],
+  );
+
+  // Deletions flow through onNodesChange/onEdgesChange (not commit()-wrapped
+  // callers), so commit here on remove changes. React Flow fires the node
+  // remove and its cascade edge removes in the same tick — dedupe by timestamp
+  // so one Delete keypress produces one undo step.
+  const removeCommitRef = useRef(0);
+  const commitForRemove = useCallback(() => {
+    const now = performance.now();
+    if (now - removeCommitRef.current < 50) return;
+    removeCommitRef.current = now;
+    commit();
+  }, [commit]);
+
+  const onViewNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      if (!currentSubgraphId) {
+        if (changes.some((c) => c.type === 'remove')) commitForRemove();
+        onNodesChange(changes);
+        return;
+      }
+      // Interface nodes (SubgraphInput/Output) are structural — not deletable.
+      const filtered = changes.filter((c) => {
+        if (c.type !== 'remove') return true;
+        const node = currentSubgraph?.nodes.find((n) => n.id === c.id);
+        return !isSubgraphInterfaceNode(node?.type);
+      });
+      if (filtered.length === 0) return;
+      if (filtered.some((c) => c.type === 'remove')) commitForRemove();
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? {
+                ...sg,
+                nodes: applyNodeChanges(filtered, sg.nodes as unknown as Node[]) as unknown as GraphNode[],
+              }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, currentSubgraph, onNodesChange, setSubgraphs, commitForRemove],
+  );
+
+  const onViewEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      if (!currentSubgraphId) {
+        if (changes.some((c) => c.type === 'remove')) commitForRemove();
+        onEdgesChange(changes);
+        return;
+      }
+      // React Flow cascades node deletion to connected edges. When the node is
+      // a protected interface node, the cascade must be blocked too — cascade
+      // removes arrive unselected, while a user-deleted edge is selected first.
+      const filtered = changes.filter((c) => {
+        if (c.type !== 'remove') return true;
+        const edge = currentSubgraph?.edges.find((e) => e.id === c.id);
+        if (!edge) return true;
+        const selected = (edge as Edge).selected === true;
+        if (selected) return true;
+        const sourceNode = currentSubgraph?.nodes.find((n) => n.id === edge.source);
+        const targetNode = currentSubgraph?.nodes.find((n) => n.id === edge.target);
+        return !isSubgraphInterfaceNode(sourceNode?.type) && !isSubgraphInterfaceNode(targetNode?.type);
+      });
+      if (filtered.length === 0) return;
+      if (filtered.some((c) => c.type === 'remove')) commitForRemove();
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? {
+                ...sg,
+                edges: applyEdgeChanges(filtered, sg.edges as unknown as Edge[]) as unknown as GraphEdge[],
+              }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, currentSubgraph, onEdgesChange, setSubgraphs, commitForRemove],
+  );
+
+  // Navigation is view state, not a document change — no undo commit.
+  const navigateTo = useCallback(
+    (path: string[]) => {
+      setEditPath(path);
+      setSelectedNode(null);
+      setInfoNodeId(null);
+      setContextMenu(null);
+      setPreviewTargetId(null);
+      window.setTimeout(() => void fitView({ duration: 200 }), 50);
+    },
+    [fitView],
+  );
+
+  const enterSubgraph = useCallback(
+    (subgraphId: string) => {
+      if (!subgraphs.some((s) => s.id === subgraphId)) {
+        setStatus(`Cannot enter: subgraph "${subgraphId || '(unset)'}" is missing from this document`);
+        return;
+      }
+      navigateTo([...editPath, subgraphId]);
+    },
+    [editPath, subgraphs, navigateTo],
+  );
+
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+    (_, node) => {
+      if (node.type !== 'Subgraph') return;
+      const id = getSubgraphId(node.data);
+      if (id) enterSubgraph(id);
+    },
+    [enterSubgraph],
+  );
+
+  // Undo can remove the definition being edited — bail back to root.
+  useEffect(() => {
+    if (editPath.length > 0 && !editPath.every((id) => subgraphs.some((s) => s.id === id))) {
+      setEditPath([]);
+    }
+  }, [editPath, subgraphs]);
+
   // ── Connection ──────────────────────────────────────
 
   const validateConnection = useCallback(
-    (conn: Connection | Edge) => isValidConnection(conn, nodes, edges),
-    [nodes, edges],
+    (conn: Connection | Edge) => isValidConnection(conn, viewNodes, viewEdges, subgraphs, currentSubgraph),
+    [viewNodes, viewEdges, subgraphs, currentSubgraph],
   );
 
   const onConnect = useCallback(
     (conn: Connection) => {
       if (!validateConnection(conn)) return;
       commit();
-      setEdges((eds) => addEdge(conn, eds));
+      setViewEdges((eds) => addEdge(conn, eds));
     },
-    [setEdges, validateConnection, commit],
+    [setViewEdges, validateConnection, commit],
   );
 
   const onConnectStart = useCallback((_: unknown, { nodeId, handleId, handleType }: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {
@@ -188,14 +393,14 @@ function PcgEditor() {
       if (!nodeId || !handleId || !handleType) return;
 
       // Find the node and its pin type
-      const node = nodes.find((n) => n.id === nodeId);
+      const node = viewNodes.find((n) => n.id === nodeId);
       if (!node?.type) return;
 
       let pinType: PinType | undefined;
       if (handleType === 'source') {
-        pinType = getOutputPinType(node.type, handleId);
+        pinType = resolveOutputPinType(node, handleId, subgraphs, currentSubgraph);
       } else {
-        pinType = getInputPinType(node.type, handleId);
+        pinType = resolveInputPinType(node, handleId, subgraphs, currentSubgraph);
       }
       if (!pinType) return;
 
@@ -221,7 +426,7 @@ function PcgEditor() {
             data: { ...defaultData(nodeType) },
           };
           commit();
-          setNodes((nds) => [...nds, newNode]);
+          setViewNodes((nds) => [...nds, newNode]);
 
           // Auto-connect
           let conn: Connection;
@@ -237,7 +442,7 @@ function PcgEditor() {
                 targetHandle: inputPin.id,
               };
               if (validateConnection(conn)) {
-                setEdges((eds) => addEdge(conn, eds));
+                setViewEdges((eds) => addEdge(conn, eds));
               }
             }
           } else {
@@ -252,7 +457,7 @@ function PcgEditor() {
                 targetHandle: handleId,
               };
               if (validateConnection(conn)) {
-                setEdges((eds) => addEdge(conn, eds));
+                setViewEdges((eds) => addEdge(conn, eds));
               }
             }
           }
@@ -264,7 +469,7 @@ function PcgEditor() {
       connectingHandleId.current = null;
       connectingHandleType.current = null;
     },
-    [nodes, setNodes, setEdges, screenToFlowPosition, commit, validateConnection],
+    [viewNodes, subgraphs, currentSubgraph, setViewNodes, setViewEdges, screenToFlowPosition, commit, validateConnection],
   );
 
   // ── Node creation ───────────────────────────────────
@@ -280,9 +485,10 @@ function PcgEditor() {
         data: { ...defaultData(nodeType) },
       };
       commit();
-      setNodes((nds) => [...nds, newNode]);
+      setViewNodes((nds) => [...nds, newNode]);
+      setStatus(`Added ${nodeType}`);
     },
-    [setNodes, screenToFlowPosition, commit],
+    [setViewNodes, screenToFlowPosition, commit],
   );
 
   const openSearchAt = useCallback((x: number, y: number) => {
@@ -319,7 +525,7 @@ function PcgEditor() {
   const updateNodeData = useCallback(
     (nodeId: string, patch: Record<string, unknown>) => {
       commit();
-      setNodes((nds) =>
+      setViewNodes((nds) =>
         nds.map((n) =>
           n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n,
         ),
@@ -329,7 +535,7 @@ function PcgEditor() {
         prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...patch } } : prev,
       );
     },
-    [setNodes, commit],
+    [setViewNodes, commit],
   );
 
   // ── Agent graph ops (actions dispatched from the agent panel) ──
@@ -345,15 +551,15 @@ function PcgEditor() {
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
         });
-        setNodes((nds) => [
+        setViewNodes((nds) => [
           ...nds,
           { id: newId, type: nodeType, position: pos, data: { ...defaultData(nodeType) } },
         ]);
         return newId;
       },
       connectNodes: (source, target, sourceHandle, targetHandle) => {
-        const sourceNode = nodes.find((n) => n.id === source);
-        const targetNode = nodes.find((n) => n.id === target);
+        const sourceNode = viewNodes.find((n) => n.id === source);
+        const targetNode = viewNodes.find((n) => n.id === target);
         if (!sourceNode) throw new Error(`source node "${source}" not found`);
         if (!targetNode) throw new Error(`target node "${target}" not found`);
         const outPin = getNodeTypeDefs(sourceNode.type ?? '')?.outputs[0];
@@ -367,18 +573,18 @@ function PcgEditor() {
         if (!validateConnection(conn)) {
           throw new Error(`invalid connection ${source} → ${target}`);
         }
-        setEdges((eds) => addEdge(conn, eds));
+        setViewEdges((eds) => addEdge(conn, eds));
       },
       setNodeParam: (nodeId, key, value) => {
-        if (!nodes.some((n) => n.id === nodeId)) {
+        if (!viewNodes.some((n) => n.id === nodeId)) {
           throw new Error(`node "${nodeId}" not found`);
         }
-        setNodes((nds) =>
+        setViewNodes((nds) =>
           nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [key]: value } } : n)),
         );
       },
     }),
-    [nodes, setNodes, setEdges, screenToFlowPosition, validateConnection],
+    [viewNodes, setViewNodes, setViewEdges, screenToFlowPosition, validateConnection],
   );
 
   const applyAgentActions = useCallback(
@@ -393,7 +599,7 @@ function PcgEditor() {
       const def = getNodeTypeDefs(nodeType);
       if (!def) return;
 
-      const currentValue = (nodes.find((n) => n.id === nodeId)?.data as Record<string, unknown>)?.[propertyKey] ?? prop.default;
+      const currentValue = (viewNodes.find((n) => n.id === nodeId)?.data as Record<string, unknown>)?.[propertyKey] ?? prop.default;
       const hasRange = prop.minimum !== undefined && prop.maximum !== undefined;
 
       const paramType: GraphParameter['type'] =
@@ -415,9 +621,9 @@ function PcgEditor() {
         max: prop.maximum ?? 1,
       };
       commit();
-      setParameters((prev) => [...prev, newParam]);
+      setViewParameters([...viewParameters, newParam]);
     },
-    [nodes, commit],
+    [viewNodes, viewParameters, setViewParameters, commit],
   );
 
   // ── Bind/unbind parameter ──────────────────────────
@@ -425,8 +631,8 @@ function PcgEditor() {
   const bindParameter = useCallback(
     (nodeId: string, propertyKey: string, paramId: string | null) => {
       commit();
-      setParameters((prev) =>
-        prev.map((p) => {
+      setViewParameters(
+        viewParameters.map((p) => {
           // Clear any existing binding to this node.property
           if (p.targetNode === nodeId && p.targetProperty === propertyKey) {
             return { ...p, targetNode: '', targetProperty: '' };
@@ -441,7 +647,7 @@ function PcgEditor() {
         }),
       );
     },
-    [commit],
+    [viewParameters, setViewParameters, commit],
   );
 
   // ── Keyboard shortcuts ─────────────────────────────
@@ -496,7 +702,7 @@ function PcgEditor() {
   }, []);
 
   const copyRawData = useCallback(async (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId);
+    const node = viewNodes.find((n) => n.id === nodeId);
     if (!node) return;
     const rawData = {
       id: node.id,
@@ -511,7 +717,7 @@ function PcgEditor() {
       setStatus('Failed to copy to clipboard');
     }
     setContextMenu(null);
-  }, [nodes]);
+  }, [viewNodes]);
 
   // ── Graph pane right-click ─────────────────────────
 
@@ -571,6 +777,7 @@ function PcgEditor() {
 
     nodeCounter = syncNodeCounterFromNodes(result.nodes);
     commit();
+    setEditPath([]);
     setNodes(result.nodes);
     setEdges(result.edges);
     setParameters(result.parameters);
@@ -584,6 +791,7 @@ function PcgEditor() {
 
   const handleNewGraph = () => {
     commit();
+    setEditPath([]);
     setNodes([]);
     setEdges([]);
     setParameters([]);
@@ -618,7 +826,7 @@ function PcgEditor() {
   // ── Preview cook ────────────────────────────────────
 
   const requestPreviewCook = useCallback(async (targetOverride?: string | null) => {
-    if (nodes.length === 0) return;
+    if (viewNodes.length === 0) return;
     // Read the target from the store (not React state) so this callback's identity
     // stays stable across ▶ clicks — a new identity would propagate through
     // NodeActionsContext and re-render every node.
@@ -635,12 +843,22 @@ function PcgEditor() {
 
     setPreviewLoading(true);
     setPreviewError(null);
+    // Full document from root states; inside a subgraph, cook its interior in
+    // isolation via a synthetic Output node (interface nodes are stripped).
     let graph = exportGraph(nodes, edges, parameters, subgraphs);
+    if (currentSubgraph) {
+      graph = buildSubgraphCookGraph(currentSubgraph, graph.subgraphs ?? []);
+    }
     if (target) {
-      const targetNode = nodes.find((n) => n.id === target);
-      const outputPin = targetNode ? getNodeTypeDefs(targetNode.type ?? '')?.outputs[0] : undefined;
+      const targetNode = graph.nodes.find((n) => n.id === target);
+      // Manifest nodes take their first declared output pin; subgraph instances
+      // take the first output pin of the referenced definition.
+      const outputPinId =
+        targetNode?.type === 'Subgraph'
+          ? findSubgraph(subgraphs, getSubgraphId(targetNode.data))?.outputs[0]?.id
+          : getNodeTypeDefs(targetNode?.type ?? '')?.outputs[0]?.id;
       const previewGraph =
-        targetNode && outputPin ? buildPreviewCookGraph(graph, target, outputPin.id) : null;
+        targetNode && outputPinId ? buildPreviewCookGraph(graph, target, outputPinId) : null;
       if (previewGraph) {
         graph = previewGraph;
       } else {
@@ -658,7 +876,7 @@ function PcgEditor() {
     } else if (result.error !== 'aborted') {
       setPreviewError(result.error ?? 'Cook failed');
     }
-  }, [nodes, edges, parameters, subgraphs]);
+  }, [nodes, edges, parameters, subgraphs, currentSubgraph, viewNodes.length]);
 
   const openPreview = useCallback(async () => {
     setShowPreview(true);
@@ -741,11 +959,11 @@ function PcgEditor() {
   const splineEditNode = useMemo(() => {
     const candidateIds = [previewTargetNodeId, selectedNode?.id].filter(Boolean) as string[];
     for (const id of candidateIds) {
-      const node = nodes.find((n) => n.id === id);
+      const node = viewNodes.find((n) => n.id === id);
       if (node?.type && isSplineAuthoringNode(node.type)) return node;
     }
     return null;
-  }, [nodes, previewTargetNodeId, selectedNode?.id]);
+  }, [viewNodes, previewTargetNodeId, selectedNode?.id]);
 
   const splineEdit = useMemo((): SplineEditContext | null => {
     if (!splineEditNode) return null;
@@ -798,6 +1016,8 @@ function PcgEditor() {
 
   return (
     <NodeActionsContext.Provider value={nodeActions}>
+    <SubgraphsContext.Provider value={subgraphs}>
+    <CurrentSubgraphContext.Provider value={currentSubgraph}>
     <div className="pcg-app">
       {/* Toolbar — aligned with Unity: left=New/Save/Save As/Show in Project, right=Parameters/Inspector */}
       <div className="pcg-toolbar">
@@ -856,24 +1076,57 @@ function PcgEditor() {
         {showAgent && <AgentPanel onApplyActions={applyAgentActions} />}
         {showBlackboard && (
           <Blackboard
-            parameters={parameters}
-            nodes={nodes}
+            parameters={viewParameters}
+            nodes={viewNodes}
             onParametersChange={(params) => {
               commit();
-              setParameters(params);
+              setViewParameters(params);
             }}
           />
         )}
         <div className="pcg-graph-container">
+          {/* Breadcrumb — visible while editing inside a subgraph */}
+          {editPath.length > 0 && (
+            <div className="pcg-breadcrumb">
+              <button
+                type="button"
+                className="pcg-breadcrumb__item"
+                onClick={() => navigateTo([])}
+              >
+                Root
+              </button>
+              {editPath.map((id, i) => (
+                <span key={`${id}-${i}`} className="pcg-breadcrumb__segment">
+                  <span className="pcg-breadcrumb__sep">/</span>
+                  <button
+                    type="button"
+                    className={`pcg-breadcrumb__item${i === editPath.length - 1 ? ' pcg-breadcrumb__item--current' : ''}`}
+                    onClick={() => navigateTo(editPath.slice(0, i + 1))}
+                  >
+                    {subgraphs.find((s) => s.id === id)?.name || id}
+                  </button>
+                </span>
+              ))}
+              <span className="pcg-breadcrumb__hint">Double-click empty space to go up</span>
+            </div>
+          )}
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            nodes={viewNodes}
+            edges={viewEdges}
+            onNodesChange={onViewNodesChange}
+            onEdgesChange={onViewEdgesChange}
             onConnect={onConnect}
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
             onNodeClick={onNodeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
+            onDoubleClick={(e) => {
+              // Double-click on empty canvas goes up one level (Unity-style).
+              const target = e.target as HTMLElement;
+              if (editPath.length > 0 && target.classList.contains('react-flow__pane')) {
+                navigateTo(editPath.slice(0, -1));
+              }
+            }}
             onPaneClick={onPaneClick}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
@@ -891,7 +1144,10 @@ function PcgEditor() {
 
           {/* Status bar */}
           <div className="pcg-status-bar">
-            <span>{nodes.length} nodes · {edges.length} edges · {parameters.length} params · {subgraphs.length} subgraphs</span>
+            <span>
+              {currentSubgraph && <span className="pcg-status-bar__path">{currentSubgraph.name || currentSubgraph.id}: </span>}
+              {viewNodes.length} nodes · {viewEdges.length} edges · {viewParameters.length} params · {subgraphs.length} subgraphs
+            </span>
             <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit · P: Parameters · I: Inspector</span>
             {(canUndo || canRedo) && (
               <span className="pcg-status-bar__undo">
@@ -904,9 +1160,9 @@ function PcgEditor() {
         {showInspector && (
           <Inspector
             selectedNode={selectedNode}
-            parameters={parameters}
-            nodes={nodes}
-            edges={edges}
+            parameters={viewParameters}
+            nodes={viewNodes}
+            edges={viewEdges}
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}
@@ -935,7 +1191,7 @@ function PcgEditor() {
       {/* Floating: Node Info Panel (pinned via hover toolbar ℹ) */}
       {infoNodeId &&
         (() => {
-          const node = nodes.find((n) => n.id === infoNodeId);
+          const node = viewNodes.find((n) => n.id === infoNodeId);
           if (!node) return null;
           // Anchor to the node's right edge; recompute every render so the
           // panel sticks to the node when it moves or the viewport changes.
@@ -947,8 +1203,8 @@ function PcgEditor() {
           return (
             <NodeInfoPanel
               node={node}
-              nodes={nodes}
-              edges={edges}
+              nodes={viewNodes}
+              edges={viewEdges}
               x={anchor.x}
               y={anchor.y}
               onClose={() => setInfoNodeId(null)}
@@ -975,6 +1231,8 @@ function PcgEditor() {
         </>
       )}
     </div>
+    </CurrentSubgraphContext.Provider>
+    </SubgraphsContext.Provider>
     </NodeActionsContext.Provider>
   );
 }
