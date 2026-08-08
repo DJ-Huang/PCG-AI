@@ -42,8 +42,6 @@ interface PreviewViewportProps {
   error: string | null;
   onRefresh: () => void;
   onClose: () => void;
-  targetLabel?: string | null;
-  onResetTarget?: () => void;
   splineEdit?: SplineEditContext | null;
 }
 
@@ -51,6 +49,9 @@ type DisplayMode = 'mesh' | 'edges' | 'points';
 
 const SPLINE_CURVE_COLOR = 0x4de66a;
 const CONTROL_LINE_COLOR = 0xffd933;
+
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 900;
 
 function flipZArray(src: Float32Array): Float32Array {
   const out = new Float32Array(src.length);
@@ -68,8 +69,6 @@ export default function PreviewViewport({
   error,
   onRefresh,
   onClose,
-  targetLabel,
-  onResetTarget,
   splineEdit,
 }: PreviewViewportProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +84,27 @@ export default function PreviewViewport({
   } | null>(null);
   const [modes, setModes] = useState<DisplayMode[]>(['mesh']);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [width, setWidth] = useState(420);
+
+  const onResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = width;
+      const onMove = (ev: MouseEvent) => {
+        setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth - (ev.clientX - startX))));
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        document.body.classList.remove('pcg-preview--resizing');
+      };
+      document.body.classList.add('pcg-preview--resizing');
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [width],
+  );
   const dragRef = useRef<DragState | null>(null);
   const splineEditRef = useRef(splineEdit);
   const selectedIndexRef = useRef(selectedIndex);
@@ -93,6 +113,8 @@ export default function PreviewViewport({
 
   const dataRef = useRef(data);
   dataRef.current = data;
+
+  const hasAutoFramedRef = useRef(false);
 
   const focusPreview = useCallback(() => {
     const ctx = sceneRef.current;
@@ -408,7 +430,10 @@ export default function PreviewViewport({
     if (!ctx) return;
     disposeGroup(ctx.content);
     ctx.content.clear();
-    if (!data) return;
+    if (!data) {
+      hasAutoFramedRef.current = false;
+      return;
+    }
 
     const geometry = data.geometry;
     const mesh = data.mesh;
@@ -427,8 +452,9 @@ export default function PreviewViewport({
     }
 
     const fitPositions = collectFitPositions(data, splineEdit?.controlPoints);
-    if (fitPositions.length > 0) {
+    if (fitPositions.length > 0 && !hasAutoFramedRef.current) {
       fitCamera(ctx.camera, ctx.controls, fitPositions);
+      hasAutoFramedRef.current = true;
     }
 
     applyModes(ctx.content, modes, data.splines != null);
@@ -470,24 +496,13 @@ export default function PreviewViewport({
         : 'no geometry';
 
   return (
-    <div className="pcg-preview">
+    <div className="pcg-preview" style={{ width }}>
+      <div
+        className="pcg-preview__resize-handle"
+        onMouseDown={onResizeStart}
+        title="Drag to resize"
+      />
       <div className="pcg-preview__header">
-        <span>Preview</span>
-        {targetLabel && (
-          <span className="pcg-preview__target" title={`Previewing node: ${targetLabel}`}>
-            ▶ {targetLabel}
-            {onResetTarget && (
-              <button
-                type="button"
-                className="pcg-preview__target-reset"
-                onClick={onResetTarget}
-                title="Back to full-graph preview"
-              >
-                ×
-              </button>
-            )}
-          </span>
-        )}
         {splineEdit && (
           <span
             className="pcg-preview__spline-hint"
@@ -676,23 +691,44 @@ function focusCameraOnTarget(
   controls.update();
 }
 
-function fitCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, positions: Float32Array) {
-  const bounds = new THREE.BufferGeometry();
-  bounds.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  bounds.computeBoundingSphere();
-  const sphere = bounds.boundingSphere;
-  bounds.dispose();
-  if (!sphere) return;
+function fitCamera(
+  camera: THREE.PerspectiveCamera,
+  controls: OrbitControls,
+  positions: Float32Array,
+  margin = 1.35,
+) {
+  if (positions.length < 3) return;
+
+  const box = new THREE.Box3();
+  const point = new THREE.Vector3();
+  for (let i = 0; i < positions.length; i += 3) {
+    point.set(positions[i], positions[i + 1], positions[i + 2]);
+    box.expandByPoint(point);
+  }
+  if (box.isEmpty()) return;
+
+  const center = new THREE.Vector3();
+  const sphere = new THREE.Sphere();
+  box.getCenter(center);
+  box.getBoundingSphere(sphere);
   const radius = Math.max(sphere.radius, 0.001);
-  controls.target.copy(sphere.center);
-  const distance = radius * 2.2;
-  camera.position.set(
-    sphere.center.x + distance * 0.7,
-    sphere.center.y + distance * 0.6,
-    sphere.center.z + distance * 0.7,
-  );
-  camera.near = Math.max(distance / 1000, 0.001);
-  camera.far = distance * 100;
+
+  const fovRad = (camera.fov * Math.PI) / 180;
+  const aspect = Math.max(camera.aspect, 0.01);
+  const halfFovTan = Math.tan(fovRad * 0.5);
+
+  // Perspective fit: ensure the AABB bounding sphere fits in both vertical and
+  // horizontal FOV, then add margin for the angled view direction.
+  const fitVert = radius / halfFovTan;
+  const fitHorz = radius / (halfFovTan * aspect);
+  const distance = Math.max(fitVert, fitHorz) * margin;
+
+  const viewDir = new THREE.Vector3(0.7, 0.6, 0.7).normalize();
+  camera.position.copy(center).addScaledVector(viewDir, distance);
+  controls.target.copy(center);
+
+  camera.near = Math.max(distance / 1000, 0.0001);
+  camera.far = Math.max(distance * 100, radius * 20, 10);
   camera.updateProjectionMatrix();
   controls.update();
 }

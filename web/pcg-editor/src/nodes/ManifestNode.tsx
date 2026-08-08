@@ -12,7 +12,8 @@ export default function ManifestNode({ id, type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
   const [hovered, setHovered] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { onInfo, onPreview } = useContext(NodeActionsContext);
+  const { onInfo, onPreview, previewTargetId } = useContext(NodeActionsContext);
+  const previewing = previewTargetId === id;
 
   // The toolbar is portaled outside the node DOM, so hide on a short delay:
   // moving the pointer from the node onto the toolbar must not dismiss it.
@@ -89,8 +90,14 @@ export default function ManifestNode({ id, type, selected, data }: NodeProps) {
         </button>
         <button
           type="button"
-          className="nodrag pcg-node-toolbar__btn"
-          title={def.outputs.length > 0 ? 'Preview this node' : 'No output to preview'}
+          className={`nodrag pcg-node-toolbar__btn${previewing ? ' pcg-node-toolbar__btn--previewing' : ''}`}
+          title={
+            def.outputs.length === 0
+              ? 'No output to preview'
+              : previewing
+                ? 'Clear node preview (back to full-graph preview)'
+                : 'Preview this node'
+          }
           disabled={def.outputs.length === 0}
           onClick={(e) => {
             e.stopPropagation();
@@ -101,7 +108,7 @@ export default function ManifestNode({ id, type, selected, data }: NodeProps) {
         </button>
       </NodeToolbar>
 
-      <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}`}>
+      <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}${previewing ? ' pcg-node--previewing' : ''}`}>
       {/* Pill + port dots stack (ports stay centered on the pill) */}
       <div className="pcg-node__stack">
         {def.inputs.length > 0 && (

@@ -14,6 +14,7 @@ import {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useViewport,
   type Connection,
   type Node,
   type Edge,
@@ -127,7 +128,7 @@ function PcgEditor() {
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
-  const [infoNode, setInfoNode] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
   const [previewTargetNodeId, setPreviewTargetNodeId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -135,6 +136,8 @@ function PcgEditor() {
   const connectingHandleId = useRef<string | null>(null);
   const connectingHandleType = useRef<'source' | 'target' | null>(null);
   const { screenToFlowPosition, flowToScreenPosition, fitView } = useReactFlow();
+  // Subscribe to viewport so the pinned info panel re-anchors on pan/zoom.
+  useViewport();
 
   const { commit, undo, redo, beginDrag, endDrag, canUndo, canRedo } = useUndoRedo(
     nodes,
@@ -300,23 +303,14 @@ function PcgEditor() {
 
   // ── Node hover toolbar actions (info / per-node preview) ──
 
-  const handleNodeInfo = useCallback(
-    (nodeId: string) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      if (!node) return;
-      setInfoNode((prev) => {
-        if (prev?.nodeId === nodeId) return null;
-        const anchor = flowToScreenPosition({ x: node.position.x + 200, y: node.position.y });
-        return { nodeId, x: anchor.x, y: anchor.y };
-      });
-    },
-    [nodes, flowToScreenPosition],
-  );
+  const handleNodeInfo = useCallback((nodeId: string) => {
+    setInfoNodeId((prev) => (prev === nodeId ? null : nodeId));
+  }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setContextMenu(null);
-    setInfoNode(null);
+    setInfoNodeId(null);
   }, []);
 
   // ── Node data update (from Inspector) ──────────────
@@ -594,7 +588,7 @@ function PcgEditor() {
     setParameters([]);
     setSubgraphs([]);
     setSelectedNode(null);
-    setInfoNode(null);
+    setInfoNodeId(null);
     setPreviewTargetNodeId(null);
     setCurrentFilename('');
     nodeCounter = 100;
@@ -709,26 +703,25 @@ function PcgEditor() {
       // run since the direct cook here already covers it (avoids a duplicate
       // request whose cache-hit stats would mask the real exec numbers).
       skipDebounceRef.current = true;
+      if (nodeId === previewTargetNodeId) {
+        // Clicking ▶ on the current target clears it — back to full-graph preview.
+        setPreviewTargetNodeId(null);
+        void requestPreviewCook(null);
+        return;
+      }
       setPreviewTargetNodeId(nodeId);
       if (!showPreview) {
         void openPreview();
       }
       void requestPreviewCook(nodeId);
     },
-    [showPreview, openPreview, requestPreviewCook],
+    [showPreview, previewTargetNodeId, openPreview, requestPreviewCook],
   );
 
   const nodeActions = useMemo(
-    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview }),
-    [handleNodeInfo, handleNodePreview],
+    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview, previewTargetId: previewTargetNodeId }),
+    [handleNodeInfo, handleNodePreview, previewTargetNodeId],
   );
-
-  const previewTargetLabel = (() => {
-    if (!previewTargetNodeId) return null;
-    const node = nodes.find((n) => n.id === previewTargetNodeId);
-    if (!node) return null;
-    return getNodeTypeDefs(node.type ?? '')?.displayName ?? node.type ?? previewTargetNodeId;
-  })();
 
   const splineEditNode = useMemo(() => {
     const candidateIds = [previewTargetNodeId, selectedNode?.id].filter(Boolean) as string[];
@@ -911,17 +904,7 @@ function PcgEditor() {
             error={previewError}
             onRefresh={() => void requestPreviewCook()}
             onClose={() => void togglePreview()}
-            targetLabel={previewTargetLabel}
             splineEdit={splineEditForViewport}
-            onResetTarget={
-              previewTargetNodeId
-                ? () => {
-                    skipDebounceRef.current = true;
-                    setPreviewTargetNodeId(null);
-                    void requestPreviewCook(null);
-                  }
-                : undefined
-            }
           />
         )}
       </div>
@@ -935,19 +918,27 @@ function PcgEditor() {
       )}
 
       {/* Floating: Node Info Panel (pinned via hover toolbar ℹ) */}
-      {infoNode &&
+      {infoNodeId &&
         (() => {
-          const node = nodes.find((n) => n.id === infoNode.nodeId);
-          return node ? (
+          const node = nodes.find((n) => n.id === infoNodeId);
+          if (!node) return null;
+          // Anchor to the node's right edge; recompute every render so the
+          // panel sticks to the node when it moves or the viewport changes.
+          const width = node.measured?.width ?? 200;
+          const anchor = flowToScreenPosition({
+            x: node.position.x + width + 12,
+            y: node.position.y,
+          });
+          return (
             <NodeInfoPanel
               node={node}
               nodes={nodes}
               edges={edges}
-              x={infoNode.x}
-              y={infoNode.y}
-              onClose={() => setInfoNode(null)}
+              x={anchor.x}
+              y={anchor.y}
+              onClose={() => setInfoNodeId(null)}
             />
-          ) : null;
+          );
         })()}
 
       {/* Floating: Context Menu */}

@@ -9,9 +9,12 @@ export interface NodeActions {
   onInfo: (nodeId: string) => void;
   /** Cook and preview this node's output in the preview viewport. */
   onPreview: (nodeId: string) => void;
+  /** Node currently driving the 3D preview (null = full-graph preview). */
+  previewTargetId: string | null;
 }
 
 export const NodeActionsContext = createContext<NodeActions>({
   onInfo: () => {},
   onPreview: () => {},
+  previewTargetId: null,
 });
