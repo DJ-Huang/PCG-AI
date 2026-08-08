@@ -197,6 +197,39 @@ function exportGraphPlugin(): Plugin {
           }
         });
       });
+
+      // Load a .pcg graph file from disk (for the /review route)
+      // GET /api/load-graph?path=<relative-path>
+      server.middlewares.use('/api/load-graph', (req, res, next) => {
+        if (req.method !== 'GET') {
+          next();
+          return;
+        }
+        const url = new URL(req.url ?? '', 'http://localhost');
+        const relPath = url.searchParams.get('path');
+        if (!relPath) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: 'Missing "path" query parameter' }));
+          return;
+        }
+        const resolved = path.resolve(__dirname, '../../', relPath);
+        if (!fs.existsSync(resolved)) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: `File not found: ${relPath}` }));
+          return;
+        }
+        try {
+          const content = fs.readFileSync(resolved, 'utf8');
+          res.setHeader('Content-Type', 'application/json');
+          res.end(content);
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: String(err) }));
+        }
+      });
     },
   };
 }

@@ -3,16 +3,16 @@
   "nodes": [
     {
       "id": "shape_toy",
-      "type": "ImportMesh",
+      "type": "CreateBoxMesh",
       "position": {
         "x": 200,
         "y": 0
       },
       "data": {
         "__nodeTitle": "Source: Rubber Toy",
-        "path": "",
-        "scale": 3.0,
-        "axisConversion": "none"
+        "width": 0.5,
+        "height": 1.0,
+        "depth": 0.4
       }
     },
     {
@@ -44,16 +44,18 @@
     },
     {
       "id": "shape_teapot",
-      "type": "ImportMesh",
+      "type": "CreateCylinderMesh",
       "position": {
         "x": 560,
         "y": 0
       },
       "data": {
         "__nodeTitle": "Source: Teapot",
-        "path": "",
-        "scale": 1.0,
-        "axisConversion": "none"
+        "radius": 0.5,
+        "height": 0.7,
+        "radialSegments": 24,
+        "capTop": true,
+        "capBottom": true
       }
     },
     {
@@ -104,17 +106,11 @@
       },
       "data": {
         "__nodeTitle": "Match Size (Ground)",
-        "justifyWith": "inputIfWired",
-        "justifyY": "min",
-        "targetJustifyY": "same",
-        "justifyX": "none",
-        "justifyZ": "none",
-        "scaleToFit": false,
-        "translate": true
+        "justifyWith": "inputIfWired"
       }
     },
     {
-      "id": "color_solid",
+      "id": "color_red",
       "type": "VertexColor",
       "position": {
         "x": 380,
@@ -130,37 +126,19 @@
       }
     },
     {
-      "id": "texture_uv",
-      "type": "UVTexture",
+      "id": "color_blue",
+      "type": "VertexColor",
       "position": {
         "x": 740,
         "y": 640
       },
       "data": {
-        "__nodeTitle": "UV Texture",
-        "projection": "planar",
-        "axis": "y",
-        "scaleU": 1.0,
-        "scaleV": 1.0,
-        "offsetU": 0.0,
-        "offsetV": 0.0
-      }
-    },
-    {
-      "id": "texture_project",
-      "type": "ProjectTexture",
-      "position": {
-        "x": 380,
-        "y": 800
-      },
-      "data": {
-        "__nodeTitle": "Project Texture",
-        "direction": "y",
-        "scaleU": 1.0,
-        "scaleV": 1.0,
-        "offsetU": 0.0,
-        "offsetV": 0.0,
-        "useReferenceBounds": false
+        "__nodeTitle": "Solid Color (Blue)",
+        "r": 0.1,
+        "g": 0.3,
+        "b": 0.9,
+        "a": 1.0,
+        "emission": 0.0
       }
     },
     {
@@ -168,7 +146,7 @@
       "type": "Switch",
       "position": {
         "x": 380,
-        "y": 960
+        "y": 800
       },
       "data": {
         "__nodeTitle": "Color Switch (Look)",
@@ -180,7 +158,7 @@
       "type": "PointsFromVolume",
       "position": {
         "x": 380,
-        "y": 1120
+        "y": 960
       },
       "data": {
         "__nodeTitle": "Points From Volume",
@@ -207,7 +185,7 @@
       "type": "CopyMeshToPoints",
       "position": {
         "x": 740,
-        "y": 1280
+        "y": 1120
       },
       "data": {
         "__nodeTitle": "Copy Bricks To Points (Static)"
@@ -218,7 +196,7 @@
       "type": "SortGeometry",
       "position": {
         "x": 380,
-        "y": 1280
+        "y": 1120
       },
       "data": {
         "__nodeTitle": "Sort Points (Bottom-Up)",
@@ -234,7 +212,7 @@
       "type": "GroupByRange",
       "position": {
         "x": 380,
-        "y": 1440
+        "y": 1280
       },
       "data": {
         "__nodeTitle": "Group By Range (Animation)",
@@ -253,7 +231,7 @@
       "type": "Blast",
       "position": {
         "x": 380,
-        "y": 1600
+        "y": 1440
       },
       "data": {
         "__nodeTitle": "Blast (Reveal Animation)",
@@ -270,7 +248,7 @@
       "type": "CopyMeshToPoints",
       "position": {
         "x": 560,
-        "y": 1760
+        "y": 1600
       },
       "data": {
         "__nodeTitle": "Copy Bricks To Points (Animated)"
@@ -281,7 +259,7 @@
       "type": "Switch",
       "position": {
         "x": 560,
-        "y": 1920
+        "y": 1760
       },
       "data": {
         "__nodeTitle": "Animation Switch",
@@ -293,7 +271,7 @@
       "type": "AssignMaterial",
       "position": {
         "x": 560,
-        "y": 2080
+        "y": 1920
       },
       "data": {
         "__nodeTitle": "Assign Brick Material",
@@ -305,7 +283,7 @@
       "type": "Output",
       "position": {
         "x": 560,
-        "y": 2240
+        "y": 2080
       },
       "data": {
         "__nodeTitle": "Output",
@@ -350,36 +328,29 @@
       "targetHandle": "source"
     },
     {
-      "id": "e_match_solid",
+      "id": "e_match_red",
       "source": "match_size",
-      "target": "color_solid",
+      "target": "color_red",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_match_uv",
+      "id": "e_match_blue",
       "source": "match_size",
-      "target": "texture_uv",
+      "target": "color_blue",
       "sourceHandle": "out",
       "targetHandle": "in"
     },
     {
-      "id": "e_uv_project",
-      "source": "texture_uv",
-      "target": "texture_project",
-      "sourceHandle": "out",
-      "targetHandle": "in"
-    },
-    {
-      "id": "e_solid_cswitch",
-      "source": "color_solid",
+      "id": "e_red_cswitch",
+      "source": "color_red",
       "target": "color_switch",
       "sourceHandle": "out",
       "targetHandle": "in0"
     },
     {
-      "id": "e_project_cswitch",
-      "source": "texture_project",
+      "id": "e_blue_cswitch",
+      "source": "color_blue",
       "target": "color_switch",
       "sourceHandle": "out",
       "targetHandle": "in1"

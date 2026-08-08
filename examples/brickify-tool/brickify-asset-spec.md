@@ -19,6 +19,15 @@
 - Source shape can be switched (box proxy ↔ alternate box proxy) — Switch node mirrors Houdini's switch SOP
 - Points generated from mesh surface (approximation of Houdini's Points from Volumes)
 
+### ImportMesh placeholders (P0)
+
+`brickify-tool.pcg` may ship with `ImportMesh` nodes whose `path` is an **empty string** — these are intentional placeholders, not runnable geometry. Before cook:
+
+- Replace with `CreateBoxMesh` / `CreateCylinderMesh` (or another generator), **or**
+- Bind a real asset path and `projectRoot`.
+
+`validate_pcg.py` emits a warning on empty `ImportMesh.path`; the graph produces zero geometry until substituted.
+
 ## Material Slots
 
 | Slot | Part | Shader Family | Texture Channels | Finish |

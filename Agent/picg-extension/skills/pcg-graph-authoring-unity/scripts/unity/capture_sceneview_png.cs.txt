@@ -1,0 +1,46 @@
+// capture_sceneview_png.cs.txt
+// Paste into user-tuanjie execute_csharp_script after replacing tokens.
+// Tokens: __SCREENSHOT_REL__   (project-relative, e.g. screenshots/SceneView_2026-07-31_22-40-00.png)
+//
+// Captures the focused SceneView into a PNG under the Unity project root.
+// Prefer a clean PcgReview_* scene with only the review subject visible.
+
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+
+string rel = "__SCREENSHOT_REL__";
+string abs = Path.GetFullPath(Path.Combine(Application.dataPath, "..", rel));
+Directory.CreateDirectory(Path.GetDirectoryName(abs) ?? ".");
+
+var view = SceneView.lastActiveSceneView;
+if (view == null)
+    return "FAIL no SceneView";
+
+view.Focus();
+view.Repaint();
+
+int w = Mathf.Max(640, (int)view.position.width);
+int h = Mathf.Max(480, (int)view.position.height);
+
+var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32);
+var prev = RenderTexture.active;
+var cam = view.camera;
+if (cam == null)
+    return "FAIL SceneView.camera null";
+
+var prevTarget = cam.targetTexture;
+cam.targetTexture = rt;
+cam.Render();
+RenderTexture.active = rt;
+var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+tex.Apply();
+cam.targetTexture = prevTarget;
+RenderTexture.active = prev;
+Object.DestroyImmediate(rt);
+
+File.WriteAllBytes(abs, tex.EncodeToPNG());
+Object.DestroyImmediate(tex);
+
+return "OK " + abs;

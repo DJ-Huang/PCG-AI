@@ -1,0 +1,23 @@
+# Web integration
+
+Use the pcg-server HTTP cook API and the clean review-page rules in `AUTHORING_SKILL_DIR/web-review.md`. Create durable assets; a working temporary page is not a delivery.
+
+## Required integration sequence
+
+1. Create or update web material assets from the material plan using Three.js material types supported by the web preview runtime.
+2. Configure imported texture assets and connect each declared channel to its material property.
+3. Bind material assets to the generated output by stable renderer/slot identity. Verify bindings survive a fresh cook and an asset reload.
+4. Construct or update the exported asset (glTF / web scene) at the AssetSpec output path. Preserve an intelligible hierarchy, pivot/front-axis convention, and required PCG graph reference.
+5. Regenerate once in a clean review page. Remove only stale artifacts that are proven to belong to this asset; do not delete unrelated project assets.
+6. Render the final asset in the clean review page with a camera and lighting that make geometry and surface response inspectable. Use the same reference view when one exists.
+
+## Integration checks
+
+- All material and texture references resolve after reload.
+- No renderer uses a default, missing, or accidental fallback material.
+- The exported asset opens with the expected hierarchy, scale, pivot, and front orientation.
+- Graph parameters, if exposed, remain wired to valid root nodes and do not break material bindings after recook.
+- Asset paths are deterministic and contain no session-instance-only references.
+- The review page remains dedicated to the asset under review; do not judge it in a cluttered editor.
+
+Record concrete paths for material assets, texture assets, exported asset, review page, and final render.
