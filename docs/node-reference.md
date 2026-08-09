@@ -1992,19 +1992,34 @@ blast_short → StaticMeshSpawner(short) ─┘
 
 ### CreateArcSpline
 
-生成圆弧样条（对齐 Houdini Circle SOP 的 arc 模式），用于拱窗剖面、拱门线脚等。
+对齐 Houdini **Circle SOP**（polygon 模式）。类型名保留 `CreateArcSpline`；Inspector 显示为 **Circle**。
 
-| 属性 | 类型 | 默认值 | 范围 | 说明 |
-|------|------|--------|------|------|
-| radius | number | 1.0 | > 0 | 圆弧半径 |
-| startAngle | number | 0.0 | | 起始角（度） |
-| endAngle | number | 180.0 | | 结束角（度） |
-| segments | integer | 16 | 1–256 | 弧段数；采样点数 = segments + 1 |
-| axis | enum | z | x/y/z | 圆弧所在平面的法线轴（与 `CreateSpiralSpline.axis` 对齐） |
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `orientation` | enum | `xy` | 圆所在平面：`xy` / `yz` / `zx`（对齐 Houdini Orientation） |
+| `reverse` | boolean | false | 翻转 180° |
+| `radiusX` | number | 1.0 | X 半径 |
+| `radiusY` | number | 1.0 | Y 半径（不等时为椭圆） |
+| `radius` | number | 1.0 | 遗留别名，等同 `radiusX` |
+| `centerX/Y/Z` | number | 0 | 圆心 |
+| `rotateX/Y/Z` | number | 0 | 绕圆心旋转（度） |
+| `uniformScale` | number | 1.0 | 均匀缩放 |
+| `divisions` | integer | 16 | 分段数（对齐 Houdini Divisions） |
+| `segments` | integer | 16 | 遗留别名，等同 `divisions` |
+| `arcType` | enum | `openArc` | `closed` / `openArc` / `closedArc` / `slicedArc` |
+| `startAngle` | number | 0.0 | 弧起始角（度），`closed` 时忽略 |
+| `endAngle` | number | 180.0 | 弧结束角（度），`closed` 时忽略 |
+| `axis` | enum | `z` | 遗留平面法线；映射为 `orientation` |
 
-**输出**：`out: SpatialSpline`（polyline，closed=false）。圆弧位于垂直于 `axis` 的平面上，圆心在原点。
+**点数规则**（对齐 SideFX 文档）：
 
-> 典型连接：`CreateArcSpline → SweepAlongSpline(rectangle) → TransformMesh`（拱门线脚）；或作为拱窗 Boolean cutter 的剖面轮廓。
+- `openArc`：`divisions + 1`
+- `closedArc` / `slicedArc`：`divisions + 2`（`slicedArc` 首点为圆心）
+- `closed`（整圆）：`divisions` 边，闭合多边形
+
+**输出**：`out: SpatialSpline`。遗留参数 `axis=z` 等价 `orientation=xy`。
+
+> 典型连接：`CreateArcSpline → SweepAlongSpline(rectangle) → TransformMesh`（拱门线脚）；整圆 + `SweepAlongSpline(circle)` 做管道截面。
 
 ---
 

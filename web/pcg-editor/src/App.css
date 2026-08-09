@@ -1401,11 +1401,39 @@
 }
 
 .pcg-search-panel__group-title {
-  padding: 4px 12px 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
   font-size: 10px;
-  color: #5f5f5f;
+  color: #8a8a8c;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pcg-search-panel__group-title:hover {
+  color: #d4d4d4;
+  background: #232324;
+}
+
+.pcg-search-panel__chevron {
+  display: inline-block;
+  font-size: 9px;
+  transition: transform 0.12s;
+}
+
+.pcg-search-panel__chevron--open {
+  transform: rotate(90deg);
+}
+
+.pcg-search-panel__count {
+  margin-left: auto;
+  color: #5f5f5f;
 }
 
 .pcg-search-panel__item {

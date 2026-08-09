@@ -28,11 +28,24 @@ interface NodeSearchPanelProps {
 
 export default function NodeSearchPanel({ config }: NodeSearchPanelProps) {
   const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  const toggleCategory = (category: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
 
   const allNodes = getNodesByCategory();
 
@@ -90,21 +103,36 @@ export default function NodeSearchPanel({ config }: NodeSearchPanelProps) {
         {filtered.size === 0 && (
           <div className="pcg-search-panel__empty">No matching nodes</div>
         )}
-        {Array.from(filtered.entries()).map(([category, nodes]) => (
-          <div key={category} className="pcg-search-panel__group">
-            <div className="pcg-search-panel__group-title">{category}</div>
-            {nodes.map((node) => (
+        {Array.from(filtered.entries()).map(([category, nodes]) => {
+          // Searching or port-drag filtering always expands results.
+          const isExpanded = query !== '' || config.filterPinType !== undefined || expanded.has(category);
+          return (
+            <div key={category} className="pcg-search-panel__group">
               <button
-                key={node.type}
                 type="button"
-                className="pcg-search-panel__item"
-                onClick={() => handleSelect(node.type)}
+                className="pcg-search-panel__group-title"
+                onClick={() => toggleCategory(category)}
               >
-                {node.displayName}
+                <span className={`pcg-search-panel__chevron${isExpanded ? ' pcg-search-panel__chevron--open' : ''}`}>
+                  ▸
+                </span>
+                {category}
+                <span className="pcg-search-panel__count">{nodes.length}</span>
               </button>
-            ))}
-          </div>
-        ))}
+              {isExpanded &&
+                nodes.map((node) => (
+                  <button
+                    key={node.type}
+                    type="button"
+                    className="pcg-search-panel__item"
+                    onClick={() => handleSelect(node.type)}
+                  >
+                    {node.displayName}
+                  </button>
+                ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

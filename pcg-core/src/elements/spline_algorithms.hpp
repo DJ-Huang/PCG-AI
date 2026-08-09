@@ -123,11 +123,17 @@ struct CreateSpiralSplineOptions {
 data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& options);
 
 struct CreateArcSplineOptions {
-    double radius = 1.0;
+    double radius_x = 1.0;
+    double radius_y = 1.0;
     double start_angle_deg = 0.0;
     double end_angle_deg = 180.0;
-    int segments = 16;
-    std::string axis = "z";
+    int divisions = 16;
+    std::string orientation = "xy";
+    std::string arc_type = "openArc";
+    data::PcgVec3 center{0.0, 0.0, 0.0};
+    data::PcgVec3 rotate_deg{0.0, 0.0, 0.0};
+    double uniform_scale = 1.0;
+    bool reverse = false;
 };
 
 data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options);

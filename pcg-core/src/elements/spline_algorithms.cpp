@@ -174,42 +174,136 @@ data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& o
     return out;
 }
 
+data::PcgVec3 map_circle_uv_to_xyz(const std::string& orientation, double u, double v)
+{
+    if (orientation == "xy")
+        return {u, v, 0.0};
+    if (orientation == "yz")
+        return {0.0, u, v};
+    if (orientation == "zx")
+        return {v, 0.0, u};
+    return {};
+}
+
+data::PcgVec3 rotate_xyz_deg(const data::PcgVec3& point, const data::PcgVec3& degrees)
+{
+    constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+    const double rx = degrees.x * kDegToRad;
+    const double ry = degrees.y * kDegToRad;
+    const double rz = degrees.z * kDegToRad;
+
+    const double cx = std::cos(rx);
+    const double sx = std::sin(rx);
+    const double cy = std::cos(ry);
+    const double sy = std::sin(ry);
+    const double cz = std::cos(rz);
+    const double sz = std::sin(rz);
+
+    double x = point.x;
+    double y = point.y;
+    double z = point.z;
+
+    const double y1 = y * cx - z * sx;
+    const double z1 = y * sx + z * cx;
+    y = y1;
+    z = z1;
+
+    const double x2 = x * cy + z * sy;
+    const double z2 = -x * sy + z * cy;
+    x = x2;
+    z = z2;
+
+    const double x3 = x * cz - y * sz;
+    const double y3 = x * sz + y * cz;
+    x = x3;
+    y = y3;
+
+    return {x, y, z};
+}
+
 data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options)
 {
     data::PcgSplineData out;
 
-    if (options.radius <= 0.0 || options.segments < 1)
+    const double scale = options.uniform_scale;
+    const double radius_x = options.radius_x * scale;
+    const double radius_y = options.radius_y * scale;
+    if (radius_x <= 0.0 || radius_y <= 0.0 || options.divisions < 1)
         return out;
 
-    int axis = -1;
-    if (options.axis == "x" || options.axis == "X") axis = 0;
-    else if (options.axis == "y" || options.axis == "Y") axis = 1;
-    else if (options.axis == "z" || options.axis == "Z") axis = 2;
-    else return out;
+    const std::string& orientation = options.orientation;
+    if (orientation != "xy" && orientation != "yz" && orientation != "zx")
+        return out;
+
+    const std::string& arc_type = options.arc_type;
+    if (arc_type != "closed" && arc_type != "openArc" && arc_type != "closedArc" &&
+        arc_type != "slicedArc")
+        return out;
 
     constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
-    const int sample_count = options.segments + 1;
-    const double start_rad = options.start_angle_deg * kDegToRad;
-    const double end_rad = options.end_angle_deg * kDegToRad;
+    const double start_deg = arc_type == "closed" ? 0.0 : options.start_angle_deg;
+    const double end_deg = arc_type == "closed" ? 360.0 : options.end_angle_deg;
+    const double start_rad = start_deg * kDegToRad;
+    const double end_rad = end_deg * kDegToRad;
     const double span = end_rad - start_rad;
 
+    const int divisions = options.divisions;
+    int arc_samples = divisions + 1;
+    if (arc_type == "closed")
+        arc_samples = std::max(divisions, 3);
+    else if (arc_type == "slicedArc")
+        arc_samples = divisions + 1;
+
     data::PcgSpline spline;
-    spline.closed = false;
-    spline.points.reserve(static_cast<size_t>(sample_count));
+    if (arc_type == "closed" || arc_type == "closedArc" || arc_type == "slicedArc")
+        spline.closed = true;
+    else
+        spline.closed = false;
 
-    for (int i = 0; i < sample_count; ++i) {
-        const double t = static_cast<double>(i) / static_cast<double>(options.segments);
+    const auto emit_local = [&](double u, double v) {
+        if (options.reverse) {
+            u = -u;
+            v = -v;
+        }
+        data::PcgVec3 local = map_circle_uv_to_xyz(orientation, u, v);
+        local = rotate_xyz_deg(local, options.rotate_deg);
+        return data::PcgSplinePoint{
+            local.x + options.center.x,
+            local.y + options.center.y,
+            local.z + options.center.z,
+        };
+    };
+
+    const auto sample_arc = [&](int index, int count) {
+        const double t = count <= 1 ? 0.0
+                                    : static_cast<double>(index) / static_cast<double>(count - 1);
         const double angle = start_rad + span * t;
-        const double c = options.radius * std::cos(angle);
-        const double s = options.radius * std::sin(angle);
+        return emit_local(radius_x * std::cos(angle), radius_y * std::sin(angle));
+    };
 
-        data::PcgSplinePoint p{};
-        // Arc lies in the plane perpendicular to axis (Houdini Circle SOP arc mode).
-        if (axis == 0)      { p = {0.0, c, s}; }
-        else if (axis == 1) { p = {c, 0.0, s}; }
-        else                { p = {c, s, 0.0}; }
-        spline.points.push_back(p);
+    if (arc_type == "slicedArc") {
+        spline.points.push_back(emit_local(0.0, 0.0));
+        for (int i = 0; i < arc_samples; ++i)
+            spline.points.push_back(sample_arc(i, arc_samples));
+    } else if (arc_type == "closedArc") {
+        for (int i = 0; i < arc_samples; ++i)
+            spline.points.push_back(sample_arc(i, arc_samples));
+        if (!spline.points.empty())
+            spline.points.push_back(spline.points.front());
+    } else if (arc_type == "closed") {
+        for (int i = 0; i < arc_samples; ++i) {
+            const double angle = 2.0 * 3.14159265358979323846 *
+                                 static_cast<double>(i) / static_cast<double>(arc_samples);
+            spline.points.push_back(
+                emit_local(radius_x * std::cos(angle), radius_y * std::sin(angle)));
+        }
+    } else {
+        for (int i = 0; i < arc_samples; ++i)
+            spline.points.push_back(sample_arc(i, arc_samples));
     }
+
+    if (spline.points.size() < 2)
+        return out;
 
     out.add_spline(std::move(spline));
     return out;

@@ -29,8 +29,8 @@
       "id": "roof",
       "type": "Subgraph",
       "position": {
-        "x": 0,
-        "y": 0
+        "x": 2.0205919668813834,
+        "y": 3.587459390328373
       },
       "data": {
         "__nodeTitle": "Roof",

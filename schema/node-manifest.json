@@ -9245,7 +9245,7 @@
     },
     {
       "type": "CreateArcSpline",
-      "displayName": "Create Arc Spline",
+      "displayName": "Circle",
       "category": "Spline",
       "inputs": [],
       "outputs": [
@@ -9256,28 +9256,143 @@
         }
       ],
       "properties": {
+        "orientation": {
+          "type": "enum",
+          "default": "xy",
+          "displayName": "Orientation",
+          "options": [
+            {
+              "value": "xy",
+              "label": "XY"
+            },
+            {
+              "value": "yz",
+              "label": "YZ"
+            },
+            {
+              "value": "zx",
+              "label": "ZX"
+            }
+          ]
+        },
+        "reverse": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Reverse"
+        },
+        "radiusX": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.001,
+          "displayName": "Radius X"
+        },
+        "radiusY": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0.001,
+          "displayName": "Radius Y"
+        },
         "radius": {
           "type": "number",
           "default": 1.0,
-          "minimum": 0.001
+          "minimum": 0.001,
+          "displayName": "Radius",
+          "description": "Legacy alias for radiusX when radiusX is omitted."
         },
-        "startAngle": {
+        "centerX": {
           "type": "number",
-          "default": 0.0
+          "default": 0.0,
+          "displayName": "Center X"
         },
-        "endAngle": {
+        "centerY": {
           "type": "number",
-          "default": 180.0
+          "default": 0.0,
+          "displayName": "Center Y"
+        },
+        "centerZ": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Center Z"
+        },
+        "rotateX": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Rotate X"
+        },
+        "rotateY": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Rotate Y"
+        },
+        "rotateZ": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Rotate Z"
+        },
+        "uniformScale": {
+          "type": "number",
+          "default": 1.0,
+          "displayName": "Uniform Scale"
+        },
+        "divisions": {
+          "type": "integer",
+          "default": 16,
+          "minimum": 1,
+          "maximum": 256,
+          "displayName": "Divisions"
         },
         "segments": {
           "type": "integer",
           "default": 16,
           "minimum": 1,
-          "maximum": 256
+          "maximum": 256,
+          "description": "Legacy alias for divisions."
+        },
+        "arcType": {
+          "type": "enum",
+          "default": "openArc",
+          "displayName": "Arc Type",
+          "options": [
+            {
+              "value": "closed",
+              "label": "Closed"
+            },
+            {
+              "value": "openArc",
+              "label": "Open Arc"
+            },
+            {
+              "value": "closedArc",
+              "label": "Closed Arc"
+            },
+            {
+              "value": "slicedArc",
+              "label": "Sliced Arc"
+            }
+          ]
+        },
+        "startAngle": {
+          "type": "number",
+          "default": 0.0,
+          "displayName": "Start Angle",
+          "visibleWhen": {
+            "property": "arcType",
+            "notEquals": "closed"
+          }
+        },
+        "endAngle": {
+          "type": "number",
+          "default": 180.0,
+          "displayName": "End Angle",
+          "visibleWhen": {
+            "property": "arcType",
+            "notEquals": "closed"
+          }
         },
         "axis": {
           "type": "enum",
           "default": "z",
+          "description": "Legacy plane normal; use orientation instead.",
           "options": [
             {
               "value": "x",

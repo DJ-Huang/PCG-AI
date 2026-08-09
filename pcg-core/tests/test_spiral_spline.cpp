@@ -148,19 +148,20 @@ int main()
         expect(std::abs(pts.back().y - (-1.0)) < 1e-10, "spiral neg pitch: endpoint y = -1.0");
     }
 
-    // --- Arc: semicircle in XY (axis Z) ---
+    // --- Arc: semicircle in XY (legacy axis Z) ---
     {
         CreateArcSplineOptions opts;
-        opts.radius = 2.0;
+        opts.radius_x = 2.0;
+        opts.radius_y = 2.0;
         opts.start_angle_deg = 0.0;
         opts.end_angle_deg = 180.0;
-        opts.segments = 8;
-        opts.axis = "z";
+        opts.divisions = 8;
+        opts.orientation = "xy";
 
         auto spline_data = create_arc_spline_data(opts);
         expect(spline_data.splines().size() == 1, "arc: 1 spline");
         const auto& pts = spline_data.splines()[0].points;
-        expect(pts.size() == 9, "arc: segments+1 samples");
+        expect(pts.size() == 9, "arc: divisions+1 samples");
         expect(!spline_data.splines()[0].closed, "arc: open polyline");
         expect(std::abs(pts.front().x - 2.0) < 1e-10 && std::abs(pts.front().y) < 1e-10,
                "arc: start at (radius,0,0)");
@@ -170,17 +171,63 @@ int main()
                "arc: midpoint at (0,radius,0)");
     }
 
+    // --- Circle: closed full polygon (triangle) ---
+    {
+        CreateArcSplineOptions opts;
+        opts.radius_x = 1.0;
+        opts.radius_y = 1.0;
+        opts.divisions = 3;
+        opts.arc_type = "closed";
+
+        auto spline_data = create_arc_spline_data(opts);
+        const auto& spline = spline_data.splines()[0];
+        expect(spline.closed, "circle closed: closed flag");
+        expect(spline.points.size() == 3, "circle closed: divisions vertices");
+    }
+
+    // --- Circle: sliced arc pie (center + arc) ---
+    {
+        CreateArcSplineOptions opts;
+        opts.radius_x = 2.0;
+        opts.start_angle_deg = 0.0;
+        opts.end_angle_deg = 90.0;
+        opts.divisions = 4;
+        opts.arc_type = "slicedArc";
+
+        auto spline_data = create_arc_spline_data(opts);
+        const auto& pts = spline_data.splines()[0].points;
+        expect(pts.size() == 6, "sliced arc: divisions+2 points");
+        expect(std::abs(pts[0].x) < 1e-10 && std::abs(pts[0].y) < 1e-10, "sliced arc: center at origin");
+        expect(std::abs(pts[1].x - 2.0) < 1e-10, "sliced arc: start on +X");
+    }
+
+    // --- Circle: ellipse + center offset ---
+    {
+        CreateArcSplineOptions opts;
+        opts.radius_x = 2.0;
+        opts.radius_y = 1.0;
+        opts.center = {1.0, 2.0, 3.0};
+        opts.divisions = 4;
+        opts.arc_type = "openArc";
+
+        auto spline_data = create_arc_spline_data(opts);
+        const auto& p0 = spline_data.splines()[0].points.front();
+        expect(std::abs(p0.x - 3.0) < 1e-10 && std::abs(p0.y - 2.0) < 1e-10 &&
+                   std::abs(p0.z - 3.0) < 1e-10,
+               "ellipse: center offset applied");
+    }
+
     // --- Arc: reject invalid ---
     {
         CreateArcSplineOptions opts;
-        opts.radius = 0.0;
+        opts.radius_x = 0.0;
         expect(create_arc_spline_data(opts).splines().empty(), "arc: radius=0 rejected");
-        opts.radius = 1.0;
-        opts.segments = 0;
-        expect(create_arc_spline_data(opts).splines().empty(), "arc: segments<1 rejected");
-        opts.segments = 4;
-        opts.axis = "w";
-        expect(create_arc_spline_data(opts).splines().empty(), "arc: invalid axis rejected");
+        opts.radius_x = 1.0;
+        opts.divisions = 0;
+        expect(create_arc_spline_data(opts).splines().empty(), "arc: divisions<1 rejected");
+        opts.divisions = 4;
+        opts.orientation = "bad";
+        expect(create_arc_spline_data(opts).splines().empty(), "arc: invalid orientation rejected");
     }
 
     if (g_fail > 0) {

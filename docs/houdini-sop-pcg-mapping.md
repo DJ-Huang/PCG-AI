@@ -22,8 +22,8 @@
 
 ### 覆盖率（基础建模 237 节点）
 
-- ✅ 完整：59
-- 部分：20
+- ✅ 完整：60
+- 部分：19
 - 组合：1
 - ❌ 无：157
 
@@ -37,7 +37,7 @@
 |---|---|---|---|
 | Add | `add` | `Add` | ✅ |
 | Box | `box` | `CreateBoxMesh` | ✅ |
-| Circle | `circle` | `CreateArcSpline` | 部分 |
+| Circle | `circle` | `CreateArcSpline` | ✅ |
 | Circle from Edges | `circlefromedges` | — | ❌ |
 | Circle Spline | `circlespline` | — | ❌ |
 | Curve | `curve` | `CreateSpline` / `CreateBezierSpline` | 部分 |
