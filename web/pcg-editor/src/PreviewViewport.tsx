@@ -220,6 +220,12 @@ export default function PreviewViewport({
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    // Blender-style: MMB orbit, Shift+MMB pan, scroll zoom (OrbitControls maps shift+rotate → pan).
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.ROTATE,
+      RIGHT: THREE.MOUSE.PAN,
+    };
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x333a44, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -631,7 +637,7 @@ export default function PreviewViewport({
           ref={containerRef}
           className="pcg-preview__canvas"
           tabIndex={0}
-          title="Click to focus · F to frame selection"
+          title="Click to focus · MMB orbit · Shift+MMB pan · scroll zoom · F frame"
           onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
         />
         <div className="pcg-preview__shading-bar" role="toolbar" aria-label="Viewport shading">
