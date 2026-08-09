@@ -8,6 +8,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines } from './cookResult';
@@ -64,6 +67,10 @@ const STUDIO_ENV_INTENSITY = 0.55;
 
 const SPLINE_CURVE_COLOR = 0x4de66a;
 const CONTROL_LINE_COLOR = 0xffd933;
+/** Blender default theme wire color (userdef_default_theme.c, dark theme). */
+const EDGE_OVERLAY_COLOR = 0x1a1a1a;
+/** Screen-space px; Blender overlay uses ~1px core + AA expansion in pack_line_data. */
+const EDGE_OVERLAY_LINE_WIDTH = 2.5;
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 900;
@@ -265,6 +272,7 @@ export default function PreviewViewport({
       renderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      syncEdgeOverlayResolution(content, w, h);
     };
     resize();
     const observer = new ResizeObserver(resize);
@@ -498,7 +506,12 @@ export default function PreviewViewport({
 
     if (mesh) ctx.content.add(buildMeshObject(mesh, flipZArray));
     if (geometry && geometry.faceCount > 0) {
-      const edgeObj = buildEdgeObject(geometry, flipZArray(geometry.positions));
+      const edgeObj = buildEdgeObject(
+        geometry,
+        flipZArray(geometry.positions),
+        ctx.renderer.domElement.clientWidth,
+        ctx.renderer.domElement.clientHeight,
+      );
       if (edgeObj) ctx.content.add(edgeObj);
     }
     if (hasSolid) ctx.content.add(buildPointsObject(flipZArray(cloudPositions!)));
@@ -880,15 +893,54 @@ function buildMeshObject(mesh: ParsedMesh, flipZ: (src: Float32Array) => Float32
   return meshObj;
 }
 
-function buildEdgeObject(geometry: ParsedGeometry, positions: Float32Array): THREE.LineSegments | null {
+function buildEdgeObject(
+  geometry: ParsedGeometry,
+  positions: Float32Array,
+  viewportWidth: number,
+  viewportHeight: number,
+): LineSegments2 | null {
   const edges = buildEdgeIndices(geometry);
   if (edges.length === 0) return null;
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setIndex(new THREE.BufferAttribute(edges, 1));
-  const lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x54c8bc }));
+
+  const segmentPositions = new Float32Array((edges.length / 2) * 6);
+  for (let i = 0; i < edges.length; i += 2) {
+    const a = edges[i] * 3;
+    const b = edges[i + 1] * 3;
+    const o = (i / 2) * 6;
+    segmentPositions[o] = positions[a];
+    segmentPositions[o + 1] = positions[a + 1];
+    segmentPositions[o + 2] = positions[a + 2];
+    segmentPositions[o + 3] = positions[b];
+    segmentPositions[o + 4] = positions[b + 1];
+    segmentPositions[o + 5] = positions[b + 2];
+  }
+
+  const lineGeo = new LineSegmentsGeometry();
+  lineGeo.setPositions(segmentPositions);
+
+  const material = new LineMaterial({
+    color: EDGE_OVERLAY_COLOR,
+    linewidth: EDGE_OVERLAY_LINE_WIDTH,
+    worldUnits: false,
+    depthTest: true,
+    depthWrite: false,
+  });
+  material.resolution.set(
+    Math.max(viewportWidth, 1),
+    Math.max(viewportHeight, 1),
+  );
+
+  const lines = new LineSegments2(lineGeo, material);
+  lines.renderOrder = 1;
   lines.userData.kind = 'edges';
   return lines;
+}
+
+function syncEdgeOverlayResolution(group: THREE.Group, width: number, height: number) {
+  const edge = group.children.find((c) => c.userData.kind === 'edges');
+  if (!(edge instanceof LineSegments2)) return;
+  const material = edge.material as LineMaterial;
+  material.resolution.set(Math.max(width, 1), Math.max(height, 1));
 }
 
 function buildPointsObject(positions: Float32Array): THREE.Points {
@@ -1024,7 +1076,8 @@ function disposeGroup(group: THREE.Group) {
       child instanceof THREE.Mesh ||
       child instanceof THREE.Points ||
       child instanceof THREE.LineSegments ||
-      child instanceof THREE.Line
+      child instanceof THREE.Line ||
+      child instanceof LineSegments2
     ) {
       child.geometry.dispose();
       const material = child.material as THREE.Material | THREE.Material[];
