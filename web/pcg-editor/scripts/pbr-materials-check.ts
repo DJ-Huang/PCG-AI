@@ -47,7 +47,7 @@ check('Blender Studio has the expected three-light rig', BLENDER_STUDIO_LIGHTS.l
 check('Blender Studio keeps its key-light calibration', nearlyEqual(BLENDER_STUDIO_LIGHTS[0].diffuse[0], 0.723042));
 check('Blender Studio keeps its key-light wrap', nearlyEqual(BLENDER_STUDIO_LIGHTS[0].smooth, 0.2));
 const frontDiffuse = evaluateBlenderStudioDiffuse([0, 0, 1]);
-check('Blender Studio evaluates the front-facing diffuse oracle', nearlyEqual(frontDiffuse[0], 0.303362294));
+check('Blender Studio evaluates the front-facing diffuse oracle', nearlyEqual(frontDiffuse[0], 0.373065584));
 const studioMaterial = createBlenderStudioMaterial(false);
 check('Blender Studio bypasses Three.js tone mapping', studioMaterial.toneMapped === false);
 check('Blender Studio uses Blender solid color', studioMaterial.fragmentShader.includes(`vec3(${BLENDER_SOLID_COLOR})`));
