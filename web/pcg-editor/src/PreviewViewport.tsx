@@ -32,6 +32,7 @@ import SolidShadingPopover, {
   DEFAULT_MATCAP_ID,
   type SolidLighting,
 } from './preview/SolidShadingPopover';
+import ViewportOverlaysPopover from './preview/ViewportOverlaysPopover';
 import { createInfiniteGrid } from './preview/infiniteGrid';
 import {
   disposeMatcapLibrary,
@@ -56,7 +57,7 @@ interface PreviewViewportProps {
   splineEdit?: SplineEditContext | null;
 }
 
-type ShadingMode = 'wireframe' | 'solid' | 'material' | 'rendered';
+type ShadingMode = 'solid' | 'material' | 'rendered';
 
 const XRAY_OPACITY = 0.35;
 const STUDIO_ENV_INTENSITY = 0.55;
@@ -101,10 +102,13 @@ export default function PreviewViewport({
   const [shadingMode, setShadingMode] = useState<ShadingMode>('solid');
   const [solidLighting, setSolidLighting] = useState<SolidLighting>('flat');
   const [matcapId, setMatcapId] = useState<MatcapId>(DEFAULT_MATCAP_ID);
+  const [wireframeOverlay, setWireframeOverlay] = useState(false);
   const [xrayEnabled, setXrayEnabled] = useState(false);
+  const [overlayPopoverOpen, setOverlayPopoverOpen] = useState(false);
   const [solidPopoverOpen, setSolidPopoverOpen] = useState(false);
-  const shadingRef = useRef({ shadingMode, solidLighting, xrayEnabled, matcapId });
-  shadingRef.current = { shadingMode, solidLighting, xrayEnabled, matcapId };
+  const shadingRef = useRef({ shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId });
+  shadingRef.current = { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId };
+  const overlayPopoverRef = useRef<HTMLDivElement>(null);
   const solidPopoverRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [width, setWidth] = useState(420);
@@ -503,11 +507,12 @@ export default function PreviewViewport({
       hasAutoFramedRef.current = true;
     }
 
-    const { shadingMode, solidLighting, xrayEnabled } = shadingRef.current;
+    const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled } = shadingRef.current;
     applyShading(
       ctx.content,
       shadingMode,
       solidLighting,
+      wireframeOverlay,
       xrayEnabled,
       ctx.envMap,
       ctx.matcapTexture,
@@ -541,11 +546,12 @@ export default function PreviewViewport({
     if (!ctx) return;
 
     const runShading = () => {
-      const { shadingMode, solidLighting, xrayEnabled } = shadingRef.current;
+      const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled } = shadingRef.current;
       applyShading(
         ctx.content,
         shadingMode,
         solidLighting,
+        wireframeOverlay,
         xrayEnabled,
         ctx.envMap,
         ctx.matcapTexture,
@@ -561,11 +567,21 @@ export default function PreviewViewport({
     } else {
       runShading();
     }
-  }, [shadingMode, solidLighting, xrayEnabled, matcapId]);
+  }, [shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId]);
 
   useEffect(() => {
     if (shadingMode !== 'solid') setSolidPopoverOpen(false);
   }, [shadingMode]);
+
+  useEffect(() => {
+    if (!overlayPopoverOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (overlayPopoverRef.current?.contains(e.target as Node)) return;
+      setOverlayPopoverOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [overlayPopoverOpen]);
 
   useEffect(() => {
     if (!solidPopoverOpen) return;
@@ -577,7 +593,7 @@ export default function PreviewViewport({
     return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [solidPopoverOpen]);
 
-  const xrayActive = xrayEnabled && (shadingMode === 'wireframe' || shadingMode === 'solid');
+  const xrayActive = xrayEnabled && shadingMode === 'solid';
 
   const geometry = data?.geometry ?? null;
   const splineCount = data?.splines?.splines.length ?? 0;
@@ -619,11 +635,28 @@ export default function PreviewViewport({
           onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
         />
         <div className="pcg-preview__shading-bar" role="toolbar" aria-label="Viewport shading">
+          <div className="pcg-preview__shading-popover-wrap" ref={overlayPopoverRef}>
+            <button
+              type="button"
+              className={`pcg-preview__shading-chevron${overlayPopoverOpen || wireframeOverlay ? ' is-active' : ''}`}
+              title="Viewport overlays"
+              aria-expanded={overlayPopoverOpen}
+              onClick={() => setOverlayPopoverOpen((v) => !v)}
+            >
+              ▾
+            </button>
+            {overlayPopoverOpen && (
+              <ViewportOverlaysPopover
+                wireframeOverlay={wireframeOverlay}
+                onWireframeOverlayChange={setWireframeOverlay}
+              />
+            )}
+          </div>
           <button
             type="button"
             className={`pcg-preview__shading-xray${xrayActive ? ' is-active' : ''}`}
             title="X-Ray"
-            disabled={shadingMode !== 'wireframe' && shadingMode !== 'solid'}
+            disabled={shadingMode !== 'solid'}
             aria-pressed={xrayActive}
             onClick={() => setXrayEnabled((v) => !v)}
           >
@@ -633,19 +666,6 @@ export default function PreviewViewport({
             </svg>
           </button>
           <div className="pcg-preview__shading-modes" role="radiogroup" aria-label="Shading mode">
-            <button
-              type="button"
-              className={`pcg-preview__shading-mode${shadingMode === 'wireframe' ? ' is-active' : ''}`}
-              title="Wireframe"
-              aria-pressed={shadingMode === 'wireframe'}
-              onClick={() => setShadingMode('wireframe')}
-            >
-              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
-                <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1" />
-                <ellipse cx="8" cy="8" rx="6.5" ry="2.5" fill="none" stroke="currentColor" strokeWidth="0.8" />
-                <ellipse cx="8" cy="8" rx="2.5" ry="6.5" fill="none" stroke="currentColor" strokeWidth="0.8" />
-              </svg>
-            </button>
             <button
               type="button"
               className={`pcg-preview__shading-mode${shadingMode === 'solid' ? ' is-active' : ''}`}
@@ -726,13 +746,15 @@ function applyShading(
   group: THREE.Group,
   shadingMode: ShadingMode,
   solidLighting: SolidLighting,
+  wireframeOverlay: boolean,
   xrayEnabled: boolean,
   envMap: THREE.Texture | null,
   matcapTexture: THREE.Texture | null,
 ) {
   const hasMesh = group.children.some((c) => c.userData.kind === 'mesh');
   const hasEdges = group.children.some((c) => c.userData.kind === 'edges');
-  const xrayActive = xrayEnabled && (shadingMode === 'wireframe' || shadingMode === 'solid');
+  const xrayActive = xrayEnabled && shadingMode === 'solid';
+  const wireframeOnly = wireframeOverlay && !hasEdges;
 
   for (const child of group.children) {
     const kind = child.userData.kind as string;
@@ -741,11 +763,11 @@ function applyShading(
       continue;
     }
     if (kind === 'edges') {
-      child.visible = shadingMode === 'wireframe';
+      child.visible = wireframeOverlay;
       continue;
     }
     if (kind === 'points') {
-      child.visible = !hasMesh && shadingMode !== 'wireframe';
+      child.visible = !hasMesh && !wireframeOverlay;
       continue;
     }
     if (kind !== 'mesh' || !(child instanceof THREE.Mesh)) continue;
@@ -755,9 +777,8 @@ function applyShading(
     const oldMaterial = mesh.material as THREE.Material;
     oldMaterial.dispose();
 
-    if (shadingMode === 'wireframe') {
-      mesh.visible = !hasEdges;
-      if (hasEdges) continue;
+    if (wireframeOnly) {
+      mesh.visible = true;
       const mat = new THREE.MeshBasicMaterial({
         color: hasVertexColors ? 0xffffff : 0x9aa4ae,
         vertexColors: hasVertexColors,

@@ -850,7 +850,8 @@
 }
 
 .pcg-preview__shading-xray.is-active,
-.pcg-preview__shading-mode.is-active {
+.pcg-preview__shading-mode.is-active,
+.pcg-preview__shading-chevron.is-active {
   background: #2b6cb0;
   color: #e8f0ff;
 }
@@ -887,6 +888,26 @@
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 3;
+}
+
+.pcg-preview__shading-popover--align-left {
+  left: 0;
+  right: auto;
+}
+
+.pcg-preview__overlay-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #c8c8c8;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.pcg-preview__overlay-row input {
+  margin: 0;
+  accent-color: #2b6cb0;
 }
 
 .pcg-preview__shading-popover-title {
