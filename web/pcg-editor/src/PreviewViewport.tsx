@@ -45,6 +45,7 @@ import {
   getBuiltinEnvironment,
 } from './preview/builtinEnvironments';
 import { createInfiniteGrid } from './preview/infiniteGrid';
+import { createBlenderStudioMaterial } from './preview/blenderStudio';
 import {
   createStandardPbrMaterial,
   disposePbrTextureCache,
@@ -101,7 +102,6 @@ export interface PreviewViewportHandle {
 type ShadingMode = 'solid' | 'material' | 'rendered';
 
 const XRAY_OPACITY = 0.35;
-const STUDIO_ENV_INTENSITY = 0.55;
 
 const SPLINE_CURVE_COLOR = 0x4de66a;
 const CONTROL_LINE_COLOR = 0xffd933;
@@ -147,7 +147,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     pmremGenerator: THREE.PMREMGenerator | null;
   } | null>(null);
   const [shadingMode, setShadingMode] = useState<ShadingMode>('solid');
-  const [solidLighting, setSolidLighting] = useState<SolidLighting>('flat');
+  const [solidLighting, setSolidLighting] = useState<SolidLighting>('studio');
   const [matcapId, setMatcapId] = useState<MatcapId>(DEFAULT_MATCAP_ID);
   const [wireframeOverlay, setWireframeOverlay] = useState(false);
   const [xrayEnabled, setXrayEnabled] = useState(false);
@@ -781,7 +781,6 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   useEffect(() => {
     const ctx = sceneRef.current;
     if (!ctx) return;
-
     const runShading = () => {
       const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled } = shadingRef.current;
       applyShading(
@@ -1047,7 +1046,7 @@ function applyShading(
     }
 
     mesh.visible = true;
-    let mat: THREE.MeshStandardMaterial | THREE.MeshMatcapMaterial;
+    let mat: THREE.Material;
     if (shadingMode === 'material') {
       const slots = Array.isArray(mesh.userData.materialSlots)
         ? mesh.userData.materialSlots as string[]
@@ -1071,14 +1070,7 @@ function applyShading(
         side: THREE.DoubleSide,
       });
     } else if (shadingMode === 'solid' && solidLighting === 'studio') {
-      mat = new THREE.MeshStandardMaterial({
-        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
-        vertexColors: hasVertexColors,
-        roughness: 0.45,
-        metalness: 0.15,
-        envMapIntensity: STUDIO_ENV_INTENSITY,
-        side: THREE.DoubleSide,
-      });
+      mat = createBlenderStudioMaterial(hasVertexColors);
     } else {
       mat = new THREE.MeshStandardMaterial({
         color: hasVertexColors ? 0xffffff : 0x9aa4ae,
@@ -1097,6 +1089,9 @@ function applyXray(material: THREE.Material, active: boolean) {
   if (!active) return;
   material.transparent = true;
   material.opacity = XRAY_OPACITY;
+  if (material instanceof THREE.ShaderMaterial && material.uniforms.opacity) {
+    material.uniforms.opacity.value = XRAY_OPACITY;
+  }
   material.depthWrite = false;
 }
 
