@@ -1,32 +1,47 @@
-# React + TypeScript + Vite
+# PCG Web Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The Web editor is the live authoring client for `pcg-server`. Start the native
+server first, then Vite:
 
-Currently, two official plugins are available:
+```bash
+./scripts/run-pcg-server.sh
+./scripts/run-pcg-web.sh
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## External Agent bridge
 
-## React Compiler
+While the editor is open it publishes the complete in-memory graph, current
+subgraph path, selection, preview target, and a SHA-256 graph hash to
+`pcg-server`. It also applies queued Agent patches through the normal Web undo
+stack and answers on-demand Preview capture requests from the live WebGL canvas.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+The MCP endpoint is built into the same native process and port:
 
 ```json
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  "mcpServers": {
+    "pcg": {
+      "url": "http://127.0.0.1:17890/mcp"
+    }
   }
 }
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Available tools are `pcg_get_editor_context`, `pcg_get_node`,
+`pcg_list_nodes`, `pcg_capture_preview`, `pcg_patch_node`, `pcg_validate`, and
+`pcg_cook`. Use the `graphHash` returned by context as `ifGraphHash` when
+patching; stale writes return `graph_conflict` instead of overwriting edits.
+
+When `PCG_AGENT_TOKEN` is set, REST and MCP bridge calls require
+`Authorization: Bearer <token>`. With no token the localhost bridge runs in
+development mode and prints a warning once.
+
+Run the protocol integration test against a running server with:
+
+```bash
+python3 scripts/validate-agent-bridge.py
+```
+
+The existing `/review?graph=...` Playwright flow remains the deterministic,
+saved-file review path. MCP Preview capture is intentionally the live editor
+path: it preserves the user's current camera and shading state.

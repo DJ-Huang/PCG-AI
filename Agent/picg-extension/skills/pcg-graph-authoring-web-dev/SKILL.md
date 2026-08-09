@@ -9,8 +9,8 @@ description: >-
   inputs, regeneration, performance, and AssetSpec-consistent output. It also
   runs a deterministic root/Subgraph layout pass before graph validation. Use
   for `/pcg-graph-authoring-web-dev`, PCG pipeline validation, capability-gap
-  assessment, Subgraph layout, or generator development that must stop on a
-  real pipeline gap.
+  assessment, Subgraph layout, PCG MCP seed/performance validation, or
+  generator development that must stop on a real pipeline gap.
 ---
 
 # PCG Web complete-asset production — development validation
@@ -24,6 +24,7 @@ Resolve paths relative to this skill directory:
 ```text
 SHARED_DIR = ../shared/pcg-web-complete-asset
 SHARED_SCRIPTS_DIR = ../shared/pcg-scripts
+PCG_MCP_CONTRACT = ../shared/pcg-mcp.md
 AUTHORING_SKILL_DIR = ../pcg-graph-authoring-web
 DEV_SKILL_DIR = .
 ```
@@ -32,7 +33,7 @@ Read shared references directly. Do not inherit the other skill's `SKILL.md`, co
 
 ## Mandatory read order
 
-1. Read `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md`.
+1. Read `PCG_MCP_CONTRACT`, then `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md`.
 2. Read `DEV_SKILL_DIR/pipeline-capability-gate.md` before approving a newly authored graph.
 3. For reference-image work, read `AUTHORING_SKILL_DIR/llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or visual cook.
 4. Read the same shared stage references as the standard skill immediately before geometry, material, texture, web, and final-acceptance stages. Recover through `SHARED_DIR/error-codes.md`.
@@ -76,6 +77,8 @@ AssetSpec
 ```
 
 Author the graph according to the shared graph standard. After the graph exists, run `SHARED_SCRIPTS_DIR/layout_pcg.py` across the root and every inline `subgraphs[]` definition. Review the generated copy, confirm that only `position.x/y` changed, then run `validate_pcg.py`. Only after the independent layout pass and static authoring validation pass, run the development gate. The gate validates graph structure, connection compatibility, parameter exposure/ranges, seeds, deterministic regeneration, legal variation, boundary and invalid inputs, performance, generated hierarchy/references, output paths, stale-artifact cleanup, and correspondence with the AssetSpec.
+
+When the same graph is open in the Web editor, use PCG MCP after static validation for native live validation, fixed-seed cook metrics, and rapid Preview evidence. Repeat cook/tuning across the gate's required seeds or boundary values only when the state can be changed safely through existing node data, verify every queued patch actually applies, and restore the final intended state. If the live graph differs or structural edits are required, use the deterministic file/HTTP path; never weaken the gate to fit the current MCP surface. The Vite `/review` route remains the saved-file final review.
 
 ## Dedicated root/Subgraph layout stage
 

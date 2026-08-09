@@ -139,6 +139,44 @@ export function getAllCategories(): string[] {
   return Array.from(categories);
 }
 
+/** Validates external Agent writes against the same manifest used by Inspector. */
+export function validateNodePropertyValue(
+  nodeType: string,
+  key: string,
+  value: unknown,
+): string | null {
+  const property = nodeMap.get(nodeType)?.properties[key];
+  if (!property) return `unknown property "${nodeType}.${key}"`;
+  const isFiniteNumber = typeof value === 'number' && Number.isFinite(value);
+  if (property.type === 'integer' && (!isFiniteNumber || !Number.isInteger(value))) {
+    return `${nodeType}.${key} requires an integer`;
+  }
+  if (property.type === 'number' && !isFiniteNumber) return `${nodeType}.${key} requires a number`;
+  if (property.type === 'boolean' && typeof value !== 'boolean') return `${nodeType}.${key} requires a boolean`;
+  if (
+    ['string', 'enum', 'groupSelect', 'groupMultiSelect', 'texture2d'].includes(property.type) &&
+    typeof value !== 'string'
+  ) {
+    return `${nodeType}.${key} requires a string`;
+  }
+  if (
+    property.type === 'vector3' &&
+    (!Array.isArray(value) || value.length !== 3 || !value.every((item) => typeof item === 'number' && Number.isFinite(item)))
+  ) {
+    return `${nodeType}.${key} requires a three-number vector`;
+  }
+  if (isFiniteNumber && property.minimum !== undefined && value < property.minimum) {
+    return `${nodeType}.${key} must be at least ${property.minimum}`;
+  }
+  if (isFiniteNumber && property.maximum !== undefined && value > property.maximum) {
+    return `${nodeType}.${key} must be at most ${property.maximum}`;
+  }
+  if (property.options && !property.options.some((option) => option.value === value)) {
+    return `${nodeType}.${key} is not a supported option`;
+  }
+  return null;
+}
+
 export function getNodesByCategory(): Map<string, ManifestNodeDef[]> {
   const map = new Map<string, ManifestNodeDef[]>();
   for (const def of manifest.nodes) {

@@ -4,6 +4,9 @@
 
 namespace pcg_server {
 
+/** Shared bearer-token gate for all agent bridge endpoints. */
+bool CheckAgentAuth(const httplib::Request& req, httplib::Response& res);
+
 /// POST /v1/agent/chat — mock agent echo + example graph actions.
 void HandleAgentChat(const httplib::Request& req, httplib::Response& res);
 

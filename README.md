@@ -72,7 +72,7 @@ PCG-AI/
 **数据流：**
 
 ```
-Web 画布编辑 → Graph JSON → pcg-server（HTTP）→ Unity Gizmo 预览
+Web 画布编辑 → Graph JSON → pcg-server（HTTP + MCP）→ Unity / 外部 Agent
 ```
 
 ---
@@ -113,6 +113,11 @@ npm run dev
 ```
 
 浏览器打开：**http://localhost:5173/**
+
+编辑器打开期间会把内存中的图、当前子图路径、选中节点和 Preview 目标同步到
+`pcg-server`。Cursor / OpenCode 可通过 `http://127.0.0.1:17890/mcp` 读取上下文、
+截取当前 WebGL Preview、校验/cook，并提交可撤销的节点参数 patch。配置和工具说明见
+[`web/pcg-editor/README.md`](web/pcg-editor/README.md)。
 
 ### 界面说明
 

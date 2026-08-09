@@ -13,26 +13,6 @@ namespace {
 // Auth skeleton: when PCG_AGENT_TOKEN is unset the service runs in dev mode
 // (pass-through, one-time warning). When set, requests must carry a matching
 // "Authorization: Bearer <token>" header or they get 401.
-bool CheckAgentAuth(const httplib::Request& req, httplib::Response& res) {
-    const char* token_env = std::getenv("PCG_AGENT_TOKEN");
-    if (token_env == nullptr || *token_env == '\0') {
-        static bool warned = false;
-        if (!warned) {
-            std::cerr << "[pcg-server] warning: PCG_AGENT_TOKEN not set — /v1/agent/* auth disabled (dev mode)"
-                      << std::endl;
-            warned = true;
-        }
-        return true;
-    }
-    const std::string expect = std::string("Bearer ") + token_env;
-    if (req.get_header_value("Authorization") == expect) {
-        return true;
-    }
-    res.status = 401;
-    res.set_content(R"({"ok":false,"error":"unauthorized"})", "application/json");
-    return false;
-}
-
 // Mock node-type picker: recognize a few manifest type names in the message.
 std::string PickNodeType(const std::string& message) {
     static const std::vector<std::string> kKnown = {
@@ -54,6 +34,26 @@ bool WantsGraphAction(const std::string& message) {
 }
 
 }  // namespace
+
+bool CheckAgentAuth(const httplib::Request& req, httplib::Response& res) {
+    const char* token_env = std::getenv("PCG_AGENT_TOKEN");
+    if (token_env == nullptr || *token_env == '\0') {
+        static bool warned = false;
+        if (!warned) {
+            std::cerr << "[pcg-server] warning: PCG_AGENT_TOKEN not set — agent bridge auth disabled (dev mode)"
+                      << std::endl;
+            warned = true;
+        }
+        return true;
+    }
+    const std::string expect = std::string("Bearer ") + token_env;
+    if (req.get_header_value("Authorization") == expect) {
+        return true;
+    }
+    res.status = 401;
+    res.set_content(R"({"ok":false,"error":"unauthorized"})", "application/json");
+    return false;
+}
 
 void HandleAgentChat(const httplib::Request& req, httplib::Response& res) {
     if (!CheckAgentAuth(req, res)) {

@@ -46,6 +46,7 @@ import {
 import {
   getNodeTypeDefs,
   getAllNodeTypes,
+  validateNodePropertyValue,
   type ManifestProperty,
   type PinType,
 } from './nodeManifest';
@@ -56,7 +57,8 @@ import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './ag
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
-import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
+import PreviewViewport, { type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
+import { useEditorBridge, type PatchApplyResult, type QueuedNodePatch } from './editorBridge';
 import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
 import { NodeActionsContext, getPreviewTargetId, setPreviewTargetId, usePreviewTargetId } from './nodeActions';
 import {
@@ -135,6 +137,7 @@ function PcgEditor() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewJobIdRef = useRef<string | null>(null);
+  const previewViewportRef = useRef<PreviewViewportHandle>(null);
   const [status, setStatus] = useState(
     restored
       ? `Restored last session${restored.filename ? `: ${restored.filename}` : ''} (${restored.nodes.length} nodes)`
@@ -582,6 +585,25 @@ function PcgEditor() {
         setViewNodes((nds) =>
           nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [key]: value } } : n)),
         );
+        setSelectedNode((prev) =>
+          prev?.id === nodeId ? { ...prev, data: { ...prev.data, [key]: value } } : prev,
+        );
+      },
+      patchNode: (nodeId, patch) => {
+        const node = viewNodes.find((candidate) => candidate.id === nodeId);
+        if (!node) {
+          throw new Error(`node "${nodeId}" not found`);
+        }
+        for (const [key, value] of Object.entries(patch)) {
+          const error = validateNodePropertyValue(node.type ?? '', key, value);
+          if (error) throw new Error(error);
+        }
+        setViewNodes((nds) =>
+          nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n)),
+        );
+        setSelectedNode((prev) =>
+          prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...patch } } : prev,
+        );
       },
     }),
     [viewNodes, setViewNodes, setViewEdges, screenToFlowPosition, validateConnection],
@@ -591,6 +613,42 @@ function PcgEditor() {
     (actions: AgentAction[]) => dispatchAgentActions(actions, agentOps, commit),
     [agentOps, commit],
   );
+
+  const bridgeGraph = useMemo(
+    () => exportGraph(nodes, edges, parameters, subgraphs),
+    [nodes, edges, parameters, subgraphs],
+  );
+  const applyBridgePatches = useCallback(
+    (patches: QueuedNodePatch[]): PatchApplyResult[] => {
+      if (patches.length === 0) return [];
+      const results = applyAgentActions(
+        patches.map((patch) => ({
+          type: 'patchNode' as const,
+          nodeId: patch.nodeId,
+          patch: patch.patch,
+        })),
+      );
+      return results.map((result, index) => ({
+        id: patches[index].id,
+        ok: result.ok,
+        error: result.ok ? undefined : result.detail,
+      }));
+    },
+    [applyAgentActions],
+  );
+  const captureBridgePreview = useCallback(
+    () => previewViewportRef.current?.captureFrame() ?? null,
+    [],
+  );
+  useEditorBridge({
+    graph: bridgeGraph,
+    graphPath: currentFilename,
+    editPath,
+    selectedNodeId: selectedNode?.id ?? null,
+    previewTargetNodeId,
+    applyPatches: applyBridgePatches,
+    capturePreview: captureBridgePreview,
+  });
 
   // ── Promote to parameter ───────────────────────────
 
@@ -1170,6 +1228,7 @@ function PcgEditor() {
         )}
         {showPreview && (
           <PreviewViewport
+            ref={previewViewportRef}
             data={previewData}
             loading={previewLoading}
             error={previewError}

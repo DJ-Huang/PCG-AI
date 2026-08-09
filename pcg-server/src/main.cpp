@@ -1,5 +1,7 @@
 #include "cook_service.hpp"
 #include "agent_service.hpp"
+#include "mcp_service.hpp"
+#include "session_service.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -29,7 +31,12 @@ int ParsePort(int argc, char** argv, int fallback) {
                 << "  POST /v1/cache/clear\n"
                 << "  POST /v1/export-fbx\n"
                 << "  POST /v1/agent/chat (mock agent; Bearer PCG_AGENT_TOKEN when set)\n"
-                << "  GET  /v1/agent/health\n";
+                << "  GET  /v1/agent/health\n"
+                << "  PUT|GET /v1/session\n"
+                << "  PUT|GET /v1/preview/screenshot\n"
+                << "  POST /v1/preview/request-capture\n"
+                << "  PATCH /v1/graph/nodes/:id\n"
+                << "  POST /mcp (MCP Streamable HTTP; optional SSE response)\n";
             std::exit(0);
         }
     }
@@ -54,6 +61,8 @@ int main(int argc, char** argv) {
             {"version", pcg_get_version()},
             {"fbx_version", pcg_fbx_get_version()},
             {"api", "v1"},
+            {"mcp", {{"enabled", true}, {"endpoint", "/mcp"}, {"transport", "streamable-http"}}},
+            {"agent_bridge", pcg_server::GetBridgeHealth()},
         };
         res.set_content(body.dump(), "application/json");
     });
@@ -65,6 +74,18 @@ int main(int argc, char** argv) {
     svr.Post("/v1/agent/chat", pcg_server::HandleAgentChat);
     svr.Get("/v1/agent/health", pcg_server::HandleAgentHealth);
     svr.Post("/v1/export-fbx", pcg_server::HandleExportFbx);
+    svr.Put("/v1/session", pcg_server::HandlePutSession);
+    svr.Get("/v1/session", pcg_server::HandleGetSession);
+    svr.Post("/v1/session/heartbeat", pcg_server::HandleSessionHeartbeat);
+    svr.Put("/v1/preview/screenshot", pcg_server::HandlePutPreviewScreenshot);
+    svr.Get("/v1/preview/screenshot", pcg_server::HandleGetPreviewScreenshot);
+    svr.Get("/v1/preview/metadata", pcg_server::HandleGetPreviewMetadata);
+    svr.Post("/v1/preview/request-capture", pcg_server::HandleRequestPreviewCapture);
+    svr.Patch(R"(/v1/graph/nodes/(.+))", pcg_server::HandlePatchNode);
+    svr.Get("/v1/graph/patches", pcg_server::HandleGetGraphPatches);
+    svr.Post("/v1/graph/patches/ack", pcg_server::HandleAckGraphPatches);
+    svr.Post("/mcp", pcg_server::HandleMcpPost);
+    svr.Get("/mcp", pcg_server::HandleMcpGet);
 
     svr.set_payload_max_length(512ull * 1024ull * 1024ull);
     svr.set_read_timeout(600, 0);

@@ -5,7 +5,7 @@
 // Positions arrive in Unity's left-handed Y-up convention; they are mapped to
 // three.js right-handed space by negating Z and reversing triangle winding.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
@@ -60,6 +60,30 @@ interface PreviewViewportProps {
   splineEdit?: SplineEditContext | null;
 }
 
+export interface PreviewCapture {
+  pngBase64: string;
+  metadata: {
+    camera: {
+      position: [number, number, number];
+      target: [number, number, number];
+      up: [number, number, number];
+      fov: number;
+      near: number;
+      far: number;
+    };
+    viewport: { width: number; height: number; pixelRatio: number };
+    shadingMode: ShadingMode;
+    solidLighting: SolidLighting;
+    matcapId: MatcapId;
+    wireframeOverlay: boolean;
+    xrayEnabled: boolean;
+  };
+}
+
+export interface PreviewViewportHandle {
+  captureFrame(): PreviewCapture | null;
+}
+
 type ShadingMode = 'solid' | 'material' | 'rendered';
 
 const XRAY_OPACITY = 0.35;
@@ -85,13 +109,13 @@ function flipZArray(src: Float32Array): Float32Array {
   return out;
 }
 
-export default function PreviewViewport({
+const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(function PreviewViewport({
   data,
   loading,
   error,
   onRefresh,
   splineEdit,
-}: PreviewViewportProps) {
+}: PreviewViewportProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -152,6 +176,42 @@ export default function PreviewViewport({
 
   const hasAutoFramedRef = useRef(false);
 
+  useImperativeHandle(ref, () => ({
+    captureFrame: () => {
+      const ctx = sceneRef.current;
+      if (!ctx || ctx.renderer.domElement.width === 0 || ctx.renderer.domElement.height === 0) {
+        return null;
+      }
+      ctx.controls.update();
+      ctx.renderer.render(ctx.scene, ctx.camera);
+      const dataUrl = ctx.renderer.domElement.toDataURL('image/png');
+      const { shadingMode: mode, solidLighting: lighting, matcapId: matcap, wireframeOverlay: wireframe, xrayEnabled: xray } = shadingRef.current;
+      return {
+        pngBase64: dataUrl.slice(dataUrl.indexOf(',') + 1),
+        metadata: {
+          camera: {
+            position: ctx.camera.position.toArray(),
+            target: ctx.controls.target.toArray(),
+            up: ctx.camera.up.toArray(),
+            fov: ctx.camera.fov,
+            near: ctx.camera.near,
+            far: ctx.camera.far,
+          },
+          viewport: {
+            width: ctx.renderer.domElement.width,
+            height: ctx.renderer.domElement.height,
+            pixelRatio: ctx.renderer.getPixelRatio(),
+          },
+          shadingMode: mode,
+          solidLighting: lighting,
+          matcapId: matcap,
+          wireframeOverlay: wireframe,
+          xrayEnabled: xray,
+        },
+      };
+    },
+  }), []);
+
   useEffect(() => {
     preloadMatcap(DEFAULT_MATCAP_ID);
   }, []);
@@ -210,7 +270,7 @@ export default function PreviewViewport({
     const container = containerRef.current;
     if (!container) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x3d3d3d);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -759,7 +819,9 @@ export default function PreviewViewport({
       {error && <div className="pcg-preview__error">{error}</div>}
     </div>
   );
-}
+});
+
+export default PreviewViewport;
 
 function applyShading(
   group: THREE.Group,

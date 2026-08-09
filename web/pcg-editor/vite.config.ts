@@ -95,6 +95,13 @@ function cookProxyPlugin(): Plugin {
         }
         proxyToPcgServer(req, res, '/v1/agent/health');
       });
+      server.middlewares.use('/api/editor-bridge', (req, res, next) => {
+        if (!['GET', 'PUT', 'POST', 'PATCH'].includes(req.method ?? '')) {
+          next();
+          return;
+        }
+        proxyToPcgServer(req, res, `/v1${req.url ?? ''}`);
+      });
     },
   };
 }

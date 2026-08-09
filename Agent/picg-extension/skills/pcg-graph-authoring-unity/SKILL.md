@@ -7,7 +7,7 @@ description: >-
   a reproducible prefab, render it, and apply full-asset acceptance. Use for
   PCG graph authoring, reference-image reconstruction, procedural Unity asset
   production, bridge/building/vehicle/scatter generators, Subgraphs, graph
-  parameters, PCG cooking, materialized prefab delivery, or
+  parameters, PCG MCP live-editor inspection/tuning, PCG cooking, materialized prefab delivery, or
   `/pcg-graph-authoring-unity`.
 ---
 
@@ -22,14 +22,15 @@ Resolve these paths relative to this skill directory before work:
 ```text
 SHARED_DIR = ../shared/pcg-unity-complete-asset
 SHARED_SCRIPTS_DIR = ../shared/pcg-scripts
+PCG_MCP_CONTRACT = ../shared/pcg-mcp.md
 AUTHORING_SKILL_DIR = .
 ```
 
-`SHARED_DIR` is authoritative for the complete production workflow, AssetSpec, geometry validation, materials, textures, Unity integration, final score, and recovery rules. `SHARED_SCRIPTS_DIR` holds the generic Python helper scripts shared across all target variants (Unity, web, …). `AUTHORING_SKILL_DIR/scripts/unity/` holds Unity-specific C# review templates. Do not copy, redefine, or weaken those rules here. If either shared directory is missing, stop and report the missing installation rather than silently falling back to a divergent workflow.
+`SHARED_DIR` is authoritative for the complete production workflow, AssetSpec, geometry validation, materials, textures, Unity integration, final score, and recovery rules. `SHARED_SCRIPTS_DIR` holds the generic Python helper scripts shared across all target variants (Unity, web, …). `PCG_MCP_CONTRACT` is authoritative for live Web-editor inspection, parameter patching, native validation/cook, Preview capture, conflict handling, and fallbacks. `AUTHORING_SKILL_DIR/scripts/unity/` holds Unity-specific C# review templates. Do not copy, redefine, or weaken those rules here. If a required shared path is missing, stop and report the missing installation rather than silently falling back to a divergent workflow.
 
 ## Mandatory read order
 
-1. Read `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md` before planning a new graph or a material rebuild.
+1. Read `PCG_MCP_CONTRACT`, then `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md` before planning a new graph or a material rebuild.
 2. For a reference-image job, read `llm-orchestration.md`, `scripts.md`, and `unity-review.md` before the first graph write or review cook.
 3. Read each shared stage reference immediately before that stage: `geometry-validation.md`, `material-workflow.md`, `texture-workflow.md`, `unity-integration.md`, and `final-acceptance.md`.
 4. On any failure, read `SHARED_DIR/error-codes.md` and repair the earliest failed stage.
@@ -60,6 +61,8 @@ AssetSpec
 ```
 
 The graph-authoring reference preserves the mandatory manifest/rule/Golden-Graph retrieval, top-to-bottom graph layout, independent root/Subgraph layout pass, node naming, physical sizing, module/Subgraph rules, per-part bevel rule, parameters, clean-scene cook, and visual refinement loop. Use the shared Python helper scripts from `SHARED_SCRIPTS_DIR` and Unity review templates from `AUTHORING_SKILL_DIR/scripts/unity/`.
+
+Use PCG MCP first for live Web-editor context, focused node reads, fast native validate/cook, current Preview capture, and conflict-safe tuning of existing node data when the live `graphPath` matches the target. It is an accelerator, not the Unity acceptance surface: keep `.pcg` file validation and the mandatory Tuanjie/Unity clean-scene cook, screenshot, prefab, and final render gates.
 
 ## Autonomous production defaults
 

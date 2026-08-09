@@ -5,7 +5,8 @@
 export type AgentAction =
   | { type: 'addNode'; nodeType: string; position?: { x: number; y: number } }
   | { type: 'connectNodes'; source: string; target: string; sourceHandle?: string; targetHandle?: string }
-  | { type: 'setNodeParam'; nodeId: string; key: string; value: unknown };
+  | { type: 'setNodeParam'; nodeId: string; key: string; value: unknown }
+  | { type: 'patchNode'; nodeId: string; patch: Record<string, unknown> };
 
 export interface AgentActionResult {
   action: AgentAction;
@@ -18,6 +19,7 @@ export interface AgentGraphOps {
   addNode(nodeType: string, position?: { x: number; y: number }): string;
   connectNodes(source: string, target: string, sourceHandle?: string, targetHandle?: string): void;
   setNodeParam(nodeId: string, key: string, value: unknown): void;
+  patchNode(nodeId: string, patch: Record<string, unknown>): void;
 }
 
 function describe(action: AgentAction): string {
@@ -28,6 +30,8 @@ function describe(action: AgentAction): string {
       return `connectNodes ${action.source} → ${action.target}`;
     case 'setNodeParam':
       return `setNodeParam ${action.nodeId}.${action.key}`;
+    case 'patchNode':
+      return `patchNode ${action.nodeId} (${Object.keys(action.patch).join(', ')})`;
   }
 }
 
@@ -50,6 +54,9 @@ export function dispatchAgentActions(
           return { action, ok: true, detail: describe(action) };
         case 'setNodeParam':
           ops.setNodeParam(action.nodeId, action.key, action.value);
+          return { action, ok: true, detail: describe(action) };
+        case 'patchNode':
+          ops.patchNode(action.nodeId, action.patch);
           return { action, ok: true, detail: describe(action) };
       }
     } catch (err) {

@@ -86,6 +86,7 @@ fi
 echo ""
 echo "[pcg-web] ready"
 echo "  API:    http://127.0.0.1:${PCG_PORT}/v1/health"
+echo "  MCP:    http://127.0.0.1:${PCG_PORT}/mcp"
 echo "  Editor: http://${VITE_HOST}:${VITE_PORT}/"
 echo "  Review: http://${VITE_HOST}:${VITE_PORT}/review?graph=<path>"
 echo ""

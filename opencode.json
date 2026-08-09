@@ -4,6 +4,11 @@
   ],
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
+    "pcg": {
+      "type": "remote",
+      "url": "http://127.0.0.1:17890/mcp",
+      "enabled": true
+    },
     "unity": {
       "type": "local",
       "command": [
