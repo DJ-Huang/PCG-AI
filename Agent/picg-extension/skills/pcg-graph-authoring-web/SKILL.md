@@ -8,7 +8,7 @@ description: >-
   full-asset acceptance. Use for PCG graph authoring for web, reference-image
   reconstruction, procedural web asset production, bridge/building/vehicle/
   scatter generators, Subgraphs, graph parameters, PCG cooking via pcg-server,
-  PCG MCP live-editor inspection/tuning, materialized web asset delivery, or
+  PCG MCP graph creation/editing, materialized web asset delivery, or
   `/pcg-graph-authoring-web`.
 ---
 
@@ -27,7 +27,7 @@ PCG_MCP_CONTRACT = ../shared/pcg-mcp.md
 AUTHORING_SKILL_DIR = .
 ```
 
-`SHARED_DIR` is authoritative for the complete production workflow, AssetSpec, geometry validation, materials, textures, web integration, final score, and recovery rules. `SHARED_SCRIPTS_DIR` holds the generic Python helper scripts shared across all target variants (Unity, web, …). `PCG_MCP_CONTRACT` is authoritative for live editor inspection, parameter patching, native validation/cook, Preview capture, conflict handling, and fallbacks. `AUTHORING_SKILL_DIR/scripts/web/` holds web-specific review scripts and templates. Do not copy, redefine, or weaken those rules here. If a required shared path is missing, stop and report the missing installation rather than silently falling back to a divergent workflow.
+`SHARED_DIR` is authoritative for the complete production workflow, AssetSpec, geometry validation, materials, textures, web integration, final score, and recovery rules. `SHARED_SCRIPTS_DIR` holds the generic Python helper scripts shared across all target variants (Unity, web, …). `PCG_MCP_CONTRACT` is authoritative for live editor schema discovery, complete graph creation/editing/saving, native validation/cook, Preview capture, conflict handling, and fallbacks. `AUTHORING_SKILL_DIR/scripts/web/` holds web-specific review scripts and templates. Do not copy, redefine, or weaken those rules here. If a required shared path is missing, stop and report the missing installation rather than silently falling back to a divergent workflow.
 
 ## Mandatory read order
 
@@ -63,7 +63,7 @@ AssetSpec
 
 The graph-authoring reference preserves the mandatory manifest/rule/Golden-Graph retrieval, top-to-bottom graph layout, independent root/Subgraph layout pass, node naming, physical sizing, module/Subgraph rules, per-part bevel rule, parameters, clean-scene cook, and visual refinement loop. Use the shared Python helper scripts from `SHARED_SCRIPTS_DIR` and web review templates from `AUTHORING_SKILL_DIR/scripts/web/`.
 
-Use PCG MCP first when the target is open in the Web editor: read context instead of guessing state, inspect only the needed nodes, validate/cook in memory, capture the current Preview, and tune existing node data with `ifGraphHash`. Continue to author structural graph changes in the `.pcg` file and keep the fixed Vite `/review` route as the deterministic saved-file final review.
+Use PCG MCP as the primary authoring path when the target is open in the Web editor: discover the live manifest, read the full document, build coherent passes with atomic graph ops or whole-document replacement, validate/cook/capture, and save through the editor with `ifGraphHash`. Use direct `.pcg` editing only as an offline/compatibility fallback. Keep `validate_pcg.py` and the fixed Vite `/review` route as deterministic saved-file acceptance layers.
 
 ## Autonomous production defaults
 

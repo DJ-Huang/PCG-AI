@@ -16,6 +16,22 @@ namespace pcg::internal::data {
 
 namespace {
 
+void merge_metadata(PcgMetadata& destination, const PcgMetadata& source)
+{
+    for (const auto& [key, value] : source.raw().items()) {
+        if (key == "pbrMaterials" && value.is_object()) {
+            nlohmann::json merged = destination.has(key) && destination.get(key).is_object()
+                ? destination.get(key)
+                : nlohmann::json::object();
+            for (const auto& [material_name, definition] : value.items())
+                merged[material_name] = definition;
+            destination.set(key, merged);
+        } else if (!destination.has(key)) {
+            destination.set(key, value);
+        }
+    }
+}
+
 void apply_face_materials(PcgMeshData& mesh,
                           const PcgGeometry& geometry,
                           const std::vector<int>& triangle_faces)
@@ -289,6 +305,7 @@ void PcgGeometry::set_face_materials(std::vector<std::string> materials)
 PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
 {
     PcgMeshData mesh;
+    mesh.metadata() = geometry.metadata();
     std::vector<int> triangle_faces;
     // Duplicate vertices per face for flat shading — each face gets its own
     // vertices so that Unity's RecalculateNormals() produces correct per-face
@@ -322,6 +339,7 @@ PcgMeshData triangulate_geometry(const PcgGeometry& geometry)
 PcgMeshData triangulate_geometry_shared(const PcgGeometry& geometry)
 {
     PcgMeshData mesh;
+    mesh.metadata() = geometry.metadata();
     std::vector<int> triangle_faces;
     for (const auto& p : geometry.points())
         mesh.add_vertex({p.x, p.y, p.z});
@@ -360,6 +378,7 @@ struct EdgeIncidence {
 PcgMeshData compute_split_normals(const PcgGeometry& geometry, const NormalComputeOptions& options)
 {
     PcgMeshData mesh;
+    mesh.metadata() = geometry.metadata();
     const auto& points = geometry.points();
     const auto& faces = geometry.faces();
 
@@ -685,6 +704,7 @@ PcgGeometry geometry_from_mesh(const PcgMeshData& mesh)
     opts.merge_coplanar_angle_deg = 0.0;
     const geometry::BMesh bmesh = geometry::bmesh_from_mesh(mesh, opts);
     PcgGeometry geo = geometry::geometry_from_bmesh(bmesh);
+    geo.metadata() = mesh.metadata();
 
     // Preserve legacy render-mesh normals as Houdini-style point N. The
     // compatibility bridge welds coincident positions, so first writer wins,
@@ -821,6 +841,7 @@ void propagate_geometry_data(const PcgGeometry& source,
     attribute_remap[static_cast<size_t>(AttributeOwner::Detail)] = {0};
     destination.attributes() = AttributeTable::remap_from(source.attributes(), attribute_remap);
     destination.detail() = source.detail();
+    destination.metadata() = source.metadata();
 
     if (source.has_colors() && source.colors().size() == source.points().size()) {
         std::vector<PcgColor> colors(point_count, PcgColor{1.0, 1.0, 1.0, 1.0});
@@ -1028,6 +1049,7 @@ void maintain_unshared_edge_group(PcgGeometry& geometry, const std::string& name
 PcgGeometry merge_geometries(const PcgGeometry& a, const PcgGeometry& b, const std::string& b_prefix)
 {
     PcgGeometry merged = a;
+    merge_metadata(merged.metadata(), b.metadata());
     const AttributeCounts a_counts = a.attribute_counts();
     const AttributeCounts b_counts = b.attribute_counts();
     const int point_offset = static_cast<int>(merged.points().size());

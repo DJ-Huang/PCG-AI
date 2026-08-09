@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <string>
 
 #include <nlohmann/json.hpp>
@@ -63,6 +64,47 @@ json ToolResult(const json& value, bool is_error = false) {
     };
 }
 
+int CommandTimeout(const json& arguments) {
+    return std::max(1000, std::min(30000, arguments.value("timeoutMs", 10000)));
+}
+
+json WaitForAppliedCommand(const json& queued, int timeout_ms) {
+    if (!queued.value("ok", false)) return ToolResult(queued, true);
+    const json command = queued.value("command", queued.value("patch", json::object()));
+    const uint64_t command_id = command.value("id", 0ull);
+    if (command_id == 0) {
+        return ToolResult({{"ok", false}, {"error", "invalid_command_receipt"}}, true);
+    }
+    json apply_result;
+    if (!WaitForGraphCommandResult(
+            command_id,
+            std::chrono::milliseconds(timeout_ms),
+            apply_result)) {
+        const bool cancelled = CancelGraphCommand(command_id);
+        return ToolResult({
+            {"ok", false}, {"accepted", true}, {"applied", false},
+            {"cancelled", cancelled}, {"error", "apply_timeout"}, {"commandId", command_id},
+            {"hint", cancelled
+                ? "The queued command was cancelled before the Web editor applied it."
+                : "The Web editor may have fetched the command; refresh context before retrying."},
+        }, true);
+    }
+    const bool ok = apply_result.value("ok", false);
+    return ToolResult({
+        {"ok", ok}, {"accepted", true}, {"applied", ok},
+        {"commandId", command_id}, {"applyResult", std::move(apply_result)},
+    }, !ok);
+}
+
+bool IsSafeRelativePcgPath(const std::string& value) {
+    const std::filesystem::path path(value);
+    if (value.empty() || path.is_absolute() || path.extension() != ".pcg") return false;
+    for (const auto& component : path) {
+        if (component == "..") return false;
+    }
+    return true;
+}
+
 json ErrorResponse(const json& id, int code, const std::string& message, const json& data = nullptr) {
     json error = {{"code", code}, {"message", message}};
     if (!data.is_null()) error["data"] = data;
@@ -95,6 +137,23 @@ json ToolDefinitions() {
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
+            {"name", "pcg_get_graph"},
+            {"description", "Read the complete live Graph JSON document, including edges, parameters, and Subgraphs."},
+            {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+        },
+        {
+            {"name", "pcg_get_node_types"},
+            {"description", "Read manifest-backed node definitions, pins, properties, defaults, and ranges from the live Web editor. Filter by exact nodeType or category when possible."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"nodeType", {{"type", "string"}}},
+                    {"category", {{"type", "string"}}},
+                }},
+                {"additionalProperties", false},
+            }},
+        },
+        {
             {"name", "pcg_capture_preview"},
             {"description", "Ask the live WebGL viewport to render and return its current PNG plus camera and shading metadata."},
             {"inputSchema", {
@@ -105,15 +164,58 @@ json ToolDefinitions() {
         },
         {
             {"name", "pcg_patch_node"},
-            {"description", "Queue a parameter patch for a node. The Web editor applies it as one undoable action."},
+            {"description", "Patch existing node data through one undoable Web-editor action and wait for the apply acknowledgement."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {
                     {"nodeId", {{"type", "string"}}},
                     {"patch", {{"type", "object"}, {"description", "Node data properties to merge."}}},
-                    {"ifGraphHash", {{"type", "string"}, {"description", "Optional optimistic-lock hash from context."}}},
+                    {"ifGraphHash", {{"type", "string"}, {"description", "Required optimistic-lock hash from context."}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
                 }},
-                {"required", json::array({"nodeId", "patch"})},
+                {"required", json::array({"nodeId", "patch", "ifGraphHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_apply_graph_ops"},
+            {"description", "Atomically author the current graph/subgraph with one Undo step. Supported op values: add_node, remove_node, patch_node, move_node, add_edge, remove_edge, upsert_parameter, remove_parameter. add_node takes node; add_edge takes edge with explicit id and handles. The whole batch succeeds or fails."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"operations", {{"type", "array"}, {"minItems", 1}, {"maxItems", 500}, {"items", {{"type", "object"}}}}},
+                    {"ifGraphHash", {{"type", "string"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"operations", "ifGraphHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_replace_graph"},
+            {"description", "Atomically replace the complete live v1/v2 Graph JSON document, including Subgraphs and parameters, with native validation, optimistic locking, and one Undo step. Run from root scope."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"graph", {{"type", "object"}}},
+                    {"ifGraphHash", {{"type", "string"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"graph", "ifGraphHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_save_graph"},
+            {"description", "Persist the complete live graph through the Web editor. Omit path to save the current named graph, or pass a workspace-relative .pcg path."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"path", {{"type", "string"}, {"description", "Optional workspace-relative .pcg path; absolute and parent-traversal paths are rejected."}}},
+                    {"ifGraphHash", {{"type", "string"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"ifGraphHash"})},
                 {"additionalProperties", false},
             }},
         },
@@ -140,6 +242,16 @@ json CallTool(const std::string& name, const json& arguments) {
         const json result = ListEditorNodes();
         return ToolResult(result, !result.value("ok", false));
     }
+    if (name == "pcg_get_graph") {
+        const json result = GetEditorDocument();
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_get_node_types") {
+        const json result = GetEditorNodeTypes(
+            arguments.value("nodeType", ""),
+            arguments.value("category", ""));
+        return ToolResult(result, !result.value("ok", false));
+    }
     if (name == "pcg_get_node") {
         std::string node_id = arguments.value("nodeId", "");
         if (node_id.empty()) {
@@ -153,11 +265,60 @@ json CallTool(const std::string& name, const json& arguments) {
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_patch_node") {
-        const json result = QueueNodePatch(
+        const json queued = QueueNodePatch(
             arguments.value("nodeId", ""),
             arguments.value("patch", json()),
             arguments.value("ifGraphHash", ""));
-        return ToolResult(result, !result.value("ok", false));
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_apply_graph_ops") {
+        const json operations = arguments.value("operations", json());
+        if (!operations.is_array() || operations.empty() || operations.size() > 500) {
+            return ToolResult({{"ok", false}, {"error", "operations must contain 1-500 items"}}, true);
+        }
+        static const std::vector<std::string> supported = {
+            "add_node", "remove_node", "patch_node", "move_node",
+            "add_edge", "remove_edge", "upsert_parameter", "remove_parameter",
+        };
+        for (const auto& operation : operations) {
+            if (!operation.is_object() || !operation.contains("op") || !operation["op"].is_string() ||
+                std::find(supported.begin(), supported.end(), operation["op"].get<std::string>()) == supported.end()) {
+                return ToolResult({{"ok", false}, {"error", "unsupported graph operation"}, {"operation", operation}}, true);
+            }
+        }
+        const json queued = QueueGraphCommand(
+            {{"type", "applyGraphOps"}, {"operations", operations}},
+            arguments.value("ifGraphHash", ""));
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_replace_graph") {
+        const json graph = arguments.value("graph", json());
+        if (!graph.is_object()) return ToolResult({{"ok", false}, {"error", "graph object is required"}}, true);
+        httplib::Request validate_req;
+        httplib::Response validate_res;
+        validate_req.body = graph.dump();
+        HandleValidate(validate_req, validate_res);
+        const json validation = json::parse(validate_res.body, nullptr, false);
+        if (validation.is_discarded() || !validation.value("ok", false)) {
+            return ToolResult({{"ok", false}, {"error", "graph_validation_failed"}, {"validation", validation}}, true);
+        }
+        const json queued = QueueGraphCommand(
+            {{"type", "replaceGraph"}, {"graph", graph}},
+            arguments.value("ifGraphHash", ""),
+            true);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_save_graph") {
+        const std::string path = arguments.value("path", "");
+        if (!path.empty() && !IsSafeRelativePcgPath(path)) {
+            return ToolResult({{"ok", false}, {"error", "path must be a workspace-relative .pcg file without parent traversal"}}, true);
+        }
+        json command = {{"type", "saveGraph"}};
+        if (!path.empty()) command["path"] = path;
+        const json queued = QueueGraphCommand(
+            std::move(command),
+            arguments.value("ifGraphHash", ""));
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_capture_preview") {
         const int requested_timeout = arguments.value("timeoutMs", 10000);
@@ -240,7 +401,7 @@ json HandleMessage(const json& message) {
             {"protocolVersion", kProtocolVersion},
             {"capabilities", {{"tools", {{"listChanged", false}}}}},
             {"serverInfo", {{"name", "pcg-server"}, {"version", "1.0.0"}}},
-            {"instructions", "Use editor context first. Pass graphHash to patch calls for optimistic locking."},
+            {"instructions", "Use editor context first. Discover node schemas with pcg_get_node_types. Pass graphHash to every write for optimistic locking; prefer one atomic pcg_apply_graph_ops batch, then validate, cook, capture, and save."},
         });
     }
     if (method == "ping") return SuccessResponse(id, json::object());

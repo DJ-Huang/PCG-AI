@@ -400,6 +400,7 @@ namespace DJTechEditor.PCG.Graph
             { "HeightField", new Color(0.45f, 0.78f, 0.28f) },   // terrain green
             { "Param", new Color(1f, 0.85f, 0f) },               // gold
             { "Texture", new Color(0.7f, 0.3f, 0.9f) },          // purple
+            { "Material", new Color(0.91f, 0.36f, 0.62f) },      // pink
             { "Any", new Color(0.65f, 0.65f, 0.65f) },           // gray
         };
 
@@ -673,6 +674,16 @@ namespace DJTechEditor.PCG.Graph
             m_RadialMenu.Add(m_PreviewBtn);
 
             EnsureOverlayAttached();
+        }
+
+        /// <summary>Removes the scene-preview action for nodes whose cook result is not visualizable.</summary>
+        protected void ConfigurePreviewSupport(bool supportsPreview)
+        {
+            if (supportsPreview || m_PreviewBtn == null)
+                return;
+
+            m_PreviewBtn.RemoveFromHierarchy();
+            m_PreviewBtn = null;
         }
 
         internal bool IsRadialMenuOpen => m_RadialMenuOpen;

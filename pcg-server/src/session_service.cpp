@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <deque>
 #include <mutex>
+#include <unordered_map>
 
 #include "agent_service.hpp"
 
@@ -24,6 +25,9 @@ struct BridgeState {
     PreviewSnapshot preview;
     uint64_t next_patch_id = 1;
     std::deque<json> patches;
+    std::condition_variable command_changed;
+    std::unordered_map<uint64_t, json> command_results;
+    std::deque<uint64_t> command_result_order;
 };
 
 BridgeState& State() {
@@ -124,12 +128,46 @@ const json* FindCurrentNode(const json& session, const std::string& node_id) {
     return nullptr;
 }
 
+json QueueGraphCommandLocked(
+    BridgeState& state,
+    json command,
+    const std::string& expected_graph_hash,
+    bool require_root_scope) {
+    if (!IsOnlineLocked(state)) {
+        return {{"ok", false}, {"status", 409}, {"error", "editor_offline"}};
+    }
+    const std::string current_hash = state.session.value("graphHash", "");
+    if (expected_graph_hash.empty()) {
+        return {{"ok", false}, {"status", 428}, {"error", "ifGraphHash is required"}};
+    }
+    if (expected_graph_hash != current_hash) {
+        return {
+            {"ok", false}, {"status", 409}, {"error", "graph_conflict"},
+            {"expectedGraphHash", expected_graph_hash}, {"currentGraphHash", current_hash},
+        };
+    }
+    const json edit_path = state.session.value("editPath", json::array());
+    if (require_root_scope && edit_path.is_array() && !edit_path.empty()) {
+        return {{"ok", false}, {"status", 409}, {"error", "root_scope_required"}, {"editPath", edit_path}};
+    }
+    command["id"] = state.next_patch_id++;
+    command["baseGraphHash"] = current_hash;
+    command["editPath"] = edit_path;
+    command["createdAt"] = EpochMillis();
+    state.patches.push_back(command);
+    return {{"ok", true}, {"accepted", true}, {"command", std::move(command)}};
+}
+
 json ContextLocked(const BridgeState& state) {
     if (!state.has_session) {
         return {{"ok", true}, {"online", false}, {"error", "editor_offline"}};
     }
     json session = state.session;
     session.erase("graph");
+    if (session.contains("nodeManifest") && session["nodeManifest"].is_object()) {
+        session["nodeManifestVersion"] = session["nodeManifest"].value("version", "");
+    }
+    session.erase("nodeManifest");
     return {
         {"ok", true},
         {"online", IsOnlineLocked(state)},
@@ -310,13 +348,68 @@ void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) 
     for (const auto& id : body["ids"]) {
         if (id.is_number_unsigned()) ids.push_back(id.get<uint64_t>());
     }
+    if (ids.empty()) {
+        JsonResponse(res, 400, {{"ok", false}, {"error", "ids must contain at least one command id"}});
+        return;
+    }
+    std::sort(ids.begin(), ids.end());
+    if (std::adjacent_find(ids.begin(), ids.end()) != ids.end()) {
+        JsonResponse(res, 400, {{"ok", false}, {"error", "duplicate command ids are not allowed"}});
+        return;
+    }
     auto& state = State();
-    std::lock_guard<std::mutex> lock(state.mutex);
-    state.patches.erase(
-        std::remove_if(state.patches.begin(), state.patches.end(), [&](const json& patch) {
-            return std::find(ids.begin(), ids.end(), patch.value("id", 0ull)) != ids.end();
-        }),
-        state.patches.end());
+    {
+        std::lock_guard<std::mutex> lock(state.mutex);
+        json unknown_ids = json::array();
+        for (const uint64_t id : ids) {
+            const bool pending = std::any_of(
+                state.patches.begin(), state.patches.end(), [&](const json& command) {
+                    return command.value("id", 0ull) == id;
+                });
+            if (!pending) unknown_ids.push_back(id);
+        }
+        if (!unknown_ids.empty()) {
+            JsonResponse(res, 409, {
+                {"ok", false}, {"error", "unknown_command_ids"},
+                {"unknownIds", std::move(unknown_ids)},
+            });
+            return;
+        }
+        const json results = body.value("results", json::array());
+        if (!results.is_array()) {
+            JsonResponse(res, 400, {{"ok", false}, {"error", "results must be an array"}});
+            return;
+        }
+        for (const auto& candidate : results) {
+            const uint64_t result_id = candidate.is_object() ? candidate.value("id", 0ull) : 0ull;
+            if (result_id == 0 || !std::binary_search(ids.begin(), ids.end(), result_id)) {
+                JsonResponse(res, 400, {{"ok", false}, {"error", "result id must match an acknowledged command id"}});
+                return;
+            }
+        }
+        for (const uint64_t id : ids) {
+            json result = {{"id", id}, {"ok", true}};
+            for (const auto& candidate : results) {
+                if (candidate.value("id", 0ull) == id) {
+                    result = candidate;
+                    break;
+                }
+            }
+            state.command_results[id] = std::move(result);
+            state.command_result_order.push_back(id);
+        }
+        while (state.command_result_order.size() > 256) {
+            const uint64_t expired = state.command_result_order.front();
+            state.command_result_order.pop_front();
+            state.command_results.erase(expired);
+        }
+        state.patches.erase(
+            std::remove_if(state.patches.begin(), state.patches.end(), [&](const json& patch) {
+                return std::find(ids.begin(), ids.end(), patch.value("id", 0ull)) != ids.end();
+            }),
+            state.patches.end());
+    }
+    state.command_changed.notify_all();
     JsonResponse(res, 200, {{"ok", true}, {"acknowledged", ids.size()}});
 }
 
@@ -344,6 +437,40 @@ json ListEditorNodes() {
     return {{"ok", true}, {"nodes", (*graph)["nodes"]}, {"graphHash", state.session.value("graphHash", "")}};
 }
 
+json GetEditorNodeTypes(const std::string& node_type, const std::string& category) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    if (!IsOnlineLocked(state)) return {{"ok", false}, {"error", "editor_offline"}};
+    const json manifest = state.session.value("nodeManifest", json());
+    if (!manifest.is_object() || !manifest.contains("nodes") || !manifest["nodes"].is_array()) {
+        return {{"ok", false}, {"error", "manifest_unavailable"}};
+    }
+    json nodes = json::array();
+    for (const auto& definition : manifest["nodes"]) {
+        if (!definition.is_object()) continue;
+        if (!node_type.empty() && definition.value("type", "") != node_type) continue;
+        if (!category.empty() && definition.value("category", "") != category) continue;
+        nodes.push_back(definition);
+    }
+    const size_t count = nodes.size();
+    return {
+        {"ok", true}, {"version", manifest.value("version", "")},
+        {"nodes", std::move(nodes)}, {"count", count},
+    };
+}
+
+json GetEditorDocument() {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    if (!IsOnlineLocked(state)) return {{"ok", false}, {"error", "editor_offline"}};
+    return {
+        {"ok", true}, {"graph", state.session.value("graph", json())},
+        {"graphHash", state.session.value("graphHash", "")},
+        {"graphPath", state.session.value("graphPath", "")},
+        {"editPath", state.session.value("editPath", json::array())},
+    };
+}
+
 json QueueNodePatch(
     const std::string& node_id,
     const json& patch,
@@ -354,23 +481,58 @@ json QueueNodePatch(
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     if (!IsOnlineLocked(state)) return {{"ok", false}, {"status", 409}, {"error", "editor_offline"}};
-    const std::string current_hash = state.session.value("graphHash", "");
-    if (!expected_graph_hash.empty() && expected_graph_hash != current_hash) {
-        return {
-            {"ok", false}, {"status", 409}, {"error", "graph_conflict"},
-            {"expectedGraphHash", expected_graph_hash}, {"currentGraphHash", current_hash},
-        };
-    }
     if (FindCurrentNode(state.session, node_id) == nullptr) {
         return {{"ok", false}, {"status", 404}, {"error", "node_not_found"}, {"nodeId", node_id}};
     }
-    json queued = {
-        {"id", state.next_patch_id++}, {"type", "setNodeParams"},
-        {"nodeId", node_id}, {"patch", patch}, {"baseGraphHash", current_hash},
-        {"editPath", state.session.value("editPath", json::array())}, {"createdAt", EpochMillis()},
-    };
-    state.patches.push_back(queued);
-    return {{"ok", true}, {"accepted", true}, {"patch", std::move(queued)}};
+    json result = QueueGraphCommandLocked(
+        state,
+        {{"type", "setNodeParams"}, {"nodeId", node_id}, {"patch", patch}},
+        expected_graph_hash,
+        false);
+    if (result.contains("command")) result["patch"] = result["command"];
+    return result;
+}
+
+json QueueGraphCommand(
+    json command,
+    const std::string& expected_graph_hash,
+    bool require_root_scope) {
+    if (!command.is_object() || !command.contains("type") || !command["type"].is_string()) {
+        return {{"ok", false}, {"status", 400}, {"error", "command type is required"}};
+    }
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    return QueueGraphCommandLocked(state, std::move(command), expected_graph_hash, require_root_scope);
+}
+
+bool WaitForGraphCommandResult(
+    uint64_t command_id,
+    std::chrono::milliseconds timeout,
+    json& result) {
+    auto& state = State();
+    std::unique_lock<std::mutex> lock(state.mutex);
+    const bool ready = state.command_changed.wait_for(lock, timeout, [&] {
+        return state.command_results.find(command_id) != state.command_results.end();
+    });
+    if (!ready) return false;
+    result = state.command_results[command_id];
+    state.command_results.erase(command_id);
+    state.command_result_order.erase(
+        std::remove(state.command_result_order.begin(), state.command_result_order.end(), command_id),
+        state.command_result_order.end());
+    return true;
+}
+
+bool CancelGraphCommand(uint64_t command_id) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    const auto before = state.patches.size();
+    state.patches.erase(
+        std::remove_if(state.patches.begin(), state.patches.end(), [&](const json& command) {
+            return command.value("id", 0ull) == command_id;
+        }),
+        state.patches.end());
+    return state.patches.size() != before;
 }
 
 json GetEditorGraph() {

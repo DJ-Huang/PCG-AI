@@ -150,7 +150,7 @@ int main()
         expect(r.vertex_count > 0, "graph3: has vertices");
     }
 
-    // --- Test 4: CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output ---
+    // --- Test 4: CreateCylinderMesh → UVTexture → VertexColor + Material → AssignMaterial → Output ---
     {
         const char* graph = R"({
           "version": "1.0",
@@ -161,14 +161,18 @@ int main()
              "data": {"projection": "cylindrical", "axis": "y", "scaleU": 1.0, "scaleV": 1.0}},
             {"id": "vc", "type": "VertexColor", "position": {"x":400,"y":0},
              "data": {"r": 1.0, "g": 0.5, "b": 0.0, "a": 0.8}},
+            {"id": "pbr", "type": "Material", "position": {"x":400,"y":160},
+             "data": {"materialName": "yellow_paint", "shaderId": "pcg.standard-pbr",
+                      "baseColor": "#ffcc33", "metallic": 0.25, "roughness": 0.35}},
             {"id": "mat", "type": "AssignMaterial", "position": {"x":600,"y":0},
-             "data": {"materialName": "yellow_paint"}},
+             "data": {"materialName": ""}},
             {"id": "out", "type": "Output", "position": {"x":800,"y":0}, "data": {}}
           ],
           "edges": [
             {"id": "e1", "source": "cyl", "target": "uv", "sourceHandle": "out", "targetHandle": "in"},
             {"id": "e2", "source": "uv", "target": "vc", "sourceHandle": "out", "targetHandle": "in"},
             {"id": "e3", "source": "vc", "target": "mat", "sourceHandle": "out", "targetHandle": "in"},
+            {"id": "e3m", "source": "pbr", "target": "mat", "sourceHandle": "out", "targetHandle": "material"},
             {"id": "e4", "source": "mat", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
           ]
         })";
@@ -187,6 +191,17 @@ int main()
             if (j["mesh_metadata"].contains("material")) {
                 expect(j["mesh_metadata"]["material"] == "yellow_paint",
                        "graph4: material name = yellow_paint");
+            }
+            expect(j["mesh_metadata"].contains("pbrMaterials"),
+                   "graph4: mesh_metadata has PBR material library");
+            if (j["mesh_metadata"].contains("pbrMaterials")) {
+                const auto& library = j["mesh_metadata"]["pbrMaterials"];
+                expect(library.contains("yellow_paint"),
+                       "graph4: PBR material keyed by assigned slot name");
+                if (library.contains("yellow_paint")) {
+                    expect(library["yellow_paint"].value("roughness", -1.0) == 0.35,
+                           "graph4: PBR roughness propagated");
+                }
             }
         }
     }

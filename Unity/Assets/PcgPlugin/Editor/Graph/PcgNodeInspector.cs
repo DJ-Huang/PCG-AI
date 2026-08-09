@@ -691,6 +691,12 @@ namespace DJTechEditor.PCG.Graph
                 return;
             }
 
+            if (node.NodeType == "Material")
+            {
+                ShowMaterialProperties(node, def);
+                return;
+            }
+
             if (def.inspectorSections != null && def.inspectorSections.Count > 0)
             {
                 ShowSectionedManifestProperties(node, def);
@@ -781,6 +787,32 @@ namespace DJTechEditor.PCG.Graph
                 m_Body.Add(CreatePropertyRow(
                     node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
             }
+        }
+
+        private void ShowMaterialProperties(PcgManifestNodeView node, ManifestNodeDef def)
+        {
+            AddSectionHeader("Portable PBR");
+            foreach (var (key, prop) in def.properties)
+            {
+                if (key is "unityShaderGuid" or "unityShaderName" or "unityPropertiesJson" ||
+                    !IsPropertyVisible(node, key, prop))
+                    continue;
+                m_Body.Add(CreatePropertyRow(
+                    node, key, prop, def, rebuildOnChange: IsVisibilityDriver(def, key)));
+            }
+
+            AddSectionHeader("Unity Shader Override");
+            m_Body.Add(PcgMaterialShaderInspector.Create(node, (patch, rebuild) =>
+            {
+                m_GraphView.WithUndo("Change Material Shader", () =>
+                {
+                    foreach (var (key, value) in patch)
+                        node.SetPropertyValue(key, value);
+                });
+                NotifyGraphChanged();
+                if (rebuild)
+                    ScheduleInspectorRebuild(node);
+            }));
         }
 
         private void ShowCarveProperties(PcgManifestNodeView node, ManifestNodeDef def)
@@ -1965,6 +1997,12 @@ namespace DJTechEditor.PCG.Graph
 
             var currentVal = node.CollectData().GetRaw(key);
 
+            if (node.NodeType == "Material" && key is "baseColor" or "emissiveColor")
+            {
+                wrapper.Add(MakeHtmlColorField(key, currentVal, value => apply(value)));
+                return wrapper;
+            }
+
             if (prop.hasRange && (prop.type == "integer" || prop.type == "number"))
             {
                 var isInteger = prop.type == "integer";
@@ -3115,6 +3153,22 @@ namespace DJTechEditor.PCG.Graph
             field.RegisterValueChangedCallback(evt =>
             {
                 m_GraphView.WithUndo("Change Property", () => onSet(evt.newValue));
+                NotifyGraphChanged();
+            });
+            return field;
+        }
+
+        private ColorField MakeHtmlColorField(string key, object val, Action<string> onSet)
+        {
+            var html = val?.ToString() ?? "#000000";
+            if (!ColorUtility.TryParseHtmlString(html, out var color))
+                color = key == "baseColor" ? new Color(0.72f, 0.76f, 0.8f, 1f) : Color.black;
+
+            var field = new ColorField { value = color, showAlpha = false };
+            field.RegisterValueChangedCallback(evt =>
+            {
+                m_GraphView.WithUndo("Change Material Color", () =>
+                    onSet("#" + ColorUtility.ToHtmlStringRGB(evt.newValue)));
                 NotifyGraphChanged();
             });
             return field;

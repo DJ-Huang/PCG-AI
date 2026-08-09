@@ -9,7 +9,7 @@ description: >-
   regeneration, performance, and AssetSpec-consistent output. It also runs a
   deterministic root/Subgraph layout pass before graph validation. Use for
   `/pcg-graph-authoring-unity-dev`, PCG pipeline validation, capability-gap
-  assessment, Subgraph layout, PCG MCP seed/performance validation, or
+  assessment, Subgraph layout, PCG MCP graph authoring and seed/performance validation, or
   generator development that must stop on a real pipeline gap.
 ---
 
@@ -64,7 +64,7 @@ AssetSpec
 
 Author the graph according to the shared graph standard. After the graph exists, run `SHARED_SCRIPTS_DIR/layout_pcg.py` across the root and every inline `subgraphs[]` definition. Review the generated copy, confirm that only `position.x/y` changed, then run `validate_pcg.py`. Only after the independent layout pass and static authoring validation pass, run the development gate. The gate validates graph structure, connection compatibility, parameter exposure/ranges, seeds, deterministic regeneration, legal variation, boundary and invalid inputs, performance, generated hierarchy/references, output paths, stale-artifact cleanup, and correspondence with the AssetSpec.
 
-When the same graph is open in the Web editor, use PCG MCP after static validation for native live validation and fixed-seed cook receipts. Repeat cook/tuning across the gate's required seeds or boundary values only when the state can be changed safely through existing node data, verify every queued patch actually applies, and restore the final intended state. If the live graph differs or structural edits are required, use the deterministic file/HTTP path; never weaken the gate to fit the current MCP surface. Tuanjie/Unity clean-scene evidence remains mandatory for Unity acceptance.
+When the target is open in the Web editor, author it through PCG MCP atomic graph ops or full replacement, then use native validation and fixed-seed cook receipts. Repeat structural/parameter variations across the gate's required seeds or boundary values as atomic batches, confirm actual apply acknowledgements, and restore the final intended state with a fresh hash. Use the deterministic file/HTTP path only when the live editor is unavailable; never weaken the gate. Tuanjie/Unity clean-scene evidence remains mandatory for Unity acceptance.
 
 ## Dedicated root/Subgraph layout stage
 

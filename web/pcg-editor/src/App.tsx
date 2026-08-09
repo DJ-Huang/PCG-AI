@@ -46,6 +46,7 @@ import {
 import {
   getNodeTypeDefs,
   getAllNodeTypes,
+  getNodeManifest,
   validateNodePropertyValue,
   type ManifestProperty,
   type PinType,
@@ -58,7 +59,13 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport, { type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
-import { useEditorBridge, type PatchApplyResult, type QueuedNodePatch } from './editorBridge';
+import { useEditorBridge } from './editorBridge';
+import {
+  applyGraphOperations,
+  parseAndValidateGraph,
+  type GraphCommandResult,
+  type QueuedGraphCommand,
+} from './graphCommands';
 import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
 import { NodeActionsContext, getPreviewTargetId, setPreviewTargetId, usePreviewTargetId } from './nodeActions';
 import {
@@ -100,6 +107,18 @@ const initialEdges: Edge[] = [
 ];
 
 let nodeCounter = 100;
+
+function allocateNodeId(existingNodes: readonly Node[]): string {
+  // Module state can reset during Vite HMR while React preserves the live graph.
+  // Always resync against the active scope before allocating to avoid duplicate keys.
+  nodeCounter = Math.max(nodeCounter, syncNodeCounterFromNodes([...existingNodes]));
+  const existingIds = new Set(existingNodes.map((node) => node.id));
+  let candidate: string;
+  do {
+    candidate = `n${++nodeCounter}`;
+  } while (existingIds.has(candidate));
+  return candidate;
+}
 
 function restoreEditorSession() {
   const session = loadEditorSession();
@@ -421,7 +440,7 @@ function PcgEditor() {
 
           // Create new node at flow position
           const flowPos = screenToFlowPosition({ x: clientX, y: clientY });
-          const newId = `n${++nodeCounter}`;
+          const newId = allocateNodeId(viewNodes);
           const newNode: Node = {
             id: newId,
             type: nodeType,
@@ -480,7 +499,7 @@ function PcgEditor() {
   const createNodeAt = useCallback(
     (nodeType: string, x: number, y: number) => {
       const flowPos = screenToFlowPosition({ x, y });
-      const newId = `n${++nodeCounter}`;
+      const newId = allocateNodeId(viewNodes);
       const newNode: Node = {
         id: newId,
         type: nodeType,
@@ -491,7 +510,7 @@ function PcgEditor() {
       setViewNodes((nds) => [...nds, newNode]);
       setStatus(`Added ${nodeType}`);
     },
-    [setViewNodes, screenToFlowPosition, commit],
+    [viewNodes, setViewNodes, screenToFlowPosition, commit],
   );
 
   const openSearchAt = useCallback((x: number, y: number) => {
@@ -549,7 +568,7 @@ function PcgEditor() {
         if (!getNodeTypeDefs(nodeType)) {
           throw new Error(`unknown node type "${nodeType}"`);
         }
-        const newId = `n${++nodeCounter}`;
+        const newId = allocateNodeId(viewNodes);
         const pos = position ?? screenToFlowPosition({
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
@@ -618,23 +637,75 @@ function PcgEditor() {
     () => exportGraph(nodes, edges, parameters, subgraphs),
     [nodes, edges, parameters, subgraphs],
   );
-  const applyBridgePatches = useCallback(
-    (patches: QueuedNodePatch[]): PatchApplyResult[] => {
-      if (patches.length === 0) return [];
-      const results = applyAgentActions(
-        patches.map((patch) => ({
-          type: 'patchNode' as const,
-          nodeId: patch.nodeId,
-          patch: patch.patch,
-        })),
-      );
-      return results.map((result, index) => ({
-        id: patches[index].id,
-        ok: result.ok,
-        error: result.ok ? undefined : result.detail,
-      }));
+  const installBridgeGraph = useCallback(
+    (parsed: ReturnType<typeof parseAndValidateGraph> & { ok: true }, nextEditPath: string[]) => {
+      commit('PCG MCP graph edit');
+      nodeCounter = syncNodeCounterFromNodes(parsed.parsed.nodes);
+      setNodes(parsed.parsed.nodes);
+      setEdges(parsed.parsed.edges);
+      setParameters(parsed.parsed.parameters);
+      setSubgraphs(parsed.parsed.subgraphs);
+      setEditPath(nextEditPath);
+      setSelectedNode(null);
+      setInfoNodeId(null);
+      setContextMenu(null);
+      setPreviewTargetId(null);
     },
-    [applyAgentActions],
+    [commit, setNodes, setEdges],
+  );
+  const applyBridgeCommands = useCallback(
+    async (commands: QueuedGraphCommand[]): Promise<GraphCommandResult[]> => {
+      const results: GraphCommandResult[] = [];
+      for (const command of commands) {
+        try {
+          if (command.type === 'saveGraph') {
+            const targetPath = command.path ?? currentFilename;
+            if (!targetPath) throw new Error('save path is required for an unnamed graph');
+            const saved = await saveGraphToFile(
+              bridgeGraph,
+              targetPath,
+            );
+            if (!saved.ok) throw new Error(saved.error ?? 'unknown save error');
+            if (command.path !== undefined) setCurrentFilename(targetPath);
+            setStatus(`Saved to ${targetPath} through PCG MCP`);
+            results.push({ id: command.id, ok: true, detail: { path: targetPath } });
+            continue;
+          }
+
+          if (command.type === 'replaceGraph') {
+            const validated = parseAndValidateGraph(command.graph);
+            if (!validated.ok) throw new Error(validated.error);
+            installBridgeGraph(validated, []);
+            setStatus(`PCG MCP replaced graph (${validated.parsed.nodes.length} root nodes)`);
+            results.push({
+              id: command.id,
+              ok: true,
+              detail: {
+                rootNodes: validated.parsed.nodes.length,
+                rootEdges: validated.parsed.edges.length,
+                subgraphs: validated.parsed.subgraphs.length,
+              },
+            });
+            continue;
+          }
+
+          const operations = command.type === 'setNodeParams'
+            ? [{ op: 'patch_node' as const, nodeId: command.nodeId, patch: command.patch }]
+            : command.operations;
+          const applied = applyGraphOperations(bridgeGraph, editPath, operations);
+          if (!applied.ok) throw new Error(applied.error);
+          installBridgeGraph({ ok: true, parsed: applied.parsed }, editPath);
+          setStatus(`PCG MCP applied ${operations.length} graph operation(s)`);
+          results.push({ id: command.id, ok: true, detail: applied.detail });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(`PCG MCP command failed: ${message}`);
+          results.push({ id: command.id, ok: false, error: message });
+        }
+      }
+      return results;
+    },
+    [bridgeGraph, currentFilename, editPath, installBridgeGraph],
   );
   const captureBridgePreview = useCallback(
     () => previewViewportRef.current?.captureFrame() ?? null,
@@ -642,11 +713,12 @@ function PcgEditor() {
   );
   useEditorBridge({
     graph: bridgeGraph,
+    nodeManifest: getNodeManifest(),
     graphPath: currentFilename,
     editPath,
     selectedNodeId: selectedNode?.id ?? null,
     previewTargetNodeId,
-    applyPatches: applyBridgePatches,
+    applyCommands: applyBridgeCommands,
     capturePreview: captureBridgePreview,
   });
 

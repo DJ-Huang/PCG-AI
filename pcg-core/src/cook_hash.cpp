@@ -132,6 +132,7 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     h = hash_combine(h, static_cast<uint64_t>(detail.shade_mode));
     double cusp = detail.cusp_angle_deg;
     h = hash_bytes(&cusp, sizeof(double), h);
+    h = hash_combine(h, hash_json(geometry.metadata().raw()));
 
     if (geometry.has_colors() && !geometry.colors().empty())
         h = hash_bytes(geometry.colors().data(),

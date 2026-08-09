@@ -1,6 +1,6 @@
 # LLM Orchestration for PCG Graph Authoring
 
-Adapted from [img2threejs](https://github.com/img2threejs/img2threejs) orchestration patterns. This doc defines **how the agent should think and loop** before writing `.pcg` JSON. Runnable scripts: [`../shared/pcg-scripts/`](../shared/pcg-scripts/) · cheatsheet: [`scripts.md`](scripts.md) · **Unity clean-scene review (P0):** [`unity-review.md`](unity-review.md).
+Adapted from [img2threejs](https://github.com/img2threejs/img2threejs) orchestration patterns. This doc defines **how the agent should think and loop** while authoring `.pcg` graphs. Runnable scripts: [`../shared/pcg-scripts/`](../shared/pcg-scripts/) · MCP authoring contract: [`../shared/pcg-mcp.md`](../shared/pcg-mcp.md) · cheatsheet: [`scripts.md`](scripts.md) · **Unity clean-scene review (P0):** [`unity-review.md`](unity-review.md).
 
 Skill id: **`pcg-graph-authoring-unity`**.
 
@@ -29,8 +29,9 @@ Skill id: **`pcg-graph-authoring-unity`**.
 3. Fill Graph Authoring Plan (*-plan.json)
 4. validate_plan.py --strict-quality  (blocks shallow plans AND unarchived references)
 5. report_pass.py --resume → current unlocked pass + next command + RESUME.md
-6. Author .pcg for CURRENT PASS ONLY (do not one-shot 80+ nodes when modularizing)
-7. validate_pcg.py → fix structural errors
+6. If the target is open in Web Editor: context → node types/full graph → atomic MCP authoring for CURRENT PASS
+   Otherwise use direct .pcg authoring as the offline/compatibility fallback
+7. MCP validate/cook, then pcg_save_graph; validate_pcg.py checks the saved deliverable
 8. create_review_scene → Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene (fixed; no ask)
 9. setup_pcg_review_subject + cook → capture_sceneview_png
 10. make_comparison_sheet.py → one side-by-side PNG (no score)
@@ -39,6 +40,11 @@ Skill id: **`pcg-graph-authoring-unity`**.
 ```
 
 Run validation after every substantive edit, not only at the end. Script flags: [`scripts.md`](scripts.md). Never screenshot a cluttered demo scene — see [`unity-review.md`](unity-review.md).
+
+For MCP edits, fetch a fresh `graphHash` before every write, use one atomic
+batch per coherent pass, and wait for `applied=true`. Re-read and recompute on
+conflict. MCP owns graph creation; Tuanjie/Unity MCP still owns the independent
+clean-scene asset acceptance.
 
 ## Reference persistence and re-hydration (P0)
 

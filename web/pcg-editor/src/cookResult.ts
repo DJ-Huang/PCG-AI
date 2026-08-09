@@ -250,6 +250,10 @@ export interface ParsedMesh {
   normals: Float32Array | null;
   colors: Float32Array | null;
   uvs: Float32Array | null;
+  /** PCGM v3 material slot names in Unity submesh order. */
+  materialSlots: string[];
+  /** Per-triangle slot index (length = indexCount / 3) for PCGM v3. */
+  triangleMaterials: Uint32Array | null;
   vertexCount: number;
   indexCount: number;
 }
@@ -300,6 +304,7 @@ export interface ParsedSplines {
 const MESH_FLAG_NORMALS = 0x1;
 const MESH_FLAG_COLORS = 0x2;
 const MESH_FLAG_UVS = 0x4;
+const MESH_FLAG_MATERIALS = 0x8;
 
 export function parseMeshBinary(data: Uint8Array): ParsedMesh {
   if (data.byteLength < 16) throw new Error('Mesh binary payload is too small');
@@ -320,8 +325,10 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
     flags = view.getUint32(offset, true);
     offset += 4;
   }
+  let materialSectionSize = 0;
   if (version === 3) {
-    offset += 4; // material section size — materials are out of preview scope
+    materialSectionSize = view.getUint32(offset, true);
+    offset += 4;
   }
 
   const need = offset + vertexCount * 12 + indexCount * 4;
@@ -342,7 +349,48 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
   const colors = (flags & MESH_FLAG_COLORS) !== 0 ? readFloatBlock(vertexCount * 4, 'colors') : null;
   const uvs = (flags & MESH_FLAG_UVS) !== 0 ? readFloatBlock(vertexCount * 2, 'uvs') : null;
 
-  return { positions, indices, normals, colors, uvs, vertexCount, indexCount };
+  const materialSlots: string[] = [];
+  let triangleMaterials: Uint32Array | null = null;
+  if ((flags & MESH_FLAG_MATERIALS) !== 0) {
+    if (version !== 3 || materialSectionSize < 4 || offset + materialSectionSize > data.byteLength) {
+      throw new Error('Mesh binary material section is invalid');
+    }
+    const sectionEnd = offset + materialSectionSize;
+    const slotCount = view.getUint32(offset, true);
+    offset += 4;
+    if (slotCount > 65536) throw new Error('Mesh binary material slot count is unreasonable');
+    for (let slot = 0; slot < slotCount; slot++) {
+      if (offset + 4 > sectionEnd) throw new Error('Mesh binary material name length truncated');
+      const byteLength = view.getUint32(offset, true);
+      offset += 4;
+      if (offset + byteLength > sectionEnd) throw new Error('Mesh binary material name truncated');
+      materialSlots.push(utf8.decode(data.subarray(offset, offset + byteLength)));
+      offset += byteLength;
+    }
+    const triangleCount = indexCount / 3;
+    if (!Number.isInteger(triangleCount) || offset + triangleCount * 4 !== sectionEnd) {
+      throw new Error('Mesh binary triangle material table size mismatch');
+    }
+    triangleMaterials = copyUint32(data, offset, triangleCount);
+    for (const slot of triangleMaterials) {
+      if (slot >= materialSlots.length) throw new Error('Mesh binary triangle material slot out of range');
+    }
+    offset = sectionEnd;
+  } else if (materialSectionSize !== 0) {
+    throw new Error('Mesh binary contains an unexpected material section');
+  }
+
+  return {
+    positions,
+    indices,
+    normals,
+    colors,
+    uvs,
+    materialSlots,
+    triangleMaterials,
+    vertexCount,
+    indexCount,
+  };
 }
 
 function readU32(view: DataView, offset: number): number {
@@ -567,6 +615,8 @@ export function buildHeightFieldPreviewMesh(
     normals: null,
     colors: null,
     uvs: null,
+    materialSlots: [],
+    triangleMaterials: null,
     vertexCount,
     indexCount: indices.length,
   };

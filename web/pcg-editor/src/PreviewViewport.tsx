@@ -12,6 +12,8 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
 import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines } from './cookResult';
 import type { PreviewData } from './previewCook';
@@ -36,7 +38,19 @@ import SolidShadingPopover, {
   type SolidLighting,
 } from './preview/SolidShadingPopover';
 import ViewportOverlaysPopover from './preview/ViewportOverlaysPopover';
+import MaterialEnvironmentPopover from './preview/MaterialEnvironmentPopover';
+import {
+  DEFAULT_BUILTIN_ENVIRONMENT,
+  EXTERNAL_ENVIRONMENT_ID,
+  getBuiltinEnvironment,
+} from './preview/builtinEnvironments';
 import { createInfiniteGrid } from './preview/infiniteGrid';
+import {
+  createStandardPbrMaterial,
+  disposePbrTextureCache,
+  normalizePbrMaterial,
+  type PbrMaterialLibrary,
+} from './preview/pbrMaterials';
 import {
   disposeMatcapLibrary,
   loadMatcapTexture,
@@ -127,6 +141,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     gizmoLength: number;
     selectedIndex: number;
     envMap: THREE.Texture | null;
+    backgroundMap: THREE.Texture | null;
+    keyLight: THREE.DirectionalLight;
     matcapTexture: THREE.Texture | null;
     pmremGenerator: THREE.PMREMGenerator | null;
   } | null>(null);
@@ -137,6 +153,20 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [overlayPopoverOpen, setOverlayPopoverOpen] = useState(false);
   const [solidPopoverOpen, setSolidPopoverOpen] = useState(false);
+  const [environmentId, setEnvironmentId] = useState(DEFAULT_BUILTIN_ENVIRONMENT.id);
+  const environmentLoadVersionRef = useRef(0);
+  const invalidateEnvironmentLoads = useCallback(() => {
+    environmentLoadVersionRef.current++;
+  }, []);
+  const [environmentRotation, setEnvironmentRotation] = useState(0);
+  const environmentRotationRef = useRef(environmentRotation);
+  environmentRotationRef.current = environmentRotation;
+  const [environmentIntensity, setEnvironmentIntensity] = useState(1);
+  const [exposure, setExposure] = useState(1);
+  const [keyLightIntensity, setKeyLightIntensity] = useState(1.15);
+  const [backgroundVisible, setBackgroundVisible] = useState(false);
+  const backgroundVisibleRef = useRef(backgroundVisible);
+  backgroundVisibleRef.current = backgroundVisible;
   const shadingRef = useRef({ shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId });
   shadingRef.current = { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId };
   const overlayPopoverRef = useRef<HTMLDivElement>(null);
@@ -273,6 +303,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0x3d3d3d);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
@@ -282,6 +313,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const envMap = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
 
     const scene = new THREE.Scene();
+    scene.environment = envMap;
+    scene.environmentIntensity = 1;
     const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 5000);
     camera.position.set(3, 2.5, 4);
 
@@ -294,8 +327,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       RIGHT: THREE.MOUSE.PAN,
     };
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x333a44, 1.1));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x333a44, 0.2));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.15);
     dir.position.set(4, 8, 5);
     scene.add(dir);
 
@@ -317,6 +350,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       gizmoLength: 0.5,
       selectedIndex: -1,
       envMap,
+      backgroundMap: null,
+      keyLight: dir,
       matcapTexture: null,
       pmremGenerator,
     };
@@ -510,6 +545,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     canvas.addEventListener('pointercancel', onPointerUp);
 
     return () => {
+      invalidateEnvironmentLoads();
       cancelAnimationFrame(raf);
       observer.disconnect();
       canvas.removeEventListener('pointerdown', focusContainer);
@@ -519,8 +555,13 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       canvas.removeEventListener('pointercancel', onPointerUp);
       controls.dispose();
       pmremGenerator.dispose();
+      if (sceneRef.current?.envMap && sceneRef.current.envMap !== envMap) {
+        sceneRef.current.envMap.dispose();
+      }
       envMap.dispose();
+      if (sceneRef.current?.backgroundMap) sceneRef.current.backgroundMap.dispose();
       disposeMatcapLibrary();
+      disposePbrTextureCache();
       disposeGroup(content);
       disposeObject3D(handles);
       handles.clear();
@@ -528,7 +569,124 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       renderer.domElement.remove();
       sceneRef.current = null;
     };
-  }, [syncSplineHandles, focusPreview]);
+  }, [syncSplineHandles, focusPreview, invalidateEnvironmentLoads]);
+
+  const loadEnvironmentUrl = useCallback(async (
+    url: string,
+    name: string,
+    id: string,
+    format: 'hdr' | 'exr',
+  ) => {
+    const startingContext = sceneRef.current;
+    const pmremGenerator = startingContext?.pmremGenerator;
+    if (!startingContext || !pmremGenerator) return;
+    const version = ++environmentLoadVersionRef.current;
+    try {
+      const source = format === 'exr'
+        ? await new EXRLoader().loadAsync(url)
+        : await new HDRLoader().loadAsync(url);
+      const ctx = sceneRef.current;
+      if (version !== environmentLoadVersionRef.current || ctx !== startingContext) {
+        source.dispose();
+        return;
+      }
+      source.mapping = THREE.EquirectangularReflectionMapping;
+      const nextEnvironment = pmremGenerator.fromEquirectangular(source).texture;
+      if (ctx.envMap) ctx.envMap.dispose();
+      if (ctx.backgroundMap) ctx.backgroundMap.dispose();
+      ctx.envMap = nextEnvironment;
+      ctx.backgroundMap = source;
+      ctx.scene.environment = nextEnvironment;
+      ctx.scene.background = backgroundVisibleRef.current ? source : null;
+      setEnvironmentId(id);
+    } catch (error) {
+      if (version === environmentLoadVersionRef.current) {
+        console.error(`[PCG] Failed to load HDRI "${name}"`, error);
+      }
+    }
+  }, []);
+
+  const loadBuiltinEnvironment = useCallback((id: string) => {
+    const environment = getBuiltinEnvironment(id);
+    if (!environment) return;
+    void loadEnvironmentUrl(environment.url, environment.name, environment.id, 'hdr');
+  }, [loadEnvironmentUrl]);
+
+  const loadEnvironmentFile = useCallback(async (file: File) => {
+    const objectUrl = URL.createObjectURL(file);
+    try {
+      await loadEnvironmentUrl(
+        objectUrl,
+        file.name,
+        EXTERNAL_ENVIRONMENT_ID,
+        file.name.toLowerCase().endsWith('.exr') ? 'exr' : 'hdr',
+      );
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }, [loadEnvironmentUrl]);
+
+  useEffect(() => {
+    loadBuiltinEnvironment(DEFAULT_BUILTIN_ENVIRONMENT.id);
+  }, [loadBuiltinEnvironment]);
+
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+    const radians = THREE.MathUtils.degToRad(environmentRotation);
+    ctx.scene.environmentRotation.set(0, radians, 0);
+    ctx.scene.backgroundRotation.set(0, radians, 0);
+    ctx.scene.environmentIntensity = environmentIntensity;
+    ctx.renderer.toneMappingExposure = exposure;
+    ctx.keyLight.intensity = keyLightIntensity;
+    ctx.scene.background = backgroundVisible ? (ctx.backgroundMap ?? ctx.envMap) : null;
+  }, [environmentRotation, environmentIntensity, exposure, keyLightIntensity, backgroundVisible]);
+
+  useEffect(() => {
+    const canvas = sceneRef.current?.renderer.domElement;
+    const controls = sceneRef.current?.controls;
+    if (!canvas || !controls) return;
+    let rotating = false;
+    let startX = 0;
+    let startRotation = 0;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.shiftKey && event.button === 2)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      rotating = true;
+      startX = event.clientX;
+      startRotation = environmentRotationRef.current;
+      controls.enabled = false;
+      canvas.setPointerCapture(event.pointerId);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (!rotating) return;
+      event.preventDefault();
+      setEnvironmentRotation(startRotation + (event.clientX - startX) * 0.35);
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      if (!rotating) return;
+      rotating = false;
+      controls.enabled = true;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      if (event.shiftKey || rotating) event.preventDefault();
+    };
+    canvas.addEventListener('pointerdown', onPointerDown, { capture: true });
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('contextmenu', onContextMenu);
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown, { capture: true });
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
+      canvas.removeEventListener('contextmenu', onContextMenu);
+      controls.enabled = true;
+    };
+  }, []);
 
   // F — frame selection (or full preview) when the preview panel has focus.
   useEffect(() => {
@@ -593,8 +751,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       solidLighting,
       wireframeOverlay,
       xrayEnabled,
-      ctx.envMap,
       ctx.matcapTexture,
+      data.materials,
     );
     // Only new cook data counts — spline-handle rebuilds reuse the same payload.
     if (data !== sceneTimedDataRef.current) {
@@ -632,8 +790,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         solidLighting,
         wireframeOverlay,
         xrayEnabled,
-        ctx.envMap,
         ctx.matcapTexture,
+        data?.materials ?? {},
       );
     };
 
@@ -646,10 +804,10 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     } else {
       runShading();
     }
-  }, [shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId]);
+  }, [shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId, data?.materials]);
 
   useEffect(() => {
-    if (shadingMode !== 'solid') setSolidPopoverOpen(false);
+    if (shadingMode === 'rendered') setSolidPopoverOpen(false);
   }, [shadingMode]);
 
   useEffect(() => {
@@ -710,7 +868,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           ref={containerRef}
           className="pcg-preview__canvas"
           tabIndex={0}
-          title="Click to focus · MMB orbit · Shift+MMB pan · scroll zoom · F frame"
+          title="Click to focus · MMB orbit · Shift+MMB pan · Shift+RMB rotate IBL · scroll zoom · F frame"
           onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
         />
         <div className="pcg-preview__shading-bar" role="toolbar" aria-label="Viewport shading">
@@ -784,9 +942,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           <div className="pcg-preview__shading-popover-wrap" ref={solidPopoverRef}>
             <button
               type="button"
-              className={`pcg-preview__shading-chevron${shadingMode === 'solid' ? '' : ' is-disabled'}`}
-              title="Solid shading options"
-              disabled={shadingMode !== 'solid'}
+              className={`pcg-preview__shading-chevron${shadingMode === 'rendered' ? ' is-disabled' : ''}`}
+              title={shadingMode === 'material' ? 'Material preview environment' : 'Solid shading options'}
+              disabled={shadingMode === 'rendered'}
               aria-expanded={solidPopoverOpen}
               onClick={() => setSolidPopoverOpen((v) => !v)}
             >
@@ -798,6 +956,23 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
                 matcapId={matcapId}
                 onSolidLightingChange={setSolidLighting}
                 onMatcapIdChange={setMatcapId}
+              />
+            )}
+            {solidPopoverOpen && shadingMode === 'material' && (
+              <MaterialEnvironmentPopover
+                environmentId={environmentId}
+                rotation={environmentRotation}
+                intensity={environmentIntensity}
+                exposure={exposure}
+                keyLightIntensity={keyLightIntensity}
+                backgroundVisible={backgroundVisible}
+                onBuiltinEnvironment={loadBuiltinEnvironment}
+                onEnvironmentFile={loadEnvironmentFile}
+                onRotationChange={setEnvironmentRotation}
+                onIntensityChange={setEnvironmentIntensity}
+                onExposureChange={setExposure}
+                onKeyLightIntensityChange={setKeyLightIntensity}
+                onBackgroundVisibleChange={setBackgroundVisible}
               />
             )}
           </div>
@@ -829,8 +1004,8 @@ function applyShading(
   solidLighting: SolidLighting,
   wireframeOverlay: boolean,
   xrayEnabled: boolean,
-  envMap: THREE.Texture | null,
   matcapTexture: THREE.Texture | null,
+  materialLibrary: PbrMaterialLibrary,
 ) {
   const hasMesh = group.children.some((c) => c.userData.kind === 'mesh');
   const hasEdges = group.children.some((c) => c.userData.kind === 'edges');
@@ -855,8 +1030,8 @@ function applyShading(
 
     const mesh = child;
     const hasVertexColors = mesh.geometry.hasAttribute('color');
-    const oldMaterial = mesh.material as THREE.Material;
-    oldMaterial.dispose();
+    const oldMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const oldMaterial of oldMaterials) oldMaterial.dispose();
 
     if (wireframeOnly) {
       mesh.visible = true;
@@ -874,15 +1049,20 @@ function applyShading(
     mesh.visible = true;
     let mat: THREE.MeshStandardMaterial | THREE.MeshMatcapMaterial;
     if (shadingMode === 'material') {
-      mat = new THREE.MeshStandardMaterial({
-        color: hasVertexColors ? 0xffffff : 0x9aa4ae,
-        vertexColors: hasVertexColors,
-        roughness: 0.4,
-        metalness: 0.5,
-        envMap,
-        envMapIntensity: 1.0,
-        side: THREE.DoubleSide,
-      });
+      const slots = Array.isArray(mesh.userData.materialSlots)
+        ? mesh.userData.materialSlots as string[]
+        : [];
+      if (slots.length > 0) {
+        mesh.material = slots.map((slot) => createStandardPbrMaterial(
+          materialLibrary[slot] ?? normalizePbrMaterial({ name: slot }, slot),
+          hasVertexColors,
+        ));
+        continue;
+      }
+      mat = createStandardPbrMaterial(
+        normalizePbrMaterial({ name: 'Material' }),
+        hasVertexColors,
+      );
     } else if (shadingMode === 'solid' && solidLighting === 'matcap' && matcapTexture) {
       mat = new THREE.MeshMatcapMaterial({
         color: hasVertexColors ? 0xffffff : 0x9aa4ae,
@@ -896,7 +1076,6 @@ function applyShading(
         vertexColors: hasVertexColors,
         roughness: 0.45,
         metalness: 0.15,
-        envMap,
         envMapIntensity: STUDIO_ENV_INTENSITY,
         side: THREE.DoubleSide,
       });
@@ -930,7 +1109,9 @@ function buildMeshObject(mesh: ParsedMesh, flipZ: (src: Float32Array) => Float32
     geo.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 4));
   }
   if (mesh.uvs && mesh.uvs.length === mesh.vertexCount * 2) {
-    geo.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
+    const uv = new THREE.BufferAttribute(mesh.uvs, 2);
+    geo.setAttribute('uv', uv);
+    geo.setAttribute('uv1', uv);
   }
   const indices = new Uint32Array(mesh.indices.length);
   for (let i = 0; i < mesh.indices.length; i += 3) {
@@ -939,6 +1120,19 @@ function buildMeshObject(mesh: ParsedMesh, flipZ: (src: Float32Array) => Float32
     indices[i + 2] = mesh.indices[i + 1];
   }
   geo.setIndex(new THREE.BufferAttribute(indices, 1));
+  if (mesh.triangleMaterials && mesh.materialSlots.length > 0) {
+    let firstTriangle = 0;
+    let activeSlot = mesh.triangleMaterials[0] ?? 0;
+    for (let triangle = 1; triangle <= mesh.triangleMaterials.length; triangle++) {
+      const slot = triangle < mesh.triangleMaterials.length
+        ? mesh.triangleMaterials[triangle]
+        : Number.NaN;
+      if (slot === activeSlot) continue;
+      geo.addGroup(firstTriangle * 3, (triangle - firstTriangle) * 3, activeSlot);
+      firstTriangle = triangle;
+      activeSlot = slot;
+    }
+  }
   if (!mesh.normals) geo.computeVertexNormals();
 
   const meshObj = new THREE.Mesh(
@@ -952,6 +1146,7 @@ function buildMeshObject(mesh: ParsedMesh, flipZ: (src: Float32Array) => Float32
     }),
   );
   meshObj.userData.kind = 'mesh';
+  meshObj.userData.materialSlots = [...mesh.materialSlots];
   return meshObj;
 }
 

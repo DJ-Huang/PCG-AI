@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test:graph-commands": "node scripts/validate-graph-commands.mjs",
+    "test:pbr": "python3 ../../scripts/validate-web-pbr.py",
+    "test:environments": "python3 ../../scripts/validate-builtin-environments.py",
     "preview": "vite preview"
   },
   "dependencies": {

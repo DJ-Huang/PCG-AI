@@ -16,6 +16,10 @@ Skill scripts ──→ Vite dev server (:5173)
 
 The Vite dev server is the review target. It proxies cook requests to pcg-server and renders results using the same `PreviewViewport.tsx` Three.js component as the full editor. The `/review` route loads a graph from disk, cooks it, and renders only the viewport — no editor UI, no other graphs.
 
+PCG MCP may create, edit, validate, cook, capture, and save the live graph
+before this gate. This gate deliberately reloads the saved `.pcg` from disk;
+live Preview evidence does not replace saved-deliverable acceptance.
+
 ## Hard rules
 
 1. **Verify both Vite dev server and pcg-server are running before any cook / screenshot / visual judgment.**

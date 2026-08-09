@@ -22,6 +22,7 @@ import {
   type ParsedMesh,
   type ParsedSplines,
 } from './cookResult';
+import { parsePbrMaterialLibrary, type PbrMaterialLibrary } from './preview/pbrMaterials';
 
 export interface PreviewData {
   /** Polygon geometry (edges/points modes) when the graph outputs faces. */
@@ -34,6 +35,8 @@ export interface PreviewData {
   splines: ParsedSplines | null;
   /** Source heightfield when the graph outputs terrain data. */
   heightfield: ParsedHeightField | null;
+  /** PBR definitions keyed by PCGM material slot name. */
+  materials: PbrMaterialLibrary;
   cook: CookResult;
   /** Client-side phase timings; filled by cookGraphPreview (absent in contract tests). */
   timings?: PreviewTimings;
@@ -278,6 +281,7 @@ export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
   }
   let splines: ParsedSplines | null = null;
   const cookJson = extractCookJsonText(cook);
+  const materials = parsePbrMaterialLibrary(cookJson);
   if (cookJson) {
     splines = parseSplineJson(cookJson);
   }
@@ -301,7 +305,7 @@ export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
     return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
   }
 
-  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, cook } };
+  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, materials, cook } };
 }
 
 export async function cookGraphPreview(

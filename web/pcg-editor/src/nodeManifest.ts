@@ -6,7 +6,7 @@ import manifestJson from '../../../schema/node-manifest.json';
 // ── Types ──────────────────────────────────────────────
 
 export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialSurface' | 'SpatialMesh' |
-  'SpatialGeometry' | 'Texture' | 'HeightField' | 'Param' | 'Any';
+  'SpatialGeometry' | 'Texture' | 'HeightField' | 'Material' | 'Param' | 'Any';
 export type PropertyType =
   | 'integer'
   | 'number'
@@ -69,6 +69,8 @@ export interface ManifestNodeDef {
   type: string;
   displayName: string;
   category: string;
+  /** Whether the node can be cooked as an isolated viewport/scene preview target. */
+  supportsPreview?: boolean;
   inputs: ManifestPin[];
   outputs: ManifestPin[];
   properties: Record<string, ManifestProperty>;
@@ -289,6 +291,7 @@ export const PIN_TYPE_COLORS: Record<string, string> = {
   SpatialGeometry: '#ffaa33',
   Param: '#ffd700',
   Texture: '#b34dd9',
+  Material: '#e85d9e',
   Any: '#a6a6a6',
 };
 

@@ -2,7 +2,7 @@
 // Supports promote-to-parameter (+) and bind/unbind via dropdown.
 // Group properties (groupSelect/groupMultiSelect) resolve available groups from upstream nodes.
 
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useId, useMemo, type CSSProperties } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
   getNodeTypeDefs,
@@ -80,6 +80,10 @@ export default function Inspector({
 
   if (isSubgraphInterfaceNode(selectedNode.type)) {
     return <InterfaceNodeInspector node={selectedNode} />;
+  }
+
+  if (selectedNode.type === 'Material') {
+    return <MaterialInspector node={selectedNode} onUpdateNodeData={onUpdateNodeData} />;
   }
 
   const def = getNodeTypeDefs(selectedNode.type ?? '');
@@ -285,6 +289,164 @@ export default function Inspector({
             <div className="pcg-inspector__no-props">No properties</div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Material Inspector ────────────────────────────────
+
+function MaterialInspector({
+  node,
+  onUpdateNodeData,
+}: {
+  node: Node;
+  onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
+}) {
+  const data = node.data as NodeData;
+  const update = (key: string, value: unknown) => onUpdateNodeData(node.id, { [key]: value });
+  const numberValue = (key: string, fallback: number) => {
+    const value = data[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  };
+
+  return (
+    <div className="pcg-inspector pcg-material-inspector">
+      <div className="pcg-inspector__title">Inspector</div>
+      <div className="pcg-inspector__node-header" style={{ background: getCategoryColor('Material') }}>
+        Material
+      </div>
+      <div className="pcg-inspector__node-type">Material · Shader driven</div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Shader</div>
+        <MaterialTextField label="Name" value={String(data.materialName ?? 'Material')} onChange={(v) => update('materialName', v)} />
+        <label className="pcg-material-inspector__field">
+          <span>Web Shader</span>
+          <select value={String(data.shaderId ?? 'pcg.standard-pbr')} onChange={(e) => update('shaderId', e.target.value)}>
+            <option value="pcg.standard-pbr">Standard PBR</option>
+          </select>
+        </label>
+        {data.unityShaderName ? (
+          <div className="pcg-material-inspector__unity-shader">
+            Unity: {String(data.unityShaderName)}
+            <small>Web 使用 Standard PBR fallback，只映射通用 PBR 参数。</small>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Surface</div>
+        <MaterialColorField label="Base Color" value={String(data.baseColor ?? '#b8c2cc')} onChange={(v) => update('baseColor', v)} />
+        <MaterialSlider label="Metallic" value={numberValue('metallic', 0)} min={0} max={1} onChange={(v) => update('metallic', v)} />
+        <MaterialSlider label="Roughness" value={numberValue('roughness', 0.5)} min={0} max={1} onChange={(v) => update('roughness', v)} />
+        <MaterialSlider label="Opacity" value={numberValue('opacity', 1)} min={0} max={1} onChange={(v) => update('opacity', v)} />
+        <label className="pcg-material-inspector__field">
+          <span>Alpha Mode</span>
+          <select value={String(data.alphaMode ?? 'opaque')} onChange={(e) => update('alphaMode', e.target.value)}>
+            <option value="opaque">Opaque</option>
+            <option value="mask">Mask</option>
+            <option value="blend">Blend</option>
+          </select>
+        </label>
+        {data.alphaMode === 'mask' && (
+          <MaterialSlider label="Alpha Cutoff" value={numberValue('alphaCutoff', 0.5)} min={0} max={1} onChange={(v) => update('alphaCutoff', v)} />
+        )}
+        <label className="pcg-material-inspector__toggle">
+          <input type="checkbox" checked={data.doubleSided === true} onChange={(e) => update('doubleSided', e.target.checked)} />
+          <span>Double Sided</span>
+        </label>
+      </div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Maps</div>
+        <MaterialTextureField label="Base Color" value={String(data.baseColorMap ?? '')} onChange={(v) => update('baseColorMap', v)} />
+        <MaterialTextureField label="Metallic" value={String(data.metallicMap ?? '')} onChange={(v) => update('metallicMap', v)} />
+        <MaterialTextureField label="Roughness" value={String(data.roughnessMap ?? '')} onChange={(v) => update('roughnessMap', v)} />
+        <MaterialTextureField label="Normal" value={String(data.normalMap ?? '')} onChange={(v) => update('normalMap', v)} />
+        <MaterialSlider label="Normal Scale" value={numberValue('normalScale', 1)} min={0} max={4} onChange={(v) => update('normalScale', v)} />
+        <MaterialTextureField label="AO" value={String(data.aoMap ?? '')} onChange={(v) => update('aoMap', v)} />
+        <MaterialSlider label="AO Intensity" value={numberValue('aoIntensity', 1)} min={0} max={4} onChange={(v) => update('aoIntensity', v)} />
+      </div>
+
+      <div className="pcg-inspector__section">
+        <div className="pcg-inspector__section-title">Emission</div>
+        <MaterialColorField label="Color" value={String(data.emissiveColor ?? '#000000')} onChange={(v) => update('emissiveColor', v)} />
+        <MaterialTextureField label="Map" value={String(data.emissiveMap ?? '')} onChange={(v) => update('emissiveMap', v)} />
+        <MaterialSlider label="Intensity" value={numberValue('emissiveIntensity', 0)} min={0} max={16} onChange={(v) => update('emissiveIntensity', v)} />
+      </div>
+    </div>
+  );
+}
+
+function MaterialTextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="pcg-material-inspector__field">
+      <span>{label}</span>
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+function MaterialColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const color = /^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff';
+  return (
+    <label className="pcg-material-inspector__field pcg-material-inspector__color">
+      <span>{label}</span>
+      <input type="color" value={color} onChange={(e) => onChange(e.target.value)} />
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  );
+}
+
+function MaterialSlider({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  const progress = max === min ? 0 : Math.min(1, Math.max(0, (value - min) / (max - min)));
+  const sliderStyle = { '--pcg-material-slider-progress': `${progress * 100}%` } as CSSProperties;
+  return (
+    <label className="pcg-material-inspector__field pcg-material-inspector__slider">
+      <span>{label}</span>
+      <span className="pcg-material-inspector__slider-control" style={sliderStyle}>
+        <span className="pcg-material-inspector__slider-track" aria-hidden>
+          <span className="pcg-material-inspector__slider-fill" />
+        </span>
+        <input type="range" min={min} max={max} step="0.01" value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      </span>
+      <input type="number" min={min} max={max} step="0.01" value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </label>
+  );
+}
+
+function MaterialTextureField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const inputId = useId();
+  const importImage = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result === 'string') onChange(reader.result);
+    });
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div className="pcg-material-inspector__texture">
+      <label htmlFor={inputId}>{label}</label>
+      <div>
+        {value && <img src={value} alt="" />}
+        <input type="text" value={value} placeholder="URL / data URI" onChange={(e) => onChange(e.target.value)} />
+        <input id={inputId} type="file" accept="image/*" hidden onChange={(e) => importImage(e.target.files?.[0])} />
+        <label className="pcg-material-inspector__browse" htmlFor={inputId}>…</label>
+        {value && <button type="button" title="Clear texture" onClick={() => onChange('')}>×</button>}
       </div>
     </div>
   );

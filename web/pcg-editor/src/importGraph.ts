@@ -15,7 +15,7 @@ import { getNodeTypeDefs } from './nodeManifest';
 
 const PIN_TYPES = new Set([
   'Any', 'Param', 'SpatialPoint', 'SpatialSpline', 'SpatialSurface',
-  'SpatialMesh', 'SpatialGeometry', 'Texture', 'HeightField',
+  'SpatialMesh', 'SpatialGeometry', 'Texture', 'HeightField', 'Material',
 ]);
 
 function canonicalPinType(value: unknown): string | undefined {
@@ -274,7 +274,10 @@ function toGraphParameter(item: unknown, index: number): ParamParse {
   }
 
   const name = typeof raw.name === 'string' ? raw.name : '';
-  const type = typeof raw.type === 'string' ? (raw.type as GraphParameter['type']) : 'number';
+  const parameterTypes = new Set<GraphParameter['type']>(['integer', 'number', 'boolean', 'string', 'vector3']);
+  const type = typeof raw.type === 'string' && parameterTypes.has(raw.type as GraphParameter['type'])
+    ? raw.type as GraphParameter['type']
+    : 'number';
   const exposed = typeof raw.exposed === 'boolean' ? raw.exposed : true;
   const targetNode = typeof raw.targetNode === 'string' ? raw.targetNode : '';
   const targetProperty = typeof raw.targetProperty === 'string' ? raw.targetProperty : '';
@@ -283,11 +286,16 @@ function toGraphParameter(item: unknown, index: number): ParamParse {
   const max = typeof raw.max === 'number' ? raw.max : 1;
 
   // Infer default value type
-  let defaultValue: number | boolean | string = 0;
+  let defaultValue: number | boolean | string | [number, number, number] = 0;
   if (type === 'boolean') {
     defaultValue = typeof raw.default === 'boolean' ? raw.default : false;
   } else if (type === 'string') {
     defaultValue = typeof raw.default === 'string' ? raw.default : '';
+  } else if (type === 'vector3') {
+    defaultValue = Array.isArray(raw.default) && raw.default.length === 3 &&
+      raw.default.every((value) => typeof value === 'number' && Number.isFinite(value))
+      ? raw.default as [number, number, number]
+      : [0, 0, 0];
   } else {
     defaultValue = typeof raw.default === 'number' ? raw.default : 0;
   }

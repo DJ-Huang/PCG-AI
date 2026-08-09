@@ -1,36 +1,23 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import { getAgentToken } from './agent/agentClient';
+import type { GraphCommandResult, QueuedGraphCommand } from './graphCommands';
 import type { GraphJson } from './graphSchema';
+import type { NodeManifest } from './nodeManifest';
 import type { PreviewCapture } from './PreviewViewport';
 
 const BRIDGE_BASE = '/api/editor-bridge';
 const HEARTBEAT_MS = 5_000;
 const POLL_MS = 400;
 
-export interface QueuedNodePatch {
-  id: number;
-  type: 'setNodeParams';
-  nodeId: string;
-  patch: Record<string, unknown>;
-  baseGraphHash: string;
-  editPath: string[];
-  createdAt: number;
-}
-
-export interface PatchApplyResult {
-  id: number;
-  ok: boolean;
-  error?: string;
-}
-
 interface EditorBridgeOptions {
   graph: GraphJson;
+  nodeManifest: NodeManifest;
   graphPath: string;
   editPath: string[];
   selectedNodeId: string | null;
   previewTargetNodeId: string | null;
-  applyPatches: (patches: QueuedNodePatch[]) => PatchApplyResult[];
+  applyCommands: (commands: QueuedGraphCommand[]) => Promise<GraphCommandResult[]>;
   capturePreview: () => PreviewCapture | null;
 }
 
@@ -41,7 +28,7 @@ interface SessionResponse {
 
 interface PatchResponse {
   ok: boolean;
-  patches?: QueuedNodePatch[];
+  patches?: QueuedGraphCommand[];
 }
 
 function bridgeHeaders(): Record<string, string> {
@@ -80,7 +67,7 @@ export function useEditorBridge(options: EditorBridgeOptions): void {
   const editPathKey = JSON.stringify(options.editPath);
   const selectedNodeId = options.selectedNodeId;
   const previewTargetNodeId = options.previewTargetNodeId;
-  const applyPatchesRef = useRef(options.applyPatches);
+  const applyCommandsRef = useRef(options.applyCommands);
   const capturePreviewRef = useRef(options.capturePreview);
   const hashRef = useRef('');
   const cursorRef = useRef(0);
@@ -91,7 +78,7 @@ export function useEditorBridge(options: EditorBridgeOptions): void {
   const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId]);
   const latestSessionKeyRef = useRef(sessionKey);
   latestSessionKeyRef.current = sessionKey;
-  applyPatchesRef.current = options.applyPatches;
+  applyCommandsRef.current = options.applyCommands;
   capturePreviewRef.current = options.capturePreview;
 
   const pushSession = useCallback(async () => {
@@ -109,10 +96,11 @@ export function useEditorBridge(options: EditorBridgeOptions): void {
       previewTargetNodeId,
       graphHash: hash,
       graph: JSON.parse(scheduledGraphText) as GraphJson,
+      nodeManifest: options.nodeManifest,
       updatedAt: Date.now(),
     });
     if (!response.ok) throw new Error(`session sync failed: HTTP ${response.status}`);
-  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey]);
+  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest]);
 
   useEffect(() => {
     const debounce = window.setTimeout(() => void pushSession().catch(console.warn), 250);
@@ -171,25 +159,24 @@ export function useEditorBridge(options: EditorBridgeOptions): void {
           const payload = (await patchesResponse.json()) as PatchResponse;
           const patches = payload.patches ?? [];
           if (patches.length > 0) {
+            // Process one command at a time. The resulting graph hash must be
+            // published before a second command based on the old snapshot can run.
+            const patch = patches[0];
             const currentPath = JSON.parse(editPathKey) as string[];
-            const compatible: QueuedNodePatch[] = [];
-            const rejected: PatchApplyResult[] = [];
-            for (const patch of patches) {
-              const samePath = JSON.stringify(patch.editPath) === editPathKey;
-              const sameGraph = !hashRef.current || patch.baseGraphHash === hashRef.current;
-              if (samePath && sameGraph) compatible.push(patch);
-              else rejected.push({
+            const samePath = JSON.stringify(patch.editPath) === editPathKey;
+            const sameGraph = !hashRef.current || patch.baseGraphHash === hashRef.current;
+            const results = samePath && sameGraph
+              ? await applyCommandsRef.current([patch])
+              : [{
                 id: patch.id,
                 ok: false,
                 error: samePath ? 'graph_conflict' : `edit_path_changed:${currentPath.join('/')}`,
-              });
-            }
-            const results = [...applyPatchesRef.current(compatible), ...rejected];
+              }];
             await postJson('/graph/patches/ack', {
-              ids: patches.map((patch) => patch.id),
+              ids: [patch.id],
               results,
             });
-            cursorRef.current = Math.max(cursorRef.current, ...patches.map((patch) => patch.id));
+            cursorRef.current = patch.id;
           }
         }
       } catch (error) {

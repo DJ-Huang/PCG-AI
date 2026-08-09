@@ -88,24 +88,26 @@ export default function ManifestNode({ id, type, selected, data }: NodeProps) {
         >
           ℹ
         </button>
-        <button
-          type="button"
-          className={`nodrag pcg-node-toolbar__btn${previewing ? ' pcg-node-toolbar__btn--previewing' : ''}`}
-          title={
-            def.outputs.length === 0
-              ? 'No output to preview'
-              : previewing
-                ? 'Clear node preview (back to full-graph preview)'
-                : 'Preview this node'
-          }
-          disabled={def.outputs.length === 0}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPreview(id);
-          }}
-        >
-          ▶
-        </button>
+        {def.supportsPreview !== false && (
+          <button
+            type="button"
+            className={`nodrag pcg-node-toolbar__btn${previewing ? ' pcg-node-toolbar__btn--previewing' : ''}`}
+            title={
+              def.outputs.length === 0
+                ? 'No output to preview'
+                : previewing
+                  ? 'Clear node preview (back to full-graph preview)'
+                  : 'Preview this node'
+            }
+            disabled={def.outputs.length === 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreview(id);
+            }}
+          >
+            ▶
+          </button>
+        )}
       </NodeToolbar>
 
       <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}${previewing ? ' pcg-node--previewing' : ''}`}>

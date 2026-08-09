@@ -40,7 +40,7 @@
     },
     "pinType": {
       "type": "string",
-      "enum": ["Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface", "SpatialMesh", "SpatialGeometry", "Texture", "HeightField"]
+      "enum": ["Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface", "SpatialMesh", "SpatialGeometry", "Texture", "HeightField", "Material"]
     },
     "subgraphPort": {
       "type": "object",

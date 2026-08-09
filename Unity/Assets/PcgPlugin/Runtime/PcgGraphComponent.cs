@@ -82,6 +82,8 @@ namespace DJTechRuntime.PCG
         private int m_TerrainApplyGeneration;
         [SerializeField] private string[] m_LastMaterialNames = Array.Empty<string>();
         private PcgPolygonPreviewData m_PolygonPreview;
+        [NonSerialized] private PcgGeneratedMaterialSet m_GeneratedMaterialSet;
+        [NonSerialized] private Material m_OwnedFallbackMaterial;
 
         [NonSerialized] private PcgHostTerrainSurface m_LastCookedHeightField;
         [NonSerialized] private int m_LastCookedHeightFieldGeneration;
@@ -311,6 +313,7 @@ namespace DJTechRuntime.PCG
             PcgScatterRenderBridge.Unregister(this);
             ClearGpuInstancers();
             CancelAsyncCook(null, log: false);
+            ReleaseGeneratedMaterials();
         }
 
         private void OnDestroy()
@@ -318,6 +321,8 @@ namespace DJTechRuntime.PCG
             PcgScatterRenderBridge.Unregister(this);
             ClearGpuInstancers();
             ClearScatterCpuCache();
+            ReleaseGeneratedMaterials();
+            ReleaseOwnedFallbackMaterial();
         }
 
         private void Start()
@@ -799,6 +804,9 @@ namespace DJTechRuntime.PCG
         {
             m_PolygonPreview = null;
             var kind = PcgResultParser.DetectKind(result);
+
+            m_GeneratedMaterialSet ??= new PcgGeneratedMaterialSet();
+            m_GeneratedMaterialSet.Rebuild(result?.Json);
 
 #if UNITY_EDITOR
             LastCookResultJson = result.Json;
@@ -1378,6 +1386,7 @@ namespace DJTechRuntime.PCG
             ClearScatterCpuCache();
             ClearLastCookedHeightField();
             m_PolygonPreview = null;
+            ReleaseGeneratedMaterials();
         }
 
         // --- Result rendering ---
@@ -1800,7 +1809,38 @@ namespace DJTechRuntime.PCG
             IReadOnlyList<string> materialNames,
             int subMeshCount)
         {
-            var fallback = ResolveFallbackMaterial();
+            return ResolveMaterialBindings(
+                materialNames,
+                subMeshCount,
+                m_MaterialBindings,
+                m_GeneratedMaterialSet?.Materials,
+                ResolveFallbackMaterial());
+        }
+
+        /// <summary>
+        /// Pure resolver for EditMode tests (no MeshRenderer required).
+        /// </summary>
+        internal static Material[] ResolveMaterialBindings(
+            IReadOnlyList<string> materialNames,
+            int subMeshCount,
+            IReadOnlyList<PcgMaterialBinding> bindings,
+            Material fallback)
+        {
+            return ResolveMaterialBindings(
+                materialNames, subMeshCount, bindings, null, fallback);
+        }
+
+        /// <summary>
+        /// Pure resolver with Material-node generated materials. Explicit bindings win,
+        /// followed by generated materials and finally the component fallback.
+        /// </summary>
+        internal static Material[] ResolveMaterialBindings(
+            IReadOnlyList<string> materialNames,
+            int subMeshCount,
+            IReadOnlyList<PcgMaterialBinding> bindings,
+            IReadOnlyDictionary<string, Material> generated,
+            Material fallback)
+        {
             var count = subMeshCount > 0
                 ? subMeshCount
                 : (materialNames != null && materialNames.Count > 0 ? materialNames.Count : 1);
@@ -1818,56 +1858,34 @@ namespace DJTechRuntime.PCG
                 if (string.IsNullOrEmpty(name))
                     continue;
 
-                foreach (var binding in m_MaterialBindings)
+                var hasExplicitBinding = false;
+                if (bindings != null)
                 {
-                    if (binding != null && binding.material != null && binding.materialName == name)
+                    foreach (var binding in bindings)
                     {
-                        resolved[slot] = binding.material;
-                        break;
+                        if (binding != null && binding.material != null && binding.materialName == name)
+                        {
+                            resolved[slot] = binding.material;
+                            hasExplicitBinding = true;
+                            break;
+                        }
                     }
                 }
+
+                if (hasExplicitBinding)
+                    continue;
+                if (generated != null && generated.TryGetValue(name, out var generatedMaterial) &&
+                    generatedMaterial != null)
+                    resolved[slot] = generatedMaterial;
             }
 
             return resolved;
         }
 
-        /// <summary>
-        /// Pure resolver for EditMode tests (no MeshRenderer required).
-        /// </summary>
-        internal static Material[] ResolveMaterialBindings(
-            IReadOnlyList<string> materialNames,
-            int subMeshCount,
-            IReadOnlyList<PcgMaterialBinding> bindings,
-            Material fallback)
+        private void ReleaseGeneratedMaterials()
         {
-            var count = subMeshCount > 0
-                ? subMeshCount
-                : (materialNames != null && materialNames.Count > 0 ? materialNames.Count : 1);
-            if (count <= 0)
-                count = 1;
-
-            var resolved = new Material[count];
-            for (var slot = 0; slot < count; slot++)
-            {
-                resolved[slot] = fallback;
-                if (materialNames == null || slot >= materialNames.Count)
-                    continue;
-
-                var name = materialNames[slot];
-                if (string.IsNullOrEmpty(name) || bindings == null)
-                    continue;
-
-                foreach (var binding in bindings)
-                {
-                    if (binding != null && binding.material != null && binding.materialName == name)
-                    {
-                        resolved[slot] = binding.material;
-                        break;
-                    }
-                }
-            }
-
-            return resolved;
+            m_GeneratedMaterialSet?.Dispose();
+            m_GeneratedMaterialSet = null;
         }
 
         private Material ResolveFallbackMaterial()
@@ -1876,13 +1894,49 @@ namespace DJTechRuntime.PCG
                 return meshMaterial;
 
             EnsureMeshComponents();
-            if (m_MeshRenderer != null && m_MeshRenderer.sharedMaterial != null)
+            if (m_MeshRenderer != null && m_MeshRenderer.sharedMaterial != null &&
+                !IsGeneratedMaterial(m_MeshRenderer.sharedMaterial))
                 return m_MeshRenderer.sharedMaterial;
 
+            return GetOrCreateOwnedFallbackMaterial();
+        }
+
+        private bool IsGeneratedMaterial(Material material)
+        {
+            if (material == null || m_GeneratedMaterialSet == null)
+                return false;
+            foreach (var generated in m_GeneratedMaterialSet.Materials.Values)
+                if (generated == material)
+                    return true;
+            return false;
+        }
+
+        private Material GetOrCreateOwnedFallbackMaterial()
+        {
+            if (m_OwnedFallbackMaterial != null)
+                return m_OwnedFallbackMaterial;
             var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            return shader != null
-                ? new Material(shader) { color = new Color(0.55f, 0.75f, 0.95f) }
+            m_OwnedFallbackMaterial = shader != null
+                ? new Material(shader)
+                {
+                    name = "PCG Fallback Material",
+                    color = new Color(0.55f, 0.75f, 0.95f),
+                    hideFlags = HideFlags.HideAndDontSave,
+                }
                 : null;
+            return m_OwnedFallbackMaterial;
+        }
+
+        private void ReleaseOwnedFallbackMaterial()
+        {
+            if (m_OwnedFallbackMaterial == null)
+                return;
+#if UNITY_EDITOR
+            DestroyImmediate(m_OwnedFallbackMaterial);
+#else
+            Destroy(m_OwnedFallbackMaterial);
+#endif
+            m_OwnedFallbackMaterial = null;
         }
 
         private void EnsureMeshComponents()
@@ -1900,10 +1954,9 @@ namespace DJTechRuntime.PCG
                     m_MeshRenderer = gameObject.AddComponent<MeshRenderer>();
                 if (m_MeshRenderer.sharedMaterial == null)
                 {
-                    var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
                     m_MeshRenderer.sharedMaterial = meshMaterial != null
                         ? meshMaterial
-                        : new Material(shader) { color = new Color(0.55f, 0.75f, 0.95f) };
+                        : GetOrCreateOwnedFallbackMaterial();
                 }
             }
         }

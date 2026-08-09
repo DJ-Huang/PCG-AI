@@ -9480,6 +9480,161 @@
       }
     },
     {
+      "type": "Material",
+      "displayName": "Material",
+      "category": "Material",
+      "supportsPreview": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Material",
+          "pinType": "Material"
+        }
+      ],
+      "properties": {
+        "materialName": {
+          "type": "string",
+          "default": "Material",
+          "displayName": "Name"
+        },
+        "shaderId": {
+          "type": "enum",
+          "default": "pcg.standard-pbr",
+          "displayName": "Shader",
+          "options": [
+            {
+              "value": "pcg.standard-pbr",
+              "label": "Standard PBR"
+            }
+          ]
+        },
+        "baseColor": {
+          "type": "string",
+          "default": "#b8c2cc",
+          "displayName": "Base Color"
+        },
+        "baseColorMap": {
+          "type": "texture2d",
+          "default": "",
+          "displayName": "Base Color Map"
+        },
+        "metallic": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0,
+          "maximum": 1,
+          "displayName": "Metallic"
+        },
+        "metallicMap": {
+          "type": "texture2d",
+          "default": "",
+          "displayName": "Metallic Map"
+        },
+        "roughness": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "displayName": "Roughness"
+        },
+        "roughnessMap": {
+          "type": "texture2d",
+          "default": "",
+          "displayName": "Roughness Map"
+        },
+        "normalMap": {
+          "type": "texture2d",
+          "default": "",
+          "displayName": "Normal Map"
+        },
+        "normalScale": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 4,
+          "displayName": "Normal Scale"
+        },
+        "aoMap": {
+          "type": "texture2d",
+          "default": "",
+          "displayName": "Ambient Occlusion"
+        },
+        "aoIntensity": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 4,
+          "displayName": "AO Intensity"
+        },
+        "emissiveColor": {
+          "type": "string",
+          "default": "#000000",
+          "displayName": "Emissive Color"
+        },
+        "emissiveMap": {
+          "type": "texture2d",
+          "default": "",
+          "displayName": "Emissive Map"
+        },
+        "emissiveIntensity": {
+          "type": "number",
+          "default": 0.0,
+          "minimum": 0,
+          "maximum": 16,
+          "displayName": "Emissive Intensity"
+        },
+        "opacity": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 0,
+          "maximum": 1,
+          "displayName": "Opacity"
+        },
+        "alphaMode": {
+          "type": "enum",
+          "default": "opaque",
+          "displayName": "Alpha Mode",
+          "options": [
+            { "value": "opaque", "label": "Opaque" },
+            { "value": "mask", "label": "Mask" },
+            { "value": "blend", "label": "Blend" }
+          ]
+        },
+        "alphaCutoff": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "displayName": "Alpha Cutoff",
+          "visibleWhen": {
+            "property": "alphaMode",
+            "equals": "mask"
+          }
+        },
+        "doubleSided": {
+          "type": "boolean",
+          "default": false,
+          "displayName": "Double Sided"
+        },
+        "unityShaderGuid": {
+          "type": "string",
+          "default": "",
+          "displayName": "Unity Shader GUID"
+        },
+        "unityShaderName": {
+          "type": "string",
+          "default": "",
+          "displayName": "Unity Shader"
+        },
+        "unityPropertiesJson": {
+          "type": "string",
+          "default": "{}",
+          "displayName": "Unity Properties"
+        }
+      }
+    },
+    {
       "type": "AssignMaterial",
       "displayName": "Assign Material",
       "category": "Material",
@@ -9488,6 +9643,11 @@
           "id": "in",
           "label": "Mesh",
           "pinType": "SpatialMesh"
+        },
+        {
+          "id": "material",
+          "label": "Material",
+          "pinType": "Material"
         }
       ],
       "outputs": [

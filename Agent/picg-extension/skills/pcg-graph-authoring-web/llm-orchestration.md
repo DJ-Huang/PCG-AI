@@ -1,6 +1,6 @@
 # LLM Orchestration for PCG Graph Authoring (web)
 
-Adapted from [img2threejs](https://github.com/img2threejs/img2threejs) orchestration patterns. This doc defines **how the agent should think and loop** before writing `.pcg` JSON. Runnable scripts: [`../shared/pcg-scripts/`](../shared/pcg-scripts/) · cheatsheet: [`scripts.md`](scripts.md) · **web clean-page review (P0):** [`web-review.md`](web-review.md).
+Adapted from [img2threejs](https://github.com/img2threejs/img2threejs) orchestration patterns. This doc defines **how the agent should think and loop** while authoring `.pcg` graphs. Runnable scripts: [`../shared/pcg-scripts/`](../shared/pcg-scripts/) · MCP authoring contract: [`../shared/pcg-mcp.md`](../shared/pcg-mcp.md) · cheatsheet: [`scripts.md`](scripts.md) · **web clean-page review (P0):** [`web-review.md`](web-review.md).
 
 Skill id: **`pcg-graph-authoring-web`**.
 
@@ -32,8 +32,9 @@ Skill id: **`pcg-graph-authoring-web`**.
 3. Fill Graph Authoring Plan (*-plan.json)
 4. validate_plan.py --strict-quality  (blocks shallow plans AND unarchived references)
 5. report_pass.py --resume → current unlocked pass + next command + RESUME.md
-6. Author .pcg for CURRENT PASS ONLY (do not one-shot 80+ nodes when modularizing)
-7. validate_pcg.py --check-server http://127.0.0.1:17890 → fix structural + server parity errors
+6. If the target is open in Web Editor: context → node types/full graph → atomic MCP authoring for CURRENT PASS
+   Otherwise use direct .pcg authoring as the offline/compatibility fallback
+7. MCP validate/cook, then pcg_save_graph; validate_pcg.py --check-server verifies the saved deliverable
 8. setup_web_review.py → review URL (http://localhost:5173/review?graph=...) (fixed; no ask)
 9. Vite /review route: load graph → cook via pcg-server → PreviewViewport → __pcgReady
 10. capture_webview_png.py → Playwright screenshots the WebGL canvas
@@ -43,6 +44,11 @@ Skill id: **`pcg-graph-authoring-web`**.
 ```
 
 Run validation after every substantive edit, not only at the end. Script flags: [`scripts.md`](scripts.md). Never screenshot a cluttered editor page — see [`web-review.md`](web-review.md).
+
+For MCP edits, fetch a fresh `graphHash` before every write, use one atomic
+batch per coherent pass, and wait for `applied=true`. Re-read and recompute on
+conflict. The live Preview is rapid feedback; the saved-file `/review` route
+remains the independent final acceptance surface.
 
 ## Reference persistence and re-hydration (P0)
 

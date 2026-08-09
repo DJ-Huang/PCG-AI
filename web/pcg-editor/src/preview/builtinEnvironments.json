@@ -1,0 +1,85 @@
+{
+  "source": "Poly Haven",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "resolution": "1k",
+  "environments": [
+    {
+      "id": "studio-small-03",
+      "name": "Studio Small 03",
+      "category": "Neutral Studio",
+      "file": "studio_small_03_1k.hdr",
+      "preview": "studio_small_03_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/studio_small_03",
+      "downloadCount": 581083,
+      "size": 1686299,
+      "md5": "74e6ef69ea9024c2cc25b3a7de8ec2f7"
+    },
+    {
+      "id": "brown-photostudio-02",
+      "name": "Brown Photostudio 02",
+      "category": "Warm Studio",
+      "file": "brown_photostudio_02_1k.hdr",
+      "preview": "brown_photostudio_02_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/brown_photostudio_02",
+      "downloadCount": 766272,
+      "size": 1648130,
+      "md5": "1362911793f932724326e6e56421f102"
+    },
+    {
+      "id": "abandoned-workshop",
+      "name": "Abandoned Workshop",
+      "category": "Industrial Interior",
+      "file": "abandoned_workshop_1k.hdr",
+      "preview": "abandoned_workshop_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/abandoned_workshop",
+      "downloadCount": 26545,
+      "size": 1697985,
+      "md5": "3131ea8d1ff78b036ba259e8d4577327"
+    },
+    {
+      "id": "courtyard",
+      "name": "Courtyard",
+      "category": "Daylight Exterior",
+      "file": "courtyard_1k.hdr",
+      "preview": "courtyard_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/courtyard",
+      "downloadCount": 23784,
+      "size": 1716791,
+      "md5": "c9f92690f97deab491c5f97dd652cee2"
+    },
+    {
+      "id": "venice-sunset",
+      "name": "Venice Sunset",
+      "category": "Golden Hour",
+      "file": "venice_sunset_1k.hdr",
+      "preview": "venice_sunset_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/venice_sunset",
+      "downloadCount": 362452,
+      "size": 1440400,
+      "md5": "a5ec4d30fc3421c214a17b208fb66d5f"
+    },
+    {
+      "id": "kiara-1-dawn",
+      "name": "Kiara 1 Dawn",
+      "category": "Cool Dawn",
+      "file": "kiara_1_dawn_1k.hdr",
+      "preview": "kiara_1_dawn_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/kiara_1_dawn",
+      "downloadCount": 449355,
+      "size": 1475077,
+      "md5": "fcefd321c51b468ead9d5e1a369a3735"
+    },
+    {
+      "id": "dikhololo-night",
+      "name": "Dikhololo Night",
+      "category": "Night",
+      "file": "dikhololo_night_1k.hdr",
+      "preview": "dikhololo_night_preview.png",
+      "sourceUrl": "https://polyhaven.com/a/dikhololo_night",
+      "downloadCount": 654850,
+      "size": 1745132,
+      "md5": "4a760813214ec4d97da8e1739bb616a5"
+    }
+  ]
+}

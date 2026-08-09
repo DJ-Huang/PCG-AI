@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
+const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
 const PCG_SERVER_PORT = Number(process.env.PCG_SERVER_PORT) || 17890;
 const PCG_SERVER_HOST = '127.0.0.1';
 
@@ -155,8 +156,13 @@ function exportGraphPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, error: 'Missing filePath or graphData' }));
               return;
             }
-            // Resolve relative to workspace root (parent of web/)
-            const resolved = path.resolve(__dirname, '..', filePath);
+            const resolved = path.resolve(WORKSPACE_ROOT, filePath);
+            const relative = path.relative(WORKSPACE_ROOT, resolved);
+            if (relative.startsWith('..') || path.isAbsolute(relative) || path.extname(resolved) !== '.pcg') {
+              res.statusCode = 403;
+              res.end(JSON.stringify({ ok: false, error: 'Graph path must be a .pcg file inside the workspace' }));
+              return;
+            }
             fs.mkdirSync(path.dirname(resolved), { recursive: true });
             fs.writeFileSync(resolved, JSON.stringify(graphData, null, 2), 'utf8');
             res.setHeader('Content-Type', 'application/json');
