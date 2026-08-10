@@ -344,6 +344,7 @@ export async function startTurn(
   input: {
     message: string;
     sessionId: string;
+    editorSessionId?: string;
     providerId: string;
     modelId: string;
     reasoningEffort?: ReasoningEffort;
@@ -360,6 +361,7 @@ export async function startTurn(
       [JSON.stringify({
         message: input.message,
         sessionId: input.sessionId,
+        ...(input.editorSessionId ? { editorSessionId: input.editorSessionId } : {}),
         providerId: input.providerId,
         modelId: input.modelId,
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),

@@ -116,7 +116,7 @@ json SuccessResponse(const json& id, const json& result) {
 }
 
 json BuildToolDefinitions() {
-    return json::array({
+    json tools = json::array({
         {
             {"name", "pcg_get_editor_context"},
             {"description", "Read the live Web editor path, selection, preview target, graph hash, and bridge status."},
@@ -234,41 +234,59 @@ json BuildToolDefinitions() {
             }},
         },
     });
+    for (auto& tool : tools) {
+        tool["inputSchema"]["properties"]["editorSessionId"] = {
+            {"type", "string"},
+            {"description", "Web editor page id. Omit when exactly one page is online; when multiple pages are listed, ask the user which one to use."},
+        };
+    }
+    return tools;
 }
 
-json CallToolInternal(const std::string& name, const json& arguments) {
-    if (name == "pcg_get_editor_context") return ToolResult(GetEditorContext());
+json CallToolInternal(
+    const std::string& name,
+    const json& arguments,
+    const std::string& bound_editor_session_id) {
+    const std::string editor_session_id = bound_editor_session_id.empty()
+        ? arguments.value("editorSessionId", "")
+        : bound_editor_session_id;
+    if (name == "pcg_get_editor_context") {
+        const json result = GetEditorContext(editor_session_id);
+        return ToolResult(result, !result.value("ok", false));
+    }
     if (name == "pcg_list_nodes") {
-        const json result = ListEditorNodes();
+        const json result = ListEditorNodes(editor_session_id);
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_get_graph") {
-        const json result = GetEditorDocument();
+        const json result = GetEditorDocument(editor_session_id);
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_get_node_types") {
         const json result = GetEditorNodeTypes(
             arguments.value("nodeType", ""),
-            arguments.value("category", ""));
+            arguments.value("category", ""),
+            editor_session_id);
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_get_node") {
         std::string node_id = arguments.value("nodeId", "");
         if (node_id.empty()) {
-            const json context = GetEditorContext();
+            const json context = GetEditorContext(editor_session_id);
             if (context.contains("session") && context["session"].is_object()) {
                 node_id = context["session"].value("selectedNodeId", "");
             }
         }
         if (node_id.empty()) return ToolResult({{"ok", false}, {"error", "no_node_selected"}}, true);
-        const json result = GetEditorNode(node_id);
+        const json result = GetEditorNode(node_id, editor_session_id);
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_patch_node") {
         const json queued = QueueNodePatch(
             arguments.value("nodeId", ""),
             arguments.value("patch", json()),
-            arguments.value("ifGraphHash", ""));
+            arguments.value("ifGraphHash", ""),
+            editor_session_id);
         return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_apply_graph_ops") {
@@ -288,7 +306,7 @@ json CallToolInternal(const std::string& name, const json& arguments) {
         }
         const json queued = QueueGraphCommand(
             {{"type", "applyGraphOps"}, {"operations", operations}},
-            arguments.value("ifGraphHash", ""));
+            arguments.value("ifGraphHash", ""), false, editor_session_id);
         return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_replace_graph") {
@@ -305,7 +323,8 @@ json CallToolInternal(const std::string& name, const json& arguments) {
         const json queued = QueueGraphCommand(
             {{"type", "replaceGraph"}, {"graph", graph}},
             arguments.value("ifGraphHash", ""),
-            true);
+            true,
+            editor_session_id);
         return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_save_graph") {
@@ -317,15 +336,16 @@ json CallToolInternal(const std::string& name, const json& arguments) {
         if (!path.empty()) command["path"] = path;
         const json queued = QueueGraphCommand(
             std::move(command),
-            arguments.value("ifGraphHash", ""));
+            arguments.value("ifGraphHash", ""), false, editor_session_id);
         return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_capture_preview") {
         const int requested_timeout = arguments.value("timeoutMs", 10000);
         const int timeout = std::max(1000, std::min(30000, requested_timeout));
-        const uint64_t request_id = RequestPreviewCapture();
+        const uint64_t request_id = RequestPreviewCapture(editor_session_id);
+        if (request_id == 0) return ToolResult(GetEditorContext(editor_session_id), true);
         PreviewSnapshot snapshot;
-        if (!WaitForPreview(request_id, std::chrono::milliseconds(timeout), snapshot)) {
+        if (!WaitForPreview(request_id, std::chrono::milliseconds(timeout), snapshot, editor_session_id)) {
             return ToolResult({
                 {"ok", false}, {"error", "preview_timeout"}, {"requestId", request_id},
                 {"hint", "Keep the Web editor and Preview panel open."},
@@ -345,7 +365,7 @@ json CallToolInternal(const std::string& name, const json& arguments) {
         return result;
     }
     if (name == "pcg_validate") {
-        const json graph = GetEditorGraph();
+        const json graph = GetEditorGraph(editor_session_id);
         if (graph.is_null()) return ToolResult({{"ok", false}, {"error", "editor_offline"}}, true);
         httplib::Request validate_req;
         httplib::Response validate_res;
@@ -356,7 +376,7 @@ json CallToolInternal(const std::string& name, const json& arguments) {
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_cook") {
-        const json graph = GetEditorGraph();
+        const json graph = GetEditorGraph(editor_session_id);
         if (graph.is_null()) return ToolResult({{"ok", false}, {"error", "editor_offline"}}, true);
         httplib::Request cook_req;
         httplib::Response cook_res;
@@ -437,8 +457,11 @@ json GetPcgToolDefinitions() {
     return BuildToolDefinitions();
 }
 
-json CallPcgTool(const std::string& name, const json& arguments) {
-    return CallToolInternal(name, arguments);
+json CallPcgTool(
+    const std::string& name,
+    const json& arguments,
+    const std::string& editor_session_id) {
+    return CallToolInternal(name, arguments, editor_session_id);
 }
 
 bool PcgToolRequiresApproval(const std::string&) {

@@ -29,6 +29,7 @@ interface AgentPanelProps {
   onApplyActions: (actions: AgentAction[]) => AgentActionResult[];
   onOpenSettings?: () => void;
   syncEditorContext?: () => Promise<void>;
+  editorSessionId?: string;
   providerRevision?: number;
 }
 
@@ -62,7 +63,7 @@ function upsertPart(message: AgentMessageRecord, part: AgentPart): AgentMessageR
   return { ...message, parts };
 }
 
-export default function AgentPanel({ onOpenSettings, syncEditorContext, providerRevision = 0 }: AgentPanelProps) {
+export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSessionId = '', providerRevision = 0 }: AgentPanelProps) {
   const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
   const [sending, setSending] = useState(false);
   const [width, setWidth] = useState(380);
@@ -319,7 +320,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     abortRef.current = abort;
     try {
       await syncEditorContext?.();
-      await startTurn({ message: text, sessionId, providerId, modelId, reasoningEffort, attachments }, handleEvent, abort.signal);
+      await startTurn({ message: text, sessionId, editorSessionId, providerId, modelId, reasoningEffort, attachments }, handleEvent, abort.signal);
     }
     catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
@@ -327,7 +328,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, onOpenSettings, providerId, reasoningEffort, selectedModel, selectedProvider, sessionId, syncEditorContext]);
+  }, [connected, editorSessionId, handleEvent, modelId, onOpenSettings, providerId, reasoningEffort, selectedModel, selectedProvider, sessionId, syncEditorContext]);
 
   const retryTurn = useCallback(async (retryTurnId: string) => {
     if (!connected || !selectedProvider || !selectedModel || sending) return;
@@ -340,7 +341,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     try {
       await syncEditorContext?.();
       await startTurn({
-        message: '', sessionId, providerId, modelId, reasoningEffort, attachments: [], retryTurnId,
+        message: '', sessionId, editorSessionId, providerId, modelId, reasoningEffort, attachments: [], retryTurnId,
       }, handleEvent, abort.signal);
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
@@ -348,7 +349,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, providerId, reasoningEffort, selectedModel, selectedProvider, sending, sessionId, syncEditorContext]);
+  }, [connected, editorSessionId, handleEvent, modelId, providerId, reasoningEffort, selectedModel, selectedProvider, sending, sessionId, syncEditorContext]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();

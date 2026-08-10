@@ -29,32 +29,38 @@ void HandlePatchNode(const httplib::Request& req, httplib::Response& res);
 void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res);
 void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res);
 
-nlohmann::json GetEditorContext();
-nlohmann::json GetEditorNode(const std::string& node_id);
-nlohmann::json ListEditorNodes();
+nlohmann::json GetEditorContext(const std::string& editor_session_id = "");
+nlohmann::json GetEditorNode(
+    const std::string& node_id,
+    const std::string& editor_session_id = "");
+nlohmann::json ListEditorNodes(const std::string& editor_session_id = "");
 nlohmann::json GetEditorNodeTypes(
     const std::string& node_type = "",
-    const std::string& category = "");
-nlohmann::json GetEditorDocument();
+    const std::string& category = "",
+    const std::string& editor_session_id = "");
+nlohmann::json GetEditorDocument(const std::string& editor_session_id = "");
 nlohmann::json QueueNodePatch(
     const std::string& node_id,
     const nlohmann::json& patch,
-    const std::string& expected_graph_hash);
+    const std::string& expected_graph_hash,
+    const std::string& editor_session_id = "");
 nlohmann::json QueueGraphCommand(
     nlohmann::json command,
     const std::string& expected_graph_hash,
-    bool require_root_scope = false);
+    bool require_root_scope = false,
+    const std::string& editor_session_id = "");
 bool WaitForGraphCommandResult(
     uint64_t command_id,
     std::chrono::milliseconds timeout,
     nlohmann::json& result);
 bool CancelGraphCommand(uint64_t command_id);
-nlohmann::json GetEditorGraph();
-uint64_t RequestPreviewCapture();
+nlohmann::json GetEditorGraph(const std::string& editor_session_id = "");
+uint64_t RequestPreviewCapture(const std::string& editor_session_id = "");
 bool WaitForPreview(
     uint64_t request_id,
     std::chrono::milliseconds timeout,
-    PreviewSnapshot& snapshot);
+    PreviewSnapshot& snapshot,
+    const std::string& editor_session_id = "");
 nlohmann::json GetBridgeHealth();
 
 }  // namespace pcg_server

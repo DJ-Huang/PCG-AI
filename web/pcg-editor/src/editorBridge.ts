@@ -11,6 +11,7 @@ const HEARTBEAT_MS = 5_000;
 const POLL_MS = 400;
 
 interface EditorBridgeOptions {
+  sessionId: string;
   graph: GraphJson;
   nodeManifest: NodeManifest;
   graphPath: string;
@@ -73,7 +74,6 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
   const cursorRef = useRef(0);
   const captureRequestRef = useRef(0);
   const pollingRef = useRef(false);
-  const sessionIdRef = useRef(crypto.randomUUID());
   const clientRevisionRef = useRef(0);
   const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId]);
   const latestSessionKeyRef = useRef(sessionKey);
@@ -88,7 +88,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     if (scheduledSessionKey !== latestSessionKeyRef.current) return;
     hashRef.current = hash;
     const response = await putJson('/session', {
-      sessionId: sessionIdRef.current,
+      sessionId: options.sessionId,
       clientRevision: ++clientRevisionRef.current,
       graphPath,
       editPath: JSON.parse(editPathKey) as string[],
@@ -106,14 +106,14 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       if (conflict?.error === 'stale_session_update') return;
     }
     if (!response.ok) throw new Error(`session sync failed: HTTP ${response.status}`);
-  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest]);
+  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest, options.sessionId]);
 
   useEffect(() => {
     const debounce = window.setTimeout(() => void pushSession().catch(console.warn), 250);
     const heartbeat = window.setInterval(
       () => void (async () => {
         try {
-          const response = await postJson('/session/heartbeat', { sessionId: sessionIdRef.current });
+          const response = await postJson('/session/heartbeat', { sessionId: options.sessionId });
           if (response.status === 409) await pushSession();
         } catch (error) {
           console.warn('[editor-bridge] heartbeat failed', error);
@@ -125,15 +125,15 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       window.clearTimeout(debounce);
       window.clearInterval(heartbeat);
     };
-  }, [pushSession]);
+  }, [pushSession, options.sessionId]);
 
   const uploadCapture = useCallback(async (requestId: number) => {
     const capture = capturePreviewRef.current();
     if (!capture) return false;
-    const response = await putJson('/preview/screenshot', { requestId, ...capture });
+    const response = await putJson('/preview/screenshot', { sessionId: options.sessionId, requestId, ...capture });
     if (!response.ok) throw new Error(`preview upload failed: HTTP ${response.status}`);
     return true;
-  }, []);
+  }, [options.sessionId]);
 
   // Maintain a recent screenshot even before an Agent explicitly requests one.
   useEffect(() => {
@@ -151,8 +151,8 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       try {
         const headers = bridgeHeaders();
         const [sessionResponse, patchesResponse] = await Promise.all([
-          fetch(`${BRIDGE_BASE}/session`, { headers }),
-          fetch(`${BRIDGE_BASE}/graph/patches?after=${cursorRef.current}`, { headers }),
+          fetch(`${BRIDGE_BASE}/session?sessionId=${encodeURIComponent(options.sessionId)}`, { headers }),
+          fetch(`${BRIDGE_BASE}/graph/patches?sessionId=${encodeURIComponent(options.sessionId)}&after=${cursorRef.current}`, { headers }),
         ]);
         if (sessionResponse.ok) {
           const session = (await sessionResponse.json()) as SessionResponse;
@@ -179,6 +179,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
                 error: samePath ? 'graph_conflict' : `edit_path_changed:${currentPath.join('/')}`,
               }];
             await postJson('/graph/patches/ack', {
+              sessionId: options.sessionId,
               ids: [patch.id],
               results,
             });
@@ -194,7 +195,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     void poll();
     const timer = window.setInterval(() => void poll(), POLL_MS);
     return () => window.clearInterval(timer);
-  }, [editPathKey, uploadCapture]);
+  }, [editPathKey, uploadCapture, options.sessionId]);
 
   // Callers that are about to start an Agent turn can await this barrier so
   // MCP tools observe the current selection instead of the debounced session.

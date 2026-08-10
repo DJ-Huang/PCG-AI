@@ -86,7 +86,7 @@ describe('AgentPanel', () => {
       releaseSync = resolve;
     }));
     vi.mocked(client.startTurn).mockResolvedValue();
-    render(<AgentPanel onApplyActions={() => []} syncEditorContext={syncEditorContext} />);
+    render(<AgentPanel onApplyActions={() => []} syncEditorContext={syncEditorContext} editorSessionId="editor-page-wood" />);
     await screen.findByTitle('OpenAI · GPT Test');
 
     fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'inspect selection' } });
@@ -97,6 +97,7 @@ describe('AgentPanel', () => {
 
     releaseSync?.();
     await waitFor(() => expect(client.startTurn).toHaveBeenCalledOnce());
+    expect(vi.mocked(client.startTurn).mock.calls[0][0]).toMatchObject({ editorSessionId: 'editor-page-wood' });
   });
 
   it('shows a retryable error when the Provider stops before a final answer', async () => {

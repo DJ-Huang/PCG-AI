@@ -26,7 +26,7 @@ describe('agentClient', () => {
     const file = new File(['node data'], 'graph.pcg', { type: 'application/json' });
 
     await startTurn({
-      message: 'inspect', sessionId: 'session-1', providerId: 'openai', modelId: 'gpt-test',
+      message: 'inspect', sessionId: 'session-1', editorSessionId: 'editor-page-wood', providerId: 'openai', modelId: 'gpt-test',
       reasoningEffort: 'max', attachments: [{ id: 'a1', file, previewUrl: null }],
     }, (event) => events.push(event));
 
@@ -43,6 +43,7 @@ describe('agentClient', () => {
     });
     const payload = JSON.parse(requestText);
     expect(payload.reasoningEffort).toBe('max');
+    expect(payload.editorSessionId).toBe('editor-page-wood');
     expect(uploaded.name).toBe('graph.pcg');
     expect(uploaded.size).toBe(file.size);
   });

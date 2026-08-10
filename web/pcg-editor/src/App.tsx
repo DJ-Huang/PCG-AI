@@ -148,6 +148,7 @@ function restoreEditorSession() {
 
 function PcgEditor() {
   const restoredRef = useRef(restoreEditorSession());
+  const editorSessionIdRef = useRef(crypto.randomUUID());
   const restored = restoredRef.current;
 
   const [nodes, setNodes, onNodesChange] = useNodesState(restored?.nodes ?? initialNodes);
@@ -773,6 +774,7 @@ function PcgEditor() {
     [],
   );
   const syncEditorContext = useEditorBridge({
+    sessionId: editorSessionIdRef.current,
     graph: bridgeGraph,
     nodeManifest: getNodeManifest(),
     graphPath: currentFilename,
@@ -1282,6 +1284,7 @@ function PcgEditor() {
             onApplyActions={applyAgentActions}
             onOpenSettings={openSettings}
             syncEditorContext={syncEditorContext}
+            editorSessionId={editorSessionIdRef.current}
             providerRevision={providerRevision}
           />
         )}

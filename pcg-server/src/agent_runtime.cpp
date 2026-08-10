@@ -81,6 +81,7 @@ struct TurnState {
     std::atomic<bool> cancelled{false};
     std::string id;
     std::string session_id;
+    std::string editor_session_id;
     std::string provider;
     std::string model;
     std::string reasoning_effort;
@@ -1144,12 +1145,21 @@ json AgentTools() {
 
 const char* SystemPrompt() {
     return
-        "You are the embedded PCG-AI graph authoring agent. Always inspect the live editor context and "
-        "manifest-backed node types before authoring. Never invent node types, properties, or pin IDs. "
-        "Every write must use the latest graphHash. Prefer one atomic pcg_apply_graph_ops batch. "
-        "Before a multi-step task, give the user one concise progress sentence. After edits, validate, cook, "
-        "and capture the preview. Do not repeat an identical read tool when the graph has not changed. On "
-        "conflicts or timeouts, refresh context instead of replaying a stale write. Explain failures plainly.";
+        "You are PCG-AI's embedded procedural-content expert. Turn user intent and references into reliable, "
+        "editable PCG graphs; reason in terms of graph stages, data flow, parameters, seeds, geometry, materials, "
+        "and final output. Prefer procedural, reusable structure over one-off geometry.\n\n"
+        "Evidence first: call pcg_get_editor_context, then inspect the selected node or live graph. Before using a "
+        "node, query pcg_get_node_types by exact type or category. The live manifest is authoritative: never invent "
+        "node types, properties, defaults, ranges, pin IDs, or pin compatibility. Do not repeat an identical read "
+        "while the graphHash is unchanged.\n\n"
+        "PCG MCP workflow: use pcg_patch_node for one existing node and pcg_apply_graph_ops for a related batch; use "
+        "pcg_replace_graph only for an intentional full-document replacement from root scope. Give every node and edge "
+        "a unique ID, use explicit manifest-backed handles, and send the latest graphHash with every write. When several "
+        "editor pages are available, ask which page to use. On conflict, timeout, or stale state, refresh context and "
+        "re-plan instead of replaying a write. Save only when requested or when intentionally updating the current named graph.\n\n"
+        "For multi-step work, start with one concise progress sentence. After a write, run pcg_validate, pcg_cook, and "
+        "pcg_capture_preview; inspect the result against the request and iterate when evidence shows a mismatch. Finish "
+        "with a concise summary of changes and validation. Explain blockers plainly and do not report success without tool evidence.";
 }
 
 json PublicToolResult(const json& result) {
@@ -1986,7 +1996,7 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
                 approval_calls.push_back(public_call);
                 continue;
             }
-            const std::string graph_hash = GetEditorContext().value("session", json::object()).value("graphHash", "");
+            const std::string graph_hash = GetEditorContext(turn.editor_session_id).value("session", json::object()).value("graphHash", "");
             const std::string cache_key = name + "\n" + graph_hash + "\n" + call.value("arguments", json::object()).dump();
             bool cached = false;
             json tool_result;
@@ -1999,7 +2009,7 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
                            {"structuredContent", {{"ok", false}, {"error", "repeated_tool_call"}}}, {"isError", true}}
                     : cached_result->second;
             } else {
-                tool_result = CallPcgTool(name, call.value("arguments", json::object()));
+                tool_result = CallPcgTool(name, call.value("arguments", json::object()), turn.editor_session_id);
                 if (CacheableReadTool(name)) {
                     turn.tool_cache[cache_key] = tool_result;
                     turn.repeated_tools[cache_key] = 0;
@@ -2472,6 +2482,7 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
     auto turn = std::make_shared<TurnState>();
     turn->id = RandomId("turn");
     turn->session_id = input.value("sessionId", RandomId("session"));
+    turn->editor_session_id = input.value("editorSessionId", "");
     if (turn->session_id.rfind("session-", 0) != 0) turn->session_id = RandomId("session");
     turn->provider = input.value("providerId", "");
     turn->model = input.value("modelId", "");
@@ -2551,7 +2562,14 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
         turn->session_record["modelId"] = turn->model;
         turn->session_record["status"] = "running";
         turn->session_record["updatedAt"] = turn->started_at;
-        const json editor = GetEditorContext();
+        const json editor = GetEditorContext(turn->editor_session_id);
+        if (!editor.value("ok", false)) {
+            JsonResponse(res, 409, ErrorBody(
+                editor.value("error", "editor_session_unavailable"),
+                "The Web editor page for this chat is no longer available. Refresh the page and retry.",
+                true));
+            return;
+        }
         const std::string graph_path = editor.value("session", json::object()).value("graphPath", "");
         if (!graph_path.empty()) turn->session_record["graphName"] = std::filesystem::path(graph_path).filename().string();
         const size_t history_start = turn->history.size();
@@ -2679,12 +2697,12 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
                 } else {
                     const json arguments = call.value("arguments", json::object());
                     const std::string expected_hash = arguments.value("ifGraphHash", "");
-                    const std::string current_hash = GetEditorContext().value("session", json::object()).value("graphHash", "");
+                    const std::string current_hash = GetEditorContext(turn->editor_session_id).value("session", json::object()).value("graphHash", "");
                     if (expected_hash.empty() || expected_hash != current_hash) {
                         result = {{"content", json::array({{{"type", "text"}, {"text", "Graph changed while approval was pending."}}})},
                                   {"structuredContent", {{"ok", false}, {"error", "graph_conflict"}, {"graphHash", current_hash}}}, {"isError", true}};
                     } else {
-                        result = CallPcgTool(call.value("name", ""), arguments);
+                        result = CallPcgTool(call.value("name", ""), arguments, turn->editor_session_id);
                     }
                 }
                 const std::string name = call.value("name", "");

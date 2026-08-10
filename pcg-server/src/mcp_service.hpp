@@ -16,7 +16,8 @@ void HandleMcpGet(const httplib::Request& req, httplib::Response& res);
 nlohmann::json GetPcgToolDefinitions();
 nlohmann::json CallPcgTool(
     const std::string& name,
-    const nlohmann::json& arguments = nlohmann::json::object());
+    const nlohmann::json& arguments = nlohmann::json::object(),
+    const std::string& editor_session_id = "");
 bool PcgToolRequiresApproval(const std::string& name);
 bool PcgToolMutatesGraph(const std::string& name);
 

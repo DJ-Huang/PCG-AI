@@ -298,7 +298,88 @@ def main() -> None:
     assert captured["structuredContent"]["requestId"] == request_id
     assert any(item["type"] == "image" for item in captured["content"])
 
-    print("Agent bridge OK: MCP read/schema/atomic graph ops/replace/save/validate/cook/preview + REST locking/ack")
+    second_graph = {
+        "version": "1.0",
+        "nodes": [{
+            "id": "other-page-node", "type": "SpawnPoints",
+            "position": {"x": 0, "y": 0}, "data": {"count": 1, "radius": 1},
+        }],
+        "edges": [], "parameters": [], "subgraphs": [],
+    }
+    second_session_id = f"bridge-second-page-{uuid.uuid4()}"
+    second_session = {
+        **session,
+        "sessionId": second_session_id,
+        "clientRevision": 1,
+        "graphPath": "other-page.pcg",
+        "graphHash": "other-page-hash",
+        "graph": second_graph,
+        "updatedAt": int(time.time() * 1000),
+    }
+    status, _ = json_request(args.base, "/v1/session", "PUT", second_session)
+    assert status == 200
+    ambiguous = mcp(
+        args.base, 15, "tools/call",
+        {"name": "pcg_get_editor_context", "arguments": {}},
+    )
+    assert ambiguous["isError"] is True
+    assert ambiguous["structuredContent"]["error"] == "editor_session_required"
+    assert len(ambiguous["structuredContent"]["editors"]) == 2
+    first_document = mcp(
+        args.base, 16, "tools/call",
+        {"name": "pcg_get_graph", "arguments": {"editorSessionId": session["sessionId"]}},
+    )
+    second_document = mcp(
+        args.base, 17, "tools/call",
+        {"name": "pcg_get_graph", "arguments": {"editorSessionId": second_session_id}},
+    )
+    assert first_document["structuredContent"]["graph"]["nodes"][0]["id"] == selected
+    assert second_document["structuredContent"]["graph"]["nodes"][0]["id"] == "other-page-node"
+
+    routed_write = {}
+
+    def write_second_page():
+        routed_write["value"] = mcp(
+            args.base, 18, "tools/call",
+            {"name": "pcg_patch_node", "arguments": {
+                "editorSessionId": second_session_id,
+                "nodeId": "other-page-node", "patch": {"count": 2},
+                "ifGraphHash": "other-page-hash",
+            }},
+        )
+
+    write_thread = threading.Thread(target=write_second_page)
+    write_thread.start()
+    routed_command = None
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        _, payload = json_request(
+            args.base, f"/v1/graph/patches?sessionId={second_session_id}&after=0"
+        )
+        if payload.get("patches"):
+            routed_command = payload["patches"][0]
+            break
+        time.sleep(0.05)
+    assert routed_command is not None
+    assert routed_command["editorSessionId"] == second_session_id
+    _, first_page_queue = json_request(
+        args.base, f"/v1/graph/patches?sessionId={session['sessionId']}&after=0"
+    )
+    assert first_page_queue["patches"] == []
+    status, _ = json_request(
+        args.base, "/v1/graph/patches/ack", "POST",
+        {
+            "sessionId": second_session_id,
+            "ids": [routed_command["id"]],
+            "results": [{"id": routed_command["id"], "ok": True}],
+        },
+    )
+    assert status == 200
+    write_thread.join(timeout=7)
+    assert not write_thread.is_alive()
+    assert routed_write["value"]["structuredContent"]["applied"] is True
+
+    print("Agent bridge OK: per-page routing + MCP read/schema/atomic graph ops/replace/save/validate/cook/preview + REST locking/ack")
 
 
 if __name__ == "__main__":

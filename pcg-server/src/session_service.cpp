@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <condition_variable>
 #include <deque>
+#include <iterator>
 #include <mutex>
 #include <unordered_map>
 
@@ -13,18 +14,22 @@ namespace {
 
 using json = nlohmann::json;
 constexpr auto kEditorOfflineAfter = std::chrono::seconds(15);
+constexpr auto kEditorRetention = std::chrono::minutes(5);
 
-struct BridgeState {
-    std::mutex mutex;
-    std::condition_variable preview_changed;
+struct EditorState {
     json session = json::object();
-    bool has_session = false;
     std::chrono::steady_clock::time_point last_seen{};
     int64_t session_revision = 0;
     uint64_t capture_request_id = 0;
     PreviewSnapshot preview;
-    uint64_t next_patch_id = 1;
     std::deque<json> patches;
+};
+
+struct BridgeState {
+    std::mutex mutex;
+    std::condition_variable preview_changed;
+    std::unordered_map<std::string, EditorState> editors;
+    uint64_t next_patch_id = 1;
     std::condition_variable command_changed;
     std::unordered_map<uint64_t, json> command_results;
     std::deque<uint64_t> command_result_order;
@@ -41,9 +46,59 @@ int64_t EpochMillis() {
         .count();
 }
 
-bool IsOnlineLocked(const BridgeState& state) {
-    return state.has_session &&
-           std::chrono::steady_clock::now() - state.last_seen <= kEditorOfflineAfter;
+bool IsOnlineLocked(const EditorState& editor) {
+    return !editor.session.empty() &&
+           std::chrono::steady_clock::now() - editor.last_seen <= kEditorOfflineAfter;
+}
+
+json EditorChoicesLocked(const BridgeState& state) {
+    json choices = json::array();
+    for (const auto& [id, editor] : state.editors) {
+        if (!IsOnlineLocked(editor)) continue;
+        const json graph = editor.session.value("graph", json::object());
+        choices.push_back({
+            {"editorSessionId", id},
+            {"graphPath", editor.session.value("graphPath", "")},
+            {"graphHash", editor.session.value("graphHash", "")},
+            {"nodeCount", graph.value("nodes", json::array()).size()},
+            {"updatedAt", editor.session.value("updatedAt", 0ll)},
+        });
+    }
+    return choices;
+}
+
+json EditorSelectionErrorLocked(const BridgeState& state, const std::string& requested_id) {
+    const json choices = EditorChoicesLocked(state);
+    if (!requested_id.empty()) {
+        return {
+            {"ok", false}, {"error", "editor_session_unavailable"},
+            {"editorSessionId", requested_id}, {"editors", choices},
+        };
+    }
+    if (choices.empty()) return {{"ok", false}, {"error", "editor_offline"}, {"editors", choices}};
+    return {
+        {"ok", false}, {"error", "editor_session_required"},
+        {"message", "Multiple Web editor pages are online. Ask the user which page to use, then pass editorSessionId."},
+        {"editors", choices},
+    };
+}
+
+EditorState* ResolveEditorLocked(BridgeState& state, const std::string& requested_id) {
+    if (!requested_id.empty()) {
+        const auto it = state.editors.find(requested_id);
+        return it != state.editors.end() && IsOnlineLocked(it->second) ? &it->second : nullptr;
+    }
+    EditorState* resolved = nullptr;
+    for (auto& [_, editor] : state.editors) {
+        if (!IsOnlineLocked(editor)) continue;
+        if (resolved != nullptr) return nullptr;
+        resolved = &editor;
+    }
+    return resolved;
+}
+
+const EditorState* ResolveEditorLocked(const BridgeState& state, const std::string& requested_id) {
+    return ResolveEditorLocked(const_cast<BridgeState&>(state), requested_id);
 }
 
 void JsonResponse(httplib::Response& res, int status, const json& body) {
@@ -130,13 +185,14 @@ const json* FindCurrentNode(const json& session, const std::string& node_id) {
 
 json QueueGraphCommandLocked(
     BridgeState& state,
+    EditorState& editor,
     json command,
     const std::string& expected_graph_hash,
     bool require_root_scope) {
-    if (!IsOnlineLocked(state)) {
+    if (!IsOnlineLocked(editor)) {
         return {{"ok", false}, {"status", 409}, {"error", "editor_offline"}};
     }
-    const std::string current_hash = state.session.value("graphHash", "");
+    const std::string current_hash = editor.session.value("graphHash", "");
     if (expected_graph_hash.empty()) {
         return {{"ok", false}, {"status", 428}, {"error", "ifGraphHash is required"}};
     }
@@ -146,7 +202,7 @@ json QueueGraphCommandLocked(
             {"expectedGraphHash", expected_graph_hash}, {"currentGraphHash", current_hash},
         };
     }
-    const json edit_path = state.session.value("editPath", json::array());
+    const json edit_path = editor.session.value("editPath", json::array());
     if (require_root_scope && edit_path.is_array() && !edit_path.empty()) {
         return {{"ok", false}, {"status", 409}, {"error", "root_scope_required"}, {"editPath", edit_path}};
     }
@@ -154,15 +210,15 @@ json QueueGraphCommandLocked(
     command["baseGraphHash"] = current_hash;
     command["editPath"] = edit_path;
     command["createdAt"] = EpochMillis();
-    state.patches.push_back(command);
+    command["editorSessionId"] = editor.session.value("sessionId", "");
+    editor.patches.push_back(command);
     return {{"ok", true}, {"accepted", true}, {"command", std::move(command)}};
 }
 
-json ContextLocked(const BridgeState& state) {
-    if (!state.has_session) {
-        return {{"ok", true}, {"online", false}, {"error", "editor_offline"}};
-    }
-    json session = state.session;
+json ContextLocked(const BridgeState& state, const std::string& editor_session_id) {
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
+    json session = editor->session;
     session.erase("graph");
     if (session.contains("nodeManifest") && session["nodeManifest"].is_object()) {
         session["nodeManifestVersion"] = session["nodeManifest"].value("version", "");
@@ -170,12 +226,12 @@ json ContextLocked(const BridgeState& state) {
     session.erase("nodeManifest");
     return {
         {"ok", true},
-        {"online", IsOnlineLocked(state)},
+        {"online", IsOnlineLocked(*editor)},
         {"session", std::move(session)},
-        {"sessionRevision", state.session_revision},
-        {"captureRequestId", state.capture_request_id},
-        {"previewRequestId", state.preview.request_id},
-        {"pendingPatchCount", state.patches.size()},
+        {"sessionRevision", editor->session_revision},
+        {"captureRequestId", editor->capture_request_id},
+        {"previewRequestId", editor->preview.request_id},
+        {"pendingPatchCount", editor->patches.size()},
         {"serverTime", EpochMillis()},
     };
 }
@@ -193,30 +249,38 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
     }
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
+    const auto now = std::chrono::steady_clock::now();
+    for (auto it = state.editors.begin(); it != state.editors.end();) {
+        it = now - it->second.last_seen > kEditorRetention ? state.editors.erase(it) : std::next(it);
+    }
     const std::string incoming_id = body.value("sessionId", "");
+    if (incoming_id.empty()) {
+        JsonResponse(res, 400, {{"ok", false}, {"error", "sessionId is required"}});
+        return;
+    }
+    auto& editor = state.editors[incoming_id];
     const int64_t incoming_revision = body.value("clientRevision", 0ll);
-    if (state.has_session && !incoming_id.empty() &&
-        incoming_id == state.session.value("sessionId", "") &&
-        incoming_revision > 0 &&
-        incoming_revision <= state.session.value("clientRevision", 0ll)) {
+    if (!editor.session.empty() && incoming_revision > 0 &&
+        incoming_revision <= editor.session.value("clientRevision", 0ll)) {
         JsonResponse(res, 409, {
             {"ok", false}, {"error", "stale_session_update"},
             {"clientRevision", incoming_revision},
-            {"currentClientRevision", state.session.value("clientRevision", 0ll)},
+            {"currentClientRevision", editor.session.value("clientRevision", 0ll)},
         });
         return;
     }
     body["receivedAt"] = EpochMillis();
-    state.session = std::move(body);
-    state.has_session = true;
-    state.last_seen = std::chrono::steady_clock::now();
-    ++state.session_revision;
-    JsonResponse(res, 200, ContextLocked(state));
+    editor.session = std::move(body);
+    editor.last_seen = now;
+    ++editor.session_revision;
+    JsonResponse(res, 200, ContextLocked(state, incoming_id));
 }
 
 void HandleGetSession(const httplib::Request& req, httplib::Response& res) {
     if (!CheckAgentAuth(req, res)) return;
-    JsonResponse(res, 200, GetEditorContext());
+    const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
+    const json context = GetEditorContext(editor_session_id);
+    JsonResponse(res, context.value("ok", false) ? 200 : 409, context);
 }
 
 void HandleSessionHeartbeat(const httplib::Request& req, httplib::Response& res) {
@@ -226,11 +290,12 @@ void HandleSessionHeartbeat(const httplib::Request& req, httplib::Response& res)
     const std::string session_id = body.value("sessionId", "");
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!state.has_session || session_id.empty() || session_id != state.session.value("sessionId", "")) {
-        JsonResponse(res, 409, {{"ok", false}, {"error", "session_replaced"}});
+    const auto it = state.editors.find(session_id);
+    if (session_id.empty() || it == state.editors.end()) {
+        JsonResponse(res, 409, {{"ok", false}, {"error", "session_missing"}});
         return;
     }
-    state.last_seen = std::chrono::steady_clock::now();
+    it->second.last_seen = std::chrono::steady_clock::now();
     JsonResponse(res, 200, {{"ok", true}, {"serverTime", EpochMillis()}});
 }
 
@@ -252,10 +317,16 @@ void HandlePutPreviewScreenshot(const httplib::Request& req, httplib::Response& 
     auto& state = State();
     {
         std::lock_guard<std::mutex> lock(state.mutex);
-        state.preview.request_id = body["requestId"].get<uint64_t>();
-        state.preview.png = std::move(png);
-        state.preview.metadata = body.value("metadata", json::object());
-        state.preview.captured_at = EpochMillis();
+        const std::string editor_session_id = body.value("sessionId", "");
+        EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+        if (editor == nullptr) {
+            JsonResponse(res, 409, EditorSelectionErrorLocked(state, editor_session_id));
+            return;
+        }
+        editor->preview.request_id = body["requestId"].get<uint64_t>();
+        editor->preview.png = std::move(png);
+        editor->preview.metadata = body.value("metadata", json::object());
+        editor->preview.captured_at = EpochMillis();
     }
     state.preview_changed.notify_all();
     JsonResponse(res, 200, {{"ok", true}, {"requestId", body["requestId"]}});
@@ -267,7 +338,13 @@ void HandleGetPreviewScreenshot(const httplib::Request& req, httplib::Response& 
     auto& state = State();
     {
         std::lock_guard<std::mutex> lock(state.mutex);
-        snapshot = state.preview;
+        const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
+        const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+        if (editor == nullptr) {
+            JsonResponse(res, 409, EditorSelectionErrorLocked(state, editor_session_id));
+            return;
+        }
+        snapshot = editor->preview;
     }
     if (snapshot.png.empty()) {
         JsonResponse(res, 404, {{"ok", false}, {"error", "preview_unavailable"}});
@@ -284,22 +361,34 @@ void HandleGetPreviewMetadata(const httplib::Request& req, httplib::Response& re
     if (!CheckAgentAuth(req, res)) return;
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (state.preview.png.empty()) {
+    const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        JsonResponse(res, 409, EditorSelectionErrorLocked(state, editor_session_id));
+        return;
+    }
+    if (editor->preview.png.empty()) {
         JsonResponse(res, 404, {{"ok", false}, {"error", "preview_unavailable"}});
         return;
     }
     JsonResponse(res, 200, {
         {"ok", true},
-        {"requestId", state.preview.request_id},
-        {"capturedAt", state.preview.captured_at},
-        {"bytes", state.preview.png.size()},
-        {"metadata", state.preview.metadata},
+        {"requestId", editor->preview.request_id},
+        {"capturedAt", editor->preview.captured_at},
+        {"bytes", editor->preview.png.size()},
+        {"metadata", editor->preview.metadata},
     });
 }
 
 void HandleRequestPreviewCapture(const httplib::Request& req, httplib::Response& res) {
     if (!CheckAgentAuth(req, res)) return;
-    const auto id = RequestPreviewCapture();
+    json body = json::object();
+    if (!req.body.empty() && !ParseObjectBody(req, res, body)) return;
+    const auto id = RequestPreviewCapture(body.value("sessionId", ""));
+    if (id == 0) {
+        JsonResponse(res, 409, GetEditorContext(body.value("sessionId", "")));
+        return;
+    }
     JsonResponse(res, 202, {{"ok", true}, {"requestId", id}});
 }
 
@@ -314,7 +403,7 @@ void HandlePatchNode(const httplib::Request& req, httplib::Response& res) {
     const std::string node_id = req.matches.size() > 1 ? req.matches[1].str() : "";
     const json patch = body["patch"];
     const std::string expected = body.value("ifGraphHash", "");
-    const json result = QueueNodePatch(node_id, patch, expected);
+    const json result = QueueNodePatch(node_id, patch, expected, body.value("editorSessionId", ""));
     JsonResponse(res, result.value("ok", false) ? 202 : result.value("status", 400), result);
 }
 
@@ -329,8 +418,14 @@ void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res) 
     }
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
+    const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        JsonResponse(res, 409, EditorSelectionErrorLocked(state, editor_session_id));
+        return;
+    }
     json patches = json::array();
-    for (const auto& patch : state.patches) {
+    for (const auto& patch : editor->patches) {
         if (patch.value("id", 0ull) > after) patches.push_back(patch);
     }
     JsonResponse(res, 200, {{"ok", true}, {"patches", patches}});
@@ -360,10 +455,16 @@ void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) 
     auto& state = State();
     {
         std::lock_guard<std::mutex> lock(state.mutex);
+        const std::string editor_session_id = body.value("sessionId", "");
+        EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+        if (editor == nullptr) {
+            JsonResponse(res, 409, EditorSelectionErrorLocked(state, editor_session_id));
+            return;
+        }
         json unknown_ids = json::array();
         for (const uint64_t id : ids) {
             const bool pending = std::any_of(
-                state.patches.begin(), state.patches.end(), [&](const json& command) {
+                editor->patches.begin(), editor->patches.end(), [&](const json& command) {
                     return command.value("id", 0ull) == id;
                 });
             if (!pending) unknown_ids.push_back(id);
@@ -403,45 +504,51 @@ void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) 
             state.command_result_order.pop_front();
             state.command_results.erase(expired);
         }
-        state.patches.erase(
-            std::remove_if(state.patches.begin(), state.patches.end(), [&](const json& patch) {
+        editor->patches.erase(
+            std::remove_if(editor->patches.begin(), editor->patches.end(), [&](const json& patch) {
                 return std::find(ids.begin(), ids.end(), patch.value("id", 0ull)) != ids.end();
             }),
-            state.patches.end());
+            editor->patches.end());
     }
     state.command_changed.notify_all();
     JsonResponse(res, 200, {{"ok", true}, {"acknowledged", ids.size()}});
 }
 
-json GetEditorContext() {
+json GetEditorContext(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    return ContextLocked(state);
+    return ContextLocked(state, editor_session_id);
 }
 
-json GetEditorNode(const std::string& node_id) {
+json GetEditorNode(const std::string& node_id, const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!IsOnlineLocked(state)) return {{"ok", false}, {"error", "editor_offline"}};
-    const json* node = FindCurrentNode(state.session, node_id);
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
+    const json* node = FindCurrentNode(editor->session, node_id);
     if (node == nullptr) return {{"ok", false}, {"error", "node_not_found"}, {"nodeId", node_id}};
-    return {{"ok", true}, {"node", *node}, {"graphHash", state.session.value("graphHash", "")}};
+    return {{"ok", true}, {"node", *node}, {"graphHash", editor->session.value("graphHash", "")}};
 }
 
-json ListEditorNodes() {
+json ListEditorNodes(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!IsOnlineLocked(state)) return {{"ok", false}, {"error", "editor_offline"}};
-    const json* graph = ResolveCurrentGraph(state.session);
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
+    const json* graph = ResolveCurrentGraph(editor->session);
     if (graph == nullptr || !graph->contains("nodes")) return {{"ok", false}, {"error", "graph_unavailable"}};
-    return {{"ok", true}, {"nodes", (*graph)["nodes"]}, {"graphHash", state.session.value("graphHash", "")}};
+    return {{"ok", true}, {"nodes", (*graph)["nodes"]}, {"graphHash", editor->session.value("graphHash", "")}};
 }
 
-json GetEditorNodeTypes(const std::string& node_type, const std::string& category) {
+json GetEditorNodeTypes(
+    const std::string& node_type,
+    const std::string& category,
+    const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!IsOnlineLocked(state)) return {{"ok", false}, {"error", "editor_offline"}};
-    const json manifest = state.session.value("nodeManifest", json());
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
+    const json manifest = editor->session.value("nodeManifest", json());
     if (!manifest.is_object() || !manifest.contains("nodes") || !manifest["nodes"].is_array()) {
         return {{"ok", false}, {"error", "manifest_unavailable"}};
     }
@@ -459,33 +566,42 @@ json GetEditorNodeTypes(const std::string& node_type, const std::string& categor
     };
 }
 
-json GetEditorDocument() {
+json GetEditorDocument(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!IsOnlineLocked(state)) return {{"ok", false}, {"error", "editor_offline"}};
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
     return {
-        {"ok", true}, {"graph", state.session.value("graph", json())},
-        {"graphHash", state.session.value("graphHash", "")},
-        {"graphPath", state.session.value("graphPath", "")},
-        {"editPath", state.session.value("editPath", json::array())},
+        {"ok", true}, {"graph", editor->session.value("graph", json())},
+        {"graphHash", editor->session.value("graphHash", "")},
+        {"graphPath", editor->session.value("graphPath", "")},
+        {"editPath", editor->session.value("editPath", json::array())},
+        {"editorSessionId", editor->session.value("sessionId", "")},
     };
 }
 
 json QueueNodePatch(
     const std::string& node_id,
     const json& patch,
-    const std::string& expected_graph_hash) {
+    const std::string& expected_graph_hash,
+    const std::string& editor_session_id) {
     if (node_id.empty() || !patch.is_object()) {
         return {{"ok", false}, {"status", 400}, {"error", "nodeId and object patch are required"}};
     }
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!IsOnlineLocked(state)) return {{"ok", false}, {"status", 409}, {"error", "editor_offline"}};
-    if (FindCurrentNode(state.session, node_id) == nullptr) {
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        json error = EditorSelectionErrorLocked(state, editor_session_id);
+        error["status"] = 409;
+        return error;
+    }
+    if (FindCurrentNode(editor->session, node_id) == nullptr) {
         return {{"ok", false}, {"status", 404}, {"error", "node_not_found"}, {"nodeId", node_id}};
     }
     json result = QueueGraphCommandLocked(
         state,
+        *editor,
         {{"type", "setNodeParams"}, {"nodeId", node_id}, {"patch", patch}},
         expected_graph_hash,
         false);
@@ -496,13 +612,20 @@ json QueueNodePatch(
 json QueueGraphCommand(
     json command,
     const std::string& expected_graph_hash,
-    bool require_root_scope) {
+    bool require_root_scope,
+    const std::string& editor_session_id) {
     if (!command.is_object() || !command.contains("type") || !command["type"].is_string()) {
         return {{"ok", false}, {"status", 400}, {"error", "command type is required"}};
     }
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    return QueueGraphCommandLocked(state, std::move(command), expected_graph_hash, require_root_scope);
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        json error = EditorSelectionErrorLocked(state, editor_session_id);
+        error["status"] = 409;
+        return error;
+    }
+    return QueueGraphCommandLocked(state, *editor, std::move(command), expected_graph_hash, require_root_scope);
 }
 
 bool WaitForGraphCommandResult(
@@ -526,48 +649,67 @@ bool WaitForGraphCommandResult(
 bool CancelGraphCommand(uint64_t command_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const auto before = state.patches.size();
-    state.patches.erase(
-        std::remove_if(state.patches.begin(), state.patches.end(), [&](const json& command) {
-            return command.value("id", 0ull) == command_id;
-        }),
-        state.patches.end());
-    return state.patches.size() != before;
+    for (auto& [_, editor] : state.editors) {
+        const auto before = editor.patches.size();
+        editor.patches.erase(
+            std::remove_if(editor.patches.begin(), editor.patches.end(), [&](const json& command) {
+                return command.value("id", 0ull) == command_id;
+            }),
+            editor.patches.end());
+        if (editor.patches.size() != before) return true;
+    }
+    return false;
 }
 
-json GetEditorGraph() {
+json GetEditorGraph(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    if (!IsOnlineLocked(state)) return json();
-    return state.session.value("graph", json());
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    return editor == nullptr ? json() : editor->session.value("graph", json());
 }
 
-uint64_t RequestPreviewCapture() {
+uint64_t RequestPreviewCapture(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    return ++state.capture_request_id;
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    return editor == nullptr ? 0 : ++editor->capture_request_id;
 }
 
 bool WaitForPreview(
     uint64_t request_id,
     std::chrono::milliseconds timeout,
-    PreviewSnapshot& snapshot) {
+    PreviewSnapshot& snapshot,
+    const std::string& editor_session_id) {
     auto& state = State();
     std::unique_lock<std::mutex> lock(state.mutex);
     const bool ready = state.preview_changed.wait_for(lock, timeout, [&] {
-        return state.preview.request_id >= request_id && !state.preview.png.empty();
+        const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+        return editor != nullptr && editor->preview.request_id >= request_id && !editor->preview.png.empty();
     });
-    if (ready) snapshot = state.preview;
+    if (ready) snapshot = ResolveEditorLocked(state, editor_session_id)->preview;
     return ready;
 }
 
 json GetBridgeHealth() {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
+    const json editors = EditorChoicesLocked(state);
+    size_t pending_patch_count = 0;
+    uint64_t capture_request_id = 0;
+    uint64_t preview_request_id = 0;
+    int64_t session_revision = 0;
+    for (const auto& [_, editor] : state.editors) {
+        if (!IsOnlineLocked(editor)) continue;
+        pending_patch_count += editor.patches.size();
+        capture_request_id = std::max(capture_request_id, editor.capture_request_id);
+        preview_request_id = std::max(preview_request_id, editor.preview.request_id);
+        session_revision = std::max(session_revision, editor.session_revision);
+    }
     return {
-        {"editorOnline", IsOnlineLocked(state)}, {"sessionRevision", state.session_revision},
-        {"captureRequestId", state.capture_request_id}, {"previewRequestId", state.preview.request_id},
-        {"pendingPatchCount", state.patches.size()},
+        {"editorOnline", !editors.empty()}, {"editorCount", editors.size()}, {"editors", editors},
+        {"sessionRevision", session_revision},
+        {"captureRequestId", capture_request_id}, {"previewRequestId", preview_request_id},
+        {"pendingPatchCount", pending_patch_count},
     };
 }
 
