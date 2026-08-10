@@ -772,7 +772,7 @@ function PcgEditor() {
     () => previewViewportRef.current?.captureFrame() ?? null,
     [],
   );
-  useEditorBridge({
+  const syncEditorContext = useEditorBridge({
     graph: bridgeGraph,
     nodeManifest: getNodeManifest(),
     graphPath: currentFilename,
@@ -1281,6 +1281,7 @@ function PcgEditor() {
           <AgentPanel
             onApplyActions={applyAgentActions}
             onOpenSettings={openSettings}
+            syncEditorContext={syncEditorContext}
             providerRevision={providerRevision}
           />
         )}

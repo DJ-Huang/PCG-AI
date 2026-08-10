@@ -27,6 +27,7 @@ import type { AgentAction, AgentActionResult } from './agentCommands';
 interface AgentPanelProps {
   onApplyActions: (actions: AgentAction[]) => AgentActionResult[];
   onOpenSettings?: () => void;
+  syncEditorContext?: () => Promise<void>;
   providerRevision?: number;
 }
 
@@ -60,7 +61,7 @@ function upsertPart(message: AgentMessageRecord, part: AgentPart): AgentMessageR
   return { ...message, parts };
 }
 
-export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: AgentPanelProps) {
+export default function AgentPanel({ onOpenSettings, syncEditorContext, providerRevision = 0 }: AgentPanelProps) {
   const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
   const [sending, setSending] = useState(false);
   const [width, setWidth] = useState(380);
@@ -296,14 +297,17 @@ export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: Age
     setPendingCalls([]);
     const abort = new AbortController();
     abortRef.current = abort;
-    try { await startTurn({ message: text, sessionId, providerId, modelId, attachments }, handleEvent, abort.signal); }
+    try {
+      await syncEditorContext?.();
+      await startTurn({ message: text, sessionId, providerId, modelId, attachments }, handleEvent, abort.signal);
+    }
     catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
     } finally {
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, onOpenSettings, providerId, selectedModel, selectedProvider, sessionId]);
+  }, [connected, handleEvent, modelId, onOpenSettings, providerId, selectedModel, selectedProvider, sessionId, syncEditorContext]);
 
   const retryTurn = useCallback(async (retryTurnId: string) => {
     if (!connected || !selectedProvider || !selectedModel || sending) return;
@@ -314,6 +318,7 @@ export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: Age
     const abort = new AbortController();
     abortRef.current = abort;
     try {
+      await syncEditorContext?.();
       await startTurn({
         message: '', sessionId, providerId, modelId, attachments: [], retryTurnId,
       }, handleEvent, abort.signal);
@@ -323,7 +328,7 @@ export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: Age
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, providerId, selectedModel, selectedProvider, sending, sessionId]);
+  }, [connected, handleEvent, modelId, providerId, selectedModel, selectedProvider, sending, sessionId, syncEditorContext]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AgentPanel from './AgentPanel';
 import * as client from './agentClient';
@@ -38,6 +38,7 @@ const connectedProvider: client.ProviderDescriptor = {
 
 describe('AgentPanel', () => {
   beforeEach(() => {
+    vi.mocked(client.startTurn).mockReset();
     vi.mocked(client.getProviders).mockResolvedValue([connectedProvider]);
     vi.mocked(client.getAgentSettings).mockResolvedValue({ providerId: 'openai', modelId: 'gpt-test' });
     vi.mocked(client.setAgentSettings).mockResolvedValue();
@@ -45,6 +46,8 @@ describe('AgentPanel', () => {
     vi.mocked(client.listAgentSessions).mockResolvedValue({ sessions: [], nextCursor: 0 });
     localStorage.clear();
   });
+
+  afterEach(cleanup);
 
   it('pauses a graph write for a per-call approval decision', async () => {
     vi.mocked(client.startTurn).mockImplementation(async (_input, onEvent) => {
@@ -75,5 +78,24 @@ describe('AgentPanel', () => {
     await waitFor(() => expect(client.decideTurn).toHaveBeenCalledWith(
       'turn-1', [{ toolCallId: 'write-1', decision: 'approve' }], expect.any(Function), expect.any(AbortSignal),
     ));
+  });
+
+  it('synchronizes the editor context before starting a turn', async () => {
+    let releaseSync: (() => void) | undefined;
+    const syncEditorContext = vi.fn(() => new Promise<void>((resolve) => {
+      releaseSync = resolve;
+    }));
+    vi.mocked(client.startTurn).mockResolvedValue();
+    render(<AgentPanel onApplyActions={() => []} syncEditorContext={syncEditorContext} />);
+    await screen.findByTitle('OpenAI · GPT Test');
+
+    fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'inspect selection' } });
+    fireEvent.click(screen.getByTitle('Send (Enter)'));
+
+    await waitFor(() => expect(syncEditorContext).toHaveBeenCalledOnce());
+    expect(client.startTurn).not.toHaveBeenCalled();
+
+    releaseSync?.();
+    await waitFor(() => expect(client.startTurn).toHaveBeenCalledOnce());
   });
 });

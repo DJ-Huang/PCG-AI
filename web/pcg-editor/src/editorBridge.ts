@@ -61,7 +61,7 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 }
 
 /** Keeps pcg-server synchronized with the authoritative in-memory Web document. */
-export function useEditorBridge(options: EditorBridgeOptions): void {
+export function useEditorBridge(options: EditorBridgeOptions): () => Promise<void> {
   const graphText = JSON.stringify(options.graph);
   const graphPath = options.graphPath;
   const editPathKey = JSON.stringify(options.editPath);
@@ -99,6 +99,12 @@ export function useEditorBridge(options: EditorBridgeOptions): void {
       nodeManifest: options.nodeManifest,
       updatedAt: Date.now(),
     });
+    if (response.status === 409) {
+      const conflict = await response.json().catch(() => null) as { error?: string } | null;
+      // A concurrent push with a higher client revision already published this
+      // snapshot (or a newer one), so the synchronization barrier is satisfied.
+      if (conflict?.error === 'stale_session_update') return;
+    }
     if (!response.ok) throw new Error(`session sync failed: HTTP ${response.status}`);
   }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest]);
 
@@ -189,4 +195,8 @@ export function useEditorBridge(options: EditorBridgeOptions): void {
     const timer = window.setInterval(() => void poll(), POLL_MS);
     return () => window.clearInterval(timer);
   }, [editPathKey, uploadCapture]);
+
+  // Callers that are about to start an Agent turn can await this barrier so
+  // MCP tools observe the current selection instead of the debounced session.
+  return pushSession;
 }
