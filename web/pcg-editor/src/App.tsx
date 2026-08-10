@@ -59,6 +59,7 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
 import PreviewViewport, { type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
+import SettingsDialog from './SettingsDialog';
 import { useEditorBridge } from './editorBridge';
 import {
   applyGraphOperations,
@@ -67,6 +68,13 @@ import {
   type QueuedGraphCommand,
 } from './graphCommands';
 import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
+import {
+  applyPreviewParameterOverrides,
+  resolvePreviewParameterValues,
+  savePreviewParameterDefaults,
+  type PreviewParameterValue,
+  type PreviewParameterValues,
+} from './previewParameters';
 import { NodeActionsContext, getPreviewTargetId, setPreviewTargetId, usePreviewTargetId } from './nodeActions';
 import {
   getEffectiveControlPoints,
@@ -149,11 +157,14 @@ function PcgEditor() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
   const [showAgent, setShowAgent] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [providerRevision, setProviderRevision] = useState(0);
   const [showInspector, setShowInspector] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewParameterValuesByScope, setPreviewParameterValuesByScope] = useState<Record<string, PreviewParameterValues>>({});
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewJobIdRef = useRef<string | null>(null);
   const previewViewportRef = useRef<PreviewViewportHandle>(null);
@@ -167,6 +178,9 @@ function PcgEditor() {
   const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
   const previewTargetNodeId = usePreviewTargetId();
+
+  const openSettings = useCallback(() => setShowSettings(true), []);
+  const closeSettings = useCallback(() => setShowSettings(false), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const connectingNodeId = useRef<string | null>(null);
@@ -211,6 +225,15 @@ function PcgEditor() {
   const viewParameters = useMemo(
     () => (currentSubgraph ? (currentSubgraph.parameters ?? []) : parameters),
     [currentSubgraph, parameters],
+  );
+  const previewParameterScope = currentSubgraphId ? `subgraph:${currentSubgraphId}` : 'root';
+  const previewParameterValues = useMemo(
+    () => resolvePreviewParameterValues(viewParameters, previewParameterValuesByScope[previewParameterScope]),
+    [viewParameters, previewParameterValuesByScope, previewParameterScope],
+  );
+  const previewParameterNodeIds = useMemo(
+    () => new Set(viewNodes.map((node) => node.id)),
+    [viewNodes],
   );
 
   /** Routes a nodes update to the root graph or the open subgraph definition. */
@@ -260,6 +283,43 @@ function PcgEditor() {
     },
     [currentSubgraphId, setParameters, setSubgraphs],
   );
+
+  const updatePreviewParameterValue = useCallback(
+    (parameterId: string, value: PreviewParameterValue) => {
+      setPreviewParameterValuesByScope((stored) => ({
+        ...stored,
+        [previewParameterScope]: {
+          ...resolvePreviewParameterValues(viewParameters, stored[previewParameterScope]),
+          [parameterId]: value,
+        },
+      }));
+    },
+    [previewParameterScope, viewParameters],
+  );
+
+  const resetPreviewParameters = useCallback(() => {
+    setPreviewParameterValuesByScope((stored) => ({
+      ...stored,
+      [previewParameterScope]: resolvePreviewParameterValues(viewParameters, undefined),
+    }));
+    setStatus('Preview parameters reset to defaults');
+  }, [previewParameterScope, viewParameters]);
+
+  const savePreviewParametersAsDefaults = useCallback(() => {
+    const saved = savePreviewParameterDefaults(
+      viewNodes as unknown as GraphNode[],
+      viewParameters,
+      previewParameterValues,
+    );
+    commit();
+    setViewNodes(() => saved.nodes as unknown as Node[]);
+    setViewParameters(saved.parameters);
+    setSelectedNode((selected) => {
+      if (!selected) return selected;
+      return (saved.nodes.find((node) => node.id === selected.id) as unknown as Node | undefined) ?? selected;
+    });
+    setStatus('Preview parameter values saved as defaults');
+  }, [viewNodes, viewParameters, previewParameterValues, commit, setViewNodes, setViewParameters]);
 
   // Deletions flow through onNodesChange/onEdgesChange (not commit()-wrapped
   // callers), so commit here on remove changes. React Flow fires the node
@@ -650,6 +710,7 @@ function PcgEditor() {
       setInfoNodeId(null);
       setContextMenu(null);
       setPreviewTargetId(null);
+      setPreviewParameterValuesByScope({});
     },
     [commit, setNodes, setEdges],
   );
@@ -808,11 +869,14 @@ function PcgEditor() {
         } else {
           undo();
         }
+      } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        openSettings();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openSearchAt, fitView, undo, redo]);
+  }, [openSearchAt, fitView, openSettings, undo, redo]);
 
   // ── Node drag undo ─────────────────────────────────
 
@@ -913,6 +977,7 @@ function PcgEditor() {
     setParameters(result.parameters);
     setSubgraphs(result.subgraphs);
     setSelectedNode(null);
+    setPreviewParameterValuesByScope({});
     setCurrentFilename(file.name);
     setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params, ${result.subgraphs.length} subgraphs)`);
   };
@@ -929,6 +994,7 @@ function PcgEditor() {
     setSelectedNode(null);
     setInfoNodeId(null);
     setPreviewTargetId(null);
+    setPreviewParameterValuesByScope({});
     setCurrentFilename('');
     nodeCounter = 100;
     clearEditorSession();
@@ -979,6 +1045,7 @@ function PcgEditor() {
     if (currentSubgraph) {
       graph = buildSubgraphCookGraph(currentSubgraph, graph.subgraphs ?? []);
     }
+    graph = applyPreviewParameterOverrides(graph, previewParameterValues);
     if (target) {
       const targetNode = graph.nodes.find((n) => n.id === target);
       // Manifest nodes take their first declared output pin; subgraph instances
@@ -1006,7 +1073,7 @@ function PcgEditor() {
     } else if (result.error !== 'aborted') {
       setPreviewError(result.error ?? 'Cook failed');
     }
-  }, [nodes, edges, parameters, subgraphs, currentSubgraph, viewNodes.length]);
+  }, [nodes, edges, parameters, subgraphs, currentSubgraph, viewNodes.length, previewParameterValues]);
 
   const openPreview = useCallback(async () => {
     setShowPreview(true);
@@ -1189,6 +1256,7 @@ function PcgEditor() {
           Preview
         </button>
         <span className="pcg-toolbar__separator" />
+        <button type="button" onClick={openSettings} title="PCG Settings (⌘,)">Settings</button>
         <input
           ref={fileInputRef}
           type="file"
@@ -1201,9 +1269,21 @@ function PcgEditor() {
         {status && <span className="pcg-toolbar__status">{status}</span>}
       </div>
 
+      <SettingsDialog
+        open={showSettings}
+        onClose={closeSettings}
+        onProvidersChanged={() => setProviderRevision((revision) => revision + 1)}
+      />
+
       {/* Main: three-panel layout */}
       <div className="pcg-main">
-        {showAgent && <AgentPanel onApplyActions={applyAgentActions} />}
+        {showAgent && (
+          <AgentPanel
+            onApplyActions={applyAgentActions}
+            onOpenSettings={openSettings}
+            providerRevision={providerRevision}
+          />
+        )}
         {showBlackboard && (
           <Blackboard
             parameters={viewParameters}
@@ -1305,6 +1385,12 @@ function PcgEditor() {
             loading={previewLoading}
             error={previewError}
             onRefresh={() => void requestPreviewCook()}
+            parameters={viewParameters}
+            parameterNodeIds={previewParameterNodeIds}
+            parameterValues={previewParameterValues}
+            onParameterValueChange={updatePreviewParameterValue}
+            onResetParameters={resetPreviewParameters}
+            onSaveParameterDefaults={savePreviewParametersAsDefaults}
             splineEdit={splineEditForViewport}
           />
         )}

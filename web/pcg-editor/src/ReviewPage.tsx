@@ -7,7 +7,7 @@
 // Sets window.__pcgReady = true when the first render is complete so
 // Playwright can capture a screenshot.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PreviewViewport from './PreviewViewport';
 import {
   cookGraphPreview,
@@ -15,6 +15,14 @@ import {
   type PreviewData,
 } from './previewCook';
 import type { GraphJson } from './graphSchema';
+import { saveGraphToFile } from './exportGraph';
+import {
+  applyPreviewParameterOverrides,
+  resolvePreviewParameterValues,
+  savePreviewParameterDefaults,
+  type PreviewParameterValue,
+  type PreviewParameterValues,
+} from './previewParameters';
 
 interface ReviewState {
   loading: boolean;
@@ -28,6 +36,8 @@ export default function ReviewPage() {
     error: null,
     data: null,
   });
+  const [graph, setGraph] = useState<GraphJson | null>(null);
+  const [parameterValues, setParameterValues] = useState<PreviewParameterValues>({});
 
   const graphPath = new URLSearchParams(window.location.search).get('graph');
 
@@ -53,7 +63,14 @@ export default function ReviewPage() {
       }
 
       const graph = (await res.json()) as GraphJson;
-      const prepared = prepareGraphForPreviewCook(graph);
+      const resolvedValues = resolvePreviewParameterValues(graph.parameters ?? [], parameterValues);
+      setGraph(graph);
+      setParameterValues((current) => (
+        JSON.stringify(current) === JSON.stringify(resolvedValues) ? current : resolvedValues
+      ));
+      const prepared = prepareGraphForPreviewCook(
+        applyPreviewParameterOverrides(graph, resolvedValues),
+      );
       const response = await cookGraphPreview(prepared, 42);
 
       if (response.ok && response.data) {
@@ -64,11 +81,42 @@ export default function ReviewPage() {
     } catch (err) {
       setState({ loading: false, error: String(err), data: null });
     }
-  }, [graphPath]);
+  }, [graphPath, parameterValues]);
 
   useEffect(() => {
-    cook();
+    const timer = setTimeout(() => void cook(), 600);
+    return () => clearTimeout(timer);
   }, [cook]);
+
+  const parameters = useMemo(() => graph?.parameters ?? [], [graph]);
+  const parameterNodeIds = useMemo(
+    () => new Set((graph?.nodes ?? []).map((node) => node.id)),
+    [graph],
+  );
+
+  const updateParameterValue = useCallback((parameterId: string, value: PreviewParameterValue) => {
+    setParameterValues((current) => ({ ...current, [parameterId]: value }));
+  }, []);
+
+  const resetParameters = useCallback(() => {
+    setParameterValues(resolvePreviewParameterValues(parameters, undefined));
+  }, [parameters]);
+
+  const saveParameterDefaults = useCallback(async () => {
+    if (!graph || !graphPath) return;
+    const saved = savePreviewParameterDefaults(graph.nodes, parameters, parameterValues);
+    const nextGraph: GraphJson = {
+      ...graph,
+      nodes: saved.nodes,
+      parameters: saved.parameters,
+    };
+    const result = await saveGraphToFile(nextGraph, graphPath);
+    if (!result.ok) {
+      setState((current) => ({ ...current, error: `Save defaults failed: ${result.error ?? 'unknown error'}` }));
+      return;
+    }
+    setGraph(nextGraph);
+  }, [graph, graphPath, parameters, parameterValues]);
 
   // Signal readiness for Playwright screenshot capture
   useEffect(() => {
@@ -104,7 +152,13 @@ export default function ReviewPage() {
           data={state.data}
           loading={state.loading}
           error={state.error}
-          onRefresh={cook}
+          onRefresh={() => void cook()}
+          parameters={parameters}
+          parameterNodeIds={parameterNodeIds}
+          parameterValues={parameterValues}
+          onParameterValueChange={updateParameterValue}
+          onResetParameters={resetParameters}
+          onSaveParameterDefaults={() => void saveParameterDefaults()}
         />
       </div>
     </div>

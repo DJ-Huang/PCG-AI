@@ -115,7 +115,7 @@ json SuccessResponse(const json& id, const json& result) {
     return {{"jsonrpc", "2.0"}, {"id", id}, {"result", result}};
 }
 
-json ToolDefinitions() {
+json BuildToolDefinitions() {
     return json::array({
         {
             {"name", "pcg_get_editor_context"},
@@ -236,7 +236,7 @@ json ToolDefinitions() {
     });
 }
 
-json CallTool(const std::string& name, const json& arguments) {
+json CallToolInternal(const std::string& name, const json& arguments) {
     if (name == "pcg_get_editor_context") return ToolResult(GetEditorContext());
     if (name == "pcg_list_nodes") {
         const json result = ListEditorNodes();
@@ -405,13 +405,13 @@ json HandleMessage(const json& message) {
         });
     }
     if (method == "ping") return SuccessResponse(id, json::object());
-    if (method == "tools/list") return SuccessResponse(id, {{"tools", ToolDefinitions()}});
+    if (method == "tools/list") return SuccessResponse(id, {{"tools", GetPcgToolDefinitions()}});
     if (method == "tools/call") {
         const json params = message.value("params", json::object());
         if (!params.is_object() || !params.contains("name") || !params["name"].is_string()) {
             return ErrorResponse(id, -32602, "Invalid tools/call parameters");
         }
-        return SuccessResponse(id, CallTool(
+        return SuccessResponse(id, CallPcgTool(
             params["name"].get<std::string>(), params.value("arguments", json::object())));
     }
     return ErrorResponse(id, -32601, "Method not found", {{"method", method}});
@@ -432,6 +432,21 @@ void SendMcpResponse(const httplib::Request& req, httplib::Response& res, const 
 }
 
 }  // namespace
+
+json GetPcgToolDefinitions() {
+    return BuildToolDefinitions();
+}
+
+json CallPcgTool(const std::string& name, const json& arguments) {
+    return CallToolInternal(name, arguments);
+}
+
+bool PcgToolRequiresApproval(const std::string& name) {
+    return name == "pcg_patch_node" ||
+           name == "pcg_apply_graph_ops" ||
+           name == "pcg_replace_graph" ||
+           name == "pcg_save_graph";
+}
 
 void HandleMcpPost(const httplib::Request& req, httplib::Response& res) {
     if (!CheckAgentAuth(req, res)) return;

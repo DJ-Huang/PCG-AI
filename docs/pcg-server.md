@@ -54,6 +54,66 @@ URL: Project Settings → PCG AI, or **PCG → Server → Set Server URL…**
 | PATCH | `/v1/graph/nodes/:id` | legacy optimistic-lock node-patch entry point |
 | GET / POST | `/v1/graph/patches`, `/v1/graph/patches/ack` | queued graph-command delivery and apply acknowledgement |
 | POST | `/mcp` | MCP Streamable HTTP; SSE response via `Accept` |
+| GET | `/v1/agent/providers` | Provider/auth status and model catalog; never returns credentials |
+| POST / DELETE | `/v1/agent/providers/:id/connect/key`, `/connection` | validate/connect or remove a Provider credential |
+| POST | `/v1/agent/providers/:id/oauth/start` | start browser PKCE or device-code OAuth |
+| GET | `/v1/agent/oauth/:attemptId/status` | poll a pending OAuth attempt |
+| GET / PUT | `/v1/agent/settings` | read/select the active connected Provider and tool-capable model |
+| POST | `/v1/agent/turns` | multipart message/attachments with chunked SSE response |
+| POST | `/v1/agent/turns/:id/decision`, `/cancel` | resolve graph-write approvals or cancel a Turn |
+
+## Embedded multi-Provider Agent
+
+`pcg-server` owns the Provider registry, credential validation, model catalog,
+session history, Provider protocol adapters, tool loop, and approval state. It
+supports OpenAI Responses, Anthropic Messages, Gemini `generateContent`, and
+OpenAI-compatible Chat Completions. Provider/model deltas and tool events use
+the fixed SSE contract:
+
+```text
+turn.created → message.delta / tool.call / tool.result
+             → approval.required → decision → … → turn.completed
+             ↘ turn.error
+```
+
+The runtime limits a Turn to 12 tool rounds, 32 calls, five minutes, eight
+attachments, 10 MiB per attachment, and 24 MiB total. PNG/JPEG bytes and UTF-8
+`.txt/.json/.pcg` content are mapped into each Provider's native multimodal
+request format. PDF is intentionally not exposed in this release.
+
+On macOS, credentials use Security.framework Generic Password items with
+Service `PCG-AI Agent`; only non-sensitive Provider/model/account metadata is
+written to `~/Library/Application Support/PCG-AI/agent.json` with user-only
+permissions. Provider errors are normalized before they reach JSON, SSE, or
+logs, so upstream response bodies and secrets are not reflected.
+
+OAuth buttons remain unavailable until the matching PCG-AI-owned Client ID is
+present. Do not use another application's registered Client ID:
+
+```bash
+export PCG_OPENAI_OAUTH_CLIENT_ID='...'
+export PCG_GITHUB_OAUTH_CLIENT_ID='...'
+export PCG_XAI_OAUTH_CLIENT_ID='...'
+```
+
+ChatGPT uses browser PKCE with the server's actual listen port. GitHub and xAI
+use device authorization with expiry, denial handling, and `slow_down`
+backoff. OpenAI/xAI refresh tokens are refreshed early under a per-Provider
+single-flight lock. Claude Pro/Max OAuth is an extension point only; Anthropic
+uses API Key authentication in this release.
+
+Kimi for Coding is a fixed API-Key Provider at
+`https://api.kimi.com/coding/v1`. Credential validation uses its `/models`
+catalog, while turns use the Anthropic-compatible `/messages` protocol. The
+web app exposes it in **Settings → AI Providers**; the Agent panel never asks
+for or manages credentials directly.
+
+The deterministic runtime validation uses an isolated config and Keychain
+service plus a local fake OpenAI-compatible Provider:
+
+```bash
+python3 scripts/validate-agent-runtime.py
+```
 
 ## External Agent MCP
 

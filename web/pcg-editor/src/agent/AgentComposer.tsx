@@ -10,7 +10,7 @@ export interface AgentAttachment {
   previewUrl: string | null;
 }
 
-const ACCEPT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf', '.txt', '.json', '.pcg'];
+const ACCEPT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.txt', '.json', '.pcg'];
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 function isAccepted(file: File): boolean {
@@ -20,11 +20,13 @@ function isAccepted(file: File): boolean {
 
 interface AgentComposerProps {
   sending: boolean;
+  agentLabel: string;
+  disabled?: boolean;
   onSend: (text: string, attachments: AgentAttachment[]) => void;
   onStop: () => void;
 }
 
-export default function AgentComposer({ sending, onSend, onStop }: AgentComposerProps) {
+export default function AgentComposer({ sending, agentLabel, disabled = false, onSend, onStop }: AgentComposerProps) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   const [rejectNote, setRejectNote] = useState('');
@@ -72,7 +74,7 @@ export default function AgentComposer({ sending, onSend, onStop }: AgentComposer
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed && attachments.length === 0) return;
-    if (sending) return;
+    if (sending || disabled) return;
     onSend(trimmed, attachments);
     setText('');
     setAttachments((prev) => {
@@ -81,7 +83,7 @@ export default function AgentComposer({ sending, onSend, onStop }: AgentComposer
     });
     setRejectNote('');
     requestAnimationFrame(autoGrow);
-  }, [text, attachments, sending, onSend, autoGrow]);
+  }, [text, attachments, sending, disabled, onSend, autoGrow]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -147,8 +149,8 @@ export default function AgentComposer({ sending, onSend, onStop }: AgentComposer
         />
         {rejectNote && <div className="pcg-agent-composer__reject">{rejectNote}</div>}
         <div className="pcg-agent-composer__buttons">
-          <span className="pcg-agent-composer__pill" title="Mock agent — no LLM connected yet">
-            ∞ Agent ⌄
+          <span className="pcg-agent-composer__pill" title={agentLabel}>
+            ∞ {agentLabel}
           </span>
           <span className="pcg-agent-composer__spacer" />
           <input
@@ -176,7 +178,7 @@ export default function AgentComposer({ sending, onSend, onStop }: AgentComposer
               type="button"
               className="pcg-agent-composer__send"
               onClick={handleSend}
-              disabled={!text.trim() && attachments.length === 0}
+              disabled={disabled || (!text.trim() && attachments.length === 0)}
               title="Send (Enter)"
             >
               ↑

@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""Deterministic embedded-Agent smoke test using a local fake Provider."""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import tempfile
+import threading
+import time
+import urllib.error
+import urllib.request
+import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SERVER = ROOT / "pcg-server" / "build" / "pcg-server"
+
+
+class FakeProvider(BaseHTTPRequestHandler):
+    def log_message(self, _format: str, *_args: object) -> None:
+        return
+
+    def _json(self, value: object) -> None:
+        body = json.dumps(value).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _sse(self, values: list[object]) -> None:
+        body = "".join(f"data: {json.dumps(value)}\n\n" for value in values)
+        body += "data: [DONE]\n\n"
+        encoded = body.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/v1/models":
+            self._json({"data": [{"id": "fake-tool-model", "name": "Fake Tool Model"}]})
+            return
+        self.send_error(404)
+
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path != "/v1/chat/completions":
+            self.send_error(404)
+            return
+        length = int(self.headers.get("Content-Length", "0"))
+        request = json.loads(self.rfile.read(length))
+        messages = request.get("messages", [])
+        user_text = " ".join(
+            part.get("text", "")
+            for message in messages
+            if message.get("role") == "user" and isinstance(message.get("content"), list)
+            for part in message["content"]
+            if isinstance(part, dict)
+        )
+        has_tool_result = any(message.get("role") == "tool" for message in messages)
+        if has_tool_result:
+            self._sse([
+                {"choices": [{"delta": {"content": "Fake Provider "}}]},
+                {"choices": [{"delta": {"content": "completed the tool loop."}}]},
+            ])
+            return
+        elif "approval" in user_text:
+            self._sse([{"choices": [{"delta": {"tool_calls": [{
+                "index": 0, "id": "write-1",
+                "function": {"name": "pcg_save_graph", "arguments": '{"ifGraphHash":"fake-hash"}'},
+            }]}}]}])
+            return
+        else:
+            self._sse([
+                {"choices": [{"delta": {"tool_calls": [{
+                    "index": 0, "id": "read-1",
+                    "function": {"name": "pcg_get_editor_context", "arguments": "{"},
+                }]}}]},
+                {"choices": [{"delta": {"tool_calls": [{
+                    "index": 0, "function": {"arguments": "}"},
+                }]}}]},
+            ])
+
+
+def request(url: str, *, method: str = "GET", body: bytes | None = None, content_type: str | None = None) -> tuple[int, bytes]:
+    headers = {"Content-Type": content_type} if content_type else {}
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers, method=method), timeout=10) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read()
+
+
+def multipart_turn(values: dict[str, object]) -> tuple[bytes, str]:
+    boundary = f"pcg-agent-{uuid.uuid4().hex}"
+    payload = json.dumps(values).encode()
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="request"; filename="request.json"\r\n'
+        "Content-Type: application/json\r\n\r\n"
+    ).encode() + payload + f"\r\n--{boundary}--\r\n".encode()
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def event_data(stream: bytes, event: str) -> list[dict[str, object]]:
+    decoded = stream.decode()
+    result: list[dict[str, object]] = []
+    for block in decoded.split("\n\n"):
+        lines = block.splitlines()
+        if f"event: {event}" not in lines:
+            continue
+        data = next(line[6:] for line in lines if line.startswith("data: "))
+        result.append(json.loads(data))
+    return result
+
+
+def main() -> None:
+    if not SERVER.exists():
+        raise SystemExit(f"Build pcg-server first: {SERVER}")
+    provider = ThreadingHTTPServer(("127.0.0.1", 0), FakeProvider)
+    threading.Thread(target=provider.serve_forever, daemon=True).start()
+    provider_port = provider.server_address[1]
+    with tempfile.TemporaryDirectory(prefix="pcg-agent-test-") as temp:
+        env = os.environ.copy()
+        env["PCG_AGENT_CONFIG_PATH"] = str(Path(temp) / "agent.json")
+        env["PCG_AGENT_KEYCHAIN_SERVICE"] = f"PCG-AI Agent Test {uuid.uuid4().hex}"
+        process = subprocess.Popen(
+            [str(SERVER), "--port", "17892"], cwd=ROOT / "pcg-server", env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+        base = "http://127.0.0.1:17892/v1/agent"
+        try:
+            for _ in range(50):
+                try:
+                    if request(f"{base}/providers")[0] == 200:
+                        break
+                except urllib.error.URLError:
+                    pass
+                time.sleep(0.1)
+            else:
+                raise AssertionError("pcg-server did not start")
+
+            status, response = request(f"{base}/providers")
+            assert status == 200, response
+            providers = json.loads(response)["providers"]
+            kimi = next(item for item in providers if item["id"] == "kimi-coding")
+            assert kimi["name"] == "Kimi for Coding"
+            assert kimi["baseUrl"] == ""
+            assert kimi["authMethods"] == [{"type": "api", "label": "API Key", "available": True}]
+
+            status, response = request(
+                f"{base}/providers/openai-compatible/connect/key",
+                method="POST",
+                body=json.dumps({"apiKey": "test-secret", "baseUrl": f"http://127.0.0.1:{provider_port}/v1"}).encode(),
+                content_type="application/json",
+            )
+            assert status == 200, response
+
+            body, content_type = multipart_turn({
+                "message": "run read tool", "sessionId": "read-session",
+                "providerId": "openai-compatible", "modelId": "fake-tool-model",
+            })
+            status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
+            assert status == 200
+            assert event_data(stream, "turn.created")
+            assert event_data(stream, "tool.call")[0]["name"] == "pcg_get_editor_context"
+            assert event_data(stream, "tool.result")
+            assert len(event_data(stream, "message.delta")) == 2
+            assert event_data(stream, "turn.completed")
+
+            body, content_type = multipart_turn({
+                "message": "approval", "sessionId": "approval-session",
+                "providerId": "openai-compatible", "modelId": "fake-tool-model",
+            })
+            status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
+            approval = event_data(stream, "approval.required")[0]
+            turn_id = str(approval["turnId"])
+            call = approval["calls"][0]
+            assert call["toolCallId"] == "write-1"
+            decision = json.dumps({"decisions": [{"toolCallId": "write-1", "decision": "reject"}]}).encode()
+            status, stream = request(
+                f"{base}/turns/{turn_id}/decision", method="POST", body=decision,
+                content_type="application/json",
+            )
+            assert status == 200
+            assert event_data(stream, "tool.result")[0]["result"]["structuredContent"]["error"] == "user_rejected"
+            assert event_data(stream, "turn.completed")
+            status, _ = request(
+                f"{base}/turns/{turn_id}/decision", method="POST", body=decision,
+                content_type="application/json",
+            )
+            assert status == 409
+
+            body, content_type = multipart_turn({
+                "message": "approval", "sessionId": "conflict-session",
+                "providerId": "openai-compatible", "modelId": "fake-tool-model",
+            })
+            status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
+            approval = event_data(stream, "approval.required")[0]
+            turn_id = str(approval["turnId"])
+            approve = json.dumps({"decisions": [{"toolCallId": "write-1", "decision": "approve"}]}).encode()
+            status, stream = request(
+                f"{base}/turns/{turn_id}/decision", method="POST", body=approve,
+                content_type="application/json",
+            )
+            assert status == 200
+            conflict = event_data(stream, "tool.result")[0]["result"]["structuredContent"]
+            assert conflict["error"] == "graph_conflict"
+            print("agent runtime validation: ok")
+        finally:
+            request(f"{base}/providers/openai-compatible/connection", method="DELETE")
+            process.terminate()
+            process.wait(timeout=5)
+            provider.shutdown()
+
+
+if __name__ == "__main__":
+    main()

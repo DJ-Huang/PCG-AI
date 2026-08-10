@@ -9,6 +9,8 @@ project(pcg-server
     LANGUAGES CXX
 )
 
+find_package(CURL REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -33,6 +35,7 @@ add_executable(pcg-server
     src/main.cpp
     src/cook_service.cpp
     src/agent_service.cpp
+    src/agent_runtime.cpp
     src/session_service.cpp
     src/mcp_service.cpp
     "${PCG_FBX_DIR}/src/pcg_fbx_exporter.cpp"
@@ -48,6 +51,7 @@ target_link_libraries(pcg-server PRIVATE
     PcgCoreStatic
     assimp::assimp
     nlohmann_json::nlohmann_json
+    CURL::libcurl
 )
 target_compile_definitions(pcg-server PRIVATE PCG_FBX_EXPORTS)
 
@@ -60,4 +64,8 @@ endif()
 if(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(pcg-server PRIVATE Threads::Threads)
+endif()
+
+if(APPLE)
+    target_link_libraries(pcg-server PRIVATE "-framework Security" "-framework CoreFoundation")
 endif()

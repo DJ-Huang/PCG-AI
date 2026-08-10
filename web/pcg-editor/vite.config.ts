@@ -24,6 +24,9 @@ function proxyToPcgServer(
   if (req.headers.authorization) {
     headers.authorization = req.headers.authorization;
   }
+  if (req.headers.accept) {
+    headers.accept = req.headers.accept;
+  }
   const upstream = http.request(
     {
       host: PCG_SERVER_HOST,
@@ -82,19 +85,12 @@ function cookProxyPlugin(): Plugin {
         }
         proxyToPcgServer(req, res, '/v1/health');
       });
-      server.middlewares.use('/api/agent/chat', (req, res, next) => {
-        if (req.method !== 'POST') {
+      server.middlewares.use('/api/agent', (req, res, next) => {
+        if (!['GET', 'POST', 'PUT', 'DELETE'].includes(req.method ?? '')) {
           next();
           return;
         }
-        proxyToPcgServer(req, res, '/v1/agent/chat');
-      });
-      server.middlewares.use('/api/agent/health', (req, res, next) => {
-        if (req.method !== 'GET') {
-          next();
-          return;
-        }
-        proxyToPcgServer(req, res, '/v1/agent/health');
+        proxyToPcgServer(req, res, `/v1/agent${req.url ?? ''}`);
       });
       server.middlewares.use('/api/editor-bridge', (req, res, next) => {
         if (!['GET', 'PUT', 'POST', 'PATCH'].includes(req.method ?? '')) {

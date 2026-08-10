@@ -1,5 +1,6 @@
 #include "cook_service.hpp"
 #include "agent_service.hpp"
+#include "agent_runtime.hpp"
 #include "mcp_service.hpp"
 #include "session_service.hpp"
 
@@ -30,7 +31,8 @@ int ParsePort(int argc, char** argv, int fallback) {
                 << "  POST /v1/validate\n"
                 << "  POST /v1/cache/clear\n"
                 << "  POST /v1/export-fbx\n"
-                << "  POST /v1/agent/chat (mock agent; Bearer PCG_AGENT_TOKEN when set)\n"
+                << "  GET  /v1/agent/providers (Bearer PCG_AGENT_TOKEN when set)\n"
+                << "  POST /v1/agent/turns (multipart + SSE)\n"
                 << "  GET  /v1/agent/health\n"
                 << "  PUT|GET /v1/session\n"
                 << "  PUT|GET /v1/preview/screenshot\n"
@@ -53,6 +55,7 @@ int ParsePort(int argc, char** argv, int fallback) {
 
 int main(int argc, char** argv) {
     const int port = ParsePort(argc, argv, 17890);
+    pcg_server::ConfigureAgentRuntime(port);
     httplib::Server svr;
 
     svr.Get("/v1/health", [](const httplib::Request&, httplib::Response& res) {
@@ -73,6 +76,18 @@ int main(int argc, char** argv) {
     svr.Post("/v1/cache/clear", pcg_server::HandleCacheClear);
     svr.Post("/v1/agent/chat", pcg_server::HandleAgentChat);
     svr.Get("/v1/agent/health", pcg_server::HandleAgentHealth);
+    svr.Get("/v1/agent/providers", pcg_server::HandleAgentProviders);
+    svr.Post(R"(/v1/agent/providers/([^/]+)/connect/key)", pcg_server::HandleAgentConnectKey);
+    svr.Delete(R"(/v1/agent/providers/([^/]+)/connection)", pcg_server::HandleAgentDeleteConnection);
+    svr.Post(R"(/v1/agent/providers/([^/]+)/validate)", pcg_server::HandleAgentValidateProvider);
+    svr.Get("/v1/agent/settings", pcg_server::HandleAgentGetSettings);
+    svr.Put("/v1/agent/settings", pcg_server::HandleAgentPutSettings);
+    svr.Post(R"(/v1/agent/providers/([^/]+)/oauth/start)", pcg_server::HandleAgentOAuthStart);
+    svr.Get(R"(/v1/agent/oauth/([^/]+)/status)", pcg_server::HandleAgentOAuthStatus);
+    svr.Get(R"(/v1/agent/oauth/callback/([^/]+))", pcg_server::HandleAgentOAuthCallback);
+    svr.Post("/v1/agent/turns", pcg_server::HandleAgentTurn);
+    svr.Post(R"(/v1/agent/turns/([^/]+)/decision)", pcg_server::HandleAgentTurnDecision);
+    svr.Post(R"(/v1/agent/turns/([^/]+)/cancel)", pcg_server::HandleAgentTurnCancel);
     svr.Post("/v1/export-fbx", pcg_server::HandleExportFbx);
     svr.Put("/v1/session", pcg_server::HandlePutSession);
     svr.Get("/v1/session", pcg_server::HandleGetSession);

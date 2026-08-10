@@ -7,6 +7,7 @@ export interface AgentMessage {
   id: string;
   role: 'user' | 'assistant' | 'action';
   text: string;
+  turnId?: string;
   attachments?: { name: string }[];
 }
 
@@ -25,7 +26,7 @@ export default function AgentMessageList({ messages }: AgentMessageListProps) {
     <div className="pcg-agent__messages">
       {messages.length === 0 && (
         <div className="pcg-agent__empty">
-          Ask the agent to operate the graph. Mock backend — no LLM connected yet.
+          Connect a Provider, choose a model, then ask the Agent to inspect or author the live graph.
         </div>
       )}
       {messages.map((msg) =>

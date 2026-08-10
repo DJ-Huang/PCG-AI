@@ -60,3 +60,42 @@ npm run test:graph-commands
 The existing `/review?graph=...` Playwright flow remains the deterministic,
 saved-file review path. MCP Preview capture is intentionally the live editor
 path: it preserves the user's current camera and shading state.
+
+## Built-in LLM Agent
+
+The left Agent panel talks directly to the embedded C++ runtime in
+`pcg-server`; it does not start OpenCode, Node, or another sidecar. Provider
+accounts are managed from the app-level **Settings → AI Providers** page; the
+Agent panel only selects connected Providers and models. Open Settings from
+the main toolbar or with `Cmd/Ctrl+,`.
+
+- API Key: OpenAI, Anthropic, Google Gemini, OpenRouter, Kimi for Coding, or an
+  OpenAI-compatible HTTPS endpoint (loopback HTTP is allowed for local models).
+- OAuth: ChatGPT Plus/Pro, GitHub Copilot, or xAI, when a PCG-AI-owned OAuth
+  Client ID is configured on the server.
+
+API keys and OAuth refresh tokens are submitted only to localhost and stored
+as Generic Password entries in macOS Keychain under the `PCG-AI Agent`
+service. The page stores neither credential and the Provider API returns only
+connection state plus masked account metadata.
+
+For Kimi Coding, select **Kimi for Coding** in Settings and paste the Kimi
+Coding API Key. Its endpoint is fixed to `https://api.kimi.com/coding/v1` and
+uses the Anthropic Messages protocol, so no Base URL is requested. The Key is
+validated against Kimi's model catalog before it is stored.
+
+Turns stream text and tool status using SSE. Read, validate, cook, and capture
+tools execute automatically. Node/graph writes, full replacement, and save
+pause on an approval card that shows the exact tool and arguments. Approval is
+bound to the Turn, call ID, and current graph hash, can execute only once, and
+fails with `graph_conflict` if the graph changed while waiting.
+
+Supported attachments are PNG/JPEG and UTF-8 `.txt`, `.json`, or `.pcg` files.
+The panel blocks images before sending when the selected model lacks image
+input capability.
+
+Web Agent tests:
+
+```bash
+npm run test:agent
+```

@@ -1,0 +1,73 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import AgentPanel from './AgentPanel';
+import * as client from './agentClient';
+
+vi.mock('./agentClient', async (loadOriginal) => {
+  const original = await loadOriginal<typeof import('./agentClient')>();
+  return {
+    ...original,
+    getProviders: vi.fn(),
+    getAgentSettings: vi.fn(),
+    setAgentSettings: vi.fn(),
+    startTurn: vi.fn(),
+    decideTurn: vi.fn(),
+    cancelTurn: vi.fn(),
+    connectApiKey: vi.fn(),
+    disconnectProvider: vi.fn(),
+    validateProvider: vi.fn(),
+    startOAuth: vi.fn(),
+    getOAuthStatus: vi.fn(),
+  };
+});
+
+const connectedProvider: client.ProviderDescriptor = {
+  id: 'openai', name: 'OpenAI', baseUrl: '',
+  authMethods: [{ type: 'api', label: 'API Key', available: true }],
+  connection: { status: 'connected', authType: 'api', accountLabel: '', error: null },
+  models: [{
+    id: 'gpt-test', name: 'GPT Test',
+    capabilities: { toolCall: true, textInput: true, imageInput: true, contextTokens: 0, outputTokens: 0 },
+  }],
+};
+
+describe('AgentPanel', () => {
+  beforeEach(() => {
+    vi.mocked(client.getProviders).mockResolvedValue([connectedProvider]);
+    vi.mocked(client.getAgentSettings).mockResolvedValue({ providerId: 'openai', modelId: 'gpt-test' });
+    vi.mocked(client.setAgentSettings).mockResolvedValue();
+    vi.mocked(client.cancelTurn).mockResolvedValue();
+  });
+
+  it('pauses a graph write for a per-call approval decision', async () => {
+    vi.mocked(client.startTurn).mockImplementation(async (_input, onEvent) => {
+      onEvent({ type: 'turn.created', data: { turnId: 'turn-1' } });
+      onEvent({
+        type: 'approval.required',
+        data: {
+          turnId: 'turn-1',
+          calls: [{
+            turnId: 'turn-1', toolCallId: 'write-1', name: 'pcg_save_graph',
+            arguments: { ifGraphHash: 'hash-1' }, requiresApproval: true,
+          }],
+        },
+      });
+    });
+    vi.mocked(client.decideTurn).mockImplementation(async (_turn, _decisions, onEvent) => {
+      onEvent({ type: 'turn.completed', data: { turnId: 'turn-1' } });
+    });
+    render(<AgentPanel onApplyActions={() => []} />);
+    await screen.findByText('OpenAI');
+
+    fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'save it' } });
+    fireEvent.click(screen.getByTitle('Send (Enter)'));
+    expect(await screen.findByText('Approve graph writes')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Approve'));
+    fireEvent.click(screen.getByText('Continue'));
+
+    await waitFor(() => expect(client.decideTurn).toHaveBeenCalledWith(
+      'turn-1', [{ toolCallId: 'write-1', decision: 'approve' }], expect.any(Function), expect.any(AbortSignal),
+    ));
+  });
+});

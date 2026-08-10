@@ -16,7 +16,9 @@ import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
 import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines } from './cookResult';
+import type { GraphParameter } from './graphSchema';
 import type { PreviewData } from './previewCook';
+import type { PreviewParameterValue, PreviewParameterValues } from './previewParameters';
 import {
   beginDrag,
   buildAxisGizmo,
@@ -59,6 +61,7 @@ import {
   type MatcapId,
 } from './preview/matcapLibrary';
 import type { Vec3 } from './splineControlPoints';
+import PreviewParametersPopover from './preview/PreviewParametersPopover';
 
 export interface SplineEditContext {
   nodeId: string;
@@ -72,6 +75,12 @@ interface PreviewViewportProps {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  parameters?: GraphParameter[];
+  parameterNodeIds?: ReadonlySet<string>;
+  parameterValues?: PreviewParameterValues;
+  onParameterValueChange?: (parameterId: string, value: PreviewParameterValue) => void;
+  onResetParameters?: () => void;
+  onSaveParameterDefaults?: () => void;
   splineEdit?: SplineEditContext | null;
 }
 
@@ -112,6 +121,10 @@ const EDGE_OVERLAY_LINE_WIDTH = 2.5;
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 900;
+const EMPTY_PARAMETERS: GraphParameter[] = [];
+const EMPTY_PARAMETER_NODE_IDS = new Set<string>();
+const EMPTY_PARAMETER_VALUES: PreviewParameterValues = {};
+const NOOP_PARAMETER_CHANGE = () => {};
 
 function flipZArray(src: Float32Array): Float32Array {
   const out = new Float32Array(src.length);
@@ -128,6 +141,12 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   loading,
   error,
   onRefresh,
+  parameters = EMPTY_PARAMETERS,
+  parameterNodeIds = EMPTY_PARAMETER_NODE_IDS,
+  parameterValues = EMPTY_PARAMETER_VALUES,
+  onParameterValueChange = NOOP_PARAMETER_CHANGE,
+  onResetParameters = NOOP_PARAMETER_CHANGE,
+  onSaveParameterDefaults = NOOP_PARAMETER_CHANGE,
   splineEdit,
 }: PreviewViewportProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -153,6 +172,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const [xrayEnabled, setXrayEnabled] = useState(false);
   const [overlayPopoverOpen, setOverlayPopoverOpen] = useState(false);
   const [solidPopoverOpen, setSolidPopoverOpen] = useState(false);
+  const [parametersPopoverOpen, setParametersPopoverOpen] = useState(false);
   const [environmentId, setEnvironmentId] = useState(DEFAULT_BUILTIN_ENVIRONMENT.id);
   const environmentLoadVersionRef = useRef(0);
   const invalidateEnvironmentLoads = useCallback(() => {
@@ -976,6 +996,18 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             )}
           </div>
         </div>
+        <div className="pcg-preview__parameter-overlay">
+          <PreviewParametersPopover
+            parameters={parameters}
+            nodeIds={parameterNodeIds}
+            values={parameterValues}
+            open={parametersPopoverOpen}
+            onOpenChange={setParametersPopoverOpen}
+            onValueChange={onParameterValueChange}
+            onReset={onResetParameters}
+            onSaveDefaults={onSaveParameterDefaults}
+          />
+        </div>
       </div>
       <div className="pcg-preview__footer">
         <div className="pcg-preview__footer-left">
@@ -986,9 +1018,11 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             </span>
           )}
         </div>
-        <button type="button" className="pcg-preview__btn pcg-preview__recook" onClick={onRefresh} disabled={loading}>
-          {loading ? 'Cooking…' : 'Re-cook'}
-        </button>
+        <div className="pcg-preview__footer-actions">
+          <button type="button" className="pcg-preview__btn pcg-preview__recook" onClick={onRefresh} disabled={loading}>
+            {loading ? 'Cooking…' : 'Re-cook'}
+          </button>
+        </div>
       </div>
       {error && <div className="pcg-preview__error">{error}</div>}
     </div>
