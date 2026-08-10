@@ -1,17 +1,22 @@
-// Left-side embedded Agent panel: connected model selection, real multipart
-// turns, SSE events, and explicit approval for every graph write.
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import AgentComposer, { type AgentAttachment } from './AgentComposer';
-import AgentMessageList, { type AgentMessage } from './AgentMessageList';
+import AgentHistory from './AgentHistory';
+import AgentMessageList from './AgentMessageList';
 import {
   cancelTurn,
   decideTurn,
+  deleteAgentSession,
+  getAgentSession,
   getAgentSettings,
   getProviders,
+  listAgentSessions,
+  renameAgentSession,
   setAgentSettings,
   startTurn,
+  type AgentMessageRecord,
+  type AgentPart,
+  type AgentSessionDescriptor,
   type AgentStreamEvent,
   type ProviderDescriptor,
   type ToolCallEvent,
@@ -20,56 +25,100 @@ import {
 import type { AgentAction, AgentActionResult } from './agentCommands';
 
 interface AgentPanelProps {
-  // Kept during the migration so App's existing graph command wiring remains
-  // source-compatible. Real Agent writes now use the shared MCP dispatcher.
   onApplyActions: (actions: AgentAction[]) => AgentActionResult[];
   onOpenSettings?: () => void;
   providerRevision?: number;
 }
 
-const MIN_WIDTH = 280;
-const MAX_WIDTH = 680;
-const SESSION_ID = `web-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 760;
+const LAST_SESSION_KEY = 'pcg-agent-last-session';
+const SHOW_REASONING_KEY = 'pcg-agent-show-reasoning';
 
-let messageCounter = 0;
-const nextMessageId = () => `m${++messageCounter}`;
+const newSessionId = () => `session-${crypto.randomUUID()}`;
+const localId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function toolResultSummary(data: Record<string, unknown>): string {
-  const name = typeof data.name === 'string' ? data.name : 'tool';
-  const result = data.result as { isError?: boolean; structuredContent?: Record<string, unknown> } | undefined;
-  const failed = result?.isError === true;
-  const detail = result?.structuredContent?.error;
-  return `${failed ? '✗' : '✓'} ${name}${detail ? ` — ${String(detail)}` : ''}`;
+function upsertAssistant(
+  messages: AgentMessageRecord[], messageId: string, turnId: string, updater: (message: AgentMessageRecord) => AgentMessageRecord,
+): AgentMessageRecord[] {
+  const index = messages.findIndex((message) => message.id === messageId);
+  if (index < 0) {
+    return [...messages, updater({ id: messageId, role: 'assistant', turnId, status: 'running', createdAt: Date.now(), parts: [] })];
+  }
+  return messages.map((message, item) => item === index ? updater(message) : message);
+}
+
+function upsertPart(message: AgentMessageRecord, part: AgentPart): AgentMessageRecord {
+  const existing = message.parts.findIndex((item) => item.id === part.id);
+  const parts = existing < 0
+    ? [...message.parts, part]
+    : message.parts.map((item, index) => index === existing ? { ...item, ...part } : item);
+  return { ...message, parts };
 }
 
 export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: AgentPanelProps) {
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
   const [sending, setSending] = useState(false);
-  const [width, setWidth] = useState(340);
+  const [width, setWidth] = useState(380);
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providerId, setProviderId] = useState('');
   const [modelId, setModelId] = useState('');
   const [connectionError, setConnectionError] = useState('');
+  const [sessionId, setSessionId] = useState(() => localStorage.getItem(LAST_SESSION_KEY) || newSessionId());
   const [activeTurnId, setActiveTurnId] = useState('');
   const [pendingCalls, setPendingCalls] = useState<ToolCallEvent[]>([]);
   const [decisions, setDecisions] = useState<Record<string, 'approve' | 'reject'>>({});
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<AgentSessionDescriptor[]>([]);
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyCursor, setHistoryCursor] = useState(0);
+  const [showReasoning, setShowReasoning] = useState(() => localStorage.getItem(SHOW_REASONING_KEY) !== 'false');
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
-  const selectedProvider = useMemo(
-    () => providers.find((provider) => provider.id === providerId),
-    [providers, providerId],
-  );
+  const selectedProvider = useMemo(() => providers.find((provider) => provider.id === providerId), [providers, providerId]);
   const selectedModel = selectedProvider?.models.find((model) => model.id === modelId);
-  const connected = selectedProvider?.connection.status === 'connected' && Boolean(selectedModel);
   const connectedProviders = useMemo(
     () => providers.filter((provider) => provider.connection.status === 'connected' && provider.models.length > 0),
     [providers],
   );
+  const connected = selectedProvider?.connection.status === 'connected' && Boolean(selectedModel);
+
+  const refreshHistory = useCallback(async (query: string) => {
+    setHistoryLoading(true);
+    try {
+      const result = await listAgentSessions(query);
+      if (mountedRef.current) {
+        setSessions(result.sessions);
+        setHistoryCursor(result.nextCursor);
+      }
+    } finally {
+      if (mountedRef.current) setHistoryLoading(false);
+    }
+  }, []);
+
+  const loadOlderHistory = useCallback(async () => {
+    if (!historyCursor || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const result = await listAgentSessions(historyQuery, historyCursor);
+      if (!mountedRef.current) return;
+      setSessions((previous) => {
+        const known = new Set(previous.map((session) => session.id));
+        return [...previous, ...result.sessions.filter((session) => !known.has(session.id))];
+      });
+      setHistoryCursor(result.nextCursor);
+    } catch (error) {
+      setConnectionError(errorMessage(error));
+    } finally {
+      if (mountedRef.current) setHistoryLoading(false);
+    }
+  }, [historyCursor, historyLoading, historyQuery]);
 
   const refreshProviders = useCallback(async () => {
     const [nextProviders, settings] = await Promise.all([getProviders(), getAgentSettings()]);
@@ -80,155 +129,238 @@ export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: Age
     setConnectionError('');
   }, []);
 
+  const openSession = useCallback(async (id: string) => {
+    const session = await getAgentSession(id);
+    setSessionId(session.id);
+    localStorage.setItem(LAST_SESSION_KEY, session.id);
+    setMessages(session.messages ?? []);
+    setPendingCalls([]);
+    setProviderId(session.providerId);
+    setModelId(session.modelId);
+    setShowHistory(false);
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     void refreshProviders().catch((error) => setConnectionError(errorMessage(error)));
+    void refreshHistory('').catch(() => undefined);
+    const stored = localStorage.getItem(LAST_SESSION_KEY);
+    if (stored) void openSession(stored).catch(() => localStorage.removeItem(LAST_SESSION_KEY));
     return () => {
       mountedRef.current = false;
       abortRef.current?.abort();
     };
-  }, [providerRevision, refreshProviders]);
+  }, [providerRevision, refreshHistory, refreshProviders, openSession]);
 
-  const push = useCallback((message: AgentMessage) => {
-    setMessages((previous) => [...previous, message]);
+  useEffect(() => {
+    if (!showHistory) return;
+    const timer = window.setTimeout(() => void refreshHistory(historyQuery).catch(() => undefined), 180);
+    return () => window.clearTimeout(timer);
+  }, [historyQuery, refreshHistory, showHistory]);
+
+  useEffect(() => {
+    const refresh = () => setShowReasoning(localStorage.getItem(SHOW_REASONING_KEY) !== 'false');
+    window.addEventListener('pcg-agent-settings-changed', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('pcg-agent-settings-changed', refresh);
+      window.removeEventListener('storage', refresh);
+    };
   }, []);
 
   const handleEvent = useCallback((event: AgentStreamEvent) => {
     const data = event.data;
+    const turnId = typeof data.turnId === 'string' ? data.turnId : activeTurnId;
+    const messageId = typeof data.messageId === 'string' ? data.messageId : `assistant-${turnId}`;
+    const partId = typeof data.partId === 'string' ? data.partId : localId('part');
     if (event.type === 'turn.created') {
-      const id = typeof data.turnId === 'string' ? data.turnId : '';
-      setActiveTurnId(id);
+      const nextSession = typeof data.sessionId === 'string' ? data.sessionId : sessionId;
+      setSessionId(nextSession);
+      localStorage.setItem(LAST_SESSION_KEY, nextSession);
+      setActiveTurnId(turnId);
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => message));
       return;
     }
-    if (event.type === 'message.delta') {
-      const text = typeof data.text === 'string' ? data.text : '';
-      const turnId = typeof data.turnId === 'string' ? data.turnId : '';
-      if (!text) return;
-      setMessages((previous) => {
-        const last = previous.at(-1);
-        if (last?.role === 'assistant' && last.turnId === turnId) {
-          return [...previous.slice(0, -1), { ...last, text: last.text + text }];
-        }
-        return [...previous, { id: nextMessageId(), role: 'assistant', text, turnId }];
-      });
+    if (event.type === 'reasoning.started' || event.type === 'message.started') {
+      const type = event.type.startsWith('reasoning') ? 'reasoning' : 'text';
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => upsertPart(message, {
+        id: partId, type, ordinal: Number(data.ordinal ?? message.parts.length), status: 'streaming', text: '',
+      })));
+      return;
+    }
+    if (event.type === 'reasoning.delta' || event.type === 'message.delta') {
+      const type = event.type.startsWith('reasoning') ? 'reasoning' : 'text';
+      const delta = String(data.delta ?? data.text ?? '');
+      if (!delta) return;
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => {
+        const current = message.parts.find((part) => part.id === partId);
+        return upsertPart(message, {
+          id: partId, type, ordinal: current?.ordinal ?? message.parts.length,
+          status: 'streaming', text: `${current?.text ?? ''}${delta}`,
+        });
+      }));
+      return;
+    }
+    if (event.type === 'reasoning.completed' || event.type === 'message.completed') {
+      const type = event.type.startsWith('reasoning') ? 'reasoning' : 'text';
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => {
+        const current = message.parts.find((part) => part.id === partId);
+        return upsertPart(message, { id: partId, type, ordinal: current?.ordinal ?? message.parts.length, status: 'completed', text: String(data.text ?? current?.text ?? '') });
+      }));
       return;
     }
     if (event.type === 'tool.call') {
       const call = data as unknown as ToolCallEvent;
-      if (!call.requiresApproval) push({ id: nextMessageId(), role: 'action', text: `… ${call.name}` });
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => upsertPart(message, {
+        id: call.partId ?? partId, type: 'tool', ordinal: call.ordinal ?? message.parts.length,
+        status: call.requiresApproval ? 'approval_required' : 'running', toolCallId: call.toolCallId,
+        name: call.name, arguments: call.arguments,
+      })));
       return;
     }
     if (event.type === 'tool.result') {
-      push({ id: nextMessageId(), role: 'action', text: toolResultSummary(data) });
+      const result = data.result as { isError?: boolean } | undefined;
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => {
+        const current = message.parts.find((part) => part.id === partId || part.toolCallId === data.toolCallId);
+        return upsertPart(message, {
+          id: current?.id ?? partId, type: 'tool', ordinal: current?.ordinal ?? message.parts.length,
+          status: result?.isError ? 'failed' : 'completed', toolCallId: String(data.toolCallId ?? current?.toolCallId ?? ''),
+          name: String(data.name ?? current?.name ?? 'tool'), arguments: current?.arguments,
+          result: data.result, cached: data.cached === true, durationMs: Number(data.durationMs ?? current?.durationMs ?? 0),
+        });
+      }));
       return;
     }
     if (event.type === 'approval.required') {
-      const turnId = typeof data.turnId === 'string' ? data.turnId : '';
-      const calls = Array.isArray(data.calls)
-        ? (data.calls as ToolCallEvent[]).map((call) => ({ ...call, turnId, requiresApproval: true }))
-        : [];
-      setActiveTurnId(turnId);
+      const calls = Array.isArray(data.calls) ? data.calls as ToolCallEvent[] : [];
       setPendingCalls(calls);
-      setDecisions(Object.fromEntries(calls.map((call) => [call.toolCallId || (call as unknown as { id: string }).id, 'reject'])));
+      setDecisions(Object.fromEntries(calls.map((call) => [call.toolCallId, 'reject'])));
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => {
+        const withCalls = calls.reduce((current, call) => upsertPart(current, {
+          id: call.partId ?? `tool-${call.toolCallId}`,
+          type: 'tool',
+          ordinal: call.ordinal ?? current.parts.length,
+          status: 'approval_required',
+          toolCallId: call.toolCallId,
+          name: call.name,
+          arguments: call.arguments,
+        }), message);
+        return { ...withCalls, status: 'awaiting_approval' };
+      }));
+      return;
+    }
+    if (event.type === 'turn.completed') {
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => ({ ...message, status: 'completed' })));
+      setPendingCalls([]);
+      setActiveTurnId('');
+      void refreshHistory('').catch(() => undefined);
       return;
     }
     if (event.type === 'turn.error') {
-      const nested = data.error as { message?: string } | undefined;
-      push({ id: nextMessageId(), role: 'action', text: `✗ ${nested?.message ?? 'Agent turn failed'}` });
+      const nested = data.error as { code?: string; message?: string; retryable?: boolean } | undefined;
+      const status = nested?.code === 'cancelled' ? 'interrupted' : 'error';
+      setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => upsertPart(
+        { ...message, status },
+        { id: partId, type: 'error', ordinal: message.parts.length, status: 'error', error: { code: nested?.code ?? 'agent_error', message: nested?.message ?? 'Agent turn failed', retryable: nested?.retryable ?? false } },
+      )));
+      void refreshHistory('').catch(() => undefined);
+      setActiveTurnId('');
     }
-  }, [push]);
+  }, [activeTurnId, refreshHistory, sessionId]);
 
   const selectModel = useCallback(async (nextProviderId: string, nextModelId?: string) => {
     const provider = providers.find((item) => item.id === nextProviderId);
     const model = nextModelId ?? provider?.models[0]?.id ?? '';
+    if (!model) return onOpenSettings?.();
     setProviderId(nextProviderId);
     setModelId(model);
-    if (!model) {
-      onOpenSettings?.();
-      return;
-    }
-    try {
-      await setAgentSettings({ providerId: nextProviderId, modelId: model });
-    } catch (error) {
-      setConnectionError(errorMessage(error));
-      onOpenSettings?.();
-    }
+    try { await setAgentSettings({ providerId: nextProviderId, modelId: model }); }
+    catch (error) { setConnectionError(errorMessage(error)); }
   }, [onOpenSettings, providers]);
 
-  const handleSend = useCallback(async (text: string, attachments: AgentAttachment[]) => {
-    if (!connected || !selectedProvider || !selectedModel) {
-      setConnectionError('Connect a Provider and select a validated model first.');
-      onOpenSettings?.();
-      return;
-    }
+  const sendTurn = useCallback(async (text: string, attachments: AgentAttachment[]) => {
+    if (!connected || !selectedProvider || !selectedModel) return onOpenSettings?.();
     if (attachments.some((attachment) => attachment.file.type.startsWith('image/')) && !selectedModel.capabilities.imageInput) {
-      push({ id: nextMessageId(), role: 'action', text: `✗ ${selectedModel.name} does not support image input` });
+      setConnectionError(`${selectedModel.name} does not support image input.`);
       return;
     }
-    push({
-      id: nextMessageId(),
-      role: 'user',
-      text: text || '(attachments only)',
-      attachments: attachments.map((attachment) => ({ name: attachment.file.name })),
-    });
+    const optimistic: AgentMessageRecord = {
+      id: localId('message'), role: 'user', status: 'completed', createdAt: Date.now(),
+      parts: [
+        ...(text ? [{ id: localId('part'), type: 'text' as const, ordinal: 0, status: 'completed' as const, text }] : []),
+        ...attachments.map((attachment, index) => ({ id: localId('part'), type: 'attachment' as const, ordinal: index + 1, status: 'completed' as const, name: attachment.file.name, mimeType: attachment.file.type })),
+      ],
+    };
+    setMessages((previous) => [...previous, optimistic]);
+    setSending(true);
+    setPendingCalls([]);
+    const abort = new AbortController();
+    abortRef.current = abort;
+    try { await startTurn({ message: text, sessionId, providerId, modelId, attachments }, handleEvent, abort.signal); }
+    catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
+    } finally {
+      if (abortRef.current === abort) abortRef.current = null;
+      setSending(false);
+    }
+  }, [connected, handleEvent, modelId, onOpenSettings, providerId, selectedModel, selectedProvider, sessionId]);
+
+  const retryTurn = useCallback(async (retryTurnId: string) => {
+    if (!connected || !selectedProvider || !selectedModel || sending) return;
+    setConnectionError('');
+    setMessages((previous) => previous.filter((message) => message.turnId !== retryTurnId));
     setSending(true);
     setPendingCalls([]);
     const abort = new AbortController();
     abortRef.current = abort;
     try {
-      await startTurn(
-        { message: text, sessionId: SESSION_ID, providerId, modelId, attachments },
-        handleEvent,
-        abort.signal,
-      );
+      await startTurn({
+        message: '', sessionId, providerId, modelId, attachments: [], retryTurnId,
+      }, handleEvent, abort.signal);
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        push({ id: nextMessageId(), role: 'action', text: `✗ ${errorMessage(error)}` });
-      }
+      if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
     } finally {
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, onOpenSettings, providerId, push, selectedModel, selectedProvider]);
+  }, [connected, handleEvent, modelId, providerId, selectedModel, selectedProvider, sending, sessionId]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setSending(false);
     if (activeTurnId) void cancelTurn(activeTurnId).catch(() => undefined);
-    push({ id: nextMessageId(), role: 'action', text: '■ Turn stopped' });
-  }, [activeTurnId, push]);
+    setMessages((previous) => previous.map((message) => message.turnId === activeTurnId ? { ...message, status: 'interrupted' } : message));
+    setActiveTurnId('');
+  }, [activeTurnId]);
 
   const submitDecisions = useCallback(async () => {
     if (!activeTurnId || pendingCalls.length === 0) return;
-    const payload: TurnDecision[] = pendingCalls.map((call) => {
-      const callId = call.toolCallId || (call as unknown as { id: string }).id;
-      return { toolCallId: callId, decision: decisions[callId] ?? 'reject' };
-    });
+    const payload: TurnDecision[] = pendingCalls.map((call) => ({ toolCallId: call.toolCallId, decision: decisions[call.toolCallId] ?? 'reject' }));
     setPendingCalls([]);
     setSending(true);
     const abort = new AbortController();
     abortRef.current = abort;
-    try {
-      await decideTurn(activeTurnId, payload, handleEvent, abort.signal);
-    } catch (error) {
-      push({ id: nextMessageId(), role: 'action', text: `✗ ${errorMessage(error)}` });
-    } finally {
-      if (abortRef.current === abort) abortRef.current = null;
-      setSending(false);
-    }
-  }, [activeTurnId, decisions, handleEvent, pendingCalls, push]);
+    try { await decideTurn(activeTurnId, payload, handleEvent, abort.signal); }
+    finally { if (abortRef.current === abort) abortRef.current = null; setSending(false); }
+  }, [activeTurnId, decisions, handleEvent, pendingCalls]);
+
+  const startNewChat = useCallback(() => {
+    if (sending || pendingCalls.length > 0) handleStop();
+    const id = newSessionId();
+    setSessionId(id);
+    localStorage.removeItem(LAST_SESSION_KEY);
+    setMessages([]);
+    setPendingCalls([]);
+    setShowHistory(false);
+  }, [handleStop, pendingCalls.length, sending]);
 
   const onResizeStart = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = width;
     const onMove = (move: MouseEvent) => setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + move.clientX - startX)));
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      document.body.classList.remove('pcg-agent--resizing');
-    };
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.classList.remove('pcg-agent--resizing'); };
     document.body.classList.add('pcg-agent--resizing');
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -238,65 +370,42 @@ export default function AgentPanel({ onOpenSettings, providerRevision = 0 }: Age
     <div className="pcg-agent" style={{ width }}>
       <div className="pcg-agent__header">
         <span className="pcg-agent__title">Agent</span>
-        <select
-          className="pcg-agent__provider-select"
-          value={providerId}
-          aria-label="Agent Provider"
-          onChange={(event) => void selectModel(event.target.value)}
-        >
-          <option value="">Choose Provider</option>
-          {connectedProviders.map((provider) => (
-            <option key={provider.id} value={provider.id}>
-              {provider.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="pcg-agent__model-select"
-          value={modelId}
-          aria-label="Agent model"
-          disabled={!selectedProvider?.models.length}
-          onChange={(event) => void selectModel(providerId, event.target.value)}
-        >
-          {!selectedProvider?.models.length && <option value="">No models</option>}
-          {selectedProvider?.models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-        </select>
+        <span className="pcg-agent__session-title">{sessions.find((session) => session.id === sessionId)?.title ?? 'New chat'}</span>
+        <button type="button" className="pcg-agent__header-button" title="New chat" aria-label="New chat" onClick={startNewChat}>＋</button>
+        <button type="button" className={`pcg-agent__header-button ${showHistory ? 'is-active' : ''}`} title="Show chat history" aria-label="Show chat history" onClick={() => setShowHistory((value) => !value)}>◷</button>
       </div>
 
-      {!connected && (
-        <div className="pcg-agent__connection-notice">
-          <span>{connectionError || 'Connect an AI Provider in PCG Settings to start.'}</span>
-          <button type="button" onClick={onOpenSettings}>Open Settings</button>
-        </div>
-      )}
+      {!connected && <div className="pcg-agent__connection-notice"><span>{connectionError || 'Connect an AI Provider in PCG Settings to start.'}</span><button type="button" onClick={onOpenSettings}>Open Settings</button></div>}
+      {connected && connectionError && <div className="pcg-agent__connection-notice"><span>{connectionError}</span><button type="button" onClick={() => setConnectionError('')}>Dismiss</button></div>}
 
-      <AgentMessageList messages={messages} />
-
-      {pendingCalls.length > 0 && (
-        <div className="pcg-agent-approval">
-          <div className="pcg-agent-approval__title">Approve graph writes</div>
-          {pendingCalls.map((call) => {
-            const callId = call.toolCallId || (call as unknown as { id: string }).id;
-            return (
-              <div key={callId} className="pcg-agent-approval__call">
-                <div><strong>{call.name}</strong><pre>{JSON.stringify(call.arguments, null, 2)}</pre></div>
-                <div className="pcg-agent-approval__choices">
-                  <button type="button" className={decisions[callId] === 'approve' ? 'is-selected' : ''} onClick={() => setDecisions((stored) => ({ ...stored, [callId]: 'approve' }))}>Approve</button>
-                  <button type="button" className={decisions[callId] !== 'approve' ? 'is-selected is-reject' : ''} onClick={() => setDecisions((stored) => ({ ...stored, [callId]: 'reject' }))}>Reject</button>
-                </div>
-              </div>
-            );
-          })}
-          <button type="button" className="pcg-agent-approval__continue" onClick={() => void submitDecisions()}>Continue</button>
-        </div>
+      {showHistory ? (
+        <AgentHistory
+          sessions={sessions} activeSessionId={sessionId} query={historyQuery} loading={historyLoading}
+          hasMore={historyCursor > 0} onLoadMore={() => void loadOlderHistory()}
+          onQueryChange={setHistoryQuery} onOpen={(id) => void openSession(id)} onClose={() => setShowHistory(false)}
+          onRename={(session) => {
+            const title = window.prompt('Rename chat', session.title);
+            if (title?.trim()) void renameAgentSession(session.id, title).then(() => refreshHistory('')).catch((error) => setConnectionError(errorMessage(error)));
+          }}
+          onDelete={(session) => {
+            if (!window.confirm(`Delete “${session.title}”? This cannot be undone.`)) return;
+            void deleteAgentSession(session.id).then(() => { if (session.id === sessionId) startNewChat(); return refreshHistory(''); }).catch((error) => setConnectionError(errorMessage(error)));
+          }}
+        />
+      ) : (
+        <AgentMessageList
+          messages={messages} pendingCalls={pendingCalls} decisions={decisions}
+          onDecision={(callId, decision) => setDecisions((stored) => ({ ...stored, [callId]: decision }))}
+          onContinue={() => void submitDecisions()}
+          onRetry={(turnId) => void retryTurn(turnId)}
+          showReasoning={showReasoning}
+        />
       )}
 
       <AgentComposer
-        sending={sending}
-        agentLabel={connected ? `${selectedProvider?.name} · ${selectedModel?.name}` : 'Connect Provider'}
-        disabled={!connected || pendingCalls.length > 0}
-        onSend={handleSend}
-        onStop={handleStop}
+        sending={sending} agentLabel={connected ? `${selectedProvider?.name} · ${selectedModel?.name}` : 'Connect Provider'}
+        disabled={!connected || pendingCalls.length > 0 || showHistory} onSend={sendTurn} onStop={handleStop}
+        providers={connectedProviders} providerId={providerId} modelId={modelId} onModelChange={(nextProvider, nextModel) => void selectModel(nextProvider, nextModel)}
       />
       <div className="pcg-agent__resize-handle" onMouseDown={onResizeStart} title="Drag to resize" />
     </div>

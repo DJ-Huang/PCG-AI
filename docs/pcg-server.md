@@ -61,6 +61,8 @@ URL: Project Settings → PCG AI, or **PCG → Server → Set Server URL…**
 | GET / PUT | `/v1/agent/settings` | read/select the active connected Provider and tool-capable model |
 | POST | `/v1/agent/turns` | multipart message/attachments with chunked SSE response |
 | POST | `/v1/agent/turns/:id/decision`, `/cancel` | resolve graph-write approvals or cancel a Turn |
+| GET | `/v1/agent/sessions?query=&cursor=&limit=` | search and page durable local chat history |
+| GET / PATCH / DELETE | `/v1/agent/sessions/:id` | open, rename, or permanently delete a chat and its attachments |
 
 ## Embedded multi-Provider Agent
 
@@ -71,15 +73,32 @@ OpenAI-compatible Chat Completions. Provider/model deltas and tool events use
 the fixed SSE contract:
 
 ```text
-turn.created → message.delta / tool.call / tool.result
+turn.created → reasoning.started / .delta / .completed
+             → message.started / .delta / .completed
+             → tool.call / tool.result
              → approval.required → decision → … → turn.completed
              ↘ turn.error
 ```
+
+Every Timeline event carries stable session, Turn, message, Part, and ordinal
+identifiers where applicable. Only reasoning text actually returned by the
+Provider is shown. Tool Parts retain complete input, structured output,
+duration, cache state, and errors; identical read calls at an unchanged graph
+hash are cached and eventually receive a loop-breaker result.
 
 The runtime limits a Turn to 12 tool rounds, 32 calls, five minutes, eight
 attachments, 10 MiB per attachment, and 24 MiB total. PNG/JPEG bytes and UTF-8
 `.txt/.json/.pcg` content are mapped into each Provider's native multimodal
 request format. PDF is intentionally not exposed in this release.
+
+Chat metadata, Timeline Parts, and attachment files survive browser refreshes
+and server restarts under
+`~/Library/Application Support/PCG-AI/Agent/Sessions/`. Directories use `0700`
+and files use `0600` on macOS; history responses expose attachment metadata,
+not local paths or bytes. `PCG_AGENT_SESSIONS_PATH` overrides this root for
+isolated tests. A failed or interrupted latest Turn can be retried without
+duplicating its user message; attachment Turns require selecting the files
+again so stale bytes are never replayed implicitly.
 
 On macOS, credentials use Security.framework Generic Password items with
 Service `PCG-AI Agent`; only non-sensitive Provider/model/account metadata is

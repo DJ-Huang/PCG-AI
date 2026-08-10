@@ -84,7 +84,8 @@ Coding API Key. Its endpoint is fixed to `https://api.kimi.com/coding/v1` and
 uses the Anthropic Messages protocol, so no Base URL is requested. The Key is
 validated against Kimi's model catalog before it is stored.
 
-Turns stream text and tool status using SSE. Read, validate, cook, and capture
+Turns stream ordered Provider reasoning, Markdown text, tool calls, complete
+tool results, approvals, and errors using SSE. Read, validate, cook, and capture
 tools execute automatically. Node/graph writes, full replacement, and save
 pause on an approval card that shows the exact tool and arguments. Approval is
 bound to the Turn, call ID, and current graph hash, can execute only once, and
@@ -93,6 +94,13 @@ fails with `graph_conflict` if the graph changed while waiting.
 Supported attachments are PNG/JPEG and UTF-8 `.txt`, `.json`, or `.pcg` files.
 The panel blocks images before sending when the selected model lacks image
 input capability.
+
+The clock button opens durable local chat history with search, date groups,
+rename, deletion, and paged loading. Sessions and attachments survive a page
+refresh and `pcg-server` restart. **Settings → General** controls whether
+Provider-returned reasoning is shown; models that do not return reasoning do
+not receive a fabricated Thinking section. Failed and interrupted Turns can be
+retried in place without duplicating the user message.
 
 Web Agent tests:
 

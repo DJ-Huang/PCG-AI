@@ -1,6 +1,7 @@
 #include "cook_service.hpp"
 #include "agent_service.hpp"
 #include "agent_runtime.hpp"
+#include "agent_session_store.hpp"
 #include "mcp_service.hpp"
 #include "session_service.hpp"
 
@@ -57,6 +58,22 @@ int main(int argc, char** argv) {
     const int port = ParsePort(argc, argv, 17890);
     pcg_server::ConfigureAgentRuntime(port);
     httplib::Server svr;
+    svr.set_exception_handler([](const httplib::Request&, httplib::Response& res, std::exception_ptr error) {
+        try {
+            if (error) std::rethrow_exception(error);
+        } catch (const std::exception& exception) {
+            std::cerr << "[pcg-server] request failed: " << exception.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[pcg-server] request failed with an unknown exception" << std::endl;
+        }
+        res.status = 500;
+        res.set_content(nlohmann::json{
+            {"ok", false},
+            {"error", {{"code", "internal_error"},
+                       {"message", "The local Agent runtime encountered an internal error."},
+                       {"retryable", true}}},
+        }.dump(), "application/json");
+    });
 
     svr.Get("/v1/health", [](const httplib::Request&, httplib::Response& res) {
         nlohmann::json body = {
@@ -85,6 +102,10 @@ int main(int argc, char** argv) {
     svr.Post(R"(/v1/agent/providers/([^/]+)/oauth/start)", pcg_server::HandleAgentOAuthStart);
     svr.Get(R"(/v1/agent/oauth/([^/]+)/status)", pcg_server::HandleAgentOAuthStatus);
     svr.Get(R"(/v1/agent/oauth/callback/([^/]+))", pcg_server::HandleAgentOAuthCallback);
+    svr.Get("/v1/agent/sessions", pcg_server::HandleAgentListSessions);
+    svr.Get(R"(/v1/agent/sessions/([^/]+))", pcg_server::HandleAgentGetSession);
+    svr.Patch(R"(/v1/agent/sessions/([^/]+))", pcg_server::HandleAgentPatchSession);
+    svr.Delete(R"(/v1/agent/sessions/([^/]+))", pcg_server::HandleAgentDeleteSession);
     svr.Post("/v1/agent/turns", pcg_server::HandleAgentTurn);
     svr.Post(R"(/v1/agent/turns/([^/]+)/decision)", pcg_server::HandleAgentTurnDecision);
     svr.Post(R"(/v1/agent/turns/([^/]+)/cancel)", pcg_server::HandleAgentTurnCancel);

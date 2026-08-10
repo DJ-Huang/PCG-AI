@@ -19,6 +19,10 @@ vi.mock('./agentClient', async (loadOriginal) => {
     validateProvider: vi.fn(),
     startOAuth: vi.fn(),
     getOAuthStatus: vi.fn(),
+    listAgentSessions: vi.fn(),
+    getAgentSession: vi.fn(),
+    renameAgentSession: vi.fn(),
+    deleteAgentSession: vi.fn(),
   };
 });
 
@@ -38,6 +42,8 @@ describe('AgentPanel', () => {
     vi.mocked(client.getAgentSettings).mockResolvedValue({ providerId: 'openai', modelId: 'gpt-test' });
     vi.mocked(client.setAgentSettings).mockResolvedValue();
     vi.mocked(client.cancelTurn).mockResolvedValue();
+    vi.mocked(client.listAgentSessions).mockResolvedValue({ sessions: [], nextCursor: 0 });
+    localStorage.clear();
   });
 
   it('pauses a graph write for a per-call approval decision', async () => {
@@ -58,11 +64,11 @@ describe('AgentPanel', () => {
       onEvent({ type: 'turn.completed', data: { turnId: 'turn-1' } });
     });
     render(<AgentPanel onApplyActions={() => []} />);
-    await screen.findByText('OpenAI');
+    await screen.findByTitle('OpenAI · GPT Test');
 
     fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'save it' } });
     fireEvent.click(screen.getByTitle('Send (Enter)'));
-    expect(await screen.findByText('Approve graph writes')).toBeInTheDocument();
+    expect(await screen.findByText('Approve this graph write?')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Approve'));
     fireEvent.click(screen.getByText('Continue'));
 

@@ -16,6 +16,7 @@ export interface ModelCapabilities {
   toolCall: boolean;
   textInput: boolean;
   imageInput: boolean;
+  reasoning?: boolean;
   contextTokens: number;
   outputTokens: number;
 }
@@ -68,12 +69,63 @@ export interface ToolCallEvent {
   name: string;
   arguments: Record<string, unknown>;
   requiresApproval?: boolean;
+  partId?: string;
+  messageId?: string;
+  ordinal?: number;
+}
+
+export type AgentPartStatus = 'streaming' | 'running' | 'approval_required' | 'completed' | 'failed' | 'error';
+
+export interface AgentPart {
+  id: string;
+  type: 'text' | 'reasoning' | 'tool' | 'attachment' | 'error';
+  ordinal: number;
+  status?: AgentPartStatus;
+  text?: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+  toolCallId?: string;
+  arguments?: Record<string, unknown>;
+  result?: unknown;
+  cached?: boolean;
+  durationMs?: number;
+  error?: AgentError;
+}
+
+export interface AgentMessageRecord {
+  id: string;
+  role: 'user' | 'assistant';
+  turnId?: string;
+  status: 'running' | 'awaiting_approval' | 'completed' | 'interrupted' | 'error';
+  createdAt: number;
+  parts: AgentPart[];
+}
+
+export interface AgentSessionDescriptor {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  providerId: string;
+  modelId: string;
+  graphName: string;
+  status: 'running' | 'awaiting_approval' | 'completed' | 'interrupted' | 'error' | 'idle';
+}
+
+export interface AgentSession extends AgentSessionDescriptor {
+  messages: AgentMessageRecord[];
 }
 
 export interface AgentStreamEvent {
   type:
     | 'turn.created'
+    | 'reasoning.started'
+    | 'reasoning.delta'
+    | 'reasoning.completed'
+    | 'message.started'
     | 'message.delta'
+    | 'message.completed'
     | 'tool.call'
     | 'tool.result'
     | 'approval.required'
@@ -178,6 +230,31 @@ export async function getOAuthStatus(attemptId: string): Promise<{ status: strin
   return jsonRequest(`/oauth/${encodeURIComponent(attemptId)}/status`, { headers: authHeaders() });
 }
 
+export async function listAgentSessions(query = '', cursor = 0): Promise<{ sessions: AgentSessionDescriptor[]; nextCursor: number }> {
+  const params = new URLSearchParams({ limit: '50' });
+  if (query.trim()) params.set('query', query.trim());
+  if (cursor > 0) params.set('cursor', String(cursor));
+  return jsonRequest(`/sessions?${params}`, { headers: authHeaders() });
+}
+
+export async function getAgentSession(sessionId: string): Promise<AgentSession> {
+  const response = await jsonRequest<{ session: AgentSession }>(`/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: authHeaders(),
+  });
+  return response.session;
+}
+
+export async function renameAgentSession(sessionId: string, title: string): Promise<AgentSessionDescriptor> {
+  const response = await jsonRequest<{ session: AgentSessionDescriptor }>(`/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH', headers: authHeaders(true), body: JSON.stringify({ title }),
+  });
+  return response.session;
+}
+
+export async function deleteAgentSession(sessionId: string): Promise<void> {
+  await jsonRequest(`/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE', headers: authHeaders() });
+}
+
 async function consumeEventStream(response: Response, onEvent: (event: AgentStreamEvent) => void): Promise<void> {
   if (!response.ok) return readError(response);
   if (!response.body) throw new Error('Agent response stream is unavailable');
@@ -219,6 +296,7 @@ export async function startTurn(
     providerId: string;
     modelId: string;
     attachments: AgentAttachment[];
+    retryTurnId?: string;
   },
   onEvent: (event: AgentStreamEvent) => void,
   signal?: AbortSignal,
@@ -227,7 +305,13 @@ export async function startTurn(
   form.append(
     'request',
     new Blob(
-      [JSON.stringify({ message: input.message, sessionId: input.sessionId, providerId: input.providerId, modelId: input.modelId })],
+      [JSON.stringify({
+        message: input.message,
+        sessionId: input.sessionId,
+        providerId: input.providerId,
+        modelId: input.modelId,
+        ...(input.retryTurnId ? { retryTurnId: input.retryTurnId } : {}),
+      })],
       { type: 'application/json' },
     ),
     'request.json',

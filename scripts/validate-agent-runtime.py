@@ -77,6 +77,7 @@ class FakeProvider(BaseHTTPRequestHandler):
             return
         else:
             self._sse([
+                {"choices": [{"delta": {"reasoning_content": "I will inspect the live graph first."}}]},
                 {"choices": [{"delta": {"tool_calls": [{
                     "index": 0, "id": "read-1",
                     "function": {"name": "pcg_get_editor_context", "arguments": "{"},
@@ -119,6 +120,16 @@ def event_data(stream: bytes, event: str) -> list[dict[str, object]]:
     return result
 
 
+def event_types(stream: bytes) -> list[str]:
+    result: list[str] = []
+    for block in stream.decode().split("\n\n"):
+        for line in block.splitlines():
+            if line.startswith("event: "):
+                result.append(line[7:])
+                break
+    return result
+
+
 def main() -> None:
     if not SERVER.exists():
         raise SystemExit(f"Build pcg-server first: {SERVER}")
@@ -128,6 +139,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="pcg-agent-test-") as temp:
         env = os.environ.copy()
         env["PCG_AGENT_CONFIG_PATH"] = str(Path(temp) / "agent.json")
+        env["PCG_AGENT_SESSIONS_PATH"] = str(Path(temp) / "sessions")
         env["PCG_AGENT_KEYCHAIN_SERVICE"] = f"PCG-AI Agent Test {uuid.uuid4().hex}"
         process = subprocess.Popen(
             [str(SERVER), "--port", "17892"], cwd=ROOT / "pcg-server", env=env,
@@ -167,11 +179,42 @@ def main() -> None:
             })
             status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
             assert status == 200
-            assert event_data(stream, "turn.created")
+            created = event_data(stream, "turn.created")[0]
+            read_session_id = str(created["sessionId"])
+            sequence = event_types(stream)
+            expected = [
+                "reasoning.started", "reasoning.delta", "reasoning.completed",
+                "tool.call", "tool.result", "message.started", "message.delta",
+                "message.completed", "turn.completed",
+            ]
+            positions = [sequence.index(item) for item in expected]
+            assert positions == sorted(positions), sequence
             assert event_data(stream, "tool.call")[0]["name"] == "pcg_get_editor_context"
-            assert event_data(stream, "tool.result")
+            tool_result = event_data(stream, "tool.result")[0]
+            assert "structuredContent" in tool_result["result"]
+            assert "durationMs" in tool_result
             assert len(event_data(stream, "message.delta")) == 2
             assert event_data(stream, "turn.completed")
+
+            status, response = request(f"{base}/sessions?limit=invalid&cursor=invalid")
+            assert status == 200, response
+            listed = json.loads(response)["sessions"]
+            assert any(item["id"] == read_session_id for item in listed)
+            status, response = request(f"{base}/sessions/{read_session_id}")
+            assert status == 200, response
+            saved = json.loads(response)["session"]
+            saved_tool = next(
+                part for message in saved["messages"] for part in message["parts"]
+                if part["type"] == "tool"
+            )
+            assert "structuredContent" in saved_tool["result"]
+            assert "_historyStart" not in json.dumps(saved)
+            status, response = request(
+                f"{base}/sessions/{read_session_id}", method="PATCH",
+                body=json.dumps({"title": "Renamed runtime test"}).encode(),
+                content_type="application/json",
+            )
+            assert status == 200 and json.loads(response)["session"]["title"] == "Renamed runtime test"
 
             body, content_type = multipart_turn({
                 "message": "approval", "sessionId": "approval-session",
@@ -211,6 +254,26 @@ def main() -> None:
             assert status == 200
             conflict = event_data(stream, "tool.result")[0]["result"]["structuredContent"]
             assert conflict["error"] == "graph_conflict"
+
+            process.terminate()
+            process.wait(timeout=5)
+            process = subprocess.Popen(
+                [str(SERVER), "--port", "17892"], cwd=ROOT / "pcg-server", env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            for _ in range(50):
+                try:
+                    if request(f"{base}/providers")[0] == 200:
+                        break
+                except urllib.error.URLError:
+                    pass
+                time.sleep(0.1)
+            status, response = request(f"{base}/sessions/{read_session_id}")
+            assert status == 200, response
+            assert json.loads(response)["session"]["title"] == "Renamed runtime test"
+            status, _ = request(f"{base}/sessions/{read_session_id}", method="DELETE")
+            assert status == 200
+            assert request(f"{base}/sessions/{read_session_id}")[0] == 404
             print("agent runtime validation: ok")
         finally:
             request(f"{base}/providers/openai-compatible/connection", method="DELETE")

@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <future>
 #include <iomanip>
 #include <map>
 #include <memory>
@@ -17,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <curl/curl.h>
@@ -29,6 +31,7 @@
 #endif
 
 #include "agent_service.hpp"
+#include "agent_session_store.hpp"
 #include "mcp_service.hpp"
 #include "session_service.hpp"
 
@@ -74,8 +77,14 @@ struct TurnState {
     std::string session_id;
     std::string provider;
     std::string model;
+    std::string assistant_message_id;
+    std::string final_status = "running";
     json history = json::array();
+    json session_record = json::object();
     json pending = json::array();
+    std::unordered_map<std::string, json> tool_cache;
+    std::unordered_map<std::string, int> repeated_tools;
+    int next_ordinal = 0;
     int tool_rounds = 0;
     int tool_calls = 0;
     int64_t started_at = 0;
@@ -90,6 +99,7 @@ struct RuntimeState {
     json provider_meta = json::object();
     std::unordered_map<std::string, OAuthAttempt> oauth;
     std::unordered_map<std::string, std::shared_ptr<TurnState>> turns;
+    std::unordered_set<std::string> resolved_turns;
     std::unordered_map<std::string, json> sessions;
     std::unordered_map<std::string, std::shared_ptr<std::mutex>> refresh_mutexes;
     int server_port = 17890;
@@ -113,6 +123,143 @@ std::string RandomId(const std::string& prefix) {
         out << std::hex << std::setw(8) << std::setfill('0') << rd();
     }
     return out.str();
+}
+
+std::string TruncateUtf8(std::string value, size_t max_bytes) {
+    if (value.size() <= max_bytes) return value;
+    const size_t suffix_size = 3;
+    size_t end = max_bytes > suffix_size ? max_bytes - suffix_size : 0;
+    while (end > 0 && (static_cast<unsigned char>(value[end]) & 0xC0) == 0x80) --end;
+    value.resize(end);
+    value += "...";
+    return value;
+}
+
+std::string FirstUserText(const json& message) {
+    for (const auto& part : message.value("content", json::array())) {
+        if (part.value("type", "") != "text") continue;
+        std::string text = part.value("text", "");
+        const size_t newline = text.find('\n');
+        if (newline != std::string::npos) text.resize(newline);
+        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) text.erase(text.begin());
+        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) text.pop_back();
+        text = TruncateUtf8(std::move(text), 80);
+        if (!text.empty()) return text;
+    }
+    for (const auto& part : message.value("content", json::array())) {
+        const std::string name = part.value("name", "");
+        if (!name.empty()) return name;
+    }
+    return "New chat";
+}
+
+json PublicUserMessage(const json& message, const std::string& id, int64_t created_at) {
+    json parts = json::array();
+    int ordinal = 0;
+    for (const auto& source : message.value("content", json::array())) {
+        if (source.value("attachment", false)) {
+            parts.push_back({{"id", RandomId("part")}, {"type", "attachment"}, {"ordinal", ordinal++},
+                             {"name", source.value("name", "attachment")},
+                             {"mimeType", source.value("mimeType", "application/octet-stream")},
+                             {"size", source.value("size", 0LL)}});
+        } else if (source.value("type", "") == "text") {
+            parts.push_back({{"id", RandomId("part")}, {"type", "text"}, {"ordinal", ordinal++},
+                             {"text", source.value("text", "")}});
+        } else if (source.value("type", "") == "image") {
+            parts.push_back({{"id", RandomId("part")}, {"type", "attachment"}, {"ordinal", ordinal++},
+                             {"name", source.value("name", "image")}, {"mimeType", source.value("mimeType", "")},
+                             {"size", source.value("size", 0LL)}});
+        }
+    }
+    return {{"id", id}, {"role", "user"}, {"status", "completed"},
+            {"createdAt", created_at}, {"parts", std::move(parts)}};
+}
+
+bool PrepareRetry(json& session, const std::string& retry_turn_id, json& user,
+                  std::string& error_code, std::string& error_message) {
+    auto& messages = session["messages"];
+    if (!messages.is_array() || messages.size() < 2) {
+        error_code = "retry_turn_not_found";
+        error_message = "The failed turn is no longer available to retry.";
+        return false;
+    }
+    size_t assistant_index = messages.size();
+    for (size_t index = 0; index < messages.size(); ++index) {
+        if (messages[index].value("role", "") == "assistant" &&
+            messages[index].value("turnId", "") == retry_turn_id) {
+            assistant_index = index;
+            break;
+        }
+    }
+    if (assistant_index == messages.size() || assistant_index == 0 || assistant_index + 1 != messages.size() ||
+        messages[assistant_index - 1].value("role", "") != "user") {
+        error_code = "retry_turn_stale";
+        error_message = "Only the latest failed or interrupted turn can be retried.";
+        return false;
+    }
+    const std::string status = messages[assistant_index].value("status", "");
+    if (status != "error" && status != "interrupted") {
+        error_code = "retry_turn_not_retryable";
+        error_message = "Only failed or interrupted turns can be retried.";
+        return false;
+    }
+    if (!messages[assistant_index].contains("_historyStart") ||
+        !messages[assistant_index]["_historyStart"].is_number_unsigned()) {
+        error_code = "retry_turn_unavailable";
+        error_message = "This older turn does not contain retry state.";
+        return false;
+    }
+    user = {{"role", "user"}, {"content", json::array()}};
+    for (const auto& part : messages[assistant_index - 1].value("parts", json::array())) {
+        if (part.value("type", "") == "attachment") {
+            error_code = "retry_attachment_unavailable";
+            error_message = "Turns with attachments must be sent again so the original file bytes are available.";
+            return false;
+        }
+        if (part.value("type", "") == "text" && !part.value("text", "").empty()) {
+            user["content"].push_back({{"type", "text"}, {"text", part.value("text", "")}});
+        }
+    }
+    if (user["content"].empty()) {
+        error_code = "retry_message_unavailable";
+        error_message = "The original user message is unavailable.";
+        return false;
+    }
+    auto& history = session["history"];
+    const size_t history_start = messages[assistant_index].value("_historyStart", history.size());
+    if (!history.is_array() || history_start > history.size()) {
+        error_code = "retry_state_invalid";
+        error_message = "The saved retry state is invalid.";
+        return false;
+    }
+    history.erase(history.begin() + static_cast<json::difference_type>(history_start), history.end());
+    messages.erase(messages.begin() + static_cast<json::difference_type>(assistant_index));
+    return true;
+}
+
+json& AssistantRecord(TurnState& turn) {
+    auto& messages = turn.session_record["messages"];
+    for (auto it = messages.rbegin(); it != messages.rend(); ++it) {
+        if (it->value("id", "") == turn.assistant_message_id) return *it;
+    }
+    messages.push_back({{"id", turn.assistant_message_id}, {"role", "assistant"},
+                        {"turnId", turn.id}, {"status", "running"},
+                        {"createdAt", turn.started_at}, {"parts", json::array()}});
+    return messages.back();
+}
+
+json* FindPart(TurnState& turn, const std::string& part_id) {
+    auto& parts = AssistantRecord(turn)["parts"];
+    for (auto& part : parts) if (part.value("id", "") == part_id) return &part;
+    return nullptr;
+}
+
+void PersistTurn(TurnState& turn) {
+    turn.session_record["history"] = turn.history;
+    turn.session_record["updatedAt"] = NowMs();
+    turn.session_record["status"] = turn.final_status;
+    AssistantRecord(turn)["status"] = turn.final_status;
+    SaveAgentSession(turn.session_record);
 }
 
 std::string EncodeBase64(const std::string& input) {
@@ -264,7 +411,17 @@ void LoadConfigLocked(RuntimeState& state) {
     if (!state.provider_meta.is_object()) state.provider_meta = json::object();
 }
 
-bool CredentialGet(const std::string& provider, json& value) {
+std::mutex& CredentialCacheMutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+std::unordered_map<std::string, json>& CredentialCache() {
+    static std::unordered_map<std::string, json> cache;
+    return cache;
+}
+
+bool CredentialGetBlocking(const std::string& provider, json& value) {
 #ifdef __APPLE__
     CFStringRef service = CFStringCreateWithCString(
         kCFAllocatorDefault, KeychainService(), kCFStringEncodingUTF8);
@@ -300,6 +457,63 @@ bool CredentialGet(const std::string& provider, json& value) {
 #else
     (void)provider;
     (void)value;
+    return false;
+#endif
+}
+
+bool CredentialGet(const std::string& provider, json& value) {
+    {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        const auto cached = CredentialCache().find(provider);
+        if (cached != CredentialCache().end()) {
+            value = cached->second;
+            return true;
+        }
+    }
+    auto loaded = std::make_shared<json>();
+    std::promise<bool> promise;
+    std::future<bool> future = promise.get_future();
+    std::thread([provider, loaded, promise = std::move(promise)]() mutable {
+        const bool success = CredentialGetBlocking(provider, *loaded);
+        if (success) {
+            std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+            CredentialCache()[provider] = *loaded;
+        }
+        promise.set_value(success);
+    }).detach();
+    if (future.wait_for(std::chrono::seconds(3)) != std::future_status::ready || !future.get()) return false;
+    value = *loaded;
+    {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        CredentialCache()[provider] = value;
+    }
+    return true;
+}
+
+bool CredentialExists(const std::string& provider) {
+#ifdef __APPLE__
+    CFStringRef service = CFStringCreateWithCString(
+        kCFAllocatorDefault, KeychainService(), kCFStringEncodingUTF8);
+    CFStringRef account = CFStringCreateWithBytes(
+        kCFAllocatorDefault, reinterpret_cast<const UInt8*>(provider.data()),
+        static_cast<CFIndex>(provider.size()), kCFStringEncodingUTF8, false);
+    if (!service || !account) {
+        if (service) CFRelease(service);
+        if (account) CFRelease(account);
+        return false;
+    }
+    const void* keys[] = {kSecClass, kSecAttrService, kSecAttrAccount, kSecMatchLimit};
+    const void* values[] = {kSecClassGenericPassword, service, account, kSecMatchLimitOne};
+    CFDictionaryRef query = CFDictionaryCreate(
+        kCFAllocatorDefault, keys, values, 4,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    const OSStatus status = SecItemCopyMatching(query, nullptr);
+    CFRelease(query);
+    CFRelease(account);
+    CFRelease(service);
+    return status == errSecSuccess;
+#else
+    (void)provider;
     return false;
 #endif
 }
@@ -346,7 +560,12 @@ bool CredentialSet(const std::string& provider, const json& value) {
     CFRelease(data);
     CFRelease(account);
     CFRelease(service);
-    return status == errSecSuccess;
+    if (status == errSecSuccess) {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        CredentialCache()[provider] = value;
+        return true;
+    }
+    return false;
 #else
     (void)provider;
     (void)value;
@@ -375,7 +594,12 @@ bool CredentialDelete(const std::string& provider) {
     CFRelease(query);
     CFRelease(account);
     CFRelease(service);
-    return status == errSecSuccess || status == errSecItemNotFound;
+    if (status == errSecSuccess || status == errSecItemNotFound) {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        CredentialCache().erase(provider);
+        return true;
+    }
+    return false;
 #else
     (void)provider;
     return false;
@@ -461,7 +685,7 @@ HttpResult Http(
 
 void JsonResponse(httplib::Response& res, int status, const json& body) {
     res.status = status;
-    res.set_content(body.dump(), "application/json");
+    res.set_content(body.dump(-1, ' ', false, json::error_handler_t::replace), "application/json");
 }
 
 json ErrorBody(const std::string& code, const std::string& message, bool retryable = false) {
@@ -521,11 +745,12 @@ std::string ProviderBaseUrl(const std::string& id) {
     return id == "openai-compatible" ? state.custom_base_url : "";
 }
 
-json Model(const std::string& id, const std::string& name, bool image = true) {
+json Model(const std::string& id, const std::string& name, bool image = true, bool reasoning = false) {
     return {
         {"id", id}, {"name", name.empty() ? id : name},
         {"capabilities", {
             {"toolCall", true}, {"textInput", true}, {"imageInput", image},
+            {"reasoning", reasoning},
             {"contextTokens", 0}, {"outputTokens", 0},
         }},
     };
@@ -540,7 +765,8 @@ json ParseModels(const std::string& provider, const json& body) {
             if (id.rfind("models/", 0) == 0) id = id.substr(7);
             const auto methods = item.value("supportedGenerationMethods", std::vector<std::string>{});
             if (std::find(methods.begin(), methods.end(), "generateContent") == methods.end()) continue;
-            models.push_back(Model(id, item.value("displayName", id), id.find("gemini") != std::string::npos));
+            models.push_back(Model(id, item.value("displayName", id), id.find("gemini") != std::string::npos,
+                                   id.find("thinking") != std::string::npos || id.find("2.5") != std::string::npos));
         }
         return models;
     }
@@ -551,7 +777,10 @@ json ParseModels(const std::string& provider, const json& body) {
         const std::string id = item.value("id", "");
         if (id.empty()) continue;
         const bool image = id.find("embedding") == std::string::npos;
-        models.push_back(Model(id, item.value("display_name", item.value("name", id)), image));
+        const bool reasoning = provider == "kimi-coding" || provider == "anthropic" ||
+            id.find("reason") != std::string::npos || id.find("thinking") != std::string::npos ||
+            id.rfind("o", 0) == 0 || id.rfind("gpt-5", 0) == 0;
+        models.push_back(Model(id, item.value("display_name", item.value("name", id)), image, reasoning));
     }
     return models;
 }
@@ -681,6 +910,16 @@ void StoreValidation(const std::string& provider, const json& validation) {
     SaveConfigLocked(state);
 }
 
+void StoreCredentialMetadata(const std::string& provider, const json& credential) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    LoadConfigLocked(state);
+    json& meta = state.provider_meta[provider];
+    meta["authType"] = credential.value("type", "");
+    meta["accountLabel"] = credential.value("accountLabel", "");
+    SaveConfigLocked(state);
+}
+
 json AuthMethods(const std::string& provider) {
     json methods = json::array();
     if (IsSupportedKeyProvider(provider)) methods.push_back({{"type", "api"}, {"label", "API Key"}, {"available", true}});
@@ -715,32 +954,45 @@ json PublicProviders() {
         {"openai-compatible", "OpenAI Compatible"},
         {"github-copilot", "GitHub Copilot"}, {"xai", "xAI"},
     };
-    auto& state = State();
-    std::lock_guard<std::mutex> lock(state.mutex);
-    LoadConfigLocked(state);
+    json configured_meta;
+    std::string custom_base_url;
+    {
+        auto& state = State();
+        std::lock_guard<std::mutex> lock(state.mutex);
+        LoadConfigLocked(state);
+        configured_meta = state.provider_meta;
+        custom_base_url = state.custom_base_url;
+    }
     json result = json::array();
     for (const auto& entry : providers) {
         json credential;
-        const bool connected = CredentialGet(entry.first, credential);
-        const json meta = state.provider_meta.value(entry.first, json::object());
+        const bool stored = CredentialExists(entry.first);
+        const bool connected = stored && CredentialGet(entry.first, credential);
+        const json meta = configured_meta.value(entry.first, json::object());
+        const json connection_error = stored && !connected
+            ? json{{"code", "credential_unavailable"},
+                   {"message", "Reconnect this Provider to authorize Keychain access."},
+                   {"retryable", true}}
+            : meta.value("error", json());
         result.push_back({
             {"id", entry.first}, {"name", entry.second},
             {"authMethods", AuthMethods(entry.first)},
             {"connection", {
-                {"status", connected ? meta.value("status", "connected") : "unavailable"},
-                {"authType", connected ? credential.value("type", "") : ""},
-                {"accountLabel", connected ? credential.value("accountLabel", "") : ""},
-                {"error", meta.value("error", json())},
+                {"status", connected ? meta.value("status", "connected") : stored ? "invalid" : "unavailable"},
+                {"authType", connected ? credential.value("type", meta.value("authType", "")) : ""},
+                {"accountLabel", connected ? credential.value("accountLabel", meta.value("accountLabel", "")) : ""},
+                {"error", connection_error},
             }},
             {"models", meta.value("models", json::array())},
-            {"baseUrl", entry.first == "openai-compatible" ? state.custom_base_url : ""},
+            {"baseUrl", entry.first == "openai-compatible" ? custom_base_url : ""},
         });
     }
     return result;
 }
 
 std::string Sse(const std::string& event, const json& data) {
-    return "event: " + event + "\ndata: " + data.dump() + "\n\n";
+    return "event: " + event + "\ndata: " +
+        data.dump(-1, ' ', false, json::error_handler_t::replace) + "\n\n";
 }
 
 json AgentTools() {
@@ -763,8 +1015,9 @@ const char* SystemPrompt() {
         "You are the embedded PCG-AI graph authoring agent. Always inspect the live editor context and "
         "manifest-backed node types before authoring. Never invent node types, properties, or pin IDs. "
         "Every write must use the latest graphHash. Prefer one atomic pcg_apply_graph_ops batch. "
-        "After edits, validate, cook, and capture the preview. On conflicts or timeouts, refresh context "
-        "instead of replaying a stale write. Explain failures plainly.";
+        "Before a multi-step task, give the user one concise progress sentence. After edits, validate, cook, "
+        "and capture the preview. Do not repeat an identical read tool when the graph has not changed. On "
+        "conflicts or timeouts, refresh context instead of replaying a stale write. Explain failures plainly.";
 }
 
 json OpenAiMessages(const json& history) {
@@ -783,6 +1036,7 @@ json OpenAiMessages(const json& history) {
             messages.push_back({{"role", "user"}, {"content", std::move(content)}});
         } else if (role == "assistant") {
             json item = {{"role", "assistant"}, {"content", message.value("text", "")}};
+            if (!message.value("reasoning", "").empty()) item["reasoning_content"] = message.value("reasoning", "");
             if (message.contains("toolCalls")) {
                 item["tool_calls"] = json::array();
                 for (const auto& call : message["toolCalls"]) {
@@ -873,6 +1127,13 @@ json AnthropicMessages(const json& history) {
             messages.push_back({{"role", "user"}, {"content", std::move(content)}});
         } else if (role == "assistant") {
             json content = json::array();
+            if (!message.value("reasoning", "").empty()) {
+                json thinking = {{"type", "thinking"}, {"thinking", message.value("reasoning", "")}};
+                if (!message.value("reasoningSignature", "").empty()) {
+                    thinking["signature"] = message.value("reasoningSignature", "");
+                }
+                content.push_back(std::move(thinking));
+            }
             if (!message.value("text", "").empty()) content.push_back({{"type", "text"}, {"text", message.value("text", "")}});
             for (const auto& call : message.value("toolCalls", json::array())) content.push_back({
                 {"type", "tool_use"}, {"id", call.value("id", "")},
@@ -904,6 +1165,9 @@ json GeminiContents(const json& history) {
             contents.push_back({{"role", "user"}, {"parts", std::move(parts)}});
         } else if (role == "assistant") {
             json parts = json::array();
+            if (!message.value("reasoning", "").empty()) {
+                parts.push_back({{"text", message.value("reasoning", "")}, {"thought", true}});
+            }
             if (!message.value("text", "").empty()) parts.push_back({{"text", message.value("text", "")}});
             for (const auto& call : message.value("toolCalls", json::array())) parts.push_back({{"functionCall", {
                 {"name", call.value("name", "")}, {"args", call.value("arguments", json::object())},
@@ -987,18 +1251,71 @@ json NormalizeCompletion(const std::string& provider, const json& body) {
 struct CompletionStream {
     std::string provider;
     std::string turn_id;
+    TurnState* turn = nullptr;
     EventEmitter emit;
     std::string buffer;
     std::string response_body;
     std::string text;
+    std::string reasoning;
+    std::string reasoning_signature;
+    std::string text_part_id;
+    std::string reasoning_part_id;
     std::map<std::string, json> calls;
     bool writable = true;
 };
 
+json StreamEventData(CompletionStream& stream, const std::string& part_id) {
+    return {{"sessionId", stream.turn ? stream.turn->session_id : ""}, {"turnId", stream.turn_id},
+            {"messageId", stream.turn ? stream.turn->assistant_message_id : ""}, {"partId", part_id}};
+}
+
+std::string EnsureStreamPart(CompletionStream& stream, const std::string& type) {
+    std::string& part_id = type == "reasoning" ? stream.reasoning_part_id : stream.text_part_id;
+    if (!part_id.empty() || !stream.turn) return part_id;
+    part_id = RandomId("part");
+    const int ordinal = stream.turn->next_ordinal++;
+    AssistantRecord(*stream.turn)["parts"].push_back({
+        {"id", part_id}, {"type", type}, {"ordinal", ordinal}, {"text", ""}, {"status", "streaming"},
+    });
+    json data = StreamEventData(stream, part_id);
+    data["ordinal"] = ordinal;
+    stream.writable = stream.emit(type == "reasoning" ? "reasoning.started" : "message.started", data);
+    return part_id;
+}
+
 void AppendStreamText(CompletionStream& stream, const std::string& delta) {
     if (delta.empty() || !stream.writable) return;
+    const std::string part_id = EnsureStreamPart(stream, "text");
     stream.text += delta;
-    stream.writable = stream.emit("message.delta", {{"turnId", stream.turn_id}, {"text", delta}});
+    if (stream.turn) if (json* part = FindPart(*stream.turn, part_id)) (*part)["text"] = stream.text;
+    json data = StreamEventData(stream, part_id);
+    data["text"] = delta;
+    data["delta"] = delta;
+    stream.writable = stream.emit("message.delta", data);
+}
+
+void AppendStreamReasoning(CompletionStream& stream, const std::string& delta) {
+    if (delta.empty() || !stream.writable) return;
+    const std::string part_id = EnsureStreamPart(stream, "reasoning");
+    stream.reasoning += delta;
+    if (stream.turn) if (json* part = FindPart(*stream.turn, part_id)) (*part)["text"] = stream.reasoning;
+    json data = StreamEventData(stream, part_id);
+    data["delta"] = delta;
+    stream.writable = stream.emit("reasoning.delta", data);
+}
+
+void CompleteStreamParts(CompletionStream& stream) {
+    for (const auto& item : std::vector<std::pair<std::string, std::string>>{
+             {"reasoning", stream.reasoning_part_id}, {"message", stream.text_part_id}}) {
+        if (item.second.empty()) continue;
+        if (stream.turn) if (json* part = FindPart(*stream.turn, item.second)) (*part)["status"] = "completed";
+        json data = StreamEventData(stream, item.second);
+        data["text"] = item.first == "reasoning" ? stream.reasoning : stream.text;
+        if (!stream.emit(item.first == "reasoning" ? "reasoning.completed" : "message.completed", data)) {
+            stream.writable = false;
+            return;
+        }
+    }
 }
 
 void AppendStreamCall(CompletionStream& stream, const std::string& key,
@@ -1019,6 +1336,10 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
         const std::string type = event.value("type", "");
         if (type == "content_block_start") {
             const json block = event.value("content_block", json::object());
+            if (block.value("type", "") == "thinking") {
+                AppendStreamReasoning(stream, block.value("thinking", ""));
+                stream.reasoning_signature = block.value("signature", "");
+            }
             if (block.value("type", "") == "tool_use") {
                 const std::string key = std::to_string(event.value("index", 0));
                 AppendStreamCall(stream, key, block.value("id", ""), block.value("name", ""),
@@ -1028,6 +1349,8 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
         } else if (type == "content_block_delta") {
             const json delta = event.value("delta", json::object());
             if (delta.value("type", "") == "text_delta") AppendStreamText(stream, delta.value("text", ""));
+            if (delta.value("type", "") == "thinking_delta") AppendStreamReasoning(stream, delta.value("thinking", ""));
+            if (delta.value("type", "") == "signature_delta") stream.reasoning_signature += delta.value("signature", "");
             if (delta.value("type", "") == "input_json_delta") {
                 AppendStreamCall(stream, std::to_string(event.value("index", 0)), "", "", delta.value("partial_json", ""));
             }
@@ -1037,6 +1360,7 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
     if (stream.provider == "openai-responses") {
         const std::string type = event.value("type", "");
         if (type == "response.output_text.delta") AppendStreamText(stream, event.value("delta", ""));
+        if (type == "response.reasoning_summary_text.delta") AppendStreamReasoning(stream, event.value("delta", ""));
         if (type == "response.output_item.added") {
             const json item = event.value("item", json::object());
             if (item.value("type", "") == "function_call") {
@@ -1054,7 +1378,8 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
         const json candidates = event.value("candidates", json::array());
         if (candidates.empty()) return;
         for (const auto& part : candidates[0].value("content", json::object()).value("parts", json::array())) {
-            if (part.contains("text")) AppendStreamText(stream, part.value("text", ""));
+            if (part.contains("text") && part.value("thought", false)) AppendStreamReasoning(stream, part.value("text", ""));
+            else if (part.contains("text")) AppendStreamText(stream, part.value("text", ""));
             if (part.contains("functionCall")) {
                 const json call = part["functionCall"];
                 const std::string key = RandomId("call");
@@ -1066,6 +1391,11 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
     const json choices = event.value("choices", json::array());
     if (choices.empty()) return;
     const json delta = choices[0].value("delta", json::object());
+    if (delta.contains("reasoning_content") && delta["reasoning_content"].is_string()) {
+        AppendStreamReasoning(stream, delta.value("reasoning_content", ""));
+    } else if (delta.contains("reasoning") && delta["reasoning"].is_string()) {
+        AppendStreamReasoning(stream, delta.value("reasoning", ""));
+    }
     if (delta.contains("content") && delta["content"].is_string()) AppendStreamText(stream, delta["content"]);
     for (const auto& call : delta.value("tool_calls", json::array())) {
         const std::string key = std::to_string(call.value("index", 0));
@@ -1184,9 +1514,11 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
     CompletionStream stream;
     stream.provider = protocol;
     stream.turn_id = turn.id;
+    stream.turn = &turn;
     stream.emit = emit;
     const HttpResult response = HttpStreamCompletion(
         url, CredentialHeaders(turn.provider, credential), request.dump(), stream, &turn.cancelled);
+    CompleteStreamParts(stream);
     if (!response.ok()) {
         if (response.error == "cancelled") return ErrorBody("cancelled", "Turn cancelled.");
         const json upstream = json::parse(stream.buffer, nullptr, false);
@@ -1209,7 +1541,9 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
         return ErrorBody("provider_error", "Provider request failed (HTTP " +
             std::to_string(response.status) + ").", response.status >= 500);
     }
-    json normalized = {{"text", stream.text}, {"toolCalls", json::array()}, {"streamed", !stream.text.empty()}};
+    json normalized = {{"text", stream.text}, {"reasoning", stream.reasoning},
+                       {"reasoningSignature", stream.reasoning_signature},
+                       {"toolCalls", json::array()}, {"streamed", !stream.text.empty()}};
     for (auto& entry : stream.calls) {
         json arguments = json::parse(entry.second.value("argumentsText", "{}"), nullptr, false);
         if (!arguments.is_object()) arguments = json::object();
@@ -1228,28 +1562,84 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
     return normalized;
 }
 
+json& AddToolPart(TurnState& turn, const json& call, bool approval) {
+    const std::string part_id = RandomId("part");
+    AssistantRecord(turn)["parts"].push_back({
+        {"id", part_id}, {"type", "tool"}, {"ordinal", turn.next_ordinal++},
+        {"toolCallId", call.value("id", "")}, {"name", call.value("name", "")},
+        {"arguments", call.value("arguments", json::object())},
+        {"status", approval ? "approval_required" : "running"}, {"startedAt", NowMs()},
+    });
+    return AssistantRecord(turn)["parts"].back();
+}
+
+void FinishToolPart(TurnState& turn, const std::string& call_id, const json& result, bool cached) {
+    for (auto& part : AssistantRecord(turn)["parts"]) {
+        if (part.value("type", "") != "tool" || part.value("toolCallId", "") != call_id) continue;
+        part["result"] = result;
+        part["cached"] = cached;
+        part["completedAt"] = NowMs();
+        part["durationMs"] = part.value("completedAt", 0LL) - part.value("startedAt", 0LL);
+        part["status"] = result.value("isError", false) ? "failed" : "completed";
+        return;
+    }
+}
+
+std::string ToolPartId(TurnState& turn, const std::string& call_id) {
+    for (const auto& part : AssistantRecord(turn)["parts"]) {
+        if (part.value("type", "") == "tool" && part.value("toolCallId", "") == call_id) {
+            return part.value("id", "");
+        }
+    }
+    return {};
+}
+
+void AddErrorPart(TurnState& turn, const json& error) {
+    AssistantRecord(turn)["parts"].push_back({
+        {"id", RandomId("part")}, {"type", "error"}, {"ordinal", turn.next_ordinal++},
+        {"status", "error"}, {"error", error.value("error", json::object())},
+    });
+}
+
+bool CacheableReadTool(const std::string& name) {
+    return name == "pcg_get_editor_context" || name == "pcg_get_node" ||
+           name == "pcg_list_nodes" || name == "pcg_get_graph" || name == "pcg_get_node_types";
+}
+
 void RunTurn(TurnState& turn, const EventEmitter& emit) {
     while (!turn.cancelled.load()) {
         if (++turn.tool_rounds > kMaxToolRounds || turn.tool_calls > kMaxToolCalls ||
             NowMs() - turn.started_at > kTurnTimeoutSeconds * 1000LL) {
+            turn.final_status = "error";
+            AddErrorPart(turn, ErrorBody("turn_limit", "Agent turn exceeded its safety limit."));
             emit("turn.error", ErrorBody("turn_limit", "Agent turn exceeded its safety limit."));
             return;
         }
         json completion = Complete(turn, emit);
         if (!completion.value("ok", false)) {
+            turn.final_status = completion.value("error", json::object()).value("code", "") == "cancelled"
+                ? "interrupted" : "error";
+            AddErrorPart(turn, completion);
             emit("turn.error", completion);
             return;
         }
         const std::string text = completion.value("text", "");
         const json calls = completion.value("toolCalls", json::array());
-        turn.history.push_back({{"role", "assistant"}, {"text", text}, {"toolCalls", calls}});
+        turn.history.push_back({{"role", "assistant"}, {"text", text},
+                                {"reasoning", completion.value("reasoning", "")},
+                                {"reasoningSignature", completion.value("reasoningSignature", "")},
+                                {"toolCalls", calls}});
         if (!text.empty() && !completion.value("streamed", false) &&
             !emit("message.delta", {{"turnId", turn.id}, {"text", text}})) {
             turn.cancelled.store(true);
             return;
         }
         if (calls.empty()) {
-            emit("turn.completed", {{"turnId", turn.id}});
+            turn.final_status = "completed";
+            AssistantRecord(turn)["status"] = "completed";
+            emit("turn.completed", {{"sessionId", turn.session_id}, {"turnId", turn.id},
+                 {"messageId", turn.assistant_message_id}, {"durationMs", NowMs() - turn.started_at},
+                 {"toolCalls", turn.tool_calls}, {"status", "completed"}});
             return;
         }
         turn.tool_calls += static_cast<int>(calls.size());
@@ -1258,8 +1648,11 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
         json approval_calls = json::array();
         for (const auto& call : calls) {
             const std::string name = call.value("name", "");
+            json& tool_part = AddToolPart(turn, call, PcgToolRequiresApproval(name));
             const json public_call = {
-                {"turnId", turn.id}, {"toolCallId", call.value("id", "")},
+                {"sessionId", turn.session_id}, {"turnId", turn.id}, {"messageId", turn.assistant_message_id},
+                {"partId", tool_part.value("id", "")}, {"ordinal", tool_part.value("ordinal", 0)},
+                {"toolCallId", call.value("id", "")},
                 {"name", name}, {"arguments", call.value("arguments", json::object())},
                 {"requiresApproval", PcgToolRequiresApproval(name)},
             };
@@ -1272,25 +1665,52 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
                 approval_calls.push_back(public_call);
                 continue;
             }
-            const json tool_result = CallPcgTool(name, call.value("arguments", json::object()));
+            const std::string graph_hash = GetEditorContext().value("session", json::object()).value("graphHash", "");
+            const std::string cache_key = name + "\n" + graph_hash + "\n" + call.value("arguments", json::object()).dump();
+            bool cached = false;
+            json tool_result;
+            const auto cached_result = turn.tool_cache.find(cache_key);
+            if (CacheableReadTool(name) && cached_result != turn.tool_cache.end()) {
+                cached = true;
+                const int repeats = ++turn.repeated_tools[cache_key];
+                tool_result = repeats >= 3
+                    ? json{{"content", json::array({{{"type", "text"}, {"text", "Identical read call repeated without a graph change. Use the cached context and continue."}}})},
+                           {"structuredContent", {{"ok", false}, {"error", "repeated_tool_call"}}}, {"isError", true}}
+                    : cached_result->second;
+            } else {
+                tool_result = CallPcgTool(name, call.value("arguments", json::object()));
+                if (CacheableReadTool(name)) {
+                    turn.tool_cache[cache_key] = tool_result;
+                    turn.repeated_tools[cache_key] = 0;
+                }
+            }
+            FinishToolPart(turn, call.value("id", ""), tool_result, cached);
+            const json* finished_part = FindPart(turn, tool_part.value("id", ""));
             turn.history.push_back({
                 {"role", "tool"}, {"toolCallId", call.value("id", "")}, {"name", name},
                 {"content", tool_result.dump()}, {"isError", tool_result.value("isError", false)},
             });
             if (!emit("tool.result", {
                 {"turnId", turn.id}, {"toolCallId", call.value("id", "")},
-                {"name", name}, {"result", tool_result},
+                {"sessionId", turn.session_id}, {"messageId", turn.assistant_message_id},
+                {"partId", tool_part.value("id", "")}, {"name", name}, {"result", tool_result}, {"cached", cached},
+                {"durationMs", finished_part ? finished_part->value("durationMs", 0LL) : 0LL},
             })) {
                 turn.cancelled.store(true);
                 return;
             }
         }
         if (!turn.pending.empty()) {
-            emit("approval.required", {{"turnId", turn.id}, {"calls", std::move(approval_calls)}});
+            turn.final_status = "awaiting_approval";
+            emit("approval.required", {{"sessionId", turn.session_id}, {"turnId", turn.id},
+                 {"messageId", turn.assistant_message_id}, {"calls", std::move(approval_calls)}});
             return;
         }
     }
-    emit("turn.error", ErrorBody("cancelled", "Turn cancelled."));
+    turn.final_status = "interrupted";
+    const json cancelled = ErrorBody("cancelled", "Turn cancelled.");
+    AddErrorPart(turn, cancelled);
+    emit("turn.error", cancelled);
 }
 
 bool IsUtf8(const std::string& value) {
@@ -1343,11 +1763,14 @@ bool BuildUserMessage(const httplib::Request& req, const json& input, httplib::R
             message["content"].push_back({
                 {"type", "image"}, {"name", file.filename},
                 {"mimeType", jpeg ? "image/jpeg" : "image/png"},
+                {"size", file.content.size()}, {"attachment", true},
                 {"data", EncodeBase64(file.content)},
             });
         } else if (text_file && IsUtf8(file.content)) {
             message["content"].push_back({
                 {"type", "text"}, {"text", "\n--- attachment: " + file.filename + " ---\n" + file.content + "\n--- end attachment ---"},
+                {"name", file.filename}, {"mimeType", file.content_type.empty() ? "text/plain" : file.content_type},
+                {"size", file.content.size()}, {"attachment", true},
             });
         } else {
             JsonResponse(res, 400, ErrorBody("unsupported_attachment", "Only UTF-8 .txt/.json/.pcg and PNG/JPEG attachments are supported."));
@@ -1386,6 +1809,7 @@ void FinishOAuth(const std::string& id, const json& credential) {
     }
     const json validation = ValidateCredential(provider, stored_credential);
     StoreValidation(provider, validation);
+    StoreCredentialMetadata(provider, stored_credential);
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     auto it = state.oauth.find(id);
@@ -1443,9 +1867,12 @@ void PollDeviceOAuth(OAuthAttempt attempt, const std::string& token_url, const s
 }  // namespace
 
 void ConfigureAgentRuntime(int server_port) {
-    auto& state = State();
-    std::lock_guard<std::mutex> lock(state.mutex);
-    if (server_port > 0 && server_port <= 65535) state.server_port = server_port;
+    {
+        auto& state = State();
+        std::lock_guard<std::mutex> lock(state.mutex);
+        if (server_port > 0 && server_port <= 65535) state.server_port = server_port;
+    }
+    RecoverInterruptedAgentSessions();
 }
 
 void HandleAgentProviders(const httplib::Request& req, httplib::Response& res) {
@@ -1490,6 +1917,7 @@ void HandleAgentConnectKey(const httplib::Request& req, httplib::Response& res) 
         return;
     }
     StoreValidation(provider, validation);
+    StoreCredentialMetadata(provider, credential);
     JsonResponse(res, 200, {{"ok", true}, {"provider", provider}, {"models", validation["models"]}});
 }
 
@@ -1710,11 +2138,31 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
     auto turn = std::make_shared<TurnState>();
     turn->id = RandomId("turn");
     turn->session_id = input.value("sessionId", RandomId("session"));
+    if (turn->session_id.rfind("session-", 0) != 0) turn->session_id = RandomId("session");
     turn->provider = input.value("providerId", "");
     turn->model = input.value("modelId", "");
     turn->started_at = NowMs();
+    turn->assistant_message_id = RandomId("message");
+    json persisted_session;
+    const bool existing_session = LoadAgentSession(turn->session_id, persisted_session);
+    const std::string retry_turn_id = input.value("retryTurnId", "");
     json user;
-    if (!BuildUserMessage(req, input, res, user)) return;
+    bool retrying = false;
+    if (!retry_turn_id.empty()) {
+        if (!existing_session) {
+            JsonResponse(res, 404, ErrorBody("session_not_found", "Chat session was not found."));
+            return;
+        }
+        std::string code;
+        std::string message;
+        if (!PrepareRetry(persisted_session, retry_turn_id, user, code, message)) {
+            JsonResponse(res, 409, ErrorBody(code, message));
+            return;
+        }
+        retrying = true;
+    } else if (!BuildUserMessage(req, input, res, user)) {
+        return;
+    }
     {
         auto& state = State();
         std::lock_guard<std::mutex> lock(state.mutex);
@@ -1740,10 +2188,44 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
             return;
         }
         const auto history = state.sessions.find(turn->session_id);
-        turn->history = history == state.sessions.end() ? json::array() : history->second;
+        turn->history = existing_session ? persisted_session.value("history", json::array())
+            : history == state.sessions.end() ? json::array() : history->second;
         if (!turn->history.is_array()) turn->history = json::array();
+        turn->session_record = existing_session ? std::move(persisted_session) : json{
+            {"id", turn->session_id}, {"title", FirstUserText(user)},
+            {"createdAt", turn->started_at}, {"updatedAt", turn->started_at},
+            {"providerId", turn->provider}, {"modelId", turn->model},
+            {"graphName", ""}, {"status", "running"}, {"history", json::array()}, {"messages", json::array()},
+        };
+        turn->session_record["providerId"] = turn->provider;
+        turn->session_record["modelId"] = turn->model;
+        turn->session_record["status"] = "running";
+        turn->session_record["updatedAt"] = turn->started_at;
+        const json editor = GetEditorContext();
+        const std::string graph_path = editor.value("session", json::object()).value("graphPath", "");
+        if (!graph_path.empty()) turn->session_record["graphName"] = std::filesystem::path(graph_path).filename().string();
+        const size_t history_start = turn->history.size();
+        if (!retrying) {
+            const std::string user_message_id = RandomId("message");
+            turn->session_record["messages"].push_back(PublicUserMessage(user, user_message_id, turn->started_at));
+        }
+        AssistantRecord(*turn)["_historyStart"] = history_start;
         turn->history.push_back(std::move(user));
+        turn->session_record["history"] = turn->history;
         state.turns[turn->id] = turn;
+    }
+    if (!retrying) {
+        const auto range = req.files.equal_range("attachment");
+        for (auto it = range.first; it != range.second; ++it) {
+            if (!SaveAgentSessionAttachment(turn->session_id, it->second.filename, it->second.content)) {
+                JsonResponse(res, 500, ErrorBody("attachment_write_failed", "Could not persist a chat attachment."));
+                return;
+            }
+        }
+    }
+    if (!SaveAgentSession(turn->session_record)) {
+        JsonResponse(res, 500, ErrorBody("session_write_failed", "Could not persist the chat session."));
+        return;
     }
     res.status = 200;
     res.set_header("Cache-Control", "no-cache");
@@ -1757,16 +2239,25 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
                 const std::string payload = Sse(event, data);
                 return sink.is_writable && sink.is_writable() && sink.write(payload.data(), payload.size());
             };
-            if (!emit("turn.created", {{"turnId", turn->id}, {"sessionId", turn->session_id}})) {
+            if (!emit("turn.created", {{"turnId", turn->id}, {"sessionId", turn->session_id},
+                      {"messageId", turn->assistant_message_id},
+                      {"session", PublicAgentSession(turn->session_record, false)}})) {
                 turn->cancelled.store(true);
                 return false;
             }
             {
                 std::lock_guard<std::mutex> turn_lock(turn->mutex);
                 RunTurn(*turn, emit);
-                auto& state = State();
-                std::lock_guard<std::mutex> state_lock(state.mutex);
-                state.sessions[turn->session_id] = turn->history;
+                {
+                    auto& state = State();
+                    std::lock_guard<std::mutex> state_lock(state.mutex);
+                    state.sessions[turn->session_id] = turn->history;
+                    if (turn->final_status != "awaiting_approval") {
+                        state.turns.erase(turn->id);
+                        state.resolved_turns.insert(turn->id);
+                    }
+                }
+                PersistTurn(*turn);
             }
             sink.done();
             return true;
@@ -1780,14 +2271,18 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
     if (!CheckAgentAuth(req, res)) return;
     const std::string id = Match(req, 1);
     std::shared_ptr<TurnState> turn;
+    bool already_resolved = false;
     {
         auto& state = State();
         std::lock_guard<std::mutex> lock(state.mutex);
         auto it = state.turns.find(id);
         if (it != state.turns.end()) turn = it->second;
+        already_resolved = state.resolved_turns.find(id) != state.resolved_turns.end();
     }
     if (!turn) {
-        JsonResponse(res, 404, ErrorBody("turn_not_found", "Turn was not found."));
+        JsonResponse(res, already_resolved ? 409 : 404,
+            ErrorBody(already_resolved ? "approval_already_resolved" : "turn_not_found",
+                      already_resolved ? "This approval has already been resolved." : "Turn was not found."));
         return;
     }
     json body;
@@ -1820,6 +2315,7 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
             }
             const json pending = std::move(turn->pending);
             turn->pending = json::array();
+            turn->final_status = "running";
             for (const auto& call : pending) {
                 const std::string call_id = call.value("id", "");
                 bool approved = false;
@@ -1845,7 +2341,13 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
                     {"role", "tool"}, {"toolCallId", call_id}, {"name", call.value("name", "")},
                     {"content", result.dump()}, {"isError", result.value("isError", false)},
                 });
-                if (!emit("tool.result", {{"turnId", id}, {"toolCallId", call_id}, {"name", call.value("name", "")}, {"result", result}})) {
+                FinishToolPart(*turn, call_id, result, false);
+                const json* finished_part = FindPart(*turn, ToolPartId(*turn, call_id));
+                if (!emit("tool.result", {{"sessionId", turn->session_id}, {"turnId", id},
+                         {"messageId", turn->assistant_message_id}, {"partId", ToolPartId(*turn, call_id)},
+                         {"toolCallId", call_id}, {"name", call.value("name", "")},
+                         {"result", result}, {"cached", false},
+                         {"durationMs", finished_part ? finished_part->value("durationMs", 0LL) : 0LL}})) {
                     turn->cancelled.store(true);
                     return false;
                 }
@@ -1855,7 +2357,12 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
                 auto& state = State();
                 std::lock_guard<std::mutex> lock(state.mutex);
                 state.sessions[turn->session_id] = turn->history;
+                if (turn->final_status != "awaiting_approval") {
+                    state.turns.erase(turn->id);
+                    state.resolved_turns.insert(turn->id);
+                }
             }
+            PersistTurn(*turn);
             sink.done();
             return true;
         },
@@ -1879,6 +2386,18 @@ void HandleAgentTurnCancel(const httplib::Request& req, httplib::Response& res) 
         return;
     }
     turn->cancelled.store(true);
+    {
+        std::lock_guard<std::mutex> turn_lock(turn->mutex);
+        if (turn->final_status == "awaiting_approval") {
+            turn->pending = json::array();
+            turn->final_status = "interrupted";
+            AddErrorPart(*turn, ErrorBody("cancelled", "Turn cancelled."));
+            PersistTurn(*turn);
+            auto& state = State();
+            std::lock_guard<std::mutex> state_lock(state.mutex);
+            state.turns.erase(id);
+        }
+    }
     JsonResponse(res, 200, {{"ok", true}, {"turnId", id}});
 }
 

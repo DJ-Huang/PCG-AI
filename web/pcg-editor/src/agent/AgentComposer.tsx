@@ -2,7 +2,9 @@
 // paperclip / drag / paste attachment entries, Enter to send, Shift+Enter for
 // newline, send switches to stop while a request is in flight.
 
-import { useCallback, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
+
+import type { ProviderDescriptor } from './agentClient';
 
 export interface AgentAttachment {
   id: string;
@@ -22,16 +24,27 @@ interface AgentComposerProps {
   sending: boolean;
   agentLabel: string;
   disabled?: boolean;
+  providers?: ProviderDescriptor[];
+  providerId?: string;
+  modelId?: string;
+  onModelChange?: (providerId: string, modelId: string) => void;
   onSend: (text: string, attachments: AgentAttachment[]) => void;
   onStop: () => void;
 }
 
-export default function AgentComposer({ sending, agentLabel, disabled = false, onSend, onStop }: AgentComposerProps) {
+export default function AgentComposer({
+  sending, agentLabel, disabled = false, providers = [], providerId = '', modelId = '', onModelChange, onSend, onStop,
+}: AgentComposerProps) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   const [rejectNote, setRejectNote] = useState('');
+  const [showModels, setShowModels] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (disabled || sending) setShowModels(false);
+  }, [disabled, sending]);
 
   const autoGrow = useCallback(() => {
     const el = textareaRef.current;
@@ -149,9 +162,9 @@ export default function AgentComposer({ sending, agentLabel, disabled = false, o
         />
         {rejectNote && <div className="pcg-agent-composer__reject">{rejectNote}</div>}
         <div className="pcg-agent-composer__buttons">
-          <span className="pcg-agent-composer__pill" title={agentLabel}>
+          <button type="button" className="pcg-agent-composer__pill" title={agentLabel} onClick={() => setShowModels((value) => !value)}>
             ∞ {agentLabel}
-          </span>
+          </button>
           <span className="pcg-agent-composer__spacer" />
           <input
             ref={fileInputRef}
@@ -185,6 +198,20 @@ export default function AgentComposer({ sending, agentLabel, disabled = false, o
             </button>
           )}
         </div>
+        {showModels && providers.length > 0 && (
+          <div className="pcg-agent-composer__model-menu">
+            {providers.flatMap((provider) => provider.models.map((model) => (
+              <button
+                type="button"
+                key={`${provider.id}/${model.id}`}
+                className={provider.id === providerId && model.id === modelId ? 'is-selected' : ''}
+                onClick={() => { onModelChange?.(provider.id, model.id); setShowModels(false); }}
+              >
+                <span>{model.name}</span><small>{provider.name}{model.capabilities.reasoning ? ' · Thinking' : ''}</small>
+              </button>
+            )))}
+          </div>
+        )}
       </div>
     </div>
   );

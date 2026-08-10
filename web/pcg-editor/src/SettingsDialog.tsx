@@ -19,6 +19,7 @@ interface SettingsDialogProps {
 }
 
 type SettingsSection = 'general' | 'providers';
+const SHOW_REASONING_KEY = 'pcg-agent-show-reasoning';
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -33,6 +34,7 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
   const [bridgeToken, setBridgeToken] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(() => localStorage.getItem(SHOW_REASONING_KEY) !== 'false');
   const oauthGeneration = useRef(0);
 
   const selectedProvider = useMemo(
@@ -68,8 +70,11 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
   useEffect(() => {
     setApiKey('');
     setStatus('');
+  }, [providerId]);
+
+  useEffect(() => {
     setBaseUrl(selectedProvider?.baseUrl ?? '');
-  }, [providerId, selectedProvider?.baseUrl]);
+  }, [selectedProvider?.baseUrl]);
 
   const markProvidersChanged = useCallback(async () => {
     await refreshProviders();
@@ -193,6 +198,21 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
                   setAgentToken(bridgeToken.trim());
                   setStatus('Local bridge token saved in this browser.');
                 }}>Save local token</button>
+                <div className="pcg-settings__field">
+                  <span>Agent timeline</span>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={showReasoning}
+                      onChange={(event) => {
+                        const next = event.target.checked;
+                        setShowReasoning(next);
+                        localStorage.setItem(SHOW_REASONING_KEY, String(next));
+                        window.dispatchEvent(new CustomEvent('pcg-agent-settings-changed'));
+                      }}
+                    /> Show Provider reasoning when available
+                  </label>
+                </div>
               </div>
             ) : (
               <div className="pcg-settings__providers">
