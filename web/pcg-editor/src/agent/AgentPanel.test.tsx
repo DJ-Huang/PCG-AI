@@ -98,4 +98,32 @@ describe('AgentPanel', () => {
     releaseSync?.();
     await waitFor(() => expect(client.startTurn).toHaveBeenCalledOnce());
   });
+
+  it('shows a retryable error when the Provider stops before a final answer', async () => {
+    vi.mocked(client.startTurn).mockImplementation(async (_input, onEvent) => {
+      onEvent({ type: 'turn.created', data: { turnId: 'turn-cut', messageId: 'assistant-cut' } });
+      onEvent({ type: 'reasoning.started', data: {
+        turnId: 'turn-cut', messageId: 'assistant-cut', partId: 'reasoning-cut', ordinal: 0,
+      } });
+      onEvent({ type: 'reasoning.delta', data: {
+        turnId: 'turn-cut', messageId: 'assistant-cut', partId: 'reasoning-cut', text: 'Let me also',
+      } });
+      onEvent({ type: 'reasoning.completed', data: {
+        turnId: 'turn-cut', messageId: 'assistant-cut', partId: 'reasoning-cut', text: 'Let me also',
+      } });
+      onEvent({ type: 'turn.error', data: { turnId: 'turn-cut', messageId: 'assistant-cut', error: {
+        code: 'provider_output_truncated',
+        message: 'The Provider reached its output limit before producing a final answer.',
+        retryable: true,
+      } } });
+    });
+    render(<AgentPanel onApplyActions={() => []} />);
+    await screen.findByTitle('OpenAI · GPT Test');
+
+    fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'inspect it' } });
+    fireEvent.click(screen.getByTitle('Send (Enter)'));
+
+    expect(await screen.findByText('The Provider reached its output limit before producing a final answer.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
 });

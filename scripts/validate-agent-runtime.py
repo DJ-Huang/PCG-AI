@@ -32,9 +32,10 @@ class FakeProvider(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _sse(self, values: list[object]) -> None:
+    def _sse(self, values: list[object], *, include_done: bool = True) -> None:
         body = "".join(f"data: {json.dumps(value)}\n\n" for value in values)
-        body += "data: [DONE]\n\n"
+        if include_done:
+            body += "data: [DONE]\n\n"
         encoded = body.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -63,6 +64,18 @@ class FakeProvider(BaseHTTPRequestHandler):
             if isinstance(part, dict)
         )
         has_tool_result = any(message.get("role") == "tool" for message in messages)
+        if "truncate" in user_text:
+            self._sse([{"choices": [{
+                "delta": {"reasoning_content": "I will also inspect"},
+                "finish_reason": "length",
+            }]}])
+            return
+        if "disconnect" in user_text:
+            self._sse([{"choices": [{
+                "delta": {"reasoning_content": "I will also inspect"},
+                "finish_reason": None,
+            }]}], include_done=False)
+            return
         if has_tool_result:
             self._sse([
                 {"choices": [{"delta": {"content": "Fake Provider "}}]},
@@ -228,6 +241,22 @@ def main() -> None:
             assert "durationMs" in tool_result
             assert len(event_data(stream, "message.delta")) == 2
             assert event_data(stream, "turn.completed")
+
+            for prompt, expected_code in [
+                ("truncate during reasoning", "provider_output_truncated"),
+                ("disconnect during reasoning", "provider_stream_interrupted"),
+            ]:
+                body, content_type = multipart_turn({
+                    "message": prompt, "sessionId": f"{expected_code}-session",
+                    "providerId": "openai-compatible", "modelId": "fake-tool-model",
+                })
+                status, interrupted = request(
+                    f"{base}/turns", method="POST", body=body, content_type=content_type,
+                )
+                assert status == 200
+                errors = event_data(interrupted, "turn.error")
+                assert errors and errors[0]["error"]["code"] == expected_code, errors
+                assert errors[0]["error"]["retryable"] is True
 
             status, response = request(f"{base}/sessions?limit=invalid&cursor=invalid")
             assert status == 200, response

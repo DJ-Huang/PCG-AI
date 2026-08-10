@@ -13,6 +13,7 @@ describe('agentClient', () => {
       start(controller) {
         controller.enqueue(encoder.encode('event: turn.created\ndata: {"turnId":"turn-1"}\n'));
         controller.enqueue(encoder.encode('\nevent: message.delta\ndata: {"turnId":"turn-1","text":"hello"}\n\n'));
+        controller.enqueue(encoder.encode('event: turn.completed\ndata: {"turnId":"turn-1"}\n\n'));
         controller.close();
       },
     });
@@ -29,7 +30,7 @@ describe('agentClient', () => {
       reasoningEffort: 'max', attachments: [{ id: 'a1', file, previewUrl: null }],
     }, (event) => events.push(event));
 
-    expect(events.map((event) => event.type)).toEqual(['turn.created', 'message.delta']);
+    expect(events.map((event) => event.type)).toEqual(['turn.created', 'message.delta', 'turn.completed']);
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     expect(request.body).toBeInstanceOf(FormData);
     const uploaded = (request.body as FormData).get('attachment') as File;
@@ -44,6 +45,30 @@ describe('agentClient', () => {
     expect(payload.reasoningEffort).toBe('max');
     expect(uploaded.name).toBe('graph.pcg');
     expect(uploaded.size).toBe(file.size);
+  });
+
+  it('surfaces an SSE connection that ends without a turn terminal event', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('event: turn.created\ndata: {"turnId":"turn-cut"}\n\n'));
+        controller.enqueue(encoder.encode('event: reasoning.delta\ndata: {"turnId":"turn-cut","text":"unfinished"}\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, {
+      status: 200, headers: { 'Content-Type': 'text/event-stream' },
+    })));
+    const events: AgentStreamEvent[] = [];
+
+    await startTurn({
+      message: 'inspect', sessionId: 'session-cut', providerId: 'kimi-coding', modelId: 'k3', attachments: [],
+    }, (event) => events.push(event));
+
+    expect(events.at(-1)).toMatchObject({
+      type: 'turn.error',
+      data: { turnId: 'turn-cut', error: { code: 'agent_stream_interrupted', retryable: true } },
+    });
   });
 
   it('sends a Provider key once without persisting it in browser storage', async () => {

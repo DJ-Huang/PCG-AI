@@ -277,6 +277,25 @@ async function consumeEventStream(response: Response, onEvent: (event: AgentStre
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let sawTerminal = false;
+  let sawToolResult = false;
+  let lastTurnId = '';
+
+  const emitInterrupted = () => {
+    if (sawTerminal) return;
+    sawTerminal = true;
+    onEvent({
+      type: 'turn.error',
+      data: {
+        turnId: lastTurnId,
+        error: {
+          code: 'agent_stream_interrupted',
+          message: 'The Agent connection ended unexpectedly. The partial response was kept.',
+          retryable: !sawToolResult,
+        },
+      },
+    });
+  };
 
   const flush = (block: string) => {
     let type = '';
@@ -286,23 +305,39 @@ async function consumeEventStream(response: Response, onEvent: (event: AgentStre
       if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
     }
     if (!type || data.length === 0) return;
-    onEvent({ type: type as AgentStreamEvent['type'], data: JSON.parse(data.join('\n')) as Record<string, unknown> });
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(data.join('\n')) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (typeof parsed.turnId === 'string') lastTurnId = parsed.turnId;
+    if (type === 'tool.result') sawToolResult = true;
+    if (type === 'turn.completed' || type === 'turn.error' || type === 'approval.required') sawTerminal = true;
+    onEvent({ type: type as AgentStreamEvent['type'], data: parsed });
   };
 
-  while (true) {
-    const chunk = await reader.read();
-    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-    let boundary = buffer.search(/\r?\n\r?\n/);
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
-      buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
-      flush(block);
-      boundary = buffer.search(/\r?\n\r?\n/);
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      let boundary = buffer.search(/\r?\n\r?\n/);
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        const match = buffer.slice(boundary).match(/^\r?\n\r?\n/);
+        buffer = buffer.slice(boundary + (match?.[0].length ?? 2));
+        flush(block);
+        boundary = buffer.search(/\r?\n\r?\n/);
+      }
+      if (chunk.done) break;
     }
-    if (chunk.done) break;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    emitInterrupted();
+    return;
   }
   if (buffer.trim()) flush(buffer);
+  emitInterrupted();
 }
 
 export async function startTurn(

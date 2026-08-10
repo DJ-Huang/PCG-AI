@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -1508,6 +1509,8 @@ struct CompletionStream {
     std::string reasoning_part_id;
     std::map<std::string, json> calls;
     bool writable = true;
+    bool terminal_event = false;
+    std::string finish_reason;
 };
 
 json StreamEventData(CompletionStream& stream, const std::string& part_id) {
@@ -1574,12 +1577,21 @@ void AppendStreamCall(CompletionStream& stream, const std::string& key,
 }
 
 void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) {
-    if (payload.empty() || payload == "[DONE]") return;
+    if (payload.empty()) return;
+    if (payload == "[DONE]") {
+        stream.terminal_event = true;
+        return;
+    }
     stream.response_body = payload;
     const json event = json::parse(payload, nullptr, false);
     if (!event.is_object()) return;
     if (stream.provider == "anthropic") {
         const std::string type = event.value("type", "");
+        if (type == "message_stop") stream.terminal_event = true;
+        if (type == "message_delta") {
+            const std::string reason = event.value("delta", json::object()).value("stop_reason", "");
+            if (!reason.empty()) stream.finish_reason = reason;
+        }
         if (type == "content_block_start") {
             const json block = event.value("content_block", json::object());
             if (block.value("type", "") == "thinking") {
@@ -1605,6 +1617,13 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
     }
     if (stream.provider == "openai-responses") {
         const std::string type = event.value("type", "");
+        if (type == "response.completed" || type == "response.failed" || type == "response.incomplete") {
+            stream.terminal_event = true;
+        }
+        if (type == "response.incomplete") {
+            stream.finish_reason = event.value("response", json::object())
+                .value("incomplete_details", json::object()).value("reason", "incomplete");
+        }
         if (type == "response.output_text.delta") AppendStreamText(stream, event.value("delta", ""));
         if (type == "response.reasoning_summary_text.delta") AppendStreamReasoning(stream, event.value("delta", ""));
         if (type == "response.output_item.added") {
@@ -1623,6 +1642,11 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
     if (stream.provider == "google") {
         const json candidates = event.value("candidates", json::array());
         if (candidates.empty()) return;
+        const std::string reason = candidates[0].value("finishReason", "");
+        if (!reason.empty()) {
+            stream.terminal_event = true;
+            stream.finish_reason = reason;
+        }
         for (const auto& part : candidates[0].value("content", json::object()).value("parts", json::array())) {
             if (part.contains("text") && part.value("thought", false)) AppendStreamReasoning(stream, part.value("text", ""));
             else if (part.contains("text")) AppendStreamText(stream, part.value("text", ""));
@@ -1636,6 +1660,10 @@ void ParseCompletionEvent(CompletionStream& stream, const std::string& payload) 
     }
     const json choices = event.value("choices", json::array());
     if (choices.empty()) return;
+    if (choices[0].contains("finish_reason") && !choices[0]["finish_reason"].is_null()) {
+        stream.terminal_event = true;
+        stream.finish_reason = choices[0].value("finish_reason", "");
+    }
     const json delta = choices[0].value("delta", json::object());
     if (delta.contains("reasoning_content") && delta["reasoning_content"].is_string()) {
         AppendStreamReasoning(stream, delta.value("reasoning_content", ""));
@@ -1813,6 +1841,20 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
             response.status == 429 || response.status >= 500;
         return ErrorBody("provider_error", message, transient && !turn.has_mutation);
     }
+    if (!stream.terminal_event) {
+        return ErrorBody("provider_stream_interrupted",
+            "The Provider stream ended unexpectedly before the Agent finished. The partial response was kept.",
+            !turn.has_mutation);
+    }
+    std::string finish_reason = stream.finish_reason;
+    std::transform(finish_reason.begin(), finish_reason.end(), finish_reason.begin(),
+        [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+    if (finish_reason == "length" || finish_reason == "max_tokens" ||
+        finish_reason == "max_output_tokens" || finish_reason == "incomplete") {
+        return ErrorBody("provider_output_truncated",
+            "The Provider reached its output limit before producing a final answer. Try again or use a lower Thinking effort.",
+            !turn.has_mutation);
+    }
     ClearToolImages(turn.history);
     json normalized = {{"text", stream.text}, {"reasoning", stream.reasoning},
                        {"reasoningSignature", stream.reasoning_signature},
@@ -1830,6 +1872,12 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
         if (!parsed.is_object()) return ErrorBody("invalid_provider_response", "Provider returned invalid streaming data.");
         normalized = NormalizeCompletion(protocol, parsed);
         normalized["streamed"] = false;
+    }
+    if (normalized.value("text", "").empty() &&
+        normalized.value("toolCalls", json::array()).empty()) {
+        return ErrorBody("provider_response_incomplete",
+            "The Provider stopped after reasoning without producing a final answer. The partial reasoning was kept.",
+            !turn.has_mutation);
     }
     normalized["ok"] = true;
     return normalized;
