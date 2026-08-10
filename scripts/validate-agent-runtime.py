@@ -193,6 +193,19 @@ def main() -> None:
             assert credential_path.parent.stat().st_mode & 0o777 == 0o700
             assert "test-secret" not in config_path.read_text()
 
+            status, response = request(
+                f"{base}/settings", method="PUT",
+                body=json.dumps({
+                    "providerId": "openai-compatible", "modelId": "fake-tool-model",
+                    "reasoningEffort": "max",
+                }).encode(),
+                content_type="application/json",
+            )
+            assert status == 200, response
+            status, response = request(f"{base}/settings")
+            assert status == 200, response
+            assert json.loads(response)["reasoningEffort"] == "max"
+
             body, content_type = multipart_turn({
                 "message": "run read tool", "sessionId": "read-session",
                 "providerId": "openai-compatible", "modelId": "fake-tool-model",
@@ -263,6 +276,9 @@ def main() -> None:
             status, response = request(f"{base}/sessions/{read_session_id}")
             assert status == 200, response
             assert json.loads(response)["session"]["title"] == "Renamed runtime test"
+            status, response = request(f"{base}/settings")
+            assert status == 200, response
+            assert json.loads(response)["reasoningEffort"] == "max"
             status, response = request(f"{base}/providers")
             assert status == 200, response
             connected = next(

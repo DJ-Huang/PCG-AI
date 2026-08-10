@@ -971,11 +971,23 @@
 .pcg-agent-history__item:hover .pcg-agent-history__actions { display: flex; }
 .pcg-agent-history__empty { padding: 24px 8px; text-align: center; }
 .pcg-agent-history__more { width: 100%; margin-top: 8px; padding: 7px; color: #96969a; background: transparent; border: 1px solid #343438; border-radius: 6px; font-size: 9px; cursor: pointer; }
-.pcg-agent-composer__pill { max-width: 72%; border: 0; cursor: pointer; }
+.pcg-agent-composer__pill { min-width: 0; max-width: 58%; overflow: hidden; border: 0; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.pcg-agent-composer__thinking-pill { flex: none; padding: 4px 8px; color: #bdbdc1; background: transparent; border: 0; border-radius: 999px; font-size: 10px; white-space: nowrap; cursor: pointer; }
+.pcg-agent-composer__thinking-pill:hover { color: #fff; background: #303034; }
 .pcg-agent-composer__model-menu { position: absolute; right: 0; bottom: calc(100% + 7px); left: 0; z-index: 25; max-height: 260px; display: grid; gap: 3px; overflow: auto; padding: 6px; background: #222224; border: 1px solid #414145; border-radius: 9px; box-shadow: 0 12px 30px #0009; }
 .pcg-agent-composer__model-menu button { display: grid; gap: 2px; padding: 7px 8px; color: #c7c7ca; background: transparent; border: 0; border-radius: 6px; text-align: left; cursor: pointer; }
 .pcg-agent-composer__model-menu button:hover, .pcg-agent-composer__model-menu button.is-selected { color: #fff; background: #343438; }
 .pcg-agent-composer__model-menu small { color: #747478; font-size: 9px; }
+.pcg-agent-composer__thinking-menu { position: absolute; bottom: calc(100% + 7px); left: 108px; z-index: 26; width: min(250px, calc(100% - 124px)); overflow: hidden; color: #e1e1e3; background: #202021; border: 1px solid #414145; border-radius: 9px; box-shadow: 0 12px 30px #0009; }
+.pcg-agent-composer__thinking-heading { padding: 9px 12px 5px; color: #85858a; font-size: 10px; }
+.pcg-agent-composer__thinking-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 12px 10px; font-size: 12px; }
+.pcg-agent-composer__thinking-switch { position: relative; width: 32px; height: 18px; background: #3aa66f; border-radius: 999px; }
+.pcg-agent-composer__thinking-switch span { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; }
+.pcg-agent-composer__thinking-section, .pcg-agent-composer__thinking-fixed { padding: 2px 0 8px; border-top: 1px solid #343437; }
+.pcg-agent-composer__thinking-section button { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 7px 12px; color: #dedee1; background: transparent; border: 0; font-size: 12px; text-align: left; text-transform: capitalize; cursor: pointer; }
+.pcg-agent-composer__thinking-section button:hover, .pcg-agent-composer__thinking-section button.is-selected { background: #303033; }
+.pcg-agent-composer__thinking-section > small, .pcg-agent-composer__thinking-fixed small { display: block; padding: 6px 12px 2px; color: #747478; font-size: 9px; line-height: 1.35; }
+.pcg-agent-composer__thinking-fixed > span { display: block; padding: 9px 12px 0; color: #85858a; font-size: 10px; }
 
 .pcg-blackboard__param {
   background: #232324;

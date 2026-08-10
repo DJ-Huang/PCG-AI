@@ -17,9 +17,13 @@ export interface ModelCapabilities {
   textInput: boolean;
   imageInput: boolean;
   reasoning?: boolean;
+  reasoningEfforts?: ReasoningEffort[];
+  defaultReasoningEffort?: ReasoningEffort;
   contextTokens: number;
   outputTokens: number;
 }
+
+export type ReasoningEffort = 'low' | 'high' | 'max';
 
 export interface ModelDescriptor {
   id: string;
@@ -52,6 +56,7 @@ export interface ProviderDescriptor {
 export interface AgentSettings {
   providerId: string;
   modelId: string;
+  reasoningEffort: ReasoningEffort;
 }
 
 export interface OAuthStart {
@@ -180,7 +185,18 @@ export async function getProviders(): Promise<ProviderDescriptor[]> {
   const result = await jsonRequest<{ providers: ProviderDescriptor[] }>('/providers', {
     headers: authHeaders(),
   });
-  return result.providers;
+  return result.providers.map((provider) => provider.id !== 'kimi-coding' ? provider : ({
+    ...provider,
+    models: provider.models.map((model) => model.id !== 'k3' && model.id !== 'k3-256k' ? model : ({
+      ...model,
+      capabilities: {
+        ...model.capabilities,
+        reasoning: true,
+        reasoningEfforts: model.capabilities.reasoningEfforts ?? ['low', 'high', 'max'],
+        defaultReasoningEffort: model.capabilities.defaultReasoningEffort ?? 'high',
+      },
+    })),
+  }));
 }
 
 export async function connectApiKey(providerId: string, apiKey: string, baseUrl?: string): Promise<void> {
@@ -295,6 +311,7 @@ export async function startTurn(
     sessionId: string;
     providerId: string;
     modelId: string;
+    reasoningEffort?: ReasoningEffort;
     attachments: AgentAttachment[];
     retryTurnId?: string;
   },
@@ -310,6 +327,7 @@ export async function startTurn(
         sessionId: input.sessionId,
         providerId: input.providerId,
         modelId: input.modelId,
+        ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
         ...(input.retryTurnId ? { retryTurnId: input.retryTurnId } : {}),
       })],
       { type: 'application/json' },

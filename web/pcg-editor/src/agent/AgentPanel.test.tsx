@@ -40,7 +40,7 @@ describe('AgentPanel', () => {
   beforeEach(() => {
     vi.mocked(client.startTurn).mockReset();
     vi.mocked(client.getProviders).mockResolvedValue([connectedProvider]);
-    vi.mocked(client.getAgentSettings).mockResolvedValue({ providerId: 'openai', modelId: 'gpt-test' });
+    vi.mocked(client.getAgentSettings).mockResolvedValue({ providerId: 'openai', modelId: 'gpt-test', reasoningEffort: 'high' });
     vi.mocked(client.setAgentSettings).mockResolvedValue();
     vi.mocked(client.cancelTurn).mockResolvedValue();
     vi.mocked(client.listAgentSessions).mockResolvedValue({ sessions: [], nextCursor: 0 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { connectApiKey, setAgentToken, startTurn, type AgentStreamEvent } from './agentClient';
+import { connectApiKey, getProviders, setAgentToken, startTurn, type AgentStreamEvent } from './agentClient';
 
 describe('agentClient', () => {
   beforeEach(() => {
@@ -26,13 +26,22 @@ describe('agentClient', () => {
 
     await startTurn({
       message: 'inspect', sessionId: 'session-1', providerId: 'openai', modelId: 'gpt-test',
-      attachments: [{ id: 'a1', file, previewUrl: null }],
+      reasoningEffort: 'max', attachments: [{ id: 'a1', file, previewUrl: null }],
     }, (event) => events.push(event));
 
     expect(events.map((event) => event.type)).toEqual(['turn.created', 'message.delta']);
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     expect(request.body).toBeInstanceOf(FormData);
     const uploaded = (request.body as FormData).get('attachment') as File;
+    const requestFile = (request.body as FormData).get('request') as Blob;
+    const requestText = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(requestFile);
+    });
+    const payload = JSON.parse(requestText);
+    expect(payload.reasoningEffort).toBe('max');
     expect(uploaded.name).toBe('graph.pcg');
     expect(uploaded.size).toBe(file.size);
   });
@@ -52,5 +61,21 @@ describe('agentClient', () => {
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     expect(request.headers).toMatchObject({ Authorization: 'Bearer local-bridge-token' });
     expect(request.body).toContain('provider-secret');
+  });
+
+  it('migrates cached Kimi K3 metadata to expose supported effort levels', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ providers: [{
+      id: 'kimi-coding', name: 'Kimi for Coding', authMethods: [], baseUrl: '',
+      connection: { status: 'connected', authType: 'api', accountLabel: '', error: null },
+      models: [{ id: 'k3', name: 'K3', capabilities: {
+        toolCall: true, textInput: true, imageInput: true, reasoning: true,
+        contextTokens: 0, outputTokens: 0,
+      } }],
+    }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    const providers = await getProviders();
+
+    expect(providers[0].models[0].capabilities.reasoningEfforts).toEqual(['low', 'high', 'max']);
+    expect(providers[0].models[0].capabilities.defaultReasoningEffort).toBe('high');
   });
 });

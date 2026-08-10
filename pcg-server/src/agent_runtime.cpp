@@ -82,6 +82,7 @@ struct TurnState {
     std::string session_id;
     std::string provider;
     std::string model;
+    std::string reasoning_effort;
     std::string assistant_message_id;
     std::string final_status = "running";
     json history = json::array();
@@ -102,6 +103,7 @@ struct RuntimeState {
     bool loaded = false;
     std::string provider_id;
     std::string model_id;
+    std::string reasoning_effort = "high";
     std::string custom_base_url;
     json provider_meta = json::object();
     std::unordered_map<std::string, OAuthAttempt> oauth;
@@ -450,6 +452,28 @@ bool SaveCredentialFile(const json& credentials) {
     return true;
 }
 
+bool IsReasoningEffort(const std::string& value) {
+    return value == "low" || value == "high" || value == "max";
+}
+
+void EnrichKnownProviderModels(json& provider_meta) {
+    if (!provider_meta.is_object()) return;
+    auto provider = provider_meta.find("kimi-coding");
+    if (provider == provider_meta.end() || !provider->is_object()) return;
+    auto models = provider->find("models");
+    if (models == provider->end() || !models->is_array()) return;
+    for (auto& model : *models) {
+        if (!model.is_object()) continue;
+        const std::string id = model.value("id", "");
+        if (id != "k3" && id != "k3-256k") continue;
+        json& capabilities = model["capabilities"];
+        if (!capabilities.is_object()) capabilities = json::object();
+        capabilities["reasoning"] = true;
+        capabilities["reasoningEfforts"] = json::array({"low", "high", "max"});
+        capabilities["defaultReasoningEffort"] = "high";
+    }
+}
+
 void SaveConfigLocked(RuntimeState& state) {
     const auto path = ConfigPath();
     std::error_code ec;
@@ -457,6 +481,7 @@ void SaveConfigLocked(RuntimeState& state) {
     const json value = {
         {"providerId", state.provider_id},
         {"modelId", state.model_id},
+        {"reasoningEffort", state.reasoning_effort},
         {"customBaseUrl", state.custom_base_url},
         {"providers", state.provider_meta},
     };
@@ -478,9 +503,12 @@ void LoadConfigLocked(RuntimeState& state) {
     if (!value.is_object()) return;
     state.provider_id = value.value("providerId", "");
     state.model_id = value.value("modelId", "");
+    state.reasoning_effort = value.value("reasoningEffort", "high");
+    if (!IsReasoningEffort(state.reasoning_effort)) state.reasoning_effort = "high";
     state.custom_base_url = value.value("customBaseUrl", "");
     state.provider_meta = value.value("providers", json::object());
     if (!state.provider_meta.is_object()) state.provider_meta = json::object();
+    EnrichKnownProviderModels(state.provider_meta);
 }
 
 std::mutex& CredentialCacheMutex() {
@@ -818,14 +846,19 @@ std::string ProviderBaseUrl(const std::string& id) {
     return id == "openai-compatible" ? state.custom_base_url : "";
 }
 
-json Model(const std::string& id, const std::string& name, bool image = true, bool reasoning = false) {
+json Model(const std::string& id, const std::string& name, bool image = true, bool reasoning = false,
+           const json& reasoning_efforts = json::array()) {
+    json capabilities = {
+        {"toolCall", true}, {"textInput", true}, {"imageInput", image},
+        {"reasoning", reasoning}, {"contextTokens", 0}, {"outputTokens", 0},
+    };
+    if (!reasoning_efforts.empty()) {
+        capabilities["reasoningEfforts"] = reasoning_efforts;
+        capabilities["defaultReasoningEffort"] = "high";
+    }
     return {
         {"id", id}, {"name", name.empty() ? id : name},
-        {"capabilities", {
-            {"toolCall", true}, {"textInput", true}, {"imageInput", image},
-            {"reasoning", reasoning},
-            {"contextTokens", 0}, {"outputTokens", 0},
-        }},
+        {"capabilities", std::move(capabilities)},
     };
 }
 
@@ -853,7 +886,9 @@ json ParseModels(const std::string& provider, const json& body) {
         const bool reasoning = provider == "kimi-coding" || provider == "anthropic" ||
             id.find("reason") != std::string::npos || id.find("thinking") != std::string::npos ||
             id.rfind("o", 0) == 0 || id.rfind("gpt-5", 0) == 0;
-        models.push_back(Model(id, item.value("display_name", item.value("name", id)), image, reasoning));
+        const bool kimi_k3 = provider == "kimi-coding" && (id == "k3" || id == "k3-256k");
+        models.push_back(Model(id, item.value("display_name", item.value("name", id)), image, reasoning,
+                               kimi_k3 ? json::array({"low", "high", "max"}) : json::array()));
     }
     return models;
 }
@@ -1716,6 +1751,9 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
         });
         request = {{"model", turn.model}, {"max_tokens", 8192}, {"system", SystemPrompt()},
                    {"messages", AnthropicMessages(turn.history)}, {"tools", std::move(tools)}, {"stream", true}};
+        if (turn.provider == "kimi-coding" && !turn.reasoning_effort.empty()) {
+            request["reasoning_effort"] = turn.reasoning_effort;
+        }
     } else if (turn.provider == "google") {
         url = base + "/models/" + UrlEncode(turn.model) + ":streamGenerateContent?alt=sse";
         json declarations = json::array();
@@ -2207,7 +2245,8 @@ void HandleAgentGetSettings(const httplib::Request& req, httplib::Response& res)
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     LoadConfigLocked(state);
-    JsonResponse(res, 200, {{"ok", true}, {"providerId", state.provider_id}, {"modelId", state.model_id}});
+    JsonResponse(res, 200, {{"ok", true}, {"providerId", state.provider_id}, {"modelId", state.model_id},
+                            {"reasoningEffort", state.reasoning_effort}});
 }
 
 void HandleAgentPutSettings(const httplib::Request& req, httplib::Response& res) {
@@ -2216,6 +2255,11 @@ void HandleAgentPutSettings(const httplib::Request& req, httplib::Response& res)
     if (!ParseObjectBody(req, res, body)) return;
     const std::string provider = body.value("providerId", "");
     const std::string model = body.value("modelId", "");
+    const std::string reasoning_effort = body.value("reasoningEffort", "high");
+    if (!IsReasoningEffort(reasoning_effort)) {
+        JsonResponse(res, 400, ErrorBody("invalid_reasoning_effort", "Reasoning effort must be low, high, or max."));
+        return;
+    }
     json credential;
     if (!CredentialGet(provider, credential)) {
         MarkCredentialUnavailable(provider);
@@ -2238,8 +2282,10 @@ void HandleAgentPutSettings(const httplib::Request& req, httplib::Response& res)
     }
     state.provider_id = provider;
     state.model_id = model;
+    state.reasoning_effort = reasoning_effort;
     SaveConfigLocked(state);
-    JsonResponse(res, 200, {{"ok", true}, {"providerId", provider}, {"modelId", model}});
+    JsonResponse(res, 200, {{"ok", true}, {"providerId", provider}, {"modelId", model},
+                            {"reasoningEffort", reasoning_effort}});
 }
 
 void HandleAgentOAuthStart(const httplib::Request& req, httplib::Response& res) {
@@ -2381,6 +2427,7 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
     if (turn->session_id.rfind("session-", 0) != 0) turn->session_id = RandomId("session");
     turn->provider = input.value("providerId", "");
     turn->model = input.value("modelId", "");
+    turn->reasoning_effort = input.value("reasoningEffort", "");
     turn->started_at = NowMs();
     turn->assistant_message_id = RandomId("message");
     json persisted_session;
@@ -2426,6 +2473,16 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
             return;
         }
         turn->image_input = capabilities.value("imageInput", false);
+        const json efforts = capabilities.value("reasoningEfforts", json::array());
+        if (!efforts.empty()) {
+            if (turn->reasoning_effort.empty()) turn->reasoning_effort = state.reasoning_effort;
+            if (std::find(efforts.begin(), efforts.end(), turn->reasoning_effort) == efforts.end()) {
+                JsonResponse(res, 400, ErrorBody("invalid_reasoning_effort", "The selected model does not support that reasoning effort."));
+                return;
+            }
+        } else {
+            turn->reasoning_effort.clear();
+        }
         const bool has_image = std::any_of(user["content"].begin(), user["content"].end(),
             [](const json& part) { return part.value("type", "") == "image"; });
         if (has_image && !capabilities.value("imageInput", false)) {

@@ -17,6 +17,7 @@ import {
   type AgentMessageRecord,
   type AgentPart,
   type AgentSessionDescriptor,
+  type ReasoningEffort,
   type AgentStreamEvent,
   type ProviderDescriptor,
   type ToolCallEvent,
@@ -68,6 +69,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providerId, setProviderId] = useState('');
   const [modelId, setModelId] = useState('');
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>('high');
   const [connectionError, setConnectionError] = useState('');
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(LAST_SESSION_KEY) || newSessionId());
   const [activeTurnId, setActiveTurnId] = useState('');
@@ -127,6 +129,11 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     setProviders(nextProviders);
     setProviderId(settings.providerId);
     setModelId(settings.modelId);
+    const configuredModel = nextProviders.find((provider) => provider.id === settings.providerId)
+      ?.models.find((model) => model.id === settings.modelId);
+    const efforts = configuredModel?.capabilities.reasoningEfforts ?? [];
+    const configuredEffort = settings.reasoningEffort ?? configuredModel?.capabilities.defaultReasoningEffort ?? 'high';
+    setReasoningEffort(efforts.length === 0 || efforts.includes(configuredEffort) ? configuredEffort : (configuredModel?.capabilities.defaultReasoningEffort ?? efforts[0]));
     setConnectionError('');
   }, []);
 
@@ -275,9 +282,22 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     if (!model) return onOpenSettings?.();
     setProviderId(nextProviderId);
     setModelId(model);
-    try { await setAgentSettings({ providerId: nextProviderId, modelId: model }); }
+    const selected = provider?.models.find((item) => item.id === model);
+    const efforts = selected?.capabilities.reasoningEfforts ?? [];
+    const nextEffort = efforts.length === 0 || efforts.includes(reasoningEffort)
+      ? reasoningEffort
+      : (selected?.capabilities.defaultReasoningEffort ?? efforts[0]);
+    setReasoningEffort(nextEffort);
+    try { await setAgentSettings({ providerId: nextProviderId, modelId: model, reasoningEffort: nextEffort }); }
     catch (error) { setConnectionError(errorMessage(error)); }
-  }, [onOpenSettings, providers]);
+  }, [onOpenSettings, providers, reasoningEffort]);
+
+  const selectReasoningEffort = useCallback(async (effort: ReasoningEffort) => {
+    if (!selectedModel?.capabilities.reasoningEfforts?.includes(effort)) return;
+    setReasoningEffort(effort);
+    try { await setAgentSettings({ providerId, modelId, reasoningEffort: effort }); }
+    catch (error) { setConnectionError(errorMessage(error)); }
+  }, [modelId, providerId, selectedModel]);
 
   const sendTurn = useCallback(async (text: string, attachments: AgentAttachment[]) => {
     if (!connected || !selectedProvider || !selectedModel) return onOpenSettings?.();
@@ -299,7 +319,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     abortRef.current = abort;
     try {
       await syncEditorContext?.();
-      await startTurn({ message: text, sessionId, providerId, modelId, attachments }, handleEvent, abort.signal);
+      await startTurn({ message: text, sessionId, providerId, modelId, reasoningEffort, attachments }, handleEvent, abort.signal);
     }
     catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
@@ -307,7 +327,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, onOpenSettings, providerId, selectedModel, selectedProvider, sessionId, syncEditorContext]);
+  }, [connected, handleEvent, modelId, onOpenSettings, providerId, reasoningEffort, selectedModel, selectedProvider, sessionId, syncEditorContext]);
 
   const retryTurn = useCallback(async (retryTurnId: string) => {
     if (!connected || !selectedProvider || !selectedModel || sending) return;
@@ -320,7 +340,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     try {
       await syncEditorContext?.();
       await startTurn({
-        message: '', sessionId, providerId, modelId, attachments: [], retryTurnId,
+        message: '', sessionId, providerId, modelId, reasoningEffort, attachments: [], retryTurnId,
       }, handleEvent, abort.signal);
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setConnectionError(errorMessage(error));
@@ -328,7 +348,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
       if (abortRef.current === abort) abortRef.current = null;
       setSending(false);
     }
-  }, [connected, handleEvent, modelId, providerId, selectedModel, selectedProvider, sending, sessionId, syncEditorContext]);
+  }, [connected, handleEvent, modelId, providerId, reasoningEffort, selectedModel, selectedProvider, sending, sessionId, syncEditorContext]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -410,7 +430,9 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
       <AgentComposer
         sending={sending} agentLabel={connected ? `${selectedProvider?.name} · ${selectedModel?.name}` : 'Connect Provider'}
         disabled={!connected || pendingCalls.length > 0 || showHistory} onSend={sendTurn} onStop={handleStop}
-        providers={connectedProviders} providerId={providerId} modelId={modelId} onModelChange={(nextProvider, nextModel) => void selectModel(nextProvider, nextModel)}
+        providers={connectedProviders} providerId={providerId} modelId={modelId} reasoningEffort={reasoningEffort}
+        onModelChange={(nextProvider, nextModel) => void selectModel(nextProvider, nextModel)}
+        onReasoningEffortChange={(effort) => void selectReasoningEffort(effort)}
       />
       <div className="pcg-agent__resize-handle" onMouseDown={onResizeStart} title="Drag to resize" />
     </div>
