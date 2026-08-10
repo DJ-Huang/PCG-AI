@@ -87,6 +87,8 @@ struct TurnState {
     int next_ordinal = 0;
     int tool_rounds = 0;
     int tool_calls = 0;
+    bool image_input = false;
+    bool has_mutation = false;
     int64_t started_at = 0;
 };
 
@@ -254,8 +256,12 @@ json* FindPart(TurnState& turn, const std::string& part_id) {
     return nullptr;
 }
 
+void ClearToolImages(json& history);
+
 void PersistTurn(TurnState& turn) {
-    turn.session_record["history"] = turn.history;
+    json persisted_history = turn.history;
+    ClearToolImages(persisted_history);
+    turn.session_record["history"] = std::move(persisted_history);
     turn.session_record["updatedAt"] = NowMs();
     turn.session_record["status"] = turn.final_status;
     AssistantRecord(turn)["status"] = turn.final_status;
@@ -1020,6 +1026,86 @@ const char* SystemPrompt() {
         "conflicts or timeouts, refresh context instead of replaying a stale write. Explain failures plainly.";
 }
 
+json PublicToolResult(const json& result) {
+    json compact = result;
+    if (!compact.contains("content") || !compact["content"].is_array()) return compact;
+    for (auto& part : compact["content"]) {
+        if (!part.is_object() || part.value("type", "") != "image") continue;
+        const size_t encoded_bytes = part.value("data", "").size();
+        part.erase("data");
+        part["encodedBytes"] = encoded_bytes;
+    }
+    return compact;
+}
+
+json ToolResultImages(const json& result) {
+    json images = json::array();
+    for (const auto& part : result.value("content", json::array())) {
+        if (!part.is_object() || part.value("type", "") != "image") continue;
+        const std::string data = part.value("data", "");
+        if (data.empty() || data.size() > (kMaxAttachmentBytes * 4 / 3 + 4)) continue;
+        images.push_back({
+            {"mimeType", part.value("mimeType", "image/png")},
+            {"data", data},
+        });
+    }
+    return images;
+}
+
+std::string ModelToolResult(const json& result) {
+    if (result.contains("structuredContent")) return result["structuredContent"].dump();
+    return PublicToolResult(result).dump();
+}
+
+void SanitizeLegacyToolHistory(json& history) {
+    if (!history.is_array()) return;
+    for (auto& message : history) {
+        if (!message.is_object() || message.value("role", "") != "tool" ||
+            !message.contains("content") || !message["content"].is_string()) continue;
+        const std::string content = message["content"].get<std::string>();
+        if (content.size() < 4096) continue;
+        const json parsed = json::parse(content, nullptr, false);
+        if (!parsed.is_object()) continue;
+        message["content"] = ModelToolResult(parsed);
+        message.erase("images");
+    }
+}
+
+void CompactSessionToolResults(json& session) {
+    if (!session.contains("messages") || !session["messages"].is_array()) return;
+    for (auto& message : session["messages"]) {
+        if (!message.contains("parts") || !message["parts"].is_array()) continue;
+        for (auto& part : message["parts"]) {
+            if (part.is_object() && part.value("type", "") == "tool" &&
+                part.contains("result") && part["result"].is_object()) {
+                part["result"] = PublicToolResult(part["result"]);
+            }
+        }
+    }
+}
+
+void AppendToolHistory(TurnState& turn, const std::string& call_id,
+                       const std::string& name, const json& result) {
+    for (auto& message : turn.history) {
+        if (message.is_object()) message.erase("images");
+    }
+    json entry = {
+        {"role", "tool"}, {"toolCallId", call_id}, {"name", name},
+        {"content", ModelToolResult(result)}, {"isError", result.value("isError", false)},
+    };
+    if (turn.image_input) {
+        json images = ToolResultImages(result);
+        if (!images.empty()) entry["images"] = std::move(images);
+    }
+    turn.history.push_back(std::move(entry));
+}
+
+void ClearToolImages(json& history) {
+    for (auto& message : history) {
+        if (message.is_object()) message.erase("images");
+    }
+}
+
 json OpenAiMessages(const json& history) {
     json messages = json::array({{{"role", "system"}, {"content", SystemPrompt()}}});
     for (const auto& message : history) {
@@ -1052,6 +1138,15 @@ json OpenAiMessages(const json& history) {
                 {"role", "tool"}, {"tool_call_id", message.value("toolCallId", "")},
                 {"content", message.value("content", "")},
             });
+            json image_content = json::array();
+            for (const auto& image : message.value("images", json::array())) {
+                image_content.push_back({
+                    {"type", "image_url"},
+                    {"image_url", {{"url", "data:" + image.value("mimeType", "image/png") +
+                        ";base64," + image.value("data", "")}}},
+                });
+            }
+            if (!image_content.empty()) messages.push_back({{"role", "user"}, {"content", std::move(image_content)}});
         }
     }
     return messages;
@@ -1093,6 +1188,15 @@ json OpenAiResponseInput(const json& history) {
                 {"call_id", message.value("toolCallId", "")},
                 {"output", message.value("content", "")},
             });
+            json image_content = json::array();
+            for (const auto& image : message.value("images", json::array())) {
+                image_content.push_back({
+                    {"type", "input_image"},
+                    {"image_url", "data:" + image.value("mimeType", "image/png") +
+                        ";base64," + image.value("data", "")},
+                });
+            }
+            if (!image_content.empty()) input.push_back({{"role", "user"}, {"content", std::move(image_content)}});
         }
     }
     return input;
@@ -1141,9 +1245,19 @@ json AnthropicMessages(const json& history) {
             });
             messages.push_back({{"role", "assistant"}, {"content", std::move(content)}});
         } else if (role == "tool") {
+            json tool_content = json::array({{{"type", "text"}, {"text", message.value("content", "")}}});
+            for (const auto& image : message.value("images", json::array())) {
+                tool_content.push_back({
+                    {"type", "image"},
+                    {"source", {
+                        {"type", "base64"}, {"media_type", image.value("mimeType", "image/png")},
+                        {"data", image.value("data", "")},
+                    }},
+                });
+            }
             messages.push_back({{"role", "user"}, {"content", json::array({{
                 {"type", "tool_result"}, {"tool_use_id", message.value("toolCallId", "")},
-                {"content", message.value("content", "")}, {"is_error", message.value("isError", false)},
+                {"content", std::move(tool_content)}, {"is_error", message.value("isError", false)},
             }})}});
         }
     }
@@ -1174,10 +1288,17 @@ json GeminiContents(const json& history) {
             }}});
             contents.push_back({{"role", "model"}, {"parts", std::move(parts)}});
         } else if (role == "tool") {
-            contents.push_back({{"role", "user"}, {"parts", json::array({{{"functionResponse", {
+            json parts = json::array({{{"functionResponse", {
                 {"name", message.value("name", "")},
                 {"response", {{"result", message.value("content", "")}}},
-            }}}})}});
+            }}}});
+            for (const auto& image : message.value("images", json::array())) {
+                parts.push_back({{"inlineData", {
+                    {"mimeType", image.value("mimeType", "image/png")},
+                    {"data", image.value("data", "")},
+                }}});
+            }
+            contents.push_back({{"role", "user"}, {"parts", std::move(parts)}});
         }
     }
     return contents;
@@ -1469,6 +1590,22 @@ HttpResult HttpStreamCompletion(const std::string& url, const std::vector<std::s
     return result;
 }
 
+json ProviderErrorPayload(const CompletionStream& stream) {
+    const std::string& payload = stream.buffer.empty() ? stream.response_body : stream.buffer;
+    const json parsed = json::parse(payload, nullptr, false);
+    return parsed.is_object() ? parsed : json::object();
+}
+
+std::string ProviderErrorDetail(const json& payload) {
+    const json error = payload.value("error", json::object());
+    if (error.is_object()) {
+        const std::string message = error.value("message", "");
+        if (!message.empty()) return TruncateUtf8(message, 600);
+    }
+    const std::string message = payload.value("message", "");
+    return TruncateUtf8(message, 600);
+}
+
 json Complete(TurnState& turn, const EventEmitter& emit) {
     json credential;
     if (!CredentialGet(turn.provider, credential)) return ErrorBody("not_connected", "Connect the selected Provider first.");
@@ -1521,7 +1658,7 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
     CompleteStreamParts(stream);
     if (!response.ok()) {
         if (response.error == "cancelled") return ErrorBody("cancelled", "Turn cancelled.");
-        const json upstream = json::parse(stream.buffer, nullptr, false);
+        const json upstream = ProviderErrorPayload(stream);
         const json upstream_error = upstream.is_object() ? upstream.value("error", json::object()) : json::object();
         const std::string upstream_code = upstream_error.is_object()
             ? upstream_error.value("code", upstream_error.value("type", "")) : "";
@@ -1533,14 +1670,19 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
             return ErrorBody("quota_exhausted", "Provider quota or credit is exhausted.");
         }
         if (response.status == 429) {
-            return ErrorBody("rate_limited", "Provider rate limit reached. Try again later.", true);
+            return ErrorBody("rate_limited", "Provider rate limit reached. Try again later.", !turn.has_mutation);
         }
         if (upstream_code == "model_not_found" || upstream_code == "invalid_model") {
             return ErrorBody("model_unavailable", "The selected model is not available for this account.");
         }
-        return ErrorBody("provider_error", "Provider request failed (HTTP " +
-            std::to_string(response.status) + ").", response.status >= 500);
+        const std::string detail = ProviderErrorDetail(upstream);
+        const std::string message = "Provider request failed (HTTP " + std::to_string(response.status) + ")" +
+            (detail.empty() ? "." : ": " + detail);
+        const bool transient = response.status == 0 || response.status == 408 ||
+            response.status == 429 || response.status >= 500;
+        return ErrorBody("provider_error", message, transient && !turn.has_mutation);
     }
+    ClearToolImages(turn.history);
     json normalized = {{"text", stream.text}, {"reasoning", stream.reasoning},
                        {"reasoningSignature", stream.reasoning_signature},
                        {"toolCalls", json::array()}, {"streamed", !stream.text.empty()}};
@@ -1684,16 +1826,15 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
                     turn.repeated_tools[cache_key] = 0;
                 }
             }
-            FinishToolPart(turn, call.value("id", ""), tool_result, cached);
+            const json public_result = PublicToolResult(tool_result);
+            FinishToolPart(turn, call.value("id", ""), public_result, cached);
             const json* finished_part = FindPart(turn, tool_part.value("id", ""));
-            turn.history.push_back({
-                {"role", "tool"}, {"toolCallId", call.value("id", "")}, {"name", name},
-                {"content", tool_result.dump()}, {"isError", tool_result.value("isError", false)},
-            });
+            AppendToolHistory(turn, call.value("id", ""), name, tool_result);
+            if (PcgToolMutatesGraph(name) && !tool_result.value("isError", false)) turn.has_mutation = true;
             if (!emit("tool.result", {
                 {"turnId", turn.id}, {"toolCallId", call.value("id", "")},
                 {"sessionId", turn.session_id}, {"messageId", turn.assistant_message_id},
-                {"partId", tool_part.value("id", "")}, {"name", name}, {"result", tool_result}, {"cached", cached},
+                {"partId", tool_part.value("id", "")}, {"name", name}, {"result", public_result}, {"cached", cached},
                 {"durationMs", finished_part ? finished_part->value("durationMs", 0LL) : 0LL},
             })) {
                 turn.cancelled.store(true);
@@ -2145,6 +2286,10 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
     turn->assistant_message_id = RandomId("message");
     json persisted_session;
     const bool existing_session = LoadAgentSession(turn->session_id, persisted_session);
+    if (existing_session) {
+        SanitizeLegacyToolHistory(persisted_session["history"]);
+        CompactSessionToolResults(persisted_session);
+    }
     const std::string retry_turn_id = input.value("retryTurnId", "");
     json user;
     bool retrying = false;
@@ -2181,6 +2326,7 @@ void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {
             JsonResponse(res, 400, ErrorBody("model_capability_unsupported", "The selected model cannot run Agent tool turns."));
             return;
         }
+        turn->image_input = capabilities.value("imageInput", false);
         const bool has_image = std::any_of(user["content"].begin(), user["content"].end(),
             [](const json& part) { return part.value("type", "") == "image"; });
         if (has_image && !capabilities.value("imageInput", false)) {
@@ -2337,16 +2483,16 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
                         result = CallPcgTool(call.value("name", ""), arguments);
                     }
                 }
-                turn->history.push_back({
-                    {"role", "tool"}, {"toolCallId", call_id}, {"name", call.value("name", "")},
-                    {"content", result.dump()}, {"isError", result.value("isError", false)},
-                });
-                FinishToolPart(*turn, call_id, result, false);
+                const std::string name = call.value("name", "");
+                const json public_result = PublicToolResult(result);
+                AppendToolHistory(*turn, call_id, name, result);
+                if (PcgToolMutatesGraph(name) && !result.value("isError", false)) turn->has_mutation = true;
+                FinishToolPart(*turn, call_id, public_result, false);
                 const json* finished_part = FindPart(*turn, ToolPartId(*turn, call_id));
                 if (!emit("tool.result", {{"sessionId", turn->session_id}, {"turnId", id},
                          {"messageId", turn->assistant_message_id}, {"partId", ToolPartId(*turn, call_id)},
-                         {"toolCallId", call_id}, {"name", call.value("name", "")},
-                         {"result", result}, {"cached", false},
+                         {"toolCallId", call_id}, {"name", name},
+                         {"result", public_result}, {"cached", false},
                          {"durationMs", finished_part ? finished_part->value("durationMs", 0LL) : 0LL}})) {
                     turn->cancelled.store(true);
                     return false;

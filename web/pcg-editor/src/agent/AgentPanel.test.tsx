@@ -49,7 +49,7 @@ describe('AgentPanel', () => {
 
   afterEach(cleanup);
 
-  it('pauses a graph write for a per-call approval decision', async () => {
+  it('defaults an approval request to approve', async () => {
     vi.mocked(client.startTurn).mockImplementation(async (_input, onEvent) => {
       onEvent({ type: 'turn.created', data: { turnId: 'turn-1' } });
       onEvent({
@@ -72,7 +72,7 @@ describe('AgentPanel', () => {
     fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'save it' } });
     fireEvent.click(screen.getByTitle('Send (Enter)'));
     expect(await screen.findByText('Approve this graph write?')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Approve'));
+    expect(screen.getByText('Approve')).toHaveClass('is-selected');
     fireEvent.click(screen.getByText('Continue'));
 
     await waitFor(() => expect(client.decideTurn).toHaveBeenCalledWith(

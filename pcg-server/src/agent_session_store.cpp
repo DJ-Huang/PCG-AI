@@ -86,6 +86,25 @@ int64_t QueryInteger(const httplib::Request& req, const char* name, int64_t fall
     }
 }
 
+void StripToolResultImages(json& messages) {
+    if (!messages.is_array()) return;
+    for (auto& message : messages) {
+        if (!message.contains("parts") || !message["parts"].is_array()) continue;
+        for (auto& part : message["parts"]) {
+            if (!part.is_object() || part.value("type", "") != "tool" ||
+                !part.contains("result") || !part["result"].is_object()) continue;
+            json& content = part["result"]["content"];
+            if (!content.is_array()) continue;
+            for (auto& item : content) {
+                if (!item.is_object() || item.value("type", "") != "image") continue;
+                const size_t encoded_bytes = item.value("data", "").size();
+                item.erase("data");
+                item["encodedBytes"] = encoded_bytes;
+            }
+        }
+    }
+}
+
 }  // namespace
 
 bool LoadAgentSession(const std::string& id, json& session) {
@@ -166,6 +185,7 @@ json PublicAgentSession(const json& session, bool include_messages) {
     };
     if (include_messages) {
         result["messages"] = session.value("messages", json::array());
+        StripToolResultImages(result["messages"]);
         for (auto& message : result["messages"]) message.erase("_historyStart");
     }
     return result;

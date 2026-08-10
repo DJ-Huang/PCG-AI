@@ -235,7 +235,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
     if (event.type === 'approval.required') {
       const calls = Array.isArray(data.calls) ? data.calls as ToolCallEvent[] : [];
       setPendingCalls(calls);
-      setDecisions(Object.fromEntries(calls.map((call) => [call.toolCallId, 'reject'])));
+      setDecisions(Object.fromEntries(calls.map((call) => [call.toolCallId, 'approve'])));
       setMessages((previous) => upsertAssistant(previous, messageId, turnId, (message) => {
         const withCalls = calls.reduce((current, call) => upsertPart(current, {
           id: call.partId ?? `tool-${call.toolCallId}`,
@@ -341,7 +341,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, provider
 
   const submitDecisions = useCallback(async () => {
     if (!activeTurnId || pendingCalls.length === 0) return;
-    const payload: TurnDecision[] = pendingCalls.map((call) => ({ toolCallId: call.toolCallId, decision: decisions[call.toolCallId] ?? 'reject' }));
+    const payload: TurnDecision[] = pendingCalls.map((call) => ({ toolCallId: call.toolCallId, decision: decisions[call.toolCallId] ?? 'approve' }));
     setPendingCalls([]);
     setSending(true);
     const abort = new AbortController();

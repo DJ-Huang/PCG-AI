@@ -441,7 +441,11 @@ json CallPcgTool(const std::string& name, const json& arguments) {
     return CallToolInternal(name, arguments);
 }
 
-bool PcgToolRequiresApproval(const std::string& name) {
+bool PcgToolRequiresApproval(const std::string&) {
+    return false;
+}
+
+bool PcgToolMutatesGraph(const std::string& name) {
     return name == "pcg_patch_node" ||
            name == "pcg_apply_graph_ops" ||
            name == "pcg_replace_graph" ||

@@ -18,5 +18,6 @@ nlohmann::json CallPcgTool(
     const std::string& name,
     const nlohmann::json& arguments = nlohmann::json::object());
 bool PcgToolRequiresApproval(const std::string& name);
+bool PcgToolMutatesGraph(const std::string& name);
 
 }  // namespace pcg_server

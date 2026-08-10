@@ -129,7 +129,7 @@ export default function AgentMessageList({ messages, pendingCalls, decisions, on
                     const call = pendingCalls.find((item) => item.toolCallId === part.toolCallId);
                     return <ToolPart key={part.id} part={part} call={call} decision={part.toolCallId ? decisions[part.toolCallId] : undefined} onDecision={onDecision} onContinue={onContinue} />;
                   }
-                  if (part.type === 'error') return <div key={part.id} className="pcg-agent-error"><strong>{part.error?.message ?? 'Agent turn failed'}</strong>{message.turnId && onRetry && <button type="button" onClick={() => onRetry(message.turnId!)}>Retry</button>}</div>;
+                  if (part.type === 'error') return <div key={part.id} className="pcg-agent-error"><strong>{part.error?.message ?? 'Agent turn failed'}</strong>{part.error?.retryable && message.turnId && onRetry && <button type="button" onClick={() => onRetry(message.turnId!)}>Retry</button>}</div>;
                   return null;
                 })}
                 {message.status === 'interrupted' && <div className="pcg-agent-interrupted">Turn stopped{message.turnId && onRetry && <button type="button" onClick={() => onRetry(message.turnId!)}>Retry</button>}</div>}
