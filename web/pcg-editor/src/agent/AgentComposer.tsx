@@ -99,6 +99,7 @@ export default function AgentComposer({
   }, [text, attachments, sending, disabled, onSend, autoGrow]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
