@@ -100,11 +100,23 @@ isolated tests. A failed or interrupted latest Turn can be retried without
 duplicating its user message; attachment Turns require selecting the files
 again so stale bytes are never replayed implicitly.
 
-On macOS, credentials use Security.framework Generic Password items with
-Service `PCG-AI Agent`; only non-sensitive Provider/model/account metadata is
-written to `~/Library/Application Support/PCG-AI/agent.json` with user-only
-permissions. Provider errors are normalized before they reach JSON, SSE, or
-logs, so upstream response bodies and secrets are not reflected.
+Credentials are stored separately in
+`~/Library/Application Support/PCG-AI/credentials.json`. Its directory uses
+`0700`, the file uses `0600`, and updates use an atomic replacement so a crash
+cannot leave a partial secret file. Only non-sensitive Provider/model/account
+metadata is written to `agent.json`. Set `PCG_AGENT_CREDENTIALS_PATH` for an
+isolated file, or explicitly set `PCG_AGENT_CREDENTIAL_STORE=keychain` to use
+the macOS Keychain in a stably signed distribution. Development builds default
+to the protected file because an ad-hoc binary changes identity after rebuilds
+and would otherwise repeatedly trigger macOS authorization prompts. Provider
+errors are normalized before they reach JSON, SSE, or logs, so upstream
+response bodies and secrets are not reflected.
+
+Existing development credentials that were saved by an older build remain in
+Keychain but are not read automatically, because doing so would recreate the
+authorization prompt. Reconnect each Provider once after upgrading; subsequent
+refreshes, chats, restarts, and rebuilds use the protected file without a
+prompt.
 
 OAuth buttons remain unavailable until the matching PCG-AI-owned Client ID is
 present. Do not use another application's registered Client ID:
@@ -127,8 +139,8 @@ catalog, while turns use the Anthropic-compatible `/messages` protocol. The
 web app exposes it in **Settings → AI Providers**; the Agent panel never asks
 for or manages credentials directly.
 
-The deterministic runtime validation uses an isolated config and Keychain
-service plus a local fake OpenAI-compatible Provider:
+The deterministic runtime validation uses isolated config, credential, and
+session paths plus a local fake OpenAI-compatible Provider:
 
 ```bash
 python3 scripts/validate-agent-runtime.py

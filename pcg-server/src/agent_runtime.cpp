@@ -24,10 +24,13 @@
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+
 #ifdef __APPLE__
 #include <CommonCrypto/CommonDigest.h>
 #include <Security/Security.h>
-#include <sys/stat.h>
 #endif
 
 #include "agent_service.hpp"
@@ -48,6 +51,8 @@ constexpr int kMaxToolRounds = 12;
 constexpr int kMaxToolCalls = 32;
 constexpr int kTurnTimeoutSeconds = 300;
 constexpr const char* kKeychainService = "PCG-AI Agent";
+constexpr const char* kFileCredentialStore = "protected-file";
+constexpr const char* kKeychainCredentialStore = "macos-keychain";
 
 struct HttpResult {
     long status = 0;
@@ -384,6 +389,67 @@ const char* KeychainService() {
     return override_service && *override_service ? override_service : kKeychainService;
 }
 
+bool UsesKeychainCredentialStore() {
+    const char* store = std::getenv("PCG_AGENT_CREDENTIAL_STORE");
+    return store && std::string(store) == "keychain";
+}
+
+std::filesystem::path CredentialPath() {
+    if (const char* override_path = std::getenv("PCG_AGENT_CREDENTIALS_PATH")) {
+        if (*override_path) return std::filesystem::path(override_path);
+    }
+    return ConfigPath().parent_path() / "credentials.json";
+}
+
+json LoadCredentialFile() {
+    const auto path = CredentialPath();
+#ifndef _WIN32
+    chmod(path.c_str(), S_IRUSR | S_IWUSR);
+#endif
+    std::ifstream input(path);
+    if (!input) return json::object();
+    json value = json::parse(input, nullptr, false);
+    return value.is_object() ? value : json::object();
+}
+
+bool SaveCredentialFile(const json& credentials) {
+    const auto path = CredentialPath();
+    const auto parent = path.has_parent_path() ? path.parent_path() : std::filesystem::current_path();
+    std::error_code ec;
+    const bool parent_existed = std::filesystem::exists(parent, ec);
+    if (ec) return false;
+    std::filesystem::create_directories(parent, ec);
+    if (ec) return false;
+#ifndef _WIN32
+    const bool owns_parent = parent == ConfigPath().parent_path();
+    if ((!parent_existed || owns_parent) && chmod(parent.c_str(), S_IRWXU) != 0) return false;
+#endif
+    const auto temporary = path.string() + ".tmp." + RandomId("write");
+    {
+        std::ofstream output(temporary, std::ios::trunc);
+        if (!output) return false;
+#ifndef _WIN32
+        if (chmod(temporary.c_str(), S_IRUSR | S_IWUSR) != 0) {
+            output.close();
+            std::filesystem::remove(temporary, ec);
+            return false;
+        }
+#endif
+        output << json{{"version", 1}, {"credentials", credentials}}.dump(2);
+        output.close();
+        if (!output) {
+            std::filesystem::remove(temporary, ec);
+            return false;
+        }
+    }
+    std::filesystem::rename(temporary, path, ec);
+    if (ec) {
+        std::filesystem::remove(temporary, ec);
+        return false;
+    }
+    return true;
+}
+
 void SaveConfigLocked(RuntimeState& state) {
     const auto path = ConfigPath();
     std::error_code ec;
@@ -476,6 +542,14 @@ bool CredentialGet(const std::string& provider, json& value) {
             return true;
         }
     }
+    if (!UsesKeychainCredentialStore()) {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        const json stored = LoadCredentialFile().value("credentials", json::object());
+        if (!stored.is_object() || !stored.contains(provider) || !stored[provider].is_object()) return false;
+        value = stored[provider];
+        CredentialCache()[provider] = value;
+        return true;
+    }
     auto loaded = std::make_shared<json>();
     std::promise<bool> promise;
     std::future<bool> future = promise.get_future();
@@ -496,35 +570,16 @@ bool CredentialGet(const std::string& provider, json& value) {
     return true;
 }
 
-bool CredentialExists(const std::string& provider) {
-#ifdef __APPLE__
-    CFStringRef service = CFStringCreateWithCString(
-        kCFAllocatorDefault, KeychainService(), kCFStringEncodingUTF8);
-    CFStringRef account = CFStringCreateWithBytes(
-        kCFAllocatorDefault, reinterpret_cast<const UInt8*>(provider.data()),
-        static_cast<CFIndex>(provider.size()), kCFStringEncodingUTF8, false);
-    if (!service || !account) {
-        if (service) CFRelease(service);
-        if (account) CFRelease(account);
-        return false;
-    }
-    const void* keys[] = {kSecClass, kSecAttrService, kSecAttrAccount, kSecMatchLimit};
-    const void* values[] = {kSecClassGenericPassword, service, account, kSecMatchLimitOne};
-    CFDictionaryRef query = CFDictionaryCreate(
-        kCFAllocatorDefault, keys, values, 4,
-        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    const OSStatus status = SecItemCopyMatching(query, nullptr);
-    CFRelease(query);
-    CFRelease(account);
-    CFRelease(service);
-    return status == errSecSuccess;
-#else
-    (void)provider;
-    return false;
-#endif
-}
-
 bool CredentialSet(const std::string& provider, const json& value) {
+    if (!UsesKeychainCredentialStore()) {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        json stored = LoadCredentialFile().value("credentials", json::object());
+        if (!stored.is_object()) stored = json::object();
+        stored[provider] = value;
+        if (!SaveCredentialFile(stored)) return false;
+        CredentialCache()[provider] = value;
+        return true;
+    }
 #ifdef __APPLE__
     const std::string raw = value.dump();
     CFStringRef service = CFStringCreateWithCString(
@@ -580,6 +635,18 @@ bool CredentialSet(const std::string& provider, const json& value) {
 }
 
 bool CredentialDelete(const std::string& provider) {
+    if (!UsesKeychainCredentialStore()) {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        json stored = LoadCredentialFile().value("credentials", json::object());
+        if (!stored.is_object() || !stored.contains(provider)) {
+            CredentialCache().erase(provider);
+            return true;
+        }
+        stored.erase(provider);
+        if (!SaveCredentialFile(stored)) return false;
+        CredentialCache().erase(provider);
+        return true;
+    }
 #ifdef __APPLE__
     CFStringRef service = CFStringCreateWithCString(
         kCFAllocatorDefault, KeychainService(), kCFStringEncodingUTF8);
@@ -813,6 +880,8 @@ std::vector<std::string> CredentialHeaders(const std::string& provider, const js
     return headers;
 }
 
+void MarkCredentialUnavailable(const std::string& provider);
+
 bool EnsureFreshOAuthCredential(const std::string& provider, json& credential, json* error = nullptr) {
     if (credential.value("type", "") != "oauth") return true;
     const int64_t expires = credential.value("expires", 0LL);
@@ -834,6 +903,7 @@ bool EnsureFreshOAuthCredential(const std::string& provider, json& credential, j
     std::lock_guard<std::mutex> refresh_lock(*refresh_mutex);
     json current;
     if (!CredentialGet(provider, current)) {
+        MarkCredentialUnavailable(provider);
         if (error) *error = ErrorBody("not_connected", "Provider credential is no longer available.");
         return false;
     }
@@ -863,7 +933,7 @@ bool EnsureFreshOAuthCredential(const std::string& provider, json& credential, j
     current["expires"] = NowMs() + parsed.value("expires_in", 3600) * 1000LL;
     current = EnrichOAuthCredential(std::move(current), parsed);
     if (!CredentialSet(provider, current)) {
-        if (error) *error = ErrorBody("keychain_write_failed", "Could not update the refreshed credential in macOS Keychain.");
+        if (error) *error = ErrorBody("credential_store_write_failed", "Could not update the refreshed credential.");
         return false;
     }
     credential = std::move(current);
@@ -921,8 +991,24 @@ void StoreCredentialMetadata(const std::string& provider, const json& credential
     std::lock_guard<std::mutex> lock(state.mutex);
     LoadConfigLocked(state);
     json& meta = state.provider_meta[provider];
+    meta["credentialStored"] = true;
     meta["authType"] = credential.value("type", "");
     meta["accountLabel"] = credential.value("accountLabel", "");
+    SaveConfigLocked(state);
+}
+
+void MarkCredentialUnavailable(const std::string& provider) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    LoadConfigLocked(state);
+    json& meta = state.provider_meta[provider];
+    meta["credentialStored"] = false;
+    meta["status"] = "invalid";
+    meta["error"] = {
+        {"code", "credential_unavailable"},
+        {"message", "Reconnect this Provider to restore its credential."},
+        {"retryable", false},
+    };
     SaveConfigLocked(state);
 }
 
@@ -969,25 +1055,29 @@ json PublicProviders() {
         configured_meta = state.provider_meta;
         custom_base_url = state.custom_base_url;
     }
+    const bool keychain_store = UsesKeychainCredentialStore();
+    json stored_credentials = json::object();
+    if (!keychain_store) {
+        std::lock_guard<std::mutex> lock(CredentialCacheMutex());
+        stored_credentials = LoadCredentialFile().value("credentials", json::object());
+        if (!stored_credentials.is_object()) stored_credentials = json::object();
+    }
     json result = json::array();
     for (const auto& entry : providers) {
-        json credential;
-        const bool stored = CredentialExists(entry.first);
-        const bool connected = stored && CredentialGet(entry.first, credential);
         const json meta = configured_meta.value(entry.first, json::object());
-        const json connection_error = stored && !connected
-            ? json{{"code", "credential_unavailable"},
-                   {"message", "Reconnect this Provider to authorize Keychain access."},
-                   {"retryable", true}}
-            : meta.value("error", json());
+        const bool stored = keychain_store
+            ? meta.value("credentialStored", !meta.value("authType", "").empty())
+            : stored_credentials.contains(entry.first) && stored_credentials[entry.first].is_object();
+        std::string status = meta.value("status", stored ? "connected" : "unavailable");
+        if (!stored && status == "connected") status = "unavailable";
         result.push_back({
             {"id", entry.first}, {"name", entry.second},
             {"authMethods", AuthMethods(entry.first)},
             {"connection", {
-                {"status", connected ? meta.value("status", "connected") : stored ? "invalid" : "unavailable"},
-                {"authType", connected ? credential.value("type", meta.value("authType", "")) : ""},
-                {"accountLabel", connected ? credential.value("accountLabel", meta.value("accountLabel", "")) : ""},
-                {"error", connection_error},
+                {"status", status},
+                {"authType", stored ? meta.value("authType", "") : ""},
+                {"accountLabel", stored ? meta.value("accountLabel", "") : ""},
+                {"error", meta.value("error", json())},
             }},
             {"models", meta.value("models", json::array())},
             {"baseUrl", entry.first == "openai-compatible" ? custom_base_url : ""},
@@ -1608,7 +1698,10 @@ std::string ProviderErrorDetail(const json& payload) {
 
 json Complete(TurnState& turn, const EventEmitter& emit) {
     json credential;
-    if (!CredentialGet(turn.provider, credential)) return ErrorBody("not_connected", "Connect the selected Provider first.");
+    if (!CredentialGet(turn.provider, credential)) {
+        MarkCredentialUnavailable(turn.provider);
+        return ErrorBody("not_connected", "Reconnect the selected Provider to restore its credential.");
+    }
     json refresh_error;
     if (!EnsureFreshOAuthCredential(turn.provider, credential, &refresh_error)) return refresh_error;
     const std::string base = ProviderBaseUrl(turn.provider);
@@ -1944,7 +2037,7 @@ void FinishOAuth(const std::string& id, const json& credential) {
         auto it = state.oauth.find(id);
         if (it != state.oauth.end()) {
             it->second.status = "failed";
-            it->second.error = "keychain_write_failed";
+            it->second.error = "credential_store_write_failed";
         }
         return;
     }
@@ -2016,6 +2109,10 @@ void ConfigureAgentRuntime(int server_port) {
     RecoverInterruptedAgentSessions();
 }
 
+const char* AgentCredentialStoreName() {
+    return UsesKeychainCredentialStore() ? kKeychainCredentialStore : kFileCredentialStore;
+}
+
 void HandleAgentProviders(const httplib::Request& req, httplib::Response& res) {
     if (!CheckAgentAuth(req, res)) return;
     JsonResponse(res, 200, {{"ok", true}, {"providers", PublicProviders()}});
@@ -2054,7 +2151,7 @@ void HandleAgentConnectKey(const httplib::Request& req, httplib::Response& res) 
         return;
     }
     if (!CredentialSet(provider, credential)) {
-        JsonResponse(res, 500, ErrorBody("keychain_write_failed", "Could not save the credential in macOS Keychain."));
+        JsonResponse(res, 500, ErrorBody("credential_store_write_failed", "Could not save the Provider credential."));
         return;
     }
     StoreValidation(provider, validation);
@@ -2066,7 +2163,7 @@ void HandleAgentDeleteConnection(const httplib::Request& req, httplib::Response&
     if (!CheckAgentAuth(req, res)) return;
     const std::string provider = Match(req, 1);
     if (!CredentialDelete(provider)) {
-        JsonResponse(res, 500, ErrorBody("keychain_delete_failed", "Could not remove the Provider credential."));
+        JsonResponse(res, 500, ErrorBody("credential_store_delete_failed", "Could not remove the Provider credential."));
         return;
     }
     auto& state = State();
@@ -2090,6 +2187,7 @@ void HandleAgentValidateProvider(const httplib::Request& req, httplib::Response&
     const std::string provider = Match(req, 1);
     json credential;
     if (!CredentialGet(provider, credential)) {
+        MarkCredentialUnavailable(provider);
         JsonResponse(res, 404, ErrorBody("not_connected", "Provider is not connected."));
         return;
     }
@@ -2120,6 +2218,7 @@ void HandleAgentPutSettings(const httplib::Request& req, httplib::Response& res)
     const std::string model = body.value("modelId", "");
     json credential;
     if (!CredentialGet(provider, credential)) {
+        MarkCredentialUnavailable(provider);
         JsonResponse(res, 400, ErrorBody("not_connected", "Connect the selected Provider first."));
         return;
     }

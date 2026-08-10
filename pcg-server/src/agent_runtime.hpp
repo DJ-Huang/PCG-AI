@@ -7,6 +7,9 @@ namespace pcg_server {
 // Keeps browser OAuth redirect URIs aligned with the actual --port value.
 void ConfigureAgentRuntime(int server_port);
 
+// Describes the active secret backend without exposing credential contents.
+const char* AgentCredentialStoreName();
+
 void HandleAgentProviders(const httplib::Request& req, httplib::Response& res);
 void HandleAgentConnectKey(const httplib::Request& req, httplib::Response& res);
 void HandleAgentDeleteConnection(const httplib::Request& req, httplib::Response& res);

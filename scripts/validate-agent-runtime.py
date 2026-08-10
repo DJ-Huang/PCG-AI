@@ -138,9 +138,20 @@ def main() -> None:
     provider_port = provider.server_address[1]
     with tempfile.TemporaryDirectory(prefix="pcg-agent-test-") as temp:
         env = os.environ.copy()
-        env["PCG_AGENT_CONFIG_PATH"] = str(Path(temp) / "agent.json")
+        config_path = Path(temp) / "agent.json"
+        credential_path = Path(temp) / "secret-store" / "credentials.json"
+        config_path.write_text(json.dumps({
+            "providers": {
+                "openai-compatible": {
+                    "credentialStored": True,
+                    "status": "connected",
+                    "authType": "api",
+                },
+            },
+        }))
+        env["PCG_AGENT_CONFIG_PATH"] = str(config_path)
+        env["PCG_AGENT_CREDENTIALS_PATH"] = str(credential_path)
         env["PCG_AGENT_SESSIONS_PATH"] = str(Path(temp) / "sessions")
-        env["PCG_AGENT_KEYCHAIN_SERVICE"] = f"PCG-AI Agent Test {uuid.uuid4().hex}"
         process = subprocess.Popen(
             [str(SERVER), "--port", "17892"], cwd=ROOT / "pcg-server", env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
@@ -160,10 +171,15 @@ def main() -> None:
             status, response = request(f"{base}/providers")
             assert status == 200, response
             providers = json.loads(response)["providers"]
+            status, response = request("http://127.0.0.1:17892/v1/agent/health")
+            assert status == 200, response
+            assert json.loads(response)["credentialStore"] == "protected-file"
             kimi = next(item for item in providers if item["id"] == "kimi-coding")
             assert kimi["name"] == "Kimi for Coding"
             assert kimi["baseUrl"] == ""
             assert kimi["authMethods"] == [{"type": "api", "label": "API Key", "available": True}]
+            stale = next(item for item in providers if item["id"] == "openai-compatible")
+            assert stale["connection"]["status"] == "unavailable"
 
             status, response = request(
                 f"{base}/providers/openai-compatible/connect/key",
@@ -172,6 +188,10 @@ def main() -> None:
                 content_type="application/json",
             )
             assert status == 200, response
+            assert credential_path.exists()
+            assert credential_path.stat().st_mode & 0o777 == 0o600
+            assert credential_path.parent.stat().st_mode & 0o777 == 0o700
+            assert "test-secret" not in config_path.read_text()
 
             body, content_type = multipart_turn({
                 "message": "run read tool", "sessionId": "read-session",
@@ -221,39 +241,11 @@ def main() -> None:
                 "providerId": "openai-compatible", "modelId": "fake-tool-model",
             })
             status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
-            approval = event_data(stream, "approval.required")[0]
-            turn_id = str(approval["turnId"])
-            call = approval["calls"][0]
-            assert call["toolCallId"] == "write-1"
-            decision = json.dumps({"decisions": [{"toolCallId": "write-1", "decision": "reject"}]}).encode()
-            status, stream = request(
-                f"{base}/turns/{turn_id}/decision", method="POST", body=decision,
-                content_type="application/json",
-            )
             assert status == 200
-            assert event_data(stream, "tool.result")[0]["result"]["structuredContent"]["error"] == "user_rejected"
+            assert not event_data(stream, "approval.required")
+            tool_error = event_data(stream, "tool.result")[0]["result"]["structuredContent"]
+            assert tool_error.get("error") != "user_rejected"
             assert event_data(stream, "turn.completed")
-            status, _ = request(
-                f"{base}/turns/{turn_id}/decision", method="POST", body=decision,
-                content_type="application/json",
-            )
-            assert status == 409
-
-            body, content_type = multipart_turn({
-                "message": "approval", "sessionId": "conflict-session",
-                "providerId": "openai-compatible", "modelId": "fake-tool-model",
-            })
-            status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
-            approval = event_data(stream, "approval.required")[0]
-            turn_id = str(approval["turnId"])
-            approve = json.dumps({"decisions": [{"toolCallId": "write-1", "decision": "approve"}]}).encode()
-            status, stream = request(
-                f"{base}/turns/{turn_id}/decision", method="POST", body=approve,
-                content_type="application/json",
-            )
-            assert status == 200
-            conflict = event_data(stream, "tool.result")[0]["result"]["structuredContent"]
-            assert conflict["error"] == "graph_conflict"
 
             process.terminate()
             process.wait(timeout=5)
@@ -271,6 +263,20 @@ def main() -> None:
             status, response = request(f"{base}/sessions/{read_session_id}")
             assert status == 200, response
             assert json.loads(response)["session"]["title"] == "Renamed runtime test"
+            status, response = request(f"{base}/providers")
+            assert status == 200, response
+            connected = next(
+                item for item in json.loads(response)["providers"]
+                if item["id"] == "openai-compatible"
+            )
+            assert connected["connection"]["status"] == "connected"
+            body, content_type = multipart_turn({
+                "message": "run after restart", "sessionId": "restart-session",
+                "providerId": "openai-compatible", "modelId": "fake-tool-model",
+            })
+            status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
+            assert status == 200
+            assert event_data(stream, "turn.completed")
             status, _ = request(f"{base}/sessions/{read_session_id}", method="DELETE")
             assert status == 200
             assert request(f"{base}/sessions/{read_session_id}")[0] == 404

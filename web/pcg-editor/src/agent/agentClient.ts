@@ -1,6 +1,6 @@
 // Typed client for the embedded pcg-server Agent runtime. Provider secrets are
-// submitted once and stored by the server in macOS Keychain; they are never
-// persisted in the browser or returned by these APIs.
+// submitted once and stored by the server in its protected credential store;
+// they are never persisted in the browser or returned by these APIs.
 
 import type { AgentAttachment } from './AgentComposer';
 

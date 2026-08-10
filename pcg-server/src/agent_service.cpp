@@ -1,4 +1,5 @@
 #include "agent_service.hpp"
+#include "agent_runtime.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -52,7 +53,14 @@ void HandleAgentHealth(const httplib::Request& req, httplib::Response& res) {
         return;
     }
     res.status = 200;
-    res.set_content(R"({"ok":true,"service":"agent","mock":false,"runtime":"embedded-cpp","credentialStore":"macos-keychain"})", "application/json");
+    nlohmann::json body = {
+        {"ok", true},
+        {"service", "agent"},
+        {"mock", false},
+        {"runtime", "embedded-cpp"},
+        {"credentialStore", AgentCredentialStoreName()},
+    };
+    res.set_content(body.dump(), "application/json");
 }
 
 }  // namespace pcg_server

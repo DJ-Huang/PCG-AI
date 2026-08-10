@@ -271,7 +271,7 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
                                   value={apiKey}
                                   autoComplete="off"
                                   spellCheck={false}
-                                  placeholder="Stored in macOS Keychain"
+                                  placeholder="Stored securely by the local server"
                                   onChange={(event) => setApiKey(event.target.value)}
                                 />
                               </label>
