@@ -67,6 +67,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSe
   const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
   const [sending, setSending] = useState(false);
   const [width, setWidth] = useState(380);
+  const [collapsed, setCollapsed] = useState(false);
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providerId, setProviderId] = useState('');
   const [modelId, setModelId] = useState('');
@@ -393,18 +394,23 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSe
   }, [width]);
 
   return (
-    <div className="pcg-agent" style={{ width }}>
-      <div className="pcg-agent__header">
-        <span className="pcg-agent__title">Agent</span>
-        <span className="pcg-agent__session-title">{sessions.find((session) => session.id === sessionId)?.title ?? 'New chat'}</span>
-        <button type="button" className="pcg-agent__header-button" title="New chat" aria-label="New chat" onClick={startNewChat}>＋</button>
-        <button type="button" className={`pcg-agent__header-button ${showHistory ? 'is-active' : ''}`} title="Show chat history" aria-label="Show chat history" onClick={() => setShowHistory((value) => !value)}>◷</button>
-      </div>
+    <div className={`pcg-agent ${collapsed ? 'pcg-agent--collapsed' : ''}`} style={{ width: collapsed ? 36 : width }}>
+      {collapsed ? (
+        <button type="button" className="pcg-agent__collapse-button" title="Expand Agent panel" aria-label="Expand Agent panel" onClick={() => setCollapsed(false)}>›</button>
+      ) : (
+        <>
+          <div className="pcg-agent__header">
+            <span className="pcg-agent__title">Agent</span>
+            <span className="pcg-agent__session-title">{sessions.find((session) => session.id === sessionId)?.title ?? 'New chat'}</span>
+            <button type="button" className="pcg-agent__header-button" title="New chat" aria-label="New chat" onClick={startNewChat}>＋</button>
+            <button type="button" className={`pcg-agent__header-button ${showHistory ? 'is-active' : ''}`} title="Show chat history" aria-label="Show chat history" onClick={() => setShowHistory((value) => !value)}>◷</button>
+            <button type="button" className="pcg-agent__header-button" title="Collapse Agent panel" aria-label="Collapse Agent panel" onClick={() => setCollapsed(true)}>‹</button>
+          </div>
 
-      {!connected && <div className="pcg-agent__connection-notice"><span>{connectionError || 'Connect an AI Provider in PCG Settings to start.'}</span><button type="button" onClick={onOpenSettings}>Open Settings</button></div>}
-      {connected && connectionError && <div className="pcg-agent__connection-notice"><span>{connectionError}</span><button type="button" onClick={() => setConnectionError('')}>Dismiss</button></div>}
+          {!connected && <div className="pcg-agent__connection-notice"><span>{connectionError || 'Connect an AI Provider in PCG Settings to start.'}</span><button type="button" onClick={onOpenSettings}>Open Settings</button></div>}
+          {connected && connectionError && <div className="pcg-agent__connection-notice"><span>{connectionError}</span><button type="button" onClick={() => setConnectionError('')}>Dismiss</button></div>}
 
-      {showHistory ? (
+          {showHistory ? (
         <AgentHistory
           sessions={sessions} activeSessionId={sessionId} query={historyQuery} loading={historyLoading}
           hasMore={historyCursor > 0} onLoadMore={() => void loadOlderHistory()}
@@ -418,7 +424,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSe
             void deleteAgentSession(session.id).then(() => { if (session.id === sessionId) startNewChat(); return refreshHistory(''); }).catch((error) => setConnectionError(errorMessage(error)));
           }}
         />
-      ) : (
+          ) : (
         <AgentMessageList
           messages={messages} pendingCalls={pendingCalls} decisions={decisions}
           onDecision={(callId, decision) => setDecisions((stored) => ({ ...stored, [callId]: decision }))}
@@ -426,16 +432,18 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSe
           onRetry={(turnId) => void retryTurn(turnId)}
           showReasoning={showReasoning}
         />
-      )}
+          )}
 
-      <AgentComposer
+          <AgentComposer
         sending={sending} agentLabel={connected ? `${selectedProvider?.name} · ${selectedModel?.name}` : 'Connect Provider'}
         disabled={!connected || pendingCalls.length > 0 || showHistory} onSend={sendTurn} onStop={handleStop}
         providers={connectedProviders} providerId={providerId} modelId={modelId} reasoningEffort={reasoningEffort}
         onModelChange={(nextProvider, nextModel) => void selectModel(nextProvider, nextModel)}
         onReasoningEffortChange={(effort) => void selectReasoningEffort(effort)}
-      />
-      <div className="pcg-agent__resize-handle" onMouseDown={onResizeStart} title="Drag to resize" />
+          />
+          <div className="pcg-agent__resize-handle" onMouseDown={onResizeStart} title="Drag to resize" />
+        </>
+      )}
     </div>
   );
 }

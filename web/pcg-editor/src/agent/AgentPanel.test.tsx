@@ -127,4 +127,17 @@ describe('AgentPanel', () => {
     expect(await screen.findByText('The Provider reached its output limit before producing a final answer.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
+
+  it('collapses left and restores the Agent panel', async () => {
+    render(<AgentPanel onApplyActions={() => []} />);
+    await screen.findByTitle('OpenAI · GPT Test');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Agent panel' }));
+    expect(screen.getByRole('button', { name: 'Expand Agent panel' })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Plan, build, @ nodes, attach refs…')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Agent panel' }));
+    expect(await screen.findByRole('button', { name: 'Collapse Agent panel' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…')).toBeInTheDocument();
+  });
 });

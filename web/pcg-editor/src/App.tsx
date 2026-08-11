@@ -95,6 +95,15 @@ const nodeTypes = {
   SubgraphOutput: SubgraphInterfaceNode,
 };
 
+// React Flow default minZoom is 0.5 — too high for dense PCG graphs.
+const GRAPH_MIN_ZOOM = 0.05;
+const GRAPH_MAX_ZOOM = 2;
+const GRAPH_FIT_VIEW_OPTIONS = {
+  minZoom: GRAPH_MIN_ZOOM,
+  maxZoom: GRAPH_MAX_ZOOM,
+  padding: 0.15,
+};
+
 const initialNodes: Node[] = [
   {
     id: 'n1',
@@ -407,7 +416,7 @@ function PcgEditor() {
       setInfoNodeId(null);
       setContextMenu(null);
       setPreviewTargetId(null);
-      window.setTimeout(() => void fitView({ duration: 200 }), 50);
+      window.setTimeout(() => void fitView({ ...GRAPH_FIT_VIEW_OPTIONS, duration: 200 }), 50);
     },
     [fitView],
   );
@@ -857,7 +866,7 @@ function PcgEditor() {
       } else if (e.key === 'f' || e.key === 'F') {
         if ((e.target as HTMLElement).closest('.pcg-preview')) return;
         e.preventDefault();
-        fitView({ duration: 200 });
+        fitView({ ...GRAPH_FIT_VIEW_OPTIONS, duration: 200 });
       } else if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         setShowBlackboard((v) => !v);
@@ -1348,7 +1357,10 @@ function PcgEditor() {
             onPaneContextMenu={onPaneContextMenu}
             isValidConnection={validateConnection}
             nodeTypes={nodeTypes}
+            minZoom={GRAPH_MIN_ZOOM}
+            maxZoom={GRAPH_MAX_ZOOM}
             fitView
+            fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
             deleteKeyCode={['Delete', 'Backspace']}
           >
             <Background variant={BackgroundVariant.Lines} gap={24} color="#2b2b2b" />

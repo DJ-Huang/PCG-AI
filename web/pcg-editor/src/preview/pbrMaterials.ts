@@ -29,6 +29,8 @@ export interface PbrMaterialDefinition {
 
 export type PbrMaterialLibrary = Record<string, PbrMaterialDefinition>;
 
+export type PbrDebugView = 'lit' | 'albedo' | 'normal' | 'metallic' | 'smoothness' | 'ao' | 'emissive';
+
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, Promise<THREE.Texture>>();
 
@@ -164,6 +166,58 @@ export function createStandardPbrMaterial(
   bindTexture(material, definition.emissiveMap, THREE.SRGBColorSpace, (texture) => {
     material.emissiveMap = texture;
   }, onTextureReady);
+  return material;
+}
+
+/** Creates an unlit view of one material input without changing the source PBR data. */
+export function createPbrDebugMaterial(
+  definition: PbrMaterialDefinition,
+  view: Exclude<PbrDebugView, 'lit'>,
+  onTextureReady?: () => void,
+): THREE.ShaderMaterial {
+  const textureUrl = view === 'albedo'
+    ? definition.baseColorMap
+    : view === 'normal'
+      ? definition.normalMap
+      : view === 'metallic'
+        ? definition.metallicMap
+      : view === 'smoothness'
+        ? definition.roughnessMap
+        : view === 'ao'
+          ? definition.aoMap
+          : definition.emissiveMap;
+  const colorSpace = view === 'albedo' || view === 'emissive' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  const fallback = view === 'albedo'
+    ? new THREE.Color(definition.baseColor)
+    : view === 'normal'
+      ? new THREE.Color(0x8080ff)
+      : view === 'emissive'
+        ? new THREE.Color(definition.emissiveColor).multiplyScalar(definition.emissiveIntensity)
+        : new THREE.Color().setScalar(
+          view === 'metallic' ? definition.metallic : view === 'smoothness' ? 1 - definition.roughness : 1,
+        );
+  const material = new THREE.ShaderMaterial({
+    name: `${definition.name} (${view})`,
+    uniforms: {
+      inputMap: { value: null as THREE.Texture | null },
+      fallbackColor: { value: fallback },
+      invert: { value: view === 'smoothness' },
+      hasInputMap: { value: false },
+    },
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform sampler2D inputMap; uniform vec3 fallbackColor; uniform bool invert; uniform bool hasInputMap; varying vec2 vUv; void main() { vec3 value = fallbackColor; if (hasInputMap) value = texture2D(inputMap, vUv).rgb; if (invert) value = vec3(1.0) - value; gl_FragColor = vec4(value, 1.0); }`,
+    side: definition.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
+  });
+  if (textureUrl) {
+    void loadTexture(textureUrl, colorSpace).then((texture) => {
+      material.uniforms.inputMap.value = texture;
+      material.uniforms.hasInputMap.value = true;
+      material.needsUpdate = true;
+      onTextureReady?.();
+    }).catch((error) => {
+      console.warn(`[PCG] Failed to load material texture "${textureUrl}"`, error);
+    });
+  }
   return material;
 }
 

@@ -4,6 +4,7 @@ import {
   BUILTIN_ENVIRONMENTS,
   getBuiltinEnvironment,
 } from './builtinEnvironments';
+import type { PbrDebugView } from './pbrMaterials';
 
 interface MaterialEnvironmentPopoverProps {
   environmentId: string;
@@ -12,6 +13,7 @@ interface MaterialEnvironmentPopoverProps {
   exposure: number;
   keyLightIntensity: number;
   backgroundVisible: boolean;
+  debugView: PbrDebugView;
   onBuiltinEnvironment: (id: string) => void;
   onEnvironmentFile: (file: File) => void;
   onRotationChange: (value: number) => void;
@@ -19,6 +21,7 @@ interface MaterialEnvironmentPopoverProps {
   onExposureChange: (value: number) => void;
   onKeyLightIntensityChange: (value: number) => void;
   onBackgroundVisibleChange: (value: boolean) => void;
+  onDebugViewChange: (value: PbrDebugView) => void;
 }
 
 function SliderRow({
@@ -52,6 +55,7 @@ export default function MaterialEnvironmentPopover({
   exposure,
   keyLightIntensity,
   backgroundVisible,
+  debugView,
   onBuiltinEnvironment,
   onEnvironmentFile,
   onRotationChange,
@@ -59,12 +63,25 @@ export default function MaterialEnvironmentPopover({
   onExposureChange,
   onKeyLightIntensityChange,
   onBackgroundVisibleChange,
+  onDebugViewChange,
 }: MaterialEnvironmentPopoverProps) {
   const inputId = useId();
   const selectedEnvironment = getBuiltinEnvironment(environmentId);
   return (
     <div className="pcg-preview__environment-popover" role="dialog" aria-label="Material Preview Environment">
       <div className="pcg-preview__shading-popover-title">Material Preview</div>
+      <label className="pcg-preview__environment-debug">
+        <span>Material Debug</span>
+        <select value={debugView} onChange={(e) => onDebugViewChange(e.target.value as PbrDebugView)}>
+          <option value="lit">Lit</option>
+          <option value="albedo">Albedo</option>
+          <option value="normal">Normal</option>
+          <option value="metallic">Metallic</option>
+          <option value="smoothness">Smoothness</option>
+          <option value="ao">Ambient Occlusion</option>
+          <option value="emissive">Emissive</option>
+        </select>
+      </label>
       <details className="pcg-preview__environment-picker">
         <summary aria-label="Choose built-in HDRI">
           {selectedEnvironment ? (

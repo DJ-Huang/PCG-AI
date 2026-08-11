@@ -1787,7 +1787,7 @@ json Complete(TurnState& turn, const EventEmitter& emit) {
             {"name", tool.value("name", "")}, {"description", tool.value("description", "")},
             {"input_schema", tool.value("inputSchema", json::object())},
         });
-        request = {{"model", turn.model}, {"max_tokens", 8192}, {"system", SystemPrompt()},
+        request = {{"model", turn.model}, {"max_tokens", 16384}, {"system", SystemPrompt()},
                    {"messages", AnthropicMessages(turn.history)}, {"tools", std::move(tools)}, {"stream", true}};
         if (turn.provider == "kimi-coding" && !turn.reasoning_effort.empty()) {
             request["reasoning_effort"] = turn.reasoning_effort;

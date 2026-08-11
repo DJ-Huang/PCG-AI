@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import {
+  createPbrDebugMaterial,
   createStandardPbrMaterial,
   disposePbrTextureCache,
   normalizePbrMaterial,
@@ -153,6 +154,13 @@ try {
   check('mask mode sets alpha test', nearlyEqual(mask.alphaTest, 0.33));
   check('mask mode remains opaque', !mask.transparent);
 
+  const smoothnessDebug = createPbrDebugMaterial(definition, 'smoothness', () => readyCount++);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  check('smoothness debug material is unlit', smoothnessDebug.lights === false);
+  check('smoothness debug view inverts roughness', smoothnessDebug.uniforms.invert.value === true);
+  check('smoothness debug view uses the roughness texture', smoothnessDebug.uniforms.inputMap.value?.name === 'roughness.png');
+  check('debug texture binding reports ready', readyCount === 7);
+
   let disposeCount = 0;
   for (const texture of loadedTextures) {
     texture.addEventListener('dispose', () => disposeCount++);
@@ -163,6 +171,7 @@ try {
 
   material.dispose();
   mask.dispose();
+  smoothnessDebug.dispose();
 } finally {
   THREE.TextureLoader.prototype.loadAsync = originalLoadAsync;
   disposePbrTextureCache();

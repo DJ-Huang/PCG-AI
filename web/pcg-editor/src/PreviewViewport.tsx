@@ -50,8 +50,10 @@ import { createInfiniteGrid } from './preview/infiniteGrid';
 import { createBlenderStudioMaterial } from './preview/blenderStudio';
 import {
   createStandardPbrMaterial,
+  createPbrDebugMaterial,
   disposePbrTextureCache,
   normalizePbrMaterial,
+  type PbrDebugView,
   type PbrMaterialLibrary,
 } from './preview/pbrMaterials';
 import {
@@ -111,6 +113,47 @@ export interface PreviewViewportHandle {
 type ShadingMode = 'solid' | 'material' | 'rendered';
 
 const XRAY_OPACITY = 0.35;
+
+type ViewAxis = 'x' | 'y' | 'z';
+
+const AXIS_VIEW_DIRECTIONS: Record<ViewAxis, THREE.Vector3> = {
+  x: new THREE.Vector3(1, 0, 0),
+  y: new THREE.Vector3(0, 1, 0),
+  z: new THREE.Vector3(0, 0, 1),
+};
+
+const AXIS_VIEW_UPS: Record<ViewAxis, THREE.Vector3> = {
+  x: new THREE.Vector3(0, 1, 0),
+  y: new THREE.Vector3(0, 0, 1),
+  z: new THREE.Vector3(0, 1, 0),
+};
+
+interface AxisNavigationPoint {
+  x: number;
+  y: number;
+  scale: number;
+  zIndex: number;
+}
+
+type AxisNavigation = Record<ViewAxis, AxisNavigationPoint>;
+
+const AXIS_NAVIGATION_CENTER = 42;
+const AXIS_NAVIGATION_RADIUS = 24;
+
+function getAxisNavigation(camera: THREE.PerspectiveCamera): AxisNavigation {
+  camera.updateMatrixWorld();
+  const inverseCameraRotation = camera.quaternion.clone().invert();
+  const pointFor = (axis: ViewAxis): AxisNavigationPoint => {
+    const direction = AXIS_VIEW_DIRECTIONS[axis].clone().applyQuaternion(inverseCameraRotation);
+    return {
+      x: AXIS_NAVIGATION_CENTER + direction.x * AXIS_NAVIGATION_RADIUS,
+      y: AXIS_NAVIGATION_CENTER - direction.y * AXIS_NAVIGATION_RADIUS,
+      scale: 0.74 + (direction.z + 1) * 0.18,
+      zIndex: Math.round((direction.z + 1) * 100),
+    };
+  };
+  return { x: pointFor('x'), y: pointFor('y'), z: pointFor('z') };
+}
 
 const SPLINE_CURVE_COLOR = 0x4de66a;
 const CONTROL_LINE_COLOR = 0xffd933;
@@ -185,10 +228,16 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const [exposure, setExposure] = useState(1);
   const [keyLightIntensity, setKeyLightIntensity] = useState(1.15);
   const [backgroundVisible, setBackgroundVisible] = useState(false);
+  const [pbrDebugView, setPbrDebugView] = useState<PbrDebugView>('lit');
+  const [axisNavigation, setAxisNavigation] = useState<AxisNavigation>(() => ({
+    x: { x: 63, y: 42, scale: 0.92, zIndex: 50 },
+    y: { x: 42, y: 20, scale: 0.92, zIndex: 50 },
+    z: { x: 28, y: 56, scale: 0.86, zIndex: 35 },
+  }));
   const backgroundVisibleRef = useRef(backgroundVisible);
   backgroundVisibleRef.current = backgroundVisible;
-  const shadingRef = useRef({ shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId });
-  shadingRef.current = { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId };
+  const shadingRef = useRef({ shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId, pbrDebugView });
+  shadingRef.current = { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId, pbrDebugView };
   const overlayPopoverRef = useRef<HTMLDivElement>(null);
   const solidPopoverRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -283,6 +332,20 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     if (positions.length > 0) fitCamera(ctx.camera, ctx.controls, positions);
   }, []);
 
+  const setAxisView = useCallback((axis: ViewAxis) => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+
+    const { camera, controls } = ctx;
+    const distance = Math.max(camera.position.distanceTo(controls.target), 0.08);
+    camera.up.copy(AXIS_VIEW_UPS[axis]);
+    camera.position.copy(controls.target).addScaledVector(AXIS_VIEW_DIRECTIONS[axis], distance);
+    camera.lookAt(controls.target);
+    camera.updateProjectionMatrix();
+    controls.update();
+    setAxisNavigation(getAxisNavigation(camera));
+  }, []);
+
   const syncSplineHandles = useCallback((points: readonly Vec3[], selected: number) => {
     const ctx = sceneRef.current;
     if (!ctx) return;
@@ -346,6 +409,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       MIDDLE: THREE.MOUSE.ROTATE,
       RIGHT: THREE.MOUSE.PAN,
     };
+    const syncAxisNavigation = () => setAxisNavigation(getAxisNavigation(camera));
+    controls.addEventListener('change', syncAxisNavigation);
+    syncAxisNavigation();
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x333a44, 0.2));
     const dir = new THREE.DirectionalLight(0xffffff, 1.15);
@@ -574,6 +640,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
       controls.dispose();
+      controls.removeEventListener('change', syncAxisNavigation);
       pmremGenerator.dispose();
       if (sceneRef.current?.envMap && sceneRef.current.envMap !== envMap) {
         sceneRef.current.envMap.dispose();
@@ -764,7 +831,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       hasAutoFramedRef.current = true;
     }
 
-    const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled } = shadingRef.current;
+    const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, pbrDebugView } = shadingRef.current;
     applyShading(
       ctx.content,
       shadingMode,
@@ -773,6 +840,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       xrayEnabled,
       ctx.matcapTexture,
       data.materials,
+      pbrDebugView,
     );
     // Only new cook data counts — spline-handle rebuilds reuse the same payload.
     if (data !== sceneTimedDataRef.current) {
@@ -802,7 +870,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const ctx = sceneRef.current;
     if (!ctx) return;
     const runShading = () => {
-      const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled } = shadingRef.current;
+      const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, pbrDebugView } = shadingRef.current;
       applyShading(
         ctx.content,
         shadingMode,
@@ -811,6 +879,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         xrayEnabled,
         ctx.matcapTexture,
         data?.materials ?? {},
+        pbrDebugView,
       );
     };
 
@@ -823,7 +892,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     } else {
       runShading();
     }
-  }, [shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId, data?.materials]);
+  }, [shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId, pbrDebugView, data?.materials]);
 
   useEffect(() => {
     if (shadingMode === 'rendered') setSolidPopoverOpen(false);
@@ -890,6 +959,42 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           title="Click to focus · MMB orbit · Shift+MMB pan · Shift+RMB rotate IBL · scroll zoom · F frame"
           onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
         />
+        <div className="pcg-preview__axis-navigation" role="group" aria-label="Axis views">
+          <svg className="pcg-preview__axis-stems" viewBox="0 0 84 84" aria-hidden="true">
+            {(['x', 'y', 'z'] as const).map((axis) => (
+              <line
+                key={axis}
+                className={`pcg-preview__axis-stem pcg-preview__axis-stem--${axis}`}
+                x1={AXIS_NAVIGATION_CENTER}
+                y1={AXIS_NAVIGATION_CENTER}
+                x2={axisNavigation[axis].x}
+                y2={axisNavigation[axis].y}
+              />
+            ))}
+          </svg>
+          <span className="pcg-preview__axis-origin" aria-hidden="true" />
+          {(['x', 'y', 'z'] as const).map((axis) => {
+            const point = axisNavigation[axis];
+            return (
+              <button
+                key={axis}
+                type="button"
+                className={`pcg-preview__axis-button pcg-preview__axis-button--${axis}`}
+                title={`${axis.toUpperCase()} axis view`}
+                aria-label={`View along ${axis.toUpperCase()} axis`}
+                onClick={() => setAxisView(axis)}
+                style={{
+                  left: point.x,
+                  top: point.y,
+                  transform: `translate(-50%, -50%) scale(${point.scale})`,
+                  zIndex: point.zIndex,
+                }}
+              >
+                {axis.toUpperCase()}
+              </button>
+            );
+          })}
+        </div>
         <div className="pcg-preview__shading-bar" role="toolbar" aria-label="Viewport shading">
           <div className="pcg-preview__shading-popover-wrap" ref={overlayPopoverRef}>
             <button
@@ -985,6 +1090,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
                 exposure={exposure}
                 keyLightIntensity={keyLightIntensity}
                 backgroundVisible={backgroundVisible}
+                debugView={pbrDebugView}
                 onBuiltinEnvironment={loadBuiltinEnvironment}
                 onEnvironmentFile={loadEnvironmentFile}
                 onRotationChange={setEnvironmentRotation}
@@ -992,6 +1098,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
                 onExposureChange={setExposure}
                 onKeyLightIntensityChange={setKeyLightIntensity}
                 onBackgroundVisibleChange={setBackgroundVisible}
+                onDebugViewChange={setPbrDebugView}
               />
             )}
           </div>
@@ -1039,6 +1146,7 @@ function applyShading(
   xrayEnabled: boolean,
   matcapTexture: THREE.Texture | null,
   materialLibrary: PbrMaterialLibrary,
+  pbrDebugView: PbrDebugView,
 ) {
   const hasMesh = group.children.some((c) => c.userData.kind === 'mesh');
   const hasEdges = group.children.some((c) => c.userData.kind === 'edges');
@@ -1086,16 +1194,18 @@ function applyShading(
         ? mesh.userData.materialSlots as string[]
         : [];
       if (slots.length > 0) {
-        mesh.material = slots.map((slot) => createStandardPbrMaterial(
-          materialLibrary[slot] ?? normalizePbrMaterial({ name: slot }, slot),
-          hasVertexColors,
-        ));
+        mesh.material = slots.map((slot) => {
+          const definition = materialLibrary[slot] ?? normalizePbrMaterial({ name: slot }, slot);
+          return pbrDebugView === 'lit'
+            ? createStandardPbrMaterial(definition, hasVertexColors)
+            : createPbrDebugMaterial(definition, pbrDebugView);
+        });
         continue;
       }
-      mat = createStandardPbrMaterial(
-        normalizePbrMaterial({ name: 'Material' }),
-        hasVertexColors,
-      );
+      const definition = normalizePbrMaterial({ name: 'Material' });
+      mat = pbrDebugView === 'lit'
+        ? createStandardPbrMaterial(definition, hasVertexColors)
+        : createPbrDebugMaterial(definition, pbrDebugView);
     } else if (shadingMode === 'solid' && solidLighting === 'matcap' && matcapTexture) {
       mat = new THREE.MeshMatcapMaterial({
         color: hasVertexColors ? 0xffffff : 0x9aa4ae,
