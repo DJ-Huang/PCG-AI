@@ -143,6 +143,27 @@ def event_types(stream: bytes) -> list[str]:
     return result
 
 
+def sync_editor(base: str, editor_session_id: str, client_revision: int) -> None:
+    status, response = request(
+        f"{base}/session",
+        method="PUT",
+        body=json.dumps({
+            "sessionId": editor_session_id,
+            "clientRevision": client_revision,
+            "graphPath": "agent-runtime-test.pcg",
+            "editPath": [],
+            "selectedNodeId": None,
+            "previewTargetNodeId": None,
+            "graphHash": "agent-runtime-test-hash",
+            "graph": {"version": "1.0", "nodes": [], "edges": [], "parameters": [], "subgraphs": []},
+            "nodeManifest": {"version": "agent-runtime-test", "nodeTypes": []},
+            "updatedAt": int(time.time() * 1000),
+        }).encode(),
+        content_type="application/json",
+    )
+    assert status == 200, response
+
+
 def main() -> None:
     if not SERVER.exists():
         raise SystemExit(f"Build pcg-server first: {SERVER}")
@@ -169,7 +190,9 @@ def main() -> None:
             [str(SERVER), "--port", "17892"], cwd=ROOT / "pcg-server", env=env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         )
-        base = "http://127.0.0.1:17892/v1/agent"
+        server_base = "http://127.0.0.1:17892/v1"
+        base = f"{server_base}/agent"
+        editor_session_id = f"agent-runtime-editor-{uuid.uuid4()}"
         try:
             for _ in range(50):
                 try:
@@ -219,8 +242,11 @@ def main() -> None:
             assert status == 200, response
             assert json.loads(response)["reasoningEffort"] == "max"
 
+            sync_editor(server_base, editor_session_id, 1)
+
             body, content_type = multipart_turn({
                 "message": "run read tool", "sessionId": "read-session",
+                "editorSessionId": editor_session_id,
                 "providerId": "openai-compatible", "modelId": "fake-tool-model",
             })
             status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
@@ -248,6 +274,7 @@ def main() -> None:
             ]:
                 body, content_type = multipart_turn({
                     "message": prompt, "sessionId": f"{expected_code}-session",
+                    "editorSessionId": editor_session_id,
                     "providerId": "openai-compatible", "modelId": "fake-tool-model",
                 })
                 status, interrupted = request(
@@ -280,6 +307,7 @@ def main() -> None:
 
             body, content_type = multipart_turn({
                 "message": "approval", "sessionId": "approval-session",
+                "editorSessionId": editor_session_id,
                 "providerId": "openai-compatible", "modelId": "fake-tool-model",
             })
             status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
@@ -315,8 +343,10 @@ def main() -> None:
                 if item["id"] == "openai-compatible"
             )
             assert connected["connection"]["status"] == "connected"
+            sync_editor(server_base, editor_session_id, 2)
             body, content_type = multipart_turn({
                 "message": "run after restart", "sessionId": "restart-session",
+                "editorSessionId": editor_session_id,
                 "providerId": "openai-compatible", "modelId": "fake-tool-model",
             })
             status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)

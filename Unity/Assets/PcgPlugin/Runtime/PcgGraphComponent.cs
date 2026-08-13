@@ -313,7 +313,6 @@ namespace DJTechRuntime.PCG
             PcgScatterRenderBridge.Unregister(this);
             ClearGpuInstancers();
             CancelAsyncCook(null, log: false);
-            ReleaseGeneratedMaterials();
         }
 
         private void OnDestroy()

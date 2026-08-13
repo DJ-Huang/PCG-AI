@@ -14,6 +14,7 @@ import {
 import type { GraphParameter, ParameterType, NodeData } from './graphSchema';
 import { resolveUpstreamGroups, filterGroupsByDomain, type AvailableGroup } from './groupResolver';
 import { findSubgraph, getSubgraphId, getSubgraphNodeTitle, isSubgraphInterfaceNode, useCurrentSubgraph, useSubgraphs } from './subgraphs';
+import { resolvePbrTextureUrl } from './preview/pbrMaterials';
 
 interface InspectorProps {
   selectedNode: Node | null;
@@ -442,8 +443,8 @@ function MaterialTextureField({ label, value, onChange }: { label: string; value
     <div className="pcg-material-inspector__texture">
       <label htmlFor={inputId}>{label}</label>
       <div>
-        {value && <img src={value} alt="" />}
-        <input type="text" value={value} placeholder="URL / data URI" onChange={(e) => onChange(e.target.value)} />
+        {value && <img src={resolvePbrTextureUrl(value)} alt="" />}
+        <input type="text" value={value} placeholder="pcg-resource:// / URL / data URI" onChange={(e) => onChange(e.target.value)} />
         <input id={inputId} type="file" accept="image/*" hidden onChange={(e) => importImage(e.target.files?.[0])} />
         <label className="pcg-material-inspector__browse" htmlFor={inputId}>…</label>
         {value && <button type="button" title="Clear texture" onClick={() => onChange('')}>×</button>}

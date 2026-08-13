@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using DJTechRuntime.PCG;
 using DJTechEditor.PCG.Graph;
 using NUnit.Framework;
@@ -197,6 +198,102 @@ namespace DJTechEditor.PCG.Tests
                 Object.DestroyImmediate(generated);
                 Object.DestroyImmediate(fallback);
             }
+        }
+
+        [Test]
+        public void DisableEnable_KeepsGeneratedMaterialsAliveUntilDestroy()
+        {
+            var shader = Shader.Find("Hidden/InternalErrorShader") ?? Shader.Find("Standard");
+            Assert.That(shader, Is.Not.Null);
+            var gameObject = new GameObject("PCG generated material lifetime test");
+            var previousDefer = PcgGraphComponent.EditorShouldDeferPreviewCookOnEnable;
+            try
+            {
+                PcgGraphComponent.EditorShouldDeferPreviewCookOnEnable = () => true;
+                var renderer = gameObject.AddComponent<MeshRenderer>();
+                var component = gameObject.AddComponent<PcgGraphComponent>();
+                var set = new PcgGeneratedMaterialSet();
+                var material = new Material(shader) { name = "Generated" };
+                SetGeneratedMaterial(set, "paint", material);
+                SetGeneratedMaterialSet(component, set);
+                renderer.sharedMaterial = material;
+
+                component.enabled = false;
+                component.enabled = true;
+                gameObject.SetActive(false);
+                gameObject.SetActive(true);
+
+                Assert.That(material == null, Is.False);
+                Assert.That(renderer.sharedMaterial, Is.SameAs(material));
+                Object.DestroyImmediate(gameObject);
+                Assert.That(material == null, Is.True, "Generated material should be released on destroy.");
+                gameObject = null;
+            }
+            finally
+            {
+                PcgGraphComponent.EditorShouldDeferPreviewCookOnEnable = previousDefer;
+                if (gameObject != null)
+                    Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [TestCase("pcg-resource://textures/wooden-cabin/cedar-clapboard-albedo.png", "textures/wooden-cabin/cedar-clapboard-albedo")]
+        [TestCase("/assets/textures/wooden-cabin/cedar-clapboard-albedo.png", "textures/wooden-cabin/cedar-clapboard-albedo")]
+        [TestCase("PCG-RESOURCE://textures/wood.png", "textures/wood")]
+        public void PortableResourceLocator_MapsToResourcesKey(string storage, string expected)
+        {
+            Assert.That(PcgTextureAssetUtil.TryGetPortableResourceKey(storage, out var key), Is.True);
+            Assert.That(key, Is.EqualTo(expected));
+        }
+
+        [TestCase("https://example.com/assets/textures/wood.png")]
+        [TestCase("pcg-resource://../secret.png")]
+        [TestCase("")]
+        public void PortableResourceLocator_RejectsNonPortableOrUnsafeValues(string storage)
+        {
+            Assert.That(PcgTextureAssetUtil.TryGetPortableResourceKey(storage, out _), Is.False);
+        }
+
+        [Test]
+        public void Rebuild_LoadsWebAssetLocatorFromUnityResources()
+        {
+            var definition = new Dictionary<string, object>
+            {
+                ["kind"] = "pcg.material",
+                ["name"] = "cabin_wood",
+                ["baseColorMap"] = "/assets/textures/wooden-cabin/cedar-clapboard-albedo.png",
+            };
+            var root = new Dictionary<string, object>
+            {
+                ["materials"] = new Dictionary<string, object> { ["cabin_wood"] = definition },
+            };
+            var set = new PcgGeneratedMaterialSet();
+            try
+            {
+                set.Rebuild(PcgMiniJson.Serialize(root));
+                Assert.That(set.TryGet("cabin_wood", out var material), Is.True);
+                var property = material.HasProperty("_BaseMap") ? "_BaseMap" : "_MainTex";
+                Assert.That(material.GetTexture(property), Is.Not.Null);
+            }
+            finally
+            {
+                set.Dispose();
+            }
+        }
+
+        private static void SetGeneratedMaterial(PcgGeneratedMaterialSet set, string name, Material material)
+        {
+            var field = typeof(PcgGeneratedMaterialSet).GetField("m_Materials", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var materials = (Dictionary<string, Material>)field.GetValue(set);
+            materials[name] = material;
+        }
+
+        private static void SetGeneratedMaterialSet(PcgGraphComponent component, PcgGeneratedMaterialSet set)
+        {
+            var field = typeof(PcgGraphComponent).GetField("m_GeneratedMaterialSet", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(component, set);
         }
 
         private static Dictionary<string, object> Property(string type, object value)

@@ -6,6 +6,7 @@ import {
   disposePbrTextureCache,
   normalizePbrMaterial,
   parsePbrMaterialLibrary,
+  resolvePbrTextureUrl,
 } from '../src/preview/pbrMaterials';
 import {
   BUILTIN_ENVIRONMENTS,
@@ -93,6 +94,12 @@ const topLevelLibrary = parsePbrMaterialLibrary(JSON.stringify({
 }));
 check('top-level material library takes precedence', Object.keys(topLevelLibrary).join(',') === 'roof');
 check('malformed cook JSON is safe', Object.keys(parsePbrMaterialLibrary('{')).length === 0);
+check(
+  'portable resource locators resolve to Web public assets',
+  resolvePbrTextureUrl('pcg-resource://textures/wooden-cabin/cedar.png') ===
+    '/assets/textures/wooden-cabin/cedar.png',
+);
+check('ordinary URLs remain unchanged', resolvePbrTextureUrl('/custom/cedar.png') === '/custom/cedar.png');
 
 const originalLoadAsync = THREE.TextureLoader.prototype.loadAsync;
 const loadedTextures: THREE.Texture[] = [];
@@ -107,7 +114,7 @@ try {
   const definition = normalizePbrMaterial({
     name: 'coated-metal',
     baseColor: '#804020',
-    baseColorMap: 'shared-color.png',
+    baseColorMap: 'pcg-resource://textures/shared-color.png',
     metallic: 0.8,
     metallicMap: 'metallic.png',
     roughness: 0.2,
@@ -117,7 +124,7 @@ try {
     aoMap: 'ao.png',
     aoIntensity: 0.6,
     emissiveColor: '#102030',
-    emissiveMap: 'shared-color.png',
+    emissiveMap: 'pcg-resource://textures/shared-color.png',
     emissiveIntensity: 2.5,
     opacity: 0.4,
     alphaMode: 'blend',
@@ -158,6 +165,7 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 0));
   check('smoothness debug material is unlit', smoothnessDebug.lights === false);
   check('smoothness debug view inverts roughness', smoothnessDebug.uniforms.invert.value === true);
+  check('portable locator is resolved before loading', material.map?.name === '/assets/textures/shared-color.png');
   check('smoothness debug view uses the roughness texture', smoothnessDebug.uniforms.inputMap.value?.name === 'roughness.png');
   check('debug texture binding reports ready', readyCount === 7);
 

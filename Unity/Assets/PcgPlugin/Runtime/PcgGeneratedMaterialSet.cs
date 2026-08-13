@@ -284,6 +284,9 @@ namespace DJTechRuntime.PCG
 
         private static Texture2D LoadResourcesTexture(string storage)
         {
+            if (PcgTextureAssetUtil.TryGetPortableResourceKey(storage, out var portableResourceKey))
+                return Resources.Load<Texture2D>(portableResourceKey);
+
             var normalized = storage.Replace('\\', '/');
             var resourcesIndex = normalized.IndexOf("/Resources/", StringComparison.Ordinal);
             if (resourcesIndex >= 0)

@@ -6,11 +6,14 @@ using UnityEngine;
 namespace DJTechRuntime.PCG
 {
     /// <summary>
-    /// ImageTexture node stores an asset path from AssetDatabase.GetAssetPath (Assets/, Packages/, Resources/, …) or legacy GUID.
+    /// Texture storage accepts a portable pcg-resource locator, an AssetDatabase path, or a legacy GUID.
     /// Built-in textures (Default-Particle, etc.) use Resources/*_builtin_extra/TextureName because GetAssetPath only returns the container.
     /// </summary>
     public static class PcgTextureAssetUtil
     {
+        public const string PortableResourcePrefix = "pcg-resource://";
+        public const string WebAssetPrefix = "/assets/";
+
         private static readonly string[] BuiltinExtraContainers =
         {
             "Resources/tuanjie_builtin_extra",
@@ -24,6 +27,10 @@ namespace DJTechRuntime.PCG
 
             if (PcgTextureGuidUtil.IsValidAssetGuid(stored))
                 return true;
+
+            if (stored.StartsWith(PortableResourcePrefix, StringComparison.OrdinalIgnoreCase) ||
+                stored.StartsWith(WebAssetPrefix, StringComparison.OrdinalIgnoreCase))
+                return TryGetPortableResourceKey(stored, out _);
 
             // Any path returned by AssetDatabase.GetAssetPath (incl. Resources/tuanjie_builtin_extra/Name).
             return stored.IndexOf('/') >= 0;
@@ -63,6 +70,13 @@ namespace DJTechRuntime.PCG
                 return null;
 
             var normalized = stored.Replace('\\', '/');
+
+            if (TryGetPortableResourceKey(normalized, out var resourceKey))
+            {
+                var fromPortableResource = Resources.Load<Texture2D>(resourceKey);
+                if (fromPortableResource != null)
+                    return fromPortableResource;
+            }
 
             if (PcgTextureGuidUtil.IsValidAssetGuid(normalized))
             {
@@ -110,6 +124,41 @@ namespace DJTechRuntime.PCG
             }
 
             return null;
+        }
+
+        public static bool TryGetPortableResourceKey(string stored, out string resourceKey)
+        {
+            resourceKey = null;
+            if (string.IsNullOrWhiteSpace(stored))
+                return false;
+
+            string normalized;
+            if (stored.StartsWith(PortableResourcePrefix, StringComparison.OrdinalIgnoreCase))
+                normalized = stored.Substring(PortableResourcePrefix.Length);
+            else if (stored.StartsWith(WebAssetPrefix, StringComparison.OrdinalIgnoreCase))
+                normalized = stored.Substring(WebAssetPrefix.Length);
+            else
+                return false;
+
+            normalized = normalized
+                .Replace('\\', '/')
+                .TrimStart('/');
+            var extension = normalized.LastIndexOf('.');
+            if (extension > normalized.LastIndexOf('/'))
+                normalized = normalized.Substring(0, extension);
+            if (string.IsNullOrWhiteSpace(normalized) || HasParentSegment(normalized))
+                return false;
+
+            resourceKey = normalized;
+            return true;
+        }
+
+        private static bool HasParentSegment(string path)
+        {
+            foreach (var segment in path.Split('/'))
+                if (segment == "..")
+                    return true;
+            return false;
         }
 
         public static string StorageToProjectPath(string stored)

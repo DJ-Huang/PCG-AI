@@ -33,6 +33,13 @@ export type PbrDebugView = 'lit' | 'albedo' | 'normal' | 'metallic' | 'smoothnes
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, Promise<THREE.Texture>>();
+const PORTABLE_RESOURCE_PREFIX = 'pcg-resource://';
+
+export function resolvePbrTextureUrl(storage: string): string {
+  if (!storage.toLowerCase().startsWith(PORTABLE_RESOURCE_PREFIX)) return storage;
+  const key = storage.slice(PORTABLE_RESOURCE_PREFIX.length).replace(/^\/+/, '');
+  return key ? `/assets/${key}` : '';
+}
 
 function finiteNumber(value: unknown, fallback: number, minimum = -Infinity, maximum = Infinity): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -95,10 +102,11 @@ export function parsePbrMaterialLibrary(cookJson: string): PbrMaterialLibrary {
 }
 
 function loadTexture(url: string, colorSpace: THREE.ColorSpace): Promise<THREE.Texture> {
-  const key = `${colorSpace}:${url}`;
+  const resolvedUrl = resolvePbrTextureUrl(url);
+  const key = `${colorSpace}:${resolvedUrl}`;
   let pending = textureCache.get(key);
   if (!pending) {
-    pending = textureLoader.loadAsync(url).then((texture) => {
+    pending = textureLoader.loadAsync(resolvedUrl).then((texture) => {
       texture.colorSpace = colorSpace;
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
