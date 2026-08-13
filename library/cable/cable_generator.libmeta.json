@@ -1,0 +1,10 @@
+{
+  "id": "pcg.lib:cable:cable_generator",
+  "displayName": "Cable Generator",
+  "category": "Cable",
+  "assetVersion": "1.0.0",
+  "keywords": ["cable", "wire", "电缆", "线缆", "spline", "sweep", "tube", "pipe"],
+  "description": "沿输入 spline 扫掠出圆截面电缆。重采样控制分段密度，扫掠自动加盖并平滑着色。",
+  "doc": "cable/cable_generator.md",
+  "minCoreVersion": ""
+}

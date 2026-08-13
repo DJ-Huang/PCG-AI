@@ -2730,6 +2730,19 @@
   color: #fff;
 }
 
+.pcg-search-panel__badge {
+  float: right;
+  font-size: 9px;
+  line-height: 14px;
+  padding: 0 5px;
+  margin-top: 1px;
+  border-radius: 3px;
+  background: #2b3a2b;
+  color: #7fbf7f;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* ── Context Menu ───────────────────────────────────── */
 
 .pcg-context-menu {

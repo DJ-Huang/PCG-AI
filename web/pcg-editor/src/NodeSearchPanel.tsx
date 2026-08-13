@@ -9,6 +9,20 @@ import {
   hasCompatibleInputPin,
   hasCompatibleOutputPin,
 } from './nodeManifest';
+import {
+  ensureLibraryIndex,
+  getLibraryIndexSync,
+  getLibraryItemsByCategory,
+  libraryItemHasCompatibleInput,
+  libraryItemHasCompatibleOutput,
+  libraryItemMatchesQuery,
+  type LibraryIndex,
+  type LibraryIndexItem,
+} from './libraryManifest';
+
+export type NodeSearchSelection =
+  | { kind: 'node'; nodeType: string }
+  | { kind: 'library'; item: LibraryIndexItem };
 
 export interface SearchPanelConfig {
   /** Screen position to anchor the panel. */
@@ -18,8 +32,8 @@ export interface SearchPanelConfig {
   filterPinType?: PinType;
   /** When true, the dragged port was an output (source) — filter for compatible inputs. */
   isSourcePort?: boolean;
-  /** Called when user selects a node type, or null to cancel. */
-  onSelect: (nodeType: string | null) => void;
+  /** Called when user selects a node or library item, or null to cancel. */
+  onSelect: (selection: NodeSearchSelection | null) => void;
 }
 
 interface NodeSearchPanelProps {
@@ -29,11 +43,23 @@ interface NodeSearchPanelProps {
 export default function NodeSearchPanel({ config }: NodeSearchPanelProps) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [library, setLibrary] = useState<LibraryIndex | null>(getLibraryIndexSync());
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (library) return;
+    let cancelled = false;
+    void ensureLibraryIndex().then((index) => {
+      if (!cancelled && index) setLibrary(index);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [library]);
 
   const toggleCategory = (category: string) => {
     setExpanded((prev) => {
@@ -74,14 +100,30 @@ export default function NodeSearchPanel({ config }: NodeSearchPanelProps) {
     }
   }
 
+  // Builtin library items merge into the same panel under Library · <category>.
+  const filteredLibrary = new Map<string, LibraryIndexItem[]>();
+  if (library) {
+    for (const [category, items] of getLibraryItemsByCategory()) {
+      const matched = items.filter((item) => {
+        if (query && !libraryItemMatchesQuery(item, query)) return false;
+        if (config.filterPinType) {
+          if (config.isSourcePort) {
+            return libraryItemHasCompatibleInput(item, config.filterPinType);
+          }
+          return libraryItemHasCompatibleOutput(item, config.filterPinType);
+        }
+        return true;
+      });
+      if (matched.length > 0) {
+        filteredLibrary.set(category, matched);
+      }
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       config.onSelect(null);
     }
-  };
-
-  const handleSelect = (nodeType: string) => {
-    config.onSelect(nodeType);
   };
 
   return (
@@ -100,7 +142,7 @@ export default function NodeSearchPanel({ config }: NodeSearchPanelProps) {
         onKeyDown={handleKeyDown}
       />
       <div className="pcg-search-panel__list">
-        {filtered.size === 0 && (
+        {filtered.size === 0 && filteredLibrary.size === 0 && (
           <div className="pcg-search-panel__empty">No matching nodes</div>
         )}
         {Array.from(filtered.entries()).map(([category, nodes]) => {
@@ -125,9 +167,41 @@ export default function NodeSearchPanel({ config }: NodeSearchPanelProps) {
                     key={node.type}
                     type="button"
                     className="pcg-search-panel__item"
-                    onClick={() => handleSelect(node.type)}
+                    onClick={() => config.onSelect({ kind: 'node', nodeType: node.type })}
                   >
                     {node.displayName}
+                  </button>
+                ))}
+            </div>
+          );
+        })}
+        {Array.from(filteredLibrary.entries()).map(([category, items]) => {
+          const group = `Library · ${category}`;
+          const isExpanded = query !== '' || config.filterPinType !== undefined || expanded.has(group);
+          return (
+            <div key={group} className="pcg-search-panel__group">
+              <button
+                type="button"
+                className="pcg-search-panel__group-title"
+                onClick={() => toggleCategory(group)}
+              >
+                <span className={`pcg-search-panel__chevron${isExpanded ? ' pcg-search-panel__chevron--open' : ''}`}>
+                  ▸
+                </span>
+                {group}
+                <span className="pcg-search-panel__count">{items.length}</span>
+              </button>
+              {isExpanded &&
+                items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="pcg-search-panel__item"
+                    title={item.description}
+                    onClick={() => config.onSelect({ kind: 'library', item })}
+                  >
+                    {item.displayName}
+                    <span className="pcg-search-panel__badge">lib</span>
                   </button>
                 ))}
             </div>

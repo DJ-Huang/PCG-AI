@@ -2546,7 +2546,7 @@
             "translate": [
               0,
               2.9,
-              2.35
+              2
             ],
             "rotation": [
               0,
@@ -2699,7 +2699,7 @@
             "translate": [
               0,
               2.9,
-              -5.32
+              -5.5
             ],
             "rotation": [
               0,
@@ -2756,360 +2756,6 @@
             "outputAttribute": "xform",
             "outputMultiplyOrder": "post",
             "__nodeTitle": "gable_b Place"
-          }
-        },
-        {
-          "id": "roof_L_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 2360,
-            "y": 0
-          },
-          "data": {
-            "width": 3.55,
-            "height": 0.2,
-            "depth": 10.1,
-            "__nodeTitle": "Roof L Box"
-          }
-        },
-        {
-          "id": "roof_L_place",
-          "type": "TransformMesh",
-          "position": {
-            "x": 1640,
-            "y": 480
-          },
-          "data": {
-            "group": "",
-            "groupType": "guess",
-            "transformOrder": "srt",
-            "rotateOrder": "xyz",
-            "translate": [
-              -1.78,
-              3.45,
-              -1.1
-            ],
-            "rotation": [
-              0,
-              0,
-              28
-            ],
-            "scale": [
-              1,
-              1,
-              1
-            ],
-            "shear": [
-              0,
-              0,
-              0
-            ],
-            "uniformScale": 1,
-            "pivotTranslate": [
-              0,
-              0,
-              0
-            ],
-            "pivotRotate": [
-              0,
-              0,
-              0
-            ],
-            "preTransformOrder": "srt",
-            "preRotateOrder": "xyz",
-            "preTranslate": [
-              0,
-              0,
-              0
-            ],
-            "preRotate": [
-              0,
-              0,
-              0
-            ],
-            "preScale": [
-              1,
-              1,
-              1
-            ],
-            "preShear": [
-              0,
-              0,
-              0
-            ],
-            "recomputePointNormals": false,
-            "preserveNormalLength": true,
-            "invertTransform": false,
-            "outputTransform": false,
-            "outputAttribute": "xform",
-            "outputMultiplyOrder": "post",
-            "__nodeTitle": "Roof L Place"
-          }
-        },
-        {
-          "id": "roof_R_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 2720,
-            "y": 0
-          },
-          "data": {
-            "width": 3.55,
-            "height": 0.2,
-            "depth": 10.1,
-            "__nodeTitle": "Roof R Box"
-          }
-        },
-        {
-          "id": "roof_R_place",
-          "type": "TransformMesh",
-          "position": {
-            "x": 2000,
-            "y": 480
-          },
-          "data": {
-            "group": "",
-            "groupType": "guess",
-            "transformOrder": "srt",
-            "rotateOrder": "xyz",
-            "translate": [
-              1.78,
-              3.45,
-              -1.1
-            ],
-            "rotation": [
-              0,
-              0,
-              -28
-            ],
-            "scale": [
-              1,
-              1,
-              1
-            ],
-            "shear": [
-              0,
-              0,
-              0
-            ],
-            "uniformScale": 1,
-            "pivotTranslate": [
-              0,
-              0,
-              0
-            ],
-            "pivotRotate": [
-              0,
-              0,
-              0
-            ],
-            "preTransformOrder": "srt",
-            "preRotateOrder": "xyz",
-            "preTranslate": [
-              0,
-              0,
-              0
-            ],
-            "preRotate": [
-              0,
-              0,
-              0
-            ],
-            "preScale": [
-              1,
-              1,
-              1
-            ],
-            "preShear": [
-              0,
-              0,
-              0
-            ],
-            "recomputePointNormals": false,
-            "preserveNormalLength": true,
-            "invertTransform": false,
-            "outputTransform": false,
-            "outputAttribute": "xform",
-            "outputMultiplyOrder": "post",
-            "__nodeTitle": "Roof R Place"
-          }
-        },
-        {
-          "id": "ridge_box",
-          "type": "CreateBoxMesh",
-          "position": {
-            "x": 3080,
-            "y": 0
-          },
-          "data": {
-            "width": 0.4,
-            "height": 0.2,
-            "depth": 10.2,
-            "__nodeTitle": "Ridge Cap"
-          }
-        },
-        {
-          "id": "ridge_place",
-          "type": "TransformMesh",
-          "position": {
-            "x": 2720,
-            "y": 480
-          },
-          "data": {
-            "group": "",
-            "groupType": "guess",
-            "transformOrder": "srt",
-            "rotateOrder": "xyz",
-            "translate": [
-              0,
-              4.65,
-              -1.1
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "scale": [
-              1,
-              1,
-              1
-            ],
-            "shear": [
-              0,
-              0,
-              0
-            ],
-            "uniformScale": 1,
-            "pivotTranslate": [
-              0,
-              0,
-              0
-            ],
-            "pivotRotate": [
-              0,
-              0,
-              0
-            ],
-            "preTransformOrder": "srt",
-            "preRotateOrder": "xyz",
-            "preTranslate": [
-              0,
-              0,
-              0
-            ],
-            "preRotate": [
-              0,
-              0,
-              0
-            ],
-            "preScale": [
-              1,
-              1,
-              1
-            ],
-            "preShear": [
-              0,
-              0,
-              0
-            ],
-            "recomputePointNormals": false,
-            "preserveNormalLength": true,
-            "invertTransform": false,
-            "outputTransform": false,
-            "outputAttribute": "xform",
-            "outputMultiplyOrder": "post",
-            "__nodeTitle": "Ridge Place"
-          }
-        },
-        {
-          "id": "roof_L_uv",
-          "type": "UVTexture",
-          "position": {
-            "x": 2360,
-            "y": 160
-          },
-          "data": {
-            "projection": "planar",
-            "axis": "y",
-            "scaleU": 0.55,
-            "scaleV": 0.55,
-            "offsetU": 0,
-            "offsetV": 0,
-            "__nodeTitle": "Roof L UV"
-          }
-        },
-        {
-          "id": "roof_L_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 1640,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "cabin_roof",
-            "__nodeTitle": "Roof L Mat"
-          }
-        },
-        {
-          "id": "roof_R_uv",
-          "type": "UVTexture",
-          "position": {
-            "x": 2720,
-            "y": 160
-          },
-          "data": {
-            "projection": "planar",
-            "axis": "y",
-            "scaleU": 0.55,
-            "scaleV": 0.55,
-            "offsetU": 0,
-            "offsetV": 0,
-            "__nodeTitle": "Roof R UV"
-          }
-        },
-        {
-          "id": "roof_R_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 2000,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "cabin_roof",
-            "__nodeTitle": "Roof R Mat"
-          }
-        },
-        {
-          "id": "ridge_uv",
-          "type": "UVTexture",
-          "position": {
-            "x": 3080,
-            "y": 160
-          },
-          "data": {
-            "projection": "planar",
-            "axis": "y",
-            "scaleU": 0.55,
-            "scaleV": 0.55,
-            "offsetU": 0,
-            "offsetV": 0,
-            "__nodeTitle": "Ridge UV"
-          }
-        },
-        {
-          "id": "ridge_mat",
-          "type": "AssignMaterial",
-          "position": {
-            "x": 2720,
-            "y": 320
-          },
-          "data": {
-            "group": "",
-            "materialName": "cabin_roof",
-            "__nodeTitle": "Ridge Mat"
           }
         },
         {
@@ -3647,7 +3293,7 @@
             "rotateOrder": "xyz",
             "translate": [
               0.18,
-              4.055413793103448,
+              4.4365,
               -1.1
             ],
             "rotation": [
@@ -3720,7 +3366,7 @@
             "axis": "x",
             "angle": 0,
             "translateX": 0.37,
-            "translateY": -0.125,
+            "translateY": -0.1767,
             "translateZ": 0,
             "centerX": 0,
             "centerY": 0,
@@ -3742,7 +3388,7 @@
             "rotateOrder": "xyz",
             "translate": [
               -0.18,
-              4.055413793103448,
+              4.4365,
               -1.1
             ],
             "rotation": [
@@ -3815,7 +3461,7 @@
             "axis": "x",
             "angle": 0,
             "translateX": -0.37,
-            "translateY": -0.125,
+            "translateY": -0.1767,
             "translateZ": 0,
             "centerX": 0,
             "centerY": 0,
@@ -3961,6 +3607,189 @@
             "materialName": "cabin_stone",
             "__nodeTitle": "Chimney Stones Mat"
           }
+        },
+        {
+          "id": "roof_shell_profile",
+          "type": "CreateSpline",
+          "position": {
+            "x": 2360,
+            "y": 0
+          },
+          "data": {
+            "mode": "polyline",
+            "closed": true,
+            "subdivisions": 1,
+            "startX": 0,
+            "startY": 0,
+            "startZ": 0,
+            "endX": 40,
+            "endY": 0,
+            "endZ": 0,
+            "controlPoints": "[{\"x\":-3.35,\"y\":0,\"z\":0},{\"x\":3.35,\"y\":0,\"z\":0},{\"x\":0,\"y\":1.6,\"z\":0},{\"x\":-3.35,\"y\":0,\"z\":0}]",
+            "editPlane": "none",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Roof Shell Profile"
+          }
+        },
+        {
+          "id": "roof_shell_path",
+          "type": "CreateSpline",
+          "position": {
+            "x": 2720,
+            "y": 0
+          },
+          "data": {
+            "mode": "polyline",
+            "closed": false,
+            "subdivisions": 1,
+            "startX": 0,
+            "startY": 0,
+            "startZ": -6.15,
+            "endX": 0,
+            "endY": 0,
+            "endZ": 3.95,
+            "controlPoints": "[{\"x\":0,\"y\":0,\"z\":-6.15},{\"x\":0,\"y\":0,\"z\":3.95}]",
+            "editPlane": "none",
+            "sceneOffsetX": 0,
+            "sceneOffsetY": 0,
+            "sceneOffsetZ": 0,
+            "__nodeTitle": "Roof Shell Path"
+          }
+        },
+        {
+          "id": "roof_shell_sweep",
+          "type": "SweepAlongSpline",
+          "position": {
+            "x": 2540,
+            "y": 160
+          },
+          "data": {
+            "surfaceShape": "crossSection",
+            "profileWidth": 6,
+            "profileHeight": 0.4,
+            "radius": 1,
+            "columns": 16,
+            "sampleSpacing": 0.05,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0,
+            "twist": 0,
+            "profileRoll": 0,
+            "scaleStart": 1,
+            "scaleEnd": 1,
+            "profilePlane": "xy",
+            "shadeMode": "auto",
+            "cuspAngle": 30,
+            "__nodeTitle": "Roof Shell Sweep"
+          }
+        },
+        {
+          "id": "roof_shell_uv",
+          "type": "UVTexture",
+          "position": {
+            "x": 2540,
+            "y": 320
+          },
+          "data": {
+            "projection": "planar",
+            "axis": "y",
+            "scaleU": 0.55,
+            "scaleV": 0.55,
+            "offsetU": 0,
+            "offsetV": 0,
+            "__nodeTitle": "Roof Shell UV"
+          }
+        },
+        {
+          "id": "roof_shell_mat",
+          "type": "AssignMaterial",
+          "position": {
+            "x": 2540,
+            "y": 480
+          },
+          "data": {
+            "group": "",
+            "materialName": "cabin_roof",
+            "__nodeTitle": "Roof Shell Mat"
+          }
+        },
+        {
+          "id": "roof_shell_place",
+          "type": "TransformMesh",
+          "position": {
+            "x": 2540,
+            "y": 640
+          },
+          "data": {
+            "group": "",
+            "groupType": "guess",
+            "transformOrder": "srt",
+            "rotateOrder": "xyz",
+            "translate": [
+              0,
+              2.9,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "shear": [
+              0,
+              0,
+              0
+            ],
+            "uniformScale": 1,
+            "pivotTranslate": [
+              0,
+              0,
+              0
+            ],
+            "pivotRotate": [
+              0,
+              0,
+              0
+            ],
+            "preTransformOrder": "srt",
+            "preRotateOrder": "xyz",
+            "preTranslate": [
+              0,
+              0,
+              0
+            ],
+            "preRotate": [
+              0,
+              0,
+              0
+            ],
+            "preScale": [
+              1,
+              1,
+              1
+            ],
+            "preShear": [
+              0,
+              0,
+              0
+            ],
+            "recomputePointNormals": false,
+            "preserveNormalLength": true,
+            "invertTransform": false,
+            "outputTransform": false,
+            "outputAttribute": "xform",
+            "outputMultiplyOrder": "post",
+            "__nodeTitle": "Roof Shell Place"
+          }
         }
       ],
       "edges": [
@@ -4070,90 +3899,6 @@
           "targetHandle": "in"
         },
         {
-          "id": "e_roof_L_col_to_uv",
-          "source": "roof_L_box",
-          "target": "roof_L_uv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_L_pl_from_mat",
-          "source": "roof_L_mat",
-          "target": "roof_L_place",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_R_col_to_uv",
-          "source": "roof_R_box",
-          "target": "roof_R_uv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_R_pl_from_mat",
-          "source": "roof_R_mat",
-          "target": "roof_R_place",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_ridge_col_to_uv",
-          "source": "ridge_box",
-          "target": "ridge_uv",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_ridge_pl_from_mat",
-          "source": "ridge_mat",
-          "target": "ridge_place",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_L_place_rm",
-          "source": "roof_L_place",
-          "target": "roof_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_R_place_rm",
-          "source": "roof_R_place",
-          "target": "roof_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_ridge_place_rm",
-          "source": "ridge_place",
-          "target": "roof_merge",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_L_uv_mat",
-          "source": "roof_L_uv",
-          "target": "roof_L_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_roof_R_uv_mat",
-          "source": "roof_R_uv",
-          "target": "roof_R_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
-          "id": "e_ridge_uv_mat",
-          "source": "ridge_uv",
-          "target": "ridge_mat",
-          "sourceHandle": "out",
-          "targetHandle": "in"
-        },
-        {
           "id": "e_gable_f_uv_mat",
           "source": "gable_f_uv",
           "target": "gable_f_mat",
@@ -4243,27 +3988,6 @@
           "target": "roof_merge",
           "sourceHandle": "out",
           "targetHandle": "in"
-        },
-        {
-          "id": "e_cabin_roof_pbr_roof_L_mat",
-          "source": "cabin_roof_pbr",
-          "target": "roof_L_mat",
-          "sourceHandle": "out",
-          "targetHandle": "material"
-        },
-        {
-          "id": "e_cabin_roof_pbr_roof_R_mat",
-          "source": "cabin_roof_pbr",
-          "target": "roof_R_mat",
-          "sourceHandle": "out",
-          "targetHandle": "material"
-        },
-        {
-          "id": "e_cabin_roof_pbr_ridge_mat",
-          "source": "cabin_roof_pbr",
-          "target": "ridge_mat",
-          "sourceHandle": "out",
-          "targetHandle": "material"
         },
         {
           "id": "e_cabin_roof_pbr_shingle_mat",
@@ -4383,8 +4107,58 @@
           "target": "chimney_stones_mat",
           "sourceHandle": "out",
           "targetHandle": "material"
+        },
+        {
+          "id": "e_shell_prof",
+          "source": "roof_shell_profile",
+          "target": "roof_shell_sweep",
+          "sourceHandle": "out",
+          "targetHandle": "profile"
+        },
+        {
+          "id": "e_shell_path",
+          "source": "roof_shell_path",
+          "target": "roof_shell_sweep",
+          "sourceHandle": "out",
+          "targetHandle": "backbone"
+        },
+        {
+          "id": "e_shell_uv",
+          "source": "roof_shell_sweep",
+          "target": "roof_shell_uv",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_shell_mat",
+          "source": "roof_shell_uv",
+          "target": "roof_shell_mat",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_shell_pbr",
+          "source": "cabin_roof_pbr",
+          "target": "roof_shell_mat",
+          "sourceHandle": "out",
+          "targetHandle": "material"
+        },
+        {
+          "id": "e_shell_place",
+          "source": "roof_shell_mat",
+          "target": "roof_shell_place",
+          "sourceHandle": "out",
+          "targetHandle": "in"
+        },
+        {
+          "id": "e_shell_rm",
+          "source": "roof_shell_place",
+          "target": "roof_merge",
+          "sourceHandle": "out",
+          "targetHandle": "in"
         }
-      ]
+      ],
+      "parameters": []
     },
     {
       "id": "porch",
@@ -10267,6 +10041,168 @@
           "target": "door_panel_merge_merge",
           "sourceHandle": "out",
           "targetHandle": "in"
+        }
+      ]
+    },
+    {
+      "id": "lib_pcg_lib_cable_cable_generator",
+      "name": "Cable Generator",
+      "inputs": [
+        {
+          "id": "path",
+          "name": "Path",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "subgraph_input",
+          "type": "SubgraphInput",
+          "position": {
+            "x": 200,
+            "y": 0
+          },
+          "data": {}
+        },
+        {
+          "id": "resample",
+          "type": "ResampleSpline",
+          "position": {
+            "x": 200,
+            "y": 160
+          },
+          "data": {
+            "edgeMode": "unshared",
+            "edgeGroup": "",
+            "method": "evenLength",
+            "measure": "arc",
+            "useMaxSegmentLength": false,
+            "maxSegmentLength": 1,
+            "useMaxSegments": false,
+            "maxSegments": 2,
+            "evenLastSegmentSameLength": true,
+            "maintainLastVertex": true,
+            "writeCurveUAttr": false,
+            "curveUAttribute": "curveu",
+            "writeDistanceAttr": false,
+            "distanceAttribute": "ptdist",
+            "writeCurveNumAttr": false,
+            "curveNumAttribute": "curvenum",
+            "mode": "spacing",
+            "spacing": 0.25,
+            "pointCount": 32
+          }
+        },
+        {
+          "id": "sweep",
+          "type": "SweepAlongSpline",
+          "position": {
+            "x": 200,
+            "y": 320
+          },
+          "data": {
+            "surfaceShape": "circle",
+            "profileWidth": 6,
+            "profileHeight": 0.4,
+            "radius": 0.03,
+            "columns": 8,
+            "sampleSpacing": 1,
+            "capStart": true,
+            "capEnd": true,
+            "upX": 0,
+            "upY": 1,
+            "upZ": 0,
+            "twist": 0,
+            "profileRoll": 0,
+            "scaleStart": 1,
+            "scaleEnd": 1,
+            "profilePlane": "xy",
+            "shadeMode": "smooth",
+            "cuspAngle": 30
+          }
+        },
+        {
+          "id": "subgraph_output",
+          "type": "SubgraphOutput",
+          "position": {
+            "x": 200,
+            "y": 480
+          },
+          "data": {}
+        }
+      ],
+      "edges": [
+        {
+          "id": "e1",
+          "source": "subgraph_input",
+          "target": "resample",
+          "sourceHandle": "path",
+          "targetHandle": "in",
+          "sourcePinType": "SpatialSpline",
+          "targetPinType": "Any"
+        },
+        {
+          "id": "e2",
+          "source": "resample",
+          "target": "sweep",
+          "sourceHandle": "out",
+          "targetHandle": "backbone",
+          "sourcePinType": "SpatialSpline",
+          "targetPinType": "SpatialSpline"
+        },
+        {
+          "id": "e3",
+          "source": "sweep",
+          "target": "subgraph_output",
+          "sourceHandle": "out",
+          "targetHandle": "out",
+          "sourcePinType": "SpatialMesh",
+          "targetPinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "segmentLength",
+          "name": "Segment Length",
+          "type": "number",
+          "default": 0.25,
+          "exposed": true,
+          "targetNode": "resample",
+          "targetProperty": "spacing",
+          "hasRange": true,
+          "min": 0.05,
+          "max": 2
+        },
+        {
+          "id": "thickness",
+          "name": "Thickness",
+          "type": "number",
+          "default": 0.03,
+          "exposed": true,
+          "targetNode": "sweep",
+          "targetProperty": "radius",
+          "hasRange": true,
+          "min": 0.002,
+          "max": 0.5
+        },
+        {
+          "id": "sides",
+          "name": "Sides",
+          "type": "integer",
+          "default": 8,
+          "exposed": true,
+          "targetNode": "sweep",
+          "targetProperty": "columns",
+          "hasRange": true,
+          "min": 3,
+          "max": 32
         }
       ]
     }

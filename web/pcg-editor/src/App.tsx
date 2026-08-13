@@ -57,7 +57,8 @@ import AgentPanel from './agent/AgentPanel';
 import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './agent/agentCommands';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
-import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
+import NodeSearchPanel, { type SearchPanelConfig, type NodeSearchSelection } from './NodeSearchPanel';
+import { loadLibrarySubgraph, type LibraryIndexItem } from './libraryManifest';
 import PreviewViewport, { type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
 import SettingsDialog from './SettingsDialog';
 import { useEditorBridge } from './editorBridge';
@@ -569,12 +570,38 @@ function PcgEditor() {
         y: clientY,
         filterPinType: pinType,
         isSourcePort: handleType === 'source',
-        onSelect: (nodeType) => {
+        onSelect: (selection: NodeSearchSelection | null) => {
           setSearchConfig(null);
-          if (!nodeType) return;
+          if (!selection) return;
 
           // Create new node at flow position
           const flowPos = screenToFlowPosition({ x: clientX, y: clientY });
+
+          if (selection.kind === 'library') {
+            const item: LibraryIndexItem = selection.item;
+            if (currentSubgraphId) {
+              setStatus('Library nodes can only be added at the root level');
+              return;
+            }
+            void loadLibrarySubgraph(item).then((subgraph) => {
+              const newId = allocateNodeId(viewNodes);
+              commit();
+              setSubgraphs((subs) => (subs.some((s) => s.id === subgraph.id) ? subs : [...subs, subgraph]));
+              setViewNodes((nds) => [
+                ...nds,
+                { id: newId, type: 'Subgraph', position: flowPos, data: { subgraphId: subgraph.id, __nodeTitle: item.displayName } },
+              ]);
+              const conn: Connection = handleType === 'source'
+                ? { source: nodeId, target: newId, sourceHandle: handleId, targetHandle: item.inputs[0]?.id ?? null }
+                : { source: newId, target: nodeId, sourceHandle: item.outputs[0]?.id ?? null, targetHandle: handleId };
+              if (validateConnection(conn)) {
+                setViewEdges((eds) => addEdge(conn, eds));
+              }
+            }).catch(() => setStatus(`Failed to load ${item.displayName}`));
+            return;
+          }
+
+          const nodeType = selection.nodeType;
           const newId = allocateNodeId(viewNodes);
           const newNode: Node = {
             id: newId,
@@ -626,7 +653,7 @@ function PcgEditor() {
       connectingHandleId.current = null;
       connectingHandleType.current = null;
     },
-    [viewNodes, subgraphs, currentSubgraph, setViewNodes, setViewEdges, screenToFlowPosition, commit, validateConnection],
+    [viewNodes, subgraphs, currentSubgraph, currentSubgraphId, setSubgraphs, setViewNodes, setViewEdges, screenToFlowPosition, commit, validateConnection],
   );
 
   // ── Node creation ───────────────────────────────────
@@ -648,16 +675,46 @@ function PcgEditor() {
     [viewNodes, setViewNodes, screenToFlowPosition, commit],
   );
 
+  const createLibraryNodeAt = useCallback(
+    (item: LibraryIndexItem, x: number, y: number) => {
+      if (currentSubgraphId) {
+        setStatus('Library nodes can only be added at the root level');
+        return;
+      }
+      const flowPos = screenToFlowPosition({ x, y });
+      void loadLibrarySubgraph(item)
+        .then((subgraph) => {
+          const newId = allocateNodeId(viewNodes);
+          commit();
+          setSubgraphs((subs) => (subs.some((s) => s.id === subgraph.id) ? subs : [...subs, subgraph]));
+          setViewNodes((nds) => [
+            ...nds,
+            {
+              id: newId,
+              type: 'Subgraph',
+              position: flowPos,
+              data: { subgraphId: subgraph.id, __nodeTitle: item.displayName },
+            },
+          ]);
+          setStatus(`Added ${item.displayName}`);
+        })
+        .catch(() => setStatus(`Failed to load ${item.displayName}`));
+    },
+    [currentSubgraphId, viewNodes, setSubgraphs, setViewNodes, screenToFlowPosition, commit],
+  );
+
   const openSearchAt = useCallback((x: number, y: number) => {
     setSearchConfig({
       x,
       y,
-      onSelect: (nodeType) => {
+      onSelect: (selection: NodeSearchSelection | null) => {
         setSearchConfig(null);
-        if (nodeType) createNodeAt(nodeType, x, y);
+        if (!selection) return;
+        if (selection.kind === 'library') createLibraryNodeAt(selection.item, x, y);
+        else createNodeAt(selection.nodeType, x, y);
       },
     });
-  }, [createNodeAt]);
+  }, [createNodeAt, createLibraryNodeAt]);
 
   // ── Selection ───────────────────────────────────────
 

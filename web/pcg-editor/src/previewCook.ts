@@ -71,10 +71,37 @@ function needsConvertHeightFieldPreview(nodeType: string, sourceHandle: string):
 }
 
 /**
+ * Collects the upstream closure of the given root nodes. pcg-core executes
+ * every node it receives, so graphs sent to cook must be limited to what the
+ * preview actually pulls — orphan nodes with unbound required inputs would
+ * otherwise fail the entire cook (e.g. a freshly dropped, still-unwired
+ * library subgraph must not break the main preview).
+ */
+function collectUpstreamClosure(
+  allEdges: GraphJson['edges'],
+  rootIds: ReadonlySet<string>,
+): Set<string> {
+  const included = new Set<string>(rootIds);
+  const queue = [...rootIds];
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    for (const edge of allEdges) {
+      if (edge.target !== nodeId || included.has(edge.source)) continue;
+      included.add(edge.source);
+      queue.push(edge.source);
+    }
+  }
+  return included;
+}
+
+/**
  * Full-graph preview: retarget the terminal Output to the preview sink id so
  * pcg-core enables preview-only behaviors (per-triangle node attribution for
  * component picking), and rasterize HeightField → Output through
  * ConvertHeightField.
+ *
+ * Cook scope is the Output node's upstream closure; nodes that don't feed the
+ * Output cannot affect the preview result.
  */
 export function prepareGraphForPreviewCook(graph: GraphJson): GraphJson {
   const output = graph.nodes.find((n) => n.type === 'Output');
@@ -85,8 +112,15 @@ export function prepareGraphForPreviewCook(graph: GraphJson): GraphJson {
   const convertHeightField =
     source != null && needsConvertHeightFieldPreview(source.type, incoming.sourceHandle ?? 'out');
 
-  const nodes = graph.nodes.map((n) => ({ ...n }));
-  const edges = graph.edges.map((e) => ({ ...e }));
+  const included = collectUpstreamClosure(graph.edges, new Set([output.id]));
+  const nodes = graph.nodes.filter((n) => included.has(n.id)).map((n) => ({ ...n }));
+  const edges = graph.edges
+    .filter((e) => included.has(e.source) && included.has(e.target))
+    .map((e) => ({ ...e }));
+  const parameters = (graph.parameters ?? []).filter(
+    (p) => p.targetNode && included.has(p.targetNode),
+  );
+
   const outputNode = nodes.find((n) => n.id === output.id);
   const incomingEdge = edges.find((e) => e.target === output.id);
   if (!outputNode || !incomingEdge) return graph;
@@ -112,7 +146,7 @@ export function prepareGraphForPreviewCook(graph: GraphJson): GraphJson {
     });
   }
 
-  return { ...graph, nodes, edges };
+  return { ...graph, nodes, edges, parameters };
 }
 
 /**
@@ -217,14 +251,27 @@ export function buildSubgraphCookGraph(
     subgraph.nodes.filter((n) => n.type === 'SubgraphOutput').map((n) => n.id),
   );
 
+  // Cook scope: upstream closure of the SubgraphOutput feeders, mirroring the
+  // root-level preview pruning (orphan interior nodes must not fail the cook).
+  const feederIds = new Set(
+    subgraph.edges.filter((e) => outputIds.has(e.target)).map((e) => e.source),
+  );
+  const cookScope =
+    feederIds.size > 0
+      ? collectUpstreamClosure(subgraph.edges, new Set([...feederIds, ...outputIds]))
+      : null;
+
   const nodes = subgraph.nodes
     .filter((n) => !interfaceIds.has(n.id))
+    .filter((n) => cookScope === null || cookScope.has(n.id))
     .map((n) => ({ id: n.id, type: n.type, position: { ...n.position }, data: { ...n.data } }));
 
   const edges: GraphJson['edges'] = [];
   let feedsOutput = false;
   for (const e of subgraph.edges) {
     if (interfaceIds.has(e.source)) continue;
+    if (cookScope !== null && !cookScope.has(e.source)) continue;
+    if (cookScope !== null && !outputIds.has(e.target) && !cookScope.has(e.target)) continue;
     if (outputIds.has(e.target)) {
       feedsOutput = true;
       edges.push({
@@ -250,11 +297,15 @@ export function buildSubgraphCookGraph(
     });
   }
 
+  const scopedNodeIds = new Set(nodes.map((n) => n.id));
+
   return {
     version: '2.0',
     nodes,
     edges,
-    parameters: subgraph.parameters ?? [],
+    parameters: (subgraph.parameters ?? []).filter(
+      (p) => p.targetNode && scopedNodeIds.has(p.targetNode),
+    ),
     subgraphs,
   };
 }
