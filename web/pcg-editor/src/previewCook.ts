@@ -11,6 +11,7 @@ import {
   parseMeshBinary,
   parsePointBinary,
   parseSplineJson,
+  parseSourceMapping,
   parseHeightFieldBinary,
   buildHeightFieldPreviewMesh,
   extractCookJsonText,
@@ -21,6 +22,7 @@ import {
   type ParsedHeightField,
   type ParsedMesh,
   type ParsedSplines,
+  type SourceMapping,
 } from './cookResult';
 import { parsePbrMaterialLibrary, type PbrMaterialLibrary } from './preview/pbrMaterials';
 
@@ -37,6 +39,8 @@ export interface PreviewData {
   heightfield: ParsedHeightField | null;
   /** PBR definitions keyed by PCGM material slot name. */
   materials: PbrMaterialLibrary;
+  /** Per-triangle node attribution (preview-sink cooks only); null when absent. */
+  sourceMapping: SourceMapping | null;
   cook: CookResult;
   /** Client-side phase timings; filled by cookGraphPreview (absent in contract tests). */
   timings?: PreviewTimings;
@@ -66,37 +70,47 @@ function needsConvertHeightFieldPreview(nodeType: string, sourceHandle: string):
   return getOutputPinType(nodeType, sourceHandle) === 'HeightField';
 }
 
-/** Full-graph preview: rasterize HeightField → Output through ConvertHeightField. */
+/**
+ * Full-graph preview: retarget the terminal Output to the preview sink id so
+ * pcg-core enables preview-only behaviors (per-triangle node attribution for
+ * component picking), and rasterize HeightField → Output through
+ * ConvertHeightField.
+ */
 export function prepareGraphForPreviewCook(graph: GraphJson): GraphJson {
   const output = graph.nodes.find((n) => n.type === 'Output');
   if (!output) return graph;
   const incoming = graph.edges.find((e) => e.target === output.id);
   if (!incoming) return graph;
   const source = graph.nodes.find((n) => n.id === incoming.source);
-  if (!source || !needsConvertHeightFieldPreview(source.type, incoming.sourceHandle ?? 'out')) {
-    return graph;
-  }
+  const convertHeightField =
+    source != null && needsConvertHeightFieldPreview(source.type, incoming.sourceHandle ?? 'out');
 
   const nodes = graph.nodes.map((n) => ({ ...n }));
   const edges = graph.edges.map((e) => ({ ...e }));
+  const outputNode = nodes.find((n) => n.id === output.id);
   const incomingEdge = edges.find((e) => e.target === output.id);
-  if (!incomingEdge) return graph;
+  if (!outputNode || !incomingEdge) return graph;
 
-  nodes.push({
-    id: PREVIEW_CONVERT_NODE_ID,
-    type: 'ConvertHeightField',
-    position: { ...output.position },
-    data: {},
-  });
-  incomingEdge.target = PREVIEW_CONVERT_NODE_ID;
-  incomingEdge.targetHandle = 'in';
-  edges.push({
-    id: `${PREVIEW_CONVERT_NODE_ID}_edge`,
-    source: PREVIEW_CONVERT_NODE_ID,
-    target: output.id,
-    sourceHandle: 'out',
-    targetHandle: 'in',
-  });
+  outputNode.id = PREVIEW_SINK_NODE_ID;
+  incomingEdge.target = PREVIEW_SINK_NODE_ID;
+
+  if (convertHeightField) {
+    nodes.push({
+      id: PREVIEW_CONVERT_NODE_ID,
+      type: 'ConvertHeightField',
+      position: { ...output.position },
+      data: {},
+    });
+    incomingEdge.target = PREVIEW_CONVERT_NODE_ID;
+    incomingEdge.targetHandle = 'in';
+    edges.push({
+      id: `${PREVIEW_CONVERT_NODE_ID}_edge`,
+      source: PREVIEW_CONVERT_NODE_ID,
+      target: PREVIEW_SINK_NODE_ID,
+      sourceHandle: 'out',
+      targetHandle: 'in',
+    });
+  }
 
   return { ...graph, nodes, edges };
 }
@@ -282,6 +296,7 @@ export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
   let splines: ParsedSplines | null = null;
   const cookJson = extractCookJsonText(cook);
   const materials = parsePbrMaterialLibrary(cookJson);
+  const sourceMapping = parseSourceMapping(cookJson);
   if (cookJson) {
     splines = parseSplineJson(cookJson);
   }
@@ -305,7 +320,7 @@ export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
     return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
   }
 
-  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, materials, cook } };
+  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, materials, sourceMapping, cook } };
 }
 
 export async function cookGraphPreview(

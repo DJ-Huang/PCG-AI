@@ -678,6 +678,40 @@ export function parseSplineJson(json: string): ParsedSplines | null {
 }
 
 /**
+ * Per-triangle node attribution emitted by pcg-core for preview-sink cooks.
+ * triangleSources[i] indexes sourceNodes for PCGM triangle i; -1 = unknown.
+ */
+export interface SourceMapping {
+  sourceNodes: string[];
+  triangleSources: Int32Array;
+}
+
+export function parseSourceMapping(json: string): SourceMapping | null {
+  if (!json.trim()) return null;
+  try {
+    const payload = JSON.parse(json) as {
+      source_nodes?: unknown;
+      triangle_sources?: unknown;
+    };
+    if (!Array.isArray(payload.source_nodes) || !Array.isArray(payload.triangle_sources)) {
+      return null;
+    }
+    const sourceNodes: string[] = [];
+    for (const entry of payload.source_nodes) {
+      if (typeof entry !== 'string') return null;
+      sourceNodes.push(entry);
+    }
+    const triangleSources = new Int32Array(payload.triangle_sources.length);
+    for (let i = 0; i < payload.triangle_sources.length; i++) {
+      triangleSources[i] = Number(payload.triangle_sources[i]) | 0;
+    }
+    return { sourceNodes, triangleSources };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Deduplicated line-segment index pairs from polygon face loops.
  * Faces: 1 index = isolated point (no edge), 2 = single edge, 3+ = closed loop.
  */

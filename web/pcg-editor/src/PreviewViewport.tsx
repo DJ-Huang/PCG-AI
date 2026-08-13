@@ -15,7 +15,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
-import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines } from './cookResult';
+import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines, type SourceMapping } from './cookResult';
 import type { GraphParameter } from './graphSchema';
 import type { PreviewData } from './previewCook';
 import type { PreviewParameterValue, PreviewParameterValues } from './previewParameters';
@@ -84,6 +84,13 @@ interface PreviewViewportProps {
   onResetParameters?: () => void;
   onSaveParameterDefaults?: () => void;
   splineEdit?: SplineEditContext | null;
+  /** Click on a preview mesh component → attributed graph node id (may be a
+   *  subgraph path like "n5/n12"). Only fires for cooks with source mapping. */
+  onPickNode?: (nodeId: string) => void;
+  /** Graph-selected node id; triangles attributed to it via source mapping get
+   *  an edge highlight overlay. A root-scope subgraph instance id also matches
+   *  its flattened "instance/inner" entries. */
+  selectedNodeId?: string | null;
 }
 
 export interface PreviewCapture {
@@ -161,9 +168,15 @@ const CONTROL_LINE_COLOR = 0xffd933;
 const EDGE_OVERLAY_COLOR = 0x1a1a1a;
 /** Screen-space px; Blender overlay uses ~1px core + AA expansion in pack_line_data. */
 const EDGE_OVERLAY_LINE_WIDTH = 2.5;
+/** Houdini viewport selection orange. */
+const SELECTION_HIGHLIGHT_COLOR = 0xff9d2e;
+const SELECTION_HIGHLIGHT_LINE_WIDTH = 3;
 
 const MIN_WIDTH = 320;
-const MAX_WIDTH = 900;
+const MAX_WIDTH = 1400;
+/** Default preview width: ~45% of the window so the 3D view dominates the graph editor. */
+const defaultWidth = () =>
+  Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(window.innerWidth * 0.45)));
 const EMPTY_PARAMETERS: GraphParameter[] = [];
 const EMPTY_PARAMETER_NODE_IDS = new Set<string>();
 const EMPTY_PARAMETER_VALUES: PreviewParameterValues = {};
@@ -191,6 +204,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   onResetParameters = NOOP_PARAMETER_CHANGE,
   onSaveParameterDefaults = NOOP_PARAMETER_CHANGE,
   splineEdit,
+  onPickNode,
+  selectedNodeId = null,
 }: PreviewViewportProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
@@ -241,9 +256,14 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const overlayPopoverRef = useRef<HTMLDivElement>(null);
   const solidPopoverRef = useRef<HTMLDivElement>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [width, setWidth] = useState(420);
+  const [width, setWidth] = useState(defaultWidth);
   const [sceneMs, setSceneMs] = useState(0);
   const sceneTimedDataRef = useRef<PreviewData | null>(null);
+  const pickDownRef = useRef<{ x: number; y: number; consumed: boolean } | null>(null);
+  const onPickNodeRef = useRef(onPickNode);
+  onPickNodeRef.current = onPickNode;
+  const sourceMappingRef = useRef<SourceMapping | null>(null);
+  sourceMappingRef.current = data?.sourceMapping ?? null;
 
   const onResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -251,7 +271,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       const startX = e.clientX;
       const startWidth = width;
       const onMove = (ev: MouseEvent) => {
-        setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth - (ev.clientX - startX))));
+        setWidth(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + (ev.clientX - startX))));
       };
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
@@ -630,6 +650,50 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     canvas.addEventListener('pointerup', onPointerUp);
     canvas.addEventListener('pointercancel', onPointerUp);
 
+    // ── Node picking: click (not orbit drag) a mesh component → attributed node ──
+    const onPickDown = (event: PointerEvent) => {
+      pickDownRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        consumed: dragRef.current != null,
+      };
+    };
+    const onPickUp = (event: PointerEvent) => {
+      const start = pickDownRef.current;
+      pickDownRef.current = null;
+      if (!start || start.consumed || dragRef.current) return;
+      if (event.button !== 0) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (dx * dx + dy * dy > 25) return; // orbit drag, not a click
+      const ctx = sceneRef.current;
+      const mapping = sourceMappingRef.current;
+      const pick = onPickNodeRef.current;
+      if (!ctx || !mapping || !pick) return;
+      const pickRect = ctx.renderer.domElement.getBoundingClientRect();
+      if (pickRect.width <= 0 || pickRect.height <= 0) return;
+      const ndc = new THREE.Vector2(
+        ((event.clientX - pickRect.left) / pickRect.width) * 2 - 1,
+        -((event.clientY - pickRect.top) / pickRect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, ctx.camera);
+      const meshes = ctx.content.children.filter(
+        (obj): obj is THREE.Mesh => (obj as THREE.Mesh).userData?.kind === 'mesh',
+      );
+      const hits = raycaster.intersectObjects(meshes, false);
+      for (const hit of hits) {
+        const triangle = hit.faceIndex;
+        if (triangle == null || triangle < 0 || triangle >= mapping.triangleSources.length) continue;
+        const source = mapping.triangleSources[triangle];
+        if (source < 0 || source >= mapping.sourceNodes.length) continue;
+        pick(mapping.sourceNodes[source]);
+        return;
+      }
+    };
+    canvas.addEventListener('pointerdown', onPickDown);
+    canvas.addEventListener('pointerup', onPickUp);
+
     return () => {
       invalidateEnvironmentLoads();
       cancelAnimationFrame(raf);
@@ -639,6 +703,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
+      canvas.removeEventListener('pointerdown', onPickDown);
+      canvas.removeEventListener('pointerup', onPickUp);
       controls.dispose();
       controls.removeEventListener('change', syncAxisNavigation);
       pmremGenerator.dispose();
@@ -848,6 +914,29 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       setSceneMs(performance.now() - rebuildStart);
     }
   }, [data, splineEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Selection edge highlight: overlay the triangles attributed to the
+  // graph-selected node. Declared after the content rebuild so a fresh cook
+  // re-applies the highlight to the new mesh on the same commit.
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+    const old = ctx.content.children.find((c) => c.userData.kind === 'selection');
+    if (old) {
+      ctx.content.remove(old);
+      disposeObject3D(old);
+    }
+    const mapping = data?.sourceMapping;
+    if (!mapping || !selectedNodeId) return;
+    const highlight = buildSelectionHighlight(
+      ctx.content,
+      mapping,
+      selectedNodeId,
+      ctx.renderer.domElement.clientWidth,
+      ctx.renderer.domElement.clientHeight,
+    );
+    if (highlight) ctx.content.add(highlight);
+  }, [data, splineEdit, selectedNodeId]);
 
   useEffect(() => {
     const ctx = sceneRef.current;
@@ -1155,7 +1244,7 @@ function applyShading(
 
   for (const child of group.children) {
     const kind = child.userData.kind as string;
-    if (kind === 'spline' || kind === 'control-line') {
+    if (kind === 'spline' || kind === 'control-line' || kind === 'selection') {
       child.visible = true;
       continue;
     }
@@ -1332,11 +1421,90 @@ function buildEdgeObject(
   return lines;
 }
 
+function buildSelectionHighlight(
+  group: THREE.Group,
+  mapping: SourceMapping,
+  nodeId: string,
+  viewportWidth: number,
+  viewportHeight: number,
+): LineSegments2 | null {
+  const mesh = group.children.find(
+    (obj): obj is THREE.Mesh => (obj as THREE.Mesh).userData?.kind === 'mesh',
+  );
+  if (!mesh) return null;
+  const index = mesh.geometry.getIndex();
+  const position = mesh.geometry.getAttribute('position');
+  if (!index || !position) return null;
+
+  // Root-scope cooks flatten subgraph ids to "instance/inner"; interior cooks
+  // emit unprefixed ids. Exact match covers both, the prefix form covers a
+  // selected subgraph instance highlighting all of its interior output.
+  const matched = new Set<number>();
+  for (let i = 0; i < mapping.sourceNodes.length; i++) {
+    const entry = mapping.sourceNodes[i];
+    if (entry === nodeId || entry.startsWith(`${nodeId}/`)) matched.add(i);
+  }
+  if (matched.size === 0) return null;
+
+  const edgeKeys = new Set<string>();
+  const addEdge = (a: number, b: number) => {
+    edgeKeys.add(a < b ? `${a}:${b}` : `${b}:${a}`);
+  };
+  const triangleCount = Math.min(mapping.triangleSources.length, Math.floor(index.count / 3));
+  for (let t = 0; t < triangleCount; t++) {
+    if (!matched.has(mapping.triangleSources[t])) continue;
+    const a = index.getX(t * 3);
+    const b = index.getX(t * 3 + 1);
+    const c = index.getX(t * 3 + 2);
+    addEdge(a, b);
+    addEdge(b, c);
+    addEdge(c, a);
+  }
+  if (edgeKeys.size === 0) return null;
+
+  const segmentPositions = new Float32Array(edgeKeys.size * 6);
+  let o = 0;
+  for (const key of edgeKeys) {
+    const sep = key.indexOf(':');
+    const a = Number(key.slice(0, sep));
+    const b = Number(key.slice(sep + 1));
+    segmentPositions[o++] = position.getX(a);
+    segmentPositions[o++] = position.getY(a);
+    segmentPositions[o++] = position.getZ(a);
+    segmentPositions[o++] = position.getX(b);
+    segmentPositions[o++] = position.getY(b);
+    segmentPositions[o++] = position.getZ(b);
+  }
+
+  const lineGeo = new LineSegmentsGeometry();
+  lineGeo.setPositions(segmentPositions);
+
+  const material = new LineMaterial({
+    color: SELECTION_HIGHLIGHT_COLOR,
+    linewidth: SELECTION_HIGHLIGHT_LINE_WIDTH,
+    worldUnits: false,
+    depthTest: true,
+    depthWrite: false,
+  });
+  material.resolution.set(
+    Math.max(viewportWidth, 1),
+    Math.max(viewportHeight, 1),
+  );
+
+  const lines = new LineSegments2(lineGeo, material);
+  lines.renderOrder = 2;
+  lines.userData.kind = 'selection';
+  return lines;
+}
+
 function syncEdgeOverlayResolution(group: THREE.Group, width: number, height: number) {
-  const edge = group.children.find((c) => c.userData.kind === 'edges');
-  if (!(edge instanceof LineSegments2)) return;
-  const material = edge.material as LineMaterial;
-  material.resolution.set(Math.max(width, 1), Math.max(height, 1));
+  for (const child of group.children) {
+    const kind = child.userData.kind;
+    if (kind !== 'edges' && kind !== 'selection') continue;
+    if (!(child instanceof LineSegments2)) continue;
+    const material = child.material as LineMaterial;
+    material.resolution.set(Math.max(width, 1), Math.max(height, 1));
+  }
 }
 
 function buildPointsObject(positions: Float32Array): THREE.Points {

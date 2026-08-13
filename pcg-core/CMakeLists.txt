@@ -221,6 +221,12 @@ target_include_directories(test_cook_cache PRIVATE src)
 
 add_test(NAME test_cook_cache COMMAND test_cook_cache WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_pick_source_mapping tests/test_pick_source_mapping.cpp)
+target_link_libraries(test_pick_source_mapping PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_pick_source_mapping PRIVATE src)
+
+add_test(NAME test_pick_source_mapping COMMAND test_pick_source_mapping WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_spawn_mesh_binary tests/test_spawn_mesh_binary.cpp)
 target_link_libraries(test_spawn_mesh_binary PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_spawn_mesh_binary PRIVATE src)

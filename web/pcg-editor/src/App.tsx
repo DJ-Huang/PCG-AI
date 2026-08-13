@@ -432,6 +432,71 @@ function PcgEditor() {
     [editPath, subgraphs, navigateTo],
   );
 
+  // ── Preview picking: executor ids are flattened from the root
+  // ("<instanceId>/<innerId>"), so resolve from the root scope regardless of
+  // which subgraph is currently open, then select + center the target node.
+  const handlePreviewPickNode = useCallback(
+    (flatId: string) => {
+      const segments = flatId.split('/').filter(Boolean);
+      if (segments.length === 0) return;
+
+      // Subgraph-interior cooks (editor inside a subgraph) emit unprefixed ids
+      // scoped to the open subgraph — resolve those against the current view.
+      let scopeNodes: Node[] =
+        segments.length === 1 && currentSubgraph ? viewNodes : (nodes as Node[]);
+      const path: string[] =
+        segments.length === 1 && currentSubgraph ? [...editPath] : [];
+      for (let i = 0; i < segments.length - 1; i++) {
+        const instance = scopeNodes.find((n) => n.id === segments[i]);
+        const sgId = instance?.type === 'Subgraph' ? getSubgraphId(instance.data) : null;
+        const def = sgId ? findSubgraph(subgraphs, sgId) : null;
+        if (!def) {
+          setStatus(`Pick: cannot resolve subgraph path in "${flatId}"`);
+          return;
+        }
+        path.push(sgId!);
+        scopeNodes = def.nodes as unknown as Node[];
+      }
+      const targetId = segments[segments.length - 1];
+      const target = scopeNodes.find((n) => n.id === targetId);
+      if (!target) {
+        setStatus(`Pick: node "${targetId}" no longer exists`);
+        return;
+      }
+
+      const samePath =
+        editPath.length === path.length && editPath.every((id, i) => id === path[i]);
+      if (!samePath) {
+        setEditPath(path);
+        setInfoNodeId(null);
+        setContextMenu(null);
+        setPreviewTargetId(null);
+      }
+
+      const markSelected = (nds: Node[]): Node[] =>
+        nds.map((n) => ({ ...n, selected: n.id === targetId }));
+      if (path.length === 0) {
+        setNodes((nds) => markSelected(nds as Node[]));
+      } else {
+        const scopeId = path[path.length - 1];
+        setSubgraphs((subs) =>
+          subs.map((sg) =>
+            sg.id === scopeId
+              ? { ...sg, nodes: markSelected(sg.nodes as unknown as Node[]) as unknown as GraphNode[] }
+              : sg,
+          ),
+        );
+      }
+      setSelectedNode(target);
+      window.setTimeout(
+        () => void fitView({ nodes: [{ id: targetId }], duration: 300, padding: 0.4, maxZoom: 1.5 }),
+        80,
+      );
+      setStatus(`Picked ${target.type ?? 'node'} "${targetId}"`);
+    },
+    [nodes, subgraphs, editPath, currentSubgraph, viewNodes, fitView, setNodes, setSubgraphs],
+  );
+
   const onNodeDoubleClick: NodeMouseHandler = useCallback(
     (_, node) => {
       if (node.type !== 'Subgraph') return;
@@ -1307,6 +1372,24 @@ function PcgEditor() {
             }}
           />
         )}
+        {showPreview && (
+          <PreviewViewport
+            ref={previewViewportRef}
+            data={previewData}
+            loading={previewLoading}
+            error={previewError}
+            onRefresh={() => void requestPreviewCook()}
+            parameters={viewParameters}
+            parameterNodeIds={previewParameterNodeIds}
+            parameterValues={previewParameterValues}
+            onParameterValueChange={updatePreviewParameterValue}
+            onResetParameters={resetPreviewParameters}
+            onSaveParameterDefaults={savePreviewParametersAsDefaults}
+            splineEdit={splineEditForViewport}
+            onPickNode={handlePreviewPickNode}
+            selectedNodeId={selectedNode?.id ?? null}
+          />
+        )}
         <div className="pcg-graph-container">
           {/* Breadcrumb — visible while editing inside a subgraph */}
           {editPath.length > 0 && (
@@ -1392,22 +1475,6 @@ function PcgEditor() {
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}
-          />
-        )}
-        {showPreview && (
-          <PreviewViewport
-            ref={previewViewportRef}
-            data={previewData}
-            loading={previewLoading}
-            error={previewError}
-            onRefresh={() => void requestPreviewCook()}
-            parameters={viewParameters}
-            parameterNodeIds={previewParameterNodeIds}
-            parameterValues={previewParameterValues}
-            onParameterValueChange={updatePreviewParameterValue}
-            onResetParameters={resetPreviewParameters}
-            onSaveParameterDefaults={savePreviewParametersAsDefaults}
-            splineEdit={splineEditForViewport}
           />
         )}
       </div>
