@@ -64,6 +64,7 @@ import {
 } from './preview/matcapLibrary';
 import type { Vec3 } from './splineControlPoints';
 import PreviewParametersPopover from './preview/PreviewParametersPopover';
+import ImagePreviewPane from './preview/ImagePreviewPane';
 
 export interface SplineEditContext {
   nodeId: string;
@@ -1009,6 +1010,15 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
   const xrayActive = xrayEnabled && shadingMode === 'solid';
 
+  const images = data?.images ?? [];
+  const has3dContent = !!(data?.geometry || data?.mesh || data?.scatterPoints) || (data?.splines?.splines.length ?? 0) > 0;
+  const preferredTab: '3d' | 'image' = images.length > 0 && !has3dContent ? 'image' : '3d';
+  const [tabOverride, setTabOverride] = useState<'3d' | 'image' | null>(null);
+  // Follow the cooked output type on each new result; a manual tab click wins
+  // until the next cook lands (Blender viewer-node style).
+  useEffect(() => setTabOverride(null), [data]);
+  const activeTab = tabOverride ?? preferredTab;
+
   const geometry = data?.geometry ?? null;
   const splineCount = data?.splines?.splines.length ?? 0;
   const stats = geometry
@@ -1021,7 +1031,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       ? `${data.scatterPoints.length / 3} scatter pts`
       : splineCount > 0
         ? `${splineCount} spline${splineCount === 1 ? '' : 's'}`
-        : 'no geometry';
+        : images.length > 0
+          ? `image · ${images[0].nodeId}`
+          : 'no geometry';
 
   return (
     <div className="pcg-preview" style={{ width }}>
@@ -1041,13 +1053,47 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         </div>
       )}
       <div className="pcg-preview__viewport">
+        <div className="pcg-preview__tabs" role="tablist" aria-label="Preview type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === '3d'}
+            className={`pcg-preview__tab${activeTab === '3d' ? ' is-active' : ''}`}
+            title={has3dContent ? '3D scene preview' : '3D scene preview (cook produced no geometry)'}
+            onClick={() => setTabOverride('3d')}
+          >
+            3D
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'image'}
+            className={`pcg-preview__tab${activeTab === 'image' ? ' is-active' : ''}`}
+            title={images.length > 0 ? 'Image preview' : 'Cook produced no image'}
+            onClick={() => setTabOverride('image')}
+          >
+            Image
+          </button>
+        </div>
         <div
           ref={containerRef}
           className="pcg-preview__canvas"
           tabIndex={0}
+          style={activeTab === 'image' ? { visibility: 'hidden' } : undefined}
           title="Click to focus · MMB orbit · Shift+MMB pan · Shift+RMB rotate IBL · scroll zoom · F frame"
           onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
         />
+        {activeTab === 'image' && (
+          images.length > 0 ? (
+            <ImagePreviewPane image={images[0]} />
+          ) : (
+            <div className="pcg-preview__image-pane pcg-preview__image-pane--empty">
+              <span>Cook produced no image</span>
+            </div>
+          )
+        )}
+        {activeTab === '3d' && (
+        <>
         <div className="pcg-preview__axis-navigation" role="group" aria-label="Axis views">
           <svg className="pcg-preview__axis-stems" viewBox="0 0 84 84" aria-hidden="true">
             {(['x', 'y', 'z'] as const).map((axis) => (
@@ -1192,6 +1238,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             )}
           </div>
         </div>
+        </>
+        )}
         <div className="pcg-preview__parameter-overlay">
           <PreviewParametersPopover
             parameters={parameters}

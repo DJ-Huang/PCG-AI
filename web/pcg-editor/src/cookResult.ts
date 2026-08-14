@@ -678,6 +678,41 @@ export function parseSplineJson(json: string): ParsedSplines | null {
 }
 
 /**
+ * Texture descriptor emitted by ImageTexture/MeshyImageGen when the preview
+ * target outputs a Texture pin (pcg-core mesh_elements.cpp). `source` is the
+ * node data storage string (pcg-resource://…, /assets/… or URL), empty when
+ * the node has no image baked yet.
+ */
+export interface ParsedTexture {
+  slotId: string;
+  source: string;
+  repeatX: number;
+  repeatY: number;
+}
+
+export function parseTextureJson(json: string): ParsedTexture | null {
+  if (!json.trim()) return null;
+  try {
+    const payload = JSON.parse(json) as {
+      kind?: unknown;
+      slotId?: unknown;
+      source?: unknown;
+      repeatX?: unknown;
+      repeatY?: unknown;
+    };
+    if (payload.kind !== 'texture' || typeof payload.slotId !== 'string') return null;
+    return {
+      slotId: payload.slotId,
+      source: typeof payload.source === 'string' ? payload.source : '',
+      repeatX: Number.isFinite(payload.repeatX) ? Number(payload.repeatX) : 1,
+      repeatY: Number.isFinite(payload.repeatY) ? Number(payload.repeatY) : 1,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Per-triangle node attribution emitted by pcg-core for preview-sink cooks.
  * triangleSources[i] indexes sourceNodes for PCGM triangle i; -1 = unknown.
  */

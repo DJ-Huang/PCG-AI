@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphJson } from './graphSchema';
+import { PcgExecuteKind, type CookResult } from './cookResult';
 import {
   PREVIEW_SINK_NODE_ID,
   SUBGRAPH_PREVIEW_OUTPUT_ID,
+  buildPreviewDataFromCook,
   buildSubgraphCookGraph,
   prepareGraphForPreviewCook,
 } from './previewCook';
@@ -134,5 +136,61 @@ describe('buildSubgraphCookGraph', () => {
     expect(cooked.parameters?.map((p) => p.id)).toEqual(['p1']);
     // The output feeder is rewired to the synthetic Output node.
     expect(cooked.edges.some((e) => e.target === SUBGRAPH_PREVIEW_OUTPUT_ID && e.source === 'chain_b')).toBe(true);
+  });
+});
+
+function cookStub(json: string): CookResult {
+  return {
+    code: 0,
+    kind: PcgExecuteKind.Json,
+    nodesExecuted: 1,
+    nodesSkipped: 0,
+    graphExecuteMs: 0,
+    binaryWriteMs: 0,
+    pointCount: 0,
+    pointAttrFlags: 0,
+    vertexCount: 0,
+    indexCount: 0,
+    error: '',
+    json,
+    mesh: new Uint8Array(),
+    points: new Uint8Array(),
+    geometry: new Uint8Array(),
+    heightfield: new Uint8Array(),
+    perf: '',
+  };
+}
+
+describe('buildPreviewDataFromCook texture output', () => {
+  it('accepts a texture-only cook result and resolves the image url', () => {
+    const result = buildPreviewDataFromCook(cookStub(JSON.stringify({
+      kind: 'texture',
+      slotId: 'tex1',
+      source: 'pcg-resource://textures/brick.png',
+      repeatX: 2,
+      repeatY: 3,
+    })));
+    expect(result.ok).toBe(true);
+    expect(result.data?.images).toEqual([
+      {
+        nodeId: 'tex1',
+        storage: 'pcg-resource://textures/brick.png',
+        url: '/assets/textures/brick.png',
+        repeatX: 2,
+        repeatY: 3,
+      },
+    ]);
+  });
+
+  it('keeps the JSON-only error when the result is not a texture', () => {
+    const result = buildPreviewDataFromCook(cookStub(JSON.stringify({ kind: 'other' })));
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('JSON output only');
+  });
+
+  it('treats a texture without source as previewable with an empty url', () => {
+    const result = buildPreviewDataFromCook(cookStub(JSON.stringify({ kind: 'texture', slotId: 'gen1' })));
+    expect(result.ok).toBe(true);
+    expect(result.data?.images[0]).toMatchObject({ nodeId: 'gen1', url: '', repeatX: 1, repeatY: 1 });
   });
 });

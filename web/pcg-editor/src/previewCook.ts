@@ -16,6 +16,7 @@ import {
   buildHeightFieldPreviewMesh,
   extractCookJsonText,
   isHeightFieldCookJson,
+  parseTextureJson,
   PcgExecuteKind,
   type CookResult,
   type ParsedGeometry,
@@ -24,7 +25,19 @@ import {
   type ParsedSplines,
   type SourceMapping,
 } from './cookResult';
-import { parsePbrMaterialLibrary, type PbrMaterialLibrary } from './preview/pbrMaterials';
+import { parsePbrMaterialLibrary, resolvePbrTextureUrl, type PbrMaterialLibrary } from './preview/pbrMaterials';
+
+/** A previewable image from a Texture-output node (ImageTexture/MeshyImageGen). */
+export interface PreviewImage {
+  /** Id of the node that produced the texture (cook JSON slotId). */
+  nodeId: string;
+  /** Raw storage string from node data (pcg-resource://…, /assets/…, URL). */
+  storage: string;
+  /** Resolved URL for <img>; empty when the node has no image source. */
+  url: string;
+  repeatX: number;
+  repeatY: number;
+}
 
 export interface PreviewData {
   /** Polygon geometry (edges/points modes) when the graph outputs faces. */
@@ -39,6 +52,8 @@ export interface PreviewData {
   heightfield: ParsedHeightField | null;
   /** PBR definitions keyed by PCGM material slot name. */
   materials: PbrMaterialLibrary;
+  /** Texture-output images when the preview target outputs a Texture pin. */
+  images: PreviewImage[];
   /** Per-triangle node attribution (preview-sink cooks only); null when absent. */
   sourceMapping: SourceMapping | null;
   cook: CookResult;
@@ -348,10 +363,21 @@ export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
   const cookJson = extractCookJsonText(cook);
   const materials = parsePbrMaterialLibrary(cookJson);
   const sourceMapping = parseSourceMapping(cookJson);
+  const images: PreviewImage[] = [];
+  const texture = parseTextureJson(cookJson);
+  if (texture) {
+    images.push({
+      nodeId: texture.slotId,
+      storage: texture.source,
+      url: texture.source ? resolvePbrTextureUrl(texture.source) : '',
+      repeatX: texture.repeatX,
+      repeatY: texture.repeatY,
+    });
+  }
   if (cookJson) {
     splines = parseSplineJson(cookJson);
   }
-  if (!geometry && !mesh && !scatterPoints && !splines) {
+  if (!geometry && !mesh && !scatterPoints && !splines && images.length === 0) {
     if (heightfieldParseError) {
       return {
         ok: false,
@@ -371,7 +397,7 @@ export function buildPreviewDataFromCook(cook: CookResult): PreviewResponse {
     return { ok: false, error: 'Cook succeeded but produced no previewable geometry.' };
   }
 
-  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, materials, sourceMapping, cook } };
+  return { ok: true, data: { geometry, mesh, scatterPoints, splines, heightfield, materials, images, sourceMapping, cook } };
 }
 
 export async function cookGraphPreview(
