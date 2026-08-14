@@ -65,6 +65,7 @@ import {
 import type { Vec3 } from './splineControlPoints';
 import PreviewParametersPopover from './preview/PreviewParametersPopover';
 import ImagePreviewPane from './preview/ImagePreviewPane';
+import UvPreviewPane from './preview/UvPreviewPane';
 
 export interface SplineEditContext {
   nodeId: string;
@@ -1013,7 +1014,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const images = data?.images ?? [];
   const has3dContent = !!(data?.geometry || data?.mesh || data?.scatterPoints) || (data?.splines?.splines.length ?? 0) > 0;
   const preferredTab: '3d' | 'image' = images.length > 0 && !has3dContent ? 'image' : '3d';
-  const [tabOverride, setTabOverride] = useState<'3d' | 'image' | null>(null);
+  const [tabOverride, setTabOverride] = useState<'3d' | 'image' | 'uv' | null>(null);
   // Follow the cooked output type on each new result; a manual tab click wins
   // until the next cook lands (Blender viewer-node style).
   useEffect(() => setTabOverride(null), [data]);
@@ -1067,6 +1068,16 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           <button
             type="button"
             role="tab"
+            aria-selected={activeTab === 'uv'}
+            className={`pcg-preview__tab${activeTab === 'uv' ? ' is-active' : ''}`}
+            title={data?.mesh?.uvs ? 'UV layout preview' : 'UV layout (cook produced no UVs)'}
+            onClick={() => setTabOverride('uv')}
+          >
+            UV
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={activeTab === 'image'}
             className={`pcg-preview__tab${activeTab === 'image' ? ' is-active' : ''}`}
             title={images.length > 0 ? 'Image preview' : 'Cook produced no image'}
@@ -1079,10 +1090,11 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           ref={containerRef}
           className="pcg-preview__canvas"
           tabIndex={0}
-          style={activeTab === 'image' ? { visibility: 'hidden' } : undefined}
+          style={activeTab !== '3d' ? { visibility: 'hidden' } : undefined}
           title="Click to focus · MMB orbit · Shift+MMB pan · Shift+RMB rotate IBL · scroll zoom · F frame"
           onPointerDown={() => containerRef.current?.focus({ preventScroll: true })}
         />
+        {activeTab === 'uv' && <UvPreviewPane mesh={data?.mesh ?? null} />}
         {activeTab === 'image' && (
           images.length > 0 ? (
             <ImagePreviewPane image={images[0]} />

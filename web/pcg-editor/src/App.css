@@ -1656,6 +1656,27 @@
   white-space: nowrap;
 }
 
+.pcg-preview__uv-pane {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  background: #1b1b1c;
+  z-index: 1;
+  touch-action: none;
+}
+
+.pcg-preview__uv-pane:active {
+  cursor: grabbing;
+}
+
+.pcg-preview__uv-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .pcg-preview__axis-navigation {
   position: absolute;
   top: 36px;
