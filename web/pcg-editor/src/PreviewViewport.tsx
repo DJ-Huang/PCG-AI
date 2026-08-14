@@ -1015,9 +1015,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const has3dContent = !!(data?.geometry || data?.mesh || data?.scatterPoints) || (data?.splines?.splines.length ?? 0) > 0;
   const preferredTab: '3d' | 'image' = images.length > 0 && !has3dContent ? 'image' : '3d';
   const [tabOverride, setTabOverride] = useState<'3d' | 'image' | 'uv' | null>(null);
-  // Follow the cooked output type on each new result; a manual tab click wins
-  // until the next cook lands (Blender viewer-node style).
-  useEffect(() => setTabOverride(null), [data]);
+  // Follow the cooked output type only when it flips (geometry ↔ image-only);
+  // re-cooks of the same kind keep the manual tab (3D/UV/Image) selection.
+  useEffect(() => setTabOverride(null), [preferredTab]);
   const activeTab = tabOverride ?? preferredTab;
 
   const geometry = data?.geometry ?? null;

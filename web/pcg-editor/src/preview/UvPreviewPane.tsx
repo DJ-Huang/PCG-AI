@@ -74,8 +74,8 @@ export default function UvPreviewPane({ mesh }: UvPreviewPaneProps) {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => setTransform(null), [uvs, size]);
-
+  // Fit once on first display; re-cooks and resizes keep the current pan/zoom
+  // (double-click resets to null → refit).
   useEffect(() => {
     if (transform || !size || !bounds) return;
     setTransform(fitTransform(size, bounds));
