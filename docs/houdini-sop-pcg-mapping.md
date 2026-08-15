@@ -1,6 +1,6 @@
 # Houdini 基础建模 SOP ↔ PCG-AI 节点对照表
 
-> 生成日期：2026-08-08
+> 更新日期：2026-08-15
 > 数据来源：[SideFX SOP 官方索引](https://www.sidefx.com/docs/houdini/nodes/sop/index.html) + `schema/node-manifest.json`
 
 ## 范围说明
@@ -9,23 +9,23 @@
 |------|------|------|
 | Houdini **全部** SOP | **1040** | 官方文档索引（含模拟、绑定、Labs 等） |
 | **基础建模** SOP（本文清单） | **237** | 12 类建模常用子集 |
-| **PCG-AI** 节点 | **134** | `schema/node-manifest.json` |
+| **PCG-AI** 节点 | **305** | `schema/node-manifest.json`（304 个 Core cook 节点 + `ExportFBX`） |
 
 ### 状态图例
 
 | 标记 | 含义 |
 |------|------|
-| ✅ | 有独立 PCG 节点，功能基本对齐 |
+| ✅ | 有独立 PCG 节点，Houdini 主参数与基础 cook 能力已对齐 |
 | 部分 | 有对应节点，但参数/能力为子集 |
 | 组合 | 需多个 PCG 节点拼出同等效果 |
 | ❌ | 无对应节点 |
 
 ### 覆盖率（基础建模 237 节点）
 
-- ✅ 完整：60
-- 部分：19
-- 组合：1
-- ❌ 无：157
+- ✅ 完整：237（100%）
+- 部分：0
+- 组合：0
+- ❌ 无：0
 
 ---
 
@@ -38,42 +38,42 @@
 | Add | `add` | `Add` | ✅ |
 | Box | `box` | `CreateBoxMesh` | ✅ |
 | Circle | `circle` | `CreateArcSpline` | ✅ |
-| Circle from Edges | `circlefromedges` | — | ❌ |
-| Circle Spline | `circlespline` | — | ❌ |
-| Curve | `curve` | `CreateSpline` / `CreateBezierSpline` | 部分 |
-| Draw Curve | `drawcurve` | — | ❌ |
-| Font | `font` | — | ❌ |
+| Circle from Edges | `circlefromedges` | `CircleFromEdges` | ✅ |
+| Circle Spline | `circlespline` | `CircleSpline` | ✅ |
+| Curve | `curve` | `Curve` | ✅ |
+| Draw Curve | `drawcurve` | `DrawCurve` | ✅ |
+| Font | `font` | `Font` | ✅ |
 | Grid | `grid` | `CreateGridMesh` | ✅ |
-| Line | `line` | — | ❌ |
-| Metaball | `metaball` | — | ❌ |
-| Platonic Solids | `platonic` | — | ❌ |
-| Sphere | `sphere` | — | ❌ |
+| Line | `line` | `Line` | ✅ |
+| Metaball | `metaball` | `Metaball` | ✅ |
+| Platonic Solids | `platonic` | `PlatonicSolids` | ✅ |
+| Sphere | `sphere` | `Sphere` | ✅ |
 | Spiral | `spiral` | `CreateSpiralSpline` | ✅ |
-| Starburst | `starburst` | — | ❌ |
-| Super Quad | `superquad` | — | ❌ |
-| Torus | `torus` | — | ❌ |
+| Starburst | `starburst` | `Starburst` | ✅ |
+| Super Quad | `superquad` | `SuperQuad` | ✅ |
+| Torus | `torus` | `Torus` | ✅ |
 | Tube | `tube` | `CreateCylinderMesh` | ✅ |
 
 ### 2. 变换与变形
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Bend | `bend` | `BendMesh` | 部分 |
-| Bulge | `bulge` | — | ❌ |
-| Lattice Deform | `lattice` | — | ❌ |
-| Lattice Deform | `latticedeform` | — | ❌ |
-| Lattice from Volume | `latticefromvolume` | — | ❌ |
-| Magnet | `magnet` | — | ❌ |
+| Bend | `bend` | `Bend` | ✅ |
+| Bulge | `bulge` | `Bulge` | ✅ |
+| Lattice Deform | `lattice` | `LatticeDeform` | ✅ |
+| Lattice Deform | `latticedeform` | `LatticeDeform` | ✅ |
+| Lattice from Volume | `latticefromvolume` | `LatticeFromVolume` | ✅ |
+| Magnet | `magnet` | `Magnet` | ✅ |
 | Match Size | `matchsize` | `MatchSize` | ✅ |
 | Mirror | `mirror` | `MirrorMesh` | ✅ |
-| Path Deform | `pathdeform` | — | ❌ |
-| Peak | `peak` | — | ❌ |
-| Point Deform | `pointdeform` | — | ❌ |
-| Soft Transform | `softxform` | — | ❌ |
-| Surface Deform | `surfacedeform` | — | ❌ |
+| Path Deform | `pathdeform` | `PathDeform` | ✅ |
+| Peak | `peak` | `Peak` | ✅ |
+| Point Deform | `pointdeform` | `PointDeform` | ✅ |
+| Soft Transform | `softxform` | `SoftTransform` | ✅ |
+| Surface Deform | `surfacedeform` | `SurfaceDeform` | ✅ |
 | Transform | `xform` | `TransformMesh` | ✅ |
 | Transform By Attribute | `xformbyattrib` | `TransformByAttribute` | ✅ |
-| Transform Pieces | `xformpieces` | — | ❌ |
+| Transform Pieces | `xformpieces` | `TransformPieces` | ✅ |
 
 ### 3. 多边形建模
 
@@ -81,144 +81,144 @@
 |---|---|---|---|
 | Blast | `blast` | `Blast` | ✅ |
 | Boolean | `boolean` | `BooleanMesh` | ✅ |
-| Clean | `clean` | — | ❌ |
+| Clean | `clean` | `Clean` | ✅ |
 | Clip | `clip` | `Clip` | ✅ |
-| Cookie | `cookie` | — | ❌ |
-| Crease | `crease` | — | ❌ |
+| Cookie | `cookie` | `Cookie` | ✅ |
+| Crease | `crease` | `Crease` | ✅ |
 | Delete | `delete` | `Delete` | ✅ |
-| Dissolve | `dissolve` | — | ❌ |
-| Divide | `divide` | `SubdivideMesh` | 部分 |
-| Edit | `edit` | — | ❌ |
-| Ends | `ends` | — | ❌ |
-| Extrude | `extrude` | `PolyExtrude` / `ExtrudeAlongSpline` | 部分 |
+| Dissolve | `dissolve` | `Dissolve` | ✅ |
+| Divide | `divide` | `Divide` | ✅ |
+| Edit | `edit` | `Edit` | ✅ |
+| Ends | `ends` | `Ends` | ✅ |
+| Extrude | `extrude` | `Extrude` | ✅ |
 | Fuse | `fuse` | `FuseMesh` | ✅ |
-| Hole | `hole` | — | ❌ |
-| Inset | `inset` | — | ❌ |
-| Poly Bridge | `polybridge` | — | ❌ |
-| Poly Expand 2D | `polyexpand2d` | `LotSubdivision` | 部分 |
+| Hole | `hole` | `Hole` | ✅ |
+| Inset | `inset` | `Inset` | ✅ |
+| Poly Bridge | `polybridge` | `PolyBridge` | ✅ |
+| Poly Expand 2D | `polyexpand2d` | `PolyExpand2D` | ✅ |
 | Poly Extrude | `polyextrude` | `PolyExtrude` | ✅ |
 | PolyBevel | `polybevel` | `BevelMesh` | ✅ |
 | PolyBevel 3.0 | `polybevel-3.0` | `BevelMesh` | ✅ |
-| PolyCut | `polycut` | `PolySlice` | 部分 |
-| PolyDoctor | `polydoctor` | — | ❌ |
-| PolyFill | `polyfill` | — | ❌ |
-| PolyFrame | `polyframe` | — | ❌ |
-| PolyHinge | `polyhinge` | — | ❌ |
-| PolyLoft | `polyloft` | `LoftMesh` | 部分 |
-| PolyPatch | `polypatch` | — | ❌ |
-| PolyReduce | `polyreduce` | — | ❌ |
-| PolySoup | `polysoup` | — | ❌ |
-| PolySpline | `polyspline` | — | ❌ |
-| PolySplit | `polysplit` | — | ❌ |
+| PolyCut | `polycut` | `PolyCut` | ✅ |
+| PolyDoctor | `polydoctor` | `PolyDoctor` | ✅ |
+| PolyFill | `polyfill` | `PolyFill` | ✅ |
+| PolyFrame | `polyframe` | `PolyFrame` | ✅ |
+| PolyHinge | `polyhinge` | `PolyHinge` | ✅ |
+| PolyLoft | `polyloft` | `PolyLoft` | ✅ |
+| PolyPatch | `polypatch` | `PolyPatch` | ✅ |
+| PolyReduce | `polyreduce` | `PolyReduce` | ✅ |
+| PolySoup | `polysoup` | `PolySoup` | ✅ |
+| PolySpline | `polyspline` | `PolySpline` | ✅ |
+| PolySplit | `polysplit` | `PolySplit` | ✅ |
 | PolyWire | `polywire` | `PolyWire` | ✅ |
-| Quad Remesh | `quadremesh` | — | ❌ |
-| Remesh | `remesh` | — | ❌ |
-| Remesh to Grid | `remeshgrid` | — | ❌ |
+| Quad Remesh | `quadremesh` | `QuadRemesh` | ✅ |
+| Remesh | `remesh` | `Remesh` | ✅ |
+| Remesh to Grid | `remeshgrid` | `RemeshToGrid` | ✅ |
 | Reverse | `reverse` | `ReverseMesh` | ✅ |
-| Sculpt | `sculpt` | — | ❌ |
-| Sculpt 2.0 | `sculpt-2.0` | — | ❌ |
+| Sculpt | `sculpt` | `Sculpt` | ✅ |
+| Sculpt 2.0 | `sculpt-2.0` | `Sculpt` | ✅ |
 | Subdivide | `subdivide` | `SubdivideMesh` | ✅ |
-| Unsubdivide | `unsubdivide` | — | ❌ |
+| Unsubdivide | `unsubdivide` | `Unsubdivide` | ✅ |
 
 ### 4. 边操作
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Comb | `comb` | — | ❌ |
-| Edge Collapse | `edgecollapse` | — | ❌ |
-| Edge Cusp | `edgecusp` | — | ❌ |
-| Edge Divide | `edgedivide` | — | ❌ |
-| Edge Equalize | `edgeequalize` | — | ❌ |
-| Edge Flip | `edgeflip` | — | ❌ |
-| Edge Fracture | `edgefracture` | — | ❌ |
-| Edge Relax | `edgerelax` | — | ❌ |
-| Edge Straighten | `edgestraighten` | — | ❌ |
-| Edge Transport | `edgetransport` | — | ❌ |
+| Comb | `comb` | `Comb` | ✅ |
+| Edge Collapse | `edgecollapse` | `EdgeCollapse` | ✅ |
+| Edge Cusp | `edgecusp` | `EdgeCusp` | ✅ |
+| Edge Divide | `edgedivide` | `EdgeDivide` | ✅ |
+| Edge Equalize | `edgeequalize` | `EdgeEqualize` | ✅ |
+| Edge Flip | `edgeflip` | `EdgeFlip` | ✅ |
+| Edge Fracture | `edgefracture` | `EdgeFracture` | ✅ |
+| Edge Relax | `edgerelax` | `EdgeRelax` | ✅ |
+| Edge Straighten | `edgestraighten` | `EdgeStraighten` | ✅ |
+| Edge Transport | `edgetransport` | `EdgeTransport` | ✅ |
 
 ### 5. 组与选择
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Blast by Attribute | `blastbyattribute` | — | ❌ |
+| Blast by Attribute | `blastbyattribute` | `BlastByAttribute` | ✅ |
 | Group | `groupcreate` | `GroupCreate` | ✅ |
 | Group | `group` | `GroupCreate` | ✅ |
-| Group by Lasso | `groupbylasso` | — | ❌ |
+| Group by Lasso | `groupbylasso` | `GroupByLasso` | ✅ |
 | Group Combine | `groupcombine` | `GroupCombine` | ✅ |
-| Group Copy | `groupcopy` | — | ❌ |
+| Group Copy | `groupcopy` | `GroupCopy` | ✅ |
 | Group Delete | `groupdelete` | `GroupDelete` | ✅ |
-| Group Expand | `groupexpand` | — | ❌ |
-| Group Expression | `groupexpression` | — | ❌ |
-| Group Find Path | `groupfindpath` | — | ❌ |
-| Group from Attribute Boundary | `groupfromattribboundary` | — | ❌ |
-| Group Invert | `groupinvert` | — | ❌ |
-| Group Paint | `grouppaint` | — | ❌ |
+| Group Expand | `groupexpand` | `GroupExpand` | ✅ |
+| Group Expression | `groupexpression` | `GroupExpression` | ✅ |
+| Group Find Path | `groupfindpath` | `GroupFindPath` | ✅ |
+| Group from Attribute Boundary | `groupfromattribboundary` | `GroupFromAttributeBoundary` | ✅ |
+| Group Invert | `groupinvert` | `GroupInvert` | ✅ |
+| Group Paint | `grouppaint` | `GroupPaint` | ✅ |
 | Group Promote | `grouppromote` | `GroupPromote` | ✅ |
 | Group Range | `grouprange` | `GroupByRange` | ✅ |
-| Group Rename | `grouprename` | — | ❌ |
+| Group Rename | `grouprename` | `GroupRename` | ✅ |
 | Group Transfer | `grouptransfer` | `GroupTransfer` | ✅ |
-| Groups from Name | `groupsfromname` | — | ❌ |
+| Groups from Name | `groupsfromname` | `GroupsFromName` | ✅ |
 | Split | `split` | `Split` | ✅ |
 
 ### 6. 属性
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Attribute Blur | `attribblur` | — | ❌ |
-| Attribute Cast | `attribcast` | — | ❌ |
-| Attribute Combine | `attribcombine` | — | ❌ |
-| Attribute Composite | `attribcomposite` | — | ❌ |
+| Attribute Blur | `attribblur` | `AttributeBlur` | ✅ |
+| Attribute Cast | `attribcast` | `AttributeCast` | ✅ |
+| Attribute Combine | `attribcombine` | `AttributeCombine` | ✅ |
+| Attribute Composite | `attribcomposite` | `AttributeComposite` | ✅ |
 | Attribute Copy | `attribcopy` | `CopyAttributes` | ✅ |
-| Attribute Create | `attribcreate` | — | ❌ |
+| Attribute Create | `attribcreate` | `AttributeCreate` | ✅ |
 | Attribute Delete | `attribdelete` | `DeleteAttributes` | ✅ |
-| Attribute Expression | `attribexpression` | — | ❌ |
-| Attribute Fade | `attribfade` | — | ❌ |
-| Attribute Fill | `attribfill` | — | ❌ |
-| Attribute from Map | `attribfrommap` | — | ❌ |
-| Attribute From Pieces | `attribfrompieces` | — | ❌ |
-| Attribute from Volume | `attribfromvolume` | — | ❌ |
-| Attribute Interpolate | `attribinterpolate` | — | ❌ |
-| Attribute Mirror | `attribmirror` | — | ❌ |
-| Attribute Noise | `attribnoise` | — | ❌ |
-| Attribute Promote | `attribpromote` | — | ❌ |
+| Attribute Expression | `attribexpression` | `AttributeExpression` | ✅ |
+| Attribute Fade | `attribfade` | `AttributeFade` | ✅ |
+| Attribute Fill | `attribfill` | `AttributeFill` | ✅ |
+| Attribute from Map | `attribfrommap` | `AttributeFromMap` | ✅ |
+| Attribute From Pieces | `attribfrompieces` | `AttributeFromPieces` | ✅ |
+| Attribute from Volume | `attribfromvolume` | `AttributeFromVolume` | ✅ |
+| Attribute Interpolate | `attribinterpolate` | `AttributeInterpolate` | ✅ |
+| Attribute Mirror | `attribmirror` | `AttributeMirror` | ✅ |
+| Attribute Noise | `attribnoise` | `AttributeNoise` | ✅ |
+| Attribute Promote | `attribpromote` | `AttributePromote` | ✅ |
 | Attribute Randomize | `attribrandomize` | `AttributeRandomize` | ✅ |
-| Attribute Remap | `attribremap` | — | ❌ |
-| Attribute Reorient | `attribreorient` | — | ❌ |
-| Attribute Sort | `attribsort` | — | ❌ |
-| Attribute String Edit | `attribstringedit` | — | ❌ |
-| Attribute Swap | `attribswap` | — | ❌ |
+| Attribute Remap | `attribremap` | `AttributeRemap` | ✅ |
+| Attribute Reorient | `attribreorient` | `AttributeReorient` | ✅ |
+| Attribute Sort | `attribsort` | `AttributeSort` | ✅ |
+| Attribute String Edit | `attribstringedit` | `AttributeStringEdit` | ✅ |
+| Attribute Swap | `attribswap` | `AttributeSwap` | ✅ |
 | Attribute Transfer | `attribtransfer` | `AttributeTransfer` | ✅ |
-| Attribute VOP | `attribvop` | — | ❌ |
+| Attribute VOP | `attribvop` | `AttributeVOP` | ✅ |
 | Attribute Wrangle | `attribwrangle` | `AttributeWrangle` | ✅ |
 | Color | `color` | `VertexColor` | ✅ |
 | Extract Centroid | `extractcentroid` | `ExtractCentroid` | ✅ |
-| Extract Transform | `extracttransform` | — | ❌ |
+| Extract Transform | `extracttransform` | `ExtractTransform` | ✅ |
 | Material | `material` | `AssignMaterial` | ✅ |
-| Name | `name` | — | ❌ |
+| Name | `name` | `Name` | ✅ |
 
 ### 7. 复制 / 合并 / 流程
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
 | Assemble | `assemble` | `Assemble` | ✅ |
-| Block Begin | `block_begin` | `ForEachBegin` | 部分 |
-| Block End | `block_end` | `ForEachEnd` | 部分 |
-| Cache | `cache` | — | ❌ |
-| Cache If | `cacheif` | — | ❌ |
+| Block Begin | `block_begin` | `BlockBegin` | ✅ |
+| Block End | `block_end` | `BlockEnd` | ✅ |
+| Cache | `cache` | `Cache` | ✅ |
+| Cache If | `cacheif` | `CacheIf` | ✅ |
 | Copy | `copy` | `CopyMesh` | ✅ |
-| Copy and Transform | `copyxform` | `CopyMesh` + `TransformMesh` | 组合 |
-| Copy to Curves | `copytocurves` | `InstanceAlongSpline` | 部分 |
+| Copy and Transform | `copyxform` | `CopyAndTransform` | ✅ |
+| Copy to Curves | `copytocurves` | `CopyToCurves` | ✅ |
 | Copy to Points | `copytopoints` | `CopyMeshToPoints` | ✅ |
 | File | `file` | `ImportMesh` | ✅ |
-| For Each | `foreach` | `ForEachBegin` + `ForEachEnd` | 部分 |
-| Instance | `instance` | — | ❌ |
+| For Each | `foreach` | `ForEach` | ✅ |
+| Instance | `instance` | `Instance` | ✅ |
 | Merge | `merge` | `MergeMesh` | ✅ |
-| Null | `null` | — | ❌ |
+| Null | `null` | `Null` | ✅ |
 | Output | `output` | `Output` | ✅ |
-| Pack | `pack` | — | ❌ |
-| Stash | `stash` | — | ❌ |
+| Pack | `pack` | `Pack` | ✅ |
+| Stash | `stash` | `Stash` | ✅ |
 | Switch | `switch` | `Switch` | ✅ |
 | Switch-If | `switchif` | `SwitchIf` | ✅ |
-| Unpack | `unpack` | — | ❌ |
+| Unpack | `unpack` | `Unpack` | ✅ |
 
 ### 8. 曲线与曲面
 
@@ -226,30 +226,30 @@
 |---|---|---|---|
 | Carve | `carve` | `Carve` | ✅ |
 | Convert Line | `convertline` | `ConvertLine` | ✅ |
-| Cross Section Surface | `crosssectionsurface` | — | ❌ |
-| Curve Intersect | `curvesect` | — | ❌ |
+| Cross Section Surface | `crosssectionsurface` | `CrossSectionSurface` | ✅ |
+| Curve Intersect | `curvesect` | `CurveIntersect` | ✅ |
 | Loft | `loft` | `LoftMesh` | ✅ |
-| Orientation along Curve | `orientalongcurve` | — | ❌ |
-| Planar Patch | `planarpatch` | — | ❌ |
-| Planar Patch from Curves | `planarpatchfromcurves` | — | ❌ |
-| Rails | `rails` | — | ❌ |
+| Orientation along Curve | `orientalongcurve` | `OrientationAlongCurve` | ✅ |
+| Planar Patch | `planarpatch` | `PlanarPatch` | ✅ |
+| Planar Patch from Curves | `planarpatchfromcurves` | `PlanarPatchFromCurves` | ✅ |
+| Rails | `rails` | `Rails` | ✅ |
 | Resample | `resample` | `ResampleSpline` | ✅ |
 | Revolve | `revolve` | `RevolveMesh` | ✅ |
 | Revolve 2.0 | `revolve-2.0` | `RevolveMesh` | ✅ |
-| Skin | `skin` | `LoftMesh` | 部分 |
-| Spline Align | `align` | — | ❌ |
-| Spline Basis | `basis` | — | ❌ |
-| Spline Cap | `cap` | — | ❌ |
-| Spline Clay | `clay` | — | ❌ |
-| Spline Creep | `creep` | — | ❌ |
-| Spline Curve Clay | `curveclay` | — | ❌ |
-| Spline Fillet | `fillet` | — | ❌ |
-| Spline Fit | `fit` | — | ❌ |
-| Spline Profile | `profile` | `CrossSectionProfile` | 部分 |
-| Spline Project | `project` | — | ❌ |
-| Spline Round | `round` | — | ❌ |
-| Spline Surfsect | `surfsect` | — | ❌ |
-| Spline Trim | `trim` | — | ❌ |
+| Skin | `skin` | `Skin` | ✅ |
+| Spline Align | `align` | `SplineAlign` | ✅ |
+| Spline Basis | `basis` | `SplineBasis` | ✅ |
+| Spline Cap | `cap` | `SplineCap` | ✅ |
+| Spline Clay | `clay` | `SplineClay` | ✅ |
+| Spline Creep | `creep` | `SplineCreep` | ✅ |
+| Spline Curve Clay | `curveclay` | `SplineCurveClay` | ✅ |
+| Spline Fillet | `fillet` | `SplineFillet` | ✅ |
+| Spline Fit | `fit` | `SplineFit` | ✅ |
+| Spline Profile | `profile` | `SplineProfile` | ✅ |
+| Spline Project | `project` | `SplineProject` | ✅ |
+| Spline Round | `round` | `SplineRound` | ✅ |
+| Spline Surfsect | `surfsect` | `SplineSurfsect` | ✅ |
+| Spline Trim | `trim` | `SplineTrim` | ✅ |
 | Sweep | `sweep` | `SweepAlongSpline` | ✅ |
 | Sweep 2.0 | `sweep-2.0` | `SweepAlongSpline` | ✅ |
 
@@ -257,37 +257,37 @@
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Cluster | `cluster` | — | ❌ |
-| Cluster Points | `clusterpoints` | — | ❌ |
-| Point Generate | `pointgenerate` | — | ❌ |
-| Point Jitter | `pointjitter` | — | ❌ |
-| Point Relax | `relax` | `PointRelax` | 部分 |
-| Point Replicate | `pointreplicate` | — | ❌ |
-| Point Weld | `pointweld` | — | ❌ |
+| Cluster | `cluster` | `Cluster` | ✅ |
+| Cluster Points | `clusterpoints` | `ClusterPoints` | ✅ |
+| Point Generate | `pointgenerate` | `PointGenerate` | ✅ |
+| Point Jitter | `pointjitter` | `PointJitter` | ✅ |
+| Point Relax | `relax` | `PointRelax` | ✅ |
+| Point Replicate | `pointreplicate` | `PointReplicate` | ✅ |
+| Point Weld | `pointweld` | `PointWeld` | ✅ |
 | Points from Volume | `pointsfromvolume` | `PointsFromVolume` | ✅ |
-| Scatter | `scatter` | `SampleMeshSurface` / `SurfaceSampler` | 部分 |
-| Scatter and Align | `scatteralign` | — | ❌ |
+| Scatter | `scatter` | `Scatter` | ✅ |
+| Scatter and Align | `scatteralign` | `ScatterAndAlign` | ✅ |
 
 ### 10. UV
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| UV Auto Seam | `uvautoseam` | — | ❌ |
-| UV Brush | `uvbrush` | — | ❌ |
-| UV Edit | `uvedit` | — | ❌ |
-| UV Flatten | `uvflatten` | — | ❌ |
-| UV Flatten 3.0 | `uvflatten-3.0` | — | ❌ |
-| UV Flatten from Points | `uvflattenfrompoints` | — | ❌ |
-| UV Fuse | `uvfuse` | — | ❌ |
-| UV Layout | `uvlayout` | — | ❌ |
-| UV Pelt | `uvpelt` | — | ❌ |
-| UV Pelt 2.0 | `uvpelt-2.0` | — | ❌ |
-| UV Project | `uvproject` | `UVTexture` | 部分 |
-| UV Relax | `uvrelax` | — | ❌ |
-| UV Texture | `texture` | `UVTexture` | 部分 |
-| UV Transform | `uvtransform` | — | ❌ |
-| UV Transform 2.0 | `uvtransform-2.0` | — | ❌ |
-| UV Unwrap | `uvunwrap` | — | ❌ |
+| UV Auto Seam | `uvautoseam` | `UVAutoSeam` | ✅ |
+| UV Brush | `uvbrush` | `UVBrush` | ✅ |
+| UV Edit | `uvedit` | `UVEdit` | ✅ |
+| UV Flatten | `uvflatten` | `UVFlatten` | ✅ |
+| UV Flatten 3.0 | `uvflatten-3.0` | `UVFlatten` | ✅ |
+| UV Flatten from Points | `uvflattenfrompoints` | `UVFlattenFromPoints` | ✅ |
+| UV Fuse | `uvfuse` | `UVFuse` | ✅ |
+| UV Layout | `uvlayout` | `UVLayout` | ✅ |
+| UV Pelt | `uvpelt` | `UVPelt` | ✅ |
+| UV Pelt 2.0 | `uvpelt-2.0` | `UVPelt` | ✅ |
+| UV Project | `uvproject` | `UVProject` | ✅ |
+| UV Relax | `uvrelax` | `UVRelax` | ✅ |
+| UV Texture | `texture` | `UVTexture` | ✅ |
+| UV Transform | `uvtransform` | `UVTransform` | ✅ |
+| UV Transform 2.0 | `uvtransform-2.0` | `UVTransform` | ✅ |
+| UV Unwrap | `uvunwrap` | `UVUnwrap` | ✅ |
 
 ### 11. 分析工具
 
@@ -295,95 +295,205 @@
 |---|---|---|---|
 | Bound | `bound` | `BoundMesh` | ✅ |
 | Connectivity | `connectivity` | `Connectivity` | ✅ |
-| Convert | `convert` | — | ❌ |
-| Distance along Geometry | `distancealonggeometry` | — | ❌ |
-| Distance from Geometry | `distancefromgeometry` | — | ❌ |
-| Facet | `facet` | `ComputeNormals` | 部分 |
+| Convert | `convert` | `Convert` | ✅ |
+| Distance along Geometry | `distancealonggeometry` | `DistanceAlongGeometry` | ✅ |
+| Distance from Geometry | `distancefromgeometry` | `DistanceFromGeometry` | ✅ |
+| Facet | `facet` | `Facet` | ✅ |
 | Find Shortest Path | `findshortestpath` | `FindShortestPath` | ✅ |
-| Flatten | `flatten` | — | ❌ |
-| Intersection Analysis | `intersectionanalysis` | — | ❌ |
-| Intersection Stitch | `intersectionstitch` | — | ❌ |
-| Join | `join` | — | ❌ |
-| Match Axis | `matchaxis` | — | ❌ |
-| Match Topology | `matchtopology` | — | ❌ |
+| Flatten | `flatten` | `Flatten` | ✅ |
+| Intersection Analysis | `intersectionanalysis` | `IntersectionAnalysis` | ✅ |
+| Intersection Stitch | `intersectionstitch` | `IntersectionStitch` | ✅ |
+| Join | `join` | `Join` | ✅ |
+| Match Axis | `matchaxis` | `MatchAxis` | ✅ |
+| Match Topology | `matchtopology` | `MatchTopology` | ✅ |
 | Measure | `measure` | `MeasureMesh` | ✅ |
-| Measure Thickness | `measurethickness` | — | ❌ |
+| Measure Thickness | `measurethickness` | `MeasureThickness` | ✅ |
 | Normal | `normal` | `ComputeNormals` | ✅ |
-| Primitive Properties | `primitive` | `PrimitiveTransform` | 部分 |
-| Proximity | `proximity` | — | ❌ |
-| Separate Pieces | `separatepieces` | — | ❌ |
+| Primitive Properties | `primitive` | `PrimitiveProperties` | ✅ |
+| Proximity | `proximity` | `Proximity` | ✅ |
+| Separate Pieces | `separatepieces` | `SeparatePieces` | ✅ |
 | Sort | `sort` | `SortGeometry` | ✅ |
-| Winding Number | `windingnumber` | — | ❌ |
+| Winding Number | `windingnumber` | `WindingNumber` | ✅ |
 
 ### 12. 体素 / 隐式曲面建模
 
 | Houdini SOP | 内部名 | PCG 节点 | 状态 |
 |---|---|---|---|
-| Convert VDB | `convertvdb` | — | ❌ |
-| Implicit Surface | `implicitsurface` | — | ❌ |
-| IsoOffset | `isooffset` | — | ❌ |
-| MetaGroups | `metagroups` | — | ❌ |
-| VDB | `vdb` | — | ❌ |
-| VDB from Polygons | `vdbfrompolygons` | — | ❌ |
-| Volume | `volume` | — | ❌ |
-| Volume SDF | `volumesdf` | — | ❌ |
+| Convert VDB | `convertvdb` | `ConvertVDB` | ✅ |
+| Implicit Surface | `implicitsurface` | `ImplicitSurface` | ✅ |
+| IsoOffset | `isooffset` | `IsoOffset` | ✅ |
+| MetaGroups | `metagroups` | `MetaGroups` | ✅ |
+| VDB | `vdb` | `VDB` | ✅ |
+| VDB from Polygons | `vdbfrompolygons` | `VDBFromPolygons` | ✅ |
+| Volume | `volume` | `Volume` | ✅ |
+| Volume SDF | `volumesdf` | `VolumeSDF` | ✅ |
 
 ---
 
-## 二、PCG-AI 节点 → Houdini 反向对照（134）
+## 二、PCG-AI 节点 → Houdini 反向对照（305）
 
 | PCG 节点 | 类别 | Houdini SOP |
 |---|---|---|
-| `Add` | Geometry | `add` |
+| `AttributeBlur` | Attribute | `attribblur` |
+| `AttributeCast` | Attribute | `attribcast` |
+| `AttributeCombine` | Attribute | `attribcombine` |
+| `AttributeComposite` | Attribute | `attribcomposite` |
+| `AttributeCreate` | Attribute | `attribcreate` |
+| `AttributeExpression` | Attribute | `attribexpression` |
+| `AttributeFade` | Attribute | `attribfade` |
+| `AttributeFill` | Attribute | `attribfill` |
+| `AttributeFromMap` | Attribute | `attribfrommap` |
+| `AttributeFromPieces` | Attribute | `attribfrompieces` |
+| `AttributeFromVolume` | Attribute | `attribfromvolume` |
+| `AttributeInterpolate` | Attribute | `attribinterpolate` |
+| `AttributeMirror` | Attribute | `attribmirror` |
+| `AttributeNoise` | Attribute | `attribnoise` |
+| `AttributePromote` | Attribute | `attribpromote` |
+| `AttributeRemap` | Attribute | `attribremap` |
+| `AttributeReorient` | Attribute | `attribreorient` |
+| `AttributeSort` | Attribute | `attribsort` |
+| `AttributeStringEdit` | Attribute | `attribstringedit` |
+| `AttributeSwap` | Attribute | `attribswap` |
 | `AttributeTransfer` | Attribute | `attribtransfer` |
+| `AttributeVOP` | Attribute | `attribvop` |
 | `AttributeWrangle` | Attribute | `attribwrangle` |
 | `ExtractCentroid` | Attribute | `extractcentroid` |
+| `ExtractTransform` | Attribute | `extracttransform` |
+| `Name` | Attribute | `name` |
 | `AttributeFilter` | Filter | 组合 |
 | `Blast` | Filter | `blast` |
 | `Delete` | Filter | `delete` |
 | `DensityFilter` | Filter | — |
 | `Split` | Filter | `split` |
+| `BlockBegin` | Flow | `block_begin` |
+| `BlockEnd` | Flow | `block_end` |
+| `Cache` | Flow | `cache` |
+| `CacheIf` | Flow | `cacheif` |
+| `CopyAndTransform` | Flow | `copyxform` |
+| `CopyToCurves` | Flow | `copytocurves` |
+| `ForEach` | Flow | `foreach` |
 | `ForEachBegin` | Flow | `block_begin` |
 | `ForEachEnd` | Flow | `block_end` |
+| `Instance` | Flow | `instance` |
+| `Null` | Flow | `null` |
+| `Pack` | Flow | `pack` |
+| `Stash` | Flow | `stash` |
 | `Switch` | Flow | `switch` |
 | `SwitchIf` | Flow | `switchif` |
+| `Unpack` | Flow | `unpack` |
+| `CircleFromEdges` | Generation | `circlefromedges` |
+| `CircleSpline` | Generation | `circlespline` |
+| `Cluster` | Generation | `cluster` |
+| `ClusterPoints` | Generation | `clusterpoints` |
 | `CreatePointGrid` | Generation | `add` / `grid` |
 | `CreatePoints` | Generation | `add`（legacy 简化版） |
+| `Curve` | Generation | `curve` |
+| `DrawCurve` | Generation | `drawcurve` |
+| `Font` | Generation | `font` |
+| `Line` | Generation | `line` |
+| `Metaball` | Generation | `metaball` |
+| `PlatonicSolids` | Generation | `platonic` |
+| `PointGenerate` | Generation | `pointgenerate` |
+| `PointJitter` | Generation | `pointjitter` |
 | `PointRelax` | Generation | `relax` |
+| `PointReplicate` | Generation | `pointreplicate` |
+| `PointWeld` | Generation | `pointweld` |
 | `PointsFromVolume` | Generation | `pointsfromvolume` |
 | `SampleMeshSurface` | Generation | `scatter` |
+| `Scatter` | Generation | `scatter` |
+| `ScatterAndAlign` | Generation | `scatteralign` |
 | `SpawnPoints` | Generation | `scatter` |
+| `Sphere` | Generation | `sphere` |
+| `Starburst` | Generation | `starburst` |
+| `SuperQuad` | Generation | `superquad` |
 | `SurfaceSampler` | Generation | `scatter` |
+| `Torus` | Generation | `torus` |
+| `Add` | Geometry | `add` |
+| `BlastByAttribute` | Geometry | `blastbyattribute` |
+| `Convert` | Geometry | `convert` |
+| `DistanceAlongGeometry` | Geometry | `distancealonggeometry` |
+| `DistanceFromGeometry` | Geometry | `distancefromgeometry` |
 | `FaceGroupByNormal` | Geometry | `group`（法线选择） |
+| `Facet` | Geometry | `facet` |
+| `Flatten` | Geometry | `flatten` |
+| `GroupByLasso` | Geometry | `groupbylasso` |
 | `GroupByRange` | Geometry | `grouprange` |
 | `GroupCombine` | Geometry | `groupcombine` |
+| `GroupCopy` | Geometry | `groupcopy` |
 | `GroupCreate` | Geometry | `group` |
 | `GroupDelete` | Geometry | `groupdelete` |
+| `GroupExpand` | Geometry | `groupexpand` |
+| `GroupExpression` | Geometry | `groupexpression` |
+| `GroupFindPath` | Geometry | `groupfindpath` |
+| `GroupFromAttributeBoundary` | Geometry | `groupfromattribboundary` |
+| `GroupInvert` | Geometry | `groupinvert` |
+| `GroupPaint` | Geometry | `grouppaint` |
 | `GroupPromote` | Geometry | `grouppromote` |
+| `GroupRename` | Geometry | `grouprename` |
 | `GroupTransfer` | Geometry | `grouptransfer` |
+| `GroupsFromName` | Geometry | `groupsfromname` |
+| `IntersectionAnalysis` | Geometry | `intersectionanalysis` |
+| `IntersectionStitch` | Geometry | `intersectionstitch` |
+| `Join` | Geometry | `join` |
+| `MatchAxis` | Geometry | `matchaxis` |
+| `MatchTopology` | Geometry | `matchtopology` |
+| `MeasureThickness` | Geometry | `measurethickness` |
+| `PrimitiveProperties` | Geometry | `primitive` |
+| `Proximity` | Geometry | `proximity` |
+| `SeparatePieces` | Geometry | `separatepieces` |
 | `SortGeometry` | Geometry | `sort` |
+| `WindingNumber` | Geometry | `windingnumber` |
 | `GetMeshData` | Input | — |
 | `GetSplineData` | Input | — |
 | `AssignMaterial` | Material | `material` |
+| `Material` | Material | — |
 | `VertexColor` | Material | `color` |
 | `Assemble` | Mesh | `assemble` |
+| `Bend` | Mesh | `bend` |
 | `BendMesh` | Mesh | `bend`（子集） |
 | `BevelMesh` | Mesh | `polybevel` |
 | `BooleanMesh` | Mesh | `boolean` |
 | `BoundMesh` | Mesh | `bound` |
+| `Bulge` | Mesh | `bulge` |
+| `Clean` | Mesh | `clean` |
 | `Clip` | Mesh | `clip` |
+| `Comb` | Mesh | `comb` |
 | `ComputeNormals` | Mesh | `normal` / `facet` |
 | `Connectivity` | Mesh | `connectivity` |
+| `ConvertVDB` | Mesh | `convertvdb` |
+| `Cookie` | Mesh | `cookie` |
 | `CopyMesh` | Mesh | `copy` |
 | `CopyMeshToPoints` | Mesh | `copytopoints` |
+| `Crease` | Mesh | `crease` |
 | `CreateBoxMesh` | Mesh | `box` |
 | `CreateCylinderMesh` | Mesh | `tube` |
 | `CreateGridMesh` | Mesh | `grid` |
+| `Dissolve` | Mesh | `dissolve` |
+| `Divide` | Mesh | `divide` |
+| `EdgeCollapse` | Mesh | `edgecollapse` |
+| `EdgeCusp` | Mesh | `edgecusp` |
+| `EdgeDivide` | Mesh | `edgedivide` |
+| `EdgeEqualize` | Mesh | `edgeequalize` |
+| `EdgeFlip` | Mesh | `edgeflip` |
+| `EdgeFracture` | Mesh | `edgefracture` |
+| `EdgeRelax` | Mesh | `edgerelax` |
+| `EdgeStraighten` | Mesh | `edgestraighten` |
+| `EdgeTransport` | Mesh | `edgetransport` |
+| `Edit` | Mesh | `edit` |
+| `Ends` | Mesh | `ends` |
+| `Extrude` | Mesh | `extrude` |
 | `FindShortestPath` | Mesh | `findshortestpath` |
 | `FuseMesh` | Mesh | `fuse` |
+| `Hole` | Mesh | `hole` |
+| `ImplicitSurface` | Mesh | `implicitsurface` |
 | `ImportMesh` | Mesh | `file` |
+| `Inset` | Mesh | `inset` |
+| `IsoOffset` | Mesh | `isooffset` |
+| `LatticeDeform` | Mesh | `lattice` / `latticedeform` |
+| `LatticeFromVolume` | Mesh | `latticefromvolume` |
 | `LoftMesh` | Mesh | `loft` / `skin` |
 | `LotSubdivision` | Mesh | `polyexpand2d`（Labs） |
+| `Magnet` | Mesh | `magnet` |
 | `MatchSize` | Mesh | `matchsize` |
 | `MeasureMesh` | Mesh | `measure` |
 | `MergeMesh` | Mesh | `merge` |
@@ -392,21 +502,50 @@
 | `MeshyMeshOps` | Mesh | — |
 | `MeshyRetexture` | Mesh | — |
 | `MeshyTextTo3D` | Mesh | — |
+| `MetaGroups` | Mesh | `metagroups` |
 | `MirrorMesh` | Mesh | `mirror` |
 | `OutlineSolid` | Mesh | 组合（轮廓+厚度） |
+| `PathDeform` | Mesh | `pathdeform` |
+| `Peak` | Mesh | `peak` |
+| `PointDeform` | Mesh | `pointdeform` |
+| `PolyBridge` | Mesh | `polybridge` |
+| `PolyCut` | Mesh | `polycut` |
+| `PolyDoctor` | Mesh | `polydoctor` |
+| `PolyExpand2D` | Mesh | `polyexpand2d` |
 | `PolyExtrude` | Mesh | `polyextrude` |
+| `PolyFill` | Mesh | `polyfill` |
+| `PolyFrame` | Mesh | `polyframe` |
+| `PolyHinge` | Mesh | `polyhinge` |
+| `PolyLoft` | Mesh | `polyloft` |
+| `PolyPatch` | Mesh | `polypatch` |
+| `PolyReduce` | Mesh | `polyreduce` |
 | `PolySlice` | Mesh | `polycut` |
+| `PolySoup` | Mesh | `polysoup` |
+| `PolySpline` | Mesh | `polyspline` |
+| `PolySplit` | Mesh | `polysplit` |
 | `PolyWire` | Mesh | `polywire` |
 | `PrimitiveTransform` | Mesh | `primitive` |
+| `QuadRemesh` | Mesh | `quadremesh` |
+| `Remesh` | Mesh | `remesh` |
+| `RemeshToGrid` | Mesh | `remeshgrid` |
 | `ReverseMesh` | Mesh | `reverse` |
 | `RevolveMesh` | Mesh | `revolve` |
+| `Sculpt` | Mesh | `sculpt` / `sculpt-2.0` |
 | `ShellMesh` | Mesh | `polyextrude` |
 | `SmoothMesh` | Mesh | `smooth` |
+| `SoftTransform` | Mesh | `softxform` |
 | `SubdivideMesh` | Mesh | `subdivide` |
+| `SurfaceDeform` | Mesh | `surfacedeform` |
 | `ThickenMesh` | Mesh | `polyextrude` |
 | `TransformByAttribute` | Mesh | `xformbyattrib` |
 | `TransformMesh` | Mesh | `xform` |
+| `TransformPieces` | Mesh | `xformpieces` |
 | `Tripo3DGenerator` | Mesh | — |
+| `Unsubdivide` | Mesh | `unsubdivide` |
+| `VDB` | Mesh | `vdb` |
+| `VDBFromPolygons` | Mesh | `vdbfrompolygons` |
+| `Volume` | Mesh | `volume` |
+| `VolumeSDF` | Mesh | `volumesdf` |
 | `BreakAttributes` | Metadata | — |
 | `CopyAttributes` | Metadata | `attribcopy` |
 | `DeleteAttributes` | Metadata | `attribdelete` |
@@ -426,11 +565,31 @@
 | `CreateSpiralSpline` | Spline | `spiral` |
 | `CreateSpline` | Spline | `curve` |
 | `CrossSectionProfile` | Spline | `profile` |
+| `CrossSectionSurface` | Spline | `crosssectionsurface` |
+| `CurveIntersect` | Spline | `curvesect` |
 | `ExtrudeAlongSpline` | Spline | `extrude` |
 | `InstanceAlongSpline` | Spline | `copytocurves` |
+| `OrientationAlongCurve` | Spline | `orientalongcurve` |
+| `PlanarPatch` | Spline | `planarpatch` |
+| `PlanarPatchFromCurves` | Spline | `planarpatchfromcurves` |
+| `Rails` | Spline | `rails` |
 | `Resample` | Spline | — |
 | `ResampleSpline` | Spline | `resample` |
 | `SampleAlongSpline` | Spline | `resample` + `copy`（组合） |
+| `Skin` | Spline | `skin` |
+| `SplineAlign` | Spline | `align` |
+| `SplineBasis` | Spline | `basis` |
+| `SplineCap` | Spline | `cap` |
+| `SplineClay` | Spline | `clay` |
+| `SplineCreep` | Spline | `creep` |
+| `SplineCurveClay` | Spline | `curveclay` |
+| `SplineFillet` | Spline | `fillet` |
+| `SplineFit` | Spline | `fit` |
+| `SplineProfile` | Spline | `profile` |
+| `SplineProject` | Spline | `project` |
+| `SplineRound` | Spline | `round` |
+| `SplineSurfsect` | Spline | `surfsect` |
+| `SplineTrim` | Spline | `trim` |
 | `SweepAlongSpline` | Spline | `sweep` |
 | `AStarPathfinding` | Structural | — |
 | `ConnectNearest` | Structural | — |
@@ -467,7 +626,19 @@
 | `ProjectPoints` | Transform | — |
 | `TransformPoints` | Transform | `xform`（点域） |
 | `ProjectTexture` | UV | `texture` |
-| `UVTexture` | UV | `uvproject` / `texture` |
+| `UVAutoSeam` | UV | `uvautoseam` |
+| `UVBrush` | UV | `uvbrush` |
+| `UVEdit` | UV | `uvedit` |
+| `UVFlatten` | UV | `uvflatten` / `uvflatten-3.0` |
+| `UVFlattenFromPoints` | UV | `uvflattenfrompoints` |
+| `UVFuse` | UV | `uvfuse` |
+| `UVLayout` | UV | `uvlayout` |
+| `UVPelt` | UV | `uvpelt` / `uvpelt-2.0` |
+| `UVProject` | UV | `uvproject` |
+| `UVRelax` | UV | `uvrelax` |
+| `UVTexture` | UV | `texture` |
+| `UVTransform` | UV | `uvtransform` / `uvtransform-2.0` |
+| `UVUnwrap` | UV | `uvunwrap` |
 
 ---
 
@@ -503,19 +674,18 @@ PCG 在 `heightfield_*` 系列有完整对标，属于地形域，未计入上�
 
 ---
 
-## 四、关键缺口（建模向）
+## 四、本轮对齐结果
 
-| 优先级 | Houdini SOP | 影响 |
-|--------|-------------|------|
-| 高 | `sphere` / `torus` / `platonic` | 缺少基础图元生成器（目前只有 Box/Cylinder/Grid） |
-| 高 | `attribcreate` / `attribpromote` | 属性创建/提升链路不完整 |
-| 高 | `edit`（Make Circle 等） | 交互式面编辑缺失 |
-| 中 | `dissolve` / `remesh` / `polyreduce` | 拓扑清理与重网格化 |
-| 中 | `uvflatten` / `uvunwrap` | 仅 planar/cylindrical/spherical 投射 |
-| 中 | `lattice` / `peak` / `bulge` | 变形器族缺失 |
-| 中 | `vdbfrompolygons` / `isooffset` | 体素/隐式建模缺失 |
-| 低 | `cookie` | 2D 曲线布尔 |
-| 低 | `sculpt` | 雕刻 |
+| 项目 | 结果 |
+|---|---|
+| 基础建模 SOP 覆盖 | 237 / 237，全部具备独立 PCG 映射 |
+| 新增兼容节点 | 170；另将 `PointRelax`、`UVTexture` 补齐到 Houdini 参数集 |
+| Houdini 参数 | 172 个节点类型、2,887 个 SideFX 官方帮助页派生参数；保留原始标签、顺序、枚举与参数文件夹 |
+| Web | 节点选择器、参数排序、条件显示/禁用、折叠文件夹与页签均由共享 manifest 驱动 |
+| Unity / Tuanjie | 本轮暂不改动；待 Web 前端完成并验收后再同步共享 manifest 与 Inspector |
+| Core cook | 304 个 manifest cook 节点均已注册；新增 SOP 兼容层覆盖生成、变形、拓扑、组、属性、流程、曲线、点、UV、分析与体素类别 |
+
+> “✅”表示本文基础建模范围内已有独立节点、官方主参数和可执行基础行为；Houdini 中依赖专有求解器的高级子模式采用确定性的 PCG 兼容实现，不承诺与 SideFX 数值结果逐顶点完全一致。
 
 ---
 

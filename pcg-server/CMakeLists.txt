@@ -39,6 +39,7 @@ add_executable(pcg-server
     src/agent_session_store.cpp
     src/session_service.cpp
     src/mcp_service.cpp
+    src/kb_service.cpp
     "${PCG_FBX_DIR}/src/pcg_fbx_exporter.cpp"
     "${PCG_FBX_DIR}/src/geometry_binary_reader.cpp"
 )

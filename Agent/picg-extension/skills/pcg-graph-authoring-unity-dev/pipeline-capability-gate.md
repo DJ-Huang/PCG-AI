@@ -20,7 +20,7 @@ Never call `MergeMesh` a Boolean/fuse, turn a variable-section form into a box s
 
 ## Required evidence
 
-Load the AssetSpec, the shared `pcg-graph-authoring.md`, the current `schema/node-manifest.json`, applicable PCG rules, and the generated graph. Golden Graphs under `VAULT_ROOT/PCG AI Rule/Golden Graphs/` may support an allowed composition; repo examples and Unity demos may not.
+Load the AssetSpec, the shared `pcg-graph-authoring.md`, the current `schema/node-manifest.json`, applicable PCG rules, and the generated graph. Golden Graphs under `<workspace>/.pcg-ai/golden-graphs/` may support an allowed composition; repo examples and Unity demos may not.
 
 Before testing, create a compact demand inventory that describes outcomes rather than desired node names:
 

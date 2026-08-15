@@ -13,22 +13,22 @@ Skill id: **`pcg-graph-authoring-web`**.
 | LLM judges visuals | Agent vision on comparison sheet | Agent vision on web screenshot |
 | Spec before codegen | `ObjectSculptSpec` JSON | Graph Authoring Plan + module table |
 | Staged passes | blockout → material → … | module-plan → blockout → assembly → materials → validate |
-| Local knowledge, not memory | BM25 on `docs/specs/vocabulary/*.jsonl` | `rule_search(domain=pcg)` + `vault_get_chunk` |
-| Controlled vocabulary | `grimoire/glossary/3d_vocabulary.md` | PCG AI Rule + manifest property names |
+| Local knowledge, not memory | BM25 on `docs/specs/vocabulary/*.jsonl` | `pcg_kb_search(category="rules")` + `pcg_kb_get` |
+| Controlled vocabulary | `grimoire/glossary/3d_vocabulary.md` | `.pcg-ai/rules/` + manifest property names |
 | One correction action per cycle | `continue \| refine-spec \| refine-code \| …` | Same, mapped to graph/spec/cook |
 
 **Division of labor:** `validate_pcg.py` checks JSON contract, pins, layout, parameter bindings, Merge→Bevel warnings. It does **not** judge silhouette fidelity. The agent inspects web screenshots for that.
 
 ## The loop (agent runs this; scripts gate structure)
 
-**P0 — do not skip steps 0–4.** Skipping `new_authoring_plan.py` / `archive_reference.py` / `validate_plan.py` and editing an existing graph directly caused brickify web-dev regressions (2026-08-08). Always start from a plan; run `vault_search` at step 2 before the first node write.
+**P0 — do not skip steps 0–4.** Skipping `new_authoring_plan.py` / `archive_reference.py` / `validate_plan.py` and editing an existing graph directly caused brickify web-dev regressions (2026-08-08). Always start from a plan; run `pcg_kb_search` at step 2 before the first node write.
 
 ```text
 0. pcg-server + Vite dev server: check_server.py (web-review.md) — required before visual review
    → start with Shell block_until_ms: 0 (NOT nohup/&); re-check_server before every cook cycle
 0.5. new_authoring_plan.py → archive_reference.py  (reference to disk BEFORE anything visual)
 1. Layered observation → write observation.layers + visualTokens INTO *-plan.json (not chat)
-2. rule_search + vault_search (local spec evidence — mandatory; record hits in plan.localRuleHits)
+2. pcg_kb_search (rules + kb) (local spec evidence — mandatory; record hits in plan.localRuleHits)
 3. Fill Graph Authoring Plan (*-plan.json)
 4. validate_plan.py --strict-quality  (blocks shallow plans AND unarchived references)
 5. report_pass.py --resume → current unlocked pass + next command + RESUME.md
@@ -195,15 +195,15 @@ Weapon/skin subjects with patterned finishes: treat as **complex+** even if bare
 
 ## Local spec search (mandatory)
 
-**Reference hygiene:** curated graphs live in Vault `PCG AI Rule/Golden Graphs/` (**.ragignore** — Glob/Read disk only, not RAG). Do **not** load workspace `examples/**/*.pcg` as local specs. Skill `examples.md` is wiring-only.
+**Reference hygiene:** curated graphs live in project `.pcg-ai/golden-graphs/` (excluded from BM25 — access via `pcg_golden_graph_list` / `pcg_golden_graph_get`). Do **not** load workspace `examples/**/*.pcg` as local specs. Skill `examples.md` is wiring-only.
 
 Mirror img2threejs `localSpecSearch` — **pipeline stage, not optional memory**:
 
-1. `rule_search(query="编图 + 模型类型 + 意图", domain=pcg, top_k=10)`
-2. `vault_get_chunk` for `pcg/graph-contract`, `pcg/assembly-bevel`, matching type rule
+1. `pcg_kb_search(query="编图 + 模型类型 + 意图", category="rules", top_k=10)`
+2. `pcg_kb_get` for `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, and the matching type rule
 3. Record `rule_id` hits in the plan (`localRuleHits`)
 4. Build graph from returned evidence; do not invent domain topology when a rule exists
-5. If `rule_search` fails: read `VAULT_ROOT/PCG AI Rule/Graph Authoring/` files directly (fallback paths in `SKILL.md`)
+5. If `pcg_kb_search` fails: read `<workspace>/.pcg-ai/rules/graph-authoring/` files directly (fallback paths in `SKILL.md`)
 
 ## Self-correction (one action per review cycle — autonomous)
 

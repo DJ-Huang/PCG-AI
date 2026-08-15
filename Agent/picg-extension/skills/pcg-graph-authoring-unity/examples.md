@@ -1,8 +1,8 @@
 # PCG Graph Examples — Houdini Top-Down Layout
 
-**Purpose:** curated **wiring / layout** snippets for the skill. These are **not** a substitute for `node-manifest.json`, PCG AI Rule strategy docs, or Vault **Golden Graphs**.
+**Purpose:** curated **wiring / layout** snippets for the skill. These are **not** a substitute for `node-manifest.json`, `.pcg-ai/rules/` strategy docs, or project **Golden Graphs** (`.pcg-ai/golden-graphs/`).
 
-**High-quality full graphs:** Vault `PCG AI Rule/Golden Graphs/` only. **Do not** open repo `examples/*.pcg` / Unity demos to model a new asset. Prefer this markdown for pin chains; prefer vault rules + Golden Graphs for modeling decisions.
+**High-quality full graphs:** project `.pcg-ai/golden-graphs/` only. **Do not** open repo `examples/*.pcg` / Unity demos to model a new asset. Prefer this markdown for pin chains; prefer project rules + Golden Graphs (`.pcg-ai/`) for modeling decisions.
 
 All positions use: `SPINE_X=200`, `ROW_STEP_Y=160`, `COL_STEP_X=320` (same-row `|Δx| ≥ 320`).
 Every node should set `data.__nodeTitle` (Unity shows that, not `id`).

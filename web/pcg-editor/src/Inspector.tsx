@@ -2,11 +2,13 @@
 // Supports promote-to-parameter (+) and bind/unbind via dropdown.
 // Group properties (groupSelect/groupMultiSelect) resolve available groups from upstream nodes.
 
-import { useCallback, useId, useMemo, type CSSProperties } from 'react';
+import { useCallback, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
   getNodeTypeDefs,
   getCategoryColor,
+  type ManifestCondition,
+  type ManifestInspectorSection,
   type ManifestProperty,
   type PropertyType,
   type GroupDomain,
@@ -15,6 +17,87 @@ import type { GraphParameter, ParameterType, NodeData } from './graphSchema';
 import { resolveUpstreamGroups, filterGroupsByDomain, type AvailableGroup } from './groupResolver';
 import { findSubgraph, getSubgraphId, getSubgraphNodeTitle, isSubgraphInterfaceNode, useCurrentSubgraph, useSubgraphs } from './subgraphs';
 import { resolvePbrTextureUrl } from './preview/pbrMaterials';
+
+type InspectorPropertyEntry = [string, ManifestProperty];
+
+function normalizeConditionValue(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return String(value);
+}
+
+function conditionMatches(
+  condition: ManifestCondition | undefined,
+  data: NodeData,
+  properties: Record<string, ManifestProperty>,
+): boolean {
+  if (!condition?.property) return true;
+  const driver = properties[condition.property];
+  const current = normalizeConditionValue(data[condition.property] ?? driver?.default);
+  if (condition.oneOf && condition.oneOf.length > 0) {
+    return condition.oneOf.some((candidate) => normalizeConditionValue(candidate) === current);
+  }
+  return current === normalizeConditionValue(condition.equals);
+}
+
+function InspectorFoldout({ section, children }: { section: ManifestInspectorSection; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(section.defaultExpanded !== false);
+  const label = section.label || section.id;
+
+  if (section.foldout !== false) {
+    return (
+      <details
+        className="pcg-inspector__foldout"
+        open={expanded}
+        onToggle={(event) => setExpanded(event.currentTarget.open)}
+      >
+        <summary className="pcg-inspector__foldout-title">{label}</summary>
+        <div className="pcg-inspector__props">{children}</div>
+      </details>
+    );
+  }
+
+  return (
+    <div className="pcg-inspector__section">
+      {(section.header || label) && <div className="pcg-inspector__section-title">{label}</div>}
+      <div className="pcg-inspector__props">{children}</div>
+    </div>
+  );
+}
+
+function InspectorTabs({
+  sections,
+  renderSection,
+}: {
+  sections: ManifestInspectorSection[];
+  renderSection: (section: ManifestInspectorSection) => ReactNode;
+}) {
+  const [activeId, setActiveId] = useState(sections[0]?.id ?? '');
+  const active = sections.find((section) => section.id === activeId) ?? sections[0];
+  if (!active) return null;
+
+  return (
+    <div className="pcg-inspector__tabs">
+      <div className="pcg-inspector__tab-list" role="tablist">
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            role="tab"
+            aria-selected={section.id === active.id}
+            className={`pcg-inspector__tab${section.id === active.id ? ' pcg-inspector__tab--active' : ''}`}
+            onClick={() => setActiveId(section.id)}
+          >
+            {section.label || section.id}
+          </button>
+        ))}
+      </div>
+      <div className="pcg-inspector__tab-panel" role="tabpanel">
+        <div className="pcg-inspector__props">{renderSection(active)}</div>
+      </div>
+    </div>
+  );
+}
 
 interface InspectorProps {
   selectedNode: Node | null;
@@ -100,22 +183,15 @@ export default function Inspector({
   const color = getCategoryColor(def.category);
   const data = selectedNode.data as NodeData;
 
-  // Split properties into group-related and regular
-  const normalizeVisible = (v: unknown): string => {
-    if (v == null) return '';
-    if (typeof v === 'boolean') return v ? 'true' : 'false';
-    if (typeof v === 'string' && (v === 'true' || v === 'false')) return v;
-    return String(v);
-  };
   const isPropVisible = (prop: ManifestProperty): boolean => {
-    const vw = prop.visibleWhen;
-    if (!vw?.property) return true;
-    const driver = def.properties[vw.property];
-    const current = normalizeVisible(data[vw.property] ?? driver?.default);
-    if (vw.oneOf && vw.oneOf.length > 0) {
-      return vw.oneOf.some((c) => normalizeVisible(c) === current);
+    if (prop.visibleWhenAny && prop.visibleWhenAny.length > 0) {
+      return prop.visibleWhenAny.some((condition) => conditionMatches(condition, data, def.properties));
     }
-    return current === normalizeVisible(vw.equals);
+    return conditionMatches(prop.visibleWhen, data, def.properties);
+  };
+  const isPropEnabled = (prop: ManifestProperty): boolean => {
+    if (!conditionMatches(prop.enabledWhen, data, def.properties)) return false;
+    return (prop.enabledWhenAll ?? []).every((condition) => conditionMatches(condition, data, def.properties));
   };
 
   const companionTargets = new Set<string>();
@@ -123,11 +199,17 @@ export default function Inspector({
     if (prop.companionField) companionTargets.add(prop.companionField);
   }
 
-  const groupProps: [string, ManifestProperty][] = [];
-  const regularProps: [string, ManifestProperty][] = [];
-  for (const [key, prop] of Object.entries(def.properties)) {
-    if (companionTargets.has(key)) continue;
-    if (!isPropVisible(prop)) continue;
+  const visibleProps: InspectorPropertyEntry[] = Object.entries(def.properties)
+    .sort(([keyA, propA], [keyB, propB]) => {
+      const orderA = propA.order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = propB.order ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB || keyA.localeCompare(keyB);
+    })
+    .filter(([key, prop]) => !companionTargets.has(key) && isPropVisible(prop));
+
+  const groupProps: InspectorPropertyEntry[] = [];
+  const regularProps: InspectorPropertyEntry[] = [];
+  for (const [key, prop] of visibleProps) {
     if (prop.type === 'groupSelect' || prop.type === 'groupMultiSelect' || prop.isGroupOutput) {
       groupProps.push([key, prop]);
     } else {
@@ -140,6 +222,7 @@ export default function Inspector({
       (p) => p.targetNode === selectedNode.id && p.targetProperty === key,
     );
     const isBound = !!binding;
+    const isEnabled = isPropEnabled(prop);
     const value = data[key] ?? prop.default;
     const filteredGroups = prop.groupDomain
       ? filterGroupsByDomain(upstreamGroups, prop.groupDomain as GroupDomain)
@@ -159,7 +242,7 @@ export default function Inspector({
       const toggled = Boolean(value);
 
       return (
-        <div key={key} className="pcg-inspector__prop">
+        <div key={key} className={`pcg-inspector__prop${isEnabled ? '' : ' pcg-inspector__prop--disabled'}`}>
           <div className="pcg-inspector__prop-header">
             <span className="pcg-inspector__prop-label">{prop.displayName ?? key}</span>
             <div className="pcg-inspector__prop-actions">
@@ -167,7 +250,7 @@ export default function Inspector({
                 type="button"
                 className="pcg-inspector__promote"
                 title="Promote to Parameter"
-                disabled={isBound}
+                disabled={isBound || !isEnabled}
                 onClick={() => onPromoteParameter(selectedNode.id, selectedNode.type!, key, prop)}
               >
                 +
@@ -175,6 +258,7 @@ export default function Inspector({
               <select
                 className="pcg-inspector__bind-select"
                 value={binding?.id ?? ''}
+                disabled={!isEnabled}
                 onChange={(e) => onBindParameter(selectedNode.id, key, e.target.value || null)}
               >
                 <option value="">(none)</option>
@@ -192,7 +276,7 @@ export default function Inspector({
             <PropertyEditor
               prop={prop}
               value={value}
-              disabled={isBound}
+              disabled={isBound || !isEnabled}
               binding={binding}
               availableGroups={filteredGroups}
               onChange={(v) => handleValueChange(selectedNode.id, key, v)}
@@ -201,7 +285,7 @@ export default function Inspector({
               <PropertyEditor
                 prop={companionProp}
                 value={companionValue}
-                disabled={!toggled || !!companionBinding}
+                disabled={!isEnabled || !toggled || !!companionBinding}
                 binding={companionBinding}
                 availableGroups={companionGroups}
                 onChange={(v) => handleValueChange(selectedNode.id, companionKey, v)}
@@ -213,7 +297,7 @@ export default function Inspector({
     }
 
     return (
-      <div key={key} className="pcg-inspector__prop">
+      <div key={key} className={`pcg-inspector__prop${isEnabled ? '' : ' pcg-inspector__prop--disabled'}`}>
         <div className="pcg-inspector__prop-header">
           <span className="pcg-inspector__prop-label">{prop.displayName ?? key}</span>
           <div className="pcg-inspector__prop-actions">
@@ -221,7 +305,7 @@ export default function Inspector({
               type="button"
               className="pcg-inspector__promote"
               title="Promote to Parameter"
-              disabled={isBound}
+              disabled={isBound || !isEnabled}
               onClick={() => onPromoteParameter(selectedNode.id, selectedNode.type!, key, prop)}
             >
               +
@@ -229,6 +313,7 @@ export default function Inspector({
             <select
               className="pcg-inspector__bind-select"
               value={binding?.id ?? ''}
+              disabled={!isEnabled}
               onChange={(e) => onBindParameter(selectedNode.id, key, e.target.value || null)}
             >
               <option value="">(none)</option>
@@ -246,7 +331,7 @@ export default function Inspector({
           <PropertyEditor
             prop={prop}
             value={value}
-            disabled={isBound}
+            disabled={isBound || !isEnabled}
             binding={binding}
             availableGroups={filteredGroups}
             onChange={(v) => handleValueChange(selectedNode.id, key, v)}
@@ -257,6 +342,19 @@ export default function Inspector({
   };
 
   const hasGroupConsumers = groupProps.some(([, p]) => p.type === 'groupSelect' || p.type === 'groupMultiSelect');
+  const sectionDefs = def.inspectorSections ?? [];
+  const sectionIds = new Set(sectionDefs.map((section) => section.id));
+  const hasSections = sectionDefs.length > 0;
+  const topProps = hasSections
+    ? visibleProps.filter(([, prop]) => !prop.section || !sectionIds.has(prop.section))
+    : [];
+  const populatedSections = sectionDefs.filter((section) =>
+    visibleProps.some(([, prop]) => prop.section === section.id),
+  );
+  const renderEntries = (entries: InspectorPropertyEntry[]) =>
+    entries.map(([key, prop]) => renderProp(key, prop));
+  const renderSection = (section: ManifestInspectorSection) =>
+    renderEntries(visibleProps.filter(([, prop]) => prop.section === section.id));
 
   return (
     <div className="pcg-inspector">
@@ -266,7 +364,31 @@ export default function Inspector({
       </div>
       <div className="pcg-inspector__node-type">{selectedNode.type}</div>
 
-      {groupProps.length > 0 && (
+      {hasSections ? (
+        <>
+          {topProps.length > 0 && (
+            <div className="pcg-inspector__section pcg-inspector__section--sticky">
+              <div className="pcg-inspector__props">{renderEntries(topProps)}</div>
+            </div>
+          )}
+          {def.inspectorSectionLayout === 'tabs' ? (
+            <InspectorTabs sections={populatedSections} renderSection={renderSection} />
+          ) : (
+            populatedSections.map((section) => (
+              <InspectorFoldout key={`${selectedNode.id}:${section.id}`} section={section}>
+                {renderSection(section)}
+              </InspectorFoldout>
+            ))
+          )}
+          {hasGroupConsumers && (
+            <div className={`pcg-inspector__group-hint${upstreamGroups.length === 0 ? ' pcg-inspector__group-hint--empty' : ''}`}>
+              {upstreamGroups.length > 0
+                ? `${upstreamGroups.length} group${upstreamGroups.length !== 1 ? 's' : ''} available from upstream`
+                : 'No groups from upstream — connect a Group Create or Sweep node'}
+            </div>
+          )}
+        </>
+      ) : groupProps.length > 0 && (
         <div className="pcg-inspector__section">
           <div className="pcg-inspector__section-title">Groups</div>
           <div className="pcg-inspector__props">
@@ -282,7 +404,7 @@ export default function Inspector({
         </div>
       )}
 
-      <div className="pcg-inspector__section">
+      {!hasSections && <div className="pcg-inspector__section">
         {groupProps.length > 0 && <div className="pcg-inspector__section-title">Parameters</div>}
         <div className="pcg-inspector__props">
           {regularProps.map(([key, prop]) => renderProp(key, prop))}
@@ -290,7 +412,7 @@ export default function Inspector({
             <div className="pcg-inspector__no-props">No properties</div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

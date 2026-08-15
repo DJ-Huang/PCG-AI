@@ -21,6 +21,9 @@
         "/Users/djhuang/PCG-AI"
       ],
       "enabled": true
+    },
+    "user-vault-rag": {
+      "enabled": false
     }
   }
 }

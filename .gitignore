@@ -31,3 +31,4 @@ tmp/
 .codely-cli/
 .playwright-cli/
 screenshots/
+.pcg-ai/index/

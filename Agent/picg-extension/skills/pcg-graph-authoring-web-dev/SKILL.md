@@ -45,7 +45,7 @@ Before `PCG_PIPELINE_VALIDATION`, enforce the standard web orchestration loop �
 | Check | Script / doc |
 |---|---|
 | Plan + archived reference | `new_authoring_plan.py` → `archive_reference.py` → `validate_plan.py --strict-quality` |
-| Vault evidence | `vault_search` + `rule_search(domain=pcg)` before first node write |
+| Vault evidence | `pcg_kb_search(category="rules")` + `pcg_kb_search(category="kb")` before first node write |
 | Server health (every cook cycle) | `scripts/web/check_server.py` — use Shell `block_until_ms: 0`, not `nohup` |
 | Manifest-server parity | `validate_pcg.py --check-server http://127.0.0.1:17890` before cook |
 | PCGR error decode | `parse_pcgr.py` on `/v1/cook` binary (not manual `xxd`) |

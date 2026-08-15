@@ -40,12 +40,40 @@ export interface ManifestProperty {
     equals?: number | boolean | string;
     oneOf?: Array<number | boolean | string>;
   };
+  visibleWhenAny?: ManifestCondition[];
+  /** Keep the row visible but disable its editor unless the condition matches. */
+  enabledWhen?: ManifestCondition;
+  enabledWhenAll?: ManifestCondition[];
   /** Boolean toggle companion: render the referenced property inline on the toggle row */
   companionField?: string;
+  /** Inspector foldout/tab section and stable Houdini parameter ordering. */
+  section?: string;
+  order?: number;
+  /** Compact row metadata shared with the Unity inspector. */
+  rowGroup?: string;
+  rowOrder?: number;
+  rowPrefix?: string;
+  indent?: boolean;
+  multiline?: boolean;
+  lines?: number;
   /** For groupSelect/groupMultiSelect: filter available groups by domain */
   groupDomain?: GroupDomain;
   /** True for outputGroup-style properties that define a new group name */
   isGroupOutput?: boolean;
+}
+
+export interface ManifestCondition {
+  property?: string;
+  equals?: number | boolean | string;
+  oneOf?: Array<number | boolean | string>;
+}
+
+export interface ManifestInspectorSection {
+  id: string;
+  label?: string;
+  foldout?: boolean;
+  defaultExpanded?: boolean;
+  header?: boolean;
 }
 
 export interface ManifestPin {
@@ -76,6 +104,12 @@ export interface ManifestNodeDef {
   properties: Record<string, ManifestProperty>;
   /** Groups this node produces on its output */
   outputGroups?: ManifestOutputGroup[];
+  /** Houdini parameter folders, rendered as foldouts or tabs. */
+  inspectorSections?: ManifestInspectorSection[];
+  inspectorSectionLayout?: 'foldouts' | 'tabs';
+  /** SideFX operator names represented by this PCG node. */
+  houdiniInternalNames?: string[];
+  documentationUrl?: string;
 }
 
 export interface NodeManifest {

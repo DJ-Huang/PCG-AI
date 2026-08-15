@@ -2,10 +2,12 @@
 #include "agent_service.hpp"
 #include "agent_runtime.hpp"
 #include "agent_session_store.hpp"
+#include "kb_service.hpp"
 #include "mcp_service.hpp"
 #include "session_service.hpp"
 
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <string>
 
@@ -32,6 +34,13 @@ int ParsePort(int argc, char** argv, int fallback) {
                 << "  POST /v1/validate\n"
                 << "  POST /v1/cache/clear\n"
                 << "  POST /v1/export-fbx\n"
+                << "  GET  /v1/kb/status\n"
+                << "  POST /v1/kb/reindex\n"
+                << "  GET|POST /v1/kb/search\n"
+                << "  GET  /v1/kb/list\n"
+                << "  GET|POST /v1/kb/get\n"
+                << "  GET  /v1/golden-graphs/list\n"
+                << "  GET|POST /v1/golden-graphs/get\n"
                 << "  GET  /v1/agent/providers (Bearer PCG_AGENT_TOKEN when set)\n"
                 << "  POST /v1/agent/turns (multipart + SSE)\n"
                 << "  GET  /v1/agent/health\n"
@@ -57,6 +66,7 @@ int ParsePort(int argc, char** argv, int fallback) {
 int main(int argc, char** argv) {
     const int port = ParsePort(argc, argv, 17890);
     pcg_server::ConfigureAgentRuntime(port);
+    pcg_server::ConfigureKbRoot(std::filesystem::current_path());
     httplib::Server svr;
     svr.set_exception_handler([](const httplib::Request&, httplib::Response& res, std::exception_ptr error) {
         try {
@@ -110,6 +120,16 @@ int main(int argc, char** argv) {
     svr.Post(R"(/v1/agent/turns/([^/]+)/decision)", pcg_server::HandleAgentTurnDecision);
     svr.Post(R"(/v1/agent/turns/([^/]+)/cancel)", pcg_server::HandleAgentTurnCancel);
     svr.Post("/v1/export-fbx", pcg_server::HandleExportFbx);
+    svr.Get("/v1/kb/status", pcg_server::HandleKbStatus);
+    svr.Post("/v1/kb/reindex", pcg_server::HandleKbReindex);
+    svr.Get("/v1/kb/search", pcg_server::HandleKbSearch);
+    svr.Post("/v1/kb/search", pcg_server::HandleKbSearch);
+    svr.Get("/v1/kb/list", pcg_server::HandleKbList);
+    svr.Get("/v1/kb/get", pcg_server::HandleKbGet);
+    svr.Post("/v1/kb/get", pcg_server::HandleKbGet);
+    svr.Get("/v1/golden-graphs/list", pcg_server::HandleKbGoldenGraphList);
+    svr.Get("/v1/golden-graphs/get", pcg_server::HandleKbGoldenGraphGet);
+    svr.Post("/v1/golden-graphs/get", pcg_server::HandleKbGoldenGraphGet);
     svr.Put("/v1/session", pcg_server::HandlePutSession);
     svr.Get("/v1/session", pcg_server::HandleGetSession);
     svr.Post("/v1/session/heartbeat", pcg_server::HandleSessionHeartbeat);

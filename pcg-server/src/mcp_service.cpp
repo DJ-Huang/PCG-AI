@@ -11,6 +11,7 @@
 
 #include "agent_service.hpp"
 #include "cook_service.hpp"
+#include "kb_service.hpp"
 #include "session_service.hpp"
 
 namespace pcg_server {
@@ -233,6 +234,68 @@ json BuildToolDefinitions() {
                 {"additionalProperties", false},
             }},
         },
+        {
+            {"name", "pcg_kb_status"},
+            {"description", "Read PCG-AI knowledge-base status: index root, chunk count, engine, last error."},
+            {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+        },
+        {
+            {"name", "pcg_kb_reindex"},
+            {"description", "Force a full rebuild of the PCG-AI knowledge-base index from .pcg-ai/rules and .pcg-ai/kb."},
+            {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+        },
+        {
+            {"name", "pcg_kb_search"},
+            {"description", "BM25 search over PCG-AI project rules and experience notes under .pcg-ai/. Returns ranked chunks with path/heading/score/excerpt."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"query", {{"type", "string"}}},
+                    {"top_k", {{"type", "integer"}, {"minimum", 1}, {"maximum", 50}, {"default", 10}}},
+                    {"category", {{"type", "string"}, {"description", "Optional filter: rules or kb."}}},
+                }},
+                {"required", json::array({"query"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_kb_list"},
+            {"description", "List markdown files indexed in .pcg-ai/rules and .pcg-ai/kb."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {{"category", {{"type", "string"}}}}},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_kb_get"},
+            {"description", "Read a full markdown file from the PCG-AI knowledge base by .pcg-ai-relative path (e.g. rules/graph-authoring/bridge.md)."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {{"path", {{"type", "string"}}}}},
+                {"required", json::array({"path"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_golden_graph_list"},
+            {"description", "List .pcg golden-graph templates under .pcg-ai/golden-graphs/, optionally filtered by class (weapon/vehicle/bridge/building/scatter/prop/other)."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {{"class", {{"type", "string"}}}}},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_golden_graph_get"},
+            {"description", "Fetch a golden-graph .pcg template by stem name (e.g. m9-bayonet) or relative path under .pcg-ai/golden-graphs/."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {{"name", {{"type", "string"}}}}},
+                {"required", json::array({"name"})},
+                {"additionalProperties", false},
+            }},
+        },
     });
     for (auto& tool : tools) {
         tool["inputSchema"]["properties"]["editorSessionId"] = {
@@ -403,6 +466,36 @@ json CallToolInternal(
         };
         if (!error.empty()) result["error"] = error;
         return ToolResult(result, code != 0);
+    }
+    if (name == "pcg_kb_status") {
+        return ToolResult(KbStatus(), false);
+    }
+    if (name == "pcg_kb_reindex") {
+        const json result = KbReindex();
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_kb_search") {
+        const json result = KbSearch(
+            arguments.value("query", ""),
+            arguments.value("top_k", 10),
+            arguments.value("category", ""));
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_kb_list") {
+        const json result = KbList(arguments.value("category", ""));
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_kb_get") {
+        const json result = KbGet(arguments.value("path", ""));
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_golden_graph_list") {
+        const json result = KbGoldenGraphList(arguments.value("class", ""));
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_golden_graph_get") {
+        const json result = KbGoldenGraphGet(arguments.value("name", ""));
+        return ToolResult(result, !result.value("ok", false));
     }
     return ToolResult({{"ok", false}, {"error", "unknown_tool"}, {"name", name}}, true);
 }

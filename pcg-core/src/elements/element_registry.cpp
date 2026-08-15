@@ -13,6 +13,7 @@
 #include "elements/vehicle_modeling_elements.hpp"
 #include "elements/building_elements.hpp"
 #include "elements/heightfield_elements.hpp"
+#include "elements/houdini_sop_elements.hpp"
 #include "elements/assembly_elements.hpp"
 #include "elements/facade_foundation_elements.hpp"
 #include "elements/topology_parity_elements.hpp"
@@ -209,6 +210,7 @@ void register_builtin_elements()
     register_assembly_elements(map);
     register_facade_foundation_elements(map);
     register_topology_parity_elements(map);
+    register_houdini_sop_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

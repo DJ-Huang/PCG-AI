@@ -153,7 +153,7 @@ Requires: `pip install playwright && playwright install chromium`
 0. Start Vite + pcg-server (Shell block_until_ms: 0) → check_server.py (repeat every cycle)
 1. new_authoring_plan.py → archive_reference.py (reference to local disk, plan rebound)
 2. Layered observation → write observation.layers + visualTokens INTO plan.json
-3. vault_search + rule_search → record localRuleHits in plan
+3. pcg_kb_search (rules + kb) → record localRuleHits in plan
 4. validate_plan.py --strict-quality
 5. report_pass.py --resume → unlock current pass (+ RESUME.md)
 6. Auto params + auto saveDir → author .pcg for that pass (no ask_user)
