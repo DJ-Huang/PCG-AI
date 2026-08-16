@@ -6,7 +6,8 @@ description: >-
   validate UV/projection, create and bind materials and textures, output a
   reproducible exported asset (glTF / web scene), render it, and apply
   full-asset acceptance. Use for PCG graph authoring for web, reference-image
-  reconstruction, procedural web asset production, bridge/building/vehicle/
+  reconstruction, three-view / 三视图 / orthographic front-side-top reconstruction,
+  procedural web asset production, bridge/building/vehicle/
   scatter generators, Subgraphs, graph parameters, PCG cooking via pcg-server,
   PCG MCP graph creation/editing, materialized web asset delivery, or
   `/pcg-graph-authoring-web`.
@@ -32,7 +33,7 @@ AUTHORING_SKILL_DIR = .
 ## Mandatory read order
 
 1. Read `PCG_MCP_CONTRACT`, then `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md` before planning a new graph or a material rebuild.
-2. For a reference-image job, read `llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or review cook.
+2. For a reference-image job, read `llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or review cook. If the user supplies front/side/top drawings, also read `triview.md`.
 3. Read each shared stage reference immediately before that stage: `geometry-validation.md`, `material-workflow.md`, `texture-workflow.md`, `web-integration.md`, and `final-acceptance.md`.
 4. On any failure, read `SHARED_DIR/error-codes.md` and repair the earliest failed stage.
 
@@ -40,8 +41,8 @@ AUTHORING_SKILL_DIR = .
 
 The reference image is not durable memory: context compaction drops pasted images and URLs rot, while material/texture/final stages run long after first observation.
 
-- **Archive first:** run `SHARED_SCRIPTS_DIR/archive_reference.py --image <path|URL|data-URI> --plan <plan.json>` immediately after `new_authoring_plan.py`. The plan points at the archived `ref_<slug>` file; never feed later stages a URL or chat attachment.
-- **Observation on disk:** `observation.layers` and `visualTokens` (hex/roughness/ratios) live in `*-plan.json`, enforced by `validate_plan.py --strict-quality`.
+- **Archive first:** run `SHARED_SCRIPTS_DIR/archive_reference.py` immediately after `new_authoring_plan.py`. For a three-view job use `--front/--side/--top` on the plan, then `archive_reference.py --from-plan --require-triview`. The plan points at archived `ref_<slug>_<view>` files; never feed later stages a URL or chat attachment.
+- **Observation on disk:** `observation.layers`, `viewObservations`, `crossViewConstraints`, and `visualTokens` live in `*-plan.json`, enforced by `validate_plan.py --strict-quality`.
 - **Re-hydrate at every stage entry** (geometry, UV, material, texture, asset export, final acceptance) and after any compaction: read `<plan-stem>-RESUME.md` → `*-plan.json` (observation + visualTokens + reviewHistory) → archived reference → latest `cmp_*.png`. Refresh the RESUME file via `SHARED_SCRIPTS_DIR/report_pass.py <plan> --resume` at each stage transition and review cycle.
 
 ## Execute the complete workflow
@@ -67,7 +68,7 @@ Use PCG MCP as the primary authoring path when the target is open in the Web edi
 
 ## Autonomous production defaults
 
-Apply sensible graph parameters, save directories, material values, texture resolution, and fixed `PcgReview_<slug>` review page paths without pausing. Record the receipt and assumptions. Continue to the next stage when its definition of done passes; on a reference image, keep refining the fully textured asset until the shared final target is met or the shared hard ceiling is reached.
+Apply sensible graph parameters, save directories, material values, texture resolution, and the fixed Vite `/review?graph=` route without pausing. Record the receipt and assumptions. Continue to the next stage when its definition of done passes; on a reference image, keep refining the fully textured asset until the shared final target is met or the shared hard ceiling is reached.
 
 Ask only for a genuinely unusable reference, unreachable pcg-server, unavailable required source asset, or an explicit request for interactive control. Unknown back faces, material inference, bevel taste, Subgraph partitioning, and parameter candidates are normal production decisions—make and record the best-supported choice.
 

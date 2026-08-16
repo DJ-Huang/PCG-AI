@@ -10,7 +10,7 @@ Record the following in the authoring plan or a sibling `<slug>-asset-spec.md`:
 |---|---|
 | `assetId` | Stable slug used by graph, review page, exported asset, and reports |
 | `intent` | One-sentence object/generator outcome and intended use |
-| `references` | Source image paths and known viewpoints; facts vs inferred details |
+| `references` | Source image paths, labelled viewpoints (`front`/`side`/`top` when given), and facts vs inferred details |
 | `scale` | Physical target dimensions in metres, or an explicit stylized-scale override |
 | `modules` | Nameable model parts and reusable PCG modules |
 | `geometryDoD` | Silhouette, proportions, openings, orientation, and required detail tiers |

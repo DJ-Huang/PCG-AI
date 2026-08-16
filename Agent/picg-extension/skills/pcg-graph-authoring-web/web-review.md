@@ -24,9 +24,10 @@ live Preview evidence does not replace saved-deliverable acceptance.
 
 1. **Verify both Vite dev server and pcg-server are running before any cook / screenshot / visual judgment.**
 2. **Always use the `/review` route** — it renders only the graph under review (+ studio light + camera). Do not screenshot the main editor page.
-3. **Screenshot from the review route**, then `make_comparison_sheet.py` vs the reference.
-4. Scripts never score visuals — agent vision does, after the sheet exists.
+3. **Screenshot the WebGL canvas from the review route**, then `make_comparison_sheet.py --view-id` vs the archived reference for **that same view**.
+4. Scripts never score visuals — agent vision does, after each sheet exists. Unlock score = **worst required view**.
 5. If either server is unreachable: **stop and ask the user** to start them. Do not guess.
+6. Do not treat a live `pcg_capture_preview` or a single 3/4 shot as a substitute for front/side/top.
 
 ## Connect protocol (every session / every review cycle)
 
@@ -72,16 +73,16 @@ If either check fails: report `Web editor: unavailable` and **do not** claim vis
 
 | Item | Value |
 |------|-------|
-| Review URL | `http://localhost:5173/review?graph=<workspace-relative-path>` |
-| Screenshot | `screenshots/Webview_YYYY-MM-DD_HH-MM-SS.png` |
-| Comparison | `screenshots/cmp_<graph-slug>_<pass>.png` |
+| Review URL | `http://localhost:5173/review?graph=<workspace-relative-path>&camera=front|side|top|three-quarter&frontAxis=+z&sideView=right` |
+| Screenshot | `screenshots/<slug>_<view>.png` (canvas only) |
+| Comparison | `screenshots/cmp_<graph-slug>_<view>.png` |
 
 The `/review` route is a dedicated React component (`ReviewPage.tsx`) that:
 1. Reads the `?graph=` query param (workspace-relative path to `.pcg` file)
 2. Fetches the graph JSON via `GET /api/load-graph?path=...`
 3. Cooks it via `POST /api/cook` (proxied to pcg-server)
 4. Renders only `PreviewViewport` (same Three.js scene, lighting, and coordinate conversion as the full editor)
-5. Sets `window.__pcgReady = true` when render is complete (for Playwright)
+5. Sets `window.__pcgReady = true` and `window.__pcgReview` when the framed render is complete (for Playwright camera switches)
 
 **Do not** `ask_user` for the review URL. **Do not** use the main editor page unless the user explicitly overrides.
 
@@ -92,10 +93,10 @@ A. python3 scripts/web/check_server.py  (verify Vite + pcg-server — repeat eve
 B. python3 ../shared/pcg-scripts/validate_pcg.py <graph>.pcg --check-server http://127.0.0.1:17890
 C. python3 scripts/web/setup_web_review.py <graph>.pcg --slug <slug> --json
    → returns review URL
-D. python3 scripts/web/capture_webview_png.py "<review-url>" --out screenshots/Webview_<stamp>.png
-   → Playwright opens the review URL, waits for __pcgReady, captures PNG
-E. python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference … --render … --out …
-F. Agent vision on the sheet → append_review.py (one action)
+D. python3 scripts/web/capture_webview_png.py "<review-url>" --cameras front,side,top,three-quarter --slug <slug> --out-dir screenshots --json
+   → Playwright waits for __pcgReady, setCamera each view, captures `.pcg-preview__canvas canvas`
+E. python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference ref_<slug>_<view> --render screenshots/<slug>_<view>.png --view-id <view> --out screenshots/cmp_<slug>_<view>.png
+F. Agent vision on each sheet → append_review.py (--view-evidence-json for triplets)
 ```
 
 If cook returns a PCGR binary with an error, decode without manual `xxd`:
@@ -113,10 +114,10 @@ python3 ../shared/pcg-scripts/parse_pcgr.py /tmp/cook.pcgr
 
 | Item | Pattern |
 |------|---------|
-| Review URL | `http://localhost:5173/review?graph=<path>` |
-| Reference archive | `ref_<graph-slug>.<ext>` next to `*-plan.json` (via `archive_reference.py`; never a URL/chat attachment) |
-| Screenshot | `screenshots/Webview_YYYY-MM-DD_HH-MM-SS.png` |
-| Comparison | `screenshots/cmp_<graph-slug>_<pass>.png` |
+| Review URL | `http://localhost:5173/review?graph=<path>&camera=<view>&frontAxis=+z&sideView=right` |
+| Reference archive | `ref_<graph-slug>_<view>.<ext>` next to `*-plan.json` (via `archive_reference.py`; never a URL/chat attachment) |
+| Screenshot | `screenshots/<slug>_<view>.png` |
+| Comparison | `screenshots/cmp_<graph-slug>_<view>.png` |
 
 `<graph-slug>` = `.pcg` basename without extension (e.g. `ghost-protocol-glock`).
 
@@ -127,7 +128,9 @@ python3 ../shared/pcg-scripts/parse_pcgr.py /tmp/cook.pcgr
 | Ask where to create the review URL | Route is fixed: `/review?graph=...` |
 | Screenshot the editor's main page with UI/other graphs loaded | Other meshes and UI dominate framing |
 | Score from an old screenshot without recook | Stale geometry |
-| `continue` on visual pass without comparison sheet + server health | Violates orchestration gate |
+| `continue` on visual pass without per-required-view comparison sheets + server health | Violates orchestration gate |
+| Average three view scores so a failed side/top still `continue`s | Worst required view is the unlock |
+| Use a 3/4 perspective shot as the only evidence | Integrity check only; cannot lock width/height/depth |
 | Feed the comparison sheet a URL / chat attachment as reference | Not durable; archive first (`archive_reference.py`) |
 | Cook without verifying Vite + pcg-server health first | Silent failure or stale cache |
 | Skip `validate_pcg.py --check-server` before first cook | Stale pcg-server binary → Unknown node type after wasted cook |
@@ -137,19 +140,19 @@ python3 ../shared/pcg-scripts/parse_pcgr.py /tmp/cook.pcgr
 
 | Pass | Servers required? |
 |------|---------------------|
-| `module-plan` | No (plan/docs only) |
-| `blockout` … `material-pass` | **Yes** — review route + sheet before `continue` |
+| `module-plan` / `reference-calibration` | No (plan/docs only) |
+| `blockout` … `cross-view-geometry-lock` | **Yes** — every required view + sheet before `continue` |
 | `parameters` | Yes if visual defaults change |
 | `validation` | `validate_pcg.py` + cook smoke if graph ships in web |
 
-`append_review.py` requires `--reference-screenshot` (archived file), `--render-screenshot`, `--comparison-image`, and `--ai-vision-notes` for visual-pass `continue`.
+`append_review.py` requires `--view-evidence-json` (every required view, each with `cameraReceipt`) for multi-view visual-pass `continue`. Single-image jobs still use `--reference-screenshot` (archived file), `--render-screenshot`, `--comparison-image`, and `--ai-vision-notes`.
 
 ## Minimal tool sequence (copy)
 
 ```text
 Shell: python3 scripts/web/check_server.py
 Shell: python3 scripts/web/setup_web_review.py <graph>.pcg --slug <slug> --json
-Shell: python3 scripts/web/capture_webview_png.py "<review-url>" --out screenshots/Webview_<stamp>.png
-Shell: python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference … --render … --out …
-# agent vision → append_review.py
+Shell: python3 scripts/web/capture_webview_png.py "<review-url>" --cameras front,side,top,three-quarter --slug <slug> --out-dir screenshots --json
+Shell: python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference … --render … --view-id <view> --out …
+# agent vision per view → append_review.py --view-evidence-json
 ```

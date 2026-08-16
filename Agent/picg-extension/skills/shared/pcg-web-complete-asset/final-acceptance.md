@@ -8,7 +8,7 @@ Use these weights in both web skill variants:
 
 | Dimension | Weight | Assess |
 |---|---:|---|
-| Geometry and silhouette | 0.35 | proportion, sections, identity features, scale, assembly, and visible detail |
+| Geometry and silhouette | 0.35 | proportion, sections, identity features, scale, assembly, visible detail, and **worst required view** |
 | Materials and textures | 0.30 | material intent, map correctness, UV/projection quality, texture scale, and surface response |
 | Technical asset construction | 0.15 | valid graph/output, hierarchy, pivot, parameters, and reproducible exported asset |
 | Web integration | 0.10 | imports, materials, bindings, durable paths, recook/reload behavior |
@@ -21,7 +21,7 @@ Use these weights in both web skill variants:
 Any hard failure blocks `FINAL_ACCEPTED` regardless of score:
 
 - graph/cook error, empty output, or failed required graph validation;
-- wrong physical/stylized scale, broken silhouette, invalid assembly, or unresolved geometry defect;
+- wrong physical/stylized scale, broken silhouette, a failed required orthographic view, invalid assembly, or unresolved geometry defect;
 - missing, default, or placeholder material on a visible final renderer;
 - required texture absent, wrongly imported/bound, visibly invalid mapping, or unresolved material error;
 - exported asset missing/damaged, unstable on reload, or holding broken references;

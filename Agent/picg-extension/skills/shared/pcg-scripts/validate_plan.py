@@ -30,7 +30,7 @@ def basic_issues(plan: dict) -> list[str]:
     if not plan.get("targetName"):
         issues.append("missing targetName")
     if "schemaVersion" not in plan:
-        issues.append("missing schemaVersion (expected 1)")
+        issues.append("missing schemaVersion (expected 1 or 2)")
     complexity = plan.get("complexity")
     if complexity not in COMPLEXITY_MINIMUMS:
         issues.append(f"complexity must be one of {sorted(COMPLEXITY_MINIMUMS)}")

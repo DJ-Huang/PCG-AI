@@ -1520,6 +1520,24 @@
   position: relative;
 }
 
+.pcg-preview.is-review {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border-right: none;
+  flex-shrink: 1;
+}
+
+.pcg-preview.is-review .pcg-preview__resize-handle,
+.pcg-preview.is-review .pcg-preview__header,
+.pcg-preview.is-review .pcg-preview__tabs,
+.pcg-preview.is-review .pcg-preview__axis-navigation,
+.pcg-preview.is-review .pcg-preview__shading-bar,
+.pcg-preview.is-review .pcg-preview__parameter-overlay,
+.pcg-preview.is-review .pcg-preview__footer {
+  display: none;
+}
+
 .pcg-preview__header {
   display: flex;
   align-items: center;

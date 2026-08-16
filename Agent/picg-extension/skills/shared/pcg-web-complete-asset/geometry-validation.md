@@ -8,7 +8,7 @@ Validate the cooked white model in a clean `PcgReview_<slug>` review page before
 |---|---|---|
 | Cook | No graph/runtime error; non-empty output exists (pcg-server returns valid geometry) | graph authoring / pipeline validation |
 | Scale | Bounds match AssetSpec and use metres; no unit drift | AssetSpec / graph data |
-| Silhouette | Primary outline, section changes, and identity features match the reference | graph plan / geometry nodes |
+| Silhouette | Required orthographic views match archived front/side/top independently; three-quarter is integrity-only | graph plan / geometry nodes |
 | Assembly | Parts are intentionally separated or fused; no accidental intersections, floaters, or hidden duplicate shells | graph modules / placement |
 | Normals and shading | No inverted faces, unexpected faceting, or undefined shading at the intended camera distance | primitive choice / topology / shading settings |
 | Hard surface | Bevel is per clean part before assembly merge; no global mixed-scale post-merge bevel | graph topology |
@@ -25,5 +25,5 @@ Record:
 
 ```text
 Geometry: cook=PASS|FAIL | bounds=<x,y,z>m | silhouette=PASS|FAIL |
-assembly=PASS|FAIL | normals=PASS|FAIL | scale=PASS|FAIL
+worstView=<front|side|top|n/a> | assembly=PASS|FAIL | normals=PASS|FAIL | scale=PASS|FAIL
 ```

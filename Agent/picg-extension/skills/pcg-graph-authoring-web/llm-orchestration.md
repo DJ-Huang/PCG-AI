@@ -2,7 +2,7 @@
 
 Adapted from [img2threejs](https://github.com/img2threejs/img2threejs) orchestration patterns. This doc defines **how the agent should think and loop** while authoring `.pcg` graphs. Runnable scripts: [`../shared/pcg-scripts/`](../shared/pcg-scripts/) · MCP authoring contract: [`../shared/pcg-mcp.md`](../shared/pcg-mcp.md) · cheatsheet: [`scripts.md`](scripts.md) · **web clean-page review (P0):** [`web-review.md`](web-review.md).
 
-Skill id: **`pcg-graph-authoring-web`**.
+Skill id: **`pcg-graph-authoring-web`**. Three-view jobs: also read [`triview.md`](triview.md) before the first node write.
 
 ## Core philosophy
 
@@ -26,8 +26,8 @@ Skill id: **`pcg-graph-authoring-web`**.
 ```text
 0. pcg-server + Vite dev server: check_server.py (web-review.md) — required before visual review
    → start with Shell block_until_ms: 0 (NOT nohup/&); re-check_server before every cook cycle
-0.5. new_authoring_plan.py → archive_reference.py  (reference to disk BEFORE anything visual)
-1. Layered observation → write observation.layers + visualTokens INTO *-plan.json (not chat)
+0.5. new_authoring_plan.py (--front/--side/--top when given) → archive_reference.py --from-plan [--require-triview]
+1. Layered observation → write observation.layers + viewObservations + crossViewConstraints + visualTokens INTO *-plan.json
 2. pcg_kb_search (rules + kb) (local spec evidence — mandatory; record hits in plan.localRuleHits)
 3. Fill Graph Authoring Plan (*-plan.json)
 4. validate_plan.py --strict-quality  (blocks shallow plans AND unarchived references)
@@ -36,10 +36,10 @@ Skill id: **`pcg-graph-authoring-web`**.
    Otherwise use direct .pcg authoring as the offline/compatibility fallback
 7. MCP validate/cook, then pcg_save_graph; validate_pcg.py --check-server verifies the saved deliverable
 8. setup_web_review.py → review URL (http://localhost:5173/review?graph=...) (fixed; no ask)
-9. Vite /review route: load graph → cook via pcg-server → PreviewViewport → __pcgReady
-10. capture_webview_png.py → Playwright screenshots the WebGL canvas
-11. make_comparison_sheet.py → one side-by-side PNG (no score)
-12. Agent vision → append_review.py (exactly ONE action; reference + vision notes required)
+9. Vite /review route: load graph → cook via pcg-server → PreviewViewport → __pcgReady / __pcgReview
+10. capture_webview_png.py --cameras front,side,top,three-quarter (canvas only; keep camera receipts)
+11. make_comparison_sheet.py --view-id <view> for every required view (no score)
+12. Agent vision per view → append_review.py (exactly ONE action; --view-evidence-json on triplets)
 13. report_pass.py --resume / orchestrate_passes.py sync → next pass or stop
 ```
 
@@ -57,26 +57,25 @@ images; URLs rot; late stages (material, texture, final acceptance) are too far
 from step 1 to trust recall. Three rules close the gap:
 
 1. **Archive first (P0).** Immediately after `new_authoring_plan.py`, run
-   `archive_reference.py --image <path|URL|data-URI> --plan <plan.json>`. The
-   plan's `sourceImage` is rewritten to `ref_<slug>.<ext>` on local disk; the
-   original source stays in `referenceArchive.originalSource`. Never point
-   `make_comparison_sheet.py --reference` at a chat attachment or URL.
+   `archive_reference.py`. For a triplet: `--front/--side/--top` on the plan, then
+   `archive_reference.py --plan … --from-plan --require-triview`. Each view becomes
+   `ref_<slug>_<view>.<ext>`; never point `make_comparison_sheet.py --reference` at a
+   chat attachment or URL. Missing a view keeps `mode=single` — do not invent drawings.
 2. **Observation lives in the plan, not in chat.** Fill `observation.layers`
-   (all 8 layers) and distill `visualTokens` (hex colors, roughness/metalness
-   ranges, key ratios, named dimensions) into `*-plan.json` before authoring.
-   `validate_plan.py --strict-quality` blocks authoring when the reference is
-   unarchived or fewer than 6 layers are filled. Material/final stages consult
-   `visualTokens` data instead of recalling the image.
+   (all 8 layers) and distill `visualTokens`. For a triplet also fill
+   `viewObservations` (≥2 landmarks per view) and `crossViewConstraints` (width /
+   height / depth, one owner each). `validate_plan.py --strict-quality` blocks
+   authoring when a required view is unarchived or fewer than 6 layers are filled.
 3. **Re-hydrate at every stage entry.** Before geometry, UV, material, texture,
    asset export, and final-acceptance work — and after any context compaction —
    re-read in this order: `*-RESUME.md` → `*-plan.json` (observation +
-   visualTokens + reviewHistory) → archived reference → latest `cmp_*.png`.
+   visualTokens + reviewHistory) → every archived view → latest per-view `cmp_*.png`.
    Regenerate the resume with `report_pass.py <plan> --resume` at each stage
    transition and after each review cycle.
 
-Every visual-pass `continue` requires `--reference-screenshot` (the archived
-file) and `--ai-vision-notes` in `append_review.py`; entries without them do
-not unlock the next pass.
+Every visual-pass `continue` on a triplet requires `--view-evidence-json` covering
+every required view, a `cameraReceipt`, and a **worst required-view** score at or
+above the pass threshold. A single 3/4 screenshot cannot hide a failed ortho view.
 
 ## Layered image observation (before shape analysis table)
 
@@ -104,7 +103,16 @@ Before writing `.pcg` nodes, emit a short plan in the reply (or optional sidecar
 ```json
 {
   "targetName": "Ghost Protocol Glock",
-  "sourceImage": "ref_ghost-protocol-glock.png (archived local file, never a URL)",
+  "sourceImage": "ref_cabin_front.png (legacy alias; never a URL)",
+  "referenceSet": {
+    "mode": "orthographic-triplet",
+    "views": [
+      { "id": "front", "role": "front", "archivedPath": "ref_cabin_front.png", "projection": "orthographic", "required": true },
+      { "id": "side", "role": "side", "archivedPath": "ref_cabin_side.png", "projection": "orthographic", "required": true },
+      { "id": "top", "role": "top", "archivedPath": "ref_cabin_top.png", "projection": "orthographic", "required": true }
+    ]
+  },
+  "coordinateFrame": { "handedness": "left-handed", "upAxis": "+y", "frontAxis": "+z", "sideView": "right" },
   "referenceArchive": { "archivedPath": "…/ref_ghost-protocol-glock.png", "originalSource": "https://…" },
   "observation": { "layers": { "identification": "compact pistol", "…": "…" }, "shapeAnalysis": "…" },
   "visualTokens": { "proportions": ["slide length ≈ 2× grip height"], "materialPalette": ["grip candy-ruby #8e1230, roughness 0.25-0.35"] },
@@ -118,7 +126,7 @@ Before writing `.pcg` nodes, emit a short plan in the reply (or optional sidecar
     ],
     "minimumMacroParts": 5,
     "minimumMesoParts": 8,
-    "reviewViewpoints": ["primary", "three-quarter"]
+    "reviewViewpoints": ["front", "side", "top", "three-quarter-integrity"]
   },
   "detailInventory": [
     {
@@ -130,8 +138,9 @@ Before writing `.pcg` nodes, emit a short plan in the reply (or optional sidecar
     }
   ],
   "unknownsToResolve": ["underside trigger guard curve"],
-  "localRuleHits": ["pcg/assembly-bevel", "pcg/vehicle"],
+  "localRuleHits": ["pcg/triview", "pcg/assembly-bevel", "pcg/vehicle"],
   "buildPasses": [
+    { "id": "reference-calibration", "status": "done" },
     { "id": "module-plan", "status": "done" },
     { "id": "blockout", "status": "pending", "componentRefs": ["body", "slide", "grip"] }
   ]
@@ -163,15 +172,16 @@ Unlock passes in order; do not dump the full graph when modularizing.
 
 | Pass | Scope | Agent delivers |
 |------|-------|----------------|
-| `module-plan` | Subgraph boundaries, lane list | Module table in reply |
+| `reference-calibration` | Archive views, object frame, per-view landmarks, width/height/depth owners | Filled `referenceSet` + `observation.viewObservations` + `crossViewConstraints` |
+| `module-plan` | Subgraph boundaries, lane list, `componentHypotheses` | Module table in reply |
 | `blockout` | Macro parts, coarse proportions | Skeleton nodes + `MergeMesh` stub |
 | `structural` | Meso parts, attachments | Per-lane chains wired |
 | `form-refinement` | Profiles, sweeps, subdiv pre-bevel | Correct primitives per part |
 | `bevel-pass` | Per-part `BevelMesh` | No post-merge blind bevel |
 | `assembly` | `MergeMesh` → `Output` | Full topology |
-| `material-pass` | `AssignMaterial`, colors, UV | Materials on named parts |
 | `parameters` | `parameters[]` auto recommended / user-listed / `[]` | Inspector bindings synced |
 | `validation` | `validate_pcg.py` clean | Zero errors; warnings addressed |
+| `cross-view-geometry-lock` | Re-capture every required ortho view + integrity 3/4 | Worst required view ≥ 0.9; no collapsed depth |
 
 For simple single-spine graphs (<15 nodes), passes may collapse — still run observation + plan + validate.
 
@@ -200,7 +210,7 @@ Weapon/skin subjects with patterned finishes: treat as **complex+** even if bare
 Mirror img2threejs `localSpecSearch` — **pipeline stage, not optional memory**:
 
 1. `pcg_kb_search(query="编图 + 模型类型 + 意图", category="rules", top_k=10)`
-2. `pcg_kb_get` for `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, and the matching type rule
+2. `pcg_kb_get` for `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, `rules/graph-authoring/triview.md` when front/side/top exist, and the matching type rule
 3. Record `rule_id` hits in the plan (`localRuleHits`)
 4. Build graph from returned evidence; do not invent domain topology when a rule exists
 5. If `pcg_kb_search` fails: read `<workspace>/.pcg-ai/rules/graph-authoring/` files directly (fallback paths in `SKILL.md`)
@@ -255,10 +265,10 @@ From img2threejs production lessons:
 | 0.6 | Macro/meso mostly correct, materials weak |
 | 0.75 | Reads correctly in web view, details approximate — **not done**; keep refining |
 | 0.85 | Strong real-time match — still refine toward 0.9 on reference-image jobs |
-| 0.9 | Near-reference match — **default autonomous stop target** |
-| 0.95+ | Usually needs multi-view or manual art |
+| 0.9 | Near-reference match on **every required view** — **default autonomous stop target** |
+| 0.95+ | Usually needs a locked triplet plus integrity 3/4 |
 
-Do not claim 0.95+ from one ambiguous photo unless the object is simple and symmetric. Under autonomous mode: if score < 0.9, choose `refine-*` and continue; do not ask the user to green-light another round. Do not `stop` at 0.75–0.85 and call it finished.
+Do not claim 0.95+ from one ambiguous photo unless the object is simple and symmetric. Under autonomous mode: if the **worst required view** is below the pass threshold, choose `refine-*` and continue; do not average views and do not ask the user to green-light another round. `three-quarter` cannot hide a failed front/side/top. Do not `stop` at 0.75–0.85 and call it finished.
 
 ## Scripts (shared + web-specific)
 

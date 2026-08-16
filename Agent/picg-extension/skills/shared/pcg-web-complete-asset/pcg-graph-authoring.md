@@ -1,23 +1,23 @@
 # PCG graph authoring standard (web)
 
-Use this shared standard in both web skill variants. `SHARED_SCRIPTS_DIR` is `../pcg-scripts` (sibling directory), which owns the generic Python helper scripts. `AUTHORING_SKILL_DIR` is the sibling `pcg-graph-authoring-web` directory, which owns the target-specific helpers: `scripts/web/`, `examples.md`, `llm-orchestration.md`, `scripts.md`, and `web-review.md`.
+Use this shared standard in both web skill variants. `SHARED_SCRIPTS_DIR` is `../pcg-scripts` (sibling directory), which owns the generic Python helper scripts. `AUTHORING_SKILL_DIR` is the sibling `pcg-graph-authoring-web` directory, which owns the target-specific helpers: `scripts/web/`, `examples.md`, `llm-orchestration.md`, `scripts.md`, `web-review.md`, and `triview.md`.
 
 ## Mandatory bootstrap
 
 Before a new or materially rebuilt graph:
 
-1. For visual work, verify the pcg-server is running and reachable (`http://127.0.0.1:17890/v1/health`), then follow `AUTHORING_SKILL_DIR/web-review.md` end-to-end. Always use a dedicated `PcgReview_<slug>.html` review page; do not judge a graph in the main editor with other content loaded.
+1. For visual work, verify the pcg-server is running and reachable (`http://127.0.0.1:17890/v1/health`), then follow `AUTHORING_SKILL_DIR/web-review.md` end-to-end. Always use the Vite `/review?graph=` route; do not judge a graph in the main editor with other content loaded. For front/side/top input, also read `AUTHORING_SKILL_DIR/triview.md`.
 2. Read `schema/node-manifest.json`. It is the sole source for node types, pin ids/types, and property defaults. Never invent a node type, pin id, or property.
-3. Load `pcg_kb_search(query="PCG-AI 编图 + 装配倒角 + 模型类型关键词", category="rules", top_k=10)`. Then `pcg_kb_get` for `rules/engineering/pcg-ai-development.md`, `rules/graph-authoring/000-index.md`, `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, and the matching model-type rule. If the KB index is unavailable, read the same files from disk at `<workspace>/.pcg-ai/rules/`.
+3. Load `pcg_kb_search(query="PCG-AI 编图 + 装配倒角 + 模型类型关键词", category="rules", top_k=10)`. Then `pcg_kb_get` for `rules/engineering/pcg-ai-development.md`, `rules/graph-authoring/000-index.md`, `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, `rules/graph-authoring/triview.md` when front/side/top exist, and the matching model-type rule. If the KB index is unavailable, read the same files from disk at `<workspace>/.pcg-ai/rules/`.
 4. Use `pcg_golden_graph_list(class=<class>)` then `pcg_golden_graph_get(name)` to load templates; the directory lives at `<workspace>/.pcg-ai/golden-graphs/` and is excluded from BM25 indexing — always go through the dedicated tool. Do not mine repo `examples/**/*.pcg` or demos for new authoring. Use `examples.md` only for short pin-wiring templates. Exception: open a graph the user explicitly asked to edit.
-5. For a reference image, read `llm-orchestration.md` and `scripts.md`, perform the eight-layer observation, create and strictly validate a Graph Authoring Plan before authoring nodes.
+5. For a reference image, read `llm-orchestration.md` and `scripts.md`, perform the eight-layer observation, create and strictly validate a Graph Authoring Plan before authoring nodes. For a triplet, fill per-view landmarks and width/height/depth owners before the first node.
 
 Before writing nodes, record:
 
 ```text
 Golden Graphs: hit <paths or none> | used for: topology|modules|none
 Auto: params=baselines | graphParams=recommended|none | saveDir=<path> |
-previewPage=PcgReview_<slug>.html | loop=on
+previewPage=/review?graph=<path> | cameras=front,side,top,three-quarter | loop=on
 ```
 
 ## Plan before nodes
@@ -113,7 +113,7 @@ Subgraph layout: PASS | scopes=<n> | nodes=<n> | moved=<n> | position-only=PASS
 1. Use `new_authoring_plan.py`, `validate_plan.py --strict-quality`, and `report_pass.py` for reference-image work. Author one pass at a time rather than a one-shot 80-node root.
 2. Determine save paths by directory glob only: prefer PCG graph folders, then `examples/`, then the workspace fallback. Do not inspect graph bodies to choose a directory.
 3. Run the dedicated root/Subgraph layout pass, then `validate_pcg.py`, and fix every error. On new/relayout graphs, treat layout, title, broken parameter, tiny-subgraph, flat-megagraph, and mixed-assembly bevel warnings as must-fix.
-4. Cook via the pcg-server HTTP API in the clean review page, capture a screenshot, generate a comparison sheet, and make one documented correction action per review cycle. A visual script cannot score the image; agent judgement on the sheet does.
+4. Cook via the pcg-server HTTP API in the clean `/review` route, capture **each required view** with the deterministic camera presets, generate a comparison sheet per view, and make one documented correction action per review cycle. Unlock on the **worst required view**, never the average. A visual script cannot score the image; agent judgement on the sheets does.
 5. Continue geometry/material passes until the active DoD is met. Do not claim visual fidelity if the pcg-server or web preview is unavailable.
 
 Use `AUTHORING_SKILL_DIR/scripts.md` for exact helper invocations. At the end of graph work, hand off the valid cooked result to `geometry-validation.md`; material and texture work are later shared stages, not reasons to skip this handoff.

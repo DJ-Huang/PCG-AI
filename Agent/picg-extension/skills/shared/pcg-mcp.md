@@ -14,10 +14,10 @@ Use the `pcg` MCP as the primary authoring and inspection control plane for the 
 | Add/delete/move/patch nodes, add/delete edges, edit parameters | `pcg_apply_graph_ops` | Atomic batch in the current root/Subgraph scope; one Undo step |
 | Create or replace a complete graph with Subgraphs | `pcg_replace_graph` | Native pre-validation plus atomic full-document replacement |
 | Persist the authored graph | `pcg_save_graph` | Saves the full live document to a workspace-relative `.pcg` path |
-| Fast native validation, cook metrics, or current viewport capture | PCG MCP | Operates on the in-memory graph without shell plumbing |
+| Fast native validation, cook metrics, or current viewport capture | PCG MCP | Rapid feedback only; not a substitute for saved `/review` ortho cameras |
 | Prove manifest/pin/layout correctness of the saved deliverable | `validate_pcg.py` | MCP validation covers the live full graph, not all authoring/style checks |
 | Final Unity acceptance | Tuanjie/Unity MCP clean scene | The Web viewport is not Unity runtime evidence |
-| Final Web acceptance of a saved graph | Vite `/review` + Playwright | Stable clean page, fixed file input, reproducible screenshot |
+| Final Web acceptance of a saved graph | Vite `/review` + Playwright `front/side/top/three-quarter` | Stable clean page, canvas capture, per-view comparison |
 
 ## Mandatory handshake
 

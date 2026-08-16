@@ -10,15 +10,16 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_PASS_ORDER: list[str] = [
+    "reference-calibration",
     "module-plan",
     "blockout",
     "structural",
     "form-refinement",
     "bevel-pass",
     "assembly",
-    "material-pass",
     "parameters",
     "validation",
+    "cross-view-geometry-lock",
 ]
 
 VISUAL_PASS_IDS: set[str] = {
@@ -27,7 +28,39 @@ VISUAL_PASS_IDS: set[str] = {
     "form-refinement",
     "bevel-pass",
     "assembly",
-    "material-pass",
+    "parameters",
+    "cross-view-geometry-lock",
+}
+
+PLANNING_PASS_IDS: set[str] = {
+    "reference-calibration",
+    "module-plan",
+}
+
+TRIVIEW_ROLES: tuple[str, str, str] = ("front", "side", "top")
+
+VALID_REFERENCE_ROLES: set[str] = {
+    "primary",
+    "front",
+    "side",
+    "top",
+    "rear",
+    "bottom",
+    "three-quarter",
+    "detail",
+}
+
+VALID_FRONT_AXES: set[str] = {"+x", "-x", "+z", "-z"}
+VALID_SIDE_VIEWS: set[str] = {"right", "left"}
+
+PASS_VISUAL_THRESHOLDS: dict[str, float] = {
+    "blockout": 0.75,
+    "structural": 0.82,
+    "form-refinement": 0.88,
+    "bevel-pass": 0.88,
+    "assembly": 0.90,
+    "parameters": 0.90,
+    "cross-view-geometry-lock": 0.90,
 }
 
 VALID_ACTIONS: set[str] = {
@@ -47,6 +80,11 @@ COMPLEXITY_MINIMUMS: dict[str, dict[str, int]] = {
 }
 
 PASS_ACCEPTANCE: dict[str, list[str]] = {
+    "reference-calibration": [
+        "Every required reference view is archived and labelled with projection/camera semantics",
+        "PCG object-space coordinate frame and width/height/depth constraints are recorded",
+        "Per-view silhouettes, landmarks, visibility, and conflicts are persisted in the plan",
+    ],
     "module-plan": [
         "Module table recorded (nameable parts, Subgraph yes/no)",
         "qualityContract.definitionOfDone is reference-specific (not generic)",
@@ -72,10 +110,6 @@ PASS_ACCEPTANCE: dict[str, list[str]] = {
         "MergeMesh → Output complete",
         "Lane layout / Subgraph packaging if soft triggers fire",
     ],
-    "material-pass": [
-        "AssignMaterial / VertexColor / UV on named parts",
-        "Identity finish zones mapped (not flat memory colors)",
-    ],
     "parameters": [
         "parameters[] synced with target node data defaults",
         "recommended Graph Parameters auto-applied when signals fire (or [] / user-listed)",
@@ -83,6 +117,12 @@ PASS_ACCEPTANCE: dict[str, list[str]] = {
     "validation": [
         "validate_pcg.py exits 0",
         "Layout / __nodeTitle / Merge→Bevel warnings addressed",
+    ],
+    "cross-view-geometry-lock": [
+        "Every mandatory reference view has current deterministic camera evidence",
+        "Worst required-view score meets the pass threshold; an average cannot hide a failed view",
+        "Width/height/depth constraints and critical landmarks pass across views",
+        "A novel three-quarter integrity view shows no collapsed depth or hidden assembly defect",
     ],
 }
 
@@ -118,13 +158,114 @@ def has_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def visual_threshold(plan: dict[str, Any]) -> float:
+def visual_threshold(plan: dict[str, Any], pass_id: str | None = None) -> float:
+    if pass_id:
+        for item in plan.get("buildPasses", []):
+            if not isinstance(item, dict) or item.get("id") != pass_id:
+                continue
+            value = item.get("visualThreshold")
+            if has_number(value):
+                return max(0.0, min(1.0, float(value)))
     loop = plan.get("selfCorrectLoop")
     if isinstance(loop, dict):
         acceptance = loop.get("visualAcceptance")
         if isinstance(acceptance, dict) and has_number(acceptance.get("threshold")):
             return max(0.0, min(1.0, float(acceptance["threshold"])))
+    if pass_id and pass_id in PASS_VISUAL_THRESHOLDS:
+        return PASS_VISUAL_THRESHOLDS[pass_id]
     return 0.7
+
+
+def reference_views(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return normalized reference views, including a v1 single-image fallback."""
+    reference_set = plan.get("referenceSet")
+    if isinstance(reference_set, dict) and isinstance(reference_set.get("views"), list):
+        return [item for item in reference_set["views"] if isinstance(item, dict)]
+
+    source = str(plan.get("sourceImage") or "")
+    archive = plan.get("referenceArchive")
+    archived = str(archive.get("archivedPath") or "") if isinstance(archive, dict) else ""
+    original = str(archive.get("originalSource") or source) if isinstance(archive, dict) else source
+    if not source and not archived and not original:
+        return []
+    return [
+        {
+            "id": "primary",
+            "role": "primary",
+            "originalSource": original,
+            "archivedPath": archived or source,
+            "projection": "unknown",
+            "required": True,
+        }
+    ]
+
+
+def required_reference_views(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    views = reference_views(plan)
+    required = [item for item in views if item.get("required") is not False]
+    return required or views
+
+
+def required_reference_view_ids(plan: dict[str, Any]) -> list[str]:
+    ids: list[str] = []
+    for index, item in enumerate(required_reference_views(plan)):
+        view_id = str(item.get("id") or item.get("role") or f"view-{index + 1}").strip()
+        if view_id and view_id not in ids:
+            ids.append(view_id)
+    return ids
+
+
+def reference_mode(plan: dict[str, Any]) -> str:
+    reference_set = plan.get("referenceSet")
+    if isinstance(reference_set, dict) and str(reference_set.get("mode") or "").strip():
+        return str(reference_set["mode"])
+    roles = {str(item.get("role") or item.get("id") or "") for item in reference_views(plan)}
+    if set(TRIVIEW_ROLES).issubset(roles):
+        return "orthographic-triplet"
+    return "single" if roles else "none"
+
+
+def evidence_by_view(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    values = entry.get("viewEvidence")
+    if not isinstance(values, list):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for item in values:
+        if not isinstance(item, dict):
+            continue
+        view_id = str(item.get("viewId") or "").strip()
+        if view_id:
+            result[view_id] = item
+    return result
+
+
+def view_evidence_completes_pass(
+    plan: dict[str, Any],
+    entry: dict[str, Any],
+    pass_id: str,
+) -> bool:
+    required_ids = required_reference_view_ids(plan)
+    by_view = evidence_by_view(entry)
+    if not required_ids or not by_view:
+        return False
+    threshold = entry.get("visualAcceptanceThreshold", visual_threshold(plan, pass_id))
+    if not has_number(threshold):
+        return False
+    for view_id in required_ids:
+        evidence = by_view.get(view_id)
+        if not evidence:
+            return False
+        if not evidence.get("referenceScreenshot") or not evidence.get("renderScreenshot"):
+            return False
+        if not evidence.get("comparisonImage") or not str(evidence.get("aiVisionNotes") or "").strip():
+            return False
+        if not has_number(evidence.get("aiVisionScore")):
+            return False
+        if float(evidence["aiVisionScore"]) < float(threshold):
+            return False
+        if len(required_ids) > 1 and not isinstance(evidence.get("cameraReceipt"), dict):
+            return False
+    return True
 
 
 def review_completes_pass(plan: dict[str, Any], entry: dict[str, Any], pass_id: str) -> bool:
@@ -132,6 +273,8 @@ def review_completes_pass(plan: dict[str, Any], entry: dict[str, Any], pass_id: 
         return False
     if pass_id not in VISUAL_PASS_IDS:
         return True
+    if evidence_by_view(entry):
+        return view_evidence_completes_pass(plan, entry, pass_id)
     visual = entry.get("visualEvidence")
     if not isinstance(visual, dict):
         return False
@@ -144,7 +287,7 @@ def review_completes_pass(plan: dict[str, Any], entry: dict[str, Any], pass_id: 
     if not str(entry.get("aiVisionNotes") or "").strip():
         return False
     score = entry.get("aiVisionScore")
-    threshold = entry.get("visualAcceptanceThreshold", visual_threshold(plan))
+    threshold = entry.get("visualAcceptanceThreshold", visual_threshold(plan, pass_id))
     if not has_number(score) or not has_number(threshold):
         return False
     return float(score) >= float(threshold)
@@ -216,27 +359,108 @@ def sync_pipeline_state(plan: dict[str, Any]) -> dict[str, Any]:
 def default_build_passes() -> list[dict[str, Any]]:
     passes: list[dict[str, Any]] = []
     for index, pass_id in enumerate(DEFAULT_PASS_ORDER):
-        passes.append(
-            {
-                "id": pass_id,
-                "status": "in_progress" if index == 0 else "pending",
-                "acceptance": list(PASS_ACCEPTANCE.get(pass_id, [])),
-                "componentRefs": [],
-            }
-        )
+        item: dict[str, Any] = {
+            "id": pass_id,
+            "status": "in_progress" if index == 0 else "pending",
+            "acceptance": list(PASS_ACCEPTANCE.get(pass_id, [])),
+            "componentRefs": [],
+        }
+        if pass_id in PASS_VISUAL_THRESHOLDS:
+            item["visualThreshold"] = PASS_VISUAL_THRESHOLDS[pass_id]
+        passes.append(item)
     return passes
+
+
+def make_reference_view(role: str, source: str) -> dict[str, Any]:
+    projection = "orthographic" if role in TRIVIEW_ROLES else "unknown"
+    return {
+        "id": role,
+        "role": role,
+        "originalSource": source,
+        "archivedPath": "",
+        "projection": projection,
+        "required": True,
+        "crop": None,
+        "confidence": 1.0,
+    }
+
+
+def default_view_observation() -> dict[str, Any]:
+    return {
+        "silhouette": "",
+        "landmarks": [],
+        "visibleComponents": [],
+        "occlusionNotes": "",
+        "confidence": 0.0,
+    }
+
+
+def default_cross_view_constraints() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "overall-width",
+            "dimension": "width",
+            "views": ["front", "top"],
+            "value": None,
+            "unit": "m",
+            "tolerance": 0.02,
+            "driver": "",
+            "status": "unmeasured",
+        },
+        {
+            "id": "overall-height",
+            "dimension": "height",
+            "views": ["front", "side"],
+            "value": None,
+            "unit": "m",
+            "tolerance": 0.02,
+            "driver": "",
+            "status": "unmeasured",
+        },
+        {
+            "id": "overall-depth",
+            "dimension": "depth",
+            "views": ["side", "top"],
+            "value": None,
+            "unit": "m",
+            "tolerance": 0.02,
+            "driver": "",
+            "status": "unmeasured",
+        },
+    ]
 
 
 def make_starter_plan(
     target_name: str,
     *,
     image: str = "",
+    references: dict[str, str] | None = None,
     complexity: str = "moderate",
     pcg_path: str = "",
+    front_axis: str = "+z",
+    side_view: str = "right",
 ) -> dict[str, Any]:
     mins = COMPLEXITY_MINIMUMS.get(complexity, COMPLEXITY_MINIMUMS["moderate"])
+    sources: dict[str, str] = {}
+    if image:
+        sources["primary"] = image
+    for role, source in (references or {}).items():
+        if source:
+            sources[role] = source
+    views = [make_reference_view(role, source) for role, source in sources.items()]
+    roles = {item["role"] for item in views}
+    triplet = set(TRIVIEW_ROLES).issubset(roles)
+    reference_mode_value = "orthographic-triplet" if triplet else ("single" if views else "none")
+    view_observations = {
+        str(item["id"]): default_view_observation()
+        for item in views
+    }
+    required_view_ids = [str(item["id"]) for item in views]
+    review_viewpoints = list(required_view_ids)
+    if "three-quarter" not in review_viewpoints:
+        review_viewpoints.append("three-quarter-integrity")
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "targetName": target_name,
         "sourceImage": image,
         "pcgPath": pcg_path,
@@ -248,6 +472,22 @@ def make_starter_plan(
                 "Run archive_reference.py right after plan creation. A chat attachment or URL "
                 "is not durable memory: compaction drops pasted images and URLs rot."
             ),
+        },
+        "referenceSet": {
+            "mode": reference_mode_value,
+            "views": views,
+            "note": (
+                "Use front/side/top for an orthographic triplet. Keep every required view "
+                "archived locally and compare it only with its deterministic camera preset."
+            ),
+        },
+        "coordinateFrame": {
+            "space": "PCG object space",
+            "handedness": "left-handed",
+            "upAxis": "+y",
+            "frontAxis": front_axis,
+            "sideView": side_view,
+            "origin": "asset pivot",
         },
         "observation": {
             "layers": {
@@ -261,6 +501,9 @@ def make_starter_plan(
                 "uncertainty": "",
             },
             "shapeAnalysis": "",
+            "viewObservations": view_observations,
+            "crossViewConstraints": default_cross_view_constraints() if triplet else [],
+            "conflictResolutions": [],
             "note": (
                 "Fill every layer from the reference BEFORE authoring. This prose is the "
                 "durable memory of the reference; the conversation attachment is not."
@@ -288,7 +531,9 @@ def make_starter_plan(
             "minimumMacroParts": mins["macroParts"],
             "minimumMesoParts": mins["mesoParts"],
             "minimumDetails": mins["minDetails"],
-            "reviewViewpoints": ["primary", "three-quarter"][: mins["reviewViewpoints"]],
+            "requiredReferenceViews": required_view_ids,
+            "reviewViewpoints": review_viewpoints,
+            "worstRequiredViewThreshold": 0.90,
         },
         "detailInventory": {
             "targetMinDetails": mins["minDetails"],
@@ -299,12 +544,15 @@ def make_starter_plan(
             ),
         },
         "modules": [],
+        "componentHypotheses": [],
         "unknownsToResolve": [],
         "localRuleHits": [],
         "buildPasses": default_build_passes(),
         "selfCorrectLoop": {
-            "visualAcceptance": {"threshold": 0.7},
-            "maxCyclesPerPass": 6,
+            "visualAcceptance": {"threshold": 0.90, "aggregation": "worst-required-view"},
+            "maxGeometryCycles": 12,
+            "maxCyclesPerPass": 12,
+            "plateau": {"window": 3, "minimumWorstViewDelta": 0.01},
         },
         "reviewHistory": [],
         "sculptPipeline": {
@@ -313,8 +561,9 @@ def make_starter_plan(
             "current": DEFAULT_PASS_ORDER[0],
         },
         "authoringInstruction": (
-            "Fill objectClass, qualityContract, detailInventory, and modules from the reference "
-            "before writing .pcg nodes. Use report_pass.py for the next command."
+            "Calibrate references, fill per-view observations/cross-view constraints and "
+            "manifest-backed component hypotheses before writing .pcg nodes. Use "
+            "report_pass.py for the next command."
         ),
     }
 
@@ -376,26 +625,123 @@ def strict_quality_issues(plan: dict[str, Any]) -> list[str]:
     if isinstance(obj, dict) and obj.get("primaryType") in {None, "", "unassessed"}:
         issues.append("objectClass.primaryType is still unassessed")
     issues.extend(reference_persistence_issues(plan))
+    if int(plan.get("schemaVersion") or 1) >= 2 and reference_views(plan):
+        issues.extend(reference_calibration_issues(plan))
+        issues.extend(component_hypothesis_issues(plan, macro))
+    return issues
+
+
+def reference_calibration_issues(plan: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    frame = plan.get("coordinateFrame")
+    if not isinstance(frame, dict):
+        issues.append("missing coordinateFrame")
+    else:
+        if frame.get("frontAxis") not in VALID_FRONT_AXES:
+            issues.append(f"coordinateFrame.frontAxis must be one of {sorted(VALID_FRONT_AXES)}")
+        if frame.get("upAxis") != "+y":
+            issues.append("coordinateFrame.upAxis must be +y in PCG object space")
+        if frame.get("sideView") not in VALID_SIDE_VIEWS:
+            issues.append(f"coordinateFrame.sideView must be one of {sorted(VALID_SIDE_VIEWS)}")
+
+    views = reference_views(plan)
+    ids = [str(item.get("id") or item.get("role") or "").strip() for item in views]
+    if any(not view_id for view_id in ids):
+        issues.append("every referenceSet.views[] entry needs a non-empty id")
+    if len(ids) != len(set(ids)):
+        issues.append("referenceSet.views[] ids must be unique")
+
+    mode = reference_mode(plan)
+    if mode == "orthographic-triplet":
+        by_role = {str(item.get("role") or item.get("id") or ""): item for item in views}
+        for role in TRIVIEW_ROLES:
+            item = by_role.get(role)
+            if not item:
+                issues.append(f"orthographic-triplet missing {role} reference")
+                continue
+            if item.get("projection") != "orthographic":
+                issues.append(f"reference view {role} projection must be orthographic")
+
+        observation = plan.get("observation")
+        per_view = observation.get("viewObservations") if isinstance(observation, dict) else None
+        if not isinstance(per_view, dict):
+            issues.append("observation.viewObservations missing for orthographic-triplet")
+        else:
+            for role in TRIVIEW_ROLES:
+                value = per_view.get(role)
+                if not isinstance(value, dict):
+                    issues.append(f"observation.viewObservations.{role} missing")
+                    continue
+                if not str(value.get("silhouette") or "").strip():
+                    issues.append(f"view observation {role} missing silhouette description")
+                landmarks = value.get("landmarks")
+                if not isinstance(landmarks, list) or len(landmarks) < 2:
+                    issues.append(f"view observation {role} needs at least 2 calibrated landmarks")
+
+        constraints = observation.get("crossViewConstraints") if isinstance(observation, dict) else None
+        if not isinstance(constraints, list):
+            issues.append("observation.crossViewConstraints missing for orthographic-triplet")
+        else:
+            by_dimension = {
+                str(item.get("dimension") or ""): item
+                for item in constraints
+                if isinstance(item, dict)
+            }
+            for dimension in ("width", "height", "depth"):
+                item = by_dimension.get(dimension)
+                if not item:
+                    issues.append(f"cross-view {dimension} constraint missing")
+                    continue
+                if not has_number(item.get("value")) or float(item["value"]) <= 0:
+                    issues.append(f"cross-view {dimension} constraint needs a positive numeric value")
+                if not str(item.get("driver") or "").strip():
+                    issues.append(f"cross-view {dimension} constraint missing owner/driver")
+                tolerance = item.get("tolerance")
+                if not has_number(tolerance) or not 0 < float(tolerance) <= 0.1:
+                    issues.append(f"cross-view {dimension} tolerance must be in (0, 0.1]")
+    return issues
+
+
+def component_hypothesis_issues(plan: dict[str, Any], minimum_macro_parts: int) -> list[str]:
+    hypotheses = plan.get("componentHypotheses")
+    if not isinstance(hypotheses, list) or len(hypotheses) < minimum_macro_parts:
+        return [
+            "componentHypotheses must cover every macro part with manifest-backed candidates "
+            f"(need at least {minimum_macro_parts})"
+        ]
+    issues: list[str] = []
+    for index, item in enumerate(hypotheses):
+        if not isinstance(item, dict):
+            issues.append(f"componentHypotheses[{index}] must be an object")
+            continue
+        label = str(item.get("component") or f"[{index}]")
+        if not str(item.get("chosenNodeType") or "").strip():
+            issues.append(f"component hypothesis {label} missing chosenNodeType")
+        if not str(item.get("manifestEvidence") or "").strip():
+            issues.append(f"component hypothesis {label} missing live/static manifestEvidence")
+        if not str(item.get("crossViewEvidence") or "").strip():
+            issues.append(f"component hypothesis {label} missing crossViewEvidence")
+        drivers = item.get("dimensionDrivers")
+        if not isinstance(drivers, list) or not drivers:
+            issues.append(f"component hypothesis {label} missing dimensionDrivers")
     return issues
 
 
 def reference_persistence_issues(plan: dict[str, Any]) -> list[str]:
     """A reference-image job must keep the reference on disk, not in chat memory."""
-    source = str(plan.get("sourceImage") or "")
-    original = ""
-    archive = plan.get("referenceArchive")
-    if isinstance(archive, dict):
-        original = str(archive.get("originalSource") or "")
-    if not source and not original:
+    views = reference_views(plan)
+    if not views:
         return []
     issues: list[str] = []
-    archived = str(archive.get("archivedPath") or "") if isinstance(archive, dict) else ""
-    if not archived:
-        issues.append("reference image not archived: run archive_reference.py so it survives compaction")
-    elif not Path(archived).expanduser().is_file():
-        issues.append(f"referenceArchive.archivedPath missing on disk: {archived}")
-    if source.startswith("data:") or "://" in source:
-        issues.append("sourceImage still points at a URL/data URI; point it at the archived local file")
+    for index, item in enumerate(required_reference_views(plan)):
+        view_id = str(item.get("id") or item.get("role") or f"view-{index + 1}")
+        archived = str(item.get("archivedPath") or "")
+        if not archived:
+            issues.append(f"reference view {view_id} not archived: run archive_reference.py")
+        elif is_remote_reference(archived):
+            issues.append(f"reference view {view_id} archivedPath must be a durable local file")
+        elif not Path(archived).expanduser().is_file():
+            issues.append(f"reference view {view_id} archivedPath missing on disk: {archived}")
     observation = plan.get("observation")
     layers = observation.get("layers") if isinstance(observation, dict) else None
     if not isinstance(layers, dict):
@@ -405,3 +751,14 @@ def reference_persistence_issues(plan: dict[str, Any]) -> list[str]:
         if filled < 6:
             issues.append(f"observation.layers has {filled}/8 layers filled; need at least 6 before authoring")
     return issues
+
+
+def is_remote_reference(value: str) -> bool:
+    return value.startswith(("data:", "blob:")) or "://" in value
+
+
+def pass_continue_blockers(plan: dict[str, Any], pass_id: str) -> list[str]:
+    """Extra gates that must be empty before action=continue unlocks the next pass."""
+    if pass_id == "reference-calibration":
+        return reference_persistence_issues(plan) + reference_calibration_issues(plan)
+    return []

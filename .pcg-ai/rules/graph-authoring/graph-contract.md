@@ -16,7 +16,7 @@ verified_date: 2026-08-01
 ## 写前真源
 
 1. 读取当前仓库 `schema/node-manifest.json`；禁止凭记忆发明 node type、property 或 pin id。
-2. `rule_search(query="PCG-AI 编图 + 模型关键词", domain="pcg", top_k=10)`；至少读取本规则和 `pcg/assembly-bevel`。
+2. `pcg_kb_search`；至少读取本规则、`pcg/assembly-bevel`，有三视图或参考图重建时再读 `pcg/triview`。
 3. **高质量图参考**：只用 Vault 磁盘目录 `PCG AI Rule/Golden Graphs/`（已在 `.ragignore`，**不进 RAG**）。写图前直接枚举并读取该目录的同类 `.pcg`（及可选 `.md` 卡片），不要用 RAG 搜索此目录。**禁止**把工程仓库 `examples/*.pcg`、Unity demo `.pcg` 当策略真源。skill `examples.md` 仅作短连线模板。用户点名编辑某文件时除外；与本规则族冲突时改掉反模式。
 
 ## JSON 与命名
@@ -46,6 +46,13 @@ verified_date: 2026-08-01
 - **有向实例朝向主通道（P0）**：prototype 有明确正面/入口/前进轴时（建筑门立面、车辆车头、招牌正面等），实例旋转不得默认世界 identity。每个落点应将 **主轴朝向最近的主通道**（道路、路径、河岸、广场边等约定的 access）；仅避让足迹不够。建筑细则与 `CopyMeshToPoints` 帧轴约定见 `pcg/building`；通用 scatter 见 `pcg/scatter`。
 - 立面开口（门 / 窗）：同一立面上门与窗的 AABB 不得重叠；有中门时窗列必须清出门洞保护区。细则见 `pcg/building`。
 - 建筑实例间距：lot / scatter 放置的多栋建筑水平 footprint 不得相交；`LotSubdivision.minSize` 须大于最大建筑边长，必要时加 `PointRelax`。细则见 `pcg/building`。
+
+## 三视图与节点精度
+
+- 用户给出正/侧/顶图时，按 `pcg/triview` 归档、标定坐标系、写入跨视图宽高深约束后再写节点。
+- 每个尺寸只能有一个 owner 节点/属性；改尺寸后必须重验全部必选视图。
+- 视觉验收按视图独立打分，最差必选视图不达标不得进入下一 pass。
+- 禁止用单张 3/4 透视截图代替正交三视图约束。
 
 ## 保存与验证
 

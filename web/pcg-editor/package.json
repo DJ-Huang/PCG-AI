@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test:agent": "vitest run src/agent src/SettingsDialog.test.tsx",
+    "test:review-camera": "vitest run src/reviewCamera.test.ts",
     "test:graph-commands": "node scripts/validate-graph-commands.mjs",
     "test:pbr": "python3 ../../scripts/validate-web-pbr.py",
     "test:environments": "python3 ../../scripts/validate-builtin-environments.py",

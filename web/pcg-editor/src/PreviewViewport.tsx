@@ -66,6 +66,14 @@ import type { Vec3 } from './splineControlPoints';
 import PreviewParametersPopover from './preview/PreviewParametersPopover';
 import ImagePreviewPane from './preview/ImagePreviewPane';
 import UvPreviewPane from './preview/UvPreviewPane';
+import {
+  applyReviewCameraPose,
+  computeReviewCameraPose,
+  type FrontAxis,
+  type ReviewCameraPose,
+  type ReviewCameraView,
+  type SideView,
+} from './reviewCamera';
 
 export interface SplineEditContext {
   nodeId: string;
@@ -93,6 +101,15 @@ interface PreviewViewportProps {
    *  an edge highlight overlay. A root-scope subgraph instance id also matches
    *  its flattened "instance/inner" entries. */
   selectedNodeId?: string | null;
+  /** Fill the parent and hide editor chrome. Used by the /review route. */
+  reviewMode?: boolean;
+  /** Deterministic camera applied after each cook on the review page. */
+  reviewCamera?: {
+    view: ReviewCameraView;
+    frontAxis?: FrontAxis;
+    sideView?: SideView;
+  } | null;
+  onReviewCameraApplied?: (pose: ReviewCameraPose) => void;
 }
 
 export interface PreviewCapture {
@@ -105,6 +122,8 @@ export interface PreviewCapture {
       fov: number;
       near: number;
       far: number;
+      projection: 'perspective' | 'orthographic';
+      view?: ReviewCameraView;
     };
     viewport: { width: number; height: number; pixelRatio: number };
     shadingMode: ShadingMode;
@@ -112,11 +131,16 @@ export interface PreviewCapture {
     matcapId: MatcapId;
     wireframeOverlay: boolean;
     xrayEnabled: boolean;
+    reviewPose?: ReviewCameraPose | null;
   };
 }
 
 export interface PreviewViewportHandle {
   captureFrame(): PreviewCapture | null;
+  setReviewCamera(view: ReviewCameraView, options?: {
+    frontAxis?: FrontAxis;
+    sideView?: SideView;
+  }): ReviewCameraPose | null;
 }
 
 type ShadingMode = 'solid' | 'material' | 'rendered';
@@ -208,15 +232,21 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   splineEdit,
   onPickNode,
   selectedNodeId = null,
+  reviewMode = false,
+  reviewCamera = null,
+  onReviewCameraApplied,
 }: PreviewViewportProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
-    camera: THREE.PerspectiveCamera;
+    camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    perspective: THREE.PerspectiveCamera;
+    orthographic: THREE.OrthographicCamera;
     controls: OrbitControls;
     content: THREE.Group;
     handles: THREE.Group;
+    helpers: THREE.Group;
     gizmoLength: number;
     selectedIndex: number;
     envMap: THREE.Texture | null;
@@ -224,6 +254,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     keyLight: THREE.DirectionalLight;
     matcapTexture: THREE.Texture | null;
     pmremGenerator: THREE.PMREMGenerator | null;
+    reviewPose: ReviewCameraPose | null;
   } | null>(null);
   const [shadingMode, setShadingMode] = useState<ShadingMode>('solid');
   const [solidLighting, setSolidLighting] = useState<SolidLighting>('studio');
@@ -294,8 +325,51 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
   const dataRef = useRef(data);
   dataRef.current = data;
+  const reviewCameraRef = useRef(reviewCamera);
+  reviewCameraRef.current = reviewCamera;
+  const onReviewCameraAppliedRef = useRef(onReviewCameraApplied);
+  onReviewCameraAppliedRef.current = onReviewCameraApplied;
+  const reviewModeRef = useRef(reviewMode);
+  reviewModeRef.current = reviewMode;
 
   const hasAutoFramedRef = useRef(false);
+
+  const applyActiveReviewCamera = useCallback((view?: ReviewCameraView, options?: {
+    frontAxis?: FrontAxis;
+    sideView?: SideView;
+  }): ReviewCameraPose | null => {
+    const ctx = sceneRef.current;
+    const previewData = dataRef.current;
+    if (!ctx || !previewData) return null;
+    const requested = view
+      ? {
+          view,
+          frontAxis: options?.frontAxis ?? reviewCameraRef.current?.frontAxis,
+          sideView: options?.sideView ?? reviewCameraRef.current?.sideView,
+        }
+      : reviewCameraRef.current;
+    if (!requested) return null;
+    const aspect = Math.max(
+      ctx.renderer.domElement.clientWidth / Math.max(ctx.renderer.domElement.clientHeight, 1),
+      0.01,
+    );
+    const positions = collectFitPositions(previewData, splineEditRef.current?.controlPoints);
+    const pose = computeReviewCameraPose(positions, requested, aspect);
+    if (!pose) return null;
+    const nextCamera = pose.projection === 'orthographic' ? ctx.orthographic : ctx.perspective;
+    applyReviewCameraPose(nextCamera, pose, aspect);
+    ctx.camera = nextCamera;
+    ctx.controls.object = nextCamera;
+    ctx.controls.target.set(pose.target[0], pose.target[1], pose.target[2]);
+    ctx.controls.update();
+    ctx.reviewPose = pose;
+    ctx.helpers.visible = !reviewModeRef.current;
+    if (nextCamera instanceof THREE.PerspectiveCamera) {
+      setAxisNavigation(getAxisNavigation(nextCamera));
+    }
+    onReviewCameraAppliedRef.current?.(pose);
+    return pose;
+  }, []);
 
   useImperativeHandle(ref, () => ({
     captureFrame: () => {
@@ -307,6 +381,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       ctx.renderer.render(ctx.scene, ctx.camera);
       const dataUrl = ctx.renderer.domElement.toDataURL('image/png');
       const { shadingMode: mode, solidLighting: lighting, matcapId: matcap, wireframeOverlay: wireframe, xrayEnabled: xray } = shadingRef.current;
+      const fov = ctx.camera instanceof THREE.PerspectiveCamera ? ctx.camera.fov : 0;
       return {
         pngBase64: dataUrl.slice(dataUrl.indexOf(',') + 1),
         metadata: {
@@ -314,9 +389,11 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             position: ctx.camera.position.toArray(),
             target: ctx.controls.target.toArray(),
             up: ctx.camera.up.toArray(),
-            fov: ctx.camera.fov,
+            fov,
             near: ctx.camera.near,
             far: ctx.camera.far,
+            projection: ctx.camera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective',
+            view: ctx.reviewPose?.view,
           },
           viewport: {
             width: ctx.renderer.domElement.width,
@@ -328,10 +405,12 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           matcapId: matcap,
           wireframeOverlay: wireframe,
           xrayEnabled: xray,
+          reviewPose: ctx.reviewPose,
         },
       };
     },
-  }), []);
+    setReviewCamera: (nextView, options) => applyActiveReviewCamera(nextView, options),
+  }), [applyActiveReviewCamera]);
 
   useEffect(() => {
     preloadMatcap(DEFAULT_MATCAP_ID);
@@ -344,21 +423,30 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const sel = selectedIndexRef.current;
 
     if (edit && sel >= 0 && sel < edit.controlPoints.length) {
-      focusCameraOnTarget(ctx.camera, ctx.controls, unityToThree(edit.controlPoints[sel]));
+      ctx.camera = ctx.perspective;
+      ctx.controls.object = ctx.perspective;
+      focusCameraOnTarget(ctx.perspective, ctx.controls, unityToThree(edit.controlPoints[sel]));
       return;
     }
 
     const previewData = dataRef.current;
     if (!previewData) return;
     const positions = collectFitPositions(previewData, edit?.controlPoints);
-    if (positions.length > 0) fitCamera(ctx.camera, ctx.controls, positions);
+    if (positions.length > 0) {
+      ctx.camera = ctx.perspective;
+      ctx.controls.object = ctx.perspective;
+      fitCamera(ctx.perspective, ctx.controls, positions);
+    }
   }, []);
 
   const setAxisView = useCallback((axis: ViewAxis) => {
     const ctx = sceneRef.current;
     if (!ctx) return;
 
-    const { camera, controls } = ctx;
+    ctx.camera = ctx.perspective;
+    ctx.controls.object = ctx.perspective;
+    const camera = ctx.perspective;
+    const { controls } = ctx;
     const distance = Math.max(camera.position.distanceTo(controls.target), 0.08);
     camera.up.copy(AXIS_VIEW_UPS[axis]);
     camera.position.copy(controls.target).addScaledVector(AXIS_VIEW_DIRECTIONS[axis], distance);
@@ -384,12 +472,12 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     if (selected >= 0 && selected < points.length) {
       const pos = unityToThree(points[selected]);
       const gizmoLen = gizmoLengthForCamera(
-        ctx.camera,
+        ctx.perspective,
         pos,
         ctx.renderer.domElement.clientHeight,
       );
       const lineRadius = gizmoLineRadiusForCamera(
-        ctx.camera,
+        ctx.perspective,
         pos,
         ctx.renderer.domElement.clientHeight,
       );
@@ -420,10 +508,12 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const scene = new THREE.Scene();
     scene.environment = envMap;
     scene.environmentIntensity = 1;
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 5000);
-    camera.position.set(3, 2.5, 4);
+    const perspective = new THREE.PerspectiveCamera(50, 1, 0.01, 5000);
+    perspective.position.set(3, 2.5, 4);
+    const orthographic = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 5000);
+    orthographic.position.set(3, 2.5, 4);
 
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(perspective, renderer.domElement);
     controls.enableDamping = true;
     // Blender-style: MMB orbit, Shift+MMB pan, scroll zoom (OrbitControls maps shift+rotate → pan).
     controls.mouseButtons = {
@@ -431,7 +521,12 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       MIDDLE: THREE.MOUSE.ROTATE,
       RIGHT: THREE.MOUSE.PAN,
     };
-    const syncAxisNavigation = () => setAxisNavigation(getAxisNavigation(camera));
+    const syncAxisNavigation = () => {
+      const active = sceneRef.current?.camera ?? perspective;
+      if (active instanceof THREE.PerspectiveCamera) {
+        setAxisNavigation(getAxisNavigation(active));
+      }
+    };
     controls.addEventListener('change', syncAxisNavigation);
     syncAxisNavigation();
 
@@ -440,8 +535,11 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     dir.position.set(4, 8, 5);
     scene.add(dir);
 
-    scene.add(createInfiniteGrid());
-    scene.add(new THREE.AxesHelper(0.75));
+    const helpers = new THREE.Group();
+    helpers.add(createInfiniteGrid());
+    helpers.add(new THREE.AxesHelper(0.75));
+    helpers.visible = !reviewModeRef.current;
+    scene.add(helpers);
 
     const content = new THREE.Group();
     scene.add(content);
@@ -451,10 +549,13 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     sceneRef.current = {
       renderer,
       scene,
-      camera,
+      camera: perspective,
+      perspective,
+      orthographic,
       controls,
       content,
       handles,
+      helpers,
       gizmoLength: 0.5,
       selectedIndex: -1,
       envMap,
@@ -462,6 +563,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       keyLight: dir,
       matcapTexture: null,
       pmremGenerator,
+      reviewPose: null,
     };
 
     loadMatcapTexture(DEFAULT_MATCAP_ID).then((tex) => {
@@ -473,8 +575,22 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       const h = container.clientHeight;
       if (w === 0 || h === 0) return;
       renderer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      const ctx = sceneRef.current;
+      const active = ctx?.camera ?? perspective;
+      if (active instanceof THREE.PerspectiveCamera) {
+        active.aspect = w / h;
+      } else if (active instanceof THREE.OrthographicCamera) {
+        const frustumHeight = Number(active.userData.frustumHeight) || (active.top - active.bottom);
+        const halfH = frustumHeight / 2;
+        const halfW = halfH * (w / h);
+        active.left = -halfW;
+        active.right = halfW;
+        active.top = halfH;
+        active.bottom = -halfH;
+      }
+      active.updateProjectionMatrix();
+      perspective.aspect = w / h;
+      perspective.updateProjectionMatrix();
       syncEdgeOverlayResolution(content, w, h);
     };
     resize();
@@ -495,7 +611,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         if (gizmo && edit && sel >= 0 && sel < edit.controlPoints.length) {
           const pos = unityToThree(edit.controlPoints[sel]);
           const len = gizmoLengthForCamera(
-            ctx.camera,
+            ctx.perspective,
             pos,
             ctx.renderer.domElement.clientHeight,
           );
@@ -503,7 +619,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           rescaleAxisGizmo(gizmo, len);
         }
       }
-      renderer.render(scene, camera);
+      renderer.render(scene, sceneRef.current?.camera ?? perspective);
     };
     tick();
 
@@ -556,7 +672,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       if (selected >= 0 && selected < edit.controlPoints.length) {
         const gizmoPos = unityToThree(edit.controlPoints[selected]);
         const axisPick = pickAxisGizmo(
-          ctx.camera,
+          ctx.perspective,
           rect,
           event.clientX,
           event.clientY,
@@ -573,7 +689,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             axisPick.axis,
             axisPick.screenAxis,
             axisPick.worldPerPixel,
-            ctx.camera,
+            ctx.perspective,
             event.clientX,
             event.clientY,
             rect,
@@ -586,7 +702,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       }
 
       const pointIndex = pickControlPoint(
-        ctx.camera,
+        ctx.perspective,
         rect,
         event.clientX,
         event.clientY,
@@ -607,7 +723,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         new THREE.Vector3(),
         new THREE.Vector2(),
         0,
-        ctx.camera,
+        ctx.perspective,
         event.clientX,
         event.clientY,
         rect,
@@ -623,7 +739,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       if (!drag || !ctx || !edit) return;
 
       const rect = ctx.renderer.domElement.getBoundingClientRect();
-      drag.livePoints[drag.index] = dragPoint(drag, ctx.camera, event.clientX, event.clientY, rect);
+      drag.livePoints[drag.index] = dragPoint(drag, ctx.perspective, event.clientX, event.clientY, rect);
       refreshGizmoVisuals(drag.livePoints, drag.index);
       updateControlPolyline(ctx.content, drag.livePoints, edit.closed);
     };
@@ -894,9 +1010,16 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     }
 
     const fitPositions = collectFitPositions(data, splineEdit?.controlPoints);
-    if (fitPositions.length > 0 && !hasAutoFramedRef.current) {
-      fitCamera(ctx.camera, ctx.controls, fitPositions);
-      hasAutoFramedRef.current = true;
+    if (fitPositions.length > 0) {
+      if (reviewCameraRef.current) {
+        applyActiveReviewCamera();
+        hasAutoFramedRef.current = true;
+      } else if (!hasAutoFramedRef.current) {
+        ctx.camera = ctx.perspective;
+        ctx.controls.object = ctx.perspective;
+        fitCamera(ctx.perspective, ctx.controls, fitPositions);
+        hasAutoFramedRef.current = true;
+      }
     }
 
     const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, pbrDebugView } = shadingRef.current;
@@ -1009,6 +1132,15 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [solidPopoverOpen]);
 
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (ctx) ctx.helpers.visible = !reviewMode;
+  }, [reviewMode]);
+
+  useEffect(() => {
+    if (reviewCamera && data) applyActiveReviewCamera();
+  }, [reviewCamera, data, applyActiveReviewCamera]);
+
   const xrayActive = xrayEnabled && shadingMode === 'solid';
 
   const images = data?.images ?? [];
@@ -1037,7 +1169,10 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           : 'no geometry';
 
   return (
-    <div className="pcg-preview" style={{ width }}>
+    <div
+      className={`pcg-preview${reviewMode ? ' is-review' : ''}`}
+      style={{ width: reviewMode ? '100%' : width, height: reviewMode ? '100%' : undefined }}
+    >
       <div
         className="pcg-preview__resize-handle"
         onMouseDown={onResizeStart}

@@ -19,8 +19,12 @@ sys.path.insert(0, str(_SCRIPTS))
 from _shared.plan_schema import (  # noqa: E402
     VALID_ACTIONS,
     VISUAL_PASS_IDS,
+    current_pass,
+    has_number,
     load_json,
+    pass_continue_blockers,
     pass_order,
+    required_reference_view_ids,
     sync_pipeline_state,
     visual_threshold,
     write_json,
@@ -46,6 +50,23 @@ def validate_optional_file(value: str | None, label: str) -> None:
         return
     if not Path(value).expanduser().exists():
         raise FileNotFoundError(f"{label} does not exist: {value}")
+
+
+def parse_view_evidence(value: str | None) -> list[dict]:
+    payload = load_json_argument(value, "view-evidence-json")
+    if payload is None:
+        return []
+    if not isinstance(payload, list):
+        raise ValueError("--view-evidence-json must be a JSON array")
+    evidence: list[dict] = []
+    for index, item in enumerate(payload):
+        if not isinstance(item, dict):
+            raise ValueError(f"viewEvidence[{index}] must be an object")
+        view_id = str(item.get("viewId") or "").strip()
+        if not view_id:
+            raise ValueError(f"viewEvidence[{index}] missing viewId")
+        evidence.append(item)
+    return evidence
 
 
 def load_json_argument(value: str | None, label: str) -> object | None:
@@ -79,6 +100,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--camera-view", default="")
     parser.add_argument("--layer-scores-json", default="")
     parser.add_argument("--feature-reviews-json", default="")
+    parser.add_argument("--view-evidence-json", default="", help="JSON array of per-view evidence objects")
     parser.add_argument("--visual-threshold", type=float, default=None)
     parser.add_argument(
         "--require-screenshot-files",
@@ -93,9 +115,16 @@ def main(argv: list[str]) -> int:
     plan_path = args.plan.expanduser().resolve()
     try:
         plan = load_json(plan_path)
+        sync_pipeline_state(plan)
         ids = pass_order(plan)
         if args.pass_id not in ids:
             raise ValueError(f"unknown pass {args.pass_id!r}; expected one of: {', '.join(ids)}")
+        unlocked = current_pass(plan)
+        if args.pass_id != unlocked:
+            raise ValueError(
+                f"{args.action} blocked: current unlocked pass is {unlocked}, not {args.pass_id}. "
+                "Complete passes in order (report_pass.py --resume)."
+            )
 
         if args.require_screenshot_files:
             for label, value in (
@@ -105,31 +134,69 @@ def main(argv: list[str]) -> int:
             ):
                 validate_optional_file(value or None, label)
 
-        if args.action == "continue" and args.pass_id in VISUAL_PASS_IDS:
-            if not args.render_screenshot or not args.comparison_image:
-                raise ValueError(
-                    "continue on a visual pass requires --render-screenshot and --comparison-image"
-                )
-            if not args.reference_screenshot:
-                raise ValueError(
-                    "continue on a visual pass requires --reference-screenshot "
-                    "(use the archived ref_<slug> file, not a chat attachment)"
-                )
-            if not (args.ai_vision_notes or "").strip():
-                raise ValueError(
-                    "continue on a visual pass requires --ai-vision-notes "
-                    "(durable vision memory; chat context is not)"
-                )
-            score = args.ai_vision_score if args.ai_vision_score is not None else args.fidelity
-            threshold = (
-                args.visual_threshold
-                if args.visual_threshold is not None
-                else visual_threshold(plan)
-            )
-            if clamp_score(score) < clamp_score(threshold):
-                raise ValueError(
-                    f"continue blocked: aiVisionScore/fidelity {score} < threshold {threshold}"
-                )
+        view_evidence = parse_view_evidence(args.view_evidence_json)
+        threshold = (
+            args.visual_threshold
+            if args.visual_threshold is not None
+            else visual_threshold(plan, args.pass_id)
+        )
+        required_ids = required_reference_view_ids(plan)
+
+        if args.action == "continue":
+            blockers = pass_continue_blockers(plan, args.pass_id)
+            if blockers:
+                raise ValueError("continue blocked:\n- " + "\n- ".join(blockers))
+            if args.pass_id in VISUAL_PASS_IDS:
+                if len(required_ids) > 1:
+                    if not view_evidence:
+                        raise ValueError(
+                            "multi-view continue requires --view-evidence-json covering every required view"
+                        )
+                    by_view = {
+                        str(item.get("viewId") or "").strip(): item for item in view_evidence
+                    }
+                    missing = [view_id for view_id in required_ids if view_id not in by_view]
+                    if missing:
+                        raise ValueError(f"view evidence missing required views: {', '.join(missing)}")
+                    scores: list[float] = []
+                    for view_id in required_ids:
+                        item = by_view[view_id]
+                        if not item.get("referenceScreenshot") or not item.get("renderScreenshot"):
+                            raise ValueError(f"view {view_id} needs referenceScreenshot and renderScreenshot")
+                        if not item.get("comparisonImage") or not str(item.get("aiVisionNotes") or "").strip():
+                            raise ValueError(f"view {view_id} needs comparisonImage and aiVisionNotes")
+                        if not has_number(item.get("aiVisionScore")):
+                            raise ValueError(f"view {view_id} needs numeric aiVisionScore")
+                        if len(required_ids) > 1 and not isinstance(item.get("cameraReceipt"), dict):
+                            raise ValueError(f"view {view_id} needs cameraReceipt from capture_webview_png.py")
+                        scores.append(clamp_score(float(item["aiVisionScore"])))
+                    worst = min(scores)
+                    if worst < clamp_score(threshold):
+                        raise ValueError(
+                            f"continue blocked: worst required-view score {worst} < threshold {threshold}"
+                        )
+                    args.fidelity = worst
+                    args.ai_vision_score = worst
+                else:
+                    if not args.render_screenshot or not args.comparison_image:
+                        raise ValueError(
+                            "continue on a visual pass requires --render-screenshot and --comparison-image"
+                        )
+                    if not args.reference_screenshot:
+                        raise ValueError(
+                            "continue on a visual pass requires --reference-screenshot "
+                            "(use the archived ref_<slug> file, not a chat attachment)"
+                        )
+                    if not (args.ai_vision_notes or "").strip():
+                        raise ValueError(
+                            "continue on a visual pass requires --ai-vision-notes "
+                            "(durable vision memory; chat context is not)"
+                        )
+                    score = args.ai_vision_score if args.ai_vision_score is not None else args.fidelity
+                    if clamp_score(score) < clamp_score(threshold):
+                        raise ValueError(
+                            f"continue blocked: aiVisionScore/fidelity {score} < threshold {threshold}"
+                        )
 
         entry = {
             "passId": args.pass_id,
@@ -146,11 +213,7 @@ def main(argv: list[str]) -> int:
                 args.ai_vision_score if args.ai_vision_score is not None else args.fidelity
             ),
             "aiVisionNotes": args.ai_vision_notes,
-            "visualAcceptanceThreshold": clamp_score(
-                args.visual_threshold
-                if args.visual_threshold is not None
-                else visual_threshold(plan)
-            ),
+            "visualAcceptanceThreshold": clamp_score(threshold),
             "cameraView": args.camera_view,
             "visualEvidence": {
                 "referenceScreenshot": args.reference_screenshot or None,
@@ -158,6 +221,16 @@ def main(argv: list[str]) -> int:
                 "comparisonImage": args.comparison_image or None,
             },
         }
+        if view_evidence:
+            entry["viewEvidence"] = view_evidence
+            first = view_evidence[0]
+            entry["visualEvidence"] = {
+                "referenceScreenshot": first.get("referenceScreenshot"),
+                "renderScreenshot": first.get("renderScreenshot"),
+                "comparisonImage": first.get("comparisonImage"),
+            }
+            notes = [str(item.get("aiVisionNotes") or "").strip() for item in view_evidence]
+            entry["aiVisionNotes"] = args.ai_vision_notes or " | ".join(item for item in notes if item)
         layer_scores = load_json_argument(args.layer_scores_json, "layer-scores-json")
         if layer_scores is not None:
             entry["layerScores"] = layer_scores

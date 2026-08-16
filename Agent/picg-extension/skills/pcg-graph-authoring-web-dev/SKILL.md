@@ -8,8 +8,8 @@ description: >-
   generator after graph authoring for structure, parameters, seeds, boundary
   inputs, regeneration, performance, and AssetSpec-consistent output. It also
   runs a deterministic root/Subgraph layout pass before graph validation. Use
-  for `/pcg-graph-authoring-web-dev`, PCG pipeline validation, capability-gap
-  assessment, Subgraph layout, PCG MCP graph authoring and seed/performance validation, or
+  for `/pcg-graph-authoring-web-dev`, PCG pipeline validation, three-view /
+  三视图 / orthographic reconstruction, capability-gap assessment, Subgraph layout, PCG MCP graph authoring and seed/performance validation, or
   generator development that must stop on a real pipeline gap.
 ---
 
@@ -35,7 +35,7 @@ Read shared references directly. Do not inherit the other skill's `SKILL.md`, co
 
 1. Read `PCG_MCP_CONTRACT`, then `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md`.
 2. Read `DEV_SKILL_DIR/pipeline-capability-gate.md` before approving a newly authored graph.
-3. For reference-image work, read `AUTHORING_SKILL_DIR/llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or visual cook.
+3. For reference-image work, read `AUTHORING_SKILL_DIR/llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or visual cook. For front/side/top input, also read `AUTHORING_SKILL_DIR/triview.md`.
 4. Read the same shared stage references as the standard skill immediately before geometry, material, texture, web, and final-acceptance stages. Recover through `SHARED_DIR/error-codes.md`.
 
 ## Web dev process guardrails (2026-08-08 brickify retrospective)
@@ -44,7 +44,7 @@ Before `PCG_PIPELINE_VALIDATION`, enforce the standard web orchestration loop �
 
 | Check | Script / doc |
 |---|---|
-| Plan + archived reference | `new_authoring_plan.py` → `archive_reference.py` → `validate_plan.py --strict-quality` |
+| Plan + archived reference | `new_authoring_plan.py` (`--front/--side/--top` when given) → `archive_reference.py --from-plan` (`--require-triview` only for a complete triplet) → `validate_plan.py --strict-quality` |
 | Vault evidence | `pcg_kb_search(category="rules")` + `pcg_kb_search(category="kb")` before first node write |
 | Server health (every cook cycle) | `scripts/web/check_server.py` — use Shell `block_until_ms: 0`, not `nohup` |
 | Manifest-server parity | `validate_pcg.py --check-server http://127.0.0.1:17890` before cook |
@@ -56,7 +56,7 @@ See `AUTHORING_SKILL_DIR/web-review.md` and `llm-orchestration.md` for the full 
 
 The dev gate adds many cook/review cycles, so compaction before the material stages is more likely than in the standard skill. The reference image is not durable memory.
 
-- Follow the standard skill's P0: archive the reference with `SHARED_SCRIPTS_DIR/archive_reference.py` right after plan creation; keep `observation.layers` and `visualTokens` in `*-plan.json`.
+- Follow the standard skill's P0: archive every required view with `SHARED_SCRIPTS_DIR/archive_reference.py` right after plan creation; keep `observation.layers`, `viewObservations`, `crossViewConstraints`, and `visualTokens` in `*-plan.json`.
 - Re-hydrate before `PCG_PIPELINE_VALIDATION` and before every downstream stage: `<plan-stem>-RESUME.md` → `*-plan.json` → archived reference → latest `cmp_*.png`. Refresh via `SHARED_SCRIPTS_DIR/report_pass.py <plan> --resume` at each stage transition.
 - Add the resume path to the layout/gate handoff receipts so a post-compaction session can re-enter without chat history.
 

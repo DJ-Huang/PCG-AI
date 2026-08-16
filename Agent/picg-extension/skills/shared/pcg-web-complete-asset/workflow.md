@@ -34,7 +34,7 @@ Requirement / AssetSpec
    - [final-acceptance.md](final-acceptance.md) before reporting success.
 4. Read [error-codes.md](error-codes.md) whenever a stage fails. Repair the named upstream stage; never mask the error downstream.
 
-For a reference-image job, also read `AUTHORING_SKILL_DIR/llm-orchestration.md`, `AUTHORING_SKILL_DIR/scripts.md`, and `AUTHORING_SKILL_DIR/web-review.md` before the first graph write or visual review.
+For a reference-image job, also read `AUTHORING_SKILL_DIR/llm-orchestration.md`, `AUTHORING_SKILL_DIR/scripts.md`, and `AUTHORING_SKILL_DIR/web-review.md` before the first graph write or visual review. For front/side/top input, also read `AUTHORING_SKILL_DIR/triview.md`.
 
 ## Stage contract
 

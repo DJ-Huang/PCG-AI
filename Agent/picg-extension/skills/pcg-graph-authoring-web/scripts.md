@@ -26,19 +26,24 @@ cd web/pcg-editor && npm run dev   # Vite dev server at :5173
 ### new_authoring_plan.py
 
 ```bash
-python3 ../shared/pcg-scripts/new_authoring_plan.py "Ghost Protocol Glock" \
-  --image /path/ref.png --complexity complex \
-  --pcg examples/ghost-protocol-glock.pcg \
-  --out examples/ghost-protocol-glock-plan.json --force
+python3 ../shared/pcg-scripts/new_authoring_plan.py "Cabin" \
+  --front /path/front.png --side /path/side.png --top /path/top.png \
+  --complexity complex \
+  --pcg examples/cabin.pcg \
+  --out examples/cabin-plan.json --force
 ```
+
+Single-image jobs still use `--image`. `--front/--side/--top` must be supplied together.
 
 ### archive_reference.py (P0 — run immediately after new_authoring_plan.py)
 
 ```bash
 python3 ../shared/pcg-scripts/archive_reference.py \
-  --image /path/ref.png \
-  --plan examples/ghost-protocol-glock-plan.json
+  --plan examples/cabin-plan.json --from-plan --require-triview
 ```
+
+Or label views explicitly: `--view front=... --view side=... --view top=... --require-triview`.
+Single-image: `--image /path/ref.png --plan …` (omit `--require-triview`).
 
 ### validate_plan.py
 
@@ -63,27 +68,27 @@ python3 ../shared/pcg-scripts/orchestrate_passes.py check plan.json --pass-id bl
 
 ```bash
 python3 ../shared/pcg-scripts/make_comparison_sheet.py \
-  --reference /path/ref.png \
-  --render /path/Webview.png \
-  --out /tmp/cmp.png
+  --reference /path/ref_cabin_front.png \
+  --render screenshots/cabin_front.png \
+  --view-id front \
+  --out screenshots/cmp_cabin_front.png
 ```
 
 ### append_review.py
 
+Triplet visual `continue` (worst required view unlocks the pass):
+
 ```bash
 python3 ../shared/pcg-scripts/append_review.py plan.json \
   --pass-id blockout \
-  --fidelity 0.72 \
+  --fidelity 0.91 \
   --action continue \
-  --summary "Macro silhouette OK; grip taper still boxy" \
-  --reference-screenshot examples/ref_ghost-protocol-glock.png \
-  --render-screenshot /path/Webview.png \
-  --comparison-image /tmp/cmp.png \
-  --ai-vision-score 0.72 \
-  --ai-vision-notes "slide stepped sight reads; grip candy gradient flat" \
-  --mismatches "grip taper" \
+  --summary "Front/top lock; side depth still short" \
+  --view-evidence-json views.json \
   --in-place
 ```
+
+`views.json` is an array of `{viewId, referenceScreenshot, renderScreenshot, comparisonImage, aiVisionScore, aiVisionNotes, cameraReceipt}`. Single-image jobs still use `--reference-screenshot` / `--render-screenshot` / `--comparison-image` / `--ai-vision-notes`.
 
 ### layout_pcg.py & validate_pcg.py
 
@@ -126,7 +131,7 @@ Checks both Vite dev server (:5173) and pcg-server (:17890). Exit 0 = both healt
 
 ```bash
 python3 scripts/web/setup_web_review.py path/to/graph.pcg \
-  --slug ghost-protocol-glock --json
+  --slug cabin --camera front --front-axis +z --side-view right --json
 ```
 
 Resolves the graph path relative to the workspace root and returns the review URL:
@@ -139,11 +144,14 @@ and renders it in a clean `PreviewViewport` (same Three.js as the full editor).
 
 ```bash
 python3 scripts/web/capture_webview_png.py "<review-url>" \
-  --out screenshots/Webview_2026-08-08_14-00-00.png
+  --cameras front,side,top,three-quarter \
+  --front-axis +z --side-view right \
+  --slug cabin --out-dir screenshots --json
 ```
 
 Opens the review URL in headless Chromium via Playwright, waits for
-`window.__pcgReady`, then captures the WebGL canvas as a PNG.
+`window.__pcgReady`, switches `window.__pcgReview.setCamera`, then captures the
+WebGL canvas (not editor chrome) as a PNG. Keep each `cameraReceipt`.
 
 Requires: `pip install playwright && playwright install chromium`
 
@@ -151,20 +159,20 @@ Requires: `pip install playwright && playwright install chromium`
 
 ```text
 0. Start Vite + pcg-server (Shell block_until_ms: 0) → check_server.py (repeat every cycle)
-1. new_authoring_plan.py → archive_reference.py (reference to local disk, plan rebound)
-2. Layered observation → write observation.layers + visualTokens INTO plan.json
-3. pcg_kb_search (rules + kb) → record localRuleHits in plan
+1. new_authoring_plan.py (--front/--side/--top when given) → archive_reference.py --from-plan
+2. Layered observation → write observation.layers + viewObservations + crossViewConstraints + visualTokens INTO plan.json
+3. pcg_kb_search (rules + kb, including pcg/triview) → record localRuleHits in plan
 4. validate_plan.py --strict-quality
 5. report_pass.py --resume → unlock current pass (+ RESUME.md)
 6. Auto params + auto saveDir → author .pcg for that pass (no ask_user)
 7. layout_pcg.py → relayout root + every inline Subgraph definition
 8. validate_pcg.py --check-server http://127.0.0.1:17890
 9. setup_web_review.py → review URL (fixed route; no ask)
-10. capture_webview_png.py "<review-url>" → screenshots/Webview_<stamp>.png
-11. make_comparison_sheet.py --reference <archived ref_<slug>> --render …
-12. Agent vision → append_review.py (one action; reference + vision notes mandatory)
-13. If fidelity < 0.9 or DoD unmet → refine-* → goto 6 (no user gate)
-14. Else report_pass.py --resume → next pass / stop at ceiling (final stop ≥ 0.9)
+10. capture_webview_png.py --cameras front,side,top,three-quarter (or one camera for a single-image job)
+11. make_comparison_sheet.py --view-id <view> --reference <archived ref> --render …
+12. Agent vision per view → append_review.py (--view-evidence-json on triplets)
+13. If worst required view < pass threshold or DoD unmet → refine-* → goto 6 (no user gate)
+14. Else report_pass.py --resume → next pass / stop at ceiling (final stop ≥ 0.9 on every required view)
 ```
 
 Do **not** insert "confirm params / save dir / continue?" between steps 5–13.

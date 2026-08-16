@@ -13,8 +13,8 @@
 
 | Skill | 触发词 | 说明 |
 |-------|--------|------|
-| [pcg-graph-authoring-web](./pcg-graph-authoring-web/SKILL.md) | `/pcg-graph-authoring-web` / PCG web 编图 / WebGL 审查 | PCG Graph 编图 + **强制 Vite + pcg-server 干净页面截图对比** |
-| [pcg-graph-authoring-web-dev](./pcg-graph-authoring-web-dev/SKILL.md) | `/pcg-graph-authoring-web-dev` / PCG web 管线评估 | Web 父 skill 功能不变 + Pipeline Capability Gate |
+| [pcg-graph-authoring-web](./pcg-graph-authoring-web/SKILL.md) | `/pcg-graph-authoring-web` / PCG web 编图 / 三视图 / three-view / WebGL 审查 | PCG Graph 编图 + **强制 Vite + pcg-server 干净页面截图对比**；正/侧/顶正交图按视图验收 |
+| [pcg-graph-authoring-web-dev](./pcg-graph-authoring-web-dev/SKILL.md) | `/pcg-graph-authoring-web-dev` / PCG web 管线评估 / 三视图 | Web 父 skill 功能不变 + Pipeline Capability Gate |
 
 ## 兼容重定向
 

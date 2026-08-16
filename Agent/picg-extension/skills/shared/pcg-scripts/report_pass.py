@@ -20,6 +20,7 @@ from _shared.plan_schema import (  # noqa: E402
     load_json,
     pass_acceptance,
     pass_order,
+    reference_views,
     review_history,
     sync_pipeline_state,
 )
@@ -37,8 +38,25 @@ def render_resume(plan_path: Path, plan: dict, completed: list[str], current: st
     history = review_history(plan)
     last = history[-1] if history else {}
     visual = last.get("visualEvidence") if isinstance(last.get("visualEvidence"), dict) else {}
+    view_evidence = last.get("viewEvidence") if isinstance(last.get("viewEvidence"), list) else []
     trend = " → ".join(f"{entry.get('fidelity', 0):.2f}" for entry in history[-10:]) or "(no reviews yet)"
     unknowns = plan.get("unknownsToResolve") or []
+    view_lines = []
+    for item in reference_views(plan):
+        view_id = str(item.get("id") or item.get("role") or "view")
+        path = str(item.get("archivedPath") or "(not archived)")
+        view_lines.append(f"- {view_id}: {path}")
+    if not view_lines:
+        view_lines.append(
+            f"- archived reference: {archive.get('archivedPath') or plan.get('sourceImage') or '(not archived — run archive_reference.py')}"
+        )
+    last_view_lines = []
+    for item in view_evidence:
+        if not isinstance(item, dict):
+            continue
+        last_view_lines.append(
+            f"- {item.get('viewId')}: score={item.get('aiVisionScore', '-')} cmp={item.get('comparisonImage') or '-'}"
+        )
     lines = [
         f"# RESUME — {plan.get('targetName', '(unnamed)')}",
         "",
@@ -46,10 +64,10 @@ def render_resume(plan_path: Path, plan: dict, completed: list[str], current: st
         "Do not hand-edit; rerun `report_pass.py <plan> --resume` to refresh.",
         "",
         "## Reference (re-read ALL of these before any visual/material/final decision)",
-        f"- archived reference: {archive.get('archivedPath') or plan.get('sourceImage') or '(not archived — run archive_reference.py)'}",
+        *view_lines,
         f"- latest comparison sheet: {visual.get('comparisonImage') or '(none yet)'}",
         f"- latest render: {visual.get('renderScreenshot') or '(none yet)'}",
-        "- observation.layers / visualTokens / detailInventory: in this plan JSON (read it)",
+        "- observation.layers / viewObservations / crossViewConstraints / visualTokens: in this plan JSON",
         "",
         "## Pipeline",
         f"- plan: {plan_path}",
@@ -63,10 +81,11 @@ def render_resume(plan_path: Path, plan: dict, completed: list[str], current: st
         f"- summary: {last.get('summary', '-')}",
         f"- still mismatched: {'; '.join(last.get('mismatches') or []) or '-'}",
         f"- outstanding unknowns: {'; '.join(str(u) for u in unknowns) or '-'}",
+        *(["", "## Last review by view", *last_view_lines] if last_view_lines else []),
         "",
         "## Next",
         f"- next command: python3 {skill_scripts_dir() / 'orchestrate_passes.py'} check {plan_path} --pass-id {current}",
-        "- after context compaction: read this file, then the plan JSON, then the archived reference",
+        "- after context compaction: read this file, then the plan JSON, then every archived reference view",
         "",
     ]
     return "\n".join(lines)

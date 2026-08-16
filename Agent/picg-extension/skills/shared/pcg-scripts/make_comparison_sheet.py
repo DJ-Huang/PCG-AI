@@ -270,6 +270,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--panel-width", type=int, default=720)
     parser.add_argument("--panel-height", type=int, default=720)
     parser.add_argument("--gutter", type=int, default=24)
+    parser.add_argument("--view-id", default="", help="Optional view id stored in the JSON receipt")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -284,6 +285,8 @@ def main(argv: list[str]) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    if args.view_id:
+        payload["viewId"] = args.view_id
     print(json.dumps(payload, indent=2, ensure_ascii=False) if args.json else payload["comparisonImage"])
     return 0
 

@@ -2,13 +2,15 @@
 // pcg-server, and renders only the PreviewViewport (no editor UI).
 //
 // URL: /review?graph=<relative-path-to-pcg-file>
+// Optional camera: &camera=front|side|top|three-quarter&frontAxis=+z&sideView=right
 // The path is resolved relative to the workspace root (parent of web/).
 //
-// Sets window.__pcgReady = true when the first render is complete so
-// Playwright can capture a screenshot.
+// Sets window.__pcgReady = true when the first framed render is complete so
+// Playwright can capture a screenshot. window.__pcgReview.setCamera switches
+// deterministic views without reloading.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import PreviewViewport from './PreviewViewport';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PreviewViewport, { type PreviewViewportHandle } from './PreviewViewport';
 import {
   cookGraphPreview,
   prepareGraphForPreviewCook,
@@ -23,11 +25,35 @@ import {
   type PreviewParameterValue,
   type PreviewParameterValues,
 } from './previewParameters';
+import {
+  parseFrontAxis,
+  parseReviewCameraView,
+  parseSideView,
+  type ReviewCameraPose,
+  type ReviewCameraView,
+} from './reviewCamera';
 
 interface ReviewState {
   loading: boolean;
   error: string | null;
   data: PreviewData | null;
+}
+
+interface PcgReviewApi {
+  ready: boolean;
+  camera: ReviewCameraPose | null;
+  setCamera: (view: ReviewCameraView) => ReviewCameraPose | null;
+  capture: () => ReturnType<PreviewViewportHandle['captureFrame']>;
+}
+
+function readReviewQuery() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    graphPath: params.get('graph'),
+    camera: parseReviewCameraView(params.get('camera')),
+    frontAxis: parseFrontAxis(params.get('frontAxis')),
+    sideView: parseSideView(params.get('sideView')),
+  };
 }
 
 export default function ReviewPage() {
@@ -38,8 +64,13 @@ export default function ReviewPage() {
   });
   const [graph, setGraph] = useState<GraphJson | null>(null);
   const [parameterValues, setParameterValues] = useState<PreviewParameterValues>({});
+  const viewportRef = useRef<PreviewViewportHandle>(null);
+  const query = useMemo(() => readReviewQuery(), []);
+  const [reviewView, setReviewView] = useState<ReviewCameraView>(
+    query.camera ?? 'three-quarter',
+  );
 
-  const graphPath = new URLSearchParams(window.location.search).get('graph');
+  const graphPath = query.graphPath;
 
   const cook = useCallback(async () => {
     if (!graphPath) {
@@ -62,14 +93,14 @@ export default function ReviewPage() {
         return;
       }
 
-      const graph = (await res.json()) as GraphJson;
-      const resolvedValues = resolvePreviewParameterValues(graph.parameters ?? [], parameterValues);
-      setGraph(graph);
+      const nextGraph = (await res.json()) as GraphJson;
+      const resolvedValues = resolvePreviewParameterValues(nextGraph.parameters ?? [], parameterValues);
+      setGraph(nextGraph);
       setParameterValues((current) => (
         JSON.stringify(current) === JSON.stringify(resolvedValues) ? current : resolvedValues
       ));
       const prepared = prepareGraphForPreviewCook(
-        applyPreviewParameterOverrides(graph, resolvedValues),
+        applyPreviewParameterOverrides(nextGraph, resolvedValues),
       );
       const response = await cookGraphPreview(prepared, 42);
 
@@ -118,16 +149,40 @@ export default function ReviewPage() {
     setGraph(nextGraph);
   }, [graph, graphPath, parameters, parameterValues]);
 
-  // Signal readiness for Playwright screenshot capture
+  const markReady = useCallback((pose: ReviewCameraPose | null) => {
+    const api: PcgReviewApi = {
+      ready: true,
+      camera: pose,
+      setCamera: (view) => {
+        setReviewView(view);
+        const next = viewportRef.current?.setReviewCamera(view, {
+          frontAxis: query.frontAxis,
+          sideView: query.sideView,
+        }) ?? null;
+        api.camera = next;
+        return next;
+      },
+      capture: () => viewportRef.current?.captureFrame() ?? null,
+    };
+    const host = window as unknown as {
+      __pcgReady?: boolean;
+      __pcgReview?: PcgReviewApi;
+    };
+    host.__pcgReview = api;
+    host.__pcgReady = true;
+  }, [query.frontAxis, query.sideView]);
+
   useEffect(() => {
-    if (!state.loading) {
-      // Small delay to ensure Three.js has rendered a frame
-      const timer = setTimeout(() => {
-        (window as unknown as Record<string, unknown>).__pcgReady = true;
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [state.loading]);
+    if (state.loading || state.error) return undefined;
+    const timer = setTimeout(() => {
+      const pose = viewportRef.current?.setReviewCamera(reviewView, {
+        frontAxis: query.frontAxis,
+        sideView: query.sideView,
+      }) ?? null;
+      markReady(pose);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [state.loading, state.error, state.data, reviewView, query.frontAxis, query.sideView, markReady]);
 
   const slug = graphPath
     ? graphPath.split('/').pop()?.replace(/\.pcg$|\.json$/, '') ?? 'review'
@@ -144,11 +199,14 @@ export default function ReviewPage() {
             nodes={state.data.cook.nodesExecuted}
             {' '}
             {state.data.cook.graphExecuteMs.toFixed(0)}ms
+            {' '}
+            cam={reviewView}
           </span>
         )}
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <PreviewViewport
+          ref={viewportRef}
           data={state.data}
           loading={state.loading}
           error={state.error}
@@ -159,6 +217,13 @@ export default function ReviewPage() {
           onParameterValueChange={updateParameterValue}
           onResetParameters={resetParameters}
           onSaveParameterDefaults={() => void saveParameterDefaults()}
+          reviewMode
+          reviewCamera={{
+            view: reviewView,
+            frontAxis: query.frontAxis,
+            sideView: query.sideView,
+          }}
+          onReviewCameraApplied={markReady}
         />
       </div>
     </div>

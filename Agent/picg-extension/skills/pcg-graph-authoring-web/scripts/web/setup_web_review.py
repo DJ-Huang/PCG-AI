@@ -20,6 +20,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlencode
 
 DEFAULT_VITE_URL = "http://127.0.0.1:5173"
 
@@ -31,6 +32,9 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--vite-url", default=DEFAULT_VITE_URL, help="Vite dev server base URL")
     parser.add_argument("--workspace", type=Path, default=None,
                          help="Workspace root for path resolution (default: auto-detect)")
+    parser.add_argument("--camera", default="", help="front | side | top | three-quarter")
+    parser.add_argument("--front-axis", default="+z", choices=["+x", "-x", "+z", "-z"])
+    parser.add_argument("--side-view", default="right", choices=["right", "left"])
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -60,7 +64,10 @@ def main(argv: list[str]) -> int:
         # Graph is outside workspace — use absolute path
         rel_path = graph_path
 
-    review_url = f"{args.vite_url}/review?graph={str(rel_path)}"
+    query = {"graph": str(rel_path), "frontAxis": args.front_axis, "sideView": args.side_view}
+    if args.camera:
+        query["camera"] = args.camera
+    review_url = f"{args.vite_url}/review?{urlencode(query)}"
 
     if args.json:
         print(json.dumps({

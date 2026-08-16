@@ -18,6 +18,7 @@ verified_date: 2026-07-19
 | rule_id | 用途 |
 |---|---|
 | `pcg/graph-contract` | `.pcg` JSON、manifest、命名、布局、Subgraph、参数与验证 |
+| `pcg/triview` | 三视图输入、跨视图尺寸约束、节点精编与多视图验收 |
 | `pcg/assembly-bevel` | 多部件装配倒角顺序与尺度 |
 | `pcg/vehicle` | 车辆部件与节点策略 |
 | `pcg/bridge` | 桥面、桥墩、拱圈与栏杆策略 |

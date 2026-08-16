@@ -16,6 +16,7 @@ _SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPTS))
 
 from _shared.plan_schema import (  # noqa: E402
+    PLANNING_PASS_IDS,
     completed_passes,
     current_pass,
     load_json,
@@ -67,7 +68,7 @@ def cmd_check(plan: dict, pass_id: str, as_json: bool) -> int:
     completed = completed_passes(plan, ids)
     current = current_pass(plan)
     unlocked = pass_id in completed or pass_id == current
-    issues = strict_quality_issues(plan) if pass_id not in {"module-plan"} else []
+    issues = strict_quality_issues(plan) if pass_id not in PLANNING_PASS_IDS else []
     # Allow module-plan even with shallow contract; block later passes
     if pass_id != "module-plan" and current != "complete" and issues:
         payload = {

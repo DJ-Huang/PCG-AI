@@ -19,6 +19,7 @@ PCG-AI 的规则、经验、Golden Graphs 全部内置在项目 `.pcg-ai/` 目�
 - 读完整规则文件 → `pcg_kb_get(path)`(path 相对 `.pcg-ai/`，如 `rules/graph-authoring/bridge.md`)
 - Golden Graph 模板 → `pcg_golden_graph_list(class?)` / `pcg_golden_graph_get(name)`
 - 索引状态/重建 → `pcg_kb_status` / `pcg_kb_reindex`
+- 经验回写/沉淀 → `pcg-kb-write` Skill（写入 `.pcg-ai/kb/`；跨项目通用经验才走 obsidian-write → Vault）
 
 编图前先 `pcg_kb_search` 查 `rules/graph-authoring/` 下对应模型类型 + `graph-contract` + `assembly-bevel`；工程问题查 `rules/engineering/pcg-ai-development.md`。需要参考 `.pcg` 模板时用 `pcg_golden_graph_*`，不要从 `examples/**` 或 Unity demo 挖新图。
 
