@@ -41,6 +41,7 @@ AUTHORING_SKILL_DIR = .
 
 The reference image is not durable memory: context compaction drops pasted images and URLs rot, while material/texture/final stages run long after first observation.
 
+- **Collect views first:** after the first reference image, ask the user in order for `front` → `side` → `top` (one view per turn) unless those files are already supplied. Do not crop a composite sheet. See `triview.md`.
 - **Archive first:** run `SHARED_SCRIPTS_DIR/archive_reference.py` immediately after `new_authoring_plan.py`. For a three-view job use `--front/--side/--top` on the plan, then `archive_reference.py --from-plan --require-triview`. The plan points at archived `ref_<slug>_<view>` files; never feed later stages a URL or chat attachment.
 - **Observation on disk:** `observation.layers`, `viewObservations`, `crossViewConstraints`, and `visualTokens` live in `*-plan.json`, enforced by `validate_plan.py --strict-quality`.
 - **Re-hydrate at every stage entry** (geometry, UV, material, texture, asset export, final acceptance) and after any compaction: read `<plan-stem>-RESUME.md` → `*-plan.json` (observation + visualTokens + reviewHistory) → archived reference → latest `cmp_*.png`. Refresh the RESUME file via `SHARED_SCRIPTS_DIR/report_pass.py <plan> --resume` at each stage transition and review cycle.
@@ -64,13 +65,15 @@ AssetSpec
 
 The graph-authoring reference preserves the mandatory manifest/rule/Golden-Graph retrieval, top-to-bottom graph layout, independent root/Subgraph layout pass, node naming, physical sizing, module/Subgraph rules, per-part bevel rule, parameters, clean-scene cook, and visual refinement loop. Use the shared Python helper scripts from `SHARED_SCRIPTS_DIR` and web review templates from `AUTHORING_SKILL_DIR/scripts/web/`.
 
-Use PCG MCP as the primary authoring path when the target is open in the Web editor: discover the live manifest, read the full document, build coherent passes with atomic graph ops or whole-document replacement, validate/cook/capture, and save through the editor with `ifGraphHash`. Use direct `.pcg` editing only as an offline/compatibility fallback. Keep `validate_pcg.py` and the fixed Vite `/review` route as deterministic saved-file acceptance layers.
+Use PCG MCP on the **open Web editor page** as the only graph-construction path: `pcg_get_editor_context` binds to that page; `pcg_apply_graph_ops` / `pcg_patch_node` / `pcg_replace_graph` create nodes and wires on the canvas; `pcg_validate` / `pcg_cook` / `pcg_capture_preview` are the rapid loop; `pcg_save_graph` persists. Do not author by `Write` of a full `.pcg` or a generator script. Keep `validate_pcg.py` and `/review` as saved-file acceptance after save.
+
+If the editor is offline, start Vite + pcg-server and retry MCP. Do not fall back to disk authoring.
 
 ## Autonomous production defaults
 
-Apply sensible graph parameters, save directories, material values, texture resolution, and the fixed Vite `/review?graph=` route without pausing. Record the receipt and assumptions. Continue to the next stage when its definition of done passes; on a reference image, keep refining the fully textured asset until the shared final target is met or the shared hard ceiling is reached.
+Apply sensible graph parameters, save directories, material values, texture resolution, and the fixed Vite `/review?graph=` route without pausing. Record the receipt and assumptions. Continue through every stage in the same session until `FINAL_ACCEPTED` or a legal stop. Do not end at a graph file, white model, or “next I will…”.
 
-Ask only for a genuinely unusable reference, unreachable pcg-server, unavailable required source asset, or an explicit request for interactive control. Unknown back faces, material inference, bevel taste, Subgraph partitioning, and parameter candidates are normal production decisions—make and record the best-supported choice.
+Ask for missing `front` / `side` / `top` after the first reference image (see `triview.md`). Also ask when a reference is genuinely unusable, the Web editor will not come online after start attempts, a required source asset is unavailable, or the user explicitly requested interactive control. Unknown back faces, material inference, bevel taste, Subgraph partitioning, and parameter candidates are normal production decisions—make and record the best-supported choice.
 
 ## Completion and handoff
 

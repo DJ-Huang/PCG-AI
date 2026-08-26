@@ -6,9 +6,27 @@ Use this when the user supplies **front / side / top** orthographic references, 
 
 Accept any of:
 
-- three files: `--front` `--side` `--top`
+- three files already labelled: `--front` `--side` `--top`
 - a labelled set: `archive_reference.py --view front=... --view side=... --view top=... --require-triview`
-- one photo plus missing views: keep `mode=single`, do **not** invent the other two drawings
+- one image (photo, concept, or a board with several drawings): **stop and ask** — do not crop, parse, or invent the other views
+
+### After the first image: ask for views in order (P0)
+
+Do **not** split a composite sheet. Do **not** keep `mode=single` by guessing. Before `new_authoring_plan.py`, collect dedicated files **one view per turn**:
+
+1. Ask for **front**（正视图 / 正立面）. Wait.
+2. Ask for **side**（侧视图 / 侧立面）. Wait. Record `coordinateFrame.sideView=right` unless the user says it is the left.
+3. Ask for **top**（顶视图 / 平面）. Wait.
+
+Skip a step only when that role is already a separate uploaded file. If the user explicitly says to proceed with a single image, keep `mode=single` and do **not** invent drawings.
+
+Then:
+
+```bash
+python3 <SHARED_SCRIPTS_DIR>/new_authoring_plan.py "<Name>" \
+  --front <front.png> --side <side.png> --top <top.png> \
+  --out <plan.json>
+```
 
 Default object frame (PCG / Unity left-handed):
 

@@ -51,9 +51,9 @@ For a reference-image job, also read `AUTHORING_SKILL_DIR/llm-orchestration.md`,
 
 ## Autonomous behavior
 
-Apply practical defaults for graph parameters, save directory, material values, texture size, and review page. Continue through all stages without asking for confirmation. Record assumptions and receipts in the plan/final reply.
+Apply practical defaults for graph parameters, save directory, material values, texture size, and review page. Continue through all stages without asking for confirmation until `FINAL_ACCEPTED` or a legal stop. Record assumptions and receipts in the plan/final reply. Do not park at graph-written, white-model, or pipeline REWORK and wait for the user.
 
-Ask only when an input is genuinely unusable, the pcg-server is absent or unreachable, a required source asset is unavailable, or the user explicitly requests interactive control. A real pipeline capability gap in the development variant is also a blocker; see its gate reference.
+Ask for missing `front` / `side` / `top` after the first reference image (one view per turn; see `AUTHORING_SKILL_DIR/triview.md`). Also ask when an input is genuinely unusable, the Web editor cannot come online after start attempts, a required source asset is unavailable, or the user explicitly requests interactive control. A real pipeline capability gap in the development variant is also a blocker; see its gate reference. `REWORK` is an immediate MCP repair loop, not a stop.
 
 On reference-image work, refine after every clean-scene render until the final fully textured asset meets the shared acceptance target or twelve consecutive cycles yield no measurable geometry, material, or texture improvement. Report residual gaps at the ceiling; do not silently lower the target.
 

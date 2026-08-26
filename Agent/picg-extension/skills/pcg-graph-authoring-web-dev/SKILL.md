@@ -10,7 +10,9 @@ description: >-
   runs a deterministic root/Subgraph layout pass before graph validation. Use
   for `/pcg-graph-authoring-web-dev`, PCG pipeline validation, three-view /
   三视图 / orthographic reconstruction, capability-gap assessment, Subgraph layout, PCG MCP graph authoring and seed/performance validation, or
-  generator development that must stop on a real pipeline gap.
+  generator development. Stop only for a real capability GAP that needs
+  user override, unusable references, or a dead editor after start attempts —
+  never park at a white-model or pipeline REWORK.
 ---
 
 # PCG Web complete-asset production — development validation
@@ -38,19 +40,29 @@ Read shared references directly. Do not inherit the other skill's `SKILL.md`, co
 3. For reference-image work, read `AUTHORING_SKILL_DIR/llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or visual cook. For front/side/top input, also read `AUTHORING_SKILL_DIR/triview.md`.
 4. Read the same shared stage references as the standard skill immediately before geometry, material, texture, web, and final-acceptance stages. Recover through `SHARED_DIR/error-codes.md`.
 
+## Live Web editor (P0 — not optional)
+
+Graph construction happens **on the open Web editor page through PCG MCP**, not as a disk JSON dump or a one-off generator script.
+
+1. Start Vite + pcg-server if needed (`block_until_ms: 0`). Call `pcg_get_editor_context`. That session **is** the page.
+2. Author with `pcg_get_node_types` → `pcg_apply_graph_ops` / `pcg_patch_node` / `pcg_replace_graph` (nodes + pin-accurate edges on the canvas). Rapid loop: `pcg_validate` → `pcg_cook` → `pcg_capture_preview`.
+3. `pcg_save_graph` to the AssetSpec path. Then layout helper + `validate_pcg.py` on the **saved** file. `/review` + Playwright is saved-file ortho acceptance, not the authoring surface.
+4. Forbidden: `_author.py`, hand-written full `.pcg` `Write`, or “open this file later.” If MCP is offline, recover the editor and retry; do not switch to file authoring.
+
 ## Web dev process guardrails (2026-08-08 brickify retrospective)
 
-Before `PCG_PIPELINE_VALIDATION`, enforce the standard web orchestration loop — do not skip planning scripts or server preflight:
+Before `PCG_PIPELINE_VALIDATION`, keep the plan/archive/preflight loop. **Do not** skip the plan. **Do not** replace MCP canvas ops with a graph-codegen script.
 
 | Check | Script / doc |
 |---|---|
-| Plan + archived reference | `new_authoring_plan.py` (`--front/--side/--top` when given) → `archive_reference.py --from-plan` (`--require-triview` only for a complete triplet) → `validate_plan.py --strict-quality` |
+| Plan + archived reference | After the first image, ask `front` → `side` → `top` in order (see `triview.md`) → `new_authoring_plan.py` (`--front/--side/--top` when given) → `archive_reference.py --from-plan` (`--require-triview` only for a complete triplet) → `validate_plan.py --strict-quality` |
 | Vault evidence | `pcg_kb_search(category="rules")` + `pcg_kb_search(category="kb")` before first node write |
+| Live page | `pcg_get_editor_context` online; author with MCP ops on that page |
 | Server health (every cook cycle) | `scripts/web/check_server.py` — use Shell `block_until_ms: 0`, not `nohup` |
-| Manifest-server parity | `validate_pcg.py --check-server http://127.0.0.1:17890` before cook |
+| Manifest-server parity | `validate_pcg.py --check-server http://127.0.0.1:17890` after MCP save, before saved-file cook |
 | PCGR error decode | `parse_pcgr.py` on `/v1/cook` binary (not manual `xxd`) |
 
-See `AUTHORING_SKILL_DIR/web-review.md` and `llm-orchestration.md` for the full 13-step loop.
+See `PCG_MCP_CONTRACT`, `AUTHORING_SKILL_DIR/web-review.md`, and `llm-orchestration.md`.
 
 ## Reference persistence and re-hydration (P0, reference-image jobs)
 
@@ -76,9 +88,9 @@ AssetSpec
 → final fully textured render and acceptance
 ```
 
-Author the graph according to the shared graph standard. After the graph exists, run `SHARED_SCRIPTS_DIR/layout_pcg.py` across the root and every inline `subgraphs[]` definition. Review the generated copy, confirm that only `position.x/y` changed, then run `validate_pcg.py`. Only after the independent layout pass and static authoring validation pass, run the development gate. The gate validates graph structure, connection compatibility, parameter exposure/ranges, seeds, deterministic regeneration, legal variation, boundary and invalid inputs, performance, generated hierarchy/references, output paths, stale-artifact cleanup, and correspondence with the AssetSpec.
+Author the graph according to the shared graph standard **on the live Web page via MCP**. After MCP save, run `SHARED_SCRIPTS_DIR/layout_pcg.py` across the root and every inline `subgraphs[]` definition, push positions back with MCP `move_node` (or `--in-place` then reload/save), confirm that only `position.x/y` changed, then `validate_pcg.py`. Only after the independent layout pass and static authoring validation pass, run the development gate. The gate validates graph structure, connection compatibility, parameter exposure/ranges, seeds, deterministic regeneration, legal variation, boundary and invalid inputs, performance, generated hierarchy/references, output paths, stale-artifact cleanup, and correspondence with the AssetSpec.
 
-When the target is open in the Web editor, author it through PCG MCP atomic graph ops or full replacement, then use fixed-seed cook metrics and rapid Preview evidence. Repeat structural/parameter variations across the gate's required seeds or boundary values as atomic batches, confirm actual apply acknowledgements, and restore the final intended state with a fresh hash. Use the deterministic file/HTTP path only when the live editor is unavailable; never weaken the gate. The Vite `/review` route remains the saved-file final review.
+Run gate cooks and parameter sweeps through MCP (`pcg_cook` / `pcg_patch_node` / `pcg_apply_graph_ops`) on the open page, confirm `applied=true`, restore the intended state with a fresh hash, then `pcg_save_graph`. The Vite `/review` route is saved-file final ortho review, not a substitute for live canvas authoring.
 
 ## Dedicated root/Subgraph layout stage
 
@@ -109,7 +121,7 @@ Subgraph layout: PASS | scopes=<n> | nodes=<n> | moved=<n> | position-only=PASS
 ## Gate behavior
 
 - `PASS`: record the pipeline receipt and continue immediately to the same white-model and complete-asset stages as the standard skill.
-- `REWORK`: return to graph planning, node construction, parameter configuration, or generation logic; retest. Do not compensate with materials or textures.
+- `REWORK`: immediately return to MCP node/wire/parameter edits on the open page; recook and retest. Do **not** end the turn or ask the user to continue. Do not compensate with materials or textures.
 - `GAP` / `INEFFICIENT`: research the missing PCG capability and mature alternatives, report the product gap, and stop for explicit user override. Do not emit a graph that pretends the unsupported feature is production-ready.
 - `OVERRIDE`: record the known fidelity/technical limit, then continue with the shared workflow. An override never changes final hard failures or score weights.
 
@@ -117,6 +129,10 @@ An obviously impossible required operation may be surfaced during planning, but 
 
 ## Autonomous behavior and completion
 
-Use the same autonomous defaults, receipts, refinement loop, blockers, durable deliverables, and `FINAL_ACCEPTED` definition as the standard variant. Do not ask separately about parameters, save locations, material choices, or pass continuation unless the user explicitly opted into interactive control.
+Use the same autonomous defaults, receipts, refinement loop, blockers, durable deliverables, and `FINAL_ACCEPTED` definition as the standard variant. Keep working through geometry, UV, materials, textures, export, and final scoring in the same session. Do not park at `GRAPH_WRITTEN`, `WHITE_MODEL_APPROVED`, or pipeline `REWORK`.
+
+Ask only for missing `front` / `side` / `top` after the first reference image, a genuinely unusable reference, a Web editor that will not come online after start attempts, or an explicit pipeline `GAP`. Do not ask about parameters, save locations, material choices, or “是否继续”.
+
+Legal `stop` is only: `FINAL_ACCEPTED`; twelve consecutive refine cycles with no measurable improvement (report residual gaps, do not lower the bar); or `GAP` / `INEFFICIENT` awaiting override.
 
 Include the dev pipeline report beside—not instead of—the shared geometry, UV, material, export, render, and final-score report. The PCG gate adds technical evidence only; it must not alter the standard artistic/technical score weights or acceptance threshold.

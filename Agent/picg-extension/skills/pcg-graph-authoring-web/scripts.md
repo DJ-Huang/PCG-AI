@@ -5,7 +5,8 @@ Web review scripts may require Playwright (`pip install playwright && playwright
 Run from anywhere; prefer absolute paths. Non-zero exit = gate failed.
 
 **Division of labor:** scripts enforce plan structure and package evidence; they **never** score
-visuals. Agent vision inspects the comparison sheet and supplies fidelity / action.
+visuals and **never** emit the product graph. Agent vision inspects comparison sheets. Agent MCP
+creates nodes and wires on the open Web editor page.
 
 Shared scripts: `../shared/pcg-scripts/` (generic Python helpers, shared across Unity/web variants).
 Web review scripts: `scripts/web/` (this skill directory).
@@ -34,6 +35,7 @@ python3 ../shared/pcg-scripts/new_authoring_plan.py "Cabin" \
 ```
 
 Single-image jobs still use `--image`. `--front/--side/--top` must be supplied together.
+After the first attached image, ask the user in order for front → side → top (see `triview.md`); do not crop a composite board.
 
 ### archive_reference.py (P0 — run immediately after new_authoring_plan.py)
 
@@ -159,21 +161,22 @@ Requires: `pip install playwright && playwright install chromium`
 
 ```text
 0. Start Vite + pcg-server (Shell block_until_ms: 0) → check_server.py (repeat every cycle)
-1. new_authoring_plan.py (--front/--side/--top when given) → archive_reference.py --from-plan
+1. After the first image, ask front → side → top unless already supplied; then new_authoring_plan.py (--front/--side/--top when given) → archive_reference.py --from-plan
 2. Layered observation → write observation.layers + viewObservations + crossViewConstraints + visualTokens INTO plan.json
 3. pcg_kb_search (rules + kb, including pcg/triview) → record localRuleHits in plan
 4. validate_plan.py --strict-quality
 5. report_pass.py --resume → unlock current pass (+ RESUME.md)
-6. Auto params + auto saveDir → author .pcg for that pass (no ask_user)
-7. layout_pcg.py → relayout root + every inline Subgraph definition
+6. Auto params + auto saveDir → author CURRENT PASS on the live Web page via PCG MCP (nodes + edges). Forbidden: generator script / full .pcg Write
+7. pcg_validate / pcg_cook / pcg_capture_preview, then pcg_save_graph; layout_pcg.py on the saved file; push positions back via MCP
 8. validate_pcg.py --check-server http://127.0.0.1:17890
-9. setup_web_review.py → review URL (fixed route; no ask)
+9. setup_web_review.py → review URL (saved-file ortho lock)
 10. capture_webview_png.py --cameras front,side,top,three-quarter (or one camera for a single-image job)
 11. make_comparison_sheet.py --view-id <view> --reference <archived ref> --render …
 12. Agent vision per view → append_review.py (--view-evidence-json on triplets)
-13. If worst required view < pass threshold or DoD unmet → refine-* → goto 6 (no user gate)
-14. Else report_pass.py --resume → next pass / stop at ceiling (final stop ≥ 0.9 on every required view)
+13. If worst required view < pass threshold or DoD unmet → refine-* **on the same MCP page** → goto 6 (no user gate)
+14. Else report_pass.py --resume → next pass. Do not stop the job until FINAL_ACCEPTED, 12-cycle plateau, or GAP.
 ```
 
 Do **not** insert "confirm params / save dir / continue?" between steps 5–13.
-After any context compaction: read `<plan-stem>-RESUME.md` → plan.json → archived reference → latest cmp sheet, then continue.
+Do **not** write a custom script to emit the product graph.
+After any context compaction: read `<plan-stem>-RESUME.md` → plan.json → archived reference → latest cmp sheet, then continue on the live MCP page.

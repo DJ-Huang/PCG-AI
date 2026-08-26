@@ -21,34 +21,33 @@ Skill id: **`pcg-graph-authoring-web`**. Three-view jobs: also read [`triview.md
 
 ## The loop (agent runs this; scripts gate structure)
 
-**P0 — do not skip steps 0–4.** Skipping `new_authoring_plan.py` / `archive_reference.py` / `validate_plan.py` and editing an existing graph directly caused brickify web-dev regressions (2026-08-08). Always start from a plan; run `pcg_kb_search` at step 2 before the first node write.
+**P0 — do not skip steps 0–4.** Skipping `new_authoring_plan.py` / `archive_reference.py` / `validate_plan.py` and editing an existing graph directly caused brickify web-dev regressions (2026-08-08). Always start from a plan; run `pcg_kb_search` at step 2 before the first node write. **Do not** replace MCP canvas authoring with a graph-codegen script.
 
 ```text
-0. pcg-server + Vite dev server: check_server.py (web-review.md) — required before visual review
-   → start with Shell block_until_ms: 0 (NOT nohup/&); re-check_server before every cook cycle
-0.5. new_authoring_plan.py (--front/--side/--top when given) → archive_reference.py --from-plan [--require-triview]
+0. pcg-server + Vite: check_server.py — start with Shell block_until_ms: 0 if down; re-check before every cook
+0.25. Open/bind the Web editor page: pcg_get_editor_context (retry until online). That session is the canvas.
+0.5. After the first image, ask front → side → top (one view per turn) unless already supplied. Then new_authoring_plan.py (--front/--side/--top when given) → archive_reference.py --from-plan [--require-triview]
 1. Layered observation → write observation.layers + viewObservations + crossViewConstraints + visualTokens INTO *-plan.json
 2. pcg_kb_search (rules + kb) (local spec evidence — mandatory; record hits in plan.localRuleHits)
 3. Fill Graph Authoring Plan (*-plan.json)
 4. validate_plan.py --strict-quality  (blocks shallow plans AND unarchived references)
 5. report_pass.py --resume → current unlocked pass + next command + RESUME.md
-6. If the target is open in Web Editor: context → node types/full graph → atomic MCP authoring for CURRENT PASS
-   Otherwise use direct .pcg authoring as the offline/compatibility fallback
-7. MCP validate/cook, then pcg_save_graph; validate_pcg.py --check-server verifies the saved deliverable
-8. setup_web_review.py → review URL (http://localhost:5173/review?graph=...) (fixed; no ask)
-9. Vite /review route: load graph → cook via pcg-server → PreviewViewport → __pcgReady / __pcgReview
+6. Author CURRENT PASS on the live page: pcg_get_node_types → pcg_apply_graph_ops / pcg_patch_node / pcg_replace_graph (real nodes + pin-accurate edges). Forbidden: Write full .pcg or a generator script.
+7. pcg_validate → pcg_cook (fixed seed) → pcg_capture_preview (rapid). Then pcg_save_graph; validate_pcg.py --check-server on the saved file
+8. setup_web_review.py → review URL (saved-file ortho lock; not the authoring surface)
+9. Vite /review: load saved graph → cook → PreviewViewport → __pcgReady / __pcgReview
 10. capture_webview_png.py --cameras front,side,top,three-quarter (canvas only; keep camera receipts)
 11. make_comparison_sheet.py --view-id <view> for every required view (no score)
 12. Agent vision per view → append_review.py (exactly ONE action; --view-evidence-json on triplets)
-13. report_pass.py --resume / orchestrate_passes.py sync → next pass or stop
+13. If DoD unmet: refine-* via MCP on the same page, immediately next cook/review. Do not stop to ask. Else report_pass.py --resume → next pass. Stop only at worst-view ≥ 0.9 + DoD, 12-cycle plateau, or pipeline GAP.
 ```
 
 Run validation after every substantive edit, not only at the end. Script flags: [`scripts.md`](scripts.md). Never screenshot a cluttered editor page — see [`web-review.md`](web-review.md).
 
 For MCP edits, fetch a fresh `graphHash` before every write, use one atomic
 batch per coherent pass, and wait for `applied=true`. Re-read and recompute on
-conflict. The live Preview is rapid feedback; the saved-file `/review` route
-remains the independent final acceptance surface.
+conflict. Live Preview is the authoring feedback loop; `/review` is saved-file
+ortho acceptance.
 
 ## Reference persistence and re-hydration (P0)
 
@@ -60,7 +59,9 @@ from step 1 to trust recall. Three rules close the gap:
    `archive_reference.py`. For a triplet: `--front/--side/--top` on the plan, then
    `archive_reference.py --plan … --from-plan --require-triview`. Each view becomes
    `ref_<slug>_<view>.<ext>`; never point `make_comparison_sheet.py --reference` at a
-   chat attachment or URL. Missing a view keeps `mode=single` — do not invent drawings.
+   chat attachment or URL. After the first image, ask the user in order for
+   front → side → top; do not crop a composite sheet. If the user opts out of
+   extra views, keep `mode=single` — do not invent drawings.
 2. **Observation lives in the plan, not in chat.** Fill `observation.layers`
    (all 8 layers) and distill `visualTokens`. For a triplet also fill
    `viewObservations` (≥2 landmarks per view) and `crossViewConstraints` (width /
@@ -225,8 +226,8 @@ After cook + screenshot: pick **one** action, apply it, and **immediately** run 
 | `refine-plan` | Wrong module split, missing part in inventory, wrong strategy rule |
 | `refine-graph` | Plan sound but nodes/wiring/values wrong |
 | `refine-cook` | Graph correct but web preview wrong (cook result, material binding, scale) |
-| `request-input` | **Last resort only** — reference unusable, or pcg-server/Vite blocked (see SKILL Autonomous mode). Prefer infer + refine |
-| `stop` | Fidelity ≥ **0.9** and DoD met; **or** 12 refine cycles with no measurable improvement; **or** pipeline GAP (dev skill) |
+| `request-input` | Missing `front`/`side`/`top` after the first image (ask in that order); **or** last resort: reference unusable, Web editor still offline after start attempts. Do not invent orthos. Do not use this to ask “是否继续”. |
+| `stop` | Fidelity ≥ **0.9** and DoD met on every required view **and** later complete-asset stages finished (`FINAL_ACCEPTED`); **or** 12 refine cycles with no measurable improvement; **or** pipeline GAP (dev skill) |
 
 Root-cause guide (img2threejs-aligned):
 

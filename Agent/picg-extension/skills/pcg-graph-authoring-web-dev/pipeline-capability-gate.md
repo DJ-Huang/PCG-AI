@@ -53,7 +53,7 @@ Use the clean review page and capture procedure from `AUTHORING_SKILL_DIR/web-re
 
 ## Test procedure
 
-1. Run the independent root/Subgraph layout pass, confirm that only `position.x/y` changed, run the normal graph-plan/static checks, and cook the authored default graph via pcg-server in a new clean review page.
+1. Run the independent root/Subgraph layout pass, confirm that only `position.x/y` changed, run the normal graph-plan/static checks, and cook the authored default graph via MCP `pcg_cook` on the open Web page (then saved-file `/review` for ortho evidence).
 2. Execute structure and output-contract checks. Treat an empty or stale output as failure even if the graph UI appears valid.
 3. Enumerate exposed parameters. Test the baked default, legal min/max values, repeat one same-seed cook, then test legal variation seeds. Test malformed/out-of-range inputs only where the runtime accepts external override input.
 4. Re-open/re-cook the asset in the clean review page. Compare hierarchy, references, bounds, and output against the AssetSpec. Inspect the output for duplicate or stale artifacts.
@@ -107,6 +107,6 @@ Recommendation: stop | wait for product | explicit override to approximate
 ## Invariants
 
 - `PASS` only unlocks the shared white-model stage; it never declares the asset finished.
-- A `REWORK` is normally an autonomous repair loop, not a parameter/save-path confirmation point.
+- A `REWORK` is an autonomous MCP repair loop on the open Web page, not a parameter/save-path confirmation and not a turn-ending stop. Fix, recook, retest in the same session.
 - An `OVERRIDE` must be explicit, recorded, and visible in the final report.
 - This gate contributes a development report only. It must not change shared final-score weights, hard failures, or the `FINAL_ACCEPTED` threshold.

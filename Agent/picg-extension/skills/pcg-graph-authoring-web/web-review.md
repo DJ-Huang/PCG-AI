@@ -38,9 +38,10 @@ live Preview evidence does not replace saved-deliverable acceptance.
 2. python3 ../shared/pcg-scripts/validate_pcg.py <graph>.pcg --check-server http://127.0.0.1:17890
    → manifest-server parity: running pcg-server must accept all node types in the graph
    → catches stale pcg-server binary (Unknown node type) before wasting a cook round
-3. If Vite unreachable → ask_user: cd web/pcg-editor && npm run dev
-4. If pcg-server unreachable → ask_user: ./scripts/run-pcg-server.sh
-5. Record endpoints in the receipt.
+3. If Vite unreachable → start `cd web/pcg-editor && npm run dev` with Shell `block_until_ms: 0`, then re-check. Ask the user only if it still fails.
+4. If pcg-server unreachable → start `./scripts/run-pcg-server.sh` with Shell `block_until_ms: 0`, then re-check. Ask only if it still fails.
+5. Bind the live editor: `pcg_get_editor_context`. Authoring happens on that page via MCP. `/review` is saved-file ortho capture.
+6. Record endpoints in the receipt.
 ```
 
 ### Starting long-lived servers (P0 — do not use nohup/disown)

@@ -17,7 +17,8 @@ verified_date: 2026-08-16
 
 ## 输入
 
-- 三视图角色固定为 `front` / `side` / `top`；缺一张就保持 `single`，禁止脑补另外两张。
+- 三视图角色固定为 `front` / `side` / `top`。用户先发一张图时：**停下按顺序要图**（正视图 → 侧视图 → 顶视图），一回合只要一个视角；禁止裁切合成板、禁止从一张图脑补另外两张。
+- 用户明确说只用单图时才保持 `mode=single`。
 - PCG 物体空间：左手系、`upAxis=+y`。`frontAxis` 默认 `+z`，`sideView` 默认 `right`。写入计划 `coordinateFrame`，后续相机与 `TransformMesh` 都用它。
 - 每个视图必须落到本地归档文件；聊天附件和 URL 不是记忆。
 

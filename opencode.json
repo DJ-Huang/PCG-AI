@@ -23,7 +23,7 @@
       "enabled": true
     },
     "user-vault-rag": {
-      "enabled": false
+      "enabled": true
     }
   }
 }

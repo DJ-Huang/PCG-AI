@@ -1,6 +1,8 @@
 # PCG MCP live-editor contract
 
-Use the `pcg` MCP as the primary authoring and inspection control plane for the graph currently open in the PCG Web editor. Saved-file validation and target-specific final review remain independent acceptance layers.
+The **open Web editor page** is the authoring surface. Use the `pcg` MCP to bind to that page, create/edit nodes, wire pins, cook, capture Preview, and save. Do not author by writing a `.pcg` JSON file or a Python/JS generator on disk.
+
+Saved-file `validate_pcg.py` and the Vite `/review` route remain independent **acceptance** layers after MCP save. They are not the place to build the graph.
 
 ## Scope and routing
 
@@ -19,6 +21,18 @@ Use the `pcg` MCP as the primary authoring and inspection control plane for the 
 | Final Unity acceptance | Tuanjie/Unity MCP clean scene | The Web viewport is not Unity runtime evidence |
 | Final Web acceptance of a saved graph | Vite `/review` + Playwright `front/side/top/three-quarter` | Stable clean page, canvas capture, per-view comparison |
 
+## Open the Web page, then MCP (P0)
+
+Authoring starts on a live editor tab. Sequence:
+
+1. Ensure Vite (`http://127.0.0.1:5173`) and pcg-server (`http://127.0.0.1:17890`) are up. If `check_server.py` fails, start them with Shell `block_until_ms: 0` (`cd web/pcg-editor && npm run dev` and `./scripts/run-pcg-server.sh`). Do not use `nohup`/`&`.
+2. Call `pcg_get_editor_context` (and `pcg_kb_*` as needed). The MCP session is the open page.
+3. If `editor_offline` / MCP discovery error: start or foreground the Web editor, retry context. Do **not** switch to dumping a `.pcg` file.
+4. Several editor pages: ask which `editorSessionId` / `graphPath` to use, then pass that id on later calls.
+5. Empty or unrelated live graph: stay on that page. Use `pcg_replace_graph` or `pcg_apply_graph_ops` to build the intended document in the editor, then `pcg_save_graph` to the AssetSpec path.
+
+There is no separate “write graph as a script” path. Nodes and edges exist when the Web editor apply acknowledgement returns.
+
 ## Mandatory handshake
 
 Call `pcg_get_editor_context` before every MCP batch. Treat its response as a snapshot, not durable state.
@@ -26,10 +40,8 @@ Call `pcg_get_editor_context` before every MCP batch. Treat its response as a sn
 Proceed only when `ok=true`, `online=true`, and the session has a `graphHash`. Compare `session.graphPath` with the intended graph:
 
 - Exact target: full MCP authoring, validation, cook, capture, and save are allowed.
-- Different or ambiguous target: do not write. Ask the user to open the target when live authoring is required, or use the saved-file compatibility workflow.
-- Offline: use the saved-file workflow. For Web final review, follow `web-review.md` server rules; for Unity final review, follow `unity-review.md`.
-
-Never start or restart a server merely because the MCP client is absent. Report the missing configured capability and use the documented safe fallback when it satisfies the task.
+- Different or ambiguous target: do not write an unrelated page. Ask which page, or replace the current document only when the user asked to create a new graph on whatever is open.
+- Offline: recover the editor/server, then retry MCP. File/HTTP cook is only for **saved-deliverable** checks after `pcg_save_graph`, never for constructing topology.
 
 ## Efficient read and edit loop
 
@@ -43,7 +55,11 @@ Never start or restart a server merely because the MCP client is absent. Report 
 8. Run `pcg_validate`, then `pcg_cook` with a fixed seed. Refine through MCP and capture current Preview as rapid feedback.
 9. Call `pcg_save_graph` with the latest hash. Then run saved-file `validate_pcg.py`; final visual acceptance still uses the target-specific clean review.
 
-Do not write an unrelated live graph. Use whole-document replacement only when the full intended graph is known; use granular ops for reviewable incremental passes.
+Do not write an unrelated live graph. Prefer `pcg_apply_graph_ops` (add/delete/move/patch nodes, add/delete edges) so the canvas shows real nodes and wires per pass. Use `pcg_replace_graph` from root when creating from scratch or replacing Subgraph definitions. Do not emit a one-off `_author.py` / graph-builder script and paste JSON onto disk.
+
+Forbidden: generating the product `.pcg` with a custom script, hand-writing the full document in the agent then `Write` to disk as the authoring method, or asking the user to “open the file later.”
+
+Required: explicit node ids, `__nodeTitle`, manifest pin handles on every edge, `ifGraphHash` on every write, `applied=true` before the next batch.
 
 ## Validation layers
 
@@ -64,7 +80,7 @@ For Dev variants, repeat `pcg_cook` across the gate's required seeds and boundar
 
 | Result | Action |
 |---|---|
-| `editor_offline` | Fall back to saved-file work; do not claim a live MCP pass |
+| `editor_offline` | Start/foreground Vite editor + pcg-server, retry `pcg_get_editor_context`. Do not author on disk. Report blocked only if the editor still cannot come online |
 | `no_node_selected` / `node_not_found` | Use context + `pcg_list_nodes`; do not guess an id |
 | `graph_conflict` | Refresh context/full graph and recompute the delta |
 | `root_scope_required` | Navigate the Web editor to root before whole-document replacement |

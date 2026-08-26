@@ -47,9 +47,8 @@ def render_resume(plan_path: Path, plan: dict, completed: list[str], current: st
         path = str(item.get("archivedPath") or "(not archived)")
         view_lines.append(f"- {view_id}: {path}")
     if not view_lines:
-        view_lines.append(
-            f"- archived reference: {archive.get('archivedPath') or plan.get('sourceImage') or '(not archived — run archive_reference.py')}"
-        )
+        fallback_ref = archive.get("archivedPath") or plan.get("sourceImage") or "(not archived — run archive_reference.py)"
+        view_lines.append(f"- archived reference: {fallback_ref}")
     last_view_lines = []
     for item in view_evidence:
         if not isinstance(item, dict):
