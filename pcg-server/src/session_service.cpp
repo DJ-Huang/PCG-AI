@@ -21,13 +21,19 @@ struct EditorState {
     std::chrono::steady_clock::time_point last_seen{};
     int64_t session_revision = 0;
     uint64_t capture_request_id = 0;
+    json capture_options = json::object();
     PreviewSnapshot preview;
+    uint64_t camera_command_id = 0;
+    json pending_camera_command = json::object();
+    uint64_t camera_applied_id = 0;
+    json camera_state = json::object();
     std::deque<json> patches;
 };
 
 struct BridgeState {
     std::mutex mutex;
     std::condition_variable preview_changed;
+    std::condition_variable camera_changed;
     std::unordered_map<std::string, EditorState> editors;
     uint64_t next_patch_id = 1;
     std::condition_variable command_changed;
@@ -230,6 +236,9 @@ json ContextLocked(const BridgeState& state, const std::string& editor_session_i
         {"session", std::move(session)},
         {"sessionRevision", editor->session_revision},
         {"captureRequestId", editor->capture_request_id},
+        {"captureOptions", editor->capture_options},
+        {"cameraCommandId", editor->camera_command_id},
+        {"cameraCommand", editor->pending_camera_command},
         {"previewRequestId", editor->preview.request_id},
         {"pendingPatchCount", editor->patches.size()},
         {"serverTime", EpochMillis()},
@@ -384,12 +393,64 @@ void HandleRequestPreviewCapture(const httplib::Request& req, httplib::Response&
     if (!CheckAgentAuth(req, res)) return;
     json body = json::object();
     if (!req.body.empty() && !ParseObjectBody(req, res, body)) return;
-    const auto id = RequestPreviewCapture(body.value("sessionId", ""));
+    const json options = body.value("options", json::object());
+    const auto id = RequestPreviewCapture(body.value("sessionId", ""), options);
     if (id == 0) {
         JsonResponse(res, 409, GetEditorContext(body.value("sessionId", "")));
         return;
     }
     JsonResponse(res, 202, {{"ok", true}, {"requestId", id}});
+}
+
+void HandlePostCameraCommand(const httplib::Request& req, httplib::Response& res) {
+    if (!CheckAgentAuth(req, res)) return;
+    json body;
+    if (!ParseObjectBody(req, res, body)) return;
+    if (!body.contains("camera") || !body["camera"].is_object()) {
+        JsonResponse(res, 400, {{"ok", false}, {"error", "camera object is required"}});
+        return;
+    }
+    const auto id = RequestCameraCommand(body["camera"], body.value("sessionId", ""));
+    if (id == 0) {
+        JsonResponse(res, 409, GetEditorContext(body.value("sessionId", "")));
+        return;
+    }
+    JsonResponse(res, 202, {{"ok", true}, {"commandId", id}});
+}
+
+void HandlePutCameraState(const httplib::Request& req, httplib::Response& res) {
+    if (!CheckAgentAuth(req, res)) return;
+    json body;
+    if (!ParseObjectBody(req, res, body)) return;
+    const std::string session_id = body.value("sessionId", "");
+    const auto command_id = body.value("commandId", 0ull);
+    auto& state = State();
+    {
+        std::lock_guard<std::mutex> lock(state.mutex);
+        EditorState* editor = ResolveEditorLocked(state, session_id);
+        if (editor == nullptr) {
+            JsonResponse(res, 409, EditorSelectionErrorLocked(state, session_id));
+            return;
+        }
+        editor->camera_applied_id = std::max(editor->camera_applied_id, command_id);
+        if (body.contains("state") && body["state"].is_object()) {
+            editor->camera_state = body["state"];
+        }
+        editor->last_seen = std::chrono::steady_clock::now();
+    }
+    state.camera_changed.notify_all();
+    JsonResponse(res, 200, {{"ok", true}, {"commandId", command_id}});
+}
+
+void HandleGetCameraState(const httplib::Request& req, httplib::Response& res) {
+    if (!CheckAgentAuth(req, res)) return;
+    const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
+    const json state_json = GetCameraState(editor_session_id);
+    if (state_json.value("ok", false)) {
+        JsonResponse(res, 200, state_json);
+        return;
+    }
+    JsonResponse(res, state_json.value("error", "") == "camera_state_unavailable" ? 404 : 409, state_json);
 }
 
 void HandlePatchNode(const httplib::Request& req, httplib::Response& res) {
@@ -668,11 +729,61 @@ json GetEditorGraph(const std::string& editor_session_id) {
     return editor == nullptr ? json() : editor->session.value("graph", json());
 }
 
-uint64_t RequestPreviewCapture(const std::string& editor_session_id) {
+uint64_t RequestPreviewCapture(const std::string& editor_session_id, const json& options) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     EditorState* editor = ResolveEditorLocked(state, editor_session_id);
-    return editor == nullptr ? 0 : ++editor->capture_request_id;
+    if (editor == nullptr) return 0;
+    editor->capture_options = options.is_object() ? options : json::object();
+    return ++editor->capture_request_id;
+}
+
+uint64_t RequestCameraCommand(const json& camera, const std::string& editor_session_id) {
+    if (!camera.is_object()) return 0;
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return 0;
+    editor->pending_camera_command = camera;
+    return ++editor->camera_command_id;
+}
+
+bool WaitForCameraState(
+    uint64_t command_id,
+    std::chrono::milliseconds timeout,
+    json& state,
+    const std::string& editor_session_id) {
+    auto& bridge = State();
+    std::unique_lock<std::mutex> lock(bridge.mutex);
+    const bool ready = bridge.camera_changed.wait_for(lock, timeout, [&] {
+        const EditorState* editor = ResolveEditorLocked(bridge, editor_session_id);
+        return editor != nullptr && editor->camera_applied_id >= command_id;
+    });
+    if (ready) state = ResolveEditorLocked(bridge, editor_session_id)->camera_state;
+    return ready;
+}
+
+json GetCameraState(const std::string& editor_session_id) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
+    if (!editor->camera_state.empty()) {
+        return {
+            {"ok", true},
+            {"camera", editor->camera_state},
+            {"appliedCommandId", editor->camera_applied_id},
+        };
+    }
+    // Fall back to the camera block of the latest screenshot metadata.
+    const json metadata_camera = editor->preview.metadata.value("camera", json());
+    const json metadata_physical = editor->preview.metadata.value("physicalCamera", json());
+    if (!metadata_camera.is_null()) {
+        json result = {{"ok", true}, {"camera", metadata_camera}, {"source", "preview_metadata"}};
+        if (!metadata_physical.is_null()) result["physicalCamera"] = metadata_physical;
+        return result;
+    }
+    return {{"ok", false}, {"error", "camera_state_unavailable"}};
 }
 
 bool WaitForPreview(

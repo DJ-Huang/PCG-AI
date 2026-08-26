@@ -59,7 +59,8 @@ import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig, type NodeSearchSelection } from './NodeSearchPanel';
 import { loadLibrarySubgraph, type LibraryIndexItem } from './libraryManifest';
-import PreviewViewport, { type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
+import PreviewViewport, { type CaptureOptions, type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
+import type { CameraCommand } from './physicalCamera';
 import SettingsDialog from './SettingsDialog';
 import { useEditorBridge } from './editorBridge';
 import {
@@ -901,7 +902,12 @@ function PcgEditor() {
     [bridgeGraph, currentFilename, editPath, installBridgeGraph],
   );
   const captureBridgePreview = useCallback(
-    () => previewViewportRef.current?.captureFrame() ?? null,
+    (options?: CaptureOptions) => previewViewportRef.current?.captureFrame(options) ?? null,
+    [],
+  );
+  const applyBridgeCameraCommand = useCallback(
+    (command: CameraCommand) =>
+      (previewViewportRef.current?.applyCameraCommand(command) ?? null) as Record<string, unknown> | null,
     [],
   );
   const syncEditorContext = useEditorBridge({
@@ -914,6 +920,7 @@ function PcgEditor() {
     previewTargetNodeId,
     applyCommands: applyBridgeCommands,
     capturePreview: captureBridgePreview,
+    applyCameraCommand: applyBridgeCameraCommand,
   });
 
   // ── Promote to parameter ───────────────────────────

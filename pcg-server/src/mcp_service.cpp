@@ -156,12 +156,52 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_capture_preview"},
-            {"description", "Ask the live WebGL viewport to render and return its current PNG plus camera and shading metadata."},
+            {"description", "Ask the live WebGL viewport to render and return its current PNG plus camera and shading metadata. Optionally override the session camera, output resolution (offscreen render, independent of viewport size), transparent background, and depth of field."},
             {"inputSchema", {
                 {"type", "object"},
-                {"properties", {{"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}}}},
+                {"properties", {
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                    {"width", {{"type", "integer"}, {"minimum", 16}, {"maximum", 8192}, {"description", "Output width in pixels; omit to use the viewport size."}}},
+                    {"height", {{"type", "integer"}, {"minimum", 16}, {"maximum", 8192}, {"description", "Output height in pixels; omit to use the viewport size."}}},
+                    {"transparent", {{"type", "boolean"}, {"description", "Alpha background PNG (drops the environment background)."}}},
+                    {"dof", {{"type", "boolean"}, {"description", "Override the session depth-of-field switch for this capture."}}},
+                    {"camera", {{"type", "object"}, {"description", "Camera override applied to the session camera before rendering; same fields as pcg_set_camera."}}},
+                }},
                 {"additionalProperties", false},
             }},
+        },
+        {
+            {"name", "pcg_set_camera"},
+            {"description", "Set the session physical camera in the live WebGL viewport: pose (position/target or azimuth/elevation/distance around target), lens (focalLengthMm or fov, sensorHeightMm), aperture (apertureFstop), focus (focusDistance or focusOnTarget), dofEnabled, exposure, near/far, projection. Session-scoped; never written into the .pcg document. Waits for the editor to apply and returns the effective state. Coordinates are viewport world space (three.js right-handed; Unity +Z flips to -Z)."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"position", {{"type", "array"}, {"items", {{"type", "number"}}}, {"minItems", 3}, {"maxItems", 3}}},
+                    {"target", {{"type", "array"}, {"items", {{"type", "number"}}}, {"minItems", 3}, {"maxItems", 3}}},
+                    {"up", {{"type", "array"}, {"items", {{"type", "number"}}}, {"minItems", 3}, {"maxItems", 3}}},
+                    {"azimuth", {{"type", "number"}, {"description", "Degrees around +Y; 0 = +Z. Requires/keeps target."}}},
+                    {"elevation", {{"type", "number"}, {"description", "Degrees above the horizon; clamped to ±89.9."}}},
+                    {"distance", {{"type", "number"}, {"description", "Distance to target in world units."}}},
+                    {"projection", {{"type", "string"}, {"enum", json::array({"perspective", "orthographic"})}}},
+                    {"focalLengthMm", {{"type", "number"}, {"minimum", 8}, {"maximum", 400}}},
+                    {"fov", {{"type", "number"}, {"minimum", 1}, {"maximum", 170}, {"description", "Vertical FOV in degrees; alternative to focalLengthMm."}}},
+                    {"sensorHeightMm", {{"type", "number"}, {"minimum", 5}, {"maximum", 70}, {"default", 24}}},
+                    {"apertureFstop", {{"type", "number"}, {"minimum", 0.7}, {"maximum", 64}}},
+                    {"focusDistance", {{"type", "number"}, {"description", "World-unit focus distance for depth of field."}}},
+                    {"focusOnTarget", {{"type", "boolean"}, {"description", "Set focusDistance to the position↔target distance."}}},
+                    {"dofEnabled", {{"type", "boolean"}}},
+                    {"exposure", {{"type", "number"}, {"minimum", 0.05}, {"maximum", 8}}},
+                    {"near", {{"type", "number"}}},
+                    {"far", {{"type", "number"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_get_camera"},
+            {"description", "Read the current session camera state from the live WebGL viewport (last applied state, or the camera block of the latest screenshot metadata)."},
+            {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
             {"name", "pcg_patch_node"},
@@ -405,7 +445,18 @@ json CallToolInternal(
     if (name == "pcg_capture_preview") {
         const int requested_timeout = arguments.value("timeoutMs", 10000);
         const int timeout = std::max(1000, std::min(30000, requested_timeout));
-        const uint64_t request_id = RequestPreviewCapture(editor_session_id);
+        json options = json::object();
+        if (arguments.contains("width")) options["width"] = arguments["width"];
+        if (arguments.contains("height")) options["height"] = arguments["height"];
+        if (arguments.contains("transparent")) options["transparent"] = arguments["transparent"];
+        if (arguments.contains("dof")) options["dof"] = arguments["dof"];
+        if (arguments.contains("camera")) {
+            if (!arguments["camera"].is_object()) {
+                return ToolResult({{"ok", false}, {"error", "camera must be an object"}}, true);
+            }
+            options["camera"] = arguments["camera"];
+        }
+        const uint64_t request_id = RequestPreviewCapture(editor_session_id, options);
         if (request_id == 0) return ToolResult(GetEditorContext(editor_session_id), true);
         PreviewSnapshot snapshot;
         if (!WaitForPreview(request_id, std::chrono::milliseconds(timeout), snapshot, editor_session_id)) {
@@ -426,6 +477,37 @@ json CallToolInternal(
             {"isError", false},
         };
         return result;
+    }
+    if (name == "pcg_set_camera") {
+        static const std::vector<std::string> camera_keys = {
+            "position", "target", "up", "azimuth", "elevation", "distance",
+            "projection", "focalLengthMm", "fov", "sensorHeightMm", "apertureFstop",
+            "focusDistance", "focusOnTarget", "dofEnabled", "exposure", "near", "far",
+        };
+        json camera = json::object();
+        for (const auto& key : camera_keys) {
+            if (arguments.contains(key)) camera[key] = arguments[key];
+        }
+        if (camera.empty()) {
+            return ToolResult({{"ok", false}, {"error", "at least one camera field is required"}}, true);
+        }
+        const uint64_t command_id = RequestCameraCommand(camera, editor_session_id);
+        if (command_id == 0) return ToolResult(GetEditorContext(editor_session_id), true);
+        json camera_state;
+        const int timeout = CommandTimeout(arguments);
+        if (!WaitForCameraState(command_id, std::chrono::milliseconds(timeout), camera_state, editor_session_id)) {
+            return ToolResult({
+                {"ok", false}, {"error", "camera_apply_timeout"}, {"commandId", command_id},
+                {"hint", "Keep the Web editor and Preview panel open."},
+            }, true);
+        }
+        return ToolResult({
+            {"ok", true}, {"commandId", command_id}, {"camera", std::move(camera_state)},
+        });
+    }
+    if (name == "pcg_get_camera") {
+        const json result = GetCameraState(editor_session_id);
+        return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_validate") {
         const json graph = GetEditorGraph(editor_session_id);

@@ -4,7 +4,8 @@ import { getAgentToken } from './agent/agentClient';
 import type { GraphCommandResult, QueuedGraphCommand } from './graphCommands';
 import type { GraphJson } from './graphSchema';
 import type { NodeManifest } from './nodeManifest';
-import type { PreviewCapture } from './PreviewViewport';
+import type { CameraCommand } from './physicalCamera';
+import type { CaptureOptions, PreviewCapture } from './PreviewViewport';
 
 const BRIDGE_BASE = '/api/editor-bridge';
 const HEARTBEAT_MS = 5_000;
@@ -19,12 +20,16 @@ interface EditorBridgeOptions {
   selectedNodeId: string | null;
   previewTargetNodeId: string | null;
   applyCommands: (commands: QueuedGraphCommand[]) => Promise<GraphCommandResult[]>;
-  capturePreview: () => PreviewCapture | null;
+  capturePreview: (options?: CaptureOptions) => PreviewCapture | null;
+  applyCameraCommand: (command: CameraCommand) => Record<string, unknown> | null;
 }
 
 interface SessionResponse {
   ok: boolean;
   captureRequestId?: number;
+  captureOptions?: CaptureOptions;
+  cameraCommandId?: number;
+  cameraCommand?: CameraCommand;
 }
 
 interface PatchResponse {
@@ -70,9 +75,11 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
   const previewTargetNodeId = options.previewTargetNodeId;
   const applyCommandsRef = useRef(options.applyCommands);
   const capturePreviewRef = useRef(options.capturePreview);
+  const applyCameraCommandRef = useRef(options.applyCameraCommand);
   const hashRef = useRef('');
   const cursorRef = useRef(0);
   const captureRequestRef = useRef(0);
+  const cameraCommandRef = useRef(0);
   const pollingRef = useRef(false);
   const clientRevisionRef = useRef(0);
   const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId]);
@@ -80,6 +87,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
   latestSessionKeyRef.current = sessionKey;
   applyCommandsRef.current = options.applyCommands;
   capturePreviewRef.current = options.capturePreview;
+  applyCameraCommandRef.current = options.applyCameraCommand;
 
   const pushSession = useCallback(async () => {
     const scheduledGraphText = graphText;
@@ -127,12 +135,21 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     };
   }, [pushSession, options.sessionId]);
 
-  const uploadCapture = useCallback(async (requestId: number) => {
-    const capture = capturePreviewRef.current();
+  const uploadCapture = useCallback(async (requestId: number, captureOptions?: CaptureOptions) => {
+    const capture = capturePreviewRef.current(captureOptions);
     if (!capture) return false;
     const response = await putJson('/preview/screenshot', { sessionId: options.sessionId, requestId, ...capture });
     if (!response.ok) throw new Error(`preview upload failed: HTTP ${response.status}`);
     return true;
+  }, [options.sessionId]);
+
+  const echoCameraState = useCallback(async (commandId: number, state: Record<string, unknown> | null) => {
+    const response = await putJson('/camera/state', {
+      sessionId: options.sessionId,
+      commandId,
+      state: state ?? {},
+    });
+    if (!response.ok) throw new Error(`camera echo failed: HTTP ${response.status}`);
   }, [options.sessionId]);
 
   // Maintain a recent screenshot even before an Agent explicitly requests one.
@@ -156,8 +173,14 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
         ]);
         if (sessionResponse.ok) {
           const session = (await sessionResponse.json()) as SessionResponse;
+          const cameraCommandId = session.cameraCommandId ?? 0;
+          if (cameraCommandId > cameraCommandRef.current) {
+            const applied = applyCameraCommandRef.current(session.cameraCommand ?? {});
+            cameraCommandRef.current = cameraCommandId;
+            await echoCameraState(cameraCommandId, applied);
+          }
           const requested = session.captureRequestId ?? 0;
-          if (requested > captureRequestRef.current && await uploadCapture(requested)) {
+          if (requested > captureRequestRef.current && await uploadCapture(requested, session.captureOptions)) {
             captureRequestRef.current = requested;
           }
         }
@@ -195,7 +218,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     void poll();
     const timer = window.setInterval(() => void poll(), POLL_MS);
     return () => window.clearInterval(timer);
-  }, [editPathKey, uploadCapture, options.sessionId]);
+  }, [editPathKey, uploadCapture, echoCameraState, options.sessionId]);
 
   // Callers that are about to start an Agent turn can await this barrier so
   // MCP tools observe the current selection instead of the debounced session.

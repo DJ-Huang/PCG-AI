@@ -14,6 +14,10 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 import { buildEdgeIndices, type ParsedGeometry, type ParsedMesh, type ParsedSplines, type SourceMapping } from './cookResult';
 import type { GraphParameter } from './graphSchema';
@@ -74,6 +78,16 @@ import {
   type ReviewCameraView,
   type SideView,
 } from './reviewCamera';
+import {
+  apertureToBokehUniform,
+  defaultPhysicalCamera,
+  focalLengthToFov,
+  mergeCameraCommand,
+  syncStateFromLiveCamera,
+  type CameraCommand,
+  type PhysicalCameraState,
+} from './physicalCamera';
+import CameraPopover from './preview/CameraPopover';
 
 export interface SplineEditContext {
   nodeId: string;
@@ -112,6 +126,18 @@ interface PreviewViewportProps {
   onReviewCameraApplied?: (pose: ReviewCameraPose) => void;
 }
 
+export interface CaptureOptions {
+  /** Output pixels; independent of the on-screen viewport size. */
+  width?: number;
+  height?: number;
+  /** Alpha background (PNG). Overrides the environment background. */
+  transparent?: boolean;
+  /** Camera override applied to the session camera before rendering. */
+  camera?: CameraCommand;
+  /** Override the session DOF switch for this capture. */
+  dof?: boolean;
+}
+
 export interface PreviewCapture {
   pngBase64: string;
   metadata: {
@@ -125,6 +151,7 @@ export interface PreviewCapture {
       projection: 'perspective' | 'orthographic';
       view?: ReviewCameraView;
     };
+    physicalCamera: PhysicalCameraState;
     viewport: { width: number; height: number; pixelRatio: number };
     shadingMode: ShadingMode;
     solidLighting: SolidLighting;
@@ -136,11 +163,14 @@ export interface PreviewCapture {
 }
 
 export interface PreviewViewportHandle {
-  captureFrame(): PreviewCapture | null;
+  captureFrame(options?: CaptureOptions): PreviewCapture | null;
   setReviewCamera(view: ReviewCameraView, options?: {
     frontAxis?: FrontAxis;
     sideView?: SideView;
   }): ReviewCameraPose | null;
+  /** Merge a camera command into the session camera and apply it. */
+  applyCameraCommand(command: CameraCommand): PhysicalCameraState | null;
+  getCameraState(): PhysicalCameraState | null;
 }
 
 type ShadingMode = 'solid' | 'material' | 'rendered';
@@ -288,6 +318,17 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   shadingRef.current = { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, matcapId, pbrDebugView };
   const overlayPopoverRef = useRef<HTMLDivElement>(null);
   const solidPopoverRef = useRef<HTMLDivElement>(null);
+  const cameraPopoverRef = useRef<HTMLDivElement>(null);
+  const [cameraPopoverOpen, setCameraPopoverOpen] = useState(false);
+  // Session-scoped physical camera. Never persisted into the .pcg document.
+  const physicalCameraRef = useRef<PhysicalCameraState>(defaultPhysicalCamera());
+  const [cameraUiState, setCameraUiState] = useState<PhysicalCameraState>(defaultPhysicalCamera());
+  const composerRef = useRef<{
+    composer: EffectComposer;
+    renderPass: RenderPass;
+    bokehPass: BokehPass;
+    outputPass: OutputPass;
+  } | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [width, setWidth] = useState(defaultWidth);
   const [sceneMs, setSceneMs] = useState(0);
@@ -371,46 +412,236 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     return pose;
   }, []);
 
-  useImperativeHandle(ref, () => ({
-    captureFrame: () => {
-      const ctx = sceneRef.current;
-      if (!ctx || ctx.renderer.domElement.width === 0 || ctx.renderer.domElement.height === 0) {
-        return null;
+  const ensureComposer = useCallback((ctx: NonNullable<typeof sceneRef.current>) => {
+    if (!composerRef.current) {
+      const composer = new EffectComposer(ctx.renderer);
+      const renderPass = new RenderPass(ctx.scene, ctx.camera);
+      const bokehPass = new BokehPass(ctx.scene, ctx.camera, {
+        focus: 1, aperture: 0, maxblur: 0.01,
+      });
+      const outputPass = new OutputPass();
+      composer.addPass(renderPass);
+      composer.addPass(bokehPass);
+      composer.addPass(outputPass);
+      composerRef.current = { composer, renderPass, bokehPass, outputPass };
+    }
+    return composerRef.current;
+  }, []);
+
+  const renderWithDof = useCallback((
+    ctx: NonNullable<typeof sceneRef.current>,
+    state: PhysicalCameraState,
+  ) => {
+    const pipeline = ensureComposer(ctx);
+    const camera = ctx.camera;
+    pipeline.renderPass.camera = camera;
+    pipeline.bokehPass.camera = camera;
+    const aspect = camera instanceof THREE.PerspectiveCamera
+      ? camera.aspect
+      : Math.max(ctx.renderer.domElement.width / Math.max(ctx.renderer.domElement.height, 1), 0.01);
+    const uniforms = pipeline.bokehPass.uniforms as Record<string, { value: number }>;
+    uniforms.focus.value = state.focusDistance;
+    uniforms.aperture.value = apertureToBokehUniform(
+      state.focalLengthMm,
+      state.apertureFstop,
+    );
+    uniforms.aspect.value = aspect;
+    pipeline.composer.render();
+  }, [ensureComposer]);
+
+  const applyCameraStateToScene = useCallback((
+    ctx: NonNullable<typeof sceneRef.current>,
+    state: PhysicalCameraState,
+  ) => {
+    const nextCamera = state.projection === 'orthographic' ? ctx.orthographic : ctx.perspective;
+    nextCamera.up.set(state.up[0], state.up[1], state.up[2]);
+    nextCamera.position.set(state.position[0], state.position[1], state.position[2]);
+    nextCamera.near = state.near;
+    nextCamera.far = state.far;
+    const aspect = Math.max(
+      ctx.renderer.domElement.clientWidth / Math.max(ctx.renderer.domElement.clientHeight, 1),
+      0.01,
+    );
+    if (nextCamera instanceof THREE.PerspectiveCamera) {
+      nextCamera.fov = focalLengthToFov(state.focalLengthMm, state.sensorHeightMm);
+      nextCamera.aspect = aspect;
+    } else {
+      // Ortho frustum height matches the perspective framing at the target distance.
+      const distance = Math.max(
+        nextCamera.position.distanceTo(new THREE.Vector3(...state.target)),
+        0.001,
+      );
+      const fov = THREE.MathUtils.degToRad(focalLengthToFov(state.focalLengthMm, state.sensorHeightMm));
+      const halfH = distance * Math.tan(fov / 2);
+      nextCamera.top = halfH;
+      nextCamera.bottom = -halfH;
+      nextCamera.left = -halfH * aspect;
+      nextCamera.right = halfH * aspect;
+      nextCamera.userData.frustumHeight = halfH * 2;
+    }
+    nextCamera.updateProjectionMatrix();
+    ctx.camera = nextCamera;
+    ctx.controls.object = nextCamera;
+    ctx.controls.target.set(state.target[0], state.target[1], state.target[2]);
+    ctx.controls.update();
+    ctx.renderer.toneMappingExposure = state.exposure;
+    ctx.reviewPose = null;
+    if (nextCamera instanceof THREE.PerspectiveCamera) {
+      setAxisNavigation(getAxisNavigation(nextCamera));
+    }
+  }, []);
+
+  const applyCameraCommand = useCallback((command: CameraCommand): PhysicalCameraState | null => {
+    const ctx = sceneRef.current;
+    if (!ctx) return null;
+    const synced = syncStateFromLiveCamera(physicalCameraRef.current, ctx.camera, ctx.controls.target);
+    const next = mergeCameraCommand(synced, command);
+    physicalCameraRef.current = next;
+    setCameraUiState(next);
+    setExposure(next.exposure);
+    applyCameraStateToScene(ctx, next);
+    return next;
+  }, [applyCameraStateToScene]);
+
+  const getCameraState = useCallback((): PhysicalCameraState | null => {
+    const ctx = sceneRef.current;
+    if (!ctx) return null;
+    const synced = syncStateFromLiveCamera(physicalCameraRef.current, ctx.camera, ctx.controls.target);
+    synced.exposure = ctx.renderer.toneMappingExposure;
+    physicalCameraRef.current = synced;
+    return synced;
+  }, []);
+
+  const captureFrameImpl = useCallback((options?: CaptureOptions): PreviewCapture | null => {
+    const ctx = sceneRef.current;
+    if (!ctx || ctx.renderer.domElement.width === 0 || ctx.renderer.domElement.height === 0) {
+      return null;
+    }
+      if (options?.camera) applyCameraCommand(options.camera);
+
+      const dofActive = (options?.dof ?? physicalCameraRef.current.dofEnabled) &&
+        ctx.camera instanceof THREE.PerspectiveCamera;
+      const clampSize = (value: number | undefined) =>
+        value === undefined ? null : Math.min(8192, Math.max(16, Math.round(value)));
+      const captureWidth = clampSize(options?.width);
+      const captureHeight = clampSize(options?.height);
+      const needsOffscreen = captureWidth !== null || captureHeight !== null;
+
+      const canvas = ctx.renderer.domElement;
+      const savedPixelRatio = ctx.renderer.getPixelRatio();
+      const savedWidth = canvas.width;
+      const savedHeight = canvas.height;
+      const savedBackground = ctx.scene.background;
+      const savedClearColor = new THREE.Color();
+      ctx.renderer.getClearColor(savedClearColor);
+      const savedClearAlpha = ctx.renderer.getClearAlpha();
+
+      const outWidth = captureWidth ?? Math.round(canvas.clientWidth * savedPixelRatio);
+      const outHeight = captureHeight ?? Math.round(canvas.clientHeight * savedPixelRatio);
+
+      try {
+        if (needsOffscreen) {
+          ctx.renderer.setPixelRatio(1);
+          ctx.renderer.setSize(outWidth, outHeight, false);
+          const aspect = Math.max(outWidth / Math.max(outHeight, 1), 0.01);
+          for (const cam of [ctx.perspective, ctx.orthographic]) {
+            if (cam instanceof THREE.PerspectiveCamera) {
+              cam.aspect = aspect;
+            } else {
+              const frustumHeight = Number(cam.userData.frustumHeight) || (cam.top - cam.bottom);
+              const halfH = frustumHeight / 2;
+              cam.left = -halfH * aspect;
+              cam.right = halfH * aspect;
+              cam.top = halfH;
+              cam.bottom = -halfH;
+            }
+            cam.updateProjectionMatrix();
+          }
+          syncEdgeOverlayResolution(ctx.content, outWidth, outHeight);
+          composerRef.current?.composer.setSize(outWidth, outHeight);
+        }
+        if (options?.transparent) {
+          ctx.scene.background = null;
+          ctx.renderer.setClearColor(0x000000, 0);
+        }
+        ctx.controls.update();
+        if (dofActive) renderWithDof(ctx, physicalCameraRef.current);
+        else ctx.renderer.render(ctx.scene, ctx.camera);
+        const dataUrl = canvas.toDataURL('image/png');
+        const state = getCameraState() ?? physicalCameraRef.current;
+        const { shadingMode: mode, solidLighting: lighting, matcapId: matcap, wireframeOverlay: wireframe, xrayEnabled: xray } = shadingRef.current;
+        const fov = ctx.camera instanceof THREE.PerspectiveCamera ? ctx.camera.fov : 0;
+        return {
+          pngBase64: dataUrl.slice(dataUrl.indexOf(',') + 1),
+          metadata: {
+            camera: {
+              position: ctx.camera.position.toArray(),
+              target: ctx.controls.target.toArray(),
+              up: ctx.camera.up.toArray(),
+              fov,
+              near: ctx.camera.near,
+              far: ctx.camera.far,
+              projection: ctx.camera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective',
+              view: ctx.reviewPose?.view,
+            },
+            physicalCamera: state,
+            viewport: {
+              width: canvas.width,
+              height: canvas.height,
+              pixelRatio: ctx.renderer.getPixelRatio(),
+            },
+            shadingMode: mode,
+            solidLighting: lighting,
+            matcapId: matcap,
+            wireframeOverlay: wireframe,
+            xrayEnabled: xray,
+            reviewPose: ctx.reviewPose,
+          },
+        };
+      } finally {
+        ctx.scene.background = savedBackground;
+        ctx.renderer.setClearColor(savedClearColor, savedClearAlpha);
+        if (needsOffscreen) {
+          ctx.renderer.setPixelRatio(savedPixelRatio);
+          ctx.renderer.setSize(savedWidth / savedPixelRatio, savedHeight / savedPixelRatio, false);
+          const aspect = Math.max(
+            canvas.clientWidth / Math.max(canvas.clientHeight, 1),
+            0.01,
+          );
+          for (const cam of [ctx.perspective, ctx.orthographic]) {
+            if (cam instanceof THREE.PerspectiveCamera) {
+              cam.aspect = aspect;
+            } else {
+              const frustumHeight = Number(cam.userData.frustumHeight) || (cam.top - cam.bottom);
+              const halfH = frustumHeight / 2;
+              cam.left = -halfH * aspect;
+              cam.right = halfH * aspect;
+              cam.top = halfH;
+              cam.bottom = -halfH;
+            }
+            cam.updateProjectionMatrix();
+          }
+          syncEdgeOverlayResolution(
+            ctx.content,
+            Math.round(canvas.clientWidth),
+            Math.round(canvas.clientHeight),
+          );
+          composerRef.current?.composer.setSize(canvas.clientWidth, canvas.clientHeight);
+        }
       }
-      ctx.controls.update();
-      ctx.renderer.render(ctx.scene, ctx.camera);
-      const dataUrl = ctx.renderer.domElement.toDataURL('image/png');
-      const { shadingMode: mode, solidLighting: lighting, matcapId: matcap, wireframeOverlay: wireframe, xrayEnabled: xray } = shadingRef.current;
-      const fov = ctx.camera instanceof THREE.PerspectiveCamera ? ctx.camera.fov : 0;
-      return {
-        pngBase64: dataUrl.slice(dataUrl.indexOf(',') + 1),
-        metadata: {
-          camera: {
-            position: ctx.camera.position.toArray(),
-            target: ctx.controls.target.toArray(),
-            up: ctx.camera.up.toArray(),
-            fov,
-            near: ctx.camera.near,
-            far: ctx.camera.far,
-            projection: ctx.camera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective',
-            view: ctx.reviewPose?.view,
-          },
-          viewport: {
-            width: ctx.renderer.domElement.width,
-            height: ctx.renderer.domElement.height,
-            pixelRatio: ctx.renderer.getPixelRatio(),
-          },
-          shadingMode: mode,
-          solidLighting: lighting,
-          matcapId: matcap,
-          wireframeOverlay: wireframe,
-          xrayEnabled: xray,
-          reviewPose: ctx.reviewPose,
-        },
-      };
-    },
+  }, [applyCameraCommand, getCameraState, renderWithDof]);
+
+  const snapshotPng = useCallback((options: CaptureOptions): string | null => {
+    const capture = captureFrameImpl(options);
+    return capture ? `data:image/png;base64,${capture.pngBase64}` : null;
+  }, [captureFrameImpl]);
+
+  useImperativeHandle(ref, () => ({
+    captureFrame: captureFrameImpl,
     setReviewCamera: (nextView, options) => applyActiveReviewCamera(nextView, options),
-  }), [applyActiveReviewCamera]);
+    applyCameraCommand: (command) => applyCameraCommand(command),
+    getCameraState: () => getCameraState(),
+  }), [captureFrameImpl, applyActiveReviewCamera, applyCameraCommand, getCameraState]);
 
   useEffect(() => {
     preloadMatcap(DEFAULT_MATCAP_ID);
@@ -493,9 +724,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const container = containerRef.current;
     if (!container) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setClearColor(0x3d3d3d);
+    renderer.setClearColor(0x3d3d3d, 1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
@@ -592,6 +823,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       perspective.aspect = w / h;
       perspective.updateProjectionMatrix();
       syncEdgeOverlayResolution(content, w, h);
+      composerRef.current?.composer.setSize(w, h);
     };
     resize();
     const observer = new ResizeObserver(resize);
@@ -619,7 +851,13 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           rescaleAxisGizmo(gizmo, len);
         }
       }
-      renderer.render(scene, sceneRef.current?.camera ?? perspective);
+      const activeCamera = sceneRef.current?.camera ?? perspective;
+      const liveCtx = sceneRef.current;
+      if (liveCtx && physicalCameraRef.current.dofEnabled && activeCamera instanceof THREE.PerspectiveCamera) {
+        renderWithDof(liveCtx, physicalCameraRef.current);
+      } else {
+        renderer.render(scene, activeCamera);
+      }
     };
     tick();
 
@@ -836,6 +1074,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       disposeGroup(content);
       disposeObject3D(handles);
       handles.clear();
+      composerRef.current?.composer.dispose();
+      composerRef.current = null;
       renderer.dispose();
       renderer.domElement.remove();
       sceneRef.current = null;
@@ -1133,6 +1373,16 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   }, [solidPopoverOpen]);
 
   useEffect(() => {
+    if (!cameraPopoverOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (cameraPopoverRef.current?.contains(e.target as Node)) return;
+      setCameraPopoverOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [cameraPopoverOpen]);
+
+  useEffect(() => {
     const ctx = sceneRef.current;
     if (ctx) ctx.helpers.visible = !reviewMode;
   }, [reviewMode]);
@@ -1381,6 +1631,27 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
                 onKeyLightIntensityChange={setKeyLightIntensity}
                 onBackgroundVisibleChange={setBackgroundVisible}
                 onDebugViewChange={setPbrDebugView}
+              />
+            )}
+          </div>
+          <div className="pcg-preview__shading-popover-wrap" ref={cameraPopoverRef}>
+            <button
+              type="button"
+              className={`pcg-preview__shading-mode${cameraPopoverOpen || cameraUiState.dofEnabled ? ' is-active' : ''}`}
+              title="Physical camera"
+              aria-expanded={cameraPopoverOpen}
+              onClick={() => setCameraPopoverOpen((v) => !v)}
+            >
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
+                <path d="M1 5 L5 5 L6.5 3 L10 3 L11.5 5 L15 5 L15 13 L1 13 Z" fill="none" stroke="currentColor" strokeWidth="1.1" />
+                <circle cx="8" cy="9" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.1" />
+              </svg>
+            </button>
+            {cameraPopoverOpen && (
+              <CameraPopover
+                state={cameraUiState}
+                onCameraChange={(command) => { applyCameraCommand(command); }}
+                onSnapshot={snapshotPng}
               />
             )}
           </div>

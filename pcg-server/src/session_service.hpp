@@ -25,6 +25,9 @@ void HandlePutPreviewScreenshot(const httplib::Request& req, httplib::Response& 
 void HandleGetPreviewScreenshot(const httplib::Request& req, httplib::Response& res);
 void HandleGetPreviewMetadata(const httplib::Request& req, httplib::Response& res);
 void HandleRequestPreviewCapture(const httplib::Request& req, httplib::Response& res);
+void HandlePostCameraCommand(const httplib::Request& req, httplib::Response& res);
+void HandlePutCameraState(const httplib::Request& req, httplib::Response& res);
+void HandleGetCameraState(const httplib::Request& req, httplib::Response& res);
 void HandlePatchNode(const httplib::Request& req, httplib::Response& res);
 void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res);
 void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res);
@@ -55,7 +58,18 @@ bool WaitForGraphCommandResult(
     nlohmann::json& result);
 bool CancelGraphCommand(uint64_t command_id);
 nlohmann::json GetEditorGraph(const std::string& editor_session_id = "");
-uint64_t RequestPreviewCapture(const std::string& editor_session_id = "");
+uint64_t RequestPreviewCapture(
+    const std::string& editor_session_id = "",
+    const nlohmann::json& options = nlohmann::json::object());
+uint64_t RequestCameraCommand(
+    const nlohmann::json& camera,
+    const std::string& editor_session_id = "");
+bool WaitForCameraState(
+    uint64_t command_id,
+    std::chrono::milliseconds timeout,
+    nlohmann::json& state,
+    const std::string& editor_session_id = "");
+nlohmann::json GetCameraState(const std::string& editor_session_id = "");
 bool WaitForPreview(
     uint64_t request_id,
     std::chrono::milliseconds timeout,

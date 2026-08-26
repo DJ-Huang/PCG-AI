@@ -2073,6 +2073,54 @@
   right: auto;
 }
 
+.pcg-preview__camera-popover {
+  width: 230px;
+}
+
+.pcg-preview__camera-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #c8c8c8;
+  padding: 3px 0;
+}
+
+.pcg-preview__camera-row > span:first-child {
+  flex: 0 0 52px;
+  color: #9a9a9a;
+}
+
+.pcg-preview__camera-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: #2b6cb0;
+}
+
+.pcg-preview__camera-row input[type='number'],
+.pcg-preview__camera-row select {
+  flex: 1;
+  min-width: 0;
+  background: #1f1f20;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #d8d8d8;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.pcg-preview__camera-value {
+  flex: 0 0 46px;
+  text-align: right;
+  color: #d8d8d8;
+  font-variant-numeric: tabular-nums;
+}
+
+.pcg-preview__camera-snapshot {
+  width: 100%;
+  margin-top: 8px;
+}
+
 .pcg-preview__overlay-row {
   display: flex;
   align-items: center;

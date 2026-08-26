@@ -137,6 +137,9 @@ int main(int argc, char** argv) {
     svr.Get("/v1/preview/screenshot", pcg_server::HandleGetPreviewScreenshot);
     svr.Get("/v1/preview/metadata", pcg_server::HandleGetPreviewMetadata);
     svr.Post("/v1/preview/request-capture", pcg_server::HandleRequestPreviewCapture);
+    svr.Post("/v1/camera/command", pcg_server::HandlePostCameraCommand);
+    svr.Put("/v1/camera/state", pcg_server::HandlePutCameraState);
+    svr.Get("/v1/camera/state", pcg_server::HandleGetCameraState);
     svr.Patch(R"(/v1/graph/nodes/(.+))", pcg_server::HandlePatchNode);
     svr.Get("/v1/graph/patches", pcg_server::HandleGetGraphPatches);
     svr.Post("/v1/graph/patches/ack", pcg_server::HandleAckGraphPatches);
