@@ -16,7 +16,7 @@ Unity C# templates: `scripts/unity/` (this skill directory).
 ```bash
 python3 ../shared/pcg-scripts/new_authoring_plan.py "Ghost Protocol Glock" \
   --image /path/ref.png --complexity complex \
-  --pcg examples/ghost-protocol-glock.pcg \
+  --pcg examples/graphs/ghost-protocol-glock.pcg \
   --out examples/ghost-protocol-glock-plan.json --force
 ```
 
@@ -139,7 +139,7 @@ The helper uses `ROW_STEP_Y=160` and `COL_STEP_X=360` by default. Keep
 ## validate_pcg.py
 
 ```bash
-python3 ../shared/pcg-scripts/validate_pcg.py examples/your-graph.pcg
+python3 ../shared/pcg-scripts/validate_pcg.py examples/graphs/your-graph.pcg
 ```
 
 Graph JSON, pin, title, layout, Subgraph modularity, fan-in centering, and
@@ -157,7 +157,7 @@ after the layout pass and after each substantive `.pcg` edit.
 5. Auto params + auto saveDir → author .pcg for that pass (no ask_user)
 6. layout_pcg.py → relayout root + every inline Subgraph definition
 7. validate_pcg.py
-8. create_review_scene.cs.txt → Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene  (fixed; no ask)
+8. create_review_scene.cs.txt → Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene  (fixed; no ask)
 9. execute_csharp_script setup_pcg_review_subject.cs.txt → cook
 10. execute_csharp_script capture_sceneview_png.cs.txt
 11. make_comparison_sheet.py --reference <archived ref_<slug>> --render …
@@ -173,7 +173,7 @@ After any context compaction: read `<plan-stem>-RESUME.md` → plan.json → arc
 
 | File | Use with |
 |------|----------|
-| `create_review_scene.cs.txt` | `execute_csharp_script` — Empty scene → `Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene` |
+| `create_review_scene.cs.txt` | `execute_csharp_script` — Empty scene → `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene` |
 | `setup_pcg_review_subject.cs.txt` | `execute_csharp_script` — load `.pcg`, cook, frame SceneView |
 | `capture_sceneview_png.cs.txt` | `execute_csharp_script` — write `screenshots/SceneView_*.png` |
 

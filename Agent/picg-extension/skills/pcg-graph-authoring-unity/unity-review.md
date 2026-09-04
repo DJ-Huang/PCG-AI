@@ -42,8 +42,8 @@ If ping fails: report `Unity MCP: unavailable` and **do not** claim visual pass/
 
 | Item | Value |
 |------|-------|
-| Preview scene dir | **`Assets/PICGGenerator/Scenes`** |
-| Scene file | `Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene` |
+| Preview scene dir | **`Assets/PCG-AI-Workspace/Scenes`** |
+| Scene file | `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene` |
 
 Always create / overwrite Preview scenes here. **Do not** `ask_user` for scene location. **Do not** use `Assets/Scenes/` unless the user explicitly overrides. Ensure the folder exists (template mkdir) before save.
 
@@ -59,12 +59,12 @@ B. Create a fresh review scene (prefer C# to avoid path quirks):
 
 ```text
 execute_csharp_script: scripts/unity/create_review_scene.cs.txt
-  → Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene
+  → Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene
 ```
 
    Or MCP: `manage_scene` action `create` with
-   `params: { "name": "PcgReview_<slug>", "path": "Assets/PICGGenerator/Scenes" }`
-   → file at `Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene`.
+   `params: { "name": "PcgReview_<slug>", "path": "Assets/PCG-AI-Workspace/Scenes" }`
+   → file at `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene`.
    **Do not** pass a path that already ends in `.scene` as the directory (MCP may nest
    `….scene/….scene`).
 C. execute_csharp_script with scripts/unity/setup_pcg_review_subject.cs.txt
@@ -85,7 +85,7 @@ H. Optional: manage_scene load previous scene; leave PcgReview_* scene on disk f
 
 | Item | Pattern |
 |------|---------|
-| Scene | `Assets/PICGGenerator/Scenes/PcgReview_<graph-slug>.scene` |
+| Scene | `Assets/PCG-AI-Workspace/Scenes/PcgReview_<graph-slug>.scene` |
 | Root GO | `PCG_Review_<graph-slug>` |
 | Reference archive | `ref_<graph-slug>.<ext>` next to `*-plan.json` (via `archive_reference.py`; never a URL/chat attachment) |
 | Screenshot | `Unity/screenshots/SceneView_YYYY-MM-DD_HH-MM-SS.png` |
@@ -97,8 +97,8 @@ H. Optional: manage_scene load previous scene; leave PcgReview_* scene on disk f
 
 | Anti-pattern | Why |
 |--------------|-----|
-| Ask where to create the Preview scene | Path is fixed: `Assets/PICGGenerator/Scenes` |
-| Write Preview scenes under `Assets/Scenes/` | Wrong default; use PICGGenerator |
+| Ask where to create the Preview scene | Path is fixed: `Assets/PCG-AI-Workspace/Scenes` |
+| Write Preview scenes under `Assets/Scenes/` | Wrong default; use `Assets/PCG-AI-Workspace/Scenes` |
 | Screenshot the user's busy Test / Demo scene | Other meshes dominate framing |
 | Only `SetActive(false)` on siblings in a shared scene | Easy to miss lights/skyboxes/UI; state leaks |
 | Score from an old screenshot without recook | Stale geometry |

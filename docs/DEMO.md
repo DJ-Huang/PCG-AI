@@ -5,7 +5,7 @@ Reproduce the full loop: **Web edit → Graph JSON → pcg-server cook → Unity
 ## Prerequisites
 
 - CMake 3.20+（macOS / Windows）
-- Node.js 18+
+- Node.js `^20.19.0` or `>=22.12.0`
 - Unity / Tuanjie Editor
 - Localhost `pcg-server`（Unity 不再加载 PcgCore dylib/dll）
 
@@ -27,7 +27,7 @@ Details: [`pcg-server.md`](pcg-server.md)
 
 ```bash
 cd web/pcg-editor
-npm install
+npm ci
 npm run dev
 ```
 

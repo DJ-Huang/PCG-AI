@@ -9,8 +9,6 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $SourceDir = Join-Path $RepoRoot "pcg-fbx-exporter"
 $BuildDir = Join-Path $SourceDir "build-windows"
-$UnityPlugins = Join-Path $RepoRoot "Unity/Assets/PcgPlugin/Plugins/Editor/x86_64"
-
 cmake -S $SourceDir -B $BuildDir -A x64
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

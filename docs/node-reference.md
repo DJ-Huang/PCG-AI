@@ -2761,7 +2761,7 @@ blast_short → StaticMeshSpawner(short) ─┘
 }
 ```
 
-> 典型连接：`CreateGridMesh / 平面 polygon → LotSubdivision → PolyExtrude → Output`（地块挤出）；或 `LotSubdivision →` 面中心点/`CopyMeshToPoints` 散布建筑。示例：`examples/lot-extrude-demo.pcg`、`examples/lot-city-demo.pcg`。
+> 典型连接：`CreateGridMesh / 平面 polygon → LotSubdivision → PolyExtrude → Output`（地块挤出）；或 `LotSubdivision →` 面中心点/`CopyMeshToPoints` 散布建筑。示例：`examples/graphs/lot-extrude-demo.pcg`、`examples/graphs/lot-city-demo.pcg`。
 
 ### CopyMesh
 
@@ -4002,7 +4002,7 @@ CopyAttributes(tag, values=tree/rock)
 
 ### PCGDemo
 
-位于 `examples/` 和 `Unity/Assets/PcgPlugin/Examples/PCGDemo/`，展示完整场景级用法：
+位于 `examples/graphs/` 和 `Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/`，展示完整场景级用法：
 
 | 文件 | 说明 |
 |------|------|
@@ -4020,7 +4020,7 @@ CopyAttributes(tag, values=tree/rock)
 
 ### Test
 
-位于 `examples/Test/` 和 `Unity/Assets/PcgPlugin/Examples/Test/`，覆盖 Phase 5 新增 7 节点的最小验证图：
+位于 `examples/tests/` 和 `Unity/Assets/PcgPlugin/Examples/Test/`，覆盖 Phase 5 新增 7 节点的最小验证图：
 
 | 文件 | 测试链路 | 验证内容 |
 |------|---------|---------|

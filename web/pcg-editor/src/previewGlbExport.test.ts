@@ -36,7 +36,7 @@ describe('exportPreviewMeshGlb', () => {
       },
     }, {
       name: 'YOYO Puppy',
-      graphPath: 'examples/tripo-yoyo-puppy-procedural.pcg',
+      graphPath: 'examples/showcases/tripo-yoyo-puppy/procedural.pcg',
       parameters: { 'Body Scale': 1 },
     });
 
@@ -46,7 +46,7 @@ describe('exportPreviewMeshGlb', () => {
     expect(view.getUint32(8, true)).toBe(result.byteLength);
     const json = glbJson(result);
     expect(json.asset.generator).toBe('PCG-AI Web GLB Exporter');
-    expect(json.nodes[0].extras.pcgGraph).toBe('examples/tripo-yoyo-puppy-procedural.pcg');
+    expect(json.nodes[0].extras.pcgGraph).toBe('examples/showcases/tripo-yoyo-puppy/procedural.pcg');
     expect(json.nodes[0].children).toEqual([1]);
     expect(json.meshes[0].primitives[0].material).toBe(0);
     expect(json.materials[0].name).toBe('Harness');

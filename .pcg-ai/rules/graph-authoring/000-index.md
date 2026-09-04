@@ -26,5 +26,5 @@ verified_date: 2026-07-19
 | `pcg/spiral-staircase` | 螺旋路径、台阶、栏杆和中心柱 |
 | `pcg/scatter` | 点生成、过滤、投影和实例化 |
 
-维护：新增模型规则放在本目录，使用 `rule_id: pcg/<slug>`、`domain: pcg`、`type: rule`，更新 `Rules/meta/rules-vault-index.md` 后执行 `vault-rag reindex`。高质量范例图放 `PCG AI Rule/Golden Graphs/`（**`.ragignore`，不进索引**；Agent 直读磁盘），不要把工程仓库未背书的 `examples/*.pcg` 当策略真源。
+维护：新增模型规则放在本目录，使用 `rule_id: pcg/<slug>`、`domain: pcg`、`type: rule`，更新 `Rules/meta/rules-vault-index.md` 后执行 `vault-rag reindex`。高质量范例图放 `PCG AI Rule/Golden Graphs/`（**`.ragignore`，不进索引**；Agent 直读磁盘），不要把工程仓库未背书的 `examples/**/*.pcg` 当策略真源。
 

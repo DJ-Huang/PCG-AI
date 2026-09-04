@@ -8,6 +8,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
@@ -89,10 +90,17 @@ import {
 } from './physicalCamera';
 import CameraPopover from './preview/CameraPopover';
 import AnimationTransport from './preview/AnimationTransport';
+import RigPosePanel from './preview/RigPosePanel';
+import {
+  createActionRigPoseOverlay,
+  type ActionRigPoseOverlay,
+} from './preview/actionRigPoseOverlay';
 import { computeMeshBandProfile, type MeshBandProfile } from './meshBandProfile';
 import {
   buildActionRigObject,
   type ActionAnimationClipInfo,
+  type ActionBoneInfo,
+  type ActionComponentInfo,
   type ActionPlaybackState,
   type ActionRuntimeController,
   type ActionRuntimeDiagnostics,
@@ -221,6 +229,8 @@ export interface PreviewViewportHandle {
   listAnimations(): string[];
   listAnimationClips(): ActionAnimationClipInfo[];
   listComponents(): string[];
+  listRigBones(): ActionBoneInfo[];
+  listRigComponents(): ActionComponentInfo[];
   playAnimation(name: string): boolean;
   pauseAnimation(): void;
   resumeAnimation(): boolean;
@@ -229,6 +239,8 @@ export interface PreviewViewportHandle {
   setAnimationSpeed(speed: number): void;
   setAnimationLoop(loop: boolean): void;
   getAnimationPlaybackState(): ActionPlaybackState | null;
+  resetPose(): void;
+  setComponentVisible(id: string, visible: boolean): boolean;
   setExplode(amount: number): void;
   inspectActionRuntime(): ActionRuntimeDiagnostics | null;
   /** Exact source GLB bytes when PreserveGltfRig is active. */
@@ -361,6 +373,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     controls: OrbitControls;
     content: THREE.Group;
     handles: THREE.Group;
+    rigHandles: THREE.Group;
     helpers: THREE.Group;
     gizmoLength: number;
     selectedIndex: number;
@@ -421,6 +434,18 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const [animationClips, setAnimationClips] = useState<ActionAnimationClipInfo[]>([]);
   const [selectedAnimation, setSelectedAnimation] = useState('');
   const [animationPlayback, setAnimationPlayback] = useState<ActionPlaybackState>(EMPTY_ACTION_PLAYBACK);
+  const [poseModeOpen, setPoseModeOpen] = useState(false);
+  const [rigBones, setRigBones] = useState<ActionBoneInfo[]>([]);
+  const [rigComponents, setRigComponents] = useState<ActionComponentInfo[]>([]);
+  const [splitRigComponents, setSplitRigComponents] = useState(false);
+  const [selectedRigBone, setSelectedRigBone] = useState('');
+  const selectedRigBoneRef = useRef(selectedRigBone);
+  selectedRigBoneRef.current = selectedRigBone;
+  const [selectedRigComponent, setSelectedRigComponent] = useState('');
+  const [componentExplode, setComponentExplode] = useState(0);
+  const poseOverlayRef = useRef<ActionRigPoseOverlay | null>(null);
+  const poseTransformRef = useRef<TransformControls | null>(null);
+  const selectPoseBoneRef = useRef<(id: string) => void>(() => {});
   const sceneTimedDataRef = useRef<PreviewData | null>(null);
   const pickDownRef = useRef<{ x: number; y: number; consumed: boolean } | null>(null);
   const onPickNodeRef = useRef(onPickNode);
@@ -434,11 +459,23 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
   const syncAnimationRuntime = useCallback((controller: ActionRuntimeController | null) => {
     const clips = controller?.clips ?? [];
+    const bones = controller?.bones ?? [];
+    const components = controller?.components ?? [];
     setAnimationClips(clips);
+    setRigBones(bones);
+    setRigComponents(components);
+    setSplitRigComponents(controller?.splitComponents ?? false);
     setSelectedAnimation((selected) => {
       if (clips.some((clip) => clip.name === selected)) return selected;
       return controller?.currentAnimation ?? clips[0]?.name ?? '';
     });
+    setSelectedRigBone((selected) => (
+      bones.some((bone) => bone.id === selected) ? selected : bones[0]?.id ?? ''
+    ));
+    setSelectedRigComponent((selected) => (
+      components.some((component) => component.id === selected) ? selected : components[0]?.id ?? ''
+    ));
+    setComponentExplode(0);
     updateAnimationPlayback(controller?.getPlaybackState() ?? EMPTY_ACTION_PLAYBACK);
   }, [updateAnimationPlayback]);
 
@@ -652,6 +689,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       const savedClearAlpha = ctx.renderer.getClearAlpha();
       const savedHelpersVisible = ctx.helpers.visible;
       const savedHandlesVisible = ctx.handles.visible;
+      const savedRigHandlesVisible = ctx.rigHandles.visible;
       const savedContentVisibility = new Map<THREE.Object3D, boolean>();
       ctx.content.traverse((child) => savedContentVisibility.set(child, child.visible));
       const savedGroups = collectPreviewMeshes(ctx.content)
@@ -679,6 +717,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         if (renderPass) {
           ctx.helpers.visible = false;
           ctx.handles.visible = false;
+          ctx.rigHandles.visible = false;
           ctx.content.traverse((child) => {
             if (child === ctx.content) return;
             const kind = child.userData.kind as string | undefined;
@@ -765,6 +804,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         }
         ctx.helpers.visible = savedHelpersVisible;
         ctx.handles.visible = savedHandlesVisible;
+        ctx.rigHandles.visible = savedRigHandlesVisible;
         ctx.content.traverse((child) => {
           child.visible = savedContentVisibility.get(child) ?? child.visible;
         });
@@ -817,6 +857,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     listAnimations: () => [...(actionController()?.animationNames ?? [])],
     listAnimationClips: () => [...(actionController()?.clips ?? [])],
     listComponents: () => [...(actionController()?.componentNames ?? [])],
+    listRigBones: () => [...(actionController()?.bones ?? [])],
+    listRigComponents: () => [...(actionController()?.components ?? [])],
     playAnimation: (name) => actionController()?.play(name) ?? false,
     pauseAnimation: () => actionController()?.pause(),
     resumeAnimation: () => actionController()?.resume() ?? false,
@@ -825,6 +867,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     setAnimationSpeed: (speed) => actionController()?.setPlaybackSpeed(speed),
     setAnimationLoop: (loop) => actionController()?.setLoop(loop),
     getAnimationPlaybackState: () => actionController()?.getPlaybackState() ?? null,
+    resetPose: () => actionController()?.resetPose(),
+    setComponentVisible: (id, visible) => actionController()?.setComponentVisible(id, visible) ?? false,
     setExplode: (amount) => actionController()?.setExplode(amount),
     inspectActionRuntime: () => actionController()?.inspect() ?? null,
     getPreservedGltfBytes: () => (
@@ -971,6 +1015,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     scene.add(content);
     const handles = new THREE.Group();
     scene.add(handles);
+    const rigHandles = new THREE.Group();
+    scene.add(rigHandles);
 
     sceneRef.current = {
       renderer,
@@ -981,6 +1027,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       controls,
       content,
       handles,
+      rigHandles,
       helpers,
       gizmoLength: 0.5,
       selectedIndex: -1,
@@ -1035,6 +1082,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       if (ctx) {
         const controller = ctx.content.userData.actionController as ActionRuntimeController | undefined;
         controller?.advance(deltaSeconds);
+        poseOverlayRef.current?.update();
+        if (poseTransformRef.current) poseTransformRef.current.camera = ctx.camera;
         const now = performance.now();
         if (controller && now - lastPlaybackUiUpdate >= 80) {
           lastPlaybackUiUpdate = now;
@@ -1278,6 +1327,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       disposePbrTextureCache();
       disposeGroup(content);
       disposeObject3D(handles);
+      disposeObject3D(rigHandles);
       handles.clear();
       composerRef.current?.composer.dispose();
       composerRef.current = null;
@@ -1451,6 +1501,47 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     updateAnimationPlayback(controller.getPlaybackState());
   }, [actionController, selectedAnimation, updateAnimationPlayback]);
 
+  const selectPoseBone = useCallback((id: string) => {
+    selectPoseBoneRef.current(id);
+  }, []);
+
+  const toggleRigComponent = useCallback((id: string, visible: boolean) => {
+    const controller = actionController();
+    if (!controller?.setComponentVisible(id, visible)) return;
+    setRigComponents(controller.components);
+  }, [actionController]);
+
+  const changeComponentExplode = useCallback((amount: number) => {
+    const safeAmount = Number.isFinite(amount) ? THREE.MathUtils.clamp(amount, 0, 1) : 0;
+    actionController()?.setExplode(safeAmount);
+    setComponentExplode(safeAmount);
+  }, [actionController]);
+
+  const resetRigPose = useCallback(() => {
+    const controller = actionController();
+    controller?.resetPose();
+    poseOverlayRef.current?.update();
+    if (controller) updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, updateAnimationPlayback]);
+
+  const togglePoseMode = useCallback(() => {
+    setPoseModeOpen((open) => {
+      if (open) return false;
+      const controller = actionController();
+      controller?.stop();
+      if (controller) updateAnimationPlayback(controller.getPlaybackState());
+      setAnimationModeOpen(false);
+      return true;
+    });
+  }, [actionController, updateAnimationPlayback]);
+
+  const toggleAnimationMode = useCallback(() => {
+    setAnimationModeOpen((open) => {
+      if (!open) setPoseModeOpen(false);
+      return !open;
+    });
+  }, []);
+
   // F frames the preview; Space controls playback while Animation mode owns focus.
   useEffect(() => {
     const container = containerRef.current;
@@ -1576,6 +1667,79 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     setSceneMs(performance.now() - rebuildStart);
     return () => { cancelled = true; };
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pose mode owns the skeleton overlay and the transform gizmo. It is kept
+  // outside cooked content so shading/re-cooks cannot recolor or dispose it.
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    const controller = actionController();
+    if (!ctx || !poseModeOpen || !controller || rigBones.length === 0) {
+      selectPoseBoneRef.current = () => {};
+      return;
+    }
+
+    controller.stop();
+    updateAnimationPlayback(controller.getPlaybackState());
+    const overlay = createActionRigPoseOverlay(controller);
+    const transform = new TransformControls(ctx.camera, ctx.renderer.domElement);
+    transform.setMode('rotate');
+    transform.setSpace('local');
+    transform.size = 0.72;
+    const transformHelper = transform.getHelper();
+    transformHelper.name = 'PCG_Action_Rig_Rotation_Gizmo';
+    ctx.rigHandles.add(overlay.group, transformHelper);
+    poseOverlayRef.current = overlay;
+    poseTransformRef.current = transform;
+
+    const selectBone = (id: string) => {
+      const bone = controller.getBoneObject(id);
+      if (!bone) return;
+      overlay.setSelectedBone(id);
+      transform.attach(bone);
+      setSelectedRigBone(id);
+    };
+    selectPoseBoneRef.current = selectBone;
+    const initialBone = rigBones.some((bone) => bone.id === selectedRigBoneRef.current)
+      ? selectedRigBoneRef.current
+      : rigBones[0].id;
+    selectBone(initialBone);
+
+    const onDraggingChanged = (event: { value?: unknown }) => {
+      ctx.controls.enabled = event.value !== true;
+    };
+    const onObjectChange = () => {
+      controller.getBoneObject(overlay.selectedBoneId ?? '')?.updateWorldMatrix(true, true);
+      overlay.update();
+    };
+    transform.addEventListener('dragging-changed', onDraggingChanged);
+    transform.addEventListener('objectChange', onObjectChange);
+
+    const canvas = ctx.renderer.domElement;
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 || transform.dragging || transform.axis) return;
+      const id = overlay.pickBone(ctx.camera, canvas.getBoundingClientRect(), event.clientX, event.clientY);
+      if (!id) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (pickDownRef.current) pickDownRef.current.consumed = true;
+      selectBone(id);
+    };
+    canvas.addEventListener('pointerdown', onPointerDown, { capture: true });
+
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown, { capture: true });
+      transform.removeEventListener('dragging-changed', onDraggingChanged);
+      transform.removeEventListener('objectChange', onObjectChange);
+      transform.detach();
+      transform.dispose();
+      ctx.rigHandles.remove(transformHelper, overlay.group);
+      overlay.dispose();
+      ctx.controls.enabled = true;
+      if (poseOverlayRef.current === overlay) poseOverlayRef.current = null;
+      if (poseTransformRef.current === transform) poseTransformRef.current = null;
+      selectPoseBoneRef.current = () => {};
+    };
+  }, [actionController, poseModeOpen, rigBones, updateAnimationPlayback]);
 
   // Polygon edges and spline authoring helpers are lightweight overlays. Keep
   // them outside the cooked-content effect so toggling an overlay never
@@ -1751,7 +1915,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
   return (
     <div
-      className={`pcg-preview${reviewMode ? ' is-review' : ''}${animationModeOpen ? ' has-animation-mode' : ''}`}
+      className={`pcg-preview${reviewMode ? ' is-review' : ''}${animationModeOpen ? ' has-animation-mode' : ''}${poseModeOpen ? ' has-rig-pose-mode' : ''}`}
       style={{ width: reviewMode ? '100%' : width, height: reviewMode ? '100%' : undefined }}
     >
       <div
@@ -1822,20 +1986,38 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         )}
         {activeTab === '3d' && (
         <>
-        {animationClips.length > 0 && (
+        {(animationClips.length > 0 || rigBones.length > 0) && (
           <div className="pcg-preview__animation-entry">
-            <button
-              type="button"
-              className={`pcg-preview__animation-mode${animationModeOpen ? ' is-active' : ''}`}
-              aria-label="Animation mode"
-              aria-pressed={animationModeOpen}
-              title="Animation mode"
-              onClick={() => setAnimationModeOpen((open) => !open)}
-            >
-              <svg viewBox="0 0 16 16" aria-hidden><path d="M4 2.5 13 8l-9 5.5z" /></svg>
-              <span>Animate</span>
-              <span className="pcg-preview__animation-count">{animationClips.length}</span>
-            </button>
+            {animationClips.length > 0 && (
+              <button
+                type="button"
+                className={`pcg-preview__animation-mode${animationModeOpen ? ' is-active' : ''}`}
+                aria-label="Animation mode"
+                aria-pressed={animationModeOpen}
+                title="Animation mode"
+                onClick={toggleAnimationMode}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden><path d="M4 2.5 13 8l-9 5.5z" /></svg>
+                <span>Animate</span>
+                <span className="pcg-preview__animation-count">{animationClips.length}</span>
+              </button>
+            )}
+            {rigBones.length > 0 && (
+              <button
+                type="button"
+                className={`pcg-preview__animation-mode${poseModeOpen ? ' is-active' : ''}`}
+                aria-label="Rig pose mode"
+                aria-pressed={poseModeOpen}
+                title="Pose mode · select and rotate bones"
+                onClick={togglePoseMode}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden>
+                  <path d="M3 2.5a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm7 11a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM5.5 3.7l5.1 8.6-1.2.7-5.1-8.6z" />
+                </svg>
+                <span>Pose</span>
+                <span className="pcg-preview__animation-count">{rigBones.length}</span>
+              </button>
+            )}
           </div>
         )}
         <div className="pcg-preview__axis-navigation" role="group" aria-label="Axis views">
@@ -2017,6 +2199,22 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             onSpeedChange={changeAnimationSpeed}
             onLoopChange={changeAnimationLoop}
             onClose={() => setAnimationModeOpen(false)}
+          />
+        )}
+        {activeTab === '3d' && poseModeOpen && rigBones.length > 0 && (
+          <RigPosePanel
+            bones={rigBones}
+            components={rigComponents}
+            splitComponents={splitRigComponents}
+            selectedBone={selectedRigBone}
+            selectedComponent={selectedRigComponent}
+            explodeAmount={componentExplode}
+            onSelectBone={selectPoseBone}
+            onSelectComponent={setSelectedRigComponent}
+            onToggleComponent={toggleRigComponent}
+            onExplodeChange={changeComponentExplode}
+            onResetPose={resetRigPose}
+            onClose={() => setPoseModeOpen(false)}
           />
         )}
         <div className="pcg-preview__parameter-overlay">

@@ -136,6 +136,13 @@ describe('ActionRig Three.js runtime', () => {
     expect(skinnedMeshes).toHaveLength(2);
     expect(skinnedMeshes.every((child) => child.skeleton === built.skeleton)).toBe(true);
     expect(skinnedMeshes.every((child) => child.parent === built.root)).toBe(true);
+    expect(built.controller.splitComponents).toBe(true);
+    expect(built.controller.bones.map((bone) => bone.id)).toEqual(['body', 'head']);
+    expect(built.controller.getBoneObject('head')).toBe(built.bones[1]);
+    expect(built.controller.components).toMatchObject([
+      { id: 'body', parent: null, visible: true, triangleCount: 1 },
+      { id: 'head', parent: 'body', visible: true, triangleCount: 1 },
+    ]);
     expect(built.root.userData.rig.bound).toBe(true);
     expect(built.root.userData.sculptRuntime.sockets.hat.parent).toBe(built.bones[1]);
     for (const skinnedMesh of skinnedMeshes) {
@@ -181,6 +188,11 @@ describe('ActionRig Three.js runtime', () => {
     expect(built.componentPivots.head.position.length()).toBeCloseTo(0.2, 5);
     expect(skinnedMeshes.find((child) => child.userData.componentId === 'head')?.position.length())
       .toBeCloseTo(0.2, 5);
+    expect(built.controller.setComponentVisible('head', false)).toBe(true);
+    expect(headMesh!.visible).toBe(false);
+    expect(built.controller.components.find((component) => component.id === 'head')?.visible).toBe(false);
+    expect(built.controller.setComponentVisible('missing', false)).toBe(false);
+    built.controller.setComponentVisible('head', true);
     built.controller.stop();
     expect(Math.abs(rest.dot(built.bones[1].quaternion))).toBeCloseTo(1, 6);
     built.controller.setPlaybackSpeed(-1);
@@ -188,7 +200,8 @@ describe('ActionRig Three.js runtime', () => {
     expect(built.controller.getPlaybackState().currentTime).toBeCloseTo(1, 6);
     built.controller.advance(0.1);
     expect(built.controller.getPlaybackState().currentTime).toBeLessThan(1);
-    built.controller.stop();
+    built.controller.resetPose();
+    expect(built.controller.getPlaybackState().clipName).toBeNull();
     built.controller.dispose();
   });
 

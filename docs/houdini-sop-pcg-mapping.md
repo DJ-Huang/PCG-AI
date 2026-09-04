@@ -694,4 +694,4 @@ PCG 在 `heightfield_*` 系列有完整对标，属于地形域，未计入上�
 - [SideFX Geometry (SOP) nodes](https://www.sidefx.com/docs/houdini/nodes/sop/index.html)
 - [PCG-AI node-manifest.json](../schema/node-manifest.json)
 - [PCG-AI node-reference.md](./node-reference.md)
-- [brickify-tool gap analysis](../examples/brickify-tool/brickify-gap-analysis.md)
+- [brickify-tool showcase](../examples/showcases/brickify-tool/README.md)

@@ -273,9 +273,9 @@ bool run_condition_outline_graph()
 
     // CMake add_test WORKING_DIRECTORY = ${CMAKE_CURRENT_SOURCE_DIR}/tests (= pcg-core/tests).
     const char* candidates[] = {
-        "../../examples/Test/test-condition-outline.pcg",
-        "../examples/Test/test-condition-outline.pcg",
-        "examples/Test/test-condition-outline.pcg",
+        "../../examples/tests/test-condition-outline.pcg",
+        "../examples/tests/test-condition-outline.pcg",
+        "examples/tests/test-condition-outline.pcg",
     };
     std::ifstream gin;
     std::string graph_path;

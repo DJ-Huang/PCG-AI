@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "output",
+      "type": "Output",
+      "position": { "x": 0, "y": 280 },
+      "data": {"label": "Output", "__nodeTitle": "Output"}
+    },
+    {
+      "id": "meshy_cup",
+      "type": "Meshy3DGenerator",
+      "position": { "x": 0, "y": 0 },
+      "data": {"texture": "Assets/Samples/PCG-AI/Showcases/M9Bayonet/T_m9-bayonet_side_albedo.png", "imageUrl": "", "texture2": "", "texture3": "", "texture4": "", "shouldTexture": true, "enablePbr": false, "shouldRemesh": true, "targetPolycount": 3000, "scale": 1, "axisConversion": "none", "forceRegenerate": false, "path": "Assets/Samples/PCG-AI/Showcases/ThirdPartyServices/meshy-cup.glb", "aiModel": "latest", "__nodeTitle": "Meshy Cup", "projectRoot": "", "saveFbx": false}
+    }
+  ],
+  "edges": [
+    {"id": "e_meshy_output", "source": "meshy_cup", "target": "output", "sourceHandle": "out", "targetHandle": "in"}
+  ],
+  "parameters": [
+  ],
+  "subgraphs": [
+  ]
+}

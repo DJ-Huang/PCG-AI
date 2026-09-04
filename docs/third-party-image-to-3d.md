@@ -65,12 +65,12 @@ Source Image / URL
 
 完整样例：
 
-- [`examples/tripo-yoyo-puppy-reference.pcg`](../examples/tripo-yoyo-puppy-reference.pcg)：Tripo 参考图
-- [`examples/tripo-yoyo-puppy-procedural.pcg`](../examples/tripo-yoyo-puppy-procedural.pcg)：不依赖 Tripo 缓存即可 Cook 的程序化角色
-- [`examples/tripo-yoyo-puppy-animated.glb`](../examples/tripo-yoyo-puppy-animated.glb)：带 10 个骨骼/语义 visual components 与 `idle`、`walk` clips 的 Web glTF 导出
-- [`examples/tripo-yoyo-puppy-asset-spec.md`](../examples/tripo-yoyo-puppy-asset-spec.md)：证据边界、语义部件、材质、参数和验收合同
-- [`examples/tripo-yoyo-puppy-reference.png`](../examples/tripo-yoyo-puppy-reference.png)：从原角色板准入后的单主体参考
-- [`examples/tripo-yoyo-puppy-evidence/README.md`](../examples/tripo-yoyo-puppy-evidence/README.md)：六视角对照、六种诊断通道、网格度量与最终验收
+- [`examples/showcases/tripo-yoyo-puppy/reference.pcg`](../examples/showcases/tripo-yoyo-puppy/reference.pcg)：Tripo 参考图
+- [`examples/showcases/tripo-yoyo-puppy/procedural.pcg`](../examples/showcases/tripo-yoyo-puppy/procedural.pcg)：不依赖 Tripo 缓存即可 Cook 的程序化角色
+- `examples/showcases/tripo-yoyo-puppy/artifacts/animated.glb`：本地生成的带骨骼与动作 glTF；`artifacts/` 默认不提交版本库
+- [`asset-spec.md`](../examples/showcases/tripo-yoyo-puppy/asset-spec.md)：证据边界、语义部件、材质、参数和验收合同
+- [`reference.png`](../examples/showcases/tripo-yoyo-puppy/reference.png)：从原角色板准入后的单主体参考
+- [`evidence/README.md`](../examples/showcases/tripo-yoyo-puppy/evidence/README.md)：保留的最终验收证据
 
 ### 对齐 img2threejs 的方法与能力边界
 
@@ -146,7 +146,7 @@ PCG-AI 在吸收这条重建/绑定路线之外，又为“来源本来就有正
 | Base URL | `https://api.meshy.ai` |
 | 创建任务 | `POST /openapi/v1/image-to-3d` |
 | 查询任务 | `GET /openapi/v1/image-to-3d/:id` |
-| 测试场景 | `Assets/PICGGenerator/Scenes/PCGReview_ThirdPartyAPI.scene`（`PCG_Meshy_Test` + `meshy-image-to-3d.pcg`） |
+| 测试场景 | `Assets/Samples/PCG-AI/Showcases/ThirdPartyServices/ThirdPartyServices.scene`（`PCG_Meshy_Test` + `meshy-image-to-3d.pcg`） |
 
 ### 用法
 

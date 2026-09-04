@@ -329,6 +329,13 @@ def _write_meta(path: Path, guid: str, body: str) -> None:
         meta_path.write_text(content, encoding="utf-8")
 
 
+def _check_meta(path: Path, guid: str, body: str, errors: list[str]) -> None:
+    meta_path = path.with_name(path.name + ".meta")
+    expected = f"fileFormatVersion: 2\nguid: {guid}\n{body}"
+    if not meta_path.exists() or meta_path.read_text(encoding="utf-8") != expected:
+        errors.append(f"stale sync metadata: {meta_path.relative_to(ROOT)}")
+
+
 def _folder_meta_body() -> str:
     return "folderAsset: yes\nDefaultImporter:\n  externalObjects: {}\n  userData: \n  assetBundleName: \n  assetBundleVariant: \n"
 
@@ -364,9 +371,20 @@ def sync_tree(source_root: Path, target_root: Path, with_meta: bool, check: bool
             directory = target.parent
             while directory != target_root and target_root in directory.parents:
                 folder_rel = directory.relative_to(target_root).as_posix()
-                _write_meta(directory, _meta_guid(f"dir:{folder_rel}"), _folder_meta_body())
+                if check:
+                    _check_meta(
+                        directory,
+                        _meta_guid(f"dir:{folder_rel}"),
+                        _folder_meta_body(),
+                        errors,
+                    )
+                else:
+                    _write_meta(directory, _meta_guid(f"dir:{folder_rel}"), _folder_meta_body())
                 directory = directory.parent
-            _write_meta(target, _meta_guid(meta_rel), _asset_meta_body(target))
+            if check:
+                _check_meta(target, _meta_guid(meta_rel), _asset_meta_body(target), errors)
+            else:
+                _write_meta(target, _meta_guid(meta_rel), _asset_meta_body(target))
     if target_root.exists():
         for stale in sorted(target_root.rglob("*")):
             if stale.is_file() and stale.suffix != ".meta" and stale not in expected_targets:

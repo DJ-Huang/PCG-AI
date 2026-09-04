@@ -290,7 +290,7 @@ PlayerSettings:
   declareImmCBAsConst: 1
   clonedFromGUID: 3c72c65a16f0acb438eed22b8b16c24a
   templatePackageId: cn.tuanjie.template.urp-blank@3.0.3
-  templateDefaultScene: Assets/Scenes/SampleScene.scene
+  templateDefaultScene: Assets/Samples/PCG-AI/Demos/Overview.scene
   useCustomMainManifest: 0
   useCustomLauncherManifest: 0
   useCustomMainGradleTemplate: 0

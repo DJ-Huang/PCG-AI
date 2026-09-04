@@ -801,7 +801,7 @@ void test_l2_project_and_scatter_graph_nodes()
 
 void test_terrain_demo_graph()
 {
-    std::ifstream file("../../examples/terrain-demo.pcg");
+    std::ifstream file("../../examples/graphs/terrain-demo.pcg");
     assert(file.good());
     const std::string graph((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());

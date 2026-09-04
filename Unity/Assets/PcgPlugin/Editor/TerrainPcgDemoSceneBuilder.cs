@@ -6,16 +6,16 @@ using UnityEngine;
 
 namespace DJTechEditor.PCG
 {
-    /// <summary>Builds Assets/Scenes/TerrainDemo.scene with HeightField → Unity Terrain binding.</summary>
+    /// <summary>Builds the packaged terrain sample with HeightField → Unity Terrain binding.</summary>
     public static class TerrainPcgDemoSceneBuilder
     {
-        private const string DemoDirectory = "Assets/PCGDemo/TerrainPcgDemo";
+        private const string DemoDirectory = "Assets/Samples/PCG-AI/Demos/GraphGallery/Terrain";
         private const string TerrainDataPath = DemoDirectory + "/TerrainPcgDemoTerrain.asset";
-        private const string ScenePath = "Assets/Scenes/TerrainDemo.scene";
+        private const string ScenePath = DemoDirectory + "/TerrainDemo.scene";
         private const string GenerateGraphPath =
-            "Assets/PICGGenerator/Scenes/PCGDemo/PcgPluginExamples/terrain-binding-demo.pcg";
+            "Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/terrain-binding-demo.pcg";
         private const string HostImportGraphPath =
-            "Assets/PICGGenerator/Scenes/PCGDemo/PcgPluginExamples/terrain-host-import-demo.pcg";
+            "Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/terrain-host-import-demo.pcg";
 
         private static string PendingMarkerPath =>
             Path.Combine(
@@ -57,7 +57,7 @@ namespace DJTechEditor.PCG
         [MenuItem("Tools/PCG/Create Terrain PCG Demo Scene")]
         public static void Create()
         {
-            EnsureFolder("Assets/PCGDemo");
+            EnsureFolder("Assets/Samples/PCG-AI/Demos/GraphGallery");
             EnsureFolder(DemoDirectory);
 
             AssetDatabase.ImportAsset(GenerateGraphPath, ImportAssetOptions.ForceUpdate);

@@ -120,6 +120,27 @@ export interface ActionAnimationClipInfo {
   loopSource: ActionLoopSource;
 }
 
+/** Editor-facing bone metadata. tailOffset is expressed in the bone's local space. */
+export interface ActionBoneInfo {
+  id: string;
+  name: string;
+  parent: string | null;
+  tailOffset: ActionVec3;
+  radius: number;
+}
+
+/** A semantic component backed by its own visual when splitComponents is enabled. */
+export interface ActionComponentInfo {
+  id: string;
+  parent: string | null;
+  bone: string;
+  role: string;
+  skin: 'smooth' | 'rigid';
+  detachable: boolean;
+  visible: boolean;
+  triangleCount: number;
+}
+
 export interface ActionPlaybackState {
   clipName: string | null;
   currentTime: number;
@@ -134,7 +155,10 @@ export interface ActionPlaybackState {
 export interface ActionRuntimeController {
   readonly animationNames: string[];
   readonly clips: ActionAnimationClipInfo[];
+  readonly bones: ActionBoneInfo[];
+  readonly components: ActionComponentInfo[];
   readonly componentNames: string[];
+  readonly splitComponents: boolean;
   readonly currentAnimation: string | null;
   play(name: string): boolean;
   pause(): void;
@@ -145,6 +169,9 @@ export interface ActionRuntimeController {
   setPlaybackSpeed(speed: number): void;
   setLoop(loop: boolean): void;
   getPlaybackState(): ActionPlaybackState;
+  getBoneObject(id: string): THREE.Bone | null;
+  resetPose(): void;
+  setComponentVisible(id: string, visible: boolean): boolean;
   setExplode(amount: number): void;
   inspect(): ActionRuntimeDiagnostics;
   dispose(): void;
@@ -1538,6 +1565,15 @@ export function buildActionRigObject(
     currentAnimation = name;
     return true;
   };
+  const stop = () => {
+    mixer.stopAllAction();
+    activeAction = null;
+    currentAnimation = null;
+    restoreRestPose();
+  };
+  const componentTriangleCounts = new Map(
+    componentSets.map((entry) => [entry.component.id, entry.indices.length / 3]),
+  );
   const controller: ActionRuntimeController = {
     animationNames: clips.map((clip) => clip.name),
     get clips() {
@@ -1548,7 +1584,30 @@ export function buildActionRigObject(
         loopSource: clipLoopSources.get(clip.name) ?? 'unmeasured',
       }));
     },
+    bones: runtime.rig.bones.map((definition, index) => {
+      const tailOffset = pcgPointToThree(definition.tail).sub(pcgPointToThree(definition.head));
+      return {
+        id: definition.id,
+        name: bones[index].name,
+        parent: definition.parent,
+        tailOffset: [tailOffset.x, tailOffset.y, tailOffset.z],
+        radius: definition.radius,
+      };
+    }),
+    get components() {
+      return runtime.rig.components.map((component) => ({
+        id: component.id,
+        parent: component.parent,
+        bone: component.bone,
+        role: component.role,
+        skin: component.skin,
+        detachable: component.detachable,
+        visible: componentVisuals[component.id]?.visible ?? true,
+        triangleCount: componentTriangleCounts.get(component.id) ?? 0,
+      }));
+    },
     componentNames: Object.keys(componentPivots),
+    splitComponents: useSplitVisuals,
     get currentAnimation() { return currentAnimation; },
     play,
     pause: () => {
@@ -1567,12 +1626,7 @@ export function buildActionRigObject(
       activeAction.play();
       return true;
     },
-    stop: () => {
-      mixer.stopAllAction();
-      activeAction = null;
-      currentAnimation = null;
-      restoreRestPose();
-    },
+    stop,
     seek: (name, timeSeconds) => {
       if (currentAnimation !== name || !activeAction) {
         if (!play(name)) return false;
@@ -1613,6 +1667,14 @@ export function buildActionRigObject(
           : 'unmeasured',
         speed: playbackSpeed,
       };
+    },
+    getBoneObject: (id) => boneById.get(id) ?? null,
+    resetPose: stop,
+    setComponentVisible: (id, visible) => {
+      const visual = componentVisuals[id];
+      if (!visual) return false;
+      visual.visible = visible;
+      return true;
     },
     setExplode: (amount) => {
       const safeAmount = Number.isFinite(amount) ? amount : 0;

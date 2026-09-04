@@ -32,7 +32,7 @@ Skill id: **`pcg-graph-authoring-unity`**.
 6. If the target is open in Web Editor: context → node types/full graph → atomic MCP authoring for CURRENT PASS
    Otherwise use direct .pcg authoring as the offline/compatibility fallback
 7. MCP validate/cook, then pcg_save_graph; validate_pcg.py checks the saved deliverable
-8. create_review_scene → Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene (fixed; no ask)
+8. create_review_scene → Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene (fixed; no ask)
 9. setup_pcg_review_subject + cook → capture_sceneview_png
 10. make_comparison_sheet.py → one side-by-side PNG (no score)
 11. Agent vision → append_review.py (exactly ONE action; reference + vision notes required)
@@ -271,4 +271,4 @@ Do not claim 0.95+ from one ambiguous photo unless the object is simple and symm
 
 Still optional / future: BM25 PCG vocabulary (`search_specs`-style), bounded `correction_loop.py`.
 
-Reference clone: `/Users/djhuang/img2threejs` (or user's path).
+Reference clone: `../img2threejs` (or user's path).

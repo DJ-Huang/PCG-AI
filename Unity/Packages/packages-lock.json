@@ -1,20 +1,8 @@
 {
   "dependencies": {
-    "cn.tuanjie.ai.generators": {
-      "version": "file:/Users/djhuang/.codely-cli/extensions/TJGenerators/Packages/cn.tuanjie.ai.generators",
-      "depth": 0,
-      "source": "local",
-      "dependencies": {
-        "cn.tuanjie.codely.bridge": "1.0.69",
-        "com.unity.modules.jsonserialize": "1.0.0",
-        "com.unity.modules.unitywebrequest": "1.0.0",
-        "com.unity.modules.video": "1.0.0",
-        "com.unity.editorcoroutines": "1.0.1"
-      }
-    },
     "cn.tuanjie.codely.bridge": {
       "version": "1.0.69",
-      "depth": 1,
+      "depth": 0,
       "source": "registry",
       "dependencies": {
         "com.unity.ext.nunit": "1.0.6",

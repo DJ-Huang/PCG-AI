@@ -30,7 +30,7 @@ cd web/pcg-editor && npm run dev   # Vite dev server at :5173
 python3 ../shared/pcg-scripts/new_authoring_plan.py "Cabin" \
   --front /path/front.png --side /path/side.png --top /path/top.png \
   --complexity complex \
-  --pcg examples/cabin.pcg \
+  --pcg examples/graphs/cabin.pcg \
   --out examples/cabin-plan.json --force
 ```
 

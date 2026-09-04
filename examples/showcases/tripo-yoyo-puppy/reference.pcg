@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "tripo-reference",
+      "type": "Tripo3DGenerator",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "texture": "examples/showcases/tripo-yoyo-puppy/reference.png",
+        "imageUrl": "",
+        "modelVersion": "v3.1-20260211",
+        "shouldTexture": true,
+        "enablePbr": true,
+        "faceLimit": 30000,
+        "scale": 1,
+        "axisConversion": "none",
+        "path": "library/web-cache/TripoCache/dc92d764f741471cc68d46ac6ed34d3c3b2c49704db58d6748173b9a5d830fea.glb",
+        "__nodeTitle": "Tripo YOYO Puppy Single-View Reference"
+      }
+    },
+    {
+      "id": "reference-output",
+      "type": "Output",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "data": {
+        "label": "Tripo GLB Reference"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "reference-to-output",
+      "source": "tripo-reference",
+      "target": "reference-output",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "Any"
+    }
+  ],
+  "parameters": [],
+  "subgraphs": []
+}

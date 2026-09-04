@@ -6,7 +6,7 @@ Use this shared standard in both skill variants. `SHARED_SCRIPTS_DIR` is `../pcg
 
 Before a new or materially rebuilt graph:
 
-1. For visual work, select and ping the workspace Unity/Tuanjie instance, then follow `AUTHORING_SKILL_DIR/unity-review.md` end-to-end. Always use a new `Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene`; do not judge a graph in a demo/cluttered scene.
+1. For visual work, select and ping the workspace Unity/Tuanjie instance, then follow `AUTHORING_SKILL_DIR/unity-review.md` end-to-end. Always use a new `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene`; do not judge a graph in a demo/cluttered scene.
 2. Read `schema/node-manifest.json`. It is the sole source for node types, pin ids/types, and property defaults. Never invent a node type, pin id, or property.
 3. Load `pcg_kb_search(query="PCG-AI 编图 + 装配倒角 + 模型类型关键词", category="rules", top_k=10)`. Then `pcg_kb_get` for `rules/engineering/pcg-ai-development.md`, `rules/graph-authoring/000-index.md`, `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, and the matching model-type rule. If the KB index is unavailable, read the same files from disk at `<workspace>/.pcg-ai/rules/`.
 4. Use `pcg_golden_graph_list(class=<class>)` then `pcg_golden_graph_get(name)` to load templates; the directory lives at `<workspace>/.pcg-ai/golden-graphs/` and is excluded from BM25 indexing — always go through the dedicated tool. Do not mine repo `examples/**/*.pcg` or Unity demos for new authoring. Use `examples.md` only for short pin-wiring templates. Exception: open a graph the user explicitly asked to edit.
@@ -17,7 +17,7 @@ Before writing nodes, record:
 ```text
 Golden Graphs: hit <paths or none> | used for: topology|modules|none
 Auto: params=baselines | graphParams=recommended|none | saveDir=<path> |
-previewScene=Assets/PICGGenerator/Scenes/PcgReview_<slug>.scene | loop=on
+previewScene=Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene | loop=on
 ```
 
 ## Plan before nodes

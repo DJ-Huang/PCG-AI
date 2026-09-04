@@ -17,7 +17,7 @@ verified_date: 2026-08-01
 
 1. 读取当前仓库 `schema/node-manifest.json`；禁止凭记忆发明 node type、property 或 pin id。
 2. `pcg_kb_search`；至少读取本规则、`pcg/assembly-bevel`，有三视图或参考图重建时再读 `pcg/triview`。
-3. **高质量图参考**：只用 Vault 磁盘目录 `PCG AI Rule/Golden Graphs/`（已在 `.ragignore`，**不进 RAG**）。写图前直接枚举并读取该目录的同类 `.pcg`（及可选 `.md` 卡片），不要用 RAG 搜索此目录。**禁止**把工程仓库 `examples/*.pcg`、Unity demo `.pcg` 当策略真源。skill `examples.md` 仅作短连线模板。用户点名编辑某文件时除外；与本规则族冲突时改掉反模式。
+3. **高质量图参考**：只用 Vault 磁盘目录 `PCG AI Rule/Golden Graphs/`（已在 `.ragignore`，**不进 RAG**）。写图前直接枚举并读取该目录的同类 `.pcg`（及可选 `.md` 卡片），不要用 RAG 搜索此目录。**禁止**把工程仓库 `examples/**/*.pcg`、Unity demo `.pcg` 当策略真源。skill `examples.md` 仅作短连线模板。用户点名编辑某文件时除外；与本规则族冲突时改掉反模式。
 
 ## JSON 与命名
 

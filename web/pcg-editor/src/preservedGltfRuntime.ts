@@ -131,6 +131,23 @@ export async function loadPreservedGltfRig(
     currentAnimation = name;
     return true;
   };
+  const preservedBones = [...new Set(skeletons.flatMap((skeleton) => skeleton.bones))];
+  const boneIds = new Map<THREE.Bone, string>();
+  const usedBoneIds = new Set<string>();
+  preservedBones.forEach((bone, index) => {
+    const base = bone.name.trim() || `bone_${index}`;
+    let id = base;
+    let suffix = 2;
+    while (usedBoneIds.has(id)) id = `${base}_${suffix++}`;
+    usedBoneIds.add(id);
+    boneIds.set(bone, id);
+  });
+  const stop = () => {
+    mixer.stopAllAction();
+    activeAction = null;
+    currentAnimation = null;
+    restoreRestPose();
+  };
   const controller: ActionRuntimeController = {
     animationNames: gltf.animations.map((clip) => clip.name),
     get clips() {
@@ -141,7 +158,20 @@ export async function loadPreservedGltfRig(
         loopSource: clipLoopSources.get(clip.name) ?? 'unmeasured',
       }));
     },
+    bones: preservedBones.map((bone) => {
+      const child = bone.children.find((candidate): candidate is THREE.Bone => candidate instanceof THREE.Bone);
+      const tailOffset = child?.position.clone() ?? new THREE.Vector3(0, Math.max(0.08, bone.position.length() * 0.6), 0);
+      return {
+        id: boneIds.get(bone)!,
+        name: bone.name || boneIds.get(bone)!,
+        parent: bone.parent instanceof THREE.Bone ? (boneIds.get(bone.parent) ?? null) : null,
+        tailOffset: [tailOffset.x, tailOffset.y, tailOffset.z],
+        radius: Math.max(0.02, tailOffset.length() * 0.08),
+      };
+    }),
+    components: [],
     componentNames: [],
+    splitComponents: false,
     get currentAnimation() { return currentAnimation; },
     play,
     pause: () => {
@@ -160,12 +190,7 @@ export async function loadPreservedGltfRig(
       activeAction.play();
       return true;
     },
-    stop: () => {
-      mixer.stopAllAction();
-      activeAction = null;
-      currentAnimation = null;
-      restoreRestPose();
-    },
+    stop,
     seek: (name, timeSeconds) => {
       if (currentAnimation !== name || !activeAction) {
         if (!play(name)) return false;
@@ -209,6 +234,9 @@ export async function loadPreservedGltfRig(
         speed: playbackSpeed,
       };
     },
+    getBoneObject: (id) => preservedBones.find((bone) => boneIds.get(bone) === id) ?? null,
+    resetPose: stop,
+    setComponentVisible: () => false,
     // A preserved continuous shell deliberately has no semantic part explosion.
     setExplode: () => {},
     inspect: (): ActionRuntimeDiagnostics => {

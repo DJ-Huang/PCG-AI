@@ -19,7 +19,7 @@ Agent 用 **文件系统** Glob / Read 本目录，不要用 `rule_search` / `va
 2. 读匹配的 **`.md` 卡片**（若有）与同名 **`.pcg`**。
 3. 仍以 manifest + `pcg/graph-contract` / `pcg/assembly-bevel` / 类型规则为准；与规则冲突时 **改图服从规则**。
 
-**禁止**：把 PCG-AI 工程仓库里的 `examples/*.pcg`、Unity demo `.pcg` 当作同类参考。
+**禁止**：把 PCG-AI 工程仓库里的 `examples/**/*.pcg`、Unity demo `.pcg` 当作同类参考。
 
 ## 目录结构
 

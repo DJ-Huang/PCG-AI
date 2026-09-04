@@ -1,0 +1,17 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.scene text eol=lf
+*.unity text eol=lf
+*.meta text eol=lf
+*.asset text eol=lf
+
+*.fbx binary
+*.gif binary
+*.glb binary
+*.gltf binary
+*.hdr binary
+*.jpg binary
+*.jpeg binary
+*.png binary

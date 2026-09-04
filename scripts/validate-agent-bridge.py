@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument("--base", default="http://127.0.0.1:17890")
     parser.add_argument(
         "--graph",
-        default=str(Path(__file__).resolve().parents[1] / "examples/boolean-subtract-box.pcg"),
+        default=str(Path(__file__).resolve().parents[1] / "examples/graphs/boolean-subtract-box.pcg"),
     )
     args = parser.parse_args()
     graph = json.loads(Path(args.graph).read_text(encoding="utf-8"))
@@ -71,7 +71,7 @@ def main() -> None:
     v2_subgraph = json.loads(
         (
             Path(__file__).resolve().parents[1]
-            / "web/wooden-cabin.pcg"
+            / "examples/showcases/wooden-cabin/web.pcg"
         ).read_text(encoding="utf-8")
     )
     selected = graph["nodes"][0]["id"]

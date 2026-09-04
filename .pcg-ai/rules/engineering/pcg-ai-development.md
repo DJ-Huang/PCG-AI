@@ -13,7 +13,7 @@ verified_date: 2026-07-28
 
 # PCG-AI 工程开发契约
 
-适用于 `pcg-core/`、`pcg-server/`、`schema/node-manifest.json`、`Unity/Assets/PcgPlugin/`、`examples/*.pcg` 及 PCG 节点新增、修复、调试和审查。
+适用于 `pcg-core/`、`pcg-server/`、`schema/node-manifest.json`、`Unity/Assets/PcgPlugin/`、`examples/**/*.pcg` 及 PCG 节点新增、修复、调试和审查。
 
 ## 真源顺序
 
@@ -40,7 +40,7 @@ Unity Editor **不再加载** `PcgCore` / `PcgFbxExporter` dylib/dll；C++ 只�
 
 ## 写 `.pcg`
 
-调用 `pcg-graph-authoring-unity`（或需管线评估时用 `pcg-graph-authoring-unity-dev`），并先用 `rule_search(domain="pcg")` 读取 `pcg/graph-contract`、`pcg/assembly-bevel` 与模型类型规则。所有节点/属性/pin 最终仍以当前 manifest 为准。拓扑/装配参考只来自 Vault 磁盘 `PCG AI Rule/Golden Graphs/`（不进 RAG，须直接枚举并读取）；**禁止**把工程仓库 `examples/*.pcg` 当策略参考。详见 `pcg/graph-contract`。
+调用 `pcg-graph-authoring-unity`（或需管线评估时用 `pcg-graph-authoring-unity-dev`），并先用 `rule_search(domain="pcg")` 读取 `pcg/graph-contract`、`pcg/assembly-bevel` 与模型类型规则。所有节点/属性/pin 最终仍以当前 manifest 为准。拓扑/装配参考只来自 Vault 磁盘 `PCG AI Rule/Golden Graphs/`（不进 RAG，须直接枚举并读取）；**禁止**把工程仓库 `examples/**/*.pcg` 当策略参考。详见 `pcg/graph-contract`。
 
 ## Houdini UI 对齐门禁
 

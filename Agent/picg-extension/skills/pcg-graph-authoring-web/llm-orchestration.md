@@ -287,4 +287,4 @@ Do not claim 0.95+ from one ambiguous photo unless the object is simple and symm
 
 Still optional / future: BM25 PCG vocabulary (`search_specs`-style), bounded `correction_loop.py`.
 
-Reference clone: `/Users/djhuang/img2threejs` (or user's path).
+Reference clone: `../img2threejs` (or user's path).

@@ -1,7 +1,6 @@
 {
   "dependencies": {
-    "cn.tuanjie.ai.generators": "file:/Users/djhuang/.codely-cli/extensions/TJGenerators/Packages/cn.tuanjie.ai.generators",
-    "cn.tuanjie.codely.bridge": "1.0.66",
+    "cn.tuanjie.codely.bridge": "1.0.69",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.2d.tilemap": "1.0.0",
     "com.unity.ads": "4.4.2",
