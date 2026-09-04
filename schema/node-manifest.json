@@ -1,5 +1,5 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "description": "Node definitions for PCG Graph editors (mesh, spline, and Houdini-style attribute/filter nodes). Pin types align with UE EPCGDataType.",
   "nodes": [
     {
@@ -6728,6 +6728,131 @@
       }
     },
     {
+      "type": "TaperedSweep",
+      "displayName": "Tapered Sweep",
+      "category": "Spline",
+      "description": "Sweep an elliptical section along an open spline with per-station radii and twist. Uses rotation-minimizing parallel-transport frames and collapses zero-radius endpoints to a true point.",
+      "inputs": [
+        {
+          "id": "backbone",
+          "label": "Backbone",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Mesh",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "outputGroups": [
+        {
+          "name": "side",
+          "domain": "face",
+          "label": "Side surfaces"
+        },
+        {
+          "name": "cap_start",
+          "domain": "face",
+          "label": "Start cap",
+          "condition": "capStart"
+        },
+        {
+          "name": "cap_end",
+          "domain": "face",
+          "label": "End cap",
+          "condition": "capEnd"
+        },
+        {
+          "name": "unshared",
+          "domain": "edge",
+          "label": "Boundary edges"
+        }
+      ],
+      "properties": {
+        "stations": {
+          "type": "string",
+          "displayName": "Radius Stations (JSON)",
+          "default": "[{\"u\":0,\"rx\":1,\"rz\":1,\"twist\":0},{\"u\":0.65,\"rx\":0.6,\"rz\":0.45,\"twist\":0},{\"u\":1,\"rx\":0,\"rz\":0,\"twist\":0}]",
+          "description": "Strictly increasing u in [0,1], with non-negative rx/rz and optional twist in degrees. Include u=0 and u=1; a zero-radius endpoint becomes one point instead of a degenerate ring.",
+          "multiline": true,
+          "lines": 6
+        },
+        "radiusScale": {
+          "type": "number",
+          "displayName": "Radius Scale",
+          "default": 1.0,
+          "minimum": 0.0001,
+          "description": "Global multiplier for every station radius; expose this as a graph parameter for overall thickness."
+        },
+        "radialSegments": {
+          "type": "integer",
+          "displayName": "Radial Segments",
+          "default": 12,
+          "minimum": 3,
+          "maximum": 128
+        },
+        "sampleSpacing": {
+          "type": "number",
+          "displayName": "Sample Spacing",
+          "default": 1.0,
+          "minimum": 0.01
+        },
+        "capStart": {
+          "type": "boolean",
+          "displayName": "Cap Start",
+          "default": true
+        },
+        "capEnd": {
+          "type": "boolean",
+          "displayName": "Cap End",
+          "default": true
+        },
+        "upX": {
+          "type": "number",
+          "displayName": "Up X",
+          "default": 0
+        },
+        "upY": {
+          "type": "number",
+          "displayName": "Up Y",
+          "default": 1
+        },
+        "upZ": {
+          "type": "number",
+          "displayName": "Up Z",
+          "default": 0
+        },
+        "shadeMode": {
+          "type": "enum",
+          "displayName": "Shade Mode",
+          "default": "auto",
+          "options": [
+            {
+              "value": "auto",
+              "label": "Auto (Group + Angle)"
+            },
+            {
+              "value": "smooth",
+              "label": "Smooth"
+            },
+            {
+              "value": "flat",
+              "label": "Flat"
+            }
+          ]
+        },
+        "cuspAngle": {
+          "type": "number",
+          "displayName": "Cusp Angle",
+          "default": 30.0,
+          "minimum": 0,
+          "maximum": 180
+        }
+      }
+    },
+    {
       "type": "ExtrudeAlongSpline",
       "displayName": "Extrude Along Spline",
       "category": "Spline",
@@ -7862,6 +7987,191 @@
               "label": "Y Up to Z Up"
             }
           ]
+        }
+      }
+    },
+    {
+      "type": "PreserveGltfRig",
+      "displayName": "Preserve Rigged GLB",
+      "category": "Animation",
+      "description": "Load a self-contained rigged GLB through a preservation route. Web preview reads the original skin.joints, inverse bind matrices, JOINTS_0, WEIGHTS_0, node-index animation channels, and continuous skinned shell without semantic component splitting.",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Rigged Geometry",
+          "pinType": "SpatialMesh"
+        }
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "displayName": "Rigged GLB Path",
+          "default": ""
+        },
+        "projectRoot": {
+          "type": "string",
+          "displayName": "Project Root (optional)",
+          "default": ""
+        },
+        "scale": {
+          "type": "number",
+          "default": 1.0,
+          "minimum": 1e-06
+        },
+        "axisConversion": {
+          "type": "enum",
+          "displayName": "Axis Conversion",
+          "default": "none",
+          "options": [
+            { "value": "none", "label": "None" },
+            { "value": "zUpToYUp", "label": "Z Up to Y Up" },
+            { "value": "yUpToZUp", "label": "Y Up to Z Up" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "ActionRig",
+      "displayName": "Action Rig",
+      "category": "Animation",
+      "description": "Attach an editable component, skeleton, skinning, socket, collider, destruction-group, and animation contract to unchanged rest geometry for Three.js preview and glTF export.",
+      "inputs": [
+        {
+          "id": "in",
+          "label": "Rest Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Rigged Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "inspectorSectionLayout": "foldouts",
+      "inspectorSections": [
+        {
+          "id": "rig",
+          "label": "Rig & Actions",
+          "foldout": true
+        },
+        {
+          "id": "binding",
+          "label": "Binding & Components",
+          "foldout": true
+        },
+        {
+          "id": "playback",
+          "label": "Playback",
+          "foldout": true
+        }
+      ],
+      "properties": {
+        "rigJson": {
+          "type": "string",
+          "displayName": "Action Rig JSON",
+          "default": "{\"schemaVersion\":2,\"componentTree\":[{\"id\":\"root\",\"parent\":null,\"pivot\":[0,0,0],\"tip\":[0,1,0],\"radius\":1,\"role\":\"structural\",\"joint\":true,\"detachable\":false}],\"clips\":[]}",
+          "multiline": true,
+          "lines": 12,
+          "section": "rig",
+          "order": 0,
+          "description": "Schema v2 uses componentTree as the single source for parts, pivots, derived bones, rigid roles, sockets, colliders, destruction groups, and clips. Schema v1 explicit bones remain compatible. Coordinates use PCG model space."
+        },
+      "skinMode": {
+        "type": "enum",
+        "displayName": "Skin Binding",
+        "default": "geodesic",
+        "section": "binding",
+        "order": 0,
+        "options": [
+          {
+            "value": "geodesic",
+            "label": "Solid Geodesic"
+          },
+          {
+            "value": "distance",
+            "label": "Smooth Distance"
+            },
+            {
+              "value": "rigid",
+              "label": "Rigid Nearest Bone"
+            }
+          ]
+        },
+        "maxInfluences": {
+          "type": "integer",
+          "displayName": "Max Influences",
+          "default": 4,
+          "minimum": 1,
+          "maximum": 4,
+          "section": "binding",
+          "order": 10
+        },
+      "falloff": {
+          "type": "number",
+          "displayName": "Weight Falloff",
+          "default": 4.0,
+          "minimum": 0.01,
+          "maximum": 32.0,
+          "section": "binding",
+        "order": 20
+      },
+      "geodesicResolution": {
+        "type": "integer",
+        "displayName": "Geodesic Resolution",
+        "default": 40,
+        "minimum": 16,
+        "maximum": 96,
+        "section": "binding",
+        "order": 25,
+        "description": "Voxel resolution used to measure distance through the model volume and prevent weight leakage across nearby limbs."
+      },
+      "componentMode": {
+          "type": "enum",
+          "displayName": "Component Assignment",
+          "default": "dominantBone",
+          "section": "binding",
+          "order": 30,
+          "options": [
+            {
+              "value": "dominantBone",
+              "label": "Dominant Bone"
+            },
+            {
+              "value": "semanticRegion",
+              "label": "Semantic Regions"
+            },
+            {
+              "value": "none",
+              "label": "Single Component"
+            }
+          ]
+        },
+        "splitComponents": {
+          "type": "boolean",
+          "displayName": "Build Separable Components",
+          "default": true,
+          "section": "binding",
+          "order": 40,
+          "description": "Create named component pivot nodes while retaining shared-skeleton deformation and one-owner triangle coverage."
+        },
+        "autoplay": {
+          "type": "string",
+          "displayName": "Autoplay Clip",
+          "default": "",
+          "section": "playback",
+          "order": 0
+        },
+        "playbackSpeed": {
+          "type": "number",
+          "displayName": "Playback Speed",
+          "default": 1.0,
+          "minimum": -8.0,
+          "maximum": 8.0,
+          "section": "playback",
+          "order": 10
         }
       }
     },
@@ -41135,6 +41445,153 @@
           "displayName": "Voxel Size",
           "default": 0.1,
           "order": 290
+        }
+      }
+    },
+    {
+      "type": "OrientedSdfSurface",
+      "displayName": "Oriented SDF Surface",
+      "category": "Mesh",
+      "description": "Reconstruct a new closed polygon surface from a baked oriented point cloud using a sparse moving-least-squares signed-distance field and Surface Nets. The payload contains no source faces or indices.",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "label": "Surface",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "inspectorSectionLayout": "foldouts",
+      "inspectorSections": [
+        {
+          "id": "reconstruction",
+          "label": "Reconstruction",
+          "foldout": true
+        },
+        {
+          "id": "payload",
+          "label": "Baked Measurement",
+          "foldout": true,
+          "defaultExpanded": false
+        },
+        {
+          "id": "preview",
+          "label": "Web Preview Budget",
+          "foldout": true
+        }
+      ],
+      "properties": {
+        "cellSize": {
+          "type": "number",
+          "displayName": "Cell Size",
+          "default": 0.004,
+          "minimum": 0.0005,
+          "maximum": 0.05,
+          "order": 0,
+          "section": "reconstruction",
+          "description": "World-space voxel edge length. Smaller values preserve finer silhouette and surface detail but increase cook and GPU cost."
+        },
+        "supportRadiusCells": {
+          "type": "number",
+          "displayName": "Support Radius (Cells)",
+          "default": 2.5,
+          "minimum": 1.25,
+          "maximum": 6.0,
+          "order": 10,
+          "section": "reconstruction",
+          "description": "Radius of each oriented tangent-plane splat measured in cells."
+        },
+        "isoOffset": {
+          "type": "number",
+          "displayName": "Iso Offset",
+          "default": 0.0,
+          "minimum": -0.02,
+          "maximum": 0.02,
+          "order": 20,
+          "section": "reconstruction",
+          "description": "Signed offset of the extracted iso-surface; positive values expand the surface."
+        },
+        "maxActiveCells": {
+          "type": "integer",
+          "displayName": "Active Cell Limit",
+          "default": 3000000,
+          "minimum": 1000,
+          "maximum": 5000000,
+          "order": 30,
+          "section": "reconstruction",
+          "description": "Safety limit for generated Surface Nets vertices."
+        },
+        "transferColors": {
+          "type": "boolean",
+          "displayName": "Transfer Vertex Colors",
+          "default": true,
+          "order": 40,
+          "section": "reconstruction"
+        },
+        "transferUvs": {
+          "type": "boolean",
+          "displayName": "Transfer UVs",
+          "default": true,
+          "order": 45,
+          "section": "reconstruction",
+          "description": "Transfer measured source UVs onto the reconstructed surface for texture-based appearance matching."
+        },
+        "flipUvV": {
+          "type": "boolean",
+          "displayName": "Flip Texture V",
+          "default": false,
+          "order": 46,
+          "section": "reconstruction",
+          "description": "Invert transferred V coordinates when matching glTF textures through the Web TextureLoader path."
+        },
+        "previewCellSizeScale": {
+          "type": "number",
+          "displayName": "Preview Cell Scale",
+          "default": 2.0,
+          "minimum": 1.0,
+          "maximum": 8.0,
+          "order": 0,
+          "section": "preview",
+          "description": "Web adaptive-preview only. Multiplies Cell Size before interactive Cook; 2 gives roughly one quarter of the final triangles. Final-quality Cook and GLB export always use the authored Cell Size."
+        },
+        "previewTriangleBudget": {
+          "type": "integer",
+          "displayName": "Preview Triangle Budget",
+          "default": 500000,
+          "minimum": 10000,
+          "maximum": 2000000,
+          "order": 10,
+          "section": "preview",
+          "description": "Web adaptive-preview safety budget. The editor retries a coarser closed SDF surface before sending an oversized mesh to Three.js; it never reduces final export quality."
+        },
+        "sourceReference": {
+          "type": "string",
+          "displayName": "Measurement Source",
+          "default": "",
+          "order": 50,
+          "section": "payload",
+          "description": "Provenance only. Cook never opens this file; all required measurements live in the encoded payload."
+        },
+        "showEncodedPayload": {
+          "type": "boolean",
+          "displayName": "Show Encoded Payload",
+          "default": false,
+          "order": 60,
+          "section": "payload"
+        },
+        "pointCloud": {
+          "type": "string",
+          "displayName": "OPC1 Point Cloud",
+          "default": "",
+          "order": 70,
+          "section": "payload",
+          "multiline": true,
+          "lines": 4,
+          "visibleWhen": {
+            "property": "showEncodedPayload",
+            "equals": true
+          },
+          "description": "Quantised positions, oriented normals, optional colours, and optional UVs. Source topology is not stored."
         }
       }
     },

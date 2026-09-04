@@ -66,13 +66,24 @@ export function createBlenderStudioMaterial(vertexColors: boolean): THREE.Shader
       opacity: { value: 1 },
     },
     vertexShader: `
+      #include <common>
+      #include <skinning_pars_vertex>
+
       ${vertexColorDeclaration}
       varying vec3 vNormalView;
       varying vec3 vViewPosition;
 
       void main() {
-        vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-        vNormalView = normalize(normalMatrix * normal);
+        #include <beginnormal_vertex>
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        #include <defaultnormal_vertex>
+
+        #include <begin_vertex>
+        #include <skinning_vertex>
+
+        vec4 viewPosition = modelViewMatrix * vec4(transformed, 1.0);
+        vNormalView = normalize(transformedNormal);
         vViewPosition = viewPosition.xyz;
         ${vertexColorAssignment}
         gl_Position = projectionMatrix * viewPosition;

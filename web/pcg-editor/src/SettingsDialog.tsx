@@ -11,6 +11,12 @@ import {
   validateProvider,
   type ProviderDescriptor,
 } from './agent/agentClient';
+import {
+  clearTripoKey,
+  getTripoStatus,
+  saveTripoKey,
+  type TripoStatus,
+} from './thirdPartyClient';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -18,7 +24,7 @@ interface SettingsDialogProps {
   onProvidersChanged: () => void;
 }
 
-type SettingsSection = 'general' | 'providers';
+type SettingsSection = 'general' | 'providers' | 'generation';
 const SHOW_REASONING_KEY = 'pcg-agent-show-reasoning';
 
 function errorMessage(error: unknown): string {
@@ -35,6 +41,8 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [showReasoning, setShowReasoning] = useState(() => localStorage.getItem(SHOW_REASONING_KEY) !== 'false');
+  const [tripoStatus, setTripoStatus] = useState<TripoStatus | null>(null);
+  const [tripoKey, setTripoKey] = useState('');
   const oauthGeneration = useRef(0);
 
   const selectedProvider = useMemo(
@@ -60,6 +68,9 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
     setBridgeToken(getAgentToken());
     setStatus('');
     void refreshProviders().catch((error) => setStatus(errorMessage(error)));
+    void getTripoStatus()
+      .then(setTripoStatus)
+      .catch(() => setTripoStatus(null));
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
@@ -159,6 +170,36 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
     }
   }, [markProvidersChanged, selectedProvider]);
 
+  const saveTripo = useCallback(async () => {
+    if (!tripoKey.trim()) return;
+    setBusy(true);
+    try {
+      const next = await saveTripoKey(tripoKey.trim());
+      setTripoStatus(next);
+      setTripoKey('');
+      setStatus('Tripo API key saved by the local server.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }, [tripoKey]);
+
+  const clearTripo = useCallback(async () => {
+    setBusy(true);
+    try {
+      const next = await clearTripoKey();
+      setTripoStatus(next);
+      setStatus(next.source === 'env'
+        ? 'Stored key cleared — the PCG_TRIPO_API_KEY environment variable is still active.'
+        : 'Tripo API key cleared.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   if (!open) return null;
 
   return (
@@ -177,6 +218,7 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
           <nav className="pcg-settings__nav" aria-label="Settings sections">
             <button type="button" className={section === 'general' ? 'is-active' : ''} onClick={() => setSection('general')}>General</button>
             <button type="button" className={section === 'providers' ? 'is-active' : ''} onClick={() => setSection('providers')}>AI Providers</button>
+            <button type="button" className={section === 'generation' ? 'is-active' : ''} onClick={() => setSection('generation')}>3D Generation</button>
           </nav>
 
           <main className="pcg-settings__content">
@@ -213,6 +255,51 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
                     /> Show Provider reasoning when available
                   </label>
                 </div>
+              </div>
+            ) : section === 'generation' ? (
+              <div className="pcg-settings__section">
+                <div className="pcg-settings__provider-title">
+                  <div>
+                    <h3>Tripo (Image to 3D)</h3>
+                    <p>Cloud image-to-3D for Tripo3DGenerator nodes. Cook and preview never call the API — only the node Generate action does.</p>
+                  </div>
+                  <span className={`pcg-settings__connection is-${tripoStatus?.configured ? 'connected' : 'unavailable'}`}>
+                    {tripoStatus
+                      ? (tripoStatus.configured
+                        ? (tripoStatus.source === 'env' ? 'Configured (env)' : 'Configured')
+                        : 'Not configured')
+                      : 'Unavailable'}
+                  </span>
+                </div>
+                <p className="pcg-settings__hint">
+                  The key is stored by the local pcg-server credential store ({tripoStatus?.credentialStore ?? 'protected-file'}), never in this browser or in .pcg files.
+                  {tripoStatus?.configured && tripoStatus.keyHint ? ` Active key: ${tripoStatus.keyHint}` : ''}
+                </p>
+                {tripoStatus?.source === 'env' ? (
+                  <p className="pcg-settings__hint">
+                    Provided by the PCG_TRIPO_API_KEY environment variable. Restart pcg-server without it to use a stored key instead.
+                  </p>
+                ) : (
+                  <div className="pcg-settings__credential">
+                    <label className="pcg-settings__field">
+                      <span>Tripo API Key</span>
+                      <input
+                        type="password"
+                        value={tripoKey}
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Stored securely by the local server"
+                        onChange={(event) => setTripoKey(event.target.value)}
+                      />
+                    </label>
+                    <div className="pcg-settings__connected-actions">
+                      <button type="button" disabled={busy || !tripoKey.trim()} onClick={() => void saveTripo()}>Save key</button>
+                      {tripoStatus?.configured && (
+                        <button type="button" className="is-danger" disabled={busy} onClick={() => void clearTripo()}>Clear key</button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="pcg-settings__providers">

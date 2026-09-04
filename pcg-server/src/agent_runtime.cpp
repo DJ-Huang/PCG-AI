@@ -2209,6 +2209,21 @@ const char* AgentCredentialStoreName() {
     return UsesKeychainCredentialStore() ? kKeychainCredentialStore : kFileCredentialStore;
 }
 
+bool LoadProtectedCredential(const std::string& name, json& value) {
+    if (name.empty()) return false;
+    return CredentialGet(name, value);
+}
+
+bool StoreProtectedCredential(const std::string& name, const json& value) {
+    if (name.empty() || !value.is_object()) return false;
+    return CredentialSet(name, value);
+}
+
+bool DeleteProtectedCredential(const std::string& name) {
+    if (name.empty()) return false;
+    return CredentialDelete(name);
+}
+
 void HandleAgentProviders(const httplib::Request& req, httplib::Response& res) {
     if (!CheckAgentAuth(req, res)) return;
     JsonResponse(res, 200, {{"ok", true}, {"providers", PublicProviders()}});

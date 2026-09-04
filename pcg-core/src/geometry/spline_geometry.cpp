@@ -501,6 +501,51 @@ std::vector<Frame3> build_frames(const std::vector<Vec3>& polyline, const Vec3& 
     return frames;
 }
 
+std::vector<Frame3> build_parallel_transport_frames(const std::vector<Vec3>& polyline,
+                                                    const Vec3& up_hint)
+{
+    std::vector<Frame3> frames;
+    if (polyline.empty())
+        return frames;
+
+    std::vector<Vec3> tangents;
+    tangents.reserve(polyline.size());
+    for (size_t i = 0; i < polyline.size(); ++i) {
+        const Vec3& previous = polyline[i == 0 ? 0 : i - 1];
+        const Vec3& next = polyline[std::min(polyline.size() - 1, i + 1)];
+        Vec3 tangent = normalize(sub(next, previous));
+        if (length(tangent) <= kEpsilon)
+            tangent = tangents.empty() ? Vec3{0.0, 1.0, 0.0} : tangents.back();
+        tangents.push_back(tangent);
+    }
+
+    frames.reserve(polyline.size());
+    Vec3 carried = compute_frame_normal(tangents.front(), up_hint);
+    Vec3 previous_binormal = normalize(cross(tangents.front(), carried));
+
+    for (size_t i = 0; i < polyline.size(); ++i) {
+        const Vec3& tangent = tangents[i];
+        Vec3 normal = project_onto_plane_perpendicular(carried, tangent);
+        if (length(normal) <= kEpsilon)
+            normal = project_onto_plane_perpendicular(previous_binormal, tangent);
+        if (length(normal) <= kEpsilon)
+            normal = compute_frame_normal(tangent, up_hint);
+        normal = normalize(normal);
+
+        Vec3 binormal = normalize(cross(tangent, normal));
+        if (length(binormal) <= kEpsilon) {
+            normal = compute_frame_normal(tangent, {1.0, 0.0, 0.0});
+            binormal = normalize(cross(tangent, normal));
+        }
+
+        frames.push_back(Frame3{polyline[i], tangent, normal, binormal});
+        carried = normal;
+        previous_binormal = binormal;
+    }
+
+    return frames;
+}
+
 Vec3 transform_local_to_world(const Frame3& frame, const Vec3& local)
 {
     return add(

@@ -35,6 +35,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--camera", default="", help="front | side | top | three-quarter")
     parser.add_argument("--front-axis", default="+z", choices=["+x", "-x", "+z", "-z"])
     parser.add_argument("--side-view", default="right", choices=["right", "left"])
+    parser.add_argument("--shading", default="material", choices=["solid", "material"],
+                        help="Clean-review shading mode (default: material)")
+    parser.add_argument("--quality", default="adaptive",
+                        choices=["adaptive", "full", "medium", "low"],
+                        help="SDF review quality; use full for final pixel acceptance")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -64,7 +69,13 @@ def main(argv: list[str]) -> int:
         # Graph is outside workspace — use absolute path
         rel_path = graph_path
 
-    query = {"graph": str(rel_path), "frontAxis": args.front_axis, "sideView": args.side_view}
+    query = {
+        "graph": str(rel_path),
+        "frontAxis": args.front_axis,
+        "sideView": args.side_view,
+        "shading": args.shading,
+        "quality": args.quality,
+    }
     if args.camera:
         query["camera"] = args.camera
     review_url = f"{args.vite_url}/review?{urlencode(query)}"
@@ -76,6 +87,8 @@ def main(argv: list[str]) -> int:
             "graphPath": str(graph_path),
             "relativePath": str(rel_path),
             "workspace": str(workspace),
+            "shading": args.shading,
+            "quality": args.quality,
         }, indent=2))
     else:
         print(f"review URL: {review_url}")

@@ -40,12 +40,15 @@ add_executable(pcg-server
     src/session_service.cpp
     src/mcp_service.cpp
     src/kb_service.cpp
+    src/third_party_service.cpp
+    src/surface_reconstruction_service.cpp
     "${PCG_FBX_DIR}/src/pcg_fbx_exporter.cpp"
     "${PCG_FBX_DIR}/src/geometry_binary_reader.cpp"
 )
 target_include_directories(pcg-server PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../pcg-core/src"
     "${PCG_FBX_DIR}/include"
     "${PCG_FBX_DIR}/src"
 )

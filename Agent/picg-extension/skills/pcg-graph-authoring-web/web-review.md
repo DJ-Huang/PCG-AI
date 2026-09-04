@@ -74,12 +74,12 @@ If either check fails: report `Web editor: unavailable` and **do not** claim vis
 
 | Item | Value |
 |------|-------|
-| Review URL | `http://localhost:5173/review?graph=<workspace-relative-path>&camera=front|side|top|three-quarter&frontAxis=+z&sideView=right` |
+| Review URL | `http://localhost:5173/review?graph=<workspace-relative-path>&camera=front|side|top|three-quarter&frontAxis=+z&sideView=right&shading=material&quality=adaptive|full|medium|low` |
 | Screenshot | `screenshots/<slug>_<view>.png` (canvas only) |
 | Comparison | `screenshots/cmp_<graph-slug>_<view>.png` |
 
 The `/review` route is a dedicated React component (`ReviewPage.tsx`) that:
-1. Reads the `?graph=` query param (workspace-relative path to `.pcg` file)
+1. Reads the `?graph=` query param (workspace-relative path to `.pcg` file); final review defaults to `shading=material` while `shading=solid` remains available for white-model inspection. SDF review defaults to a bounded `quality=adaptive`; use `quality=full` for final pixel acceptance. Browser GLB export always performs a separate full-quality Cook.
 2. Fetches the graph JSON via `GET /api/load-graph?path=...`
 3. Cooks it via `POST /api/cook` (proxied to pcg-server)
 4. Renders only `PreviewViewport` (same Three.js scene, lighting, and coordinate conversion as the full editor)

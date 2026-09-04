@@ -150,6 +150,32 @@ int main()
         expect(r.vertex_count > 0, "graph3: has vertices");
     }
 
+    // --- Test 3b: CreateSpline → TaperedSweep → Output ---
+    {
+        const char* graph = R"({
+          "version": "1.0",
+          "nodes": [
+            {"id": "path", "type": "CreateSpline", "position": {"x":0,"y":0},
+             "data": {"mode": "catmullRom", "subdivisions": 6,
+                      "controlPoints": "[{\"x\":0,\"y\":0,\"z\":0},{\"x\":0.3,\"y\":0.4,\"z\":0.1},{\"x\":-0.1,\"y\":0.8,\"z\":0.25},{\"x\":0,\"y\":1.2,\"z\":0.4}]"}},
+            {"id": "taper", "type": "TaperedSweep", "position": {"x":0,"y":160},
+             "data": {"stations": "[{\"u\":0,\"rx\":0.22,\"rz\":0.16,\"twist\":0},{\"u\":0.55,\"rx\":0.12,\"rz\":0.08,\"twist\":20},{\"u\":1,\"rx\":0,\"rz\":0,\"twist\":35}]",
+                      "radiusScale": 0.9, "radialSegments": 10, "sampleSpacing": 0.12,
+                      "capStart": true, "capEnd": true, "shadeMode": "smooth"}},
+            {"id": "out", "type": "Output", "position": {"x":0,"y":320}, "data": {}}
+          ],
+          "edges": [
+            {"id": "e1", "source": "path", "target": "taper", "sourceHandle": "out", "targetHandle": "backbone"},
+            {"id": "e2", "source": "taper", "target": "out", "sourceHandle": "out", "targetHandle": "in"}
+          ]
+        })";
+        auto r = execute_graph(graph, 42);
+        expect(r.code == PCG_OK, "graph3b: spline → tapered sweep succeeds");
+        expect(r.kind == PCG_RESULT_KIND_MESH, "graph3b: result is mesh");
+        expect(r.vertex_count > 0 && r.index_count > 0, "graph3b: has tapered geometry");
+        expect((read_flags(r.mesh_buf) & 0x4u) != 0, "graph3b: tapered sweep exports UVs");
+    }
+
     // --- Test 4: CreateCylinderMesh → UVTexture → VertexColor + Material → AssignMaterial → Output ---
     {
         const char* graph = R"({

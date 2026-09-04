@@ -53,7 +53,7 @@ import {
 } from './nodeManifest';
 import { useUndoRedo } from './useUndoRedo';
 import Blackboard from './Blackboard';
-import AgentPanel from './agent/AgentPanel';
+import AgentPanel, { type AgentLaunchRequest } from './agent/AgentPanel';
 import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './agent/agentCommands';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
@@ -69,7 +69,7 @@ import {
   type GraphCommandResult,
   type QueuedGraphCommand,
 } from './graphCommands';
-import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
+import { cookGraphPreviewBudgeted, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, shouldAutoCookGraphPreview, newPreviewJobId, type PreviewData } from './previewCook';
 import {
   applyPreviewParameterOverrides,
   resolvePreviewParameterValues,
@@ -83,6 +83,15 @@ import {
   isSplineAuthoringNode,
   serializeControlPoints,
 } from './splineControlPoints';
+import {
+  captureProceduralReferenceBundle,
+  loadProceduralSourceImageFile,
+} from './proceduralReference';
+import { buildOrientedSdfNodeData } from './thirdPartyClient';
+import {
+  bakeBaseColorTextureIntoOpc1,
+  makeVertexColorMaterialData,
+} from './orientedPointColorBake';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -105,6 +114,12 @@ const GRAPH_FIT_VIEW_OPTIONS = {
   maxZoom: GRAPH_MAX_ZOOM,
   padding: 0.15,
 };
+
+function waitForPreviewPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
 
 const initialNodes: Node[] = [
   {
@@ -168,9 +183,11 @@ function PcgEditor() {
   const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>(restored?.subgraphs ?? []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
-  const [showAgent, setShowAgent] = useState(true);
+  const [showAgent, setShowAgent] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [providerRevision, setProviderRevision] = useState(0);
+  const [agentLaunchRequest, setAgentLaunchRequest] = useState<AgentLaunchRequest | null>(null);
+  const [proceduralizingNodeId, setProceduralizingNodeId] = useState<string | null>(null);
   const [showInspector, setShowInspector] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -1161,8 +1178,8 @@ function PcgEditor() {
 
   // ── Preview cook ────────────────────────────────────
 
-  const requestPreviewCook = useCallback(async (targetOverride?: string | null) => {
-    if (viewNodes.length === 0) return;
+  const requestPreviewCook = useCallback(async (targetOverride?: string | null): Promise<boolean> => {
+    if (viewNodes.length === 0) return false;
     // Read the target from the store (not React state) so this callback's identity
     // stays stable across ▶ clicks — a new identity would propagate through
     // NodeActionsContext and re-render every node.
@@ -1202,17 +1219,17 @@ function PcgEditor() {
         // Preview target was deleted — fall back to the full graph.
         setPreviewTargetId(null);
       }
-    } else {
-      graph = prepareGraphForPreviewCook(graph);
     }
-    const result = await cookGraphPreview(graph, 42, abort.signal, jobId);
-    if (previewAbortRef.current !== abort) return; // superseded by a newer cook
+    const result = await cookGraphPreviewBudgeted(graph, 42, abort.signal, jobId);
+    if (previewAbortRef.current !== abort) return false; // superseded by a newer cook
     setPreviewLoading(false);
     if (result.ok && result.data) {
       setPreviewData(result.data);
+      return true;
     } else if (result.error !== 'aborted') {
       setPreviewError(result.error ?? 'Cook failed');
     }
+    return false;
   }, [nodes, edges, parameters, subgraphs, currentSubgraph, viewNodes.length, previewParameterValues]);
 
   const openPreview = useCallback(async () => {
@@ -1336,6 +1353,7 @@ function PcgEditor() {
   const skipDebounceRef = useRef(false);
   useEffect(() => {
     if (!showPreview) return;
+    if (!shouldAutoCookGraphPreview({ nodes: viewNodes, edges: viewEdges })) return;
     if (skipDebounceRef.current) {
       skipDebounceRef.current = false;
       return;
@@ -1347,7 +1365,128 @@ function PcgEditor() {
     return () => {
       if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
     };
-  }, [showPreview, selectedNode, requestPreviewCook]);
+  }, [showPreview, selectedNode, requestPreviewCook, viewNodes, viewEdges]);
+
+  const handleProceduralizeReference = useCallback(async (node: Node) => {
+    const data = node.data as Record<string, unknown>;
+    const referencePath = String(data.path ?? '').trim();
+    if (!referencePath) {
+      setStatus('Generate or assign a Tripo GLB before procedural reconstruction.');
+      return;
+    }
+    setProceduralizingNodeId(node.id);
+    setPreviewError(null);
+    setPreviewData(null);
+    setShowPreview(true);
+    setPreviewTargetId(node.id);
+    skipDebounceRef.current = true;
+    const existingSurface = viewNodes.find((candidate) => {
+      if (candidate.type !== 'OrientedSdfSurface') return false;
+      return String((candidate.data as Record<string, unknown>).sourceReference ?? '') === referencePath;
+    });
+    const bakedSurfaceNodeId = existingSurface?.id ?? allocateNodeId(viewNodes);
+    const existingMaterial = viewNodes.find((candidate) => {
+      if (candidate.type !== 'Material') return false;
+      const materialName = String((candidate.data as Record<string, unknown>).materialName ?? '');
+      return materialName === 'ReconstructedSourceMaterial' ||
+        materialName === 'ReconstructedVertexColorMaterial';
+    });
+    const bakedMaterialNodeId = existingMaterial?.id ?? allocateNodeId(viewNodes);
+    setStatus('Baking topology-free oriented samples from the Tripo GLB…');
+    try {
+      const previous = (existingSurface?.data ?? {}) as Record<string, unknown>;
+      const numberOrUndefined = (value: unknown) => typeof value === 'number' && Number.isFinite(value)
+        ? value
+        : undefined;
+      const baked = await buildOrientedSdfNodeData(referencePath, {
+        title: 'High-Fidelity Tripo SDF Surface',
+        componentId: 'reference.surface',
+        cellSize: numberOrUndefined(previous.cellSize),
+        supportRadiusCells: numberOrUndefined(previous.supportRadiusCells),
+        isoOffset: numberOrUndefined(previous.isoOffset),
+        maxActiveCells: numberOrUndefined(previous.maxActiveCells),
+        transferColors: typeof previous.transferColors === 'boolean' ? previous.transferColors : true,
+        transferUvs: typeof previous.transferUvs === 'boolean' ? previous.transferUvs : true,
+        flipUvV: typeof previous.flipUvV === 'boolean' ? previous.flipUvV : undefined,
+      });
+      setStatus(
+        `Baked ${baked.sourcePointCount.toLocaleString()} oriented samples from ` +
+        `${baked.sourceVertexCount.toLocaleString()} source vertices; cooking the fixed six-view reference…`,
+      );
+      await waitForPreviewPaint();
+      const cooked = await requestPreviewCook(node.id);
+      if (!cooked) throw new Error('The Tripo reference did not cook successfully.');
+      await waitForPreviewPaint();
+      const viewport = previewViewportRef.current;
+      if (!viewport) throw new Error('3D Preview is not ready.');
+      const sourceImage = String(data.texture ?? '').trim() || String(data.imageUrl ?? '').trim();
+      let sourceImageFile: File | null = null;
+      try {
+        sourceImageFile = await loadProceduralSourceImageFile(sourceImage);
+      } catch (error) {
+        console.warn('Could not attach Tripo source image; the manifest path remains available.', error);
+      }
+      const { request, manifest } = captureProceduralReferenceBundle(viewport, {
+        nodeId: node.id,
+        referencePath,
+        bakedSurfaceNodeId,
+        bakedMaterialNodeId,
+        sourceImage,
+        sourceImageFile,
+        graphPath: currentFilename,
+      });
+      let bakedNodeData = baked.nodeData;
+      let bakedMaterialData = baked.suggestedMaterialData;
+      const baseColorMap = typeof bakedMaterialData.baseColorMap === 'string'
+        ? bakedMaterialData.baseColorMap
+        : '';
+      const pointCloud = typeof bakedNodeData.pointCloud === 'string'
+        ? bakedNodeData.pointCloud
+        : '';
+      if (baseColorMap && pointCloud && baked.hasSourceUvs) {
+        setStatus('Projecting the Tripo base-colour texture into the dense oriented sample field…');
+        const colorBake = await bakeBaseColorTextureIntoOpc1(pointCloud, baseColorMap);
+        bakedNodeData = {
+          ...bakedNodeData,
+          pointCloud: colorBake.pointCloud,
+          transferColors: true,
+        };
+        bakedMaterialData = makeVertexColorMaterialData(bakedMaterialData);
+      }
+      const bakedNode: Node = {
+        id: bakedSurfaceNodeId,
+        type: 'OrientedSdfSurface',
+        position: existingSurface?.position ?? { x: node.position.x, y: node.position.y + 160 },
+        data: { ...defaultData('OrientedSdfSurface'), ...bakedNodeData },
+      };
+      const bakedMaterialNode: Node = {
+        id: bakedMaterialNodeId,
+        type: 'Material',
+        position: existingMaterial?.position ?? { x: node.position.x + 320, y: node.position.y + 160 },
+        data: { ...defaultData('Material'), ...bakedMaterialData },
+      };
+      commit();
+      setViewNodes((current) => {
+        let updated = existingSurface
+          ? current.map((candidate) => candidate.id === bakedSurfaceNodeId ? bakedNode : candidate)
+          : [...current, bakedNode];
+        updated = existingMaterial
+          ? updated.map((candidate) => candidate.id === bakedMaterialNodeId ? bakedMaterialNode : candidate)
+          : [...updated, bakedMaterialNode];
+        return updated;
+      });
+      setSelectedNode(bakedNode);
+      setPreviewTargetId(bakedSurfaceNodeId);
+      setAgentLaunchRequest(request);
+      setShowAgent(true);
+      const passCount = manifest.views.reduce((sum, view) => sum + view.passes.length, 0);
+      setStatus(`Created ${bakedSurfaceNodeId} from ${baked.sourcePointCount.toLocaleString()} samples (${Math.round(baked.payloadBytes / 1024).toLocaleString()} KiB, no source topology) + ${bakedMaterialNodeId} (texture-baked vertex colour); captured ${manifest.views.length} views / ${passCount} passes; Agent queued for ${manifest.targetGraphPath}`);
+    } catch (error) {
+      setStatus(`Procedural reference capture failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setProceduralizingNodeId(null);
+    }
+  }, [commit, currentFilename, requestPreviewCook, setViewNodes, viewNodes]);
 
   // ── Render ──────────────────────────────────────────
 
@@ -1424,6 +1563,10 @@ function PcgEditor() {
             syncEditorContext={syncEditorContext}
             editorSessionId={editorSessionIdRef.current}
             providerRevision={providerRevision}
+            launchRequest={agentLaunchRequest}
+            onLaunchConsumed={(requestId) => {
+              setAgentLaunchRequest((queued) => queued?.id === requestId ? null : queued);
+            }}
           />
         )}
         {showBlackboard && (
@@ -1539,6 +1682,8 @@ function PcgEditor() {
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}
+            onProceduralizeReference={(node) => void handleProceduralizeReference(node)}
+            proceduralizingNodeId={proceduralizingNodeId}
           />
         )}
       </div>

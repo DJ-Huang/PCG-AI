@@ -27,6 +27,8 @@ export interface PhysicalCameraState {
   exposure: number;
   near: number;
   far: number;
+  /** Vertical world-space extent when projection is orthographic. */
+  orthographicFrustumHeight?: number;
 }
 
 export const FULL_FRAME_SENSOR_HEIGHT_MM = 24;
@@ -104,6 +106,7 @@ export interface CameraCommand {
   exposure?: number;
   near?: number;
   far?: number;
+  orthographicFrustumHeight?: number;
 }
 
 function isVec3(value: unknown): value is Vec3Tuple {
@@ -200,6 +203,8 @@ export function mergeCameraCommand(
   if (near !== null) next.near = near;
   const far = clampNumber(command.far, CAMERA_LIMITS.far.min, CAMERA_LIMITS.far.max);
   if (far !== null) next.far = Math.max(far, next.near * 10);
+  const orthographicFrustumHeight = clampNumber(command.orthographicFrustumHeight, 0.001, 1000000);
+  if (orthographicFrustumHeight !== null) next.orthographicFrustumHeight = orthographicFrustumHeight;
 
   if (command.focusOnTarget) {
     next.focusDistance = Math.max(
@@ -229,6 +234,9 @@ export function syncStateFromLiveCamera(
     projection: camera instanceof THREE.OrthographicCamera ? 'orthographic' : 'perspective',
     near: camera.near,
     far: camera.far,
+    ...(camera instanceof THREE.OrthographicCamera
+      ? { orthographicFrustumHeight: Number(camera.userData.frustumHeight) || (camera.top - camera.bottom) }
+      : {}),
   };
   if (camera instanceof THREE.PerspectiveCamera) {
     next.focalLengthMm = fovToFocalLength(camera.fov, state.sensorHeightMm);

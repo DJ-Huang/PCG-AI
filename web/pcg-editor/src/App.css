@@ -1303,6 +1303,52 @@
   text-align: center;
 }
 
+.pcg-inspector__progress {
+  position: relative;
+  height: 16px;
+  margin: 8px 0 2px;
+  background: #23262b;
+  border: 1px solid #34383f;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pcg-inspector__progress-fill {
+  height: 100%;
+  background: #3d6fa8;
+  transition: width 0.3s ease;
+}
+
+.pcg-inspector__progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #d6dde6;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+.pcg-inspector__proceduralize {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #34383f;
+}
+
+.pcg-inspector__proceduralize button {
+  border-color: #4d78aa;
+  background: #274d78;
+  color: #f2f7ff;
+}
+
+.pcg-inspector__proceduralize small {
+  color: #8f99a5;
+  line-height: 1.35;
+}
+
 .pcg-material-inspector__field,
 .pcg-material-inspector__texture {
   display: grid;
@@ -1618,6 +1664,291 @@
 .pcg-preview__tab:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.pcg-preview__animation-entry {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 4;
+}
+
+.pcg-preview__animation-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #b8b8ba;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.pcg-preview__animation-mode:hover {
+  color: #f2f2f3;
+  border-color: #515154;
+}
+
+.pcg-preview__animation-mode.is-active {
+  color: #edf5ff;
+  border-color: #4b86c5;
+  background: rgba(37, 91, 148, 0.94);
+}
+
+.pcg-preview__animation-mode svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.pcg-preview__animation-count {
+  min-width: 16px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #d9e9fb;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.pcg-animation {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 24;
+  width: min(620px, calc(100% - 24px));
+  box-sizing: border-box;
+  padding: 9px 10px 10px;
+  transform: translateX(-50%);
+  border: 1px solid #424447;
+  border-radius: 10px;
+  background: rgba(32, 33, 35, 0.96);
+  color: #dadbdd;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+.pcg-animation__header,
+.pcg-animation__transport {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pcg-animation__header {
+  margin-bottom: 8px;
+}
+
+.pcg-animation__mode {
+  color: #7eb9f0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pcg-animation__clip,
+.pcg-animation__speed select {
+  min-width: 0;
+  height: 26px;
+  padding: 0 24px 0 8px;
+  border: 1px solid #45474b;
+  border-radius: 5px;
+  background: #27282a;
+  color: #e0e1e2;
+  font: inherit;
+  font-size: 11px;
+  color-scheme: dark;
+}
+
+.pcg-animation__clip {
+  flex: 1;
+}
+
+.pcg-animation__close {
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #85878b;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pcg-animation__close:hover {
+  background: #37383b;
+  color: #eee;
+}
+
+.pcg-animation__transport {
+  min-width: 0;
+}
+
+.pcg-animation__transport-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+  border: 1px solid #484a4e;
+  border-radius: 6px;
+  background: #2a2b2e;
+  color: #c8c9cb;
+  cursor: pointer;
+}
+
+.pcg-animation__transport-button--primary {
+  border-color: #4479b3;
+  background: #2c67a4;
+  color: #fff;
+}
+
+.pcg-animation__transport-button:hover,
+.pcg-animation__loop:hover {
+  filter: brightness(1.13);
+}
+
+.pcg-animation__transport-button svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.pcg-animation__time {
+  min-width: 92px;
+  color: #c5c7ca;
+  font: 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pcg-animation__time span {
+  color: #6f7175;
+}
+
+.pcg-animation__speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: #898b8f;
+  font-size: 10px;
+}
+
+.pcg-animation__speed select {
+  width: 62px;
+  padding-right: 16px;
+}
+
+.pcg-animation__loop {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #484a4e;
+  border-radius: 6px;
+  background: #2a2b2e;
+  color: #85878b;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pcg-animation__loop.is-active {
+  border-color: #4b86c5;
+  background: #294e75;
+  color: #e3f0ff;
+}
+
+.pcg-animation__timeline {
+  position: relative;
+  display: block;
+  height: 18px;
+  margin-top: 7px;
+}
+
+.pcg-animation__timeline-track {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  right: 7px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #53555a;
+  pointer-events: none;
+}
+
+.pcg-animation__timeline-fill {
+  display: block;
+  width: var(--pcg-animation-progress);
+  height: 100%;
+  background: #71b4f0;
+}
+
+.pcg-animation__timeline input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.pcg-animation__timeline input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.pcg-animation__timeline input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  appearance: none;
+  border: 2px solid #dcecff;
+  border-radius: 50%;
+  background: #3984ca;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.pcg-animation__timeline input[type='range']::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+
+.pcg-animation__timeline input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #dcecff;
+  border-radius: 50%;
+  background: #3984ca;
+}
+
+.pcg-preview.has-animation-mode .pcg-preview__parameter-overlay {
+  bottom: 116px;
+}
+
+@media (max-width: 520px) {
+  .pcg-preview__animation-mode > span:not(.pcg-preview__animation-count),
+  .pcg-animation__speed > span,
+  .pcg-animation__loop > span {
+    display: none;
+  }
+
+  .pcg-animation__time {
+    min-width: 76px;
+    font-size: 9px;
+  }
 }
 
 .pcg-preview__image-pane {

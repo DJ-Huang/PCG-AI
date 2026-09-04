@@ -5,6 +5,8 @@
 #include "kb_service.hpp"
 #include "mcp_service.hpp"
 #include "session_service.hpp"
+#include "surface_reconstruction_service.hpp"
+#include "third_party_service.hpp"
 
 #include <cstdlib>
 #include <filesystem>
@@ -39,8 +41,13 @@ int ParsePort(int argc, char** argv, int fallback) {
                 << "  GET|POST /v1/kb/search\n"
                 << "  GET  /v1/kb/list\n"
                 << "  GET|POST /v1/kb/get\n"
-                << "  GET  /v1/golden-graphs/list\n"
-                << "  GET|POST /v1/golden-graphs/get\n"
+              << "  GET  /v1/golden-graphs/list\n"
+              << "  GET|POST /v1/golden-graphs/get\n"
+              << "  GET  /v1/third-party/tripo/status\n"
+              << "  PUT|DELETE /v1/third-party/tripo/config\n"
+              << "  POST /v1/third-party/tripo/generate\n"
+              << "  GET  /v1/third-party/cache/<file>\n"
+              << "  POST /v1/reconstruct/oriented-sdf\n"
                 << "  GET  /v1/agent/providers (Bearer PCG_AGENT_TOKEN when set)\n"
                 << "  POST /v1/agent/turns (multipart + SSE)\n"
                 << "  GET  /v1/agent/health\n"
@@ -67,6 +74,7 @@ int main(int argc, char** argv) {
     const int port = ParsePort(argc, argv, 17890);
     pcg_server::ConfigureAgentRuntime(port);
     pcg_server::ConfigureKbRoot(std::filesystem::current_path());
+    pcg_server::ConfigureSurfaceReconstructionRoot(std::filesystem::current_path());
     httplib::Server svr;
     svr.set_exception_handler([](const httplib::Request&, httplib::Response& res, std::exception_ptr error) {
         try {
@@ -130,6 +138,13 @@ int main(int argc, char** argv) {
     svr.Get("/v1/golden-graphs/list", pcg_server::HandleKbGoldenGraphList);
     svr.Get("/v1/golden-graphs/get", pcg_server::HandleKbGoldenGraphGet);
     svr.Post("/v1/golden-graphs/get", pcg_server::HandleKbGoldenGraphGet);
+    svr.Get("/v1/third-party/tripo/status", pcg_server::HandleThirdPartyTripoStatus);
+    svr.Put("/v1/third-party/tripo/config", pcg_server::HandleThirdPartyTripoConfigPut);
+    svr.Delete("/v1/third-party/tripo/config", pcg_server::HandleThirdPartyTripoConfigDelete);
+    svr.Post("/v1/third-party/tripo/generate", pcg_server::HandleThirdPartyTripoGenerate);
+    svr.Get(R"(/v1/third-party/cache/([^/]+))", pcg_server::HandleThirdPartyCacheGet);
+    svr.Post("/v1/reconstruct/oriented-sdf", pcg_server::HandleBuildOrientedSdfNodeData);
+    svr.Get("/v1/assets/preserved-gltf", pcg_server::HandlePreservedGltfGet);
     svr.Put("/v1/session", pcg_server::HandlePutSession);
     svr.Get("/v1/session", pcg_server::HandleGetSession);
     svr.Post("/v1/session/heartbeat", pcg_server::HandleSessionHeartbeat);

@@ -2,7 +2,7 @@
 // Supports promote-to-parameter (+) and bind/unbind via dropdown.
 // Group properties (groupSelect/groupMultiSelect) resolve available groups from upstream nodes.
 
-import { useCallback, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import {
   getNodeTypeDefs,
@@ -17,6 +17,7 @@ import type { GraphParameter, ParameterType, NodeData } from './graphSchema';
 import { resolveUpstreamGroups, filterGroupsByDomain, type AvailableGroup } from './groupResolver';
 import { findSubgraph, getSubgraphId, getSubgraphNodeTitle, isSubgraphInterfaceNode, useCurrentSubgraph, useSubgraphs } from './subgraphs';
 import { resolvePbrTextureUrl } from './preview/pbrMaterials';
+import { generateTripoMesh } from './thirdPartyClient';
 
 type InspectorPropertyEntry = [string, ManifestProperty];
 
@@ -107,6 +108,8 @@ interface InspectorProps {
   onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
   onPromoteParameter: (nodeId: string, nodeType: string, propertyKey: string, prop: ManifestProperty) => void;
   onBindParameter: (nodeId: string, propertyKey: string, paramId: string | null) => void;
+  onProceduralizeReference?: (node: Node) => void;
+  proceduralizingNodeId?: string | null;
 }
 
 /** Checks if a parameter type is compatible with a manifest property type. */
@@ -127,6 +130,8 @@ export default function Inspector({
   onUpdateNodeData,
   onPromoteParameter,
   onBindParameter,
+  onProceduralizeReference,
+  proceduralizingNodeId = null,
 }: InspectorProps) {
   const handleValueChange = useCallback(
     (nodeId: string, key: string, value: unknown) => {
@@ -328,14 +333,24 @@ export default function Inspector({
           </div>
         </div>
         <div className="pcg-inspector__prop-value">
-          <PropertyEditor
-            prop={prop}
-            value={value}
-            disabled={isBound || !isEnabled}
-            binding={binding}
-            availableGroups={filteredGroups}
-            onChange={(v) => handleValueChange(selectedNode.id, key, v)}
-          />
+          {selectedNode.type === 'Tripo3DGenerator' && key === 'imageUrl' ? (
+            <TripoImageUploadField
+              disabled={isBound || !isEnabled}
+              onUploaded={(storage) => {
+                handleValueChange(selectedNode.id, 'texture', storage);
+                handleValueChange(selectedNode.id, 'imageUrl', '');
+              }}
+            />
+          ) : (
+            <PropertyEditor
+              prop={prop}
+              value={value}
+              disabled={isBound || !isEnabled}
+              binding={binding}
+              availableGroups={filteredGroups}
+              onChange={(v) => handleValueChange(selectedNode.id, key, v)}
+            />
+          )}
         </div>
       </div>
     );
@@ -413,6 +428,199 @@ export default function Inspector({
           )}
         </div>
       </div>}
+
+      {selectedNode.type === 'Tripo3DGenerator' && (
+        <TripoGeneratePanel
+          node={selectedNode}
+          onUpdateNodeData={onUpdateNodeData}
+          onProceduralizeReference={onProceduralizeReference}
+          proceduralizing={proceduralizingNodeId === selectedNode.id}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Tripo image upload ───────────────────────────────
+// The Tripo API only accepts public URLs or uploaded files — a local file is
+// the common case, so the Image URL row renders an upload button. The picked
+// file lands in public/assets/uploads/ and is stored on the node as a
+// pcg-resource:// Source Image (texture), which the server's generate
+// endpoint resolves and uploads to Tripo.
+
+function TripoImageUploadField({
+  disabled,
+  onUploaded,
+}: {
+  disabled?: boolean;
+  onUploaded: (storage: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const pick = (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    void (async () => {
+      try {
+        const response = await fetch(`/api/upload-texture?name=${encodeURIComponent(file.name)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: file,
+        });
+        const body = (await response.json()) as { ok?: boolean; storage?: string; error?: string };
+        if (!response.ok || !body.ok || !body.storage) {
+          throw new Error(body.error ?? `Upload failed (HTTP ${response.status})`);
+        }
+        onUploaded(body.storage);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setUploading(false);
+        if (inputRef.current) inputRef.current.value = '';
+      }
+    })();
+  };
+
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        style={{ display: 'none' }}
+        onChange={(e) => pick(e.target.files?.[0])}
+      />
+      <button
+        type="button"
+        disabled={disabled || uploading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {uploading ? 'Uploading…' : 'Upload Image…'}
+      </button>
+      {error && (
+        <div className="pcg-inspector__no-props" style={{ color: 'var(--pcg-error, #ff6b6b)' }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tripo 3D Generator ───────────────────────────────
+// Generate is the only cloud entry point: it uploads the Source Image (or
+// passes a public URL), polls the task, caches the GLB server-side, then
+// writes the cache path back into the node's `path` property. Cook/preview
+// load that file like ImportMesh and never touch the network.
+
+function TripoGeneratePanel({
+  node,
+  onUpdateNodeData,
+  onProceduralizeReference,
+  proceduralizing,
+}: {
+  node: Node;
+  onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
+  onProceduralizeReference?: (node: Node) => void;
+  proceduralizing: boolean;
+}) {
+  const data = node.data as NodeData;
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [isError, setIsError] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+
+  const imageUrl = String(data.imageUrl ?? '').trim();
+  const sourceImage = String(data.texture ?? '').trim();
+  const savedPath = String(data.path ?? '').trim();
+  const hasImage = imageUrl !== '' || sourceImage !== '';
+
+  const generate = useCallback(async () => {
+    setBusy(true);
+    setIsError(false);
+    setProgress(0);
+    setMessage('Starting Tripo generation…');
+    try {
+      const result = await generateTripoMesh(
+        {
+          ...(imageUrl ? { imageUrl } : { texturePath: sourceImage }),
+          modelVersion: String(data.modelVersion ?? '') || undefined,
+          texture: data.shouldTexture !== false,
+          pbr: data.enablePbr === true,
+          faceLimit: typeof data.faceLimit === 'number' ? data.faceLimit : undefined,
+        },
+        (update) => {
+          setProgress(update.percent);
+          setMessage(update.message);
+        },
+      );
+      if (!result.path) throw new Error('Tripo returned no model path.');
+      onUpdateNodeData(node.id, { path: result.path });
+      const notes = [
+        result.cached ? 'cache hit' : null,
+        result.stub ? 'stub mode' : null,
+        result.creditsConsumed ? `${result.creditsConsumed} credits` : null,
+      ].filter(Boolean).join(' · ');
+      setProgress(1);
+      setMessage(`Model saved to ${result.path}${notes ? ` (${notes})` : ''}`);
+    } catch (error) {
+      setIsError(true);
+      setProgress(null);
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }, [data.enablePbr, data.faceLimit, data.modelVersion, data.shouldTexture, imageUrl, node.id, onUpdateNodeData, sourceImage]);
+
+  return (
+    <div className="pcg-inspector__section">
+      <div className="pcg-inspector__section-title">Cloud Generation</div>
+      <div className="pcg-inspector__props">
+        <button
+          type="button"
+          disabled={busy || !hasImage}
+          onClick={() => void generate()}
+        >
+          {busy ? 'Generating…' : savedPath ? 'Regenerate' : 'Generate'}
+        </button>
+        {savedPath && onProceduralizeReference && (
+          <div className="pcg-inspector__proceduralize">
+            <button
+              type="button"
+              disabled={busy || proceduralizing}
+              onClick={() => onProceduralizeReference(node)}
+            >
+              {proceduralizing ? 'Baking SDF + Capturing…' : 'High-Fidelity Proceduralize'}
+            </button>
+            <small>Bake oriented samples without source topology, reconstruct with sparse SDF + Surface Nets, then enforce six-view pixel comparison.</small>
+          </div>
+        )}
+        {busy && progress !== null && (
+          <div
+            className="pcg-inspector__progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress * 100)}
+          >
+            <div
+              className="pcg-inspector__progress-fill"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+            <span className="pcg-inspector__progress-label">{Math.round(progress * 100)}%</span>
+          </div>
+        )}
+        {!hasImage && !busy && (
+          <div className="pcg-inspector__no-props">Assign a Source Image or Image URL first.</div>
+        )}
+        {message && (
+          <div className="pcg-inspector__no-props" style={isError ? { color: 'var(--pcg-error, #ff6b6b)' } : undefined}>
+            {message}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

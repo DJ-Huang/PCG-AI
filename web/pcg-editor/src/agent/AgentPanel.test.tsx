@@ -100,6 +100,33 @@ describe('AgentPanel', () => {
     expect(vi.mocked(client.startTurn).mock.calls[0][0]).toMatchObject({ editorSessionId: 'editor-page-wood' });
   });
 
+  it('consumes a queued procedural reconstruction request with its evidence files', async () => {
+    vi.mocked(client.startTurn).mockResolvedValue();
+    const onLaunchConsumed = vi.fn();
+    const files = [
+      new File(['png'], 'tripo-reference-azimuth-000.png', { type: 'image/png' }),
+      new File(['{}'], 'tripo-reference-manifest.json', { type: 'application/json' }),
+    ];
+    render(
+      <AgentPanel
+        onApplyActions={() => []}
+        launchRequest={{ id: 'rebuild-1', message: 'Build the procedural version.', files }}
+        onLaunchConsumed={onLaunchConsumed}
+        editorSessionId="editor-tripo"
+      />,
+    );
+
+    await waitFor(() => expect(client.startTurn).toHaveBeenCalledOnce());
+    expect(vi.mocked(client.startTurn).mock.calls[0][0]).toMatchObject({
+      message: 'Build the procedural version.',
+      editorSessionId: 'editor-tripo',
+    });
+    expect(vi.mocked(client.startTurn).mock.calls[0][0].attachments.map((item) => item.file.name)).toEqual(
+      files.map((file) => file.name),
+    );
+    expect(onLaunchConsumed).toHaveBeenCalledWith('rebuild-1');
+  });
+
   it('shows a retryable error when the Provider stops before a final answer', async () => {
     vi.mocked(client.startTurn).mockImplementation(async (_input, onEvent) => {
       onEvent({ type: 'turn.created', data: { turnId: 'turn-cut', messageId: 'assistant-cut' } });

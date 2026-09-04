@@ -1,6 +1,6 @@
 # PCG 节点参考手册
 
-本文档详细说明 `schema/node-manifest.json`（v1.5）中定义的全部 **134 种** PCG 节点。
+本文档说明 `schema/node-manifest.json`（v1.7）中定义的 **309 种** PCG 节点（308 个 Core 节点 + 1 个 Editor-only 节点）；节点类型、Pin 与属性的最终真源仍以 manifest 为准。
 
 每个节点包含：功能描述、输入/输出 Pin、属性表、执行逻辑和用法示例。
 
@@ -100,6 +100,7 @@
   - [CopyMesh](#copymesh)
   - [ShellMesh](#shellmesh)
   - [ImportMesh](#importmesh)
+  - [OrientedSdfSurface](#orientedsdfsurface)
   - [Meshy3DGenerator](#meshy3dgenerator)
   - [MatchSize](#matchsize)
   - [BendMesh](#bendmesh)
@@ -123,6 +124,9 @@
 - [Output 类别](#output-类别)
   - [Output](#output)
   - [ExportFBX](#exportfbx)
+- [Animation 类别](#animation-类别)
+  - [PreserveGltfRig](#preservegltfrig)
+  - [ActionRig](#actionrig)
 - [Material 类别](#material-类别)
   - [VertexColor](#vertexcolor)
   - [AssignMaterial](#assignmaterial)
@@ -1813,6 +1817,53 @@ blast_short → StaticMeshSpawner(short) ─┘
 
 ---
 
+### TaperedSweep
+
+**类别**：Spline
+
+**功能**：沿开放样条生成逐段变截面的椭圆扫掠。每个半径站点可分别控制 `rx`、`rz` 和扭转；节点使用 rotation-minimizing parallel transport frame，避免曲线拐点处发生 Frenet 标架 180° 翻转。半径同时为 0 的首/尾站点会收敛为一个真实顶点，不生成零面积圆环。
+
+**输入/输出 Pin**：
+
+| 方向 | Pin ID | 标签 | 类型 |
+|------|--------|------|------|
+| 输入 | `backbone` | Backbone | `SpatialSpline` |
+| 输出 | `out` | Mesh | `SpatialMesh` |
+
+**属性**：
+
+| 属性名 | 类型 | 默认值 | 范围 | 说明 |
+|--------|------|--------|------|------|
+| `stations` | string (JSON) | 三站点渐缩到 0 | `u` 严格递增且覆盖 0→1 | 每项为 `{u, rx, rz, twist?}` |
+| `radiusScale` | number | 1.0 | > 0 | 全部站点半径的统一倍率，适合暴露为粗细参数 |
+| `radialSegments` | integer | 12 | 3 ~ 128 | 椭圆截面分段数 |
+| `sampleSpacing` | number | 1.0 | > 0 | 沿 backbone 的弧长采样间距 |
+| `capStart` / `capEnd` | boolean | true | — | 非零半径端点是否封口；零半径端点已自然闭合 |
+| `upX` / `upY` / `upZ` | number | 0 / 1 / 0 | — | 初始 frame 的上方向提示 |
+| `shadeMode` | enum | `auto` | `auto` / `smooth` / `flat` | 法线策略 |
+| `cuspAngle` | number | 30 | 0 ~ 180 | `auto` 模式折角阈值 |
+
+```json
+{
+  "id": "tail",
+  "type": "TaperedSweep",
+  "position": { "x": 200, "y": 160 },
+  "data": {
+    "stations": "[{\"u\":0,\"rx\":0.08,\"rz\":0.06},{\"u\":0.65,\"rx\":0.045,\"rz\":0.03,\"twist\":12},{\"u\":1,\"rx\":0,\"rz\":0}]",
+    "radiusScale": 1.0,
+    "radialSegments": 12,
+    "sampleSpacing": 0.04,
+    "capStart": true,
+    "capEnd": true,
+    "shadeMode": "smooth"
+  }
+}
+```
+
+> 适合尾巴、角、爪、发束和尖端轮廓。等截面管线仍使用 `SweepAlongSpline`；不要用多个相交球体或圆柱体冒充连续尖端。
+
+---
+
 ### ExtrudeAlongSpline
 
 **类别**：Spline
@@ -2764,6 +2815,35 @@ Inner faces 会反转 winding；新层与 rim 使用拓扑 remap 传播各 owner
 | `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
 
 文件不存在、格式不支持、没有 polygon 或 Assimp 校验失败都会返回包含路径/Assimp 原因的明确错误。Cook cache 的输入指纹包含规范化路径、文件大小和修改时间，因此替换外部资产会使节点失效重算。
+
+### OrientedSdfSurface
+
+**功能**：从烘焙后的定向表面采样重建一份新的闭合 polygon surface。节点把采样解释为带法线的局部切平面，以稀疏 moving-least-squares signed-distance field 聚合，再用 Surface Nets 在零交叉处生成 quad 拓扑。它不是 `ImportMesh` 的别名：`OPC1` 载荷没有 source face / index buffer，Cook 也不会重新读取来源 GLB。
+
+**输入 Pin**：无。
+
+**输出 Pin**：`out`（`SpatialGeometry`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `cellSize` | `0.004` | 世界空间体素边长；越小越接近来源轮廓，但顶点数、Cook 时间和浏览器显存快速增长 |
+| `supportRadiusCells` | `2.5` | 每个定向切平面 splat 的支持半径，以 cell 为单位 |
+| `isoOffset` | `0` | 等值面偏移；正值膨胀、负值收缩，用于同相机轮廓误差的亚体素修正 |
+| `maxActiveCells` | `3000000` | Surface Nets 活跃 cell 安全上限，防止错误参数耗尽内存 |
+| `transferColors` | `true` | 把最近测量样本的顶点色转移到新表面 |
+| `transferUvs` | `true` | 把最近测量样本的 UV 转移到新表面，以复用来源 PBR atlas |
+| `flipUvV` | `false` | 为 Web glTF / TextureLoader 路径翻转 V 坐标 |
+| `previewCellSizeScale` | `2.0` | 仅 Web 交互预览：临时放大 `cellSize`；×2 通常约为最终面数的 1/4。不会写回最终 Cook 参数 |
+| `previewTriangleBudget` | `500000` | 仅 Web 交互预览：超预算时以更粗的闭合 SDF 表面自动重试，避免把百万面 PCGR 送入 Three.js；最终导出不受此限制 |
+| `sourceReference` | `""` | 仅用于 provenance；不会参与 Cook 文件读取 |
+| `showEncodedPayload` | `false` | 是否在 Inspector 展开密集 `OPC1` 文本 |
+| `pointCloud` | `""` | `OPC1 v2` 量化位置、法线、可选 RGBA 与 UV；不包含来源拓扑 |
+
+Web 中通常不手工粘贴载荷：Inspector 的 **High-Fidelity Proceduralize** 或 MCP `pcg_bake_oriented_sdf` 会在服务端读取工作区模型、生成 `OPC1` 并提取内嵌 base-color / normal / ORM。Web 一键流程还会把 base-color 按 GLB V 约定、双线性过滤和 sRGB→linear 转换烘入 OPC 的 RGBA，随后使用无贴图 vertex-color 材质，避免 Surface Nets 新拓扑跨 UV 岛插值。重建顶点同时获得最近朝向一致测量的源法线 `N`。MCP 图读取会隐藏大载荷，避免模型上下文复制数 MB 数据；普通属性 patch 保留隐藏字段。
+
+本节点适合 GLB 视觉基准的高保真程序化逼近，参数必须通过固定相机的 silhouette IoU 与边界像素距离调优。它仍是体素离散近似：要求比 `cellSize` 更小的薄片、尖角或微小孔洞时，应减小 cell、提高上限，或使用显式语义附件节点补形，而不是退回基础 primitive 拼装。
+
+Web 默认采用双层质量合同：编辑器和 Review 页用 `previewCellSizeScale` + `previewTriangleBudget` 生成受控 LOD，Review 页可显式切换 Adaptive / Full / Medium ×2 / Low ×3；**Export Full GLB** 会重新按图中原始 `cellSize` Cook，因此动画绑定、可拆语义组件和最终像素验收不会使用预览 LOD。多节点角色可把头脸节点倍率设为 `1`，躯干或次要附件设为 `2–3`，对应 img2threejs 的逐部件 cell-size/多级 surface 策略。
 
 ### Meshy3DGenerator
 
@@ -3761,6 +3841,61 @@ CreateSpline ──(profile)──┘
 **执行逻辑**：内部使用 `PcgGeometry` 传输（可直接连接 BevelMesh）。对每个 profile point：到旋转轴距离 ≤ 1e-8 时仅创建一个轴上点；否则创建 segments 个环上点。相邻 profile point 之间：ring-ring → quad，axis-ring → triangle，axis-axis → 不生成面。
 
 > 典型连接：`CreateSpline → RevolveMesh → BevelMesh → Output`
+
+---
+
+## Animation 类别
+
+### PreserveGltfRig
+
+**功能**：已有绑定的 GLB 走“原 rig 保留”路线。节点的 Core 输出仍提供可参与普通 PCG 链路的静态 `SpatialMesh`，同时写入 `pcg_source_rig` sidecar；Web 预览从同一个自包含 GLB 直接恢复原始场景树、`SkinnedMesh`、`skin.joints`、inverse bind matrices、`JOINTS_0` / `WEIGHTS_0` 以及按 glTF node index 寻址的动画通道。Web 导出返回来源 GLB 的原始字节，不重新量化 skin 或动画。
+
+**输入 Pin**：无。
+
+**输出 Pin**：`out`（`SpatialMesh`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `path` | `""` | 工作区内自包含 `.glb` 路径；不接受外部 buffer/texture 依赖的 `.gltf` |
+| `projectRoot` | `""` | 可选相对路径解析根 |
+| `scale` | `1.0` | 预览和静态 Core 输出的统一缩放，必须为正数 |
+| `axisConversion` | `none` | `none` / `zUpToYUp` / `yUpToZUp` |
+
+```text
+PreserveGltfRig(rigged-character.glb) → Output
+```
+
+该路线不会猜测语义部件，也不会把连续蒙皮外壳伪装成可拆零件。适用于来源已经包含正确 rig/animation 的生产资产；若需要改变拓扑、语义组件或重新绑定，请使用 `OrientedSdfSurface → ActionRig` 路线。
+
+### ActionRig
+
+**功能**：在不改变输入 rest geometry 的前提下附加可编辑的组件树、骨骼、蒙皮、动画、socket、collider 和 destruction-group 契约。Web 运行时建立真实的 Three.js `Bone → Skeleton → SkinnedMesh`；有 clip 时，Preview/Review 左上角自动出现 **Animate** 模式入口，底部工作区提供 clip 切换、播放/暂停、停止并恢复 bind pose、时间轴拖动、正向/反向倍速和循环切换。脚本接口同时提供 `play / pause / resume / stop / seek / setAnimationSpeed / setAnimationLoop / getAnimationPlaybackState / setExplode`。glTF 导出包含 skin、inverse bind matrices、命名部件层级和 animation clips。
+
+**输入 Pin**：`in`（`SpatialGeometry`）
+
+**输出 Pin**：`out`（`SpatialGeometry`）
+
+| 属性 | 默认值 | 说明 |
+|------|--------|------|
+| `rigJson` | schema v2 单 root | `componentTree` 是部件、父子关系、pivot/tip、派生 bone、语义区域、刚性角色、clips/sockets/colliders/destructionGroups 的单一真源；schema v1 显式 `bones/components` 仍兼容 |
+| `skinMode` | `geodesic` | `geodesic` 在模型实体内部计算测地距离，减少相邻四肢串权重；`distance` 为平滑欧氏距离；`rigid` 绑定最近骨骼 |
+| `maxInfluences` | `4` | 每顶点 1–4 个影响，导出为 `JOINTS_0` / `WEIGHTS_0` |
+| `falloff` | `4.0` | 距离权重衰减 |
+| `geodesicResolution` | `40` | 体积距离栅格分辨率，范围 16–96 |
+| `componentMode` | `dominantBone` | `dominantBone` / `semanticRegion` / `none`；语义区域支持 sphere、capsule、box 及 ownership priority |
+| `splitComponents` | `true` | 用互斥 triangle ownership 创建命名可分离 visual components；每个视觉件仍绑定共享 skeleton |
+| `autoplay` | `""` | Review/Preview 首次加载后播放的 clip 名称 |
+| `playbackSpeed` | `1.0` | 播放速度，可为负数 |
+
+schema v2 的 `role=hair/detail/decal/panel` 或显式 `skin=rigid` 会把对应区域绑定到单一骨骼，避免耳尖、毛束、贴花等薄细节被平滑拉长；结构区域保持 geodesic smooth skin。Visual mesh 直接挂在统一 root 下并用 identity bind，逻辑 component pivots 与骨骼层级独立，从而避免父子组件变换与 skinning 的 double-transform。
+
+动画模式属于视口会话状态，不改写 `.pcg`。ActionRig 的 `autoplay`、`playbackSpeed` 与显式布尔 `loop` 是可复现默认值；`loop=null` 或缺失表示 pose return 未测量，按 Img2Threejs 契约保守地单次播放，不能偷换成循环。`PreserveGltfRig` 读取的原 GLB 同样默认 `unmeasured → play once`，因为 glTF 本身没有 loop 标记；面板切换后记为本次 `previewOverride`。播放新 clip 时先停止旧 action 并恢复 bind pose，避免上一段未覆盖的骨骼轨道串入下一段；拖动时间轴会暂停 action、设置 clip time，再以 `mixer.update(0)` 立即刷新蒙皮。关闭面板不会停止动画；**Stop** 才会回到 rest pose。视口聚焦且 Animate 模式开启时可按 Space 播放/暂停。
+
+```text
+OrientedSdfSurface → AssignMaterial → ActionRig → Output
+```
+
+`splitComponents` 的含义是“每个三角形唯一归属且可独立显隐/位移”，不是自动恢复来源中不存在的拓扑边界。单网格 GLB 的语义区域仍是显式、可审阅的假设；要追求可预测拆件，应在 `rigJson.componentTree` 中给出 region、priority、parent 和 detachable。
 
 ---
 

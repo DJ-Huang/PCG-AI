@@ -9,6 +9,7 @@ import type {
   GraphParameter,
   GraphSubgraph,
   GraphSubgraphPort,
+  SemanticComponent,
 } from './graphSchema';
 import { defaultData } from './graphSchema';
 import { getNodeTypeDefs } from './nodeManifest';
@@ -193,6 +194,9 @@ function toGraphNode(item: unknown, index: number): NodeParse {
   if (!position.ok) return position;
 
   const data = mergeNodeData(type, raw.data);
+  const semantic = parseSemanticComponent(data.__semantic, `Node "${id}".__semantic`);
+  if (semantic && 'error' in semantic) return { ok: false, error: semantic.error };
+  if (semantic) data.__semantic = semantic;
 
   return {
     ok: true,
@@ -224,6 +228,46 @@ function mergeNodeData(type: string, value: unknown): NodeData {
     return { ...defaults };
   }
   return { ...defaults, ...(value as NodeData) };
+}
+
+function parseSemanticComponent(value: unknown, label: string): SemanticComponent | null | { error: string } {
+  if (value === undefined) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { error: `${label} must be an object.` };
+  const raw = value as Record<string, unknown>;
+  const componentId = typeof raw.componentId === 'string' ? raw.componentId.trim() : '';
+  if (!componentId) return { error: `${label}.componentId must be a non-empty string.` };
+  const vector = (candidate: unknown, field: string, positive = false): [number, number, number] | { error: string } => {
+    if (!Array.isArray(candidate) || candidate.length !== 3 || !candidate.every((v) => typeof v === 'number' && Number.isFinite(v))) return { error: `${label}.${field} must be three finite numbers.` };
+    if (positive && !(candidate[0] > 0 && candidate[1] > 0 && candidate[2] > 0)) return { error: `${label}.${field} must be greater than zero.` };
+    return candidate as [number, number, number];
+  };
+  const semantic: SemanticComponent = { componentId };
+  if (typeof raw.role === 'string') semantic.role = raw.role;
+  if (typeof raw.zone === 'string') semantic.zone = raw.zone;
+  if (raw.bounds !== undefined) {
+    if (!raw.bounds || typeof raw.bounds !== 'object' || Array.isArray(raw.bounds)) return { error: `${label}.bounds must be an object.` };
+    const bounds = raw.bounds as Record<string, unknown>;
+    const center = vector(bounds.center, 'bounds.center'); if ('error' in center) return center;
+    const size = vector(bounds.size, 'bounds.size', true); if ('error' in size) return size;
+    semantic.bounds = { center, size };
+  }
+  if (raw.anchors !== undefined) {
+    if (!raw.anchors || typeof raw.anchors !== 'object' || Array.isArray(raw.anchors)) return { error: `${label}.anchors must be an object.` };
+    semantic.anchors = {};
+    for (const [name, point] of Object.entries(raw.anchors as Record<string, unknown>)) {
+      const parsed = vector(point, `anchors.${name}`); if ('error' in parsed) return parsed;
+      semantic.anchors[name] = parsed;
+    }
+  }
+  if (raw.camera !== undefined) {
+    if (!raw.camera || typeof raw.camera !== 'object' || Array.isArray(raw.camera)) return { error: `${label}.camera must be an object.` };
+    const camera = raw.camera as Record<string, unknown>;
+    if (camera.include !== undefined && typeof camera.include !== 'boolean') return { error: `${label}.camera.include must be boolean.` };
+    if (camera.occluder !== undefined && typeof camera.occluder !== 'boolean') return { error: `${label}.camera.occluder must be boolean.` };
+    if (camera.scaleRole !== undefined && typeof camera.scaleRole !== 'string') return { error: `${label}.camera.scaleRole must be string.` };
+    semantic.camera = { ...(typeof camera.include === 'boolean' ? { include: camera.include } : {}), ...(typeof camera.occluder === 'boolean' ? { occluder: camera.occluder } : {}), ...(typeof camera.scaleRole === 'string' ? { scaleRole: camera.scaleRole } : {}) };
+  }
+  return semantic;
 }
 
 function toGraphEdge(item: unknown, index: number): EdgeParse {
@@ -387,6 +431,8 @@ function toGraphSubgraph(item: unknown, index: number): SubgraphParse {
     }
   }
 
+  const semantic = parseSemanticComponent(raw.semantic, `Subgraph "${id}".semantic`);
+  if (semantic && 'error' in semantic) return { ok: false, error: semantic.error };
   return {
     ok: true,
     subgraph: {
@@ -397,6 +443,7 @@ function toGraphSubgraph(item: unknown, index: number): SubgraphParse {
       nodes,
       edges,
       ...(parameters.length > 0 || Array.isArray(raw.parameters) ? { parameters } : {}),
+      ...(semantic ? { semantic } : {}),
     },
   };
 }

@@ -143,6 +143,7 @@ set(PCG_CORE_SOURCES
     src/elements/facade_foundation_elements.cpp
     src/elements/topology_parity_algorithms.cpp
     src/elements/topology_parity_elements.cpp
+    src/elements/oriented_sdf_surface.cpp
     src/elements/houdini_sop_elements.cpp
     src/elements/lot_subdivision_algorithms.cpp
     src/asset_path.cpp
@@ -443,6 +444,11 @@ add_executable(test_houdini_sop_elements tests/test_houdini_sop_elements.cpp)
 target_link_libraries(test_houdini_sop_elements PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_houdini_sop_elements PRIVATE src)
 add_test(NAME test_houdini_sop_elements COMMAND test_houdini_sop_elements WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_oriented_sdf_surface tests/test_oriented_sdf_surface.cpp)
+target_link_libraries(test_oriented_sdf_surface PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_oriented_sdf_surface PRIVATE src)
+add_test(NAME test_oriented_sdf_surface COMMAND test_oriented_sdf_surface WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.

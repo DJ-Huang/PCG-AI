@@ -33,6 +33,7 @@ export type PbrDebugView = 'lit' | 'albedo' | 'normal' | 'metallic' | 'smoothnes
 
 const textureLoader = new THREE.TextureLoader();
 const textureCache = new Map<string, Promise<THREE.Texture>>();
+const readyTextureCache = new Map<string, THREE.Texture>();
 const PORTABLE_RESOURCE_PREFIX = 'pcg-resource://';
 
 export function resolvePbrTextureUrl(storage: string): string {
@@ -111,6 +112,7 @@ function loadTexture(url: string, colorSpace: THREE.ColorSpace): Promise<THREE.T
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       texture.needsUpdate = true;
+      readyTextureCache.set(key, texture);
       return texture;
     });
     textureCache.set(key, pending);
@@ -126,6 +128,15 @@ function bindTexture(
   onReady?: () => void,
 ): void {
   if (!url) return;
+  const resolvedUrl = resolvePbrTextureUrl(url);
+  const key = `${colorSpace}:${resolvedUrl}`;
+  const ready = readyTextureCache.get(key);
+  if (ready) {
+    assign(ready);
+    material.needsUpdate = true;
+    onReady?.();
+    return;
+  }
   void loadTexture(url, colorSpace).then((texture) => {
     assign(texture);
     material.needsUpdate = true;
@@ -217,6 +228,16 @@ export function createPbrDebugMaterial(
     side: definition.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
   });
   if (textureUrl) {
+    const resolvedUrl = resolvePbrTextureUrl(textureUrl);
+    const key = `${colorSpace}:${resolvedUrl}`;
+    const ready = readyTextureCache.get(key);
+    if (ready) {
+      material.uniforms.inputMap.value = ready;
+      material.uniforms.hasInputMap.value = true;
+      material.needsUpdate = true;
+      onTextureReady?.();
+      return material;
+    }
     void loadTexture(textureUrl, colorSpace).then((texture) => {
       material.uniforms.inputMap.value = texture;
       material.uniforms.hasInputMap.value = true;
@@ -234,4 +255,5 @@ export function disposePbrTextureCache(): void {
     void pending.then((texture) => texture.dispose()).catch(() => undefined);
   }
   textureCache.clear();
+  readyTextureCache.clear();
 }

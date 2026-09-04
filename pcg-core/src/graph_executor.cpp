@@ -21,6 +21,13 @@
 namespace pcg::internal {
 namespace {
 
+// Group member geometry is an editor-only highlight sidecar. Expanding every
+// polygon ring for a scanned/reconstructed hero mesh duplicates the binary
+// geometry as hundreds of megabytes of decimal JSON (and repeats it per node).
+// Preserve exact group counts for large groups, but keep interactive member
+// details only while they remain practical to render in the editor.
+constexpr size_t kMaxGroupHighlightMembers = 20000;
+
 PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const char* message)
 {
     write_error(err_buf, err_buf_size, message);
@@ -52,12 +59,14 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
         const auto domain = static_cast<geometry::GroupDomain>(d);
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
+            const bool include_highlight_detail =
+                members.size() <= kMaxGroupHighlightMembers;
             auto memberArray = nlohmann::json::array();
             auto edgeEndpoints = nlohmann::json::array();
             auto facePolygons = nlohmann::json::array();
             auto pointPositions = nlohmann::json::array();
             int face_count = 0;
-            for (geometry::GroupId id : members) {
+            if (include_highlight_detail) for (geometry::GroupId id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
                     // Expand face index into constituent mesh triangles
                     if (id >= 0 && id < static_cast<geometry::GroupId>(face_to_tri.size())) {
@@ -140,11 +149,17 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
             auto entry = nlohmann::json::object({
                 {"name", name},
                 {"domain", kDomainNames[d]},
-                {"count", d == static_cast<int>(geometry::GroupDomain::Face)
-                    ? face_count
-                    : static_cast<int>(memberArray.size())},
+                {"count", include_highlight_detail
+                    ? (d == static_cast<int>(geometry::GroupDomain::Face)
+                        ? face_count
+                        : static_cast<int>(memberArray.size()))
+                    : static_cast<int>(members.size())},
                 {"members", std::move(memberArray)},
             });
+            if (!include_highlight_detail) {
+                entry["detailTruncated"] = true;
+                entry["detailLimit"] = kMaxGroupHighlightMembers;
+            }
             if (d == static_cast<int>(geometry::GroupDomain::Edge))
                 entry["edgeEndpoints"] = std::move(edgeEndpoints);
             if (d == static_cast<int>(geometry::GroupDomain::Face) && !facePolygons.empty())

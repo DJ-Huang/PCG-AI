@@ -58,6 +58,13 @@ describe('physicalCamera', () => {
     expect(merged.focalLengthMm).toBeCloseTo(25.76, 1);
   });
 
+  it('keeps an explicit orthographic semantic frame height', () => {
+    const merged = mergeCameraCommand(defaultPhysicalCamera(), {
+      projection: 'orthographic', orthographicFrustumHeight: 7.5,
+    });
+    expect(merged.orthographicFrustumHeight).toBe(7.5);
+  });
+
   it('moves the camera spherically while preserving unspecified angles', () => {
     const base = defaultPhysicalCamera();
     base.target = [0, 0, 0];

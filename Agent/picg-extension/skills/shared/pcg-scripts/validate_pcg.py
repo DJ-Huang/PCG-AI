@@ -68,7 +68,14 @@ def can_connect(src_type: str, tgt_type: str, src_handle: str, tgt_handle: str, 
                 break
     if tgt_pin is None:
         tgt_pin = "SpatialPoint"
-    return src_pin == tgt_pin or src_pin == "Any" or tgt_pin == "Any"
+    if src_pin == tgt_pin or src_pin == "Any" or tgt_pin == "Any":
+        return True
+    spatial_geometry_family = {"SpatialGeometry", "SpatialMesh", "SpatialSpline"}
+    return (
+        src_pin == "SpatialGeometry" and tgt_pin in spatial_geometry_family
+    ) or (
+        tgt_pin == "SpatialGeometry" and src_pin in spatial_geometry_family
+    )
 
 
 def layout_style(nodes: list[dict]) -> str:
@@ -801,8 +808,6 @@ def validate_graph(
     version = graph.get("version")
     if version not in ("1.0", "2.0", "3.0"):
         errors.append(f'unsupported version {version!r} (expected 1.0, 2.0, or 3.0)')
-    elif version != "1.0":
-        warnings.append(f'version is {version!r} (authoring may be 2.0/3.0)')
 
     if version == "3.0":
         for node in graph.get("nodes") or []:

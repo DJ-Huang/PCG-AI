@@ -6,6 +6,8 @@
 #include "elements/spline_algorithms.hpp"
 #include "elements/transform_algorithms.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -13,6 +15,52 @@
 
 namespace pcg::internal::elements {
 namespace {
+
+constexpr const char* kDefaultTaperedSweepStations =
+    R"([{"u":0,"rx":1,"rz":1,"twist":0},{"u":0.65,"rx":0.6,"rz":0.45,"twist":0},{"u":1,"rx":0,"rz":0,"twist":0}])";
+
+bool parse_tapered_sweep_stations(const nlohmann::json& data,
+                                  std::vector<TaperedSweepStation>& stations,
+                                  std::string& error)
+{
+    try {
+        const std::string raw = data.value("stations", std::string(kDefaultTaperedSweepStations));
+        const nlohmann::json parsed = nlohmann::json::parse(raw);
+        if (!parsed.is_array()) {
+            error = "TaperedSweep stations must be a JSON array";
+            return false;
+        }
+        stations.clear();
+        stations.reserve(parsed.size());
+        for (size_t i = 0; i < parsed.size(); ++i) {
+            const auto& item = parsed[i];
+            if (!item.is_object() || !item.contains("u") || !item.contains("rx") ||
+                !item.contains("rz") || !item["u"].is_number() ||
+                !item["rx"].is_number() || !item["rz"].is_number()) {
+                error = "TaperedSweep station " + std::to_string(i) +
+                        " requires numeric u, rx, and rz";
+                return false;
+            }
+            TaperedSweepStation station;
+            station.u = item["u"].get<double>();
+            station.rx = item["rx"].get<double>();
+            station.rz = item["rz"].get<double>();
+            if (item.contains("twist")) {
+                if (!item["twist"].is_number()) {
+                    error = "TaperedSweep station " + std::to_string(i) +
+                            " twist must be numeric";
+                    return false;
+                }
+                station.twist_degrees = item["twist"].get<double>();
+            }
+            stations.push_back(station);
+        }
+        return true;
+    } catch (const std::exception& exception) {
+        error = std::string("TaperedSweep stations JSON is invalid: ") + exception.what();
+        return false;
+    }
+}
 
 class SweepAlongSplineElement final : public IPcgElement {
 public:
@@ -62,6 +110,54 @@ public:
         else
             geometry.detail().shade_mode = data::ShadeMode::Auto;
         geometry.detail().cusp_angle_deg = opts.cusp_angle_deg;
+
+        emit_geometry(ctx, std::move(geometry));
+        return PCG_OK;
+    }
+};
+
+class TaperedSweepElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "TaperedSweep"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TaperedSweep missing node");
+
+        const data::PcgSplineData backbone =
+            get_splines_input(ctx, "backbone", "TaperedSweep missing backbone input");
+        if (backbone.splines().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "TaperedSweep missing backbone input");
+
+        TaperedSweepOptions options;
+        std::string error;
+        if (!parse_tapered_sweep_stations(ctx.node->data, options.stations, error))
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+
+        options.radius_scale = ctx.node->data.value("radiusScale", 1.0);
+        options.radial_segments = ctx.node->data.value("radialSegments", 12);
+        options.sample_spacing = ctx.node->data.value("sampleSpacing", 1.0);
+        options.cap_start = ctx.node->data.value("capStart", true);
+        options.cap_end = ctx.node->data.value("capEnd", true);
+        options.up_x = ctx.node->data.value("upX", 0.0);
+        options.up_y = ctx.node->data.value("upY", 1.0);
+        options.up_z = ctx.node->data.value("upZ", 0.0);
+        options.shade_mode = ctx.node->data.value("shadeMode", std::string("auto"));
+        options.cusp_angle_deg = ctx.node->data.value("cuspAngle", 30.0);
+
+        data::PcgGeometry geometry =
+            tapered_sweep_along_spline_geometry(backbone, options, &error);
+        if (geometry.points().empty())
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+
+        if (options.shade_mode == "smooth")
+            geometry.detail().shade_mode = data::ShadeMode::Smooth;
+        else if (options.shade_mode == "flat")
+            geometry.detail().shade_mode = data::ShadeMode::Flat;
+        else
+            geometry.detail().shade_mode = data::ShadeMode::Auto;
+        geometry.detail().cusp_angle_deg = options.cusp_angle_deg;
 
         emit_geometry(ctx, std::move(geometry));
         return PCG_OK;
@@ -284,6 +380,7 @@ public:
 void register_spline_mesh_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
 {
     map.emplace("SweepAlongSpline", std::make_unique<SweepAlongSplineElement>());
+    map.emplace("TaperedSweep", std::make_unique<TaperedSweepElement>());
     map.emplace("ExtrudeAlongSpline", std::make_unique<ExtrudeAlongSplineElement>());
     map.emplace("TransformMesh", std::make_unique<TransformMeshElement>());
     map.emplace("TransformByAttribute", std::make_unique<TransformByAttributeElement>());

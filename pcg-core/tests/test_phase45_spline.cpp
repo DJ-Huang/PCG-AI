@@ -451,6 +451,78 @@ int main()
     }
     std::printf("PASS: build_frames +X backbone keeps +Y normal\n");
 
+    const std::vector<Vec3> inflected_line = {
+        {0.0, 0.0, 0.0}, {0.8, 0.8, 0.0}, {1.6, 0.0, 0.0},
+        {2.4, -0.8, 0.0}, {3.2, 0.0, 0.0},
+    };
+    const auto transported_frames =
+        build_parallel_transport_frames(inflected_line, {0.0, 0.0, 1.0});
+    if (transported_frames.size() != inflected_line.size()) {
+        std::printf("FAIL: parallel transport frame count\n");
+        return 1;
+    }
+    for (size_t i = 1; i < transported_frames.size(); ++i) {
+        if (dot(transported_frames[i - 1].normal, transported_frames[i].normal) <= 0.0) {
+            std::printf("FAIL: parallel transport normal flipped at frame %zu\n", i);
+            return 1;
+        }
+    }
+    std::printf("PASS: parallel transport frames stay continuous through an inflection\n");
+
+    CreateSplineOptions taper_path_options;
+    taper_path_options.mode = "polyline";
+    taper_path_options.control_points = {
+        {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 2.0, 0.0},
+    };
+    const auto taper_path = create_spline_data(taper_path_options);
+    TaperedSweepOptions taper_options;
+    taper_options.stations = {
+        {0.0, 0.30, 0.20, 0.0},
+        {0.5, 0.18, 0.10, 25.0},
+        {1.0, 0.0, 0.0, 45.0},
+    };
+    taper_options.radial_segments = 8;
+    taper_options.sample_spacing = 1.0;
+    taper_options.cap_start = true;
+    taper_options.cap_end = true;
+    std::string taper_error;
+    const auto tapered =
+        tapered_sweep_along_spline_geometry(taper_path, taper_options, &taper_error);
+    if (!taper_error.empty() || tapered.points().size() != 18 || tapered.faces().size() != 24) {
+        std::printf("FAIL: tapered sweep shape (points=%zu faces=%zu error=%s)\n",
+                    tapered.points().size(), tapered.faces().size(), taper_error.c_str());
+        return 1;
+    }
+    if (!tapered.has_corner_uvs() ||
+        tapered.corner_uvs().size() != static_cast<size_t>(tapered.corner_count())) {
+        std::printf("FAIL: tapered sweep corner UV coverage\n");
+        return 1;
+    }
+    if (!tapered.groups().members(GroupDomain::Edge, "unshared").empty()) {
+        std::printf("FAIL: capped tapered sweep should be watertight\n");
+        return 1;
+    }
+
+    const auto tapered_mesh = pcg::internal::data::triangulate_geometry_shared(tapered);
+    double tapered_signed_volume = 0.0;
+    for (size_t i = 0; i + 2 < tapered_mesh.triangles().size(); i += 3) {
+        const auto& a = tapered_mesh.vertices()[static_cast<size_t>(tapered_mesh.triangles()[i])];
+        const auto& b = tapered_mesh.vertices()[static_cast<size_t>(tapered_mesh.triangles()[i + 1])];
+        const auto& c = tapered_mesh.vertices()[static_cast<size_t>(tapered_mesh.triangles()[i + 2])];
+        tapered_signed_volume +=
+            (a.x * (b.y * c.z - b.z * c.y) +
+             a.y * (b.z * c.x - b.x * c.z) +
+             a.z * (b.x * c.y - b.y * c.x)) /
+            6.0;
+    }
+    if (tapered_signed_volume <= 0.0) {
+        std::printf("FAIL: tapered sweep winding is not outward (volume=%.9f)\n",
+                    tapered_signed_volume);
+        return 1;
+    }
+    std::printf("PASS: tapered sweep true point, UVs, manifold, outward winding (volume=%.6f)\n",
+                tapered_signed_volume);
+
     double upward_sum = 0.0;
     int upward_count = 0;
     for (size_t i = 0; i + 2 < swept_rect.triangles().size(); i += 3)

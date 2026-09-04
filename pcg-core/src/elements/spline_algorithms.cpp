@@ -100,6 +100,216 @@ bool spline_is_closed(const std::vector<geometry::Vec3>& polyline, bool closed_f
     return geometry::length(geometry::sub(polyline.front(), polyline.back())) <= 1e-4;
 }
 
+bool validate_tapered_sweep_options(const TaperedSweepOptions& options, std::string& error)
+{
+    if (!std::isfinite(options.radius_scale) || options.radius_scale <= 0.0) {
+        error = "TaperedSweep radiusScale must be finite and greater than zero";
+        return false;
+    }
+    if (options.radial_segments < 3 || options.radial_segments > 128) {
+        error = "TaperedSweep radialSegments must be from 3 to 128";
+        return false;
+    }
+    if (!std::isfinite(options.sample_spacing) || options.sample_spacing <= 0.0) {
+        error = "TaperedSweep sampleSpacing must be finite and greater than zero";
+        return false;
+    }
+    if (options.stations.size() < 2) {
+        error = "TaperedSweep stations must contain at least two entries";
+        return false;
+    }
+
+    bool has_non_point_station = false;
+    for (size_t i = 0; i < options.stations.size(); ++i) {
+        const auto& station = options.stations[i];
+        if (!std::isfinite(station.u) || !std::isfinite(station.rx) ||
+            !std::isfinite(station.rz) || !std::isfinite(station.twist_degrees)) {
+            error = "TaperedSweep station values must be finite";
+            return false;
+        }
+        if (station.u < 0.0 || station.u > 1.0) {
+            error = "TaperedSweep station u must be from 0 to 1";
+            return false;
+        }
+        if (station.rx < 0.0 || station.rz < 0.0) {
+            error = "TaperedSweep station radii must be non-negative";
+            return false;
+        }
+        if (i > 0 && station.u <= options.stations[i - 1].u) {
+            error = "TaperedSweep station u values must be strictly increasing";
+            return false;
+        }
+
+        const bool collapsed = station.rx <= 1e-6 && station.rz <= 1e-6;
+        has_non_point_station = has_non_point_station || !collapsed;
+        if (collapsed && i != 0 && i + 1 != options.stations.size()) {
+            error = "TaperedSweep collapsed stations are only supported at the path ends";
+            return false;
+        }
+    }
+    if (std::abs(options.stations.front().u) > 1e-9 ||
+        std::abs(options.stations.back().u - 1.0) > 1e-9) {
+        error = "TaperedSweep stations must include u=0 and u=1 endpoints";
+        return false;
+    }
+    if (!has_non_point_station) {
+        error = "TaperedSweep stations cannot all collapse to points";
+        return false;
+    }
+    return true;
+}
+
+TaperedSweepStation sample_tapered_station(const std::vector<TaperedSweepStation>& stations,
+                                           double u)
+{
+    if (u <= stations.front().u)
+        return stations.front();
+    if (u >= stations.back().u)
+        return stations.back();
+
+    const auto upper = std::upper_bound(
+        stations.begin(), stations.end(), u,
+        [](double value, const TaperedSweepStation& station) { return value < station.u; });
+    const auto& b = *upper;
+    const auto& a = *(upper - 1);
+    const double span = b.u - a.u;
+    const double t = span <= 1e-12 ? 0.0 : (u - a.u) / span;
+    return {
+        u,
+        a.rx + (b.rx - a.rx) * t,
+        a.rz + (b.rz - a.rz) * t,
+        a.twist_degrees + (b.twist_degrees - a.twist_degrees) * t,
+    };
+}
+
+data::PcgGeometry build_tapered_sweep_geometry(
+    const std::vector<geometry::Frame3>& frames,
+    const std::vector<double>& frame_u,
+    const TaperedSweepOptions& options)
+{
+    data::PcgGeometry result;
+    if (frames.size() < 2 || frames.size() != frame_u.size())
+        return result;
+
+    struct Ring {
+        std::vector<int> points;
+        TaperedSweepStation station;
+        bool collapsed = false;
+    };
+
+    const int radial = options.radial_segments;
+    constexpr double kPi = 3.14159265358979323846;
+    std::vector<Ring> rings;
+    rings.reserve(frames.size());
+
+    for (size_t i = 0; i < frames.size(); ++i) {
+        Ring ring;
+        ring.station = sample_tapered_station(options.stations, frame_u[i]);
+        ring.station.rx *= options.radius_scale;
+        ring.station.rz *= options.radius_scale;
+        ring.collapsed = ring.station.rx <= 1e-6 && ring.station.rz <= 1e-6;
+        if (ring.collapsed) {
+            ring.points.push_back(static_cast<int>(result.points().size()));
+            const auto& centre = frames[i].origin;
+            result.points_mut().push_back({centre.x, centre.y, centre.z});
+            rings.push_back(std::move(ring));
+            continue;
+        }
+
+        ring.points.reserve(static_cast<size_t>(radial));
+        const double twist = ring.station.twist_degrees * kPi / 180.0;
+        for (int j = 0; j < radial; ++j) {
+            const double theta = (static_cast<double>(j) / static_cast<double>(radial)) *
+                                     2.0 * kPi +
+                                 twist;
+            const geometry::Vec3 offset = geometry::add(
+                geometry::scale(frames[i].normal, std::cos(theta) * ring.station.rx),
+                geometry::scale(frames[i].binormal, std::sin(theta) * ring.station.rz));
+            const geometry::Vec3 point = geometry::add(frames[i].origin, offset);
+            ring.points.push_back(static_cast<int>(result.points().size()));
+            result.points_mut().push_back({point.x, point.y, point.z});
+        }
+        rings.push_back(std::move(ring));
+    }
+
+    std::vector<data::PcgVec2> corner_uvs;
+    const auto append_face = [&](std::vector<int> face, std::vector<data::PcgVec2> uvs,
+                                 const char* group_name) {
+        const int face_index = static_cast<int>(result.faces().size());
+        result.faces_mut().push_back(std::move(face));
+        corner_uvs.insert(corner_uvs.end(), uvs.begin(), uvs.end());
+        result.groups().add(geometry::GroupDomain::Face, group_name, face_index);
+    };
+
+    for (size_t i = 0; i + 1 < rings.size(); ++i) {
+        const Ring& a = rings[i];
+        const Ring& b = rings[i + 1];
+        if (a.collapsed && b.collapsed)
+            continue;
+
+        const double v0 = frame_u[i];
+        const double v1 = frame_u[i + 1];
+        for (int j = 0; j < radial; ++j) {
+            const int next = (j + 1) % radial;
+            const double u0 = static_cast<double>(j) / static_cast<double>(radial);
+            const double u1 = static_cast<double>(j + 1) / static_cast<double>(radial);
+            if (a.collapsed) {
+                append_face(
+                    {a.points[0], b.points[static_cast<size_t>(next)], b.points[static_cast<size_t>(j)]},
+                    {{0.5, v0}, {u1, v1}, {u0, v1}}, "side");
+            } else if (b.collapsed) {
+                append_face(
+                    {a.points[static_cast<size_t>(j)], a.points[static_cast<size_t>(next)], b.points[0]},
+                    {{u0, v0}, {u1, v0}, {0.5, v1}}, "side");
+            } else {
+                append_face(
+                    {a.points[static_cast<size_t>(j)], a.points[static_cast<size_t>(next)],
+                     b.points[static_cast<size_t>(next)], b.points[static_cast<size_t>(j)]},
+                    {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}}, "side");
+            }
+        }
+    }
+
+    const auto append_cap = [&](const Ring& ring, bool start) {
+        if (ring.collapsed)
+            return;
+        const int centre_index = static_cast<int>(result.points().size());
+        geometry::Vec3 centre{};
+        for (int point_index : ring.points) {
+            const auto& point = result.points()[static_cast<size_t>(point_index)];
+            centre = geometry::add(centre, {point.x, point.y, point.z});
+        }
+        centre = geometry::scale(centre, 1.0 / static_cast<double>(ring.points.size()));
+        result.points_mut().push_back({centre.x, centre.y, centre.z});
+
+        for (int j = 0; j < radial; ++j) {
+            const int next = (j + 1) % radial;
+            const double theta0 = static_cast<double>(j) / static_cast<double>(radial) * 2.0 * kPi;
+            const double theta1 = static_cast<double>(j + 1) / static_cast<double>(radial) * 2.0 * kPi;
+            const data::PcgVec2 uv0{0.5 + 0.5 * std::cos(theta0), 0.5 + 0.5 * std::sin(theta0)};
+            const data::PcgVec2 uv1{0.5 + 0.5 * std::cos(theta1), 0.5 + 0.5 * std::sin(theta1)};
+            if (start) {
+                append_face(
+                    {centre_index, ring.points[static_cast<size_t>(next)], ring.points[static_cast<size_t>(j)]},
+                    {{0.5, 0.5}, uv1, uv0}, "cap_start");
+            } else {
+                append_face(
+                    {centre_index, ring.points[static_cast<size_t>(j)], ring.points[static_cast<size_t>(next)]},
+                    {{0.5, 0.5}, uv0, uv1}, "cap_end");
+            }
+        }
+    };
+
+    if (options.cap_start)
+        append_cap(rings.front(), true);
+    if (options.cap_end)
+        append_cap(rings.back(), false);
+
+    result.set_corner_uvs(std::move(corner_uvs));
+    data::maintain_unshared_edge_group(result, "unshared");
+    return result;
+}
+
 } // namespace
 
 std::vector<geometry::Vec3> spline_data_to_polyline(const data::PcgSplineData& splines, size_t spline_index)
@@ -834,6 +1044,70 @@ data::PcgGeometry sweep_along_spline_geometry(const data::PcgSplineData& backbon
         result = data::merge_geometries(result, swept);
     }
 
+    return result;
+}
+
+data::PcgGeometry tapered_sweep_along_spline_geometry(
+    const data::PcgSplineData& backbone,
+    const TaperedSweepOptions& options,
+    std::string* error)
+{
+    data::PcgGeometry result;
+    std::string validation_error;
+    if (!validate_tapered_sweep_options(options, validation_error)) {
+        if (error)
+            *error = validation_error;
+        return result;
+    }
+    if (backbone.splines().empty()) {
+        if (error)
+            *error = "TaperedSweep missing backbone input";
+        return result;
+    }
+
+    const geometry::Vec3 up_hint{options.up_x, options.up_y, options.up_z};
+    for (const auto& spline : backbone.splines()) {
+        std::vector<geometry::Vec3> polyline;
+        polyline.reserve(spline.points.size());
+        for (const auto& point : spline.points)
+            polyline.push_back(to_vec3(point));
+
+        if (spline_is_closed(polyline, spline.closed)) {
+            if (error)
+                *error = "TaperedSweep requires an open backbone";
+            return {};
+        }
+
+        polyline = geometry::resample_polyline_by_spacing(
+            polyline, std::max(0.01, options.sample_spacing));
+        if (polyline.size() < 2) {
+            if (error)
+                *error = "TaperedSweep backbone must contain at least two distinct points";
+            return {};
+        }
+
+        const double total_length = geometry::polyline_length(polyline);
+        if (total_length <= 1e-9) {
+            if (error)
+                *error = "TaperedSweep backbone length must be greater than zero";
+            return {};
+        }
+
+        std::vector<double> frame_u(polyline.size(), 0.0);
+        double travelled = 0.0;
+        for (size_t i = 1; i < polyline.size(); ++i) {
+            travelled += geometry::length(geometry::sub(polyline[i], polyline[i - 1]));
+            frame_u[i] = std::clamp(travelled / total_length, 0.0, 1.0);
+        }
+        frame_u.back() = 1.0;
+
+        const auto frames = geometry::build_parallel_transport_frames(polyline, up_hint);
+        data::PcgGeometry swept = build_tapered_sweep_geometry(frames, frame_u, options);
+        result = data::merge_geometries(result, swept);
+    }
+
+    if (result.points().empty() && error)
+        *error = "TaperedSweep produced empty geometry";
     return result;
 }
 

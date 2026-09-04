@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+
+#include <nlohmann/json.hpp>
+
 #include "httplib.h"
 
 namespace pcg_server {
@@ -9,6 +13,14 @@ void ConfigureAgentRuntime(int server_port);
 
 // Describes the active secret backend without exposing credential contents.
 const char* AgentCredentialStoreName();
+
+// Namespaced secrets in the Agent credential store (file chmod 600, or macOS
+// Keychain when PCG_AGENT_CREDENTIAL_STORE=keychain). Names must be unique
+// across consumers (e.g. "thirdParty.tripo"). These functions never log or
+// transmit the stored value; callers decide what to expose.
+bool LoadProtectedCredential(const std::string& name, nlohmann::json& value);
+bool StoreProtectedCredential(const std::string& name, const nlohmann::json& value);
+bool DeleteProtectedCredential(const std::string& name);
 
 void HandleAgentProviders(const httplib::Request& req, httplib::Response& res);
 void HandleAgentConnectKey(const httplib::Request& req, httplib::Response& res);

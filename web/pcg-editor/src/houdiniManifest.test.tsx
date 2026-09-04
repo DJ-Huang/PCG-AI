@@ -28,7 +28,7 @@ function renderInspector(type: string) {
 describe('Houdini SOP manifest coverage', () => {
   it('ships every generated native SOP definition', () => {
     const nodes = getAllNodeTypes();
-    expect(nodes).toHaveLength(305);
+    expect(nodes).toHaveLength(309);
     expect(nodes.filter((node) => node.houdiniInternalNames?.length)).toHaveLength(172);
     for (const type of ['Sphere', 'Torus', 'AttributeCreate', 'UVFlatten', 'Curve']) {
       const definition = getNodeTypeDefs(type);

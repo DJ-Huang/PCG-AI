@@ -4,9 +4,12 @@ import { PcgExecuteKind, type CookResult } from './cookResult';
 import {
   PREVIEW_SINK_NODE_ID,
   SUBGRAPH_PREVIEW_OUTPUT_ID,
+  applySdfPreviewQuality,
   buildPreviewDataFromCook,
   buildSubgraphCookGraph,
+  nextSdfRetryScale,
   prepareGraphForPreviewCook,
+  shouldAutoCookGraphPreview,
 } from './previewCook';
 
 function node(id: string, type: string, data: Record<string, unknown> = {}) {
@@ -97,6 +100,86 @@ describe('prepareGraphForPreviewCook', () => {
       subgraphs: [],
     };
     expect(prepareGraphForPreviewCook(graph)).toBe(graph);
+  });
+});
+
+describe('shouldAutoCookGraphPreview', () => {
+  it('keeps eager preview for ordinary graphs', () => {
+    expect(shouldAutoCookGraphPreview({
+      nodes: [node('points', 'SpawnPoints')],
+      edges: [],
+    })).toBe(true);
+  });
+
+  it('waits for a terminal connection while an oriented SDF graph is assembled', () => {
+    expect(shouldAutoCookGraphPreview({
+      nodes: [node('surface', 'OrientedSdfSurface'), node('out', 'Output')],
+      edges: [],
+    })).toBe(false);
+  });
+
+  it('allows the oriented SDF graph to cook after Output is connected', () => {
+    expect(shouldAutoCookGraphPreview({
+      nodes: [node('surface', 'OrientedSdfSurface'), node('out', 'Output')],
+      edges: [{ target: 'out' }],
+    })).toBe(true);
+  });
+});
+
+describe('SDF Web preview quality policy', () => {
+  const graph: GraphJson = {
+    version: '2.0',
+    nodes: [
+      node('head', 'OrientedSdfSurface', {
+        cellSize: 0.003,
+        maxActiveCells: 4_500_000,
+        previewCellSizeScale: 1,
+        previewTriangleBudget: 500_000,
+      }),
+      node('body', 'OrientedSdfSurface', {
+        cellSize: 0.004,
+        maxActiveCells: 3_000_000,
+        previewCellSizeScale: 2.5,
+        previewTriangleBudget: 600_000,
+      }),
+    ],
+    edges: [],
+    parameters: [],
+    subgraphs: [],
+  };
+
+  it('uses per-node adaptive cell scales and leaves the authored graph unchanged', () => {
+    const result = applySdfPreviewQuality(graph, 'adaptive');
+    expect(result.triangleBudget).toBe(500_000);
+    expect(result.nodeQualities).toEqual([
+      { nodeId: 'head', sourceCellSize: 0.003, scale: 1, effectiveCellSize: 0.003 },
+      { nodeId: 'body', sourceCellSize: 0.004, scale: 2.5, effectiveCellSize: 0.01 },
+    ]);
+    expect(result.graph.nodes[0].data.cellSize).toBe(0.003);
+    expect(result.graph.nodes[1].data.cellSize).toBe(0.01);
+    expect(result.graph.nodes[0].data.maxActiveCells).toBe(162_500);
+    expect(graph.nodes[1].data.cellSize).toBe(0.004);
+    expect(graph.nodes[1].data.maxActiveCells).toBe(3_000_000);
+  });
+
+  it('maps explicit medium/low modes to the Img2Threejs-style x2/x3 levels', () => {
+    const medium = applySdfPreviewQuality(graph, 'medium');
+    const low = applySdfPreviewQuality(graph, 'low');
+    expect(medium.nodeQualities.map((item) => item.scale)).toEqual([2, 2]);
+    expect(low.nodeQualities.map((item) => item.scale)).toEqual([3, 3]);
+  });
+
+  it('keeps full mode bit-for-bit on the authored graph inputs', () => {
+    const result = applySdfPreviewQuality(graph, 'full');
+    expect(result.graph).toBe(graph);
+    expect(result.triangleBudget).toBeNull();
+    expect(result.nodeQualities.map((item) => item.effectiveCellSize)).toEqual([0.003, 0.004]);
+  });
+
+  it('derives a bounded inverse-square retry scale', () => {
+    expect(nextSdfRetryScale(500_000, 500_000)).toBe(1);
+    expect(nextSdfRetryScale(2_000_000, 500_000)).toBeCloseTo(2.16);
+    expect(nextSdfRetryScale(20_000_000, 500_000)).toBe(2.5);
   });
 });
 
@@ -192,5 +275,43 @@ describe('buildPreviewDataFromCook texture output', () => {
     const result = buildPreviewDataFromCook(cookStub(JSON.stringify({ kind: 'texture', slotId: 'gen1' })));
     expect(result.ok).toBe(true);
     expect(result.data?.images[0]).toMatchObject({ nodeId: 'gen1', url: '', repeatX: 1, repeatY: 1 });
+  });
+});
+
+function minimalTriangleMeshBinary(): Uint8Array {
+  const buffer = new ArrayBuffer(20 + 9 * 4 + 3 * 4);
+  const view = new DataView(buffer);
+  view.setUint32(0, 0x4d474350, true); // PCGM
+  view.setUint32(4, 2, true);
+  view.setUint32(8, 3, true);
+  view.setUint32(12, 3, true);
+  view.setUint32(16, 0, true);
+  const positions = new Float32Array(buffer, 20, 9);
+  positions.set([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  const indices = new Uint32Array(buffer, 20 + 9 * 4, 3);
+  indices.set([0, 1, 2]);
+  return new Uint8Array(buffer);
+}
+
+describe('buildPreviewDataFromCook dense mesh ownership', () => {
+  it('prefers PCGM, skips redundant PCGG parsing, and releases raw payload views', () => {
+    const cook: CookResult = {
+      ...cookStub(''),
+      kind: PcgExecuteKind.Mesh,
+      vertexCount: 3,
+      indexCount: 3,
+      mesh: minimalTriangleMeshBinary(),
+      // Deliberately invalid: this would throw if the redundant polygon
+      // payload were parsed despite a complete render mesh being available.
+      geometry: new Uint8Array([1, 2, 3, 4]),
+    };
+
+    const result = buildPreviewDataFromCook(cook);
+    expect(result.ok).toBe(true);
+    expect(result.data?.mesh?.vertexCount).toBe(3);
+    expect(result.data?.geometry).toBeNull();
+    expect(result.data?.cook.mesh.byteLength).toBe(0);
+    expect(result.data?.cook.geometry.byteLength).toBe(0);
+    expect(cook.mesh.byteLength).toBeGreaterThan(0);
   });
 });

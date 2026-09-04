@@ -133,7 +133,8 @@ Checks both Vite dev server (:5173) and pcg-server (:17890). Exit 0 = both healt
 
 ```bash
 python3 scripts/web/setup_web_review.py path/to/graph.pcg \
-  --slug cabin --camera front --front-axis +z --side-view right --json
+  --slug cabin --camera front --front-axis +z --side-view right \
+  --quality adaptive --json
 ```
 
 Resolves the graph path relative to the workspace root and returns the review URL:
@@ -141,6 +142,8 @@ Resolves the graph path relative to the workspace root and returns the review UR
 
 The Vite dev server's `/review` route loads the graph, cooks it via pcg-server,
 and renders it in a clean `PreviewViewport` (same Three.js as the full editor).
+Adaptive is the browser-safe default for SDF assets; final pixel acceptance
+must pass `--quality full`. GLB export always runs a separate full-quality cook.
 
 ### capture_webview_png.py
 
@@ -148,6 +151,7 @@ and renders it in a clean `PreviewViewport` (same Three.js as the full editor).
 python3 scripts/web/capture_webview_png.py "<review-url>" \
   --cameras front,side,top,three-quarter \
   --front-axis +z --side-view right \
+  --quality full \
   --slug cabin --out-dir screenshots --json
 ```
 
@@ -156,6 +160,17 @@ Opens the review URL in headless Chromium via Playwright, waits for
 WebGL canvas (not editor chrome) as a PNG. Keep each `cameraReceipt`.
 
 Requires: `pip install playwright && playwright install chromium`
+
+### export_web_asset.py
+
+```bash
+python3 scripts/web/export_web_asset.py "<material-review-url>" \
+  --out examples/cabin/cabin.glb --json
+```
+
+Re-cooks the saved graph in the clean review page and downloads the resulting
+materialized GLB. The export preserves mesh attributes, material slots/PBR
+factors, a stable root hierarchy, and the source `.pcg` path in glTF extras.
 
 ## Suggested agent loop
 

@@ -55,9 +55,22 @@ function isFinitePosition(position: { x: number; y: number }): boolean {
 }
 
 function validateNodePatch(nodeType: string, patch: Record<string, unknown>): string | null {
+  const validateSemantic = (value: unknown): string | null => {
+    const parsed = parseGraphJson(JSON.stringify({
+      version: '1.0',
+      nodes: [{ id: 'semantic_validation', type: nodeType, position: { x: 0, y: 0 }, data: { __semantic: value } }],
+      edges: [],
+    }));
+    return parsed.ok ? null : parsed.error;
+  };
   if (nodeType === 'Subgraph') {
     for (const [key, value] of Object.entries(patch)) {
       if (key === '__nodeTitle' && typeof value === 'string') continue;
+      if (key === '__semantic') {
+        const error = validateSemantic(value);
+        if (!error) continue;
+        return error;
+      }
       if (key === 'subgraphId' && typeof value === 'string' && value.length > 0) continue;
       return `unsupported Subgraph property "${key}"`;
     }
@@ -71,6 +84,11 @@ function validateNodePatch(nodeType: string, patch: Record<string, unknown>): st
     if (key === '__nodeTitle') {
       if (typeof value !== 'string') return '__nodeTitle requires a string';
       continue;
+    }
+    if (key === '__semantic') {
+      const error = validateSemantic(value);
+      if (!error) continue;
+      return error;
     }
     const error = validateNodePropertyValue(nodeType, key, value);
     if (error) return error;

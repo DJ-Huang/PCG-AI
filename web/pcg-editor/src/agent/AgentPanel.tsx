@@ -31,6 +31,14 @@ interface AgentPanelProps {
   syncEditorContext?: () => Promise<void>;
   editorSessionId?: string;
   providerRevision?: number;
+  launchRequest?: AgentLaunchRequest | null;
+  onLaunchConsumed?: (requestId: string) => void;
+}
+
+export interface AgentLaunchRequest {
+  id: string;
+  message: string;
+  files: File[];
 }
 
 const MIN_WIDTH = 300;
@@ -63,7 +71,14 @@ function upsertPart(message: AgentMessageRecord, part: AgentPart): AgentMessageR
   return { ...message, parts };
 }
 
-export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSessionId = '', providerRevision = 0 }: AgentPanelProps) {
+export default function AgentPanel({
+  onOpenSettings,
+  syncEditorContext,
+  editorSessionId = '',
+  providerRevision = 0,
+  launchRequest = null,
+  onLaunchConsumed,
+}: AgentPanelProps) {
   const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
   const [sending, setSending] = useState(false);
   const [width, setWidth] = useState(380);
@@ -85,6 +100,7 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSe
   const [showReasoning, setShowReasoning] = useState(() => localStorage.getItem(SHOW_REASONING_KEY) !== 'false');
   const abortRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  const consumedLaunchRequestRef = useRef('');
 
   const selectedProvider = useMemo(() => providers.find((provider) => provider.id === providerId), [providers, providerId]);
   const selectedModel = selectedProvider?.models.find((model) => model.id === modelId);
@@ -330,6 +346,23 @@ export default function AgentPanel({ onOpenSettings, syncEditorContext, editorSe
       setSending(false);
     }
   }, [connected, editorSessionId, handleEvent, modelId, onOpenSettings, providerId, reasoningEffort, selectedModel, selectedProvider, sessionId, syncEditorContext]);
+
+  useEffect(() => {
+    if (!launchRequest || consumedLaunchRequestRef.current === launchRequest.id) return;
+    if (!connected || !selectedModel || sending || pendingCalls.length > 0 || showHistory) return;
+    if (launchRequest.files.some((file) => file.type.startsWith('image/')) && !selectedModel.capabilities.imageInput) {
+      setConnectionError(`${selectedModel.name} does not support the image evidence required for procedural reconstruction.`);
+      return;
+    }
+    consumedLaunchRequestRef.current = launchRequest.id;
+    onLaunchConsumed?.(launchRequest.id);
+    const attachments: AgentAttachment[] = launchRequest.files.map((file, index) => ({
+      id: `${launchRequest.id}-${index}`,
+      file,
+      previewUrl: null,
+    }));
+    void sendTurn(launchRequest.message, attachments);
+  }, [connected, launchRequest, onLaunchConsumed, pendingCalls.length, selectedModel, sendTurn, sending, showHistory]);
 
   const retryTurn = useCallback(async (retryTurnId: string) => {
     if (!connected || !selectedProvider || !selectedModel || sending) return;

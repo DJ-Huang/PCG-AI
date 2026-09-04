@@ -93,7 +93,7 @@ function cookProxyPlugin(): Plugin {
         proxyToPcgServer(req, res, `/v1/agent${req.url ?? ''}`);
       });
       server.middlewares.use('/api/editor-bridge', (req, res, next) => {
-        if (!['GET', 'PUT', 'POST', 'PATCH'].includes(req.method ?? '')) {
+        if (!['GET', 'PUT', 'POST', 'PATCH', 'DELETE'].includes(req.method ?? '')) {
           next();
           return;
         }
@@ -207,10 +207,53 @@ function exportGraphPlugin(): Plugin {
         });
       });
 
+      // Upload a local image into public/assets/uploads/ (Tripo Source Image, …).
+      // POST /api/upload-texture?name=<file.png>  (raw bytes body, ≤ 20 MB)
+      // Returns { ok, storage: "pcg-resource://uploads/<file>" }.
+      server.middlewares.use('/api/upload-texture', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        const url = new URL(req.url ?? '', 'http://localhost');
+        const rawName = path.basename(url.searchParams.get('name') ?? '');
+        const safeName = rawName.replace(/[^A-Za-z0-9._-]/g, '_');
+        if (!/\.(png|jpe?g)$/i.test(safeName)) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: 'Only .png / .jpg images are supported' }));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        let total = 0;
+        req.on('data', (chunk: Buffer) => {
+          total += chunk.length;
+          if (total <= 20 * 1024 * 1024) chunks.push(chunk);
+        });
+        req.on('end', () => {
+          if (total > 20 * 1024 * 1024) {
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: false, error: 'Image exceeds the 20 MB limit' }));
+            return;
+          }
+          try {
+            const dir = path.resolve(__dirname, 'public/assets/uploads');
+            fs.mkdirSync(dir, { recursive: true });
+            const fileName = `${Date.now()}-${safeName}`;
+            fs.writeFileSync(path.join(dir, fileName), Buffer.concat(chunks));
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, storage: `pcg-resource://uploads/${fileName}` }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: String(err) }));
+          }
+        });
+      });
+
       // Load a .pcg graph file from disk (for the /review route)
       // GET /api/load-graph?path=<relative-path>
-      server.middlewares.use('/api/load-graph', (req, res, next) => {
-        if (req.method !== 'GET') {
+      server.middlewares.use('/api/load-graph', (req, res, next) => {        if (req.method !== 'GET') {
           next();
           return;
         }

@@ -88,6 +88,16 @@ import {
   type PhysicalCameraState,
 } from './physicalCamera';
 import CameraPopover from './preview/CameraPopover';
+import AnimationTransport from './preview/AnimationTransport';
+import { computeMeshBandProfile, type MeshBandProfile } from './meshBandProfile';
+import {
+  buildActionRigObject,
+  type ActionAnimationClipInfo,
+  type ActionPlaybackState,
+  type ActionRuntimeController,
+  type ActionRuntimeDiagnostics,
+} from './actionRuntime';
+import { loadPreservedGltfRig } from './preservedGltfRuntime';
 
 export interface SplineEditContext {
   nodeId: string;
@@ -117,6 +127,10 @@ interface PreviewViewportProps {
   selectedNodeId?: string | null;
   /** Fill the parent and hide editor chrome. Used by the /review route. */
   reviewMode?: boolean;
+  /** Initial viewport shading. The clean review route uses material evidence by default. */
+  initialShadingMode?: ShadingMode;
+  /** Open the viewport's animation workspace as soon as an animated result is available. */
+  initialAnimationModeOpen?: boolean;
   /** Deterministic camera applied after each cook on the review page. */
   reviewCamera?: {
     view: ReviewCameraView;
@@ -136,6 +150,35 @@ export interface CaptureOptions {
   camera?: CameraCommand;
   /** Override the session DOF switch for this capture. */
   dof?: boolean;
+  /** Temporary depth-transparent solid pass for layout/section review captures. */
+  xray?: boolean;
+  /** Temporary shading override; the interactive viewport mode is restored afterwards. */
+  shadingMode?: ShadingMode;
+  /** Deterministic analysis output. Beauty preserves PBR; all other passes hide editor helpers. */
+  renderPass?: CaptureRenderPass;
+}
+
+const CAPTURE_RENDER_PASSES = [
+  'beauty',
+  'alpha-silhouette',
+  'semantic-id',
+  'depth',
+  'normal',
+  'roughness-material-id',
+] as const;
+
+export type CaptureRenderPass = (typeof CAPTURE_RENDER_PASSES)[number];
+
+export interface CaptureDiagnosticLegend {
+  depthRange?: [number, number];
+  semanticIds?: Array<{ id: number; sourceNode: string; color: string }>;
+  materialIds?: Array<{
+    id: number;
+    slot: string;
+    color: string;
+    roughness: number;
+    metallic: number;
+  }>;
 }
 
 export interface PreviewCapture {
@@ -159,6 +202,10 @@ export interface PreviewCapture {
     wireframeOverlay: boolean;
     xrayEnabled: boolean;
     reviewPose?: ReviewCameraPose | null;
+    /** Ground-aligned, height-normalized mesh proportions for reference/candidate comparison. */
+    meshBandProfile?: MeshBandProfile | null;
+    renderPass?: CaptureRenderPass;
+    diagnosticLegend?: CaptureDiagnosticLegend | null;
   };
 }
 
@@ -171,9 +218,24 @@ export interface PreviewViewportHandle {
   /** Merge a camera command into the session camera and apply it. */
   applyCameraCommand(command: CameraCommand): PhysicalCameraState | null;
   getCameraState(): PhysicalCameraState | null;
+  listAnimations(): string[];
+  listAnimationClips(): ActionAnimationClipInfo[];
+  listComponents(): string[];
+  playAnimation(name: string): boolean;
+  pauseAnimation(): void;
+  resumeAnimation(): boolean;
+  stopAnimation(): void;
+  seekAnimation(name: string, timeSeconds: number): boolean;
+  setAnimationSpeed(speed: number): void;
+  setAnimationLoop(loop: boolean): void;
+  getAnimationPlaybackState(): ActionPlaybackState | null;
+  setExplode(amount: number): void;
+  inspectActionRuntime(): ActionRuntimeDiagnostics | null;
+  /** Exact source GLB bytes when PreserveGltfRig is active. */
+  getPreservedGltfBytes(): ArrayBuffer | null;
 }
 
-type ShadingMode = 'solid' | 'material' | 'rendered';
+export type ShadingMode = 'solid' | 'material' | 'rendered';
 
 const XRAY_OPACITY = 0.35;
 
@@ -229,14 +291,35 @@ const SELECTION_HIGHLIGHT_COLOR = 0xff9d2e;
 const SELECTION_HIGHLIGHT_LINE_WIDTH = 3;
 
 const MIN_WIDTH = 320;
-const MAX_WIDTH = 1400;
-/** Default preview width: ~45% of the window so the 3D view dominates the graph editor. */
+const MAX_WIDTH = 2400;
+
 const defaultWidth = () =>
-  Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(window.innerWidth * 0.45)));
+  Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round((window.innerWidth * 2) / 3)));
 const EMPTY_PARAMETERS: GraphParameter[] = [];
 const EMPTY_PARAMETER_NODE_IDS = new Set<string>();
 const EMPTY_PARAMETER_VALUES: PreviewParameterValues = {};
 const NOOP_PARAMETER_CHANGE = () => {};
+const EMPTY_ACTION_PLAYBACK: ActionPlaybackState = {
+  clipName: null,
+  currentTime: 0,
+  duration: 0,
+  playing: false,
+  paused: false,
+  loop: false,
+  loopSource: 'unmeasured',
+  speed: 1,
+};
+
+function samePlaybackState(a: ActionPlaybackState, b: ActionPlaybackState): boolean {
+  return a.clipName === b.clipName &&
+    Math.abs(a.currentTime - b.currentTime) < 1e-4 &&
+    Math.abs(a.duration - b.duration) < 1e-4 &&
+    a.playing === b.playing &&
+    a.paused === b.paused &&
+    a.loop === b.loop &&
+    a.loopSource === b.loopSource &&
+    Math.abs(a.speed - b.speed) < 1e-4;
+}
 
 function flipZArray(src: Float32Array): Float32Array {
   const out = new Float32Array(src.length);
@@ -263,6 +346,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   onPickNode,
   selectedNodeId = null,
   reviewMode = false,
+  initialShadingMode = 'solid',
+  initialAnimationModeOpen = false,
   reviewCamera = null,
   onReviewCameraApplied,
 }: PreviewViewportProps, ref) {
@@ -286,7 +371,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     pmremGenerator: THREE.PMREMGenerator | null;
     reviewPose: ReviewCameraPose | null;
   } | null>(null);
-  const [shadingMode, setShadingMode] = useState<ShadingMode>('solid');
+  const [shadingMode, setShadingMode] = useState<ShadingMode>(initialShadingMode);
   const [solidLighting, setSolidLighting] = useState<SolidLighting>('studio');
   const [matcapId, setMatcapId] = useState<MatcapId>(DEFAULT_MATCAP_ID);
   const [wireframeOverlay, setWireframeOverlay] = useState(false);
@@ -332,12 +417,30 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [width, setWidth] = useState(defaultWidth);
   const [sceneMs, setSceneMs] = useState(0);
+  const [animationModeOpen, setAnimationModeOpen] = useState(initialAnimationModeOpen);
+  const [animationClips, setAnimationClips] = useState<ActionAnimationClipInfo[]>([]);
+  const [selectedAnimation, setSelectedAnimation] = useState('');
+  const [animationPlayback, setAnimationPlayback] = useState<ActionPlaybackState>(EMPTY_ACTION_PLAYBACK);
   const sceneTimedDataRef = useRef<PreviewData | null>(null);
   const pickDownRef = useRef<{ x: number; y: number; consumed: boolean } | null>(null);
   const onPickNodeRef = useRef(onPickNode);
   onPickNodeRef.current = onPickNode;
   const sourceMappingRef = useRef<SourceMapping | null>(null);
   sourceMappingRef.current = data?.sourceMapping ?? null;
+
+  const updateAnimationPlayback = useCallback((next: ActionPlaybackState) => {
+    setAnimationPlayback((current) => samePlaybackState(current, next) ? current : next);
+  }, []);
+
+  const syncAnimationRuntime = useCallback((controller: ActionRuntimeController | null) => {
+    const clips = controller?.clips ?? [];
+    setAnimationClips(clips);
+    setSelectedAnimation((selected) => {
+      if (clips.some((clip) => clip.name === selected)) return selected;
+      return controller?.currentAnimation ?? clips[0]?.name ?? '';
+    });
+    updateAnimationPlayback(controller?.getPlaybackState() ?? EMPTY_ACTION_PLAYBACK);
+  }, [updateAnimationPlayback]);
 
   const onResizeStart = useCallback(
     (e: React.MouseEvent) => {
@@ -466,13 +569,15 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       nextCamera.fov = focalLengthToFov(state.focalLengthMm, state.sensorHeightMm);
       nextCamera.aspect = aspect;
     } else {
-      // Ortho frustum height matches the perspective framing at the target distance.
+      // Explicit semantic framing wins; otherwise retain the legacy lens-derived size.
       const distance = Math.max(
         nextCamera.position.distanceTo(new THREE.Vector3(...state.target)),
         0.001,
       );
       const fov = THREE.MathUtils.degToRad(focalLengthToFov(state.focalLengthMm, state.sensorHeightMm));
-      const halfH = distance * Math.tan(fov / 2);
+      const halfH = state.orthographicFrustumHeight
+        ? state.orthographicFrustumHeight / 2
+        : distance * Math.tan(fov / 2);
       nextCamera.top = halfH;
       nextCamera.bottom = -halfH;
       nextCamera.left = -halfH * aspect;
@@ -521,6 +626,16 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
       const dofActive = (options?.dof ?? physicalCameraRef.current.dofEnabled) &&
         ctx.camera instanceof THREE.PerspectiveCamera;
+      const forcedXray = options?.xray === true;
+      const currentShading = shadingRef.current;
+      const captureShadingMode = options?.shadingMode ?? currentShading.shadingMode;
+      const renderPass = options?.renderPass;
+      const captureXray = captureShadingMode === 'solid'
+        ? (forcedXray || currentShading.xrayEnabled)
+        : false;
+      const hasTemporaryShading = (renderPass !== undefined && renderPass !== 'beauty') ||
+        captureShadingMode !== currentShading.shadingMode ||
+        captureXray !== currentShading.xrayEnabled;
       const clampSize = (value: number | undefined) =>
         value === undefined ? null : Math.min(8192, Math.max(16, Math.round(value)));
       const captureWidth = clampSize(options?.width);
@@ -535,11 +650,42 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       const savedClearColor = new THREE.Color();
       ctx.renderer.getClearColor(savedClearColor);
       const savedClearAlpha = ctx.renderer.getClearAlpha();
+      const savedHelpersVisible = ctx.helpers.visible;
+      const savedHandlesVisible = ctx.handles.visible;
+      const savedContentVisibility = new Map<THREE.Object3D, boolean>();
+      ctx.content.traverse((child) => savedContentVisibility.set(child, child.visible));
+      const savedGroups = collectPreviewMeshes(ctx.content)
+        .map((mesh) => ({
+          geometry: mesh.geometry,
+          groups: mesh.geometry.groups.map((group) => ({ ...group })),
+        }));
+      let diagnosticLegend: CaptureDiagnosticLegend | null = null;
 
       const outWidth = captureWidth ?? Math.round(canvas.clientWidth * savedPixelRatio);
       const outHeight = captureHeight ?? Math.round(canvas.clientHeight * savedPixelRatio);
 
       try {
+        if (renderPass && renderPass !== 'beauty') {
+          diagnosticLegend = applyDiagnosticRenderPass(
+            ctx.content,
+            renderPass,
+            dataRef.current?.materials ?? {},
+            dataRef.current?.sourceMapping ?? null,
+            ctx.camera,
+          );
+        } else if (hasTemporaryShading) {
+          applyShading(ctx.content, captureShadingMode, currentShading.solidLighting, currentShading.wireframeOverlay, captureXray, ctx.matcapTexture, dataRef.current?.materials ?? {}, currentShading.pbrDebugView);
+        }
+        if (renderPass) {
+          ctx.helpers.visible = false;
+          ctx.handles.visible = false;
+          ctx.content.traverse((child) => {
+            if (child === ctx.content) return;
+            const kind = child.userData.kind as string | undefined;
+            child.visible = kind === 'mesh' || kind === 'component' || kind === 'action-root' ||
+              child instanceof THREE.Group || child instanceof THREE.Bone;
+          });
+        }
         if (needsOffscreen) {
           ctx.renderer.setPixelRatio(1);
           ctx.renderer.setSize(outWidth, outHeight, false);
@@ -560,16 +706,20 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           syncEdgeOverlayResolution(ctx.content, outWidth, outHeight);
           composerRef.current?.composer.setSize(outWidth, outHeight);
         }
-        if (options?.transparent) {
+        const transparent = options?.transparent === true || renderPass === 'alpha-silhouette';
+        if (transparent) {
           ctx.scene.background = null;
           ctx.renderer.setClearColor(0x000000, 0);
+        } else if (renderPass && renderPass !== 'beauty') {
+          ctx.scene.background = null;
+          ctx.renderer.setClearColor(0x000000, 1);
         }
         ctx.controls.update();
         if (dofActive) renderWithDof(ctx, physicalCameraRef.current);
         else ctx.renderer.render(ctx.scene, ctx.camera);
         const dataUrl = canvas.toDataURL('image/png');
         const state = getCameraState() ?? physicalCameraRef.current;
-        const { shadingMode: mode, solidLighting: lighting, matcapId: matcap, wireframeOverlay: wireframe, xrayEnabled: xray } = shadingRef.current;
+        const { solidLighting: lighting, matcapId: matcap, wireframeOverlay: wireframe } = currentShading;
         const fov = ctx.camera instanceof THREE.PerspectiveCamera ? ctx.camera.fov : 0;
         return {
           pngBase64: dataUrl.slice(dataUrl.indexOf(',') + 1),
@@ -590,15 +740,34 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
               height: canvas.height,
               pixelRatio: ctx.renderer.getPixelRatio(),
             },
-            shadingMode: mode,
+            shadingMode: captureShadingMode,
             solidLighting: lighting,
             matcapId: matcap,
             wireframeOverlay: wireframe,
-            xrayEnabled: xray,
+            xrayEnabled: captureXray,
             reviewPose: ctx.reviewPose,
+            meshBandProfile: dataRef.current?.mesh
+              ? computeMeshBandProfile(dataRef.current.mesh)
+              : null,
+            renderPass,
+            diagnosticLegend,
           },
         };
       } finally {
+        for (const saved of savedGroups) {
+          saved.geometry.clearGroups();
+          for (const group of saved.groups) {
+            saved.geometry.addGroup(group.start, group.count, group.materialIndex);
+          }
+        }
+        if (hasTemporaryShading) {
+          applyShading(ctx.content, currentShading.shadingMode, currentShading.solidLighting, currentShading.wireframeOverlay, currentShading.xrayEnabled, ctx.matcapTexture, dataRef.current?.materials ?? {}, currentShading.pbrDebugView);
+        }
+        ctx.helpers.visible = savedHelpersVisible;
+        ctx.handles.visible = savedHandlesVisible;
+        ctx.content.traverse((child) => {
+          child.visible = savedContentVisibility.get(child) ?? child.visible;
+        });
         ctx.scene.background = savedBackground;
         ctx.renderer.setClearColor(savedClearColor, savedClearAlpha);
         if (needsOffscreen) {
@@ -636,12 +805,38 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     return capture ? `data:image/png;base64,${capture.pngBase64}` : null;
   }, [captureFrameImpl]);
 
+  const actionController = useCallback((): ActionRuntimeController | null => (
+    (sceneRef.current?.content.userData.actionController as ActionRuntimeController | undefined) ?? null
+  ), []);
+
   useImperativeHandle(ref, () => ({
     captureFrame: captureFrameImpl,
     setReviewCamera: (nextView, options) => applyActiveReviewCamera(nextView, options),
     applyCameraCommand: (command) => applyCameraCommand(command),
     getCameraState: () => getCameraState(),
-  }), [captureFrameImpl, applyActiveReviewCamera, applyCameraCommand, getCameraState]);
+    listAnimations: () => [...(actionController()?.animationNames ?? [])],
+    listAnimationClips: () => [...(actionController()?.clips ?? [])],
+    listComponents: () => [...(actionController()?.componentNames ?? [])],
+    playAnimation: (name) => actionController()?.play(name) ?? false,
+    pauseAnimation: () => actionController()?.pause(),
+    resumeAnimation: () => actionController()?.resume() ?? false,
+    stopAnimation: () => actionController()?.stop(),
+    seekAnimation: (name, timeSeconds) => actionController()?.seek(name, timeSeconds) ?? false,
+    setAnimationSpeed: (speed) => actionController()?.setPlaybackSpeed(speed),
+    setAnimationLoop: (loop) => actionController()?.setLoop(loop),
+    getAnimationPlaybackState: () => actionController()?.getPlaybackState() ?? null,
+    setExplode: (amount) => actionController()?.setExplode(amount),
+    inspectActionRuntime: () => actionController()?.inspect() ?? null,
+    getPreservedGltfBytes: () => (
+      (sceneRef.current?.content.userData.preservedGltfBytes as ArrayBuffer | undefined) ?? null
+    ),
+  }), [
+    captureFrameImpl,
+    applyActiveReviewCamera,
+    applyCameraCommand,
+    getCameraState,
+    actionController,
+  ]);
 
   useEffect(() => {
     preloadMatcap(DEFAULT_MATCAP_ID);
@@ -830,11 +1025,21 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     observer.observe(container);
 
     let raf = 0;
+    let lastPlaybackUiUpdate = 0;
+    const clock = new THREE.Clock();
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      const deltaSeconds = Math.min(clock.getDelta(), 0.1);
       controls.update();
       const ctx = sceneRef.current;
       if (ctx) {
+        const controller = ctx.content.userData.actionController as ActionRuntimeController | undefined;
+        controller?.advance(deltaSeconds);
+        const now = performance.now();
+        if (controller && now - lastPlaybackUiUpdate >= 80) {
+          lastPlaybackUiUpdate = now;
+          updateAnimationPlayback(controller.getPlaybackState());
+        }
         const gizmo = ctx.handles.children.find((c) => c.userData.kind === 'axis-gizmo') as
           | THREE.Group
           | undefined;
@@ -1080,7 +1285,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       renderer.domElement.remove();
       sceneRef.current = null;
     };
-  }, [syncSplineHandles, focusPreview, invalidateEnvironmentLoads]);
+  }, [syncSplineHandles, focusPreview, invalidateEnvironmentLoads, renderWithDof, updateAnimationPlayback]);
 
   const loadEnvironmentUrl = useCallback(async (
     url: string,
@@ -1199,30 +1404,88 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     };
   }, []);
 
-  // F — frame selection (or full preview) when the preview panel has focus.
+  const toggleAnimationPlayback = useCallback(() => {
+    const controller = actionController();
+    if (!controller || !selectedAnimation) return;
+    const current = controller.getPlaybackState();
+    if (current.clipName === selectedAnimation && current.playing) {
+      controller.pause();
+    } else if (current.clipName === selectedAnimation) {
+      controller.resume();
+    } else {
+      controller.play(selectedAnimation);
+    }
+    updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, selectedAnimation, updateAnimationPlayback]);
+
+  const stopAnimationPlayback = useCallback(() => {
+    const controller = actionController();
+    controller?.stop();
+    if (controller) updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, updateAnimationPlayback]);
+
+  const selectAnimationClip = useCallback((name: string) => {
+    setSelectedAnimation(name);
+    const controller = actionController();
+    if (!controller?.seek(name, 0)) return;
+    updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, updateAnimationPlayback]);
+
+  const seekAnimationPlayback = useCallback((timeSeconds: number) => {
+    const controller = actionController();
+    if (!controller || !selectedAnimation || !controller.seek(selectedAnimation, timeSeconds)) return;
+    updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, selectedAnimation, updateAnimationPlayback]);
+
+  const changeAnimationSpeed = useCallback((speed: number) => {
+    const controller = actionController();
+    controller?.setPlaybackSpeed(speed);
+    if (controller) updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, updateAnimationPlayback]);
+
+  const changeAnimationLoop = useCallback((loop: boolean) => {
+    const controller = actionController();
+    if (!controller || !selectedAnimation) return;
+    if (controller.currentAnimation !== selectedAnimation) controller.seek(selectedAnimation, 0);
+    controller.setLoop(loop);
+    updateAnimationPlayback(controller.getPlaybackState());
+  }, [actionController, selectedAnimation, updateAnimationPlayback]);
+
+  // F frames the preview; Space controls playback while Animation mode owns focus.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'f' && e.key !== 'F') return;
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
       if (!container.contains(target) && document.activeElement !== container) return;
-      e.preventDefault();
-      e.stopPropagation();
-      focusPreview();
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        e.stopPropagation();
+        focusPreview();
+      } else if (e.code === 'Space' && animationModeOpen && animationClips.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleAnimationPlayback();
+      }
     };
     container.addEventListener('keydown', onKeyDown);
     return () => container.removeEventListener('keydown', onKeyDown);
-  }, [focusPreview]);
+  }, [animationClips.length, animationModeOpen, focusPreview, toggleAnimationPlayback]);
 
   // ── Content rebuild on new cook data ─────────────────
   useEffect(() => {
     const rebuildStart = performance.now();
+    let cancelled = false;
     const ctx = sceneRef.current;
     if (!ctx) return;
+    const previousController = ctx.content.userData.actionController as ActionRuntimeController | undefined;
+    previousController?.dispose();
+    syncAnimationRuntime(null);
     disposeGroup(ctx.content);
     ctx.content.clear();
+    delete ctx.content.userData.actionController;
+    delete ctx.content.userData.preservedGltfBytes;
     if (!data) {
       hasAutoFramedRef.current = false;
       return;
@@ -1230,24 +1493,54 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
     const geometry = data.geometry;
     const mesh = data.mesh;
-    const cloudPositions = geometry ? geometry.positions : mesh ? mesh.positions : data.scatterPoints;
-    const hasSolid = cloudPositions != null && cloudPositions.length > 0;
+    const cloudPositions = geometry ? geometry.positions : data.scatterPoints;
 
-    if (mesh) ctx.content.add(buildMeshObject(mesh, flipZArray));
-    if (geometry && geometry.faceCount > 0) {
-      const edgeObj = buildEdgeObject(
-        geometry,
-        flipZArray(geometry.positions),
-        ctx.renderer.domElement.clientWidth,
-        ctx.renderer.domElement.clientHeight,
-      );
-      if (edgeObj) ctx.content.add(edgeObj);
+    if (mesh && data.sourceRig) {
+      void loadPreservedGltfRig(data.sourceRig).then((preserved) => {
+        if (cancelled) {
+          preserved.controller.dispose();
+          disposeObject3D(preserved.root);
+          return;
+        }
+        ctx.content.add(preserved.root);
+        ctx.content.userData.actionController = preserved.controller;
+        ctx.content.userData.preservedGltfBytes = preserved.sourceBytes;
+        syncAnimationRuntime(preserved.controller);
+        const current = shadingRef.current;
+        applyShading(
+          preserved.root,
+          current.shadingMode,
+          current.solidLighting,
+          current.wireframeOverlay,
+          current.xrayEnabled,
+          ctx.matcapTexture,
+          data.materials,
+          current.pbrDebugView,
+        );
+      }).catch((loadError) => {
+        if (cancelled) return;
+        console.error('PreserveGltfRig preview failed:', loadError);
+        // Keep a visible diagnostic fallback, but never claim it is the
+        // preserved animated result through the runtime controller.
+        const fallback = buildMeshObject(mesh, flipZArray);
+        fallback.userData.preservedGltfError = loadError instanceof Error
+          ? loadError.message
+          : String(loadError);
+        ctx.content.add(fallback);
+        syncAnimationRuntime(null);
+      });
+    } else if (mesh && data.actionRuntime) {
+      const action = buildActionRigObject(mesh, data.actionRuntime);
+      ctx.content.add(action.root);
+      ctx.content.userData.actionController = action.controller;
+      syncAnimationRuntime(action.controller);
+    } else if (mesh) {
+      ctx.content.add(buildMeshObject(mesh, flipZArray));
     }
-    if (hasSolid) ctx.content.add(buildPointsObject(flipZArray(cloudPositions!)));
+    if (!mesh && cloudPositions && cloudPositions.length > 0) {
+      ctx.content.add(buildPointsObject(flipZArray(cloudPositions)));
+    }
     if (data.splines) ctx.content.add(...buildSplineObjects(data.splines));
-    if (splineEdit && splineEdit.controlPoints.length > 0) {
-      ctx.content.add(buildControlPolyline(splineEdit.controlPoints, splineEdit.closed));
-    }
 
     const fitPositions = collectFitPositions(data, splineEdit?.controlPoints);
     if (fitPositions.length > 0) {
@@ -1262,23 +1555,61 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       }
     }
 
-    const { shadingMode, solidLighting, wireframeOverlay, xrayEnabled, pbrDebugView } = shadingRef.current;
+    const {
+      shadingMode,
+      solidLighting,
+      wireframeOverlay: activeWireframeOverlay,
+      xrayEnabled,
+      pbrDebugView,
+    } = shadingRef.current;
     applyShading(
       ctx.content,
       shadingMode,
       solidLighting,
-      wireframeOverlay,
+      activeWireframeOverlay,
       xrayEnabled,
       ctx.matcapTexture,
       data.materials,
       pbrDebugView,
     );
-    // Only new cook data counts — spline-handle rebuilds reuse the same payload.
-    if (data !== sceneTimedDataRef.current) {
-      sceneTimedDataRef.current = data;
-      setSceneMs(performance.now() - rebuildStart);
+    sceneTimedDataRef.current = data;
+    setSceneMs(performance.now() - rebuildStart);
+    return () => { cancelled = true; };
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polygon edges and spline authoring helpers are lightweight overlays. Keep
+  // them outside the cooked-content effect so toggling an overlay never
+  // rebuilds a dense ActionRig, skin weights, or component buffers.
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+    const old = ctx.content.children.find((child) => child.userData.kind === 'edges');
+    if (old) {
+      ctx.content.remove(old);
+      disposeObject3D(old);
     }
-  }, [data, splineEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+    const geometry = data?.geometry;
+    if (!wireframeOverlay || !geometry || geometry.faceCount === 0) return;
+    const edgeObj = buildEdgeObject(
+      geometry,
+      flipZArray(geometry.positions),
+      ctx.renderer.domElement.clientWidth,
+      ctx.renderer.domElement.clientHeight,
+    );
+    if (edgeObj) ctx.content.add(edgeObj);
+  }, [data?.geometry, wireframeOverlay]);
+
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+    const old = ctx.content.children.find((child) => child.userData.kind === 'control-line');
+    if (old) {
+      ctx.content.remove(old);
+      disposeObject3D(old);
+    }
+    if (!data || !splineEdit || splineEdit.controlPoints.length === 0) return;
+    ctx.content.add(buildControlPolyline(splineEdit.controlPoints, splineEdit.closed));
+  }, [data, splineEdit]);
 
   // ── Selection edge highlight: overlay the triangles attributed to the
   // graph-selected node. Declared after the content rebuild so a fresh cook
@@ -1420,7 +1751,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
   return (
     <div
-      className={`pcg-preview${reviewMode ? ' is-review' : ''}`}
+      className={`pcg-preview${reviewMode ? ' is-review' : ''}${animationModeOpen ? ' has-animation-mode' : ''}`}
       style={{ width: reviewMode ? '100%' : width, height: reviewMode ? '100%' : undefined }}
     >
       <div
@@ -1491,6 +1822,22 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         )}
         {activeTab === '3d' && (
         <>
+        {animationClips.length > 0 && (
+          <div className="pcg-preview__animation-entry">
+            <button
+              type="button"
+              className={`pcg-preview__animation-mode${animationModeOpen ? ' is-active' : ''}`}
+              aria-label="Animation mode"
+              aria-pressed={animationModeOpen}
+              title="Animation mode"
+              onClick={() => setAnimationModeOpen((open) => !open)}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden><path d="M4 2.5 13 8l-9 5.5z" /></svg>
+              <span>Animate</span>
+              <span className="pcg-preview__animation-count">{animationClips.length}</span>
+            </button>
+          </div>
+        )}
         <div className="pcg-preview__axis-navigation" role="group" aria-label="Axis views">
           <svg className="pcg-preview__axis-stems" viewBox="0 0 84 84" aria-hidden="true">
             {(['x', 'y', 'z'] as const).map((axis) => (
@@ -1658,6 +2005,20 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         </div>
         </>
         )}
+        {activeTab === '3d' && animationModeOpen && animationClips.length > 0 && (
+          <AnimationTransport
+            clips={animationClips}
+            selectedClip={selectedAnimation}
+            playback={animationPlayback}
+            onSelectClip={selectAnimationClip}
+            onTogglePlayback={toggleAnimationPlayback}
+            onStop={stopAnimationPlayback}
+            onSeek={seekAnimationPlayback}
+            onSpeedChange={changeAnimationSpeed}
+            onLoopChange={changeAnimationLoop}
+            onClose={() => setAnimationModeOpen(false)}
+          />
+        )}
         <div className="pcg-preview__parameter-overlay">
           <PreviewParametersPopover
             parameters={parameters}
@@ -1674,6 +2035,18 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       <div className="pcg-preview__footer">
         <div className="pcg-preview__footer-left">
           <span className="pcg-preview__stats">{stats}</span>
+          {data?.previewQuality && data.previewQuality.sdfNodeCount > 0 && (
+            <span
+              className="pcg-preview__perf"
+              title={data.previewQuality.fullResolution
+                ? 'Full authored SDF resolution'
+                : `Bounded Web preview; final export uses the authored cell size${data.previewQuality.triangleBudget ? ` (${data.previewQuality.triangleBudget.toLocaleString()} triangle budget)` : ''}`}
+            >
+              {data.previewQuality.fullResolution
+                ? 'SDF full'
+                : `SDF ${data.previewQuality.requestedQuality} ×${data.previewQuality.effectiveScale.toFixed(2)}`}
+            </span>
+          )}
           {data && (
             <span className="pcg-preview__perf" title="exec: server graph execute · wall: fetch+server total · bin: server binary write · js: client parse+build · scene: three.js rebuild">
               {data.cook.graphExecuteMs.toFixed(0)}ms exec · {data.timings ? data.timings.fetchMs.toFixed(0) : '?'}ms wall · {data.cook.binaryWriteMs.toFixed(0)}ms bin · {data.timings ? (data.timings.parseCookMs + data.timings.buildDataMs).toFixed(0) : '?'}ms js · {sceneMs.toFixed(0)}ms scene · {data.cook.nodesExecuted} nodes
@@ -1703,26 +2076,30 @@ function applyShading(
   materialLibrary: PbrMaterialLibrary,
   pbrDebugView: PbrDebugView,
 ) {
-  const hasMesh = group.children.some((c) => c.userData.kind === 'mesh');
-  const hasEdges = group.children.some((c) => c.userData.kind === 'edges');
+  let hasMesh = false;
+  let hasEdges = false;
+  group.traverse((child) => {
+    hasMesh ||= child.userData.kind === 'mesh';
+    hasEdges ||= child.userData.kind === 'edges';
+  });
   const xrayActive = xrayEnabled && shadingMode === 'solid';
   const wireframeOnly = wireframeOverlay && !hasEdges;
 
-  for (const child of group.children) {
+  group.traverse((child) => {
     const kind = child.userData.kind as string;
     if (kind === 'spline' || kind === 'control-line' || kind === 'selection') {
       child.visible = true;
-      continue;
+      return;
     }
     if (kind === 'edges') {
       child.visible = wireframeOverlay;
-      continue;
+      return;
     }
     if (kind === 'points') {
       child.visible = !hasMesh && !wireframeOverlay;
-      continue;
+      return;
     }
-    if (kind !== 'mesh' || !(child instanceof THREE.Mesh)) continue;
+    if (kind !== 'mesh' || !(child instanceof THREE.Mesh)) return;
 
     const mesh = child;
     const hasVertexColors = mesh.geometry.hasAttribute('color');
@@ -1739,7 +2116,7 @@ function applyShading(
       });
       applyXray(mat, xrayActive);
       mesh.material = mat;
-      continue;
+      return;
     }
 
     mesh.visible = true;
@@ -1755,7 +2132,7 @@ function applyShading(
             ? createStandardPbrMaterial(definition, hasVertexColors)
             : createPbrDebugMaterial(definition, pbrDebugView);
         });
-        continue;
+        return;
       }
       const definition = normalizePbrMaterial({ name: 'Material' });
       mat = pbrDebugView === 'lit'
@@ -1781,7 +2158,7 @@ function applyShading(
     }
     applyXray(mat, xrayActive);
     mesh.material = mat;
-  }
+  });
 }
 
 function applyXray(material: THREE.Material, active: boolean) {
@@ -1792,6 +2169,180 @@ function applyXray(material: THREE.Material, active: boolean) {
     material.uniforms.opacity.value = XRAY_OPACITY;
   }
   material.depthWrite = false;
+}
+
+function diagnosticBasicMaterial(color: THREE.ColorRepresentation): THREE.MeshBasicMaterial {
+  const material = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+  material.toneMapped = false;
+  return material;
+}
+
+function disposeMeshMaterials(mesh: THREE.Mesh): void {
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  for (const material of materials) material.dispose();
+}
+
+function diagnosticIdColor(id: number): THREE.Color {
+  const hue = (0.08 + id * 0.61803398875) % 1;
+  return new THREE.Color().setHSL(hue, 0.72, 0.56);
+}
+
+function colorHex(color: THREE.Color): string {
+  return `#${color.getHexString()}`;
+}
+
+function meshDepthRange(
+  group: THREE.Group,
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+): [number, number] {
+  camera.updateMatrixWorld(true);
+  const bounds = new THREE.Box3();
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.userData.kind === 'mesh') {
+      child.updateMatrixWorld(true);
+      bounds.expandByObject(child, true);
+    }
+  });
+  if (bounds.isEmpty()) return [camera.near, camera.far];
+  const depths: number[] = [];
+  for (const x of [bounds.min.x, bounds.max.x]) {
+    for (const y of [bounds.min.y, bounds.max.y]) {
+      for (const z of [bounds.min.z, bounds.max.z]) {
+        const point = new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse);
+        if (Number.isFinite(point.z)) depths.push(-point.z);
+      }
+    }
+  }
+  const minimum = Math.max(camera.near, Math.min(...depths));
+  const maximum = Math.min(camera.far, Math.max(...depths));
+  return maximum > minimum + 1e-6 ? [minimum, maximum] : [camera.near, camera.far];
+}
+
+function depthDiagnosticMaterial(range: [number, number]): THREE.ShaderMaterial {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      minDepth: { value: range[0] },
+      maxDepth: { value: range[1] },
+    },
+    vertexShader: `
+      varying float vViewDepth;
+      void main() {
+        vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewDepth = -viewPosition.z;
+        gl_Position = projectionMatrix * viewPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float minDepth;
+      uniform float maxDepth;
+      varying float vViewDepth;
+      void main() {
+        float range = max(maxDepth - minDepth, 0.000001);
+        float depth = clamp((vViewDepth - minDepth) / range, 0.0, 1.0);
+        gl_FragColor = vec4(vec3(1.0 - depth), 1.0);
+      }
+    `,
+    side: THREE.DoubleSide,
+  });
+  material.toneMapped = false;
+  return material;
+}
+
+function applySemanticIdPass(
+  mesh: THREE.Mesh,
+  mapping: SourceMapping | null,
+): CaptureDiagnosticLegend {
+  const triangleCount = Math.trunc((mesh.geometry.index?.count ?? 0) / 3);
+  if (!mapping || mapping.triangleSources.length !== triangleCount) {
+    const color = diagnosticIdColor(0);
+    mesh.material = diagnosticBasicMaterial(color);
+    return { semanticIds: [{ id: 0, sourceNode: 'unattributed', color: colorHex(color) }] };
+  }
+
+  const colors = [new THREE.Color(0x555555), ...mapping.sourceNodes.map((_, index) => diagnosticIdColor(index + 1))];
+  mesh.material = colors.map((color) => diagnosticBasicMaterial(color));
+  mesh.geometry.clearGroups();
+  let firstTriangle = 0;
+  let activeId = (mapping.triangleSources[0] ?? -1) + 1;
+  for (let triangle = 1; triangle <= mapping.triangleSources.length; triangle++) {
+    const nextId = triangle < mapping.triangleSources.length
+      ? mapping.triangleSources[triangle] + 1
+      : Number.NaN;
+    if (nextId === activeId) continue;
+    mesh.geometry.addGroup(firstTriangle * 3, (triangle - firstTriangle) * 3, Math.max(0, activeId));
+    firstTriangle = triangle;
+    activeId = nextId;
+  }
+  return {
+    semanticIds: [
+      { id: 0, sourceNode: 'unattributed', color: colorHex(colors[0]) },
+      ...mapping.sourceNodes.map((sourceNode, index) => ({
+        id: index + 1,
+        sourceNode,
+        color: colorHex(colors[index + 1]),
+      })),
+    ],
+  };
+}
+
+function applyMaterialIdPass(
+  mesh: THREE.Mesh,
+  materialLibrary: PbrMaterialLibrary,
+): CaptureDiagnosticLegend {
+  const slots = Array.isArray(mesh.userData.materialSlots)
+    ? mesh.userData.materialSlots as string[]
+    : [];
+  const effectiveSlots = slots.length > 0 ? slots : ['Material'];
+  const legend = effectiveSlots.map((slot, id) => {
+    const definition = materialLibrary[slot] ?? normalizePbrMaterial({ name: slot }, slot);
+    const hue = (0.08 + id * 0.61803398875) % 1;
+    const color = new THREE.Color().setHSL(
+      hue,
+      0.35 + definition.metallic * 0.55,
+      0.2 + definition.roughness * 0.65,
+    );
+    return {
+      id,
+      slot,
+      color: colorHex(color),
+      roughness: definition.roughness,
+      metallic: definition.metallic,
+      material: diagnosticBasicMaterial(color),
+    };
+  });
+  mesh.material = legend.map((entry) => entry.material);
+  return {
+    materialIds: legend.map(({ material: _material, ...entry }) => entry),
+  };
+}
+
+function applyDiagnosticRenderPass(
+  group: THREE.Group,
+  renderPass: Exclude<CaptureRenderPass, 'beauty'>,
+  materialLibrary: PbrMaterialLibrary,
+  sourceMapping: SourceMapping | null,
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+): CaptureDiagnosticLegend | null {
+  const meshes = collectPreviewMeshes(group);
+  const depthRange = renderPass === 'depth' ? meshDepthRange(group, camera) : null;
+  let legend: CaptureDiagnosticLegend | null = depthRange ? { depthRange } : null;
+  for (const mesh of meshes) {
+    disposeMeshMaterials(mesh);
+    if (renderPass === 'alpha-silhouette') {
+      mesh.material = diagnosticBasicMaterial(0xffffff);
+    } else if (renderPass === 'normal') {
+      const material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+      material.toneMapped = false;
+      mesh.material = material;
+    } else if (renderPass === 'depth') {
+      mesh.material = depthDiagnosticMaterial(depthRange!);
+    } else if (renderPass === 'semantic-id') {
+      legend = applySemanticIdPass(mesh, sourceMapping);
+    } else if (renderPass === 'roughness-material-id') {
+      legend = applyMaterialIdPass(mesh, materialLibrary);
+    }
+  }
+  return legend;
 }
 
 
@@ -1894,9 +2445,7 @@ function buildSelectionHighlight(
   viewportWidth: number,
   viewportHeight: number,
 ): LineSegments2 | null {
-  const mesh = group.children.find(
-    (obj): obj is THREE.Mesh => (obj as THREE.Mesh).userData?.kind === 'mesh',
-  );
+  const mesh = collectPreviewMeshes(group)[0];
   if (!mesh) return null;
   const index = mesh.geometry.getIndex();
   const position = mesh.geometry.getAttribute('position');
@@ -2024,21 +2573,35 @@ function buildControlPolyline(points: readonly Vec3[], closed: boolean): THREE.L
 }
 
 function collectFitPositions(data: PreviewData, controlPoints?: readonly Vec3[]): Float32Array {
-  const chunks: number[] = [];
-  const push = (arr: Float32Array) => {
-    for (let i = 0; i < arr.length; i++) chunks.push(arr[i]);
+  const primary = data.geometry?.positions ?? data.mesh?.positions ?? data.scatterPoints;
+  let scalarCount = primary?.length ?? 0;
+  if (data.splines) {
+    for (const spline of data.splines.splines) scalarCount += spline.points.length;
+  }
+  scalarCount += (controlPoints?.length ?? 0) * 3;
+
+  const result = new Float32Array(scalarCount);
+  let offset = 0;
+  const appendFlipped = (source: Float32Array) => {
+    for (let i = 0; i < source.length; i += 3) {
+      result[offset++] = source[i];
+      result[offset++] = source[i + 1];
+      result[offset++] = -source[i + 2];
+    }
   };
-  if (data.geometry) push(flipZArray(data.geometry.positions));
-  else if (data.mesh) push(flipZArray(data.mesh.positions));
-  else if (data.scatterPoints) push(flipZArray(data.scatterPoints));
-  if (data.splines) for (const s of data.splines.splines) push(flipZArray(s.points));
+  if (primary) appendFlipped(primary);
+  if (data.splines) {
+    for (const spline of data.splines.splines) appendFlipped(spline.points);
+  }
   if (controlPoints) {
-    for (const p of controlPoints) {
-      const v = unityToThree(p);
-      chunks.push(v.x, v.y, v.z);
+    for (const point of controlPoints) {
+      const transformed = unityToThree(point);
+      result[offset++] = transformed.x;
+      result[offset++] = transformed.y;
+      result[offset++] = transformed.z;
     }
   }
-  return new Float32Array(chunks);
+  return result;
 }
 
 function focusCameraOnTarget(
@@ -2101,7 +2664,8 @@ function fitCamera(
 }
 
 function disposeGroup(group: THREE.Group) {
-  for (const child of [...group.children]) {
+  group.traverse((child) => {
+    if (child === group) return;
     if (
       child instanceof THREE.Mesh ||
       child instanceof THREE.Points ||
@@ -2114,5 +2678,13 @@ function disposeGroup(group: THREE.Group) {
       if (Array.isArray(material)) material.forEach((m) => m.dispose());
       else material.dispose();
     }
-  }
+  });
+}
+
+function collectPreviewMeshes(group: THREE.Group): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.userData.kind === 'mesh') meshes.push(child);
+  });
+  return meshes;
 }

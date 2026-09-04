@@ -14,6 +14,7 @@
     "test:environments": "python3 ../../scripts/validate-builtin-environments.py",
     "test:library": "python3 ../../scripts/validate-builtin-library.py",
     "test:preview-parameters": "python3 ../../scripts/validate-web-preview-parameters.py",
+    "compare:procedural-reference": "python3 scripts/compare_procedural_reference.py",
     "preview": "vite preview"
   },
   "dependencies": {

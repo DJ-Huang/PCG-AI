@@ -28,7 +28,9 @@ url-content-out/
 Plan/
 mem-log/
 tmp/
+library/web-cache/
 .codely-cli/
 .playwright-cli/
 screenshots/
 .pcg-ai/index/
+web/pcg-editor/public/assets/uploads/
