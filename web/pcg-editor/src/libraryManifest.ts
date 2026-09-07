@@ -1,4 +1,10 @@
-import type { GraphParameter, GraphSubgraph, GraphSubgraphPort } from './graphSchema';
+import type {
+  GraphParameter,
+  GraphSubgraph,
+  GraphSubgraphPort,
+  ParameterType,
+  SemanticComponent,
+} from './graphSchema';
 import { pinTypesCompatible, type PinType } from './nodeManifest';
 
 export interface LibraryIndexPin {
@@ -10,8 +16,8 @@ export interface LibraryIndexPin {
 export interface LibraryIndexParameter {
   id: string;
   name: string;
-  type: string;
-  default: number | boolean | string;
+  type: ParameterType;
+  default: GraphParameter['default'];
   hasRange: boolean;
   min: number;
   max: number;
@@ -29,6 +35,7 @@ export interface LibraryIndexItem {
   inputs: LibraryIndexPin[];
   outputs: LibraryIndexPin[];
   parameters: LibraryIndexParameter[];
+  semantic?: SemanticComponent;
   thumbnail?: string;
   doc?: string;
   minCoreVersion?: string;
@@ -90,6 +97,9 @@ export function libraryItemMatchesQuery(item: LibraryIndexItem, query: string): 
   if (item.displayName.toLowerCase().includes(needle)) return true;
   if (item.id.toLowerCase().includes(needle)) return true;
   if (item.category.toLowerCase().includes(needle)) return true;
+  if (item.description.toLowerCase().includes(needle)) return true;
+  if (item.semantic?.componentId.toLowerCase().includes(needle)) return true;
+  if (item.semantic?.role?.toLowerCase().includes(needle)) return true;
   return item.keywords.some((keyword) => keyword.toLowerCase().includes(needle));
 }
 
@@ -124,6 +134,7 @@ export function loadLibrarySubgraph(item: LibraryIndexItem): Promise<GraphSubgra
       nodes: asset.nodes ?? [],
       edges: asset.edges ?? [],
       parameters: asset.parameters ?? [],
+      semantic: item.semantic,
     }));
   assetCache.set(cacheKey, load);
   return load;

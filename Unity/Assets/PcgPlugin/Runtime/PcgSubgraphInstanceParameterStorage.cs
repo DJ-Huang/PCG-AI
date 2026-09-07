@@ -129,6 +129,9 @@ namespace DJTechRuntime.PCG
                         ? boolean
                         : bool.TryParse(value?.ToString(), out var parsed) && parsed;
                     break;
+                case "vector3":
+                    existing.stringValue = PcgVector3Property.NormalizeStored(value);
+                    break;
                 default:
                     existing.stringValue = value?.ToString() ?? "";
                     break;

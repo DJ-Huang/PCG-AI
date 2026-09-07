@@ -42,6 +42,7 @@ nlohmann::json GetEditorNodeTypes(
     const std::string& category = "",
     const std::string& editor_session_id = "");
 nlohmann::json GetEditorDocument(const std::string& editor_session_id = "");
+nlohmann::json GetEditorShot(const std::string& editor_session_id = "");
 nlohmann::json QueueNodePatch(
     const std::string& node_id,
     const nlohmann::json& patch,
@@ -51,6 +52,13 @@ nlohmann::json QueueGraphCommand(
     nlohmann::json command,
     const std::string& expected_graph_hash,
     bool require_root_scope = false,
+    const std::string& editor_session_id = "");
+nlohmann::json QueueShotCommand(
+    nlohmann::json command,
+    const std::string& expected_shot_hash,
+    const std::string& editor_session_id = "");
+nlohmann::json QueuePreviewShotCommand(
+    nlohmann::json command,
     const std::string& editor_session_id = "");
 bool WaitForGraphCommandResult(
     uint64_t command_id,

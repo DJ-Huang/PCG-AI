@@ -215,7 +215,10 @@ json SolveSemanticCamera(const SemanticBounds& b, const json& spec) {
         if (view == "top") { height = std::max(sz, sx / aspect) * pad; camera["position"] = json::array({cx, cy + distance, -cz}); camera["up"] = json::array({0.0, 0.0, -1.0}); }
         else if (view == "side") { height = std::max(sy, sz / aspect) * pad; camera["position"] = json::array({cx + distance, cy, -cz}); }
         else { height = std::max(sy, sx / aspect) * pad; camera["position"] = json::array({cx, cy, -cz + distance}); }
-        camera["projection"] = "orthographic"; camera["orthographicFrustumHeight"] = std::max(0.01, height); return camera;
+        camera["projection"] = "orthographic";
+        camera["sensorFit"] = "vertical";
+        camera["orthographicScale"] = std::max(0.01, height);
+        return camera;
     }
     const double fov = std::max(10.0, std::min(100.0, spec.value("fov", 48.0)));
     const double radius = std::sqrt(sx * sx + sy * sy + sz * sz) * 0.5 * pad;
@@ -276,7 +279,7 @@ json BuildToolDefinitions() {
     json tools = json::array({
         {
             {"name", "pcg_get_editor_context"},
-            {"description", "Read the live Web editor path, selection, preview target, graph hash, and bridge status."},
+            {"description", "Read the live Web editor path, selection, preview target, graph hash, shot hash, active camera, and bridge status. Shot/camera keyframes live in the shot sidecar, never in the .pcg graph."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
@@ -362,7 +365,7 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_set_camera"},
-            {"description", "Set the session physical camera in the live WebGL viewport: pose (position/target or azimuth/elevation/distance around target), lens (focalLengthMm or fov, sensorHeightMm), aperture (apertureFstop), focus (focusDistance or focusOnTarget), dofEnabled, exposure, near/far, projection. Session-scoped; never written into the .pcg document. Waits for the editor to apply and returns the effective state. Coordinates are viewport world space (three.js right-handed; Unity +Z flips to -Z)."},
+            {"description", "Set the session physical camera in the live WebGL viewport using Blender camera semantics: pose, projection, focalLengthMm/fov, sensorWidthMm/sensorHeightMm/sensorFit, shiftX/shiftY, aperture, focus/DOF, clipping, exposure, and orthographicScale. Session-scoped; never written into the .pcg document. Waits for the editor to apply and returns the effective state. Coordinates are viewport world space (three.js right-handed; Unity +Z flips to -Z)."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {
@@ -375,15 +378,22 @@ json BuildToolDefinitions() {
                     {"projection", {{"type", "string"}, {"enum", json::array({"perspective", "orthographic"})}}},
                     {"focalLengthMm", {{"type", "number"}, {"minimum", 8}, {"maximum", 400}}},
                     {"fov", {{"type", "number"}, {"minimum", 1}, {"maximum", 170}, {"description", "Vertical FOV in degrees; alternative to focalLengthMm."}}},
+                    {"sensorWidthMm", {{"type", "number"}, {"minimum", 1}, {"maximum", 100}, {"default", 36}}},
                     {"sensorHeightMm", {{"type", "number"}, {"minimum", 5}, {"maximum", 70}, {"default", 24}}},
+                    {"sensorFit", {{"type", "string"}, {"enum", json::array({"auto", "horizontal", "vertical"})}, {"default", "auto"}}},
+                    {"shiftX", {{"type", "number"}, {"minimum", -2}, {"maximum", 2}}},
+                    {"shiftY", {{"type", "number"}, {"minimum", -2}, {"maximum", 2}}},
                     {"apertureFstop", {{"type", "number"}, {"minimum", 0.7}, {"maximum", 64}}},
+                    {"apertureBlades", {{"type", "integer"}, {"minimum", 0}, {"maximum", 16}}},
+                    {"apertureRotationDeg", {{"type", "number"}, {"minimum", -180}, {"maximum", 180}}},
+                    {"apertureRatio", {{"type", "number"}, {"minimum", 0.01}, {"maximum", 1}}},
                     {"focusDistance", {{"type", "number"}, {"description", "World-unit focus distance for depth of field."}}},
                     {"focusOnTarget", {{"type", "boolean"}, {"description", "Set focusDistance to the position↔target distance."}}},
                     {"dofEnabled", {{"type", "boolean"}}},
                     {"exposure", {{"type", "number"}, {"minimum", 0.05}, {"maximum", 8}}},
                     {"near", {{"type", "number"}}},
                     {"far", {{"type", "number"}}},
-                    {"orthographicFrustumHeight", {{"type", "number"}, {"minimum", 0.001}, {"description", "Vertical world-space frame size for an orthographic camera."}}},
+                    {"orthographicScale", {{"type", "number"}, {"minimum", 0.001}, {"description", "Blender ortho_scale: extent along the fitted sensor axis."}}},
                     {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
                 }},
                 {"additionalProperties", false},
@@ -393,6 +403,96 @@ json BuildToolDefinitions() {
             {"name", "pcg_get_camera"},
             {"description", "Read the current session camera state from the live WebGL viewport (last applied state, or the camera block of the latest screenshot metadata)."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+        },
+        {
+            {"name", "pcg_get_shot"},
+            {"description", "Read the live shot sidecar: cameras, camera graph wires, active camera, and keyframes. This is not part of the .pcg graph. Use shotHash as ifShotHash for later writes."},
+            {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+        },
+        {
+            {"name", "pcg_set_camera_keyframes"},
+            {"description", "Write keyframes for one camera station in the live shot sidecar. mode=replace replaces that camera's track; mode=upsert inserts or overwrites keys at matching times. Defaults to the active camera. Requires ifShotHash from pcg_get_shot or pcg_get_editor_context."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"cameraId", {{"type", "string"}, {"description", "Camera station id; omit to use the active camera."}}},
+                    {"mode", {{"type", "string"}, {"enum", json::array({"replace", "upsert"})}, {"default", "replace"}}},
+                    {"keyframes", {{"type", "array"}, {"minItems", 0}, {"maxItems", 500}, {"items", {{"type", "object"}, {"properties", {
+                        {"id", {{"type", "string"}}},
+                        {"timeSeconds", {{"type", "number"}}},
+                        {"interpolation", {{"type", "string"}, {"enum", json::array({"linear", "ease-in", "ease-out", "ease-in-out"})}}},
+                        {"value", {{"type", "object"}, {"description", "CameraCommand fields: position, target, focalLengthMm, etc."}}},
+                    }}, {"required", json::array({"timeSeconds", "value"})}}}}},
+                    {"seekTimeSeconds", {{"type", "number"}, {"description", "Optional playhead time after applying keys."}}},
+                    {"ifShotHash", {{"type", "string"}, {"description", "Required optimistic-lock hash from pcg_get_shot / editor context."}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"keyframes", "ifShotHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_upsert_camera"},
+            {"description", "Add or update a camera station on the Cameras graph. Session-scoped shot sidecar; never written into .pcg. Requires ifShotHash."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"id", {{"type", "string"}}},
+                    {"name", {{"type", "string"}}},
+                    {"presetId", {{"type", "string"}, {"description", "Catalog body id from the Cameras-tab palette (e.g. arri_alexa_35, full_frame). Applies sensor size and default lens."}}},
+                    {"position", {{"type", "object"}, {"properties", {
+                        {"x", {{"type", "number"}}}, {"y", {{"type", "number"}}},
+                    }}, {"additionalProperties", false}}},
+                    {"camera", {{"type", "object"}, {"description", "Optional rest-pose CameraCommand."}}},
+                    {"ifShotHash", {{"type", "string"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"ifShotHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_connect_cameras"},
+            {"description", "Wire two camera stations, or a camera to shot_output, on the Cameras graph. Requires ifShotHash."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"source", {{"type", "string"}}},
+                    {"target", {{"type", "string"}}},
+                    {"ifShotHash", {{"type", "string"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"source", "target", "ifShotHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_select_camera"},
+            {"description", "Select a camera station so Preview keys and plays that camera's track. Requires ifShotHash."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"cameraId", {{"type", "string"}}},
+                    {"ifShotHash", {{"type", "string"}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"required", json::array({"cameraId", "ifShotHash"})},
+                {"additionalProperties", false},
+            }},
+        },
+        {
+            {"name", "pcg_preview_shot"},
+            {"description", "Seek or play the live shot in the Web preview. Optional cameraId selects that station first. Does not mutate the shot document."},
+            {"inputSchema", {
+                {"type", "object"},
+                {"properties", {
+                    {"cameraId", {{"type", "string"}}},
+                    {"timeSeconds", {{"type", "number"}}},
+                    {"play", {{"type", "boolean"}, {"default", false}}},
+                    {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+                }},
+                {"additionalProperties", false},
+            }},
         },
         {
             {"name", "pcg_get_component_bounds"},
@@ -760,8 +860,10 @@ json CallToolInternal(
     if (name == "pcg_set_camera") {
         static const std::vector<std::string> camera_keys = {
             "position", "target", "up", "azimuth", "elevation", "distance",
-            "projection", "focalLengthMm", "fov", "sensorHeightMm", "apertureFstop",
-            "focusDistance", "focusOnTarget", "dofEnabled", "exposure", "near", "far", "orthographicFrustumHeight",
+            "projection", "focalLengthMm", "fov", "sensorWidthMm", "sensorHeightMm",
+            "sensorFit", "shiftX", "shiftY", "apertureFstop", "apertureBlades",
+            "apertureRotationDeg", "apertureRatio", "focusDistance", "focusOnTarget",
+            "dofEnabled", "exposure", "near", "far", "orthographicScale",
         };
         json camera = json::object();
         for (const auto& key : camera_keys) {
@@ -787,6 +889,69 @@ json CallToolInternal(
     if (name == "pcg_get_camera") {
         const json result = GetCameraState(editor_session_id);
         return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_get_shot") {
+        const json result = GetEditorShot(editor_session_id);
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_set_camera_keyframes") {
+        const json keyframes = arguments.value("keyframes", json());
+        if (!keyframes.is_array() || keyframes.size() > 500) {
+            return ToolResult({{"ok", false}, {"error", "keyframes must be an array of 0-500 items"}}, true);
+        }
+        json command = {
+            {"type", "setCameraKeyframes"},
+            {"mode", arguments.value("mode", "replace")},
+            {"keyframes", keyframes},
+        };
+        if (arguments.contains("cameraId") && arguments["cameraId"].is_string()) {
+            command["cameraId"] = arguments["cameraId"];
+        }
+        if (arguments.contains("seekTimeSeconds") && arguments["seekTimeSeconds"].is_number()) {
+            command["seekTimeSeconds"] = arguments["seekTimeSeconds"];
+        }
+        const json queued = QueueShotCommand(
+            std::move(command), arguments.value("ifShotHash", ""), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_upsert_camera") {
+        json camera = json::object();
+        if (arguments.contains("id")) camera["id"] = arguments["id"];
+        if (arguments.contains("name")) camera["name"] = arguments["name"];
+        if (arguments.contains("presetId") && arguments["presetId"].is_string()) {
+            camera["presetId"] = arguments["presetId"];
+        }
+        if (arguments.contains("position")) camera["position"] = arguments["position"];
+        if (arguments.contains("camera")) camera["camera"] = arguments["camera"];
+        const json queued = QueueShotCommand(
+            {{"type", "upsertCamera"}, {"camera", std::move(camera)}},
+            arguments.value("ifShotHash", ""), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_connect_cameras") {
+        const json queued = QueueShotCommand(
+            {{"type", "connectCameras"},
+             {"source", arguments.value("source", "")},
+             {"target", arguments.value("target", "")}},
+            arguments.value("ifShotHash", ""), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_select_camera") {
+        const json queued = QueueShotCommand(
+            {{"type", "selectCamera"}, {"cameraId", arguments.value("cameraId", "")}},
+            arguments.value("ifShotHash", ""), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_preview_shot") {
+        json command = {{"type", "previewShot"}, {"play", arguments.value("play", false)}};
+        if (arguments.contains("cameraId") && arguments["cameraId"].is_string()) {
+            command["cameraId"] = arguments["cameraId"];
+        }
+        if (arguments.contains("timeSeconds") && arguments["timeSeconds"].is_number()) {
+            command["timeSeconds"] = arguments["timeSeconds"];
+        }
+        const json queued = QueuePreviewShotCommand(std::move(command), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_get_component_bounds") {
         const json graph = GetEditorGraph(editor_session_id);
@@ -963,8 +1128,8 @@ json CallPcgTool(
     return CallToolInternal(name, arguments, editor_session_id);
 }
 
-bool PcgToolRequiresApproval(const std::string&) {
-    return false;
+bool PcgToolRequiresApproval(const std::string& name) {
+    return PcgToolMutatesGraph(name) || PcgToolMutatesShot(name);
 }
 
 bool PcgToolMutatesGraph(const std::string& name) {
@@ -973,6 +1138,13 @@ bool PcgToolMutatesGraph(const std::string& name) {
            name == "pcg_apply_graph_ops" ||
            name == "pcg_replace_graph" ||
            name == "pcg_save_graph";
+}
+
+bool PcgToolMutatesShot(const std::string& name) {
+    return name == "pcg_set_camera_keyframes" ||
+           name == "pcg_upsert_camera" ||
+           name == "pcg_connect_cameras" ||
+           name == "pcg_select_camera";
 }
 
 void HandleMcpPost(const httplib::Request& req, httplib::Response& res) {

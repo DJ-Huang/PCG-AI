@@ -7,8 +7,8 @@ source_path: PCG AI Rule/Engineering/pcg-ai-development.md
 tags: [type/rule, domain/pcg, project/pcg-ai]
 type: rule
 verified_status: limited
-verified_by: PCG-AI repository scripts, schema and pcg-core source audit
-verified_date: 2026-07-28
+verified_by: PCG-AI repository structure audit, scripts, schema and pcg-core source audit
+verified_date: 2026-09-05
 ---
 
 # PCG-AI 工程开发契约
@@ -41,6 +41,22 @@ Unity Editor **不再加载** `PcgCore` / `PcgFbxExporter` dylib/dll；C++ 只�
 ## 写 `.pcg`
 
 调用 `pcg-graph-authoring-unity`（或需管线评估时用 `pcg-graph-authoring-unity-dev`），并先用 `rule_search(domain="pcg")` 读取 `pcg/graph-contract`、`pcg/assembly-bevel` 与模型类型规则。所有节点/属性/pin 最终仍以当前 manifest 为准。拓扑/装配参考只来自 Vault 磁盘 `PCG AI Rule/Golden Graphs/`（不进 RAG，须直接枚举并读取）；**禁止**把工程仓库 `examples/**/*.pcg` 当策略参考。详见 `pcg/graph-contract`。
+
+## 仓库目录与产物门禁（P0）
+
+任何新增、移动或生成文件的任务都必须先判断内容生命周期并遵守以下路由；禁止为了当前任务方便重新制造散落目录。
+
+1. **仓库级案例唯一入口**：正式 `.pcg` / `.pcgsubgraph` 与案例资料只能进入 `examples/{graphs,tests,subgraphs,showcases,storyboards}`。禁止放回仓库根目录、`web/`、`schema/` 或临时命名目录；`schema/editor-export.pcg` 仅是 ignored 的本地 Web→Unity 交接文件。
+2. **Unity 目录不得回退**：插件代码只在 `Unity/Assets/PcgPlugin/`；正式样例只在 `Unity/Assets/Samples/PCG-AI/{Demos,Showcases,Validation}`；生成审查场景只在 ignored `Unity/Assets/PCG-AI-Workspace/Scenes`；导出只在 ignored `Unity/Assets/Exports/`。禁止恢复 `Assets/PICGGenerator/Scenes`，也不得把 review scratch 混入 Samples。
+3. **Web 目录只承载应用**：`web/pcg-editor/` 只放 Web 源码、测试和应用所需公共静态资源。案例图进入 `examples/`；用户上传只进入 ignored `web/pcg-editor/public/assets/uploads/`。
+4. **Showcase 保持最小成套**：只保留最终 graph、README/AssetSpec、已确认可分发的参考和少量最终 evidence。删除 plan、RESUME、layout 副本、authoring script、pipeline 临时报表、原始批量截图与比较缓存；不适合入 Git 的大体积最终产出放 ignored `examples/**/artifacts/`。
+5. **Unity GUID 是迁移契约**：Unity 文件和目录必须与 `.meta` 成对移动并保留 GUID。每次结构变更后检查 missing meta、duplicate GUID 与 Build Settings 场景路径；禁止删除 meta 后让 Editor 静默重建。
+6. **路径变更必须全链路收口**：移动目录后必须搜索并更新 C++ tests、C#、shell/PowerShell、文档、CI、Agent Skill、`.pcg-ai/` 规则与 Unity ProjectSettings 中的旧路径，不能只验证新文件树存在。
+7. **生成物永不回库**：`node_modules`、`dist`、CMake build、Unity Library/Logs/Temp/obj/UserSettings、崩溃日志、debug/mem-log、编辑器交接图、uploads、screenshots、Plan 和 Exports 必须由 ignore 覆盖；验证生成的目录在交付前清理。
+8. **Unity 不内嵌 native plugin**：Web/Unity 统一经 localhost `pcg-server` cook。不得把 `PcgCore` / `PcgFbxExporter` 二进制或复制脚本放回 `Assets/PcgPlugin/Plugins/`，不得提交个人绝对 package 路径。
+9. **新增目录必须自解释**：新增顶层模块、案例分类或 Unity Samples 分类时，必须同步维护相邻 README、根 README、`.gitignore` / `.gitattributes` 与相关 CI 路由；无法明确归属时先复用现有分类，不自行扩张目录层级。
+
+提交前至少执行：旧路径/个人绝对路径扫描、ignored tracked 文件检查、Markdown 本地链接检查、Unity missing meta/duplicate GUID 检查，以及受影响平台的构建或测试。
 
 ## Houdini UI 对齐门禁
 

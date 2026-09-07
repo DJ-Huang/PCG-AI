@@ -624,12 +624,14 @@ namespace DJTechRuntime.PCG
             {
                 if (paramObj is not Dictionary<string, object> paramDict)
                     continue;
+                var type = GetString(paramDict, "type", "number");
+                paramDict.TryGetValue("default", out var defaultValue);
                 output.Add(new PcgGraphParameter
                 {
                     id = GetString(paramDict, "id"),
                     name = GetString(paramDict, "name"),
-                    type = GetString(paramDict, "type", "number"),
-                    defaultValue = GetString(paramDict, "default"),
+                    type = type,
+                    defaultValue = NormalizeParameterDefault(defaultValue, type),
                     exposed = GetBool(paramDict, "exposed", true),
                     targetNode = GetString(paramDict, "targetNode"),
                     targetProperty = GetString(paramDict, "targetProperty"),
@@ -646,9 +648,21 @@ namespace DJTechRuntime.PCG
             {
                 "integer" => str,
                 "number" => str,
-                "boolean" => str,
+                "boolean" => bool.TryParse(str, out var boolean) && boolean ? "true" : "false",
+                "vector3" => PcgVector3Property.NormalizeStored(str),
                 _ => JsonString(str),
             };
+        }
+
+        private static string NormalizeParameterDefault(object value, string type)
+        {
+            if (type == "vector3")
+                return PcgVector3Property.NormalizeStored(value);
+            if (type == "boolean")
+                return value is bool boolean
+                    ? (boolean ? "true" : "false")
+                    : bool.TryParse(value?.ToString(), out var parsed) && parsed ? "true" : "false";
+            return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
 
         private static string JsonString(string value)

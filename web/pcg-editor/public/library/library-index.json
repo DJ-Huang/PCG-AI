@@ -63,6 +63,453 @@
         }
       ],
       "doc": "cable/cable_generator.md"
+    },
+    {
+      "id": "pcg.lib:character:human_proxy_standing",
+      "displayName": "Human Proxy Standing",
+      "category": "Character",
+      "file": "character/human_proxy_standing.pcgsubgraph",
+      "assetVersion": "1.0.0",
+      "contentHash": "6b2cc49d1f269cb55748affe4cba844876c8da2630074636ba6a444a5de21427",
+      "keywords": [
+        "human",
+        "person",
+        "standing",
+        "character",
+        "人物",
+        "人类",
+        "站立"
+      ],
+      "description": "约 1.75 米高的站立人物代理，具有清晰头身比例和局部 +Z 朝向。",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "scale",
+          "name": "Body Size (XYZ)",
+          "type": "vector3",
+          "default": [
+            1,
+            1,
+            1
+          ],
+          "hasRange": false,
+          "min": 0,
+          "max": 10
+        }
+      ],
+      "semantic": {
+        "componentId": "human_proxy_standing",
+        "role": "character",
+        "bounds": {
+          "center": [
+            0,
+            0.875,
+            0
+          ],
+          "size": [
+            0.76,
+            1.75,
+            0.3
+          ]
+        },
+        "anchors": {
+          "feet": [
+            0,
+            0,
+            0
+          ],
+          "head": [
+            0,
+            1.61,
+            0
+          ],
+          "look": [
+            0,
+            1.61,
+            0.5
+          ]
+        },
+        "camera": {
+          "include": true,
+          "occluder": true,
+          "scaleRole": "human"
+        }
+      }
+    },
+    {
+      "id": "pcg.lib:character:human_proxy_walking",
+      "displayName": "Human Proxy Walking",
+      "category": "Character",
+      "file": "character/human_proxy_walking.pcgsubgraph",
+      "assetVersion": "1.0.0",
+      "contentHash": "daa9038e0b8233f3ea35b6abc6ce19212973fd9f393e56b0bafcb988377cb30e",
+      "keywords": [
+        "human",
+        "person",
+        "walking",
+        "character",
+        "人物",
+        "人类",
+        "行走",
+        "走路"
+      ],
+      "description": "约 1.75 米高、带明确迈步剪影的人物代理，局部 +Z 为前进方向。",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "scale",
+          "name": "Body Size (XYZ)",
+          "type": "vector3",
+          "default": [
+            1,
+            1,
+            1
+          ],
+          "hasRange": false,
+          "min": 0,
+          "max": 10
+        }
+      ],
+      "semantic": {
+        "componentId": "human_proxy_walking",
+        "role": "character",
+        "bounds": {
+          "center": [
+            0,
+            0.875,
+            0
+          ],
+          "size": [
+            0.8,
+            1.75,
+            0.75
+          ]
+        },
+        "anchors": {
+          "feet": [
+            0,
+            0,
+            0
+          ],
+          "head": [
+            0,
+            1.61,
+            0
+          ],
+          "forward": [
+            0,
+            0.9,
+            0.75
+          ]
+        },
+        "camera": {
+          "include": true,
+          "occluder": true,
+          "scaleRole": "human"
+        }
+      }
+    },
+    {
+      "id": "pcg.lib:environment:building_block",
+      "displayName": "Building Block",
+      "category": "Environment",
+      "file": "environment/building_block.pcgsubgraph",
+      "assetVersion": "1.0.0",
+      "contentHash": "b5272d81fd4bf652bb761e8c5b7eceb79e38ff73639b7704addcba1867953690",
+      "keywords": [
+        "building",
+        "block",
+        "architecture",
+        "建筑",
+        "楼房",
+        "街景"
+      ],
+      "description": "保持贴地的可缩放建筑体块，用于城市分镜背景和遮挡设计。",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "width",
+          "name": "Width",
+          "type": "number",
+          "default": 8,
+          "hasRange": true,
+          "min": 2,
+          "max": 100
+        },
+        {
+          "id": "depth",
+          "name": "Depth",
+          "type": "number",
+          "default": 8,
+          "hasRange": true,
+          "min": 2,
+          "max": 100
+        },
+        {
+          "id": "clampBevel",
+          "name": "Clamp Bevel Overlap",
+          "type": "boolean",
+          "default": true,
+          "hasRange": false,
+          "min": 0,
+          "max": 1
+        },
+        {
+          "id": "scale",
+          "name": "Size Scale (XYZ)",
+          "type": "vector3",
+          "default": [
+            1,
+            1,
+            1
+          ],
+          "hasRange": false,
+          "min": 0,
+          "max": 10
+        }
+      ],
+      "semantic": {
+        "componentId": "building_block",
+        "role": "background_building",
+        "bounds": {
+          "center": [
+            0,
+            5,
+            0
+          ],
+          "size": [
+            8,
+            10,
+            8
+          ]
+        },
+        "anchors": {
+          "ground": [
+            0,
+            0,
+            0
+          ],
+          "roof": [
+            0,
+            10,
+            0
+          ],
+          "front": [
+            0,
+            2,
+            4
+          ]
+        },
+        "camera": {
+          "include": false,
+          "occluder": true,
+          "scaleRole": "building"
+        }
+      }
+    },
+    {
+      "id": "pcg.lib:environment:road_segment",
+      "displayName": "Road Segment",
+      "category": "Environment",
+      "file": "environment/road_segment.pcgsubgraph",
+      "assetVersion": "1.0.0",
+      "contentHash": "cb88797b92a143cbace4d1bc7d5d575176ad9714bc146f5a0b60929907fd4514",
+      "keywords": [
+        "road",
+        "street",
+        "lane",
+        "道路",
+        "街道",
+        "路段"
+      ],
+      "description": "可缩放的道路占位段，默认沿局部 +Z 延伸并贴近地面。",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "width",
+          "name": "Road Width",
+          "type": "number",
+          "default": 6,
+          "hasRange": true,
+          "min": 2,
+          "max": 30
+        },
+        {
+          "id": "length",
+          "name": "Road Length",
+          "type": "number",
+          "default": 12,
+          "hasRange": true,
+          "min": 2,
+          "max": 100
+        },
+        {
+          "id": "thickness",
+          "name": "Thickness",
+          "type": "number",
+          "default": 0.1,
+          "hasRange": true,
+          "min": 0.02,
+          "max": 1
+        },
+        {
+          "id": "scale",
+          "name": "Instance Scale",
+          "type": "vector3",
+          "default": [
+            1,
+            1,
+            1
+          ],
+          "hasRange": false,
+          "min": 0,
+          "max": 10
+        }
+      ],
+      "semantic": {
+        "componentId": "road_segment",
+        "role": "road",
+        "bounds": {
+          "center": [
+            0,
+            0.05,
+            0
+          ],
+          "size": [
+            6,
+            0.1,
+            12
+          ]
+        },
+        "anchors": {
+          "start": [
+            0,
+            0.1,
+            -6
+          ],
+          "end": [
+            0,
+            0.1,
+            6
+          ],
+          "center": [
+            0,
+            0.1,
+            0
+          ]
+        },
+        "camera": {
+          "include": false,
+          "occluder": false,
+          "scaleRole": "environment"
+        }
+      }
+    },
+    {
+      "id": "pcg.lib:vehicle:car_proxy",
+      "displayName": "Car Proxy",
+      "category": "Vehicle",
+      "file": "vehicle/car_proxy.pcgsubgraph",
+      "assetVersion": "1.0.0",
+      "contentHash": "a3b7834ac8af28887eb54e174058f89c6f425198836f6ae342c092b89382f283",
+      "keywords": [
+        "car",
+        "vehicle",
+        "automobile",
+        "汽车",
+        "车辆",
+        "轿车"
+      ],
+      "description": "带车身、座舱和四轮的可缩放分镜车辆，占位前向为局部 +Z。",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "scale",
+          "name": "Vehicle Size (XYZ)",
+          "type": "vector3",
+          "default": [
+            1,
+            1,
+            1
+          ],
+          "hasRange": false,
+          "min": 0,
+          "max": 10
+        }
+      ],
+      "semantic": {
+        "componentId": "car_proxy",
+        "role": "vehicle",
+        "bounds": {
+          "center": [
+            0,
+            0.75,
+            0
+          ],
+          "size": [
+            2.04,
+            1.5,
+            4.4
+          ]
+        },
+        "anchors": {
+          "ground": [
+            0,
+            0,
+            0
+          ],
+          "front": [
+            0,
+            0.75,
+            2.2
+          ],
+          "driver": [
+            -0.45,
+            1.15,
+            0.2
+          ]
+        },
+        "camera": {
+          "include": true,
+          "occluder": true,
+          "scaleRole": "vehicle"
+        }
+      }
     }
   ]
 }

@@ -20,5 +20,6 @@ nlohmann::json CallPcgTool(
     const std::string& editor_session_id = "");
 bool PcgToolRequiresApproval(const std::string& name);
 bool PcgToolMutatesGraph(const std::string& name);
+bool PcgToolMutatesShot(const std::string& name);
 
 }  // namespace pcg_server

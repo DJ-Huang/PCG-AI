@@ -74,7 +74,7 @@ function ToolPart({
         {output && <div className="pcg-agent-tool__section"><header>Result <button type="button" onClick={() => copyText(output)}>Copy</button></header><pre>{output}</pre></div>}
         {call && (
           <div className="pcg-agent-tool__approval">
-            <strong>Approve this graph write?</strong>
+            <strong>Approve this operation?</strong>
             <div>
               <button type="button" className={decision === 'approve' ? 'is-selected' : ''} onClick={() => onDecision(call.toolCallId, 'approve')}>Approve</button>
               <button type="button" className={decision !== 'approve' ? 'is-selected is-reject' : ''} onClick={() => onDecision(call.toolCallId, 'reject')}>Reject</button>

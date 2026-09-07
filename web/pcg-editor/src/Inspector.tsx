@@ -16,6 +16,11 @@ import {
 import type { GraphParameter, ParameterType, NodeData } from './graphSchema';
 import { resolveUpstreamGroups, filterGroupsByDomain, type AvailableGroup } from './groupResolver';
 import { findSubgraph, getSubgraphId, getSubgraphNodeTitle, isSubgraphInterfaceNode, useCurrentSubgraph, useSubgraphs } from './subgraphs';
+import {
+  readSubgraphParameterValue,
+  SUBGRAPH_PARAMETER_OVERRIDES_KEY,
+  writeSubgraphParameterValue,
+} from './subgraphParameters';
 import { resolvePbrTextureUrl } from './preview/pbrMaterials';
 import { generateTripoMesh } from './thirdPartyClient';
 
@@ -918,17 +923,44 @@ function SubgraphInspector({
             ? ` · ${subgraph.parameters.length} params`
             : ''}
         </div>
-        {subgraph.parameters && subgraph.parameters.length > 0 && (
-          <div className="pcg-inspector__props">
-            {subgraph.parameters.map((p) => (
-              <div key={p.id} className="pcg-inspector__pin-row">
-                <span className="pcg-inspector__pin-label">{p.name}</span>
-                <span className="pcg-inspector__pin-type">{p.type}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+      {subgraph.parameters && subgraph.parameters.length > 0 && (
+        <div className="pcg-inspector__section">
+          <div className="pcg-inspector__section-title">Parameters</div>
+          <div className="pcg-inspector__props">
+            {subgraph.parameters.map((parameter) => {
+              const property: ManifestProperty = {
+                type: parameter.type as PropertyType,
+                default: parameter.default,
+                ...(parameter.hasRange ? { minimum: parameter.min, maximum: parameter.max } : {}),
+              };
+              return (
+                <div key={parameter.id} className="pcg-inspector__prop">
+                  <div className="pcg-inspector__prop-header">
+                    <span className="pcg-inspector__prop-label">{parameter.name}</span>
+                  </div>
+                  <div className="pcg-inspector__prop-value">
+                    <PropertyEditor
+                      prop={property}
+                      value={readSubgraphParameterValue(data, parameter)}
+                      disabled={false}
+                      binding={undefined}
+                      onChange={(value) => onUpdateNodeData(node.id, {
+                        [SUBGRAPH_PARAMETER_OVERRIDES_KEY]: writeSubgraphParameterValue(
+                          data,
+                          subgraph.parameters ?? [],
+                          parameter.id,
+                          value,
+                        ),
+                      })}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,26 @@
+{
+  "id": "pcg.lib:character:human_proxy_standing",
+  "displayName": "Human Proxy Standing",
+  "category": "Character",
+  "assetVersion": "1.0.0",
+  "keywords": ["human", "person", "standing", "character", "人物", "人类", "站立"],
+  "description": "约 1.75 米高的站立人物代理，具有清晰头身比例和局部 +Z 朝向。",
+  "semantic": {
+    "componentId": "human_proxy_standing",
+    "role": "character",
+    "bounds": {
+      "center": [0, 0.875, 0],
+      "size": [0.76, 1.75, 0.3]
+    },
+    "anchors": {
+      "feet": [0, 0, 0],
+      "head": [0, 1.61, 0],
+      "look": [0, 1.61, 0.5]
+    },
+    "camera": {
+      "include": true,
+      "occluder": true,
+      "scaleRole": "human"
+    }
+  }
+}

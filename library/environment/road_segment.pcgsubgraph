@@ -1,0 +1,151 @@
+{
+  "version": "2.0",
+  "name": "Road Segment",
+  "contentHash": "cb88797b92a143cbace4d1bc7d5d575176ad9714bc146f5a0b60929907fd4514",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "name": "Geometry",
+      "pinType": "SpatialGeometry"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "width",
+      "name": "Road Width",
+      "type": "number",
+      "default": 6,
+      "exposed": true,
+      "targetNode": "road",
+      "targetProperty": "width",
+      "hasRange": true,
+      "min": 2,
+      "max": 30
+    },
+    {
+      "id": "length",
+      "name": "Road Length",
+      "type": "number",
+      "default": 12,
+      "exposed": true,
+      "targetNode": "road",
+      "targetProperty": "depth",
+      "hasRange": true,
+      "min": 2,
+      "max": 100
+    },
+    {
+      "id": "thickness",
+      "name": "Thickness",
+      "type": "number",
+      "default": 0.1,
+      "exposed": true,
+      "targetNode": "road",
+      "targetProperty": "height",
+      "hasRange": true,
+      "min": 0.02,
+      "max": 1
+    },
+    {
+      "id": "scale",
+      "name": "Instance Scale",
+      "type": "vector3",
+      "default": [
+        1,
+        1,
+        1
+      ],
+      "exposed": true,
+      "targetNode": "asset_scale",
+      "targetProperty": "scale",
+      "hasRange": false,
+      "min": 0,
+      "max": 10
+    }
+  ],
+  "nodes": [
+    {
+      "id": "road",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 6,
+        "height": 0.1,
+        "depth": 12,
+        "__nodeTitle": "Road Slab"
+      }
+    },
+    {
+      "id": "road_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.02,
+        "segments": 1,
+        "__nodeTitle": "Road Edge Bevel"
+      }
+    },
+    {
+      "id": "asset_scale",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "__nodeTitle": "Road Instance Scale"
+      }
+    },
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "road_to_bevel",
+      "source": "road",
+      "target": "road_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "bevel_to_scale",
+      "source": "road_bevel",
+      "target": "asset_scale",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "scale_to_output",
+      "source": "asset_scale",
+      "target": "subgraph_output",
+      "sourceHandle": "out",
+      "targetHandle": "out",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialGeometry"
+    }
+  ],
+  "subgraphs": []
+}

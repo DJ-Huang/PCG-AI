@@ -22,6 +22,7 @@ const INDEX = {
       contentHash: 'abc123',
       keywords: ['cable', 'wire', '电缆'],
       description: '沿 spline 扫掠电缆',
+      semantic: { componentId: 'cable_proxy', role: 'prop' },
       inputs: [{ id: 'path', name: 'Path', pinType: 'SpatialSpline' }],
       outputs: [{ id: 'out', name: 'Geometry', pinType: 'SpatialGeometry' }],
       parameters: [
@@ -99,6 +100,7 @@ describe('libraryManifest', () => {
   it('matches queries across display name, id and keywords', () => {
     expect(libraryItemMatchesQuery(ITEM, 'cable')).toBe(true);
     expect(libraryItemMatchesQuery(ITEM, '电缆')).toBe(true);
+    expect(libraryItemMatchesQuery(ITEM, 'prop')).toBe(true);
     expect(libraryItemMatchesQuery(ITEM, 'unrelated')).toBe(false);
   });
 
@@ -118,5 +120,6 @@ describe('libraryManifest', () => {
     expect(subgraph.inputs[0].pinType).toBe('SpatialSpline');
     expect(subgraph.nodes).toHaveLength(3);
     expect(subgraph.parameters?.[0].targetNode).toBe('sweep');
+    expect(subgraph.semantic?.componentId).toBe('cable_proxy');
   });
 });

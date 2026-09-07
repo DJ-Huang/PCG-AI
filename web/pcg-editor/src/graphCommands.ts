@@ -18,16 +18,43 @@ export type GraphOperation =
 interface QueuedCommandBase {
   id: number;
   baseGraphHash: string;
+  baseShotHash?: string;
   editPath: string[];
   createdAt: number;
 }
+
+export type ShotKeyframePayload = {
+  id?: string;
+  timeSeconds: number;
+  interpolation?: string;
+  value: Record<string, unknown>;
+};
 
 export type QueuedGraphCommand = QueuedCommandBase & (
   | { type: 'setNodeParams'; nodeId: string; patch: Record<string, unknown> }
   | { type: 'applyGraphOps'; operations: GraphOperation[] }
   | { type: 'replaceGraph'; graph: GraphJson }
   | { type: 'saveGraph'; path?: string }
+  | {
+    type: 'setCameraKeyframes';
+    cameraId?: string;
+    mode?: 'replace' | 'upsert';
+    keyframes: ShotKeyframePayload[];
+    seekTimeSeconds?: number;
+  }
+  | { type: 'upsertCamera'; camera: Record<string, unknown> }
+  | { type: 'connectCameras'; source: string; target: string }
+  | { type: 'selectCamera'; cameraId: string }
+  | { type: 'previewShot'; cameraId?: string; timeSeconds?: number; play?: boolean }
 );
+
+export function isShotCommand(command: QueuedGraphCommand): boolean {
+  return command.type === 'setCameraKeyframes'
+    || command.type === 'upsertCamera'
+    || command.type === 'connectCameras'
+    || command.type === 'selectCamera'
+    || command.type === 'previewShot';
+}
 
 export interface GraphCommandResult {
   id: number;

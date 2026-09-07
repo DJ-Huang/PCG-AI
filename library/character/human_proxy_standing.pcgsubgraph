@@ -1,0 +1,485 @@
+{
+  "version": "2.0",
+  "name": "Human Proxy Standing",
+  "contentHash": "6b2cc49d1f269cb55748affe4cba844876c8da2630074636ba6a444a5de21427",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "name": "Geometry",
+      "pinType": "SpatialGeometry"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "scale",
+      "name": "Body Size (XYZ)",
+      "type": "vector3",
+      "default": [
+        1,
+        1,
+        1
+      ],
+      "exposed": true,
+      "targetNode": "asset_scale",
+      "targetProperty": "scale",
+      "hasRange": false,
+      "min": 0,
+      "max": 10
+    }
+  ],
+  "nodes": [
+    {
+      "id": "head",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.15,
+        "height": 0.28,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Head"
+      }
+    },
+    {
+      "id": "torso",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 560,
+        "y": 0
+      },
+      "data": {
+        "width": 0.45,
+        "height": 0.65,
+        "depth": 0.25,
+        "__nodeTitle": "Torso"
+      }
+    },
+    {
+      "id": "pelvis",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 920,
+        "y": 0
+      },
+      "data": {
+        "width": 0.36,
+        "height": 0.25,
+        "depth": 0.24,
+        "__nodeTitle": "Pelvis"
+      }
+    },
+    {
+      "id": "arm_l",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 1280,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.07,
+        "height": 0.65,
+        "radialSegments": 10,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Left Arm"
+      }
+    },
+    {
+      "id": "arm_r",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 1640,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.07,
+        "height": 0.65,
+        "radialSegments": 10,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Right Arm"
+      }
+    },
+    {
+      "id": "leg_l",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 2000,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.09,
+        "height": 0.75,
+        "radialSegments": 10,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Left Leg"
+      }
+    },
+    {
+      "id": "leg_r",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 2360,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.09,
+        "height": 0.75,
+        "radialSegments": 10,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Right Leg"
+      }
+    },
+    {
+      "id": "torso_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 560,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.06,
+        "segments": 2,
+        "__nodeTitle": "Torso Bevel"
+      }
+    },
+    {
+      "id": "pelvis_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 920,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.04,
+        "segments": 2,
+        "__nodeTitle": "Pelvis Bevel"
+      }
+    },
+    {
+      "id": "place_head",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          0,
+          1.61,
+          0
+        ],
+        "__nodeTitle": "Place Head"
+      }
+    },
+    {
+      "id": "place_torso",
+      "type": "TransformMesh",
+      "position": {
+        "x": 560,
+        "y": 320
+      },
+      "data": {
+        "translate": [
+          0,
+          1.15,
+          0
+        ],
+        "__nodeTitle": "Place Torso"
+      }
+    },
+    {
+      "id": "place_pelvis",
+      "type": "TransformMesh",
+      "position": {
+        "x": 920,
+        "y": 320
+      },
+      "data": {
+        "translate": [
+          0,
+          0.72,
+          0
+        ],
+        "__nodeTitle": "Place Pelvis"
+      }
+    },
+    {
+      "id": "place_arm_l",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1280,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          -0.31,
+          1.13,
+          0
+        ],
+        "__nodeTitle": "Place Left Arm"
+      }
+    },
+    {
+      "id": "place_arm_r",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1640,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          0.31,
+          1.13,
+          0
+        ],
+        "__nodeTitle": "Place Right Arm"
+      }
+    },
+    {
+      "id": "place_leg_l",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2000,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          -0.12,
+          0.375,
+          0
+        ],
+        "__nodeTitle": "Place Left Leg"
+      }
+    },
+    {
+      "id": "place_leg_r",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2360,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          0.12,
+          0.375,
+          0
+        ],
+        "__nodeTitle": "Place Right Leg"
+      }
+    },
+    {
+      "id": "merge_character",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1280,
+        "y": 480
+      },
+      "data": {
+        "__nodeTitle": "Assemble Standing Human"
+      }
+    },
+    {
+      "id": "asset_scale",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1280,
+        "y": 640
+      },
+      "data": {
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "__nodeTitle": "Human Instance Scale"
+      }
+    },
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 1280,
+        "y": 800
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "head_place",
+      "source": "head",
+      "target": "place_head",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "torso_bevel_edge",
+      "source": "torso",
+      "target": "torso_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "torso_place",
+      "source": "torso_bevel",
+      "target": "place_torso",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "pelvis_bevel_edge",
+      "source": "pelvis",
+      "target": "pelvis_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "pelvis_place",
+      "source": "pelvis_bevel",
+      "target": "place_pelvis",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "arm_l_place",
+      "source": "arm_l",
+      "target": "place_arm_l",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "arm_r_place",
+      "source": "arm_r",
+      "target": "place_arm_r",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "leg_l_place",
+      "source": "leg_l",
+      "target": "place_leg_l",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "leg_r_place",
+      "source": "leg_r",
+      "target": "place_leg_r",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "head_merge",
+      "source": "place_head",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "torso_merge",
+      "source": "place_torso",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "pelvis_merge",
+      "source": "place_pelvis",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "arm_l_merge",
+      "source": "place_arm_l",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "arm_r_merge",
+      "source": "place_arm_r",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "leg_l_merge",
+      "source": "place_leg_l",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "leg_r_merge",
+      "source": "place_leg_r",
+      "target": "merge_character",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "merge_scale",
+      "source": "merge_character",
+      "target": "asset_scale",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "scale_output",
+      "source": "asset_scale",
+      "target": "subgraph_output",
+      "sourceHandle": "out",
+      "targetHandle": "out",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialGeometry"
+    }
+  ],
+  "subgraphs": []
+}

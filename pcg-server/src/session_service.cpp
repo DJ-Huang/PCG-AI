@@ -66,6 +66,7 @@ json EditorChoicesLocked(const BridgeState& state) {
             {"editorSessionId", id},
             {"graphPath", editor.session.value("graphPath", "")},
             {"graphHash", editor.session.value("graphHash", "")},
+            {"shotHash", editor.session.value("shotHash", "")},
             {"nodeCount", graph.value("nodes", json::array()).size()},
             {"updatedAt", editor.session.value("updatedAt", 0ll)},
         });
@@ -189,36 +190,78 @@ const json* FindCurrentNode(const json& session, const std::string& node_id) {
     return nullptr;
 }
 
-json QueueGraphCommandLocked(
+json ShotSummary(const json& shot) {
+    const json cameras = shot.value("cameras", json::array());
+    const json keys = shot.value("cameraKeyframes", json::array());
+    return {
+        {"name", shot.value("name", "")},
+        {"durationSeconds", shot.value("durationSeconds", 0.0)},
+        {"fps", shot.value("fps", 24)},
+        {"width", shot.value("width", 1920)},
+        {"height", shot.value("height", 1080)},
+        {"activeCameraId", shot.value("activeCameraId", "")},
+        {"cameraCount", cameras.is_array() ? cameras.size() : 0},
+        {"keyframeCount", keys.is_array() ? keys.size() : 0},
+    };
+}
+
+enum class CommandLock { Graph, Shot, None };
+
+json QueueEditorCommandLocked(
     BridgeState& state,
     EditorState& editor,
     json command,
-    const std::string& expected_graph_hash,
+    CommandLock lock,
+    const std::string& expected_hash,
     bool require_root_scope) {
     if (!IsOnlineLocked(editor)) {
         return {{"ok", false}, {"status", 409}, {"error", "editor_offline"}};
     }
-    const std::string current_hash = editor.session.value("graphHash", "");
-    if (expected_graph_hash.empty()) {
-        return {{"ok", false}, {"status", 428}, {"error", "ifGraphHash is required"}};
-    }
-    if (expected_graph_hash != current_hash) {
-        return {
-            {"ok", false}, {"status", 409}, {"error", "graph_conflict"},
-            {"expectedGraphHash", expected_graph_hash}, {"currentGraphHash", current_hash},
-        };
+    const std::string current_graph_hash = editor.session.value("graphHash", "");
+    const std::string current_shot_hash = editor.session.value("shotHash", "");
+    if (lock == CommandLock::Graph) {
+        if (expected_hash.empty()) {
+            return {{"ok", false}, {"status", 428}, {"error", "ifGraphHash is required"}};
+        }
+        if (expected_hash != current_graph_hash) {
+            return {
+                {"ok", false}, {"status", 409}, {"error", "graph_conflict"},
+                {"expectedGraphHash", expected_hash}, {"currentGraphHash", current_graph_hash},
+            };
+        }
+    } else if (lock == CommandLock::Shot) {
+        if (expected_hash.empty()) {
+            return {{"ok", false}, {"status", 428}, {"error", "ifShotHash is required"}};
+        }
+        if (expected_hash != current_shot_hash) {
+            return {
+                {"ok", false}, {"status", 409}, {"error", "shot_conflict"},
+                {"expectedShotHash", expected_hash}, {"currentShotHash", current_shot_hash},
+            };
+        }
     }
     const json edit_path = editor.session.value("editPath", json::array());
     if (require_root_scope && edit_path.is_array() && !edit_path.empty()) {
         return {{"ok", false}, {"status", 409}, {"error", "root_scope_required"}, {"editPath", edit_path}};
     }
     command["id"] = state.next_patch_id++;
-    command["baseGraphHash"] = current_hash;
+    command["baseGraphHash"] = current_graph_hash;
+    command["baseShotHash"] = current_shot_hash;
     command["editPath"] = edit_path;
     command["createdAt"] = EpochMillis();
     command["editorSessionId"] = editor.session.value("sessionId", "");
     editor.patches.push_back(command);
     return {{"ok", true}, {"accepted", true}, {"command", std::move(command)}};
+}
+
+json QueueGraphCommandLocked(
+    BridgeState& state,
+    EditorState& editor,
+    json command,
+    const std::string& expected_graph_hash,
+    bool require_root_scope) {
+    return QueueEditorCommandLocked(
+        state, editor, std::move(command), CommandLock::Graph, expected_graph_hash, require_root_scope);
 }
 
 json ContextLocked(const BridgeState& state, const std::string& editor_session_id) {
@@ -230,6 +273,11 @@ json ContextLocked(const BridgeState& state, const std::string& editor_session_i
         session["nodeManifestVersion"] = session["nodeManifest"].value("version", "");
     }
     session.erase("nodeManifest");
+    const json shot = session.value("shot", json::object());
+    session.erase("shot");
+    session["shotHash"] = session.value("shotHash", "");
+    session["shot"] = ShotSummary(shot);
+    session["selectedCameraId"] = session.value("selectedCameraId", shot.value("activeCameraId", ""));
     return {
         {"ok", true},
         {"online", IsOnlineLocked(*editor)},
@@ -268,6 +316,8 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
         return;
     }
     auto& editor = state.editors[incoming_id];
+    const json previous_shot = editor.session.value("shot", json::object());
+    const std::string previous_shot_hash = editor.session.value("shotHash", "");
     const int64_t incoming_revision = body.value("clientRevision", 0ll);
     if (!editor.session.empty() && incoming_revision > 0 &&
         incoming_revision <= editor.session.value("clientRevision", 0ll)) {
@@ -277,6 +327,12 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
             {"currentClientRevision", editor.session.value("clientRevision", 0ll)},
         });
         return;
+    }
+    if (!body.contains("shot") || !body["shot"].is_object()) {
+        body["shot"] = previous_shot;
+    }
+    if (!body.contains("shotHash") || !body["shotHash"].is_string()) {
+        body["shotHash"] = previous_shot_hash;
     }
     body["receivedAt"] = EpochMillis();
     editor.session = std::move(body);
@@ -641,6 +697,23 @@ json GetEditorDocument(const std::string& editor_session_id) {
     };
 }
 
+json GetEditorShot(const std::string& editor_session_id) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
+    const json shot = editor->session.value("shot", json::object());
+    return {
+        {"ok", true},
+        {"shot", shot},
+        {"shotHash", editor->session.value("shotHash", "")},
+        {"graphHash", editor->session.value("graphHash", "")},
+        {"graphPath", editor->session.value("graphPath", "")},
+        {"selectedCameraId", editor->session.value("selectedCameraId", shot.value("activeCameraId", ""))},
+        {"editorSessionId", editor->session.value("sessionId", "")},
+    };
+}
+
 json QueueNodePatch(
     const std::string& node_id,
     const json& patch,
@@ -687,6 +760,41 @@ json QueueGraphCommand(
         return error;
     }
     return QueueGraphCommandLocked(state, *editor, std::move(command), expected_graph_hash, require_root_scope);
+}
+
+json QueueShotCommand(
+    json command,
+    const std::string& expected_shot_hash,
+    const std::string& editor_session_id) {
+    if (!command.is_object() || !command.contains("type") || !command["type"].is_string()) {
+        return {{"ok", false}, {"status", 400}, {"error", "command type is required"}};
+    }
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        json error = EditorSelectionErrorLocked(state, editor_session_id);
+        error["status"] = 409;
+        return error;
+    }
+    return QueueEditorCommandLocked(
+        state, *editor, std::move(command), CommandLock::Shot, expected_shot_hash, false);
+}
+
+json QueuePreviewShotCommand(json command, const std::string& editor_session_id) {
+    if (!command.is_object() || !command.contains("type") || !command["type"].is_string()) {
+        return {{"ok", false}, {"status", 400}, {"error", "command type is required"}};
+    }
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        json error = EditorSelectionErrorLocked(state, editor_session_id);
+        error["status"] = 409;
+        return error;
+    }
+    return QueueEditorCommandLocked(
+        state, *editor, std::move(command), CommandLock::None, "", false);
 }
 
 bool WaitForGraphCommandResult(

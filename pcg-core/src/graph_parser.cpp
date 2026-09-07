@@ -91,6 +91,39 @@ bool parse_ports(const nlohmann::json& array,
     return true;
 }
 
+bool parse_parameters(const nlohmann::json& array,
+                      std::vector<GraphParameter>& parameters,
+                      std::string& error)
+{
+    if (!array.is_array()) {
+        error = "Subgraph parameters must be an array";
+        return false;
+    }
+    std::unordered_set<std::string> ids;
+    for (const auto& parameter_json : array) {
+        if (!parameter_json.is_object() ||
+            !parameter_json.contains("id") || !parameter_json["id"].is_string() ||
+            !parameter_json.contains("targetNode") || !parameter_json["targetNode"].is_string() ||
+            !parameter_json.contains("targetProperty") || !parameter_json["targetProperty"].is_string()) {
+            error = "Invalid subgraph parameter";
+            return false;
+        }
+        GraphParameter parameter;
+        parameter.id = parameter_json["id"].get<std::string>();
+        parameter.type = parameter_json.value("type", "number");
+        parameter.default_value = parameter_json.value("default", nlohmann::json{});
+        parameter.target_node = parameter_json["targetNode"].get<std::string>();
+        parameter.target_property = parameter_json["targetProperty"].get<std::string>();
+        if (parameter.id.empty() || parameter.target_node.empty() || parameter.target_property.empty() ||
+            !ids.insert(parameter.id).second) {
+            error = "Invalid or duplicate subgraph parameter id";
+            return false;
+        }
+        parameters.push_back(std::move(parameter));
+    }
+    return true;
+}
+
 bool validate_subgraph_output_contract(const GraphSubgraph& subgraph,
                                        std::string& error)
 {
@@ -108,6 +141,15 @@ bool validate_subgraph_output_contract(const GraphSubgraph& subgraph,
     if (output_count != 1) {
         error = "Subgraph must contain exactly one Output node";
         return false;
+    }
+    for (const auto& parameter : subgraph.parameters) {
+        const bool target_exists = std::any_of(
+            subgraph.nodes.begin(), subgraph.nodes.end(),
+            [&](const GraphNode& node) { return node.id == parameter.target_node; });
+        if (!target_exists) {
+            error = "Subgraph parameter target node not found: " + parameter.target_node;
+            return false;
+        }
     }
     return true;
 }
@@ -189,6 +231,66 @@ bool resolve_parent_ref_endpoints(const GraphNode& ref_node,
     return true;
 }
 
+nlohmann::json parse_instance_overrides(const GraphNode& instance)
+{
+    if (!instance.data.is_object() || !instance.data.contains("subgraphParameterOverrides"))
+        return nlohmann::json::array();
+    nlohmann::json overrides = instance.data["subgraphParameterOverrides"];
+    if (overrides.is_string())
+        overrides = nlohmann::json::parse(overrides.get<std::string>(), nullptr, false);
+    return overrides;
+}
+
+nlohmann::json resolve_parameter_value(const GraphParameter& parameter,
+                                       const nlohmann::json& overrides)
+{
+    if (overrides.is_object()) {
+        const auto found = overrides.find(parameter.id);
+        if (found != overrides.end())
+            return *found;
+    }
+    if (!overrides.is_array())
+        return parameter.default_value;
+    for (const auto& entry : overrides) {
+        if (!entry.is_object() || entry.value("parameterId", "") != parameter.id)
+            continue;
+        if (entry.contains("value"))
+            return entry["value"];
+        if (parameter.type == "integer" && entry.contains("intValue"))
+            return entry["intValue"];
+        if (parameter.type == "number" && entry.contains("floatValue"))
+            return entry["floatValue"];
+        if (parameter.type == "boolean" && entry.contains("boolValue"))
+            return entry["boolValue"];
+        if (entry.contains("stringValue")) {
+            const auto& stored = entry["stringValue"];
+            if (parameter.type == "vector3" && stored.is_string()) {
+                auto vector = nlohmann::json::parse(stored.get<std::string>(), nullptr, false);
+                if (vector.is_array() && vector.size() == 3)
+                    return vector;
+            }
+            return stored;
+        }
+    }
+    return parameter.default_value;
+}
+
+GraphSubgraph resolve_subgraph_instance(const GraphSubgraph& definition,
+                                        const GraphNode& instance)
+{
+    GraphSubgraph resolved = definition;
+    const nlohmann::json overrides = parse_instance_overrides(instance);
+    for (const auto& parameter : resolved.parameters) {
+        const auto target = std::find_if(
+            resolved.nodes.begin(), resolved.nodes.end(),
+            [&](const GraphNode& node) { return node.id == parameter.target_node; });
+        if (target == resolved.nodes.end() || !target->data.is_object())
+            continue;
+        target->data[parameter.target_property] = resolve_parameter_value(parameter, overrides);
+    }
+    return resolved;
+}
+
 bool expand_scope(const std::vector<GraphNode>& nodes,
                   const std::vector<GraphEdge>& edges,
                   const std::string& prefix,
@@ -236,7 +338,7 @@ bool expand_scope(const std::vector<GraphNode>& nodes,
         }
         stack.push_back(subgraph_id);
         ExpandedScope child;
-        const GraphSubgraph& definition = *definition_it->second;
+        const GraphSubgraph definition = resolve_subgraph_instance(*definition_it->second, node);
         ParentScopeContext child_parent;
         child_parent.nodes = &nodes;
         child_parent.edges = &edges;
@@ -458,9 +560,11 @@ PcgResultCode parse_graph(const char* json,
             subgraph.name = subgraph_json.value("name", subgraph.id);
             const auto inputs = subgraph_json.value("inputs", nlohmann::json::array());
             const auto outputs = subgraph_json.value("outputs", nlohmann::json::array());
-            if (!inputs.is_array() || !outputs.is_array() ||
+            const auto parameters = subgraph_json.value("parameters", nlohmann::json::array());
+            if (!inputs.is_array() || !outputs.is_array() || !parameters.is_array() ||
                 !parse_ports(inputs, subgraph.inputs, parse_error) ||
                 !parse_ports(outputs, subgraph.outputs, parse_error) ||
+                !parse_parameters(parameters, subgraph.parameters, parse_error) ||
                 !parse_nodes(subgraph_json["nodes"], subgraph.nodes, parse_error) ||
                 !parse_edges(subgraph_json["edges"], subgraph.edges, parse_error) ||
                 !validate_subgraph_output_contract(subgraph, parse_error))

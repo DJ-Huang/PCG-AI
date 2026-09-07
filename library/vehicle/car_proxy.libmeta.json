@@ -1,0 +1,26 @@
+{
+  "id": "pcg.lib:vehicle:car_proxy",
+  "displayName": "Car Proxy",
+  "category": "Vehicle",
+  "assetVersion": "1.0.0",
+  "keywords": ["car", "vehicle", "automobile", "汽车", "车辆", "轿车"],
+  "description": "带车身、座舱和四轮的可缩放分镜车辆，占位前向为局部 +Z。",
+  "semantic": {
+    "componentId": "car_proxy",
+    "role": "vehicle",
+    "bounds": {
+      "center": [0, 0.75, 0],
+      "size": [2.04, 1.5, 4.4]
+    },
+    "anchors": {
+      "ground": [0, 0, 0],
+      "front": [0, 0.75, 2.2],
+      "driver": [-0.45, 1.15, 0.2]
+    },
+    "camera": {
+      "include": true,
+      "occluder": true,
+      "scaleRole": "vehicle"
+    }
+  }
+}

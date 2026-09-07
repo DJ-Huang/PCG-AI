@@ -125,6 +125,22 @@ def _inferred_value(text: str) -> str:
     return _json_string(text)
 
 
+def _vector3_json(value) -> str:
+    parsed = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise LibraryError(f"invalid vector3 value {value!r}") from error
+    if (
+        not isinstance(parsed, list)
+        or len(parsed) != 3
+        or any(isinstance(axis, bool) or not isinstance(axis, (int, float)) for axis in parsed)
+    ):
+        raise LibraryError(f"vector3 must be a three-number array, got {value!r}")
+    return "[" + ",".join(_fmt_f32(float(axis)) for axis in parsed) + "]"
+
+
 def _append_json_property(key: str, value, prop_type: str) -> str:
     if prop_type == "integer":
         return f"{_json_string(key)}: {int(float(_str_of(value)))}"
@@ -135,7 +151,7 @@ def _append_json_property(key: str, value, prop_type: str) -> str:
         truthy = raw.lower() == "true" or (raw.lstrip("-").isdigit() and float(raw) != 0)
         return f"{_json_string(key)}: {'true' if truthy else 'false'}"
     if prop_type == "vector3":
-        raise LibraryError("vector3 properties are not supported in library assets yet")
+        return f"{_json_string(key)}: {_vector3_json(value)}"
     return f"{_json_string(key)}: {_json_string(_str_of(value))}"
 
 
@@ -178,10 +194,15 @@ def _canonical_ports(key: str, ports: list) -> str:
 def _canonical_parameters(parameters: list) -> str:
     items = []
     for param in parameters:
-        default_text = _str_of(param.get("default"))
+        default_value = param.get("default")
+        default_text = _str_of(default_value)
         param_type = _str_of(param.get("type")) or "number"
-        if param_type in ("integer", "number", "boolean"):
+        if param_type in ("integer", "number"):
             default_json = default_text
+        elif param_type == "boolean":
+            default_json = "true" if str(default_value).lower() == "true" else "false"
+        elif param_type == "vector3":
+            default_json = _vector3_json(default_value)
         else:
             default_json = _json_string(default_text)
         items.append(
@@ -301,8 +322,17 @@ def validate_asset(path: Path, asset: dict, manifest_nodes: dict) -> None:
         target_property = _str_of(param.get("targetProperty"))
         if props and target_property not in props:
             fail(f"parameter '{param.get('id')}': '{target_type}.{target_property}' not in manifest")
-        if param.get("type") not in ("integer", "number"):
-            fail(f"parameter '{param.get('id')}': only integer/number parameters are supported in library assets")
+        param_type = param.get("type")
+        if param_type not in ("integer", "number", "boolean", "string", "vector3"):
+            fail(f"parameter '{param.get('id')}': unsupported type '{param_type}'")
+        property_type = (props.get(target_property) or {}).get("type")
+        if property_type and property_type != param_type:
+            fail(
+                f"parameter '{param.get('id')}': type '{param_type}' does not match "
+                f"'{target_type}.{target_property}' type '{property_type}'"
+            )
+        if param_type == "vector3":
+            _vector3_json(param.get("default"))
 
 
 def validate_sidecar(path: Path, sidecar: dict) -> None:
@@ -314,6 +344,19 @@ def validate_sidecar(path: Path, sidecar: dict) -> None:
         raise LibraryError(f"{path.relative_to(ROOT)}: id '{sidecar['id']}' must be '{expected_id}'")
     if not sidecar["keywords"] or not all(isinstance(k, str) for k in sidecar["keywords"]):
         raise LibraryError(f"{path.relative_to(ROOT)}: keywords must be a non-empty string array")
+    semantic = sidecar.get("semantic")
+    if semantic is not None:
+        if not isinstance(semantic, dict) or not _str_of(semantic.get("componentId")):
+            raise LibraryError(f"{path.relative_to(ROOT)}: semantic.componentId is required")
+        bounds = semantic.get("bounds")
+        if bounds is not None:
+            if not isinstance(bounds, dict):
+                raise LibraryError(f"{path.relative_to(ROOT)}: semantic.bounds must be an object")
+            _vector3_json(bounds.get("center"))
+            size = bounds.get("size")
+            _vector3_json(size)
+            if any(float(axis) <= 0 for axis in size):
+                raise LibraryError(f"{path.relative_to(ROOT)}: semantic.bounds.size must be positive")
 
 
 # ── Sync ─────────────────────────────────────────────────────────────────────
@@ -472,6 +515,8 @@ def main() -> int:
             item["doc"] = doc.relative_to(LIBRARY).as_posix()
         if sidecar.get("minCoreVersion"):
             item["minCoreVersion"] = sidecar["minCoreVersion"]
+        if sidecar.get("semantic"):
+            item["semantic"] = sidecar["semantic"]
         items.append(item)
 
     if errors:

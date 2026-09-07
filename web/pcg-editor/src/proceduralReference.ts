@@ -79,11 +79,15 @@ export interface ProceduralReferenceManifest {
       distance: number;
       projection: PhysicalCameraState['projection'];
       focalLengthMm: number;
+      sensorWidthMm: number;
       sensorHeightMm: number;
+      sensorFit: PhysicalCameraState['sensorFit'];
+      shiftX: number;
+      shiftY: number;
       exposure: number;
       near: number;
       far: number;
-      orthographicFrustumHeight: number | null;
+      orthographicScale: number;
     };
   };
   views: Array<{
@@ -120,16 +124,21 @@ function exactCameraCommand(state: PhysicalCameraState): CameraCommand {
     up: [...state.up],
     projection: state.projection,
     focalLengthMm: state.focalLengthMm,
+    sensorWidthMm: state.sensorWidthMm,
     sensorHeightMm: state.sensorHeightMm,
+    sensorFit: state.sensorFit,
+    shiftX: state.shiftX,
+    shiftY: state.shiftY,
     apertureFstop: state.apertureFstop,
+    apertureBlades: state.apertureBlades,
+    apertureRotationDeg: state.apertureRotationDeg,
+    apertureRatio: state.apertureRatio,
     focusDistance: state.focusDistance,
     dofEnabled: state.dofEnabled,
     exposure: state.exposure,
     near: state.near,
     far: state.far,
-    ...(state.orthographicFrustumHeight
-      ? { orthographicFrustumHeight: state.orthographicFrustumHeight }
-      : {}),
+    orthographicScale: state.orthographicScale,
   };
 }
 
@@ -146,16 +155,21 @@ function viewCameraCommand(
     distance,
     projection: state.projection,
     focalLengthMm: state.focalLengthMm,
+    sensorWidthMm: state.sensorWidthMm,
     sensorHeightMm: state.sensorHeightMm,
+    sensorFit: state.sensorFit,
+    shiftX: state.shiftX,
+    shiftY: state.shiftY,
     apertureFstop: state.apertureFstop,
+    apertureBlades: state.apertureBlades,
+    apertureRotationDeg: state.apertureRotationDeg,
+    apertureRatio: state.apertureRatio,
     focusDistance: distance,
     dofEnabled: false,
     exposure: state.exposure,
     near: state.near,
     far: state.far,
-    ...(state.orthographicFrustumHeight
-      ? { orthographicFrustumHeight: state.orthographicFrustumHeight }
-      : {}),
+    orthographicScale: state.orthographicScale,
   };
 }
 
@@ -301,11 +315,15 @@ export function captureProceduralReferenceBundle(
         distance,
         projection: initialCamera.projection,
         focalLengthMm: initialCamera.focalLengthMm,
+        sensorWidthMm: initialCamera.sensorWidthMm,
         sensorHeightMm: initialCamera.sensorHeightMm,
+        sensorFit: initialCamera.sensorFit,
+        shiftX: initialCamera.shiftX,
+        shiftY: initialCamera.shiftY,
         exposure: initialCamera.exposure,
         near: initialCamera.near,
         far: initialCamera.far,
-        orthographicFrustumHeight: initialCamera.orthographicFrustumHeight ?? null,
+        orthographicScale: initialCamera.orthographicScale,
       },
     },
     views,

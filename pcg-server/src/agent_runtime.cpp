@@ -1934,7 +1934,8 @@ void AddErrorPart(TurnState& turn, const json& error) {
 
 bool CacheableReadTool(const std::string& name) {
     return name == "pcg_get_editor_context" || name == "pcg_get_node" ||
-           name == "pcg_list_nodes" || name == "pcg_get_graph" || name == "pcg_get_node_types";
+           name == "pcg_list_nodes" || name == "pcg_get_graph" || name == "pcg_get_node_types" ||
+           name == "pcg_get_shot";
 }
 
 void RunTurn(TurnState& turn, const EventEmitter& emit) {
@@ -1996,8 +1997,10 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
                 approval_calls.push_back(public_call);
                 continue;
             }
-            const std::string graph_hash = GetEditorContext(turn.editor_session_id).value("session", json::object()).value("graphHash", "");
-            const std::string cache_key = name + "\n" + graph_hash + "\n" + call.value("arguments", json::object()).dump();
+            const json context_session = GetEditorContext(turn.editor_session_id).value("session", json::object());
+            const std::string graph_hash = context_session.value("graphHash", "");
+            const std::string shot_hash = context_session.value("shotHash", "");
+            const std::string cache_key = name + "\n" + graph_hash + "\n" + shot_hash + "\n" + call.value("arguments", json::object()).dump();
             bool cached = false;
             json tool_result;
             const auto cached_result = turn.tool_cache.find(cache_key);
@@ -2019,7 +2022,7 @@ void RunTurn(TurnState& turn, const EventEmitter& emit) {
             FinishToolPart(turn, call.value("id", ""), public_result, cached);
             const json* finished_part = FindPart(turn, tool_part.value("id", ""));
             AppendToolHistory(turn, call.value("id", ""), name, tool_result);
-            if (PcgToolMutatesGraph(name) && !tool_result.value("isError", false)) turn.has_mutation = true;
+            if ((PcgToolMutatesGraph(name) || PcgToolMutatesShot(name)) && !tool_result.value("isError", false)) turn.has_mutation = true;
             if (!emit("tool.result", {
                 {"turnId", turn.id}, {"toolCallId", call.value("id", "")},
                 {"sessionId", turn.session_id}, {"messageId", turn.assistant_message_id},
@@ -2711,11 +2714,17 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
                               {"structuredContent", {{"ok", false}, {"error", "user_rejected"}}}, {"isError", true}};
                 } else {
                     const json arguments = call.value("arguments", json::object());
-                    const std::string expected_hash = arguments.value("ifGraphHash", "");
-                    const std::string current_hash = GetEditorContext(turn->editor_session_id).value("session", json::object()).value("graphHash", "");
+                    const json session = GetEditorContext(turn->editor_session_id).value("session", json::object());
+                    const std::string name_for_lock = call.value("name", "");
+                    const bool shot_write = PcgToolMutatesShot(name_for_lock);
+                    const std::string expected_hash = arguments.value(shot_write ? "ifShotHash" : "ifGraphHash", "");
+                    const std::string current_hash = session.value(shot_write ? "shotHash" : "graphHash", "");
                     if (expected_hash.empty() || expected_hash != current_hash) {
-                        result = {{"content", json::array({{{"type", "text"}, {"text", "Graph changed while approval was pending."}}})},
-                                  {"structuredContent", {{"ok", false}, {"error", "graph_conflict"}, {"graphHash", current_hash}}}, {"isError", true}};
+                        result = {{"content", json::array({{{"type", "text"}, {"text", shot_write
+                            ? "Shot changed while approval was pending."
+                            : "Graph changed while approval was pending."}}})},
+                                  {"structuredContent", {{"ok", false}, {"error", shot_write ? "shot_conflict" : "graph_conflict"},
+                                      {shot_write ? "shotHash" : "graphHash", current_hash}}}, {"isError", true}};
                     } else {
                         result = CallPcgTool(call.value("name", ""), arguments, turn->editor_session_id);
                     }
@@ -2723,7 +2732,7 @@ void HandleAgentTurnDecision(const httplib::Request& req, httplib::Response& res
                 const std::string name = call.value("name", "");
                 const json public_result = PublicToolResult(result);
                 AppendToolHistory(*turn, call_id, name, result);
-                if (PcgToolMutatesGraph(name) && !result.value("isError", false)) turn->has_mutation = true;
+                if ((PcgToolMutatesGraph(name) || PcgToolMutatesShot(name)) && !result.value("isError", false)) turn->has_mutation = true;
                 FinishToolPart(*turn, call_id, public_result, false);
                 const json* finished_part = FindPart(*turn, ToolPartId(*turn, call_id));
                 if (!emit("tool.result", {{"sessionId", turn->session_id}, {"turnId", id},

@@ -71,7 +71,7 @@ describe('AgentPanel', () => {
 
     fireEvent.change(screen.getByPlaceholderText('Plan, build, @ nodes, attach refs…'), { target: { value: 'save it' } });
     fireEvent.click(screen.getByTitle('Send (Enter)'));
-    expect(await screen.findByText('Approve this graph write?')).toBeInTheDocument();
+    expect(await screen.findByText('Approve this operation?')).toBeInTheDocument();
     expect(screen.getByText('Approve')).toHaveClass('is-selected');
     fireEvent.click(screen.getByText('Continue'));
 

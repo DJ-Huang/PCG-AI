@@ -58,11 +58,24 @@ import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './ag
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig, type NodeSearchSelection } from './NodeSearchPanel';
+import CameraSearchPanel, { type CameraSearchPanelConfig } from './CameraSearchPanel';
 import { loadLibrarySubgraph, type LibraryIndexItem } from './libraryManifest';
 import PreviewViewport, { type CaptureOptions, type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
 import type { CameraCommand } from './physicalCamera';
 import SettingsDialog from './SettingsDialog';
 import { useEditorBridge } from './editorBridge';
+import CameraWorkspace from './CameraWorkspace';
+import CameraInspector from './CameraInspector';
+import {
+  addShotCamera,
+  addShotMotionCurve,
+  connectShotCameras,
+  upsertShotCamera,
+} from './cameraGraph';
+import {
+  replaceCameraKeyframes,
+  upsertCameraKeyframe,
+} from './cameraTrack';
 import {
   applyGraphOperations,
   parseAndValidateGraph,
@@ -92,6 +105,7 @@ import {
   bakeBaseColorTextureIntoOpc1,
   makeVertexColorMaterialData,
 } from './orientedPointColorBake';
+import { createDefaultShot, selectShotCamera, syncShotCameras, type ShotDocument } from './shot';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -169,6 +183,7 @@ function restoreEditorSession() {
     parameters: result.parameters,
     subgraphs: result.subgraphs,
     filename: session.filename,
+    shot: session.shot,
   };
 }
 
@@ -203,8 +218,13 @@ function PcgEditor() {
       : '',
   );
   const [searchConfig, setSearchConfig] = useState<SearchPanelConfig | null>(null);
+  const [cameraSearchConfig, setCameraSearchConfig] = useState<Omit<CameraSearchPanelConfig, 'onSelect'> | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
+  const [shot, setShot] = useState<ShotDocument>(restored?.shot ?? createDefaultShot());
+  const [workspaceTab, setWorkspaceTab] = useState<'graph' | 'cameras'>('graph');
+  const shotRef = useRef(shot);
+  shotRef.current = shot;
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
   const previewTargetNodeId = usePreviewTargetId();
 
@@ -864,11 +884,76 @@ function PcgEditor() {
     },
     [commit, setNodes, setEdges],
   );
+  const applyShotDocument = useCallback((next: ShotDocument) => {
+    const synced = syncShotCameras(next);
+    shotRef.current = synced;
+    setShot(synced);
+    return synced;
+  }, []);
   const applyBridgeCommands = useCallback(
     async (commands: QueuedGraphCommand[]): Promise<GraphCommandResult[]> => {
       const results: GraphCommandResult[] = [];
       for (const command of commands) {
         try {
+          if (command.type === 'setCameraKeyframes') {
+            let next = command.cameraId
+              ? selectShotCamera(shotRef.current, command.cameraId)
+              : shotRef.current;
+            next = command.mode === 'upsert'
+              ? command.keyframes.reduce((document, keyframe) => upsertCameraKeyframe(document, {
+                ...keyframe,
+                interpolation: (keyframe.interpolation as ShotDocument['cameraKeyframes'][number]['interpolation']) ?? 'linear',
+                value: keyframe.value as CameraCommand,
+              }), next)
+              : replaceCameraKeyframes(next, command.keyframes as Array<Partial<ShotDocument['cameraKeyframes'][number]>>);
+            next = applyShotDocument(next);
+            setWorkspaceTab('cameras');
+            if (typeof command.seekTimeSeconds === 'number') {
+              previewViewportRef.current?.seekShot(next, command.seekTimeSeconds);
+            }
+            results.push({
+              id: command.id,
+              ok: true,
+              detail: {
+                cameraId: next.activeCameraId,
+                keyframeCount: next.cameraKeyframes.length,
+              },
+            });
+            continue;
+          }
+          if (command.type === 'upsertCamera') {
+            const next = applyShotDocument(upsertShotCamera(shotRef.current, command.camera as {
+              id?: string;
+              name?: string;
+              presetId?: string;
+              position?: { x: number; y: number };
+              camera?: CameraCommand;
+            }));
+            setWorkspaceTab('cameras');
+            results.push({ id: command.id, ok: true, detail: { cameraId: next.activeCameraId, cameraCount: next.cameras.length } });
+            continue;
+          }
+          if (command.type === 'connectCameras') {
+            const next = applyShotDocument(connectShotCameras(shotRef.current, command.source, command.target));
+            setWorkspaceTab('cameras');
+            results.push({ id: command.id, ok: true, detail: { edgeCount: next.cameraEdges.length } });
+            continue;
+          }
+          if (command.type === 'selectCamera') {
+            const next = applyShotDocument(selectShotCamera(shotRef.current, command.cameraId));
+            previewViewportRef.current?.seekShot(next, previewViewportRef.current.getShotTime());
+            setWorkspaceTab('cameras');
+            results.push({ id: command.id, ok: true, detail: { cameraId: next.activeCameraId } });
+            continue;
+          }
+          if (command.type === 'previewShot') {
+            let next = shotRef.current;
+            if (command.cameraId) next = applyShotDocument(selectShotCamera(next, command.cameraId));
+            if (command.play) previewViewportRef.current?.playShot();
+            else previewViewportRef.current?.seekShot(next, command.timeSeconds ?? previewViewportRef.current.getShotTime());
+            results.push({ id: command.id, ok: true, detail: { cameraId: next.activeCameraId, timeSeconds: command.timeSeconds ?? 0 } });
+            continue;
+          }
           if (command.type === 'saveGraph') {
             const targetPath = command.path ?? currentFilename;
             if (!targetPath) throw new Error('save path is required for an unnamed graph');
@@ -916,7 +1001,7 @@ function PcgEditor() {
       }
       return results;
     },
-    [bridgeGraph, currentFilename, editPath, installBridgeGraph],
+    [applyShotDocument, bridgeGraph, currentFilename, editPath, installBridgeGraph],
   );
   const captureBridgePreview = useCallback(
     (options?: CaptureOptions) => previewViewportRef.current?.captureFrame(options) ?? null,
@@ -935,6 +1020,7 @@ function PcgEditor() {
     editPath,
     selectedNodeId: selectedNode?.id ?? null,
     previewTargetNodeId,
+    shot,
     applyCommands: applyBridgeCommands,
     capturePreview: captureBridgePreview,
     applyCameraCommand: applyBridgeCameraCommand,
@@ -1008,6 +1094,13 @@ function PcgEditor() {
 
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
+        if (workspaceTab === 'cameras') {
+          setCameraSearchConfig({
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+          });
+          return;
+        }
         openSearchAt(window.innerWidth / 2, window.innerHeight / 2);
       } else if (e.key === 'f' || e.key === 'F') {
         if ((e.target as HTMLElement).closest('.pcg-preview')) return;
@@ -1033,7 +1126,7 @@ function PcgEditor() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openSearchAt, fitView, openSettings, undo, redo]);
+  }, [openSearchAt, fitView, openSettings, undo, redo, workspaceTab]);
 
   // ── Node drag undo ─────────────────────────────────
 
@@ -1136,6 +1229,7 @@ function PcgEditor() {
     setSelectedNode(null);
     setPreviewParameterValuesByScope({});
     setCurrentFilename(file.name);
+    setShot({ ...createDefaultShot(), graphPath: file.name });
     setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params, ${result.subgraphs.length} subgraphs)`);
   };
 
@@ -1153,6 +1247,7 @@ function PcgEditor() {
     setPreviewTargetId(null);
     setPreviewParameterValuesByScope({});
     setCurrentFilename('');
+    setShot(createDefaultShot());
     nodeCounter = 100;
     clearEditorSession();
     setStatus('New graph created');
@@ -1272,10 +1367,11 @@ function PcgEditor() {
         graph: exportGraph(nodes, edges, parameters, subgraphs),
         filename: currentFilename,
         nodeCounter,
+        shot: { ...shot, graphPath: currentFilename },
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [nodes, edges, parameters, subgraphs, currentFilename]);
+  }, [nodes, edges, parameters, subgraphs, currentFilename, shot]);
 
   // Preview panel is always-on: open it once on mount.
   // StrictMode double-invocation is safe — the health-check is idempotent.
@@ -1595,9 +1691,40 @@ function PcgEditor() {
             splineEdit={splineEditForViewport}
             onPickNode={handlePreviewPickNode}
             selectedNodeId={selectedNode?.id ?? null}
+            shot={shot}
+            onShotChange={applyShotDocument}
           />
         )}
         <div className="pcg-graph-container">
+          <div className="pcg-workspace-tabs" role="tablist" aria-label="Editor workspace">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'graph'}
+              className={workspaceTab === 'graph' ? 'is-active' : ''}
+              onClick={() => setWorkspaceTab('graph')}
+            >
+              Graph
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspaceTab === 'cameras'}
+              className={workspaceTab === 'cameras' ? 'is-active' : ''}
+              onClick={() => setWorkspaceTab('cameras')}
+            >
+              Cameras
+            </button>
+          </div>
+          <div className="pcg-graph-canvas">
+          {workspaceTab === 'cameras' ? (
+            <CameraWorkspace
+              shot={shot}
+              onShotChange={applyShotDocument}
+              onRequestCreateCamera={setCameraSearchConfig}
+            />
+          ) : (
+          <>
           {/* Breadcrumb — visible while editing inside a subgraph */}
           {editPath.length > 0 && (
             <div className="pcg-breadcrumb">
@@ -1657,8 +1784,17 @@ function PcgEditor() {
             <Controls />
             <MiniMap pannable zoomable />
           </ReactFlow>
-
-          {/* Status bar */}
+          </>
+          )}
+          </div>
+          {workspaceTab === 'cameras' ? (
+          <div className="pcg-status-bar">
+            <span>
+              {shot.cameras.length} cameras · {shot.motionCurves?.length ?? 0} curves · {shot.cameraEdges.length} wires · {shot.cameraKeyframes.length} keys on {shot.activeCameraId}
+            </span>
+            <span className="pcg-status-bar__shortcuts">Space: Create camera · click a camera to key it in Preview</span>
+          </div>
+          ) : (
           <div className="pcg-status-bar">
             <span>
               {currentSubgraph && <span className="pcg-status-bar__path">{currentSubgraph.name || currentSubgraph.id}: </span>}
@@ -1672,8 +1808,12 @@ function PcgEditor() {
               </span>
             )}
           </div>
+          )}
         </div>
-        {showInspector && (
+        {showInspector && workspaceTab === 'cameras' && (
+          <CameraInspector shot={shot} onShotChange={applyShotDocument} />
+        )}
+        {showInspector && workspaceTab === 'graph' && (
           <Inspector
             selectedNode={selectedNode}
             parameters={viewParameters}
@@ -1689,10 +1829,30 @@ function PcgEditor() {
       </div>
 
       {/* Floating: Node Search Panel */}
-      {searchConfig && (
+      {searchConfig && workspaceTab === 'graph' && (
         <>
           <div className="pcg-overlay" onClick={() => searchConfig.onSelect(null)} />
           <NodeSearchPanel config={searchConfig} />
+        </>
+      )}
+      {cameraSearchConfig && workspaceTab === 'cameras' && (
+        <>
+          <div className="pcg-overlay" onClick={() => setCameraSearchConfig(null)} />
+          <CameraSearchPanel
+            config={{
+              ...cameraSearchConfig,
+              onSelect: (selection) => {
+                const position = cameraSearchConfig.flowPosition;
+                setCameraSearchConfig(null);
+                if (!selection) return;
+                if (selection.kind === 'motionCurve') {
+                  applyShotDocument(addShotMotionCurve(shotRef.current, position));
+                  return;
+                }
+                applyShotDocument(addShotCamera(shotRef.current, position, { presetId: selection.preset.id }));
+              },
+            }}
+          />
         </>
       )}
 

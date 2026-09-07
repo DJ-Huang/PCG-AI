@@ -1,0 +1,177 @@
+{
+  "version": "2.0",
+  "name": "Building Block",
+  "contentHash": "b5272d81fd4bf652bb761e8c5b7eceb79e38ff73639b7704addcba1867953690",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "name": "Geometry",
+      "pinType": "SpatialGeometry"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "width",
+      "name": "Width",
+      "type": "number",
+      "default": 8,
+      "exposed": true,
+      "targetNode": "building",
+      "targetProperty": "width",
+      "hasRange": true,
+      "min": 2,
+      "max": 100
+    },
+    {
+      "id": "depth",
+      "name": "Depth",
+      "type": "number",
+      "default": 8,
+      "exposed": true,
+      "targetNode": "building",
+      "targetProperty": "depth",
+      "hasRange": true,
+      "min": 2,
+      "max": 100
+    },
+    {
+      "id": "clampBevel",
+      "name": "Clamp Bevel Overlap",
+      "type": "boolean",
+      "default": true,
+      "exposed": true,
+      "targetNode": "building_bevel",
+      "targetProperty": "clampOverlap",
+      "hasRange": false,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "scale",
+      "name": "Size Scale (XYZ)",
+      "type": "vector3",
+      "default": [
+        1,
+        1,
+        1
+      ],
+      "exposed": true,
+      "targetNode": "asset_scale",
+      "targetProperty": "scale",
+      "hasRange": false,
+      "min": 0,
+      "max": 10
+    }
+  ],
+  "nodes": [
+    {
+      "id": "building",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 8,
+        "height": 10,
+        "depth": 8,
+        "__nodeTitle": "Building Volume"
+      }
+    },
+    {
+      "id": "building_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.12,
+        "segments": 2,
+        "clampOverlap": true,
+        "__nodeTitle": "Building Edge Bevel"
+      }
+    },
+    {
+      "id": "ground_building",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "translate": [
+          0,
+          5,
+          0
+        ],
+        "__nodeTitle": "Place Building On Ground"
+      }
+    },
+    {
+      "id": "asset_scale",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "__nodeTitle": "Building Instance Scale"
+      }
+    },
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 200,
+        "y": 640
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "building_to_bevel",
+      "source": "building",
+      "target": "building_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "bevel_to_ground",
+      "source": "building_bevel",
+      "target": "ground_building",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "ground_to_scale",
+      "source": "ground_building",
+      "target": "asset_scale",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "scale_to_output",
+      "source": "asset_scale",
+      "target": "subgraph_output",
+      "sourceHandle": "out",
+      "targetHandle": "out",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialGeometry"
+    }
+  ],
+  "subgraphs": []
+}

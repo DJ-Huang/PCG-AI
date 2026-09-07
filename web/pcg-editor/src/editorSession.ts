@@ -1,6 +1,7 @@
 // editorSession.ts — Persist the last editor session across page refreshes.
 
 import type { GraphJson } from './graphSchema';
+import { normalizeShotDocument, type ShotDocument } from './shot';
 
 const STORAGE_KEY = 'pcg-editor-session';
 
@@ -8,6 +9,7 @@ export interface EditorSessionData {
   graph: GraphJson;
   filename: string;
   nodeCounter: number;
+  shot?: ShotDocument;
 }
 
 export function loadEditorSession(): EditorSessionData | null {
@@ -20,6 +22,7 @@ export function loadEditorSession(): EditorSessionData | null {
       graph: parsed.graph as GraphJson,
       filename: typeof parsed.filename === 'string' ? parsed.filename : '',
       nodeCounter: typeof parsed.nodeCounter === 'number' ? parsed.nodeCounter : 100,
+      ...(parsed.shot ? { shot: normalizeShotDocument(parsed.shot) } : {}),
     };
   } catch {
     return null;

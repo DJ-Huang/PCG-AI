@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import { getAgentToken } from './agent/agentClient';
-import type { GraphCommandResult, QueuedGraphCommand } from './graphCommands';
+import { canonicalShotPayload } from './cameraTrack';
+import { isShotCommand, type GraphCommandResult, type QueuedGraphCommand } from './graphCommands';
 import type { GraphJson } from './graphSchema';
 import type { NodeManifest } from './nodeManifest';
 import type { CameraCommand } from './physicalCamera';
 import type { CaptureOptions, PreviewCapture } from './PreviewViewport';
+import type { ShotDocument } from './shot';
 
 const BRIDGE_BASE = '/api/editor-bridge';
 const HEARTBEAT_MS = 5_000;
@@ -19,6 +21,7 @@ interface EditorBridgeOptions {
   editPath: string[];
   selectedNodeId: string | null;
   previewTargetNodeId: string | null;
+  shot: ShotDocument;
   applyCommands: (commands: QueuedGraphCommand[]) => Promise<GraphCommandResult[]>;
   capturePreview: (options?: CaptureOptions) => PreviewCapture | null;
   applyCameraCommand: (command: CameraCommand) => Record<string, unknown> | null;
@@ -73,16 +76,18 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
   const editPathKey = JSON.stringify(options.editPath);
   const selectedNodeId = options.selectedNodeId;
   const previewTargetNodeId = options.previewTargetNodeId;
+  const shotText = canonicalShotPayload(options.shot);
   const applyCommandsRef = useRef(options.applyCommands);
   const capturePreviewRef = useRef(options.capturePreview);
   const applyCameraCommandRef = useRef(options.applyCameraCommand);
   const hashRef = useRef('');
+  const shotHashRef = useRef('');
   const cursorRef = useRef(0);
   const captureRequestRef = useRef(0);
   const cameraCommandRef = useRef(0);
   const pollingRef = useRef(false);
   const clientRevisionRef = useRef(0);
-  const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId]);
+  const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, shotText]);
   const latestSessionKeyRef = useRef(sessionKey);
   latestSessionKeyRef.current = sessionKey;
   applyCommandsRef.current = options.applyCommands;
@@ -93,8 +98,10 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     const scheduledGraphText = graphText;
     const scheduledSessionKey = sessionKey;
     const hash = await graphHash(scheduledGraphText);
+    const nextShotHash = await graphHash(shotText);
     if (scheduledSessionKey !== latestSessionKeyRef.current) return;
     hashRef.current = hash;
+    shotHashRef.current = nextShotHash;
     const response = await putJson('/session', {
       sessionId: options.sessionId,
       clientRevision: ++clientRevisionRef.current,
@@ -102,8 +109,11 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       editPath: JSON.parse(editPathKey) as string[],
       selectedNodeId,
       previewTargetNodeId,
+      selectedCameraId: options.shot.activeCameraId,
       graphHash: hash,
+      shotHash: nextShotHash,
       graph: JSON.parse(scheduledGraphText) as GraphJson,
+      shot: JSON.parse(shotText),
       nodeManifest: options.nodeManifest,
       updatedAt: Date.now(),
     });
@@ -114,7 +124,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       if (conflict?.error === 'stale_session_update') return;
     }
     if (!response.ok) throw new Error(`session sync failed: HTTP ${response.status}`);
-  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest, options.sessionId]);
+  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, shotText, sessionKey, options.nodeManifest, options.sessionId, options.shot.activeCameraId]);
 
   useEffect(() => {
     const debounce = window.setTimeout(() => void pushSession().catch(console.warn), 250);
@@ -193,13 +203,20 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
             const patch = patches[0];
             const currentPath = JSON.parse(editPathKey) as string[];
             const samePath = JSON.stringify(patch.editPath) === editPathKey;
+            const shotCommand = isShotCommand(patch);
             const sameGraph = !hashRef.current || patch.baseGraphHash === hashRef.current;
-            const results = samePath && sameGraph
+            const sameShot = !patch.baseShotHash || patch.baseShotHash === shotHashRef.current;
+            const lockOk = shotCommand
+              ? (patch.type === 'previewShot' || sameShot)
+              : sameGraph;
+            const results = samePath && lockOk
               ? await applyCommandsRef.current([patch])
               : [{
                 id: patch.id,
                 ok: false,
-                error: samePath ? 'graph_conflict' : `edit_path_changed:${currentPath.join('/')}`,
+                error: samePath
+                  ? (shotCommand ? 'shot_conflict' : 'graph_conflict')
+                  : `edit_path_changed:${currentPath.join('/')}`,
               }];
             await postJson('/graph/patches/ack', {
               sessionId: options.sessionId,

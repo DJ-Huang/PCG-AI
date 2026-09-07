@@ -1,9 +1,14 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import http from 'node:http';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import {
+  assertWorkspaceGraphParent,
+  resolveExistingWorkspaceGraphPath,
+  resolveWorkspaceGraphPath,
+} from './devFileSecurity.js';
 
 const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
 const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
@@ -152,14 +157,9 @@ function exportGraphPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, error: 'Missing filePath or graphData' }));
               return;
             }
-            const resolved = path.resolve(WORKSPACE_ROOT, filePath);
-            const relative = path.relative(WORKSPACE_ROOT, resolved);
-            if (relative.startsWith('..') || path.isAbsolute(relative) || path.extname(resolved) !== '.pcg') {
-              res.statusCode = 403;
-              res.end(JSON.stringify({ ok: false, error: 'Graph path must be a .pcg file inside the workspace' }));
-              return;
-            }
+            const resolved = resolveWorkspaceGraphPath(WORKSPACE_ROOT, filePath);
             fs.mkdirSync(path.dirname(resolved), { recursive: true });
+            assertWorkspaceGraphParent(WORKSPACE_ROOT, resolved);
             fs.writeFileSync(resolved, JSON.stringify(graphData, null, 2), 'utf8');
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ ok: true, path: resolved }));
@@ -184,14 +184,8 @@ function exportGraphPlugin(): Plugin {
         req.on('end', () => {
           try {
             const parsed = JSON.parse(body);
-            const filePath = parsed.filePath;
-            if (!filePath) {
-              res.statusCode = 400;
-              res.end(JSON.stringify({ ok: false, error: 'Missing filePath' }));
-              return;
-            }
-            const resolved = path.resolve(__dirname, '..', filePath);
-            exec(`open -R "${resolved}"`, (err) => {
+            const resolved = resolveExistingWorkspaceGraphPath(WORKSPACE_ROOT, parsed.filePath);
+            execFile('/usr/bin/open', ['-R', resolved], (err) => {
               if (err) {
                 res.statusCode = 500;
                 res.end(JSON.stringify({ ok: false, error: String(err) }));
@@ -253,7 +247,8 @@ function exportGraphPlugin(): Plugin {
 
       // Load a .pcg graph file from disk (for the /review route)
       // GET /api/load-graph?path=<relative-path>
-      server.middlewares.use('/api/load-graph', (req, res, next) => {        if (req.method !== 'GET') {
+      server.middlewares.use('/api/load-graph', (req, res, next) => {
+        if (req.method !== 'GET') {
           next();
           return;
         }
@@ -265,11 +260,13 @@ function exportGraphPlugin(): Plugin {
           res.end(JSON.stringify({ ok: false, error: 'Missing "path" query parameter' }));
           return;
         }
-        const resolved = path.resolve(__dirname, '../../', relPath);
-        if (!fs.existsSync(resolved)) {
+        let resolved: string;
+        try {
+          resolved = resolveExistingWorkspaceGraphPath(WORKSPACE_ROOT, relPath);
+        } catch (err) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ ok: false, error: `File not found: ${relPath}` }));
+          res.end(JSON.stringify({ ok: false, error: String(err) }));
           return;
         }
         try {

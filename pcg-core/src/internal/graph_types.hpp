@@ -32,6 +32,14 @@ struct GraphPort {
     std::string pin_type = "Any";
 };
 
+struct GraphParameter {
+    std::string id;
+    std::string type = "number";
+    nlohmann::json default_value;
+    std::string target_node;
+    std::string target_property;
+};
+
 struct GraphSubgraph {
     std::string id;
     std::string name;
@@ -39,6 +47,7 @@ struct GraphSubgraph {
     std::vector<GraphPort> outputs;
     std::vector<GraphNode> nodes;
     std::vector<GraphEdge> edges;
+    std::vector<GraphParameter> parameters;
 };
 
 struct Graph {

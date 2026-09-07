@@ -1,5 +1,8 @@
 #include "pcg_api.h"
+#include "data/pcg_mesh_binary.hpp"
+#include "data/pcg_mesh_data.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -60,6 +63,56 @@ int main()
     require(code == PCG_OK, error);
     require(kind == PCG_RESULT_KIND_MESH, "subgraph graph did not produce a mesh result");
     require(vertex_count > 0 && index_count == 36, "subgraph mesh counts are incorrect");
+
+    constexpr const char* parameter_override = R"JSON({
+      "version":"2.0",
+      "nodes":[
+        {"id":"inst","type":"Subgraph","position":{"x":0,"y":0},"data":{
+          "subgraphId":"scaled_box",
+          "subgraphParameterOverrides":{"scale":[4,2,1]}
+        }},
+        {"id":"output","type":"Output","position":{"x":0,"y":160},"data":{}}
+      ],
+      "edges":[
+        {"id":"e1","source":"inst","target":"output","sourceHandle":"out","targetHandle":"in"}
+      ],
+      "subgraphs":[{
+        "id":"scaled_box","name":"Scaled Box",
+        "inputs":[],
+        "outputs":[{"id":"out","name":"Out","pinType":"SpatialMesh"}],
+        "parameters":[{
+          "id":"scale","name":"Scale","type":"vector3","default":[1,1,1],
+          "targetNode":"transform","targetProperty":"scale"
+        }],
+        "nodes":[
+          {"id":"box","type":"CreateBoxMesh","position":{"x":0,"y":0},"data":{"width":1,"height":1,"depth":1}},
+          {"id":"transform","type":"TransformMesh","position":{"x":0,"y":160},"data":{"scale":[1,1,1]}},
+          {"id":"output","type":"SubgraphOutput","position":{"x":0,"y":320},"data":{}}
+        ],
+        "edges":[
+          {"id":"ie1","source":"box","target":"transform","sourceHandle":"out","targetHandle":"in"},
+          {"id":"ie2","source":"transform","target":"output","sourceHandle":"out","targetHandle":"out"}
+        ]
+      }]
+    })JSON";
+    std::memset(error, 0, sizeof(error));
+    require(pcg_execute_graph_v7(
+        parameter_override, 42, nullptr, 0, nullptr, 0, nullptr, 0,
+        &kind, out, sizeof(out), mesh.data(), static_cast<int>(mesh.size()),
+        nullptr, 0, nullptr, nullptr, &vertex_count, &index_count,
+        nullptr, nullptr, 0, error, sizeof(error)) == PCG_OK, error);
+    pcg::internal::data::PcgMeshData scaled_box;
+    require(
+        pcg::internal::data::read_mesh_binary(mesh.data(), static_cast<int>(mesh.size()), scaled_box),
+        "failed to parse parameterized subgraph mesh");
+    require(!scaled_box.vertices().empty(), "parameterized subgraph mesh is empty");
+    double min_x = scaled_box.vertices().front().x;
+    double max_x = min_x;
+    for (const auto& vertex : scaled_box.vertices()) {
+        min_x = std::min(min_x, vertex.x);
+        max_x = std::max(max_x, vertex.x);
+    }
+    require(max_x - min_x > 3.99f, "vector3 subgraph parameter override was not applied");
 
     constexpr const char* passthrough = R"JSON({
       "version":"1.0",
@@ -205,6 +258,6 @@ int main()
     require(pcg_validate_graph(multiple_outputs, error, sizeof(error)) == PCG_ERR_INVALID_JSON,
             "subgraph with multiple outputs must be rejected");
 
-    std::puts("PASS: single-output subgraph flattening, legacy passthrough, parent ref, and guards");
+    std::puts("PASS: subgraph flattening, parameters, legacy passthrough, parent ref, and guards");
     return 0;
 }

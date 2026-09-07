@@ -9,17 +9,30 @@ import * as THREE from 'three';
 
 export const CAMERA_PROJECTIONS = ['perspective', 'orthographic'] as const;
 export type CameraProjection = (typeof CAMERA_PROJECTIONS)[number];
+export const CAMERA_SENSOR_FITS = ['auto', 'horizontal', 'vertical'] as const;
+export type CameraSensorFit = (typeof CAMERA_SENSOR_FITS)[number];
+export type ResolvedCameraSensorFit = Exclude<CameraSensorFit, 'auto'>;
 
 export interface PhysicalCameraState {
   position: [number, number, number];
   target: [number, number, number];
   up: [number, number, number];
   projection: CameraProjection;
-  /** Full-frame-equivalent focal length. */
+  /** Blender Camera.lens, in millimetres. */
   focalLengthMm: number;
-  /** Sensor height in mm; 24 = 35mm full frame. */
+  /** Blender Camera.sensor_width. */
+  sensorWidthMm: number;
+  /** Blender Camera.sensor_height. */
   sensorHeightMm: number;
+  /** Blender Camera.sensor_fit. */
+  sensorFit: CameraSensorFit;
+  /** Blender Camera.shift_x / shift_y. */
+  shiftX: number;
+  shiftY: number;
   apertureFstop: number;
+  apertureBlades: number;
+  apertureRotationDeg: number;
+  apertureRatio: number;
   /** World-unit focus distance for depth of field. */
   focusDistance: number;
   dofEnabled: boolean;
@@ -27,20 +40,27 @@ export interface PhysicalCameraState {
   exposure: number;
   near: number;
   far: number;
-  /** Vertical world-space extent when projection is orthographic. */
-  orthographicFrustumHeight?: number;
+  /** Blender Camera.ortho_scale (fit-axis extent, not always vertical). */
+  orthographicScale: number;
 }
 
+export const FULL_FRAME_SENSOR_WIDTH_MM = 36;
 export const FULL_FRAME_SENSOR_HEIGHT_MM = 24;
 
 export const CAMERA_LIMITS = {
   focalLengthMm: { min: 8, max: 400 },
+  sensorWidthMm: { min: 1, max: 100 },
   sensorHeightMm: { min: 5, max: 70 },
+  shift: { min: -2, max: 2 },
   apertureFstop: { min: 0.7, max: 64 },
+  apertureBlades: { min: 0, max: 16 },
+  apertureRotationDeg: { min: -180, max: 180 },
+  apertureRatio: { min: 0.01, max: 1 },
   focusDistance: { min: 0.01, max: 100000 },
   exposure: { min: 0.05, max: 8 },
   near: { min: 0.0001, max: 1000 },
   far: { min: 0.1, max: 1000000 },
+  orthographicScale: { min: 0.001, max: 1000000 },
 } as const;
 
 export function defaultPhysicalCamera(): PhysicalCameraState {
@@ -50,13 +70,21 @@ export function defaultPhysicalCamera(): PhysicalCameraState {
     up: [0, 1, 0],
     projection: 'perspective',
     focalLengthMm: 26,
+    sensorWidthMm: FULL_FRAME_SENSOR_WIDTH_MM,
     sensorHeightMm: FULL_FRAME_SENSOR_HEIGHT_MM,
+    sensorFit: 'auto',
+    shiftX: 0,
+    shiftY: 0,
     apertureFstop: 8,
+    apertureBlades: 0,
+    apertureRotationDeg: 0,
+    apertureRatio: 1,
     focusDistance: 5.7,
     dofEnabled: false,
     exposure: 1,
     near: 0.01,
     far: 5000,
+    orthographicScale: 6,
   };
 }
 
@@ -72,6 +100,82 @@ export function fovToFocalLength(
   sensorHeightMm: number = FULL_FRAME_SENSOR_HEIGHT_MM,
 ): number {
   return sensorHeightMm / (2 * Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2));
+}
+
+export interface BlenderProjection {
+  resolvedSensorFit: ResolvedCameraSensorFit;
+  verticalFovDeg: number;
+  orthographicWidth: number;
+  orthographicHeight: number;
+  /** Projection-centre offset in NDC, matching Blender's viewplane shift. */
+  shiftNdc: [number, number];
+}
+
+/** Blender's AUTO fit chooses the longest output dimension. */
+export function resolveBlenderSensorFit(
+  sensorFit: CameraSensorFit,
+  aspect: number,
+): ResolvedCameraSensorFit {
+  if (sensorFit !== 'auto') return sensorFit;
+  return aspect >= 1 ? 'horizontal' : 'vertical';
+}
+
+/** Reproduces BKE_camera_params_compute_viewplane for square output pixels. */
+export function blenderProjection(
+  state: Pick<
+    PhysicalCameraState,
+    | 'focalLengthMm'
+    | 'sensorWidthMm'
+    | 'sensorHeightMm'
+    | 'sensorFit'
+    | 'shiftX'
+    | 'shiftY'
+    | 'orthographicScale'
+  >,
+  outputAspect: number,
+): BlenderProjection {
+  const aspect = Math.max(outputAspect, 0.0001);
+  const resolvedSensorFit = resolveBlenderSensorFit(state.sensorFit, aspect);
+  // Blender AUTO uses sensor width even when a portrait output resolves to
+  // vertical fit. Explicit VERTICAL is the only mode that uses sensor height.
+  const sensorSizeMm = state.sensorFit === 'vertical'
+    ? state.sensorHeightMm
+    : state.sensorWidthMm;
+  const effectiveVerticalSensorMm = resolvedSensorFit === 'horizontal'
+    ? sensorSizeMm / aspect
+    : sensorSizeMm;
+  const verticalFovDeg = focalLengthToFov(state.focalLengthMm, effectiveVerticalSensorMm);
+  const orthographicWidth = resolvedSensorFit === 'horizontal'
+    ? state.orthographicScale
+    : state.orthographicScale * aspect;
+  const orthographicHeight = resolvedSensorFit === 'horizontal'
+    ? state.orthographicScale / aspect
+    : state.orthographicScale;
+  const viewFactor = resolvedSensorFit === 'horizontal' ? aspect : 1;
+  return {
+    resolvedSensorFit,
+    verticalFovDeg,
+    orthographicWidth,
+    orthographicHeight,
+    shiftNdc: [
+      (2 * state.shiftX * viewFactor) / aspect,
+      2 * state.shiftY * viewFactor,
+    ],
+  };
+}
+
+export function blenderVerticalFovToFocalLength(
+  state: Pick<PhysicalCameraState, 'sensorWidthMm' | 'sensorHeightMm' | 'sensorFit'>,
+  fovDeg: number,
+  outputAspect: number,
+): number {
+  const aspect = Math.max(outputAspect, 0.0001);
+  const resolved = resolveBlenderSensorFit(state.sensorFit, aspect);
+  const sensorSizeMm = state.sensorFit === 'vertical'
+    ? state.sensorHeightMm
+    : state.sensorWidthMm;
+  const effectiveVerticalSensorMm = resolved === 'horizontal' ? sensorSizeMm / aspect : sensorSizeMm;
+  return fovToFocalLength(fovDeg, effectiveVerticalSensorMm);
 }
 
 /** Photographic aperture → BokehShader uniform. 50mm f/1.4 maps to ≈0.025
@@ -97,8 +201,15 @@ export interface CameraCommand {
   focalLengthMm?: number;
   /** Vertical FOV in degrees; alternative to focalLengthMm. */
   fov?: number;
+  sensorWidthMm?: number;
   sensorHeightMm?: number;
+  sensorFit?: CameraSensorFit;
+  shiftX?: number;
+  shiftY?: number;
   apertureFstop?: number;
+  apertureBlades?: number;
+  apertureRotationDeg?: number;
+  apertureRatio?: number;
   focusDistance?: number;
   /** Set focusDistance to the position↔target distance. */
   focusOnTarget?: boolean;
@@ -106,6 +217,8 @@ export interface CameraCommand {
   exposure?: number;
   near?: number;
   far?: number;
+  orthographicScale?: number;
+  /** Backward-compatible import of pre-Blender-alignment shot documents. */
   orthographicFrustumHeight?: number;
 }
 
@@ -137,6 +250,7 @@ export function sphericalPosition(
 export function mergeCameraCommand(
   current: PhysicalCameraState,
   command: CameraCommand,
+  outputAspect = 16 / 9,
 ): PhysicalCameraState {
   const next: PhysicalCameraState = { ...current };
   if (command.projection && CAMERA_PROJECTIONS.includes(command.projection)) {
@@ -167,12 +281,25 @@ export function mergeCameraCommand(
     next.position = sphericalPosition(next.target, azimuthDeg, elevationDeg, distance);
   }
 
+  const sensorWidthMm = clampNumber(
+    command.sensorWidthMm,
+    CAMERA_LIMITS.sensorWidthMm.min,
+    CAMERA_LIMITS.sensorWidthMm.max,
+  );
+  if (sensorWidthMm !== null) next.sensorWidthMm = sensorWidthMm;
   const sensorHeightMm = clampNumber(
     command.sensorHeightMm,
     CAMERA_LIMITS.sensorHeightMm.min,
     CAMERA_LIMITS.sensorHeightMm.max,
   );
   if (sensorHeightMm !== null) next.sensorHeightMm = sensorHeightMm;
+  if (command.sensorFit && CAMERA_SENSOR_FITS.includes(command.sensorFit)) {
+    next.sensorFit = command.sensorFit;
+  }
+  const shiftX = clampNumber(command.shiftX, CAMERA_LIMITS.shift.min, CAMERA_LIMITS.shift.max);
+  if (shiftX !== null) next.shiftX = shiftX;
+  const shiftY = clampNumber(command.shiftY, CAMERA_LIMITS.shift.min, CAMERA_LIMITS.shift.max);
+  if (shiftY !== null) next.shiftY = shiftY;
   const focalLengthMm = clampNumber(
     command.focalLengthMm,
     CAMERA_LIMITS.focalLengthMm.min,
@@ -182,7 +309,9 @@ export function mergeCameraCommand(
     next.focalLengthMm = focalLengthMm;
   } else if (command.fov !== undefined) {
     const fov = clampNumber(command.fov, 1, 170);
-    if (fov !== null) next.focalLengthMm = fovToFocalLength(fov, next.sensorHeightMm);
+    if (fov !== null) {
+      next.focalLengthMm = blenderVerticalFovToFocalLength(next, fov, outputAspect);
+    }
   }
   const apertureFstop = clampNumber(
     command.apertureFstop,
@@ -190,6 +319,24 @@ export function mergeCameraCommand(
     CAMERA_LIMITS.apertureFstop.max,
   );
   if (apertureFstop !== null) next.apertureFstop = apertureFstop;
+  const apertureBlades = clampNumber(
+    command.apertureBlades,
+    CAMERA_LIMITS.apertureBlades.min,
+    CAMERA_LIMITS.apertureBlades.max,
+  );
+  if (apertureBlades !== null) next.apertureBlades = Math.round(apertureBlades);
+  const apertureRotationDeg = clampNumber(
+    command.apertureRotationDeg,
+    CAMERA_LIMITS.apertureRotationDeg.min,
+    CAMERA_LIMITS.apertureRotationDeg.max,
+  );
+  if (apertureRotationDeg !== null) next.apertureRotationDeg = apertureRotationDeg;
+  const apertureRatio = clampNumber(
+    command.apertureRatio,
+    CAMERA_LIMITS.apertureRatio.min,
+    CAMERA_LIMITS.apertureRatio.max,
+  );
+  if (apertureRatio !== null) next.apertureRatio = apertureRatio;
   const focusDistance = clampNumber(
     command.focusDistance,
     CAMERA_LIMITS.focusDistance.min,
@@ -203,20 +350,66 @@ export function mergeCameraCommand(
   if (near !== null) next.near = near;
   const far = clampNumber(command.far, CAMERA_LIMITS.far.min, CAMERA_LIMITS.far.max);
   if (far !== null) next.far = Math.max(far, next.near * 10);
-  const orthographicFrustumHeight = clampNumber(command.orthographicFrustumHeight, 0.001, 1000000);
-  if (orthographicFrustumHeight !== null) next.orthographicFrustumHeight = orthographicFrustumHeight;
+  const orthographicScale = clampNumber(
+    command.orthographicScale ?? command.orthographicFrustumHeight,
+    CAMERA_LIMITS.orthographicScale.min,
+    CAMERA_LIMITS.orthographicScale.max,
+  );
+  if (orthographicScale !== null) next.orthographicScale = orthographicScale;
 
   if (command.focusOnTarget) {
-    next.focusDistance = Math.max(
-      new THREE.Vector3(
-        next.position[0] - next.target[0],
-        next.position[1] - next.target[1],
-        next.position[2] - next.target[2],
-      ).length(),
-      CAMERA_LIMITS.focusDistance.min,
-    );
+    next.focusDistance = axialFocusDistance(next.position, next.target, next.target);
   }
   return next;
+}
+
+/** Blender-style focus plane: axial distance along the view direction. */
+export function axialFocusDistance(
+  cameraPosition: Vec3Tuple,
+  lookTarget: Vec3Tuple,
+  focusPoint: Vec3Tuple = lookTarget,
+): number {
+  const view = new THREE.Vector3(
+    lookTarget[0] - cameraPosition[0],
+    lookTarget[1] - cameraPosition[1],
+    lookTarget[2] - cameraPosition[2],
+  );
+  if (view.lengthSq() < 1e-12) {
+    return CAMERA_LIMITS.focusDistance.min;
+  }
+  const offset = new THREE.Vector3(
+    focusPoint[0] - cameraPosition[0],
+    focusPoint[1] - cameraPosition[1],
+    focusPoint[2] - cameraPosition[2],
+  );
+  return Math.max(Math.abs(offset.dot(view.normalize())), CAMERA_LIMITS.focusDistance.min);
+}
+
+export function applyPhysicalProjection(
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+  state: PhysicalCameraState,
+  aspect: number,
+) {
+  const projection = blenderProjection(state, aspect);
+  if (camera instanceof THREE.PerspectiveCamera) {
+    camera.fov = projection.verticalFovDeg;
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    camera.projectionMatrix.elements[8] = projection.shiftNdc[0];
+    camera.projectionMatrix.elements[9] = projection.shiftNdc[1];
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    return;
+  }
+  const centerX = state.shiftX * state.orthographicScale;
+  const centerY = state.shiftY * state.orthographicScale;
+  const halfWidth = projection.orthographicWidth / 2;
+  const halfHeight = projection.orthographicHeight / 2;
+  camera.left = centerX - halfWidth;
+  camera.right = centerX + halfWidth;
+  camera.bottom = centerY - halfHeight;
+  camera.top = centerY + halfHeight;
+  camera.userData.orthographicScale = state.orthographicScale;
+  camera.updateProjectionMatrix();
 }
 
 /** Read back the session state from the live three.js camera + controls,
@@ -235,11 +428,11 @@ export function syncStateFromLiveCamera(
     near: camera.near,
     far: camera.far,
     ...(camera instanceof THREE.OrthographicCamera
-      ? { orthographicFrustumHeight: Number(camera.userData.frustumHeight) || (camera.top - camera.bottom) }
+      ? { orthographicScale: Number(camera.userData.orthographicScale) || state.orthographicScale }
       : {}),
   };
   if (camera instanceof THREE.PerspectiveCamera) {
-    next.focalLengthMm = fovToFocalLength(camera.fov, state.sensorHeightMm);
+    next.focalLengthMm = blenderVerticalFovToFocalLength(state, camera.fov, camera.aspect);
   }
   return next;
 }

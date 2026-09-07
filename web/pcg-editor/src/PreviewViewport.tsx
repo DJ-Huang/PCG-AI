@@ -81,14 +81,39 @@ import {
 } from './reviewCamera';
 import {
   apertureToBokehUniform,
+  applyPhysicalProjection,
   defaultPhysicalCamera,
-  focalLengthToFov,
   mergeCameraCommand,
   syncStateFromLiveCamera,
   type CameraCommand,
   type PhysicalCameraState,
 } from './physicalCamera';
+import {
+  cameraStateToCommand,
+  createCameraPresetKeyframes,
+  type CameraMotionPreset,
+} from './cameraMotion';
+import { upsertShotCamera, setMotionCurvePoint } from './cameraGraph';
+import { findCameraPathCurve, sampleShotCameraWorld } from './cameraPath';
+import {
+  moveCameraKeyframeTime,
+  removeCameraKeyframe,
+  setKeyframeCamera,
+  setKeyframeInterpolation,
+  upsertCameraKeyframe,
+} from './cameraTrack';
+import { findShotMotionCurve, selectShotCamera, selectShotNode, type ShotDocument, type ShotInterpolation } from './shot';
+import {
+  exportPrevisVideo,
+  resolvePrevisCodec,
+  type ResolvedPrevisCodec,
+} from './previsExport';
 import CameraPopover from './preview/CameraPopover';
+import ShotTransport from './preview/ShotTransport';
+import {
+  pickCameraKeyframe,
+  syncCameraTrajectoryOverlay,
+} from './preview/cameraTrajectoryOverlay';
 import AnimationTransport from './preview/AnimationTransport';
 import RigPosePanel from './preview/RigPosePanel';
 import {
@@ -133,6 +158,9 @@ interface PreviewViewportProps {
    *  an edge highlight overlay. A root-scope subgraph instance id also matches
    *  its flattened "instance/inner" entries. */
   selectedNodeId?: string | null;
+  /** Single-shot sidecar. Camera and object tracks share one deterministic clock. */
+  shot?: ShotDocument;
+  onShotChange?: (shot: ShotDocument) => void;
   /** Fill the parent and hide editor chrome. Used by the /review route. */
   reviewMode?: boolean;
   /** Initial viewport shading. The clean review route uses material evidence by default. */
@@ -245,6 +273,10 @@ export interface PreviewViewportHandle {
   inspectActionRuntime(): ActionRuntimeDiagnostics | null;
   /** Exact source GLB bytes when PreserveGltfRig is active. */
   getPreservedGltfBytes(): ArrayBuffer | null;
+  seekShot(shot: ShotDocument, timeSeconds: number): PhysicalCameraState | null;
+  playShot(): boolean;
+  pauseShot(): void;
+  getShotTime(): number;
 }
 
 export type ShadingMode = 'solid' | 'material' | 'rendered';
@@ -307,6 +339,7 @@ const MAX_WIDTH = 2400;
 
 const defaultWidth = () =>
   Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round((window.innerWidth * 2) / 3)));
+
 const EMPTY_PARAMETERS: GraphParameter[] = [];
 const EMPTY_PARAMETER_NODE_IDS = new Set<string>();
 const EMPTY_PARAMETER_VALUES: PreviewParameterValues = {};
@@ -357,6 +390,8 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   splineEdit,
   onPickNode,
   selectedNodeId = null,
+  shot,
+  onShotChange,
   reviewMode = false,
   initialShadingMode = 'solid',
   initialAnimationModeOpen = false,
@@ -434,6 +469,22 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const [animationClips, setAnimationClips] = useState<ActionAnimationClipInfo[]>([]);
   const [selectedAnimation, setSelectedAnimation] = useState('');
   const [animationPlayback, setAnimationPlayback] = useState<ActionPlaybackState>(EMPTY_ACTION_PLAYBACK);
+  const shotRef = useRef(shot);
+  shotRef.current = shot;
+  const onShotChangeRef = useRef(onShotChange);
+  onShotChangeRef.current = onShotChange;
+  const [shotTime, setShotTime] = useState(0);
+  const [shotPlaying, setShotPlaying] = useState(false);
+  const shotPlaybackRef = useRef({ playing: false, timeSeconds: 0 });
+  const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
+  const cameraTrackGroupRef = useRef<THREE.Group | null>(null);
+  const [cameraMotionPreset, setCameraMotionPreset] = useState<CameraMotionPreset>('dolly');
+  const [previsCodec, setPrevisCodec] = useState<ResolvedPrevisCodec | null>(null);
+  const [previsStatus, setPrevisStatus] = useState('');
+  const [previsProgress, setPrevisProgress] = useState(0);
+  const [previsExporting, setPrevisExporting] = useState(false);
+  const previsAbortRef = useRef<AbortController | null>(null);
+  const offlineExportRef = useRef(false);
   const [poseModeOpen, setPoseModeOpen] = useState(false);
   const [rigBones, setRigBones] = useState<ActionBoneInfo[]>([]);
   const [rigComponents, setRigComponents] = useState<ActionComponentInfo[]>([]);
@@ -602,26 +653,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       ctx.renderer.domElement.clientWidth / Math.max(ctx.renderer.domElement.clientHeight, 1),
       0.01,
     );
-    if (nextCamera instanceof THREE.PerspectiveCamera) {
-      nextCamera.fov = focalLengthToFov(state.focalLengthMm, state.sensorHeightMm);
-      nextCamera.aspect = aspect;
-    } else {
-      // Explicit semantic framing wins; otherwise retain the legacy lens-derived size.
-      const distance = Math.max(
-        nextCamera.position.distanceTo(new THREE.Vector3(...state.target)),
-        0.001,
-      );
-      const fov = THREE.MathUtils.degToRad(focalLengthToFov(state.focalLengthMm, state.sensorHeightMm));
-      const halfH = state.orthographicFrustumHeight
-        ? state.orthographicFrustumHeight / 2
-        : distance * Math.tan(fov / 2);
-      nextCamera.top = halfH;
-      nextCamera.bottom = -halfH;
-      nextCamera.left = -halfH * aspect;
-      nextCamera.right = halfH * aspect;
-      nextCamera.userData.frustumHeight = halfH * 2;
-    }
-    nextCamera.updateProjectionMatrix();
+    applyPhysicalProjection(nextCamera, state, aspect);
     ctx.camera = nextCamera;
     ctx.controls.object = nextCamera;
     ctx.controls.target.set(state.target[0], state.target[1], state.target[2]);
@@ -637,7 +669,11 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const ctx = sceneRef.current;
     if (!ctx) return null;
     const synced = syncStateFromLiveCamera(physicalCameraRef.current, ctx.camera, ctx.controls.target);
-    const next = mergeCameraCommand(synced, command);
+    const aspect = Math.max(
+      ctx.renderer.domElement.clientWidth / Math.max(ctx.renderer.domElement.clientHeight, 1),
+      0.01,
+    );
+    const next = mergeCameraCommand(synced, command, aspect);
     physicalCameraRef.current = next;
     setCameraUiState(next);
     setExposure(next.exposure);
@@ -730,17 +766,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
           ctx.renderer.setSize(outWidth, outHeight, false);
           const aspect = Math.max(outWidth / Math.max(outHeight, 1), 0.01);
           for (const cam of [ctx.perspective, ctx.orthographic]) {
-            if (cam instanceof THREE.PerspectiveCamera) {
-              cam.aspect = aspect;
-            } else {
-              const frustumHeight = Number(cam.userData.frustumHeight) || (cam.top - cam.bottom);
-              const halfH = frustumHeight / 2;
-              cam.left = -halfH * aspect;
-              cam.right = halfH * aspect;
-              cam.top = halfH;
-              cam.bottom = -halfH;
-            }
-            cam.updateProjectionMatrix();
+            applyPhysicalProjection(cam, physicalCameraRef.current, aspect);
           }
           syncEdgeOverlayResolution(ctx.content, outWidth, outHeight);
           composerRef.current?.composer.setSize(outWidth, outHeight);
@@ -818,17 +844,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             0.01,
           );
           for (const cam of [ctx.perspective, ctx.orthographic]) {
-            if (cam instanceof THREE.PerspectiveCamera) {
-              cam.aspect = aspect;
-            } else {
-              const frustumHeight = Number(cam.userData.frustumHeight) || (cam.top - cam.bottom);
-              const halfH = frustumHeight / 2;
-              cam.left = -halfH * aspect;
-              cam.right = halfH * aspect;
-              cam.top = halfH;
-              cam.bottom = -halfH;
-            }
-            cam.updateProjectionMatrix();
+            applyPhysicalProjection(cam, physicalCameraRef.current, aspect);
           }
           syncEdgeOverlayResolution(
             ctx.content,
@@ -848,6 +864,176 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   const actionController = useCallback((): ActionRuntimeController | null => (
     (sceneRef.current?.content.userData.actionController as ActionRuntimeController | undefined) ?? null
   ), []);
+
+  const seekShot = useCallback((document: ShotDocument, timeSeconds: number): PhysicalCameraState | null => {
+    const ctx = sceneRef.current;
+    if (!ctx) return null;
+    const time = THREE.MathUtils.clamp(timeSeconds, 0, document.durationSeconds);
+    const sampled = sampleShotCameraWorld(document, document.activeCameraId, time);
+    physicalCameraRef.current = sampled;
+    setCameraUiState(sampled);
+    setExposure(sampled.exposure);
+    applyCameraStateToScene(ctx, sampled);
+
+    const controller = actionController();
+    const track = document.objectAnimations.find((animation) =>
+      controller?.clips.some((clip) => clip.name === animation.clip));
+    if (controller && track) {
+      const clip = controller.clips.find((entry) => entry.name === track.clip);
+      const rawTime = Math.max(0, (time - track.startSeconds) * track.playbackRate);
+      const animationTime = track.loop && clip && clip.duration > 0
+        ? rawTime % clip.duration
+        : Math.min(rawTime, clip?.duration ?? rawTime);
+      controller.setLoop(track.loop);
+      controller.seek(track.clip, animationTime);
+      updateAnimationPlayback(controller.getPlaybackState());
+    }
+    shotPlaybackRef.current.timeSeconds = time;
+    setShotTime(time);
+    return sampled;
+  }, [actionController, applyCameraStateToScene, updateAnimationPlayback]);
+
+  const playShot = useCallback(() => {
+    const document = shotRef.current;
+    if (!document || !sceneRef.current || offlineExportRef.current) return false;
+    if (shotPlaybackRef.current.timeSeconds >= document.durationSeconds) {
+      seekShot(document, 0);
+    }
+    shotPlaybackRef.current.playing = true;
+    sceneRef.current.controls.enabled = false;
+    setShotPlaying(true);
+    return true;
+  }, [seekShot]);
+
+  const pauseShot = useCallback(() => {
+    shotPlaybackRef.current.playing = false;
+    if (sceneRef.current && !offlineExportRef.current) {
+      sceneRef.current.controls.enabled = true;
+    }
+    setShotPlaying(false);
+  }, []);
+  const seekShotRef = useRef(seekShot);
+  seekShotRef.current = seekShot;
+  const pauseShotRef = useRef(pauseShot);
+  pauseShotRef.current = pauseShot;
+
+  const applyCameraMotionPreset = useCallback(() => {
+    const document = shotRef.current;
+    if (!document) return;
+    const camera = getCameraState() ?? document.camera;
+    const next = {
+      ...document,
+      camera,
+      cameraKeyframes: createCameraPresetKeyframes(
+        cameraMotionPreset,
+        camera,
+        document.durationSeconds,
+      ),
+    };
+    onShotChangeRef.current?.(next);
+    pauseShot();
+    seekShot(next, 0);
+  }, [cameraMotionPreset, getCameraState, pauseShot, seekShot]);
+
+  const changeShotCamera = useCallback((command: CameraCommand) => {
+    const camera = applyCameraCommand(command);
+    const document = shotRef.current;
+    if (camera && document) {
+      onShotChangeRef.current?.({ ...document, camera });
+    }
+  }, [applyCameraCommand]);
+
+  const setPlayheadKeyframe = useCallback(() => {
+    const document = shotRef.current;
+    const camera = getCameraState();
+    if (!document || !camera) return;
+    const next = upsertCameraKeyframe(document, {
+      timeSeconds: shotPlaybackRef.current.timeSeconds,
+      interpolation: 'ease-in-out',
+      value: cameraStateToCommand(camera),
+    });
+    const created = next.cameraKeyframes.find((keyframe) => (
+      Math.abs(keyframe.timeSeconds - shotPlaybackRef.current.timeSeconds) <= 0.5 / Math.max(next.fps, 1)
+    ));
+    onShotChangeRef.current?.(next);
+    if (created) setSelectedKeyframeId(created.id);
+  }, [getCameraState]);
+
+  const deleteSelectedKeyframe = useCallback(() => {
+    const document = shotRef.current;
+    if (!document || !selectedKeyframeId) return;
+    onShotChangeRef.current?.(removeCameraKeyframe(document, selectedKeyframeId));
+    setSelectedKeyframeId(null);
+  }, [selectedKeyframeId]);
+
+  const selectKeyframe = useCallback((keyframeId: string | null) => {
+    const document = shotRef.current;
+    setSelectedKeyframeId(keyframeId);
+    if (!document || !keyframeId) return;
+    const keyframe = document.cameraKeyframes.find((entry) => entry.id === keyframeId);
+    if (keyframe) {
+      pauseShot();
+      seekShot(document, keyframe.timeSeconds);
+    }
+  }, [pauseShot, seekShot]);
+
+  const updateShotSettings = useCallback((
+    patch: Partial<Pick<ShotDocument, 'durationSeconds' | 'fps' | 'width' | 'height'>>,
+  ) => {
+    const document = shotRef.current;
+    if (!document) return;
+    const next = { ...document, ...patch };
+    onShotChangeRef.current?.(next);
+    if (shotPlaybackRef.current.timeSeconds > next.durationSeconds) {
+      seekShot(next, next.durationSeconds);
+    }
+  }, [seekShot]);
+
+  const runPrevisExport = useCallback(async () => {
+    const currentShot = shotRef.current;
+    if (!currentShot || previsExporting) return;
+    pauseShot();
+    const abort = new AbortController();
+    previsAbortRef.current = abort;
+    offlineExportRef.current = true;
+    if (sceneRef.current) sceneRef.current.controls.enabled = false;
+    setPrevisExporting(true);
+    setPrevisProgress(0);
+    setPrevisStatus('Preparing encoder…');
+    try {
+      const codec = previsCodec ?? await resolvePrevisCodec(currentShot.width, currentShot.height);
+      setPrevisCodec(codec);
+      setPrevisStatus(`Encoding ${codec.label} ${codec.container.toUpperCase()}…`);
+      const result = await exportPrevisVideo({
+        captureFrame: captureFrameImpl,
+        seekShot,
+        getShotTime: () => shotPlaybackRef.current.timeSeconds,
+      }, currentShot, {
+        codec,
+        signal: abort.signal,
+        onProgress: ({ progress, frame, frameCount }) => {
+          setPrevisProgress(progress);
+          setPrevisStatus(`Encoding frame ${frame}/${frameCount}…`);
+        },
+      });
+      const url = URL.createObjectURL(result.blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${currentShot.name.replace(/[^a-z0-9_-]+/gi, '_') || 'shot'}-previs.${result.codec.extension}`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setPrevisStatus(`Exported ${result.frameCount} frames · ${result.codec.label} ${result.codec.container.toUpperCase()}`);
+    } catch (error) {
+      setPrevisStatus(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Export canceled'
+        : error instanceof Error ? error.message : String(error));
+    } finally {
+      previsAbortRef.current = null;
+      offlineExportRef.current = false;
+      if (sceneRef.current) sceneRef.current.controls.enabled = true;
+      setPrevisExporting(false);
+    }
+  }, [captureFrameImpl, pauseShot, previsCodec, previsExporting, seekShot]);
 
   useImperativeHandle(ref, () => ({
     captureFrame: captureFrameImpl,
@@ -874,12 +1060,19 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     getPreservedGltfBytes: () => (
       (sceneRef.current?.content.userData.preservedGltfBytes as ArrayBuffer | undefined) ?? null
     ),
+    seekShot,
+    playShot,
+    pauseShot,
+    getShotTime: () => shotPlaybackRef.current.timeSeconds,
   }), [
     captureFrameImpl,
     applyActiveReviewCamera,
     applyCameraCommand,
     getCameraState,
     actionController,
+    seekShot,
+    playShot,
+    pauseShot,
   ]);
 
   useEffect(() => {
@@ -896,6 +1089,21 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       ctx.camera = ctx.perspective;
       ctx.controls.object = ctx.perspective;
       focusCameraOnTarget(ctx.perspective, ctx.controls, unityToThree(edit.controlPoints[sel]));
+      return;
+    }
+
+    const shot = shotRef.current;
+    const selectedCurve = shot ? findShotMotionCurve(shot, shot.selectedNodeId) : null;
+    if (selectedCurve && selectedCurve.controlPoints.length > 0) {
+      const positions = new Float32Array(selectedCurve.controlPoints.length * 3);
+      selectedCurve.controlPoints.forEach((point, index) => {
+        positions[index * 3] = point[0];
+        positions[index * 3 + 1] = point[1];
+        positions[index * 3 + 2] = point[2];
+      });
+      ctx.camera = ctx.perspective;
+      ctx.controls.object = ctx.perspective;
+      fitCamera(ctx.perspective, ctx.controls, positions);
       return;
     }
 
@@ -1017,6 +1225,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     scene.add(handles);
     const rigHandles = new THREE.Group();
     scene.add(rigHandles);
+    const cameraTrack = new THREE.Group();
+    scene.add(cameraTrack);
+    cameraTrackGroupRef.current = cameraTrack;
 
     sceneRef.current = {
       renderer,
@@ -1038,6 +1249,13 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       pmremGenerator,
       reviewPose: null,
     };
+    const initialShot = shotRef.current;
+    const initialPhysicalCamera = initialShot
+      ? sampleShotCameraWorld(initialShot, initialShot.activeCameraId, shotPlaybackRef.current.timeSeconds)
+      : physicalCameraRef.current;
+    physicalCameraRef.current = initialPhysicalCamera;
+    setCameraUiState(initialPhysicalCamera);
+    applyCameraStateToScene(sceneRef.current, initialPhysicalCamera);
 
     loadMatcapTexture(DEFAULT_MATCAP_ID).then((tex) => {
       if (sceneRef.current) sceneRef.current.matcapTexture = tex;
@@ -1048,22 +1266,9 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       const h = container.clientHeight;
       if (w === 0 || h === 0) return;
       renderer.setSize(w, h);
-      const ctx = sceneRef.current;
-      const active = ctx?.camera ?? perspective;
-      if (active instanceof THREE.PerspectiveCamera) {
-        active.aspect = w / h;
-      } else if (active instanceof THREE.OrthographicCamera) {
-        const frustumHeight = Number(active.userData.frustumHeight) || (active.top - active.bottom);
-        const halfH = frustumHeight / 2;
-        const halfW = halfH * (w / h);
-        active.left = -halfW;
-        active.right = halfW;
-        active.top = halfH;
-        active.bottom = -halfH;
-      }
-      active.updateProjectionMatrix();
-      perspective.aspect = w / h;
-      perspective.updateProjectionMatrix();
+      const state = physicalCameraRef.current;
+      applyPhysicalProjection(perspective, state, w / h);
+      applyPhysicalProjection(orthographic, state, w / h);
       syncEdgeOverlayResolution(content, w, h);
       composerRef.current?.composer.setSize(w, h);
     };
@@ -1076,12 +1281,18 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
     const clock = new THREE.Clock();
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      if (offlineExportRef.current) return;
       const deltaSeconds = Math.min(clock.getDelta(), 0.1);
-      controls.update();
       const ctx = sceneRef.current;
       if (ctx) {
         const controller = ctx.content.userData.actionController as ActionRuntimeController | undefined;
-        controller?.advance(deltaSeconds);
+        const shotLocked = shotPlaybackRef.current.playing || offlineExportRef.current;
+        if (shotLocked) {
+          ctx.controls.enabled = false;
+        } else {
+          if (ctx.controls.enabled) ctx.controls.update();
+          controller?.advance(deltaSeconds);
+        }
         poseOverlayRef.current?.update();
         if (poseTransformRef.current) poseTransformRef.current.camera = ctx.camera;
         const now = performance.now();
@@ -1333,9 +1544,190 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
       composerRef.current = null;
       renderer.dispose();
       renderer.domElement.remove();
+      cameraTrackGroupRef.current = null;
       sceneRef.current = null;
     };
-  }, [syncSplineHandles, focusPreview, invalidateEnvironmentLoads, renderWithDof, updateAnimationPlayback]);
+  }, [
+    syncSplineHandles,
+    focusPreview,
+    invalidateEnvironmentLoads,
+    renderWithDof,
+    updateAnimationPlayback,
+    applyCameraStateToScene,
+  ]);
+
+  useEffect(() => {
+    if (!shot || shotPlaybackRef.current.playing || !sceneRef.current) return;
+    seekShot(shot, Math.min(shotPlaybackRef.current.timeSeconds, shot.durationSeconds));
+  }, [shot, seekShot]);
+
+  useEffect(() => {
+    if (!shotPlaying) return;
+    let lastMs = performance.now();
+    const tick = () => {
+      if (offlineExportRef.current) return;
+      const document = shotRef.current;
+      if (!document || !shotPlaybackRef.current.playing) return;
+      const now = performance.now();
+      const deltaSeconds = Math.min((now - lastMs) / 1000, 0.1);
+      lastMs = now;
+      const time = Math.min(
+        shotPlaybackRef.current.timeSeconds + deltaSeconds,
+        document.durationSeconds,
+      );
+      try {
+        seekShotRef.current(document, time);
+      } catch (error) {
+        console.error('Shot clock seek failed', error);
+        pauseShotRef.current();
+        return;
+      }
+      if (time >= document.durationSeconds) pauseShotRef.current();
+    };
+    const id = window.setInterval(tick, 16);
+    return () => window.clearInterval(id);
+  }, [shotPlaying]);
+
+  useEffect(() => {
+    if (!cameraTrackGroupRef.current) return;
+    syncCameraTrajectoryOverlay(
+      cameraTrackGroupRef.current,
+      shot,
+      selectedKeyframeId,
+      shotTime,
+      shot?.selectedNodeId,
+    );
+  }, [shot, selectedKeyframeId, shotTime]);
+
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    const group = cameraTrackGroupRef.current;
+    if (!ctx || !group) return;
+    const canvas = ctx.renderer.domElement;
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    type OverlayDrag =
+      | { kind: 'camera-key' | 'camera-target'; keyframeId: string; plane: THREE.Plane }
+      | { kind: 'camera-icon'; cameraId: string; plane: THREE.Plane }
+      | { kind: 'curve-point'; curveId: string; pointIndex: number; plane: THREE.Plane };
+    let drag: OverlayDrag | null = null;
+
+    const ndc = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1;
+      raycaster.setFromCamera(pointer, ctx.camera);
+    };
+
+    const dragPlane = (origin: THREE.Vector3) => new THREE.Plane().setFromNormalAndCoplanarPoint(
+      ctx.camera.getWorldDirection(new THREE.Vector3()).negate(),
+      origin,
+    );
+
+    const onDown = (event: PointerEvent) => {
+      if (event.button !== 0 || shotPlaybackRef.current.playing || offlineExportRef.current) return;
+      ndc(event);
+      const hit = pickCameraKeyframe(group, raycaster);
+      if (!hit) return;
+      const document = shotRef.current;
+      if (!document) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (hit.kind === 'camera-icon') {
+        const next = selectShotCamera(document, hit.cameraId);
+        onShotChangeRef.current?.(next);
+        if (findCameraPathCurve(next, hit.cameraId)) return;
+        const sampled = sampleShotCameraWorld(next, hit.cameraId, shotPlaybackRef.current.timeSeconds);
+        drag = { kind: 'camera-icon', cameraId: hit.cameraId, plane: dragPlane(new THREE.Vector3(...sampled.position)) };
+      } else if (hit.kind === 'curve-point') {
+        const next = selectShotNode(document, hit.curveId);
+        onShotChangeRef.current?.(next);
+        const curve = next.motionCurves.find((entry) => entry.id === hit.curveId);
+        const origin = curve?.controlPoints[hit.pointIndex];
+        if (!origin) return;
+        drag = {
+          kind: 'curve-point',
+          curveId: hit.curveId,
+          pointIndex: hit.pointIndex,
+          plane: dragPlane(new THREE.Vector3(...origin)),
+        };
+      } else {
+        const keyframe = document.cameraKeyframes.find((entry) => entry.id === hit.keyframeId);
+        if (!keyframe) return;
+        setSelectedKeyframeId(hit.keyframeId);
+        seekShot(document, keyframe.timeSeconds);
+        const sampled = sampleShotCameraWorld(document, document.activeCameraId, keyframe.timeSeconds);
+        const origin = new THREE.Vector3(...(hit.kind === 'camera-key' ? sampled.position : sampled.target));
+        drag = { keyframeId: hit.keyframeId, kind: hit.kind, plane: dragPlane(origin) };
+      }
+      ctx.controls.enabled = false;
+      canvas.setPointerCapture(event.pointerId);
+    };
+
+    const onMove = (event: PointerEvent) => {
+      if (!drag) return;
+      const document = shotRef.current;
+      if (!document) return;
+      ndc(event);
+      const point = new THREE.Vector3();
+      if (!raycaster.ray.intersectPlane(drag.plane, point)) return;
+      const nextPoint = point.toArray() as [number, number, number];
+      if (drag.kind === 'curve-point') {
+        onShotChangeRef.current?.(setMotionCurvePoint(document, drag.curveId, drag.pointIndex, nextPoint));
+        return;
+      }
+      if (drag.kind === 'camera-icon') {
+        const next = upsertShotCamera(document, { id: drag.cameraId, camera: { position: nextPoint } });
+        onShotChangeRef.current?.(next);
+        return;
+      }
+      const keyframe = document.cameraKeyframes.find((entry) => entry.id === drag.keyframeId);
+      if (!keyframe) return;
+      const sampled = sampleShotCameraWorld(document, document.activeCameraId, keyframe.timeSeconds);
+      const nextCamera = drag.kind === 'camera-key'
+        ? { ...sampled, position: nextPoint }
+        : { ...sampled, target: nextPoint };
+      const next = setKeyframeCamera(document, drag.keyframeId, nextCamera);
+      onShotChangeRef.current?.(next);
+      seekShot(next, keyframe.timeSeconds);
+    };
+
+    const onUp = (event: PointerEvent) => {
+      if (!drag) return;
+      drag = null;
+      ctx.controls.enabled = !shotPlaybackRef.current.playing;
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    };
+
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    return () => {
+      canvas.removeEventListener('pointerdown', onDown);
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerup', onUp);
+    };
+  }, [shot, seekShot]);
+
+  useEffect(() => {
+    if (!shot) return;
+    let active = true;
+    setPrevisCodec(null);
+    setPrevisStatus('Checking WebCodecs…');
+    void resolvePrevisCodec(shot.width, shot.height)
+      .then((codec) => {
+        if (!active) return;
+        setPrevisCodec(codec);
+        setPrevisStatus('');
+      })
+      .catch((error) => {
+        if (active) setPrevisStatus(error instanceof Error ? error.message : String(error));
+      });
+    return () => { active = false; };
+  }, [shot?.width, shot?.height]);
+
+  useEffect(() => () => previsAbortRef.current?.abort(), []);
 
   const loadEnvironmentUrl = useCallback(async (
     url: string,
@@ -1915,7 +2307,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
 
   return (
     <div
-      className={`pcg-preview${reviewMode ? ' is-review' : ''}${animationModeOpen ? ' has-animation-mode' : ''}${poseModeOpen ? ' has-rig-pose-mode' : ''}`}
+      className={`pcg-preview${reviewMode ? ' is-review' : ''}${shot ? ' has-shot-mode' : ''}${animationModeOpen ? ' has-animation-mode' : ''}${poseModeOpen ? ' has-rig-pose-mode' : ''}`}
       style={{ width: reviewMode ? '100%' : width, height: reviewMode ? '100%' : undefined }}
     >
       <div
@@ -2179,13 +2571,58 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
             {cameraPopoverOpen && (
               <CameraPopover
                 state={cameraUiState}
-                onCameraChange={(command) => { applyCameraCommand(command); }}
+                onCameraChange={changeShotCamera}
                 onSnapshot={snapshotPng}
               />
             )}
           </div>
         </div>
         </>
+        )}
+        {activeTab === '3d' && shot && (
+          <ShotTransport
+            shot={shot}
+            timeSeconds={shotTime}
+            playing={shotPlaying}
+            preset={cameraMotionPreset}
+            codecLabel={previsCodec ? `${previsCodec.label} ${previsCodec.container.toUpperCase()}` : ''}
+            exporting={previsExporting}
+            exportProgress={previsProgress}
+            exportStatus={previsStatus}
+            selectedKeyframeId={selectedKeyframeId}
+            onPresetChange={setCameraMotionPreset}
+            onApplyPreset={applyCameraMotionPreset}
+            onSelectKeyframe={selectKeyframe}
+            onSetKeyframe={setPlayheadKeyframe}
+            onDeleteKeyframe={deleteSelectedKeyframe}
+            onMoveKeyframe={(keyframeId, time) => {
+              const document = shotRef.current;
+              if (!document) return;
+              const next = moveCameraKeyframeTime(document, keyframeId, time);
+              onShotChangeRef.current?.(next);
+              seekShot(next, time);
+            }}
+            onKeyframeInterpolation={(interpolation: ShotInterpolation) => {
+              const document = shotRef.current;
+              if (!document || !selectedKeyframeId) return;
+              onShotChangeRef.current?.(setKeyframeInterpolation(document, selectedKeyframeId, interpolation));
+            }}
+            onTogglePlayback={() => {
+              if (shotPlaying) pauseShot();
+              else playShot();
+            }}
+            onStop={() => {
+              pauseShot();
+              seekShot(shot, 0);
+            }}
+            onSeek={(timeSeconds) => {
+              pauseShot();
+              seekShot(shot, timeSeconds);
+            }}
+            onSettingsChange={updateShotSettings}
+            onExport={() => void runPrevisExport()}
+            onCancelExport={() => previsAbortRef.current?.abort()}
+          />
         )}
         {activeTab === '3d' && animationModeOpen && animationClips.length > 0 && (
           <AnimationTransport

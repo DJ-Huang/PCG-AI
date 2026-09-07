@@ -1,0 +1,26 @@
+{
+  "id": "pcg.lib:character:human_proxy_walking",
+  "displayName": "Human Proxy Walking",
+  "category": "Character",
+  "assetVersion": "1.0.0",
+  "keywords": ["human", "person", "walking", "character", "人物", "人类", "行走", "走路"],
+  "description": "约 1.75 米高、带明确迈步剪影的人物代理，局部 +Z 为前进方向。",
+  "semantic": {
+    "componentId": "human_proxy_walking",
+    "role": "character",
+    "bounds": {
+      "center": [0, 0.875, 0],
+      "size": [0.8, 1.75, 0.75]
+    },
+    "anchors": {
+      "feet": [0, 0, 0],
+      "head": [0, 1.61, 0],
+      "forward": [0, 0.9, 0.75]
+    },
+    "camera": {
+      "include": true,
+      "occluder": true,
+      "scaleRole": "human"
+    }
+  }
+}

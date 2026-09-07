@@ -312,10 +312,21 @@ def main() -> None:
             })
             status, stream = request(f"{base}/turns", method="POST", body=body, content_type=content_type)
             assert status == 200
-            assert not event_data(stream, "approval.required")
-            tool_error = event_data(stream, "tool.result")[0]["result"]["structuredContent"]
-            assert tool_error.get("error") != "user_rejected"
-            assert event_data(stream, "turn.completed")
+            approvals = event_data(stream, "approval.required")
+            assert approvals and approvals[0]["calls"][0]["name"] == "pcg_save_graph", approvals
+            approval = approvals[0]
+            decision = json.dumps({"decisions": [{
+                "toolCallId": approval["calls"][0]["toolCallId"],
+                "decision": "approve",
+            }]}).encode()
+            status, decided = request(
+                f"{base}/turns/{approval['turnId']}/decision",
+                method="POST", body=decision, content_type="application/json",
+            )
+            assert status == 200
+            tool_error = event_data(decided, "tool.result")[0]["result"]["structuredContent"]
+            assert tool_error.get("error") == "graph_conflict", tool_error
+            assert event_data(decided, "turn.completed")
 
             process.terminate()
             process.wait(timeout=5)

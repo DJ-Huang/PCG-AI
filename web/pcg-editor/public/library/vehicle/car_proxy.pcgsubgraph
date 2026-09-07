@@ -1,0 +1,454 @@
+{
+  "version": "2.0",
+  "name": "Car Proxy",
+  "contentHash": "a3b7834ac8af28887eb54e174058f89c6f425198836f6ae342c092b89382f283",
+  "inputs": [],
+  "outputs": [
+    {
+      "id": "out",
+      "name": "Geometry",
+      "pinType": "SpatialGeometry"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "scale",
+      "name": "Vehicle Size (XYZ)",
+      "type": "vector3",
+      "default": [
+        1,
+        1,
+        1
+      ],
+      "exposed": true,
+      "targetNode": "asset_scale",
+      "targetProperty": "scale",
+      "hasRange": false,
+      "min": 0,
+      "max": 10
+    }
+  ],
+  "nodes": [
+    {
+      "id": "body",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 1.8,
+        "height": 0.55,
+        "depth": 4.4,
+        "__nodeTitle": "Car Body"
+      }
+    },
+    {
+      "id": "cabin",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 560,
+        "y": 0
+      },
+      "data": {
+        "width": 1.55,
+        "height": 0.65,
+        "depth": 2.2,
+        "__nodeTitle": "Car Cabin"
+      }
+    },
+    {
+      "id": "wheel_fl",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 920,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.34,
+        "height": 0.22,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Front Left Wheel"
+      }
+    },
+    {
+      "id": "wheel_fr",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 1280,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.34,
+        "height": 0.22,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Front Right Wheel"
+      }
+    },
+    {
+      "id": "wheel_rl",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 1640,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.34,
+        "height": 0.22,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Rear Left Wheel"
+      }
+    },
+    {
+      "id": "wheel_rr",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 2000,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.34,
+        "height": 0.22,
+        "radialSegments": 16,
+        "heightSegments": 1,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "Rear Right Wheel"
+      }
+    },
+    {
+      "id": "body_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.12,
+        "segments": 2,
+        "__nodeTitle": "Body Bevel"
+      }
+    },
+    {
+      "id": "cabin_bevel",
+      "type": "BevelMesh",
+      "position": {
+        "x": 560,
+        "y": 160
+      },
+      "data": {
+        "amount": 0.1,
+        "segments": 2,
+        "__nodeTitle": "Cabin Bevel"
+      }
+    },
+    {
+      "id": "place_body",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "translate": [
+          0,
+          0.64,
+          0
+        ],
+        "__nodeTitle": "Place Body"
+      }
+    },
+    {
+      "id": "place_cabin",
+      "type": "TransformMesh",
+      "position": {
+        "x": 560,
+        "y": 320
+      },
+      "data": {
+        "translate": [
+          0,
+          1.2,
+          -0.2
+        ],
+        "__nodeTitle": "Place Cabin"
+      }
+    },
+    {
+      "id": "place_wheel_fl",
+      "type": "TransformMesh",
+      "position": {
+        "x": 920,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          -0.91,
+          0.34,
+          1.35
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "__nodeTitle": "Place Front Left Wheel"
+      }
+    },
+    {
+      "id": "place_wheel_fr",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1280,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          0.91,
+          0.34,
+          1.35
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "__nodeTitle": "Place Front Right Wheel"
+      }
+    },
+    {
+      "id": "place_wheel_rl",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1640,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          -0.91,
+          0.34,
+          -1.35
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "__nodeTitle": "Place Rear Left Wheel"
+      }
+    },
+    {
+      "id": "place_wheel_rr",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2000,
+        "y": 160
+      },
+      "data": {
+        "translate": [
+          0.91,
+          0.34,
+          -1.35
+        ],
+        "rotation": [
+          0,
+          0,
+          90
+        ],
+        "__nodeTitle": "Place Rear Right Wheel"
+      }
+    },
+    {
+      "id": "merge_vehicle",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1100,
+        "y": 480
+      },
+      "data": {
+        "__nodeTitle": "Assemble Vehicle"
+      }
+    },
+    {
+      "id": "asset_scale",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1100,
+        "y": 640
+      },
+      "data": {
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "__nodeTitle": "Vehicle Instance Scale"
+      }
+    },
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 1100,
+        "y": 800
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "body_bevel_edge",
+      "source": "body",
+      "target": "body_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "body_place_edge",
+      "source": "body_bevel",
+      "target": "place_body",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "cabin_bevel_edge",
+      "source": "cabin",
+      "target": "cabin_bevel",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "cabin_place_edge",
+      "source": "cabin_bevel",
+      "target": "place_cabin",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_fl_place_edge",
+      "source": "wheel_fl",
+      "target": "place_wheel_fl",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_fr_place_edge",
+      "source": "wheel_fr",
+      "target": "place_wheel_fr",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_rl_place_edge",
+      "source": "wheel_rl",
+      "target": "place_wheel_rl",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_rr_place_edge",
+      "source": "wheel_rr",
+      "target": "place_wheel_rr",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "body_merge_edge",
+      "source": "place_body",
+      "target": "merge_vehicle",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "cabin_merge_edge",
+      "source": "place_cabin",
+      "target": "merge_vehicle",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_fl_merge_edge",
+      "source": "place_wheel_fl",
+      "target": "merge_vehicle",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_fr_merge_edge",
+      "source": "place_wheel_fr",
+      "target": "merge_vehicle",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_rl_merge_edge",
+      "source": "place_wheel_rl",
+      "target": "merge_vehicle",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "wheel_rr_merge_edge",
+      "source": "place_wheel_rr",
+      "target": "merge_vehicle",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "merge_scale_edge",
+      "source": "merge_vehicle",
+      "target": "asset_scale",
+      "sourceHandle": "out",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialMesh"
+    },
+    {
+      "id": "scale_output_edge",
+      "source": "asset_scale",
+      "target": "subgraph_output",
+      "sourceHandle": "out",
+      "targetHandle": "out",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialGeometry"
+    }
+  ],
+  "subgraphs": []
+}

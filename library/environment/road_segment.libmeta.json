@@ -1,0 +1,26 @@
+{
+  "id": "pcg.lib:environment:road_segment",
+  "displayName": "Road Segment",
+  "category": "Environment",
+  "assetVersion": "1.0.0",
+  "keywords": ["road", "street", "lane", "道路", "街道", "路段"],
+  "description": "可缩放的道路占位段，默认沿局部 +Z 延伸并贴近地面。",
+  "semantic": {
+    "componentId": "road_segment",
+    "role": "road",
+    "bounds": {
+      "center": [0, 0.05, 0],
+      "size": [6, 0.1, 12]
+    },
+    "anchors": {
+      "start": [0, 0.1, -6],
+      "end": [0, 0.1, 6],
+      "center": [0, 0.1, 0]
+    },
+    "camera": {
+      "include": false,
+      "occluder": false,
+      "scaleRole": "environment"
+    }
+  }
+}
