@@ -1,4 +1,4 @@
-# Houdini 基础建模 SOP ↔ PCG-AI 节点对照表
+# Houdini 基础建模 SOP ↔ PICG 节点对照表
 
 > 更新日期：2026-08-15
 > 数据来源：[SideFX SOP 官方索引](https://www.sidefx.com/docs/houdini/nodes/sop/index.html) + `schema/node-manifest.json`
@@ -9,7 +9,7 @@
 |------|------|------|
 | Houdini **全部** SOP | **1040** | 官方文档索引（含模拟、绑定、Labs 等） |
 | **基础建模** SOP（本文清单） | **237** | 12 类建模常用子集 |
-| **PCG-AI** 节点 | **305** | `schema/node-manifest.json`（304 个 Core cook 节点 + `ExportFBX`） |
+| **PICG** 节点 | **305** | `schema/node-manifest.json`（304 个 Core cook 节点 + `ExportFBX`） |
 
 ### 状态图例
 
@@ -330,7 +330,7 @@
 
 ---
 
-## 二、PCG-AI 节点 → Houdini 反向对照（305）
+## 二、PICG 节点 → Houdini 反向对照（305）
 
 | PCG 节点 | 类别 | Houdini SOP |
 |---|---|---|
@@ -692,6 +692,6 @@ PCG 在 `heightfield_*` 系列有完整对标，属于地形域，未计入上�
 ## 参考
 
 - [SideFX Geometry (SOP) nodes](https://www.sidefx.com/docs/houdini/nodes/sop/index.html)
-- [PCG-AI node-manifest.json](../schema/node-manifest.json)
-- [PCG-AI node-reference.md](./node-reference.md)
+- [PICG node-manifest.json](../schema/node-manifest.json)
+- [PICG node-reference.md](./node-reference.md)
 - [brickify-tool showcase](../examples/showcases/brickify-tool/README.md)

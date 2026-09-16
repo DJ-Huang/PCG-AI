@@ -1,6 +1,6 @@
 # Architecture
 
-PCG-AI separates authoring, execution and host integration so the same graph can be edited in the browser or Unity while the native runtime remains the execution source of truth.
+PICG separates authoring, execution and host integration so the same graph can be edited in the browser or Unity while the native runtime remains the execution source of truth.
 
 ## Components
 

@@ -1,12 +1,17 @@
 #include "mcp_service.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <limits>
+#include <set>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 
@@ -228,6 +233,490 @@ json SolveSemanticCamera(const SemanticBounds& b, const json& spec) {
     return camera;
 }
 
+std::string Lower(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+std::string StableContentHash(const std::string& value) {
+    uint64_t hash = 1469598103934665603ull;
+    for (const unsigned char byte : value) {
+        hash ^= byte;
+        hash *= 1099511628211ull;
+    }
+    std::ostringstream out;
+    out << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return out.str();
+}
+
+std::string RevisionArgument(const json& arguments, const std::string& key = "sinceRevision") {
+    const auto found = arguments.find(key);
+    if (found == arguments.end()) return "";
+    if (found->is_string()) return found->get<std::string>();
+    if (found->is_number_integer()) return std::to_string(found->get<int64_t>());
+    if (found->is_number_unsigned()) return std::to_string(found->get<uint64_t>());
+    return "";
+}
+
+json SelectResponseFields(const json& value, const json& arguments) {
+    const json fields = arguments.value("fields", json::array());
+    if (!fields.is_array() || fields.empty() || !value.is_object()) return value;
+    json selected = json::object();
+    for (const auto* key : {"ok", "revision", "graphHash", "shotHash", "contentHash", "notModified"}) {
+        if (value.contains(key)) selected[key] = value[key];
+    }
+    for (const auto& field : fields) if (field.is_string() && value.contains(field.get<std::string>())) selected[field.get<std::string>()] = value[field.get<std::string>()];
+    return selected;
+}
+
+bool ReadTextFile(const std::filesystem::path& path, std::string& text) {
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) return false;
+    text.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+    return true;
+}
+
+json ReadJsonFile(const std::filesystem::path& path) {
+    std::ifstream stream(path);
+    if (!stream) return json();
+    json value = json::parse(stream, nullptr, false);
+    return value.is_discarded() ? json() : value;
+}
+
+std::filesystem::path ProjectRoot() {
+    return GetKbRoot().parent_path();
+}
+
+std::string Trim(std::string value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return "";
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+json ParseInlineList(std::string value) {
+    json result = json::array();
+    value = Trim(value);
+    if (value.size() < 2 || value.front() != '[' || value.back() != ']') return result;
+    std::stringstream stream(value.substr(1, value.size() - 2));
+    std::string item;
+    while (std::getline(stream, item, ',')) {
+        item = Trim(item);
+        if (!item.empty()) result.push_back(item);
+    }
+    return result;
+}
+
+json LoadRecipeById(const std::string& recipe_id, bool include_content) {
+    if (recipe_id.empty()) return {{"ok", false}, {"error", "recipe_id_required"}};
+    const auto root = GetKbRoot() / "kb" / "recipes";
+    std::error_code error;
+    if (!std::filesystem::exists(root, error)) {
+        return {{"ok", false}, {"error", "recipe_root_missing"}, {"recipeId", recipe_id}};
+    }
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root, error)) {
+        if (error || !entry.is_regular_file() || entry.path().extension() != ".md") continue;
+        std::string text;
+        if (!ReadTextFile(entry.path(), text)) continue;
+        std::stringstream lines(text);
+        std::string line;
+        bool frontmatter = false;
+        bool closed = false;
+        json meta = json::object();
+        std::string body;
+        while (std::getline(lines, line)) {
+            if (!frontmatter && Trim(line) == "---") { frontmatter = true; continue; }
+            if (frontmatter && !closed && Trim(line) == "---") { closed = true; continue; }
+            if (frontmatter && !closed) {
+                const auto colon = line.find(':');
+                if (colon == std::string::npos) continue;
+                const std::string key = Trim(line.substr(0, colon));
+                const std::string value = Trim(line.substr(colon + 1));
+                if (key == "version") {
+                    try { meta[key] = std::stoi(value); } catch (...) { meta[key] = value; }
+                } else if (key == "roles" || key == "root_node_types") {
+                    meta[key] = ParseInlineList(value);
+                } else meta[key] = value;
+            } else if (closed) body += line + "\n";
+        }
+        if (meta.value("recipe_id", "") != recipe_id) continue;
+        const auto relative = std::filesystem::relative(entry.path(), GetKbRoot(), error);
+        json result = {
+            {"ok", true}, {"recipeId", recipe_id}, {"version", meta.value("version", 0)},
+            {"roles", meta.value("roles", json::array())},
+            {"rootNodeTypes", meta.value("root_node_types", json::array())},
+            {"path", error ? entry.path().filename().generic_string() : relative.generic_string()},
+            {"contentHash", StableContentHash(text)},
+        };
+        std::string summary;
+        std::stringstream body_lines(body);
+        while (std::getline(body_lines, line)) {
+            line = Trim(line);
+            if (!line.empty() && line.front() != '#') { summary = line; break; }
+        }
+        result["summary"] = summary;
+        if (include_content) result["content"] = body;
+        return result;
+    }
+    return {{"ok", false}, {"error", "recipe_not_found"}, {"recipeId", recipe_id}};
+}
+
+json ListLibraryItems(const json& arguments) {
+    const auto index_path = ProjectRoot() / "library" / "library-index.json";
+    std::string index_text;
+    ReadTextFile(index_path, index_text);
+    const json index = json::parse(index_text, nullptr, false);
+    if (!index.is_object() || !index.contains("items") || !index["items"].is_array()) {
+        return {{"ok", false}, {"error", "library_index_unavailable"}};
+    }
+    const std::string category = Lower(arguments.value("category", ""));
+    const std::string query = Lower(arguments.value("query", ""));
+    const std::string role = Lower(arguments.value("role", ""));
+    const bool full = arguments.value("detail", "compact") == "full";
+    json items = json::array();
+    for (const auto& item : index["items"]) {
+        if (!item.is_object()) continue;
+        const json semantic = item.value("semantic", json::object());
+        if (!category.empty() && Lower(item.value("category", "")) != category) continue;
+        if (!role.empty() && Lower(semantic.value("role", "")) != role) continue;
+        const std::string haystack = Lower(item.value("id", "") + " " + item.value("displayName", "") + " " +
+            item.value("description", "") + " " + semantic.value("componentId", ""));
+        if (!query.empty() && haystack.find(query) == std::string::npos) continue;
+        json compact = {
+            {"id", item.value("id", "")}, {"name", item.value("displayName", "")},
+            {"category", item.value("category", "")}, {"contentHash", item.value("contentHash", "")},
+            {"parameters", item.value("parameters", json::array())}, {"semantic", semantic},
+            {"recipeId", semantic.value("recipeId", "")},
+        };
+        items.push_back(full ? item : compact);
+    }
+    const std::string revision = StableContentHash(index_text);
+    if (RevisionArgument(arguments) == revision) return {{"ok", true}, {"notModified", true}, {"revision", revision}};
+    return SelectResponseFields({{"ok", true}, {"items", items}, {"count", items.size()}, {"indexVersion", index.value("version", 0)}, {"revision", revision}}, arguments);
+}
+
+json Vec3Or(const json& value, const json& fallback) {
+    double x, y, z;
+    return ReadVec3(value, x, y, z) ? json::array({x, y, z}) : fallback;
+}
+
+struct SceneComponentRecord {
+    json semantic = json::object();
+    json owner = json::object();
+    json members = json::array();
+    json dependencies = json::array();
+};
+
+std::unordered_map<std::string, SceneComponentRecord> CollectSceneComponents(const json& graph) {
+    std::unordered_map<std::string, SceneComponentRecord> result;
+    if (!graph.is_object() || !graph.value("nodes", json::array()).is_array()) return result;
+    std::unordered_map<std::string, json> nodes;
+    for (const auto& node : graph["nodes"]) if (node.is_object()) nodes[node.value("id", "")] = node;
+    std::unordered_map<std::string, std::string> member_owner;
+    for (const auto& [node_id, node] : nodes) {
+        const json semantic = node.value("data", json::object()).value("__semantic", json::object());
+        const std::string component_id = semantic.value("componentId", "");
+        if (component_id.empty()) continue;
+        auto& record = result[component_id];
+        record.semantic = semantic;
+        const json data = node.value("data", json::object());
+        record.owner = {
+            {"kind", "node"}, {"nodeId", node_id}, {"nodeType", node.value("type", "")},
+            {"worldTransform", {{"position", Vec3Or(data.value("translate", json::array()), json::array({0, 0, 0}))},
+                {"rotationEulerDeg", Vec3Or(data.value("rotation", json::array()), json::array({0, 0, 0}))},
+                {"scale", Vec3Or(data.value("scale", json::array()), json::array({1, 1, 1}))}}},
+        };
+        const json declared = semantic.value("memberNodeIds", json::array({node_id}));
+        const json members = declared.is_array() && !declared.empty() ? declared : json::array({node_id});
+        for (const auto& member_id : members) {
+            if (!member_id.is_string()) continue;
+            const auto found = nodes.find(member_id.get<std::string>());
+            if (found == nodes.end()) continue;
+            record.members.push_back({{"nodeId", member_id}, {"nodeType", found->second.value("type", "")}});
+            member_owner[member_id.get<std::string>()] = component_id;
+        }
+    }
+    for (const auto& edge : graph.value("edges", json::array())) {
+        if (!edge.is_object()) continue;
+        const auto source = member_owner.find(edge.value("source", ""));
+        const auto target = member_owner.find(edge.value("target", ""));
+        if (source == member_owner.end() || target == member_owner.end() || source->second == target->second) continue;
+        auto& dependencies = result[target->second].dependencies;
+        if (std::find(dependencies.begin(), dependencies.end(), source->second) == dependencies.end()) dependencies.push_back(source->second);
+    }
+    return result;
+}
+
+json ComponentSummary(const std::string& component_id, const SceneComponentRecord& record, const json& shot) {
+    json result = {
+        {"componentId", component_id}, {"label", record.semantic.value("label", "")},
+        {"role", record.semantic.value("role", "")}, {"zone", record.semantic.value("zone", "")},
+        {"intent", record.semantic.value("intent", "")}, {"recipeId", record.semantic.value("recipeId", "")},
+        {"owner", record.owner}, {"memberCount", record.members.size()}, {"dependencies", record.dependencies},
+    };
+    result["worldTransform"] = record.owner.value("worldTransform", json::object());
+    if (record.semantic.contains("bounds")) result["bounds"] = record.semantic["bounds"];
+    if (record.semantic.contains("anchors")) result["anchors"] = record.semantic["anchors"];
+    if (record.semantic.contains("camera")) result["camera"] = record.semantic["camera"];
+    if (shot.is_object()) {
+        for (const auto& component : shot.value("components", json::array())) {
+            if (component.is_object() && component.value("componentId", "") == component_id) {
+                result["worldTransform"] = component.value("transform", json::object());
+                result["visibility"] = {{"fromSeconds", component.value("visibleFromSeconds", 0.0)}, {"untilSeconds", component.value("visibleUntilSeconds", shot.value("durationSeconds", 0.0))}};
+            }
+        }
+        for (const auto& animation : shot.value("objectAnimations", json::array())) {
+            if (animation.is_object() && animation.value("componentId", "") == component_id) result["animation"] = animation;
+        }
+    }
+    return result;
+}
+
+json DescribeScene(const json& document, const json& shot, const json& arguments) {
+    if (!document.value("ok", false)) return document;
+    const json graph = document.value("graph", json::object());
+    const auto components = CollectSceneComponents(graph);
+    json list = json::array();
+    json roles = json::object();
+    json characters = json::array();
+    std::set<std::string> recipe_ids;
+    for (const auto& [id, component] : components) {
+        json summary = ComponentSummary(id, component, shot);
+        const std::string role = summary.value("role", "unclassified");
+        roles[role].push_back(id);
+        if (role == "character" || role == "extra") characters.push_back(id);
+        if (!summary.value("recipeId", "").empty()) recipe_ids.insert(summary.value("recipeId", ""));
+        list.push_back(std::move(summary));
+    }
+    const size_t node_count = graph.value("nodes", json::array()).size();
+    std::set<std::string> classified;
+    for (const auto& [_, component] : components) for (const auto& member : component.members) classified.insert(member.value("nodeId", ""));
+    json result = {
+        {"ok", true}, {"revision", document.value("graphHash", "")}, {"graphHash", document.value("graphHash", "")},
+        {"shotHash", shot.value("shotHash", "")}, {"components", list}, {"componentTree", roles},
+        {"characters", characters}, {"recipeIds", json(recipe_ids)},
+        {"componentCount", list.size()}, {"nodeCount", node_count}, {"unclassifiedNodeCount", node_count - std::min(node_count, classified.size())},
+        {"warnings", json::array()},
+    };
+    const std::string since = RevisionArgument(arguments);
+    if (!since.empty() && since == result.value("revision", "")) return {{"ok", true}, {"notModified", true}, {"revision", since}};
+    return SelectResponseFields(result, arguments);
+}
+
+bool HasNodeId(const json& graph, const std::string& node_id) {
+    for (const auto& node : graph.value("nodes", json::array())) if (node.is_object() && node.value("id", "") == node_id) return true;
+    return false;
+}
+
+const json* ResolveSemanticScope(const json& graph, const json& edit_path) {
+    if (!edit_path.is_array() || edit_path.empty()) return &graph;
+    const json& id_value = edit_path.back();
+    if (!id_value.is_string()) return nullptr;
+    for (const auto& subgraph : graph.value("subgraphs", json::array())) {
+        if (subgraph.is_object() && subgraph.value("id", "") == id_value.get<std::string>()) return &subgraph;
+    }
+    return nullptr;
+}
+
+std::string LibraryDefinitionId(const std::string& id) {
+    std::string value = "lib_";
+    for (const unsigned char c : id) value.push_back(std::isalnum(c) ? static_cast<char>(c) : '_');
+    return value;
+}
+
+json BuildLibraryInstances(json graph, const json& requests) {
+    const json index = ReadJsonFile(ProjectRoot() / "library" / "library-index.json");
+    if (!index.is_object() || !index.value("items", json::array()).is_array()) return {{"ok", false}, {"error", "library_index_unavailable"}};
+    if (!requests.is_array() || requests.empty() || requests.size() > 100) return {{"ok", false}, {"error", "items must contain 1-100 entries"}};
+    if (!graph.contains("subgraphs") || !graph["subgraphs"].is_array()) graph["subgraphs"] = json::array();
+    json created = json::array();
+    json skipped = json::array();
+    size_t index_position = 0;
+    for (const auto& request : requests) {
+        if (!request.is_object()) return {{"ok", false}, {"error", "library item request must be an object"}, {"operationIndex", index_position}};
+        const std::string wanted = request.value("libraryId", request.value("name", ""));
+        const std::string instance_id = request.value("instanceId", "");
+        if (wanted.empty() || instance_id.empty()) return {{"ok", false}, {"error", "libraryId and instanceId are required"}, {"operationIndex", index_position}};
+        const json* item = nullptr;
+        for (const auto& candidate : index["items"]) if (candidate.value("id", "") == wanted || candidate.value("displayName", "") == wanted) { item = &candidate; break; }
+        if (item == nullptr) return {{"ok", false}, {"error", "library_item_not_found"}, {"libraryId", wanted}, {"operationIndex", index_position}};
+        const std::string instance_node_id = instance_id + "__asset";
+        const std::string owner_node_id = instance_id + "__transform";
+        const auto existing_components = CollectSceneComponents(graph);
+        if (existing_components.find(instance_id) != existing_components.end() || HasNodeId(graph, instance_node_id) || HasNodeId(graph, owner_node_id)) {
+            skipped.push_back(instance_id);
+            ++index_position;
+            continue;
+        }
+        const std::string definition_id = LibraryDefinitionId(item->value("id", ""));
+        bool has_definition = false;
+        for (const auto& definition : graph["subgraphs"]) if (definition.value("id", "") == definition_id) has_definition = true;
+        if (!has_definition) {
+            const json asset = ReadJsonFile(ProjectRoot() / "library" / item->value("file", ""));
+            if (!asset.is_object()) return {{"ok", false}, {"error", "library_asset_unavailable"}, {"libraryId", wanted}, {"operationIndex", index_position}};
+            graph["subgraphs"].push_back({
+                {"id", definition_id}, {"name", asset.value("name", item->value("displayName", ""))},
+                {"inputs", asset.value("inputs", json::array())}, {"outputs", asset.value("outputs", json::array())},
+                {"nodes", asset.value("nodes", json::array())}, {"edges", asset.value("edges", json::array())},
+                {"parameters", asset.value("parameters", json::array())}, {"semantic", item->value("semantic", json::object())},
+            });
+        }
+        const double x = request.value("layoutX", static_cast<double>(index_position) * 520.0);
+        const double y = request.value("layoutY", 0.0);
+        json semantic = item->value("semantic", json::object());
+        if (request.contains("semantic") && request["semantic"].is_object()) semantic.update(request["semantic"]);
+        semantic["componentId"] = instance_id;
+        semantic["memberNodeIds"] = json::array({instance_node_id, owner_node_id});
+        json instance_data = {{"subgraphId", definition_id}, {"__nodeTitle", item->value("displayName", instance_id)}};
+        if (request.contains("parameters") && request["parameters"].is_object()) instance_data["subgraphParameterOverrides"] = request["parameters"];
+        graph["nodes"].push_back({{"id", instance_node_id}, {"type", "Subgraph"}, {"position", {{"x", x}, {"y", y}}}, {"data", instance_data}});
+        graph["nodes"].push_back({{"id", owner_node_id}, {"type", "TransformMesh"}, {"position", {{"x", x + 280.0}, {"y", y}}}, {"data", {
+            {"translate", Vec3Or(request.value("position", json::array()), json::array({0, 0, 0}))},
+            {"rotation", Vec3Or(request.value("rotation", json::array()), json::array({0, 0, 0}))},
+            {"scale", Vec3Or(request.value("scale", json::array()), json::array({1, 1, 1}))},
+            {"__nodeTitle", instance_id}, {"__semantic", semantic},
+        }}});
+        const json outputs = item->value("outputs", json::array());
+        const std::string output_id = !outputs.empty() ? outputs[0].value("id", "out") : "out";
+        graph["edges"].push_back({{"id", "e_" + instance_id + "__placed"}, {"source", instance_node_id}, {"target", owner_node_id}, {"sourceHandle", output_id}, {"targetHandle", "in"}});
+        created.push_back({{"componentId", instance_id}, {"libraryId", item->value("id", "")}, {"ownerNodeId", owner_node_id}, {"definitionId", definition_id}, {"semantic", semantic}});
+        ++index_position;
+    }
+    return {{"ok", true}, {"graph", graph}, {"created", created}, {"skipped", skipped}, {"changeCount", created.size()}};
+}
+
+bool PathInside(const std::filesystem::path& child, const std::filesystem::path& root) {
+    const auto child_text = child.lexically_normal().generic_string();
+    std::string root_text = root.lexically_normal().generic_string();
+    if (!root_text.empty() && root_text.back() != '/') root_text.push_back('/');
+    return child_text == root.lexically_normal().generic_string() || child_text.rfind(root_text, 0) == 0;
+}
+
+json ResolveOutputTarget(const std::string& root_id, const std::string& relative_path) {
+    if (root_id.empty() || relative_path.empty()) return {{"ok", false}, {"error", "outputRootId and relativePath are required"}};
+    const std::filesystem::path relative(relative_path);
+    if (relative.is_absolute()) return {{"ok", false}, {"error", "absolute_relative_path_forbidden"}};
+    for (const auto& part : relative) if (part == "..") return {{"ok", false}, {"error", "path_traversal_forbidden"}};
+    const json config = ReadJsonFile(GetKbRoot() / "output-roots.json");
+    const json roots = config.value("roots", json::object());
+    if (!roots.contains(root_id) || !roots[root_id].is_string()) return {{"ok", false}, {"error", "output_root_not_allowed"}, {"outputRootId", root_id}};
+    std::filesystem::path root = roots[root_id].get<std::string>();
+    if (root.is_relative()) root = ProjectRoot() / root;
+    std::error_code error;
+    root = std::filesystem::weakly_canonical(root, error);
+    if (error) return {{"ok", false}, {"error", "output_root_unavailable"}, {"detail", error.message()}};
+    const auto candidate = (root / relative).lexically_normal();
+    if (!PathInside(candidate, root)) return {{"ok", false}, {"error", "output_path_escape"}};
+    const auto parent = std::filesystem::weakly_canonical(candidate.parent_path(), error);
+    if (!error && !PathInside(parent, root)) return {{"ok", false}, {"error", "symlink_escape_forbidden"}};
+    return {{"ok", true}, {"root", root.generic_string()}, {"target", candidate.generic_string()}};
+}
+
+bool WriteTextBatchAtomically(
+    const std::vector<std::pair<std::filesystem::path, std::string>>& files,
+    std::string& error_message) {
+    struct StagedFile { std::filesystem::path target; std::filesystem::path staged; std::filesystem::path backup; bool installed = false; bool backed_up = false; };
+    std::vector<StagedFile> staged_files;
+    const std::string suffix = ".picg-stage-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::error_code error;
+    for (const auto& [target, value] : files) {
+        std::filesystem::create_directories(target.parent_path(), error);
+        if (error) { error_message = error.message(); break; }
+        StagedFile entry{target, target.string() + suffix, target.string() + suffix + ".backup"};
+        std::ofstream stream(entry.staged, std::ios::binary | std::ios::trunc);
+        if (!stream) { error_message = "cannot open staged output"; break; }
+        stream << value;
+        if (!stream.good()) { error_message = "failed writing staged output"; break; }
+        staged_files.push_back(std::move(entry));
+    }
+    if (error_message.empty()) {
+        for (auto& entry : staged_files) {
+            if (std::filesystem::exists(entry.target)) {
+                std::filesystem::rename(entry.target, entry.backup, error);
+                if (error) { error_message = error.message(); break; }
+                entry.backed_up = true;
+            }
+            std::filesystem::rename(entry.staged, entry.target, error);
+            if (error) { error_message = error.message(); break; }
+            entry.installed = true;
+        }
+    }
+    if (!error_message.empty()) {
+        for (auto it = staged_files.rbegin(); it != staged_files.rend(); ++it) {
+            if (it->installed) std::filesystem::remove(it->target, error);
+            if (it->backed_up) std::filesystem::rename(it->backup, it->target, error);
+            std::filesystem::remove(it->staged, error);
+        }
+        return false;
+    }
+    for (const auto& entry : staged_files) if (entry.backed_up) std::filesystem::remove(entry.backup, error);
+    return true;
+}
+
+json SaveProjectFiles(const json& arguments, const std::string& editor_session_id) {
+    const json document = GetEditorDocument(editor_session_id);
+    const json shot_document = GetEditorShot(editor_session_id);
+    if (!document.value("ok", false)) return document;
+    if (!shot_document.value("ok", false)) return shot_document;
+    const std::string expected_graph = arguments.value("ifGraphHash", "");
+    const std::string expected_shot = arguments.value("ifShotHash", "");
+    if (expected_graph.empty() || expected_shot.empty()) return {{"ok", false}, {"error", "ifGraphHash and ifShotHash are required"}};
+    if (expected_graph != document.value("graphHash", "")) return {{"ok", false}, {"error", "graph_conflict"}, {"currentGraphHash", document.value("graphHash", "")}};
+    if (expected_shot != shot_document.value("shotHash", "")) return {{"ok", false}, {"error", "shot_conflict"}, {"currentShotHash", shot_document.value("shotHash", "")}};
+    json resolved = ResolveOutputTarget(arguments.value("outputRootId", ""), arguments.value("relativePath", ""));
+    if (!resolved.value("ok", false)) return resolved;
+    std::filesystem::path stem = resolved.value("target", "");
+    if (stem.has_extension()) stem.replace_extension();
+    const auto graph_path = stem.string() + ".picg";
+    const auto shot_path = stem.string() + ".picgshot";
+    const auto project_path = stem.string() + ".picgproject";
+    json shot = shot_document.value("shot", json::object());
+    shot["graphPath"] = std::filesystem::path(graph_path).filename().generic_string();
+    shot["graphHash"] = document.value("graphHash", "");
+    const json project = {{"format", "PICG-project"}, {"version", "1.0"}, {"graph", document.value("graph", json::object())}, {"shot", shot}, {"graphPath", std::filesystem::path(graph_path).filename().generic_string()}};
+    std::string error_message;
+    const std::vector<std::pair<std::filesystem::path, std::string>> files = {
+        {graph_path, document.value("graph", json::object()).dump(2) + "\n"},
+        {shot_path, shot.dump(2) + "\n"},
+        {project_path, project.dump(2) + "\n"},
+    };
+    if (!WriteTextBatchAtomically(files, error_message)) {
+        return {{"ok", false}, {"error", "project_write_failed"}, {"detail", error_message}};
+    }
+    return {{"ok", true}, {"graphHash", expected_graph}, {"shotHash", expected_shot}, {"paths", {{"graph", graph_path}, {"shot", shot_path}, {"project", project_path}}}};
+}
+
+json CopyExportedShot(const json& applied, const json& arguments) {
+    if (applied.value("isError", false) || !arguments.contains("outputRootId")) return applied;
+    const json structured = applied.value("structuredContent", json::object());
+    const json detail = structured.value("applyResult", json::object()).value("detail", json::object());
+    const std::string source_relative = detail.value("path", "");
+    if (source_relative.empty()) return applied;
+    const auto export_root = (ProjectRoot() / "exports" / "previs").lexically_normal();
+    const auto source = (ProjectRoot() / source_relative).lexically_normal();
+    if (!PathInside(source, export_root) || !std::filesystem::is_regular_file(source)) {
+        return ToolResult({{"ok", false}, {"error", "encoded_video_unavailable"}, {"sourcePath", source.generic_string()}}, true);
+    }
+    std::filesystem::path relative_file(arguments.value("relativePath", source.filename().generic_string()));
+    if (!relative_file.has_extension()) relative_file.replace_extension(source.extension());
+    if (relative_file.extension() != ".mp4" && relative_file.extension() != ".webm") {
+        return ToolResult({{"ok", false}, {"error", "video_output_must_be_mp4_or_webm"}}, true);
+    }
+    json resolved = ResolveOutputTarget(arguments.value("outputRootId", ""), relative_file.generic_string());
+    if (!resolved.value("ok", false)) return ToolResult(resolved, true);
+    const std::filesystem::path target = resolved.value("target", "");
+    std::error_code error;
+    std::filesystem::create_directories(target.parent_path(), error);
+    if (!error) std::filesystem::copy_file(source, target, std::filesystem::copy_options::overwrite_existing, error);
+    if (error) return ToolResult({{"ok", false}, {"error", "video_copy_failed"}, {"detail", error.message()}}, true);
+    json result = applied;
+    result["structuredContent"]["videoPath"] = target.generic_string();
+    result["structuredContent"]["sourcePath"] = source.generic_string();
+    return result;
+}
+
 json WaitForAppliedCommand(const json& queued, int timeout_ms) {
     if (!queued.value("ok", false)) return ToolResult(queued, true);
     const json command = queued.value("command", queued.value("patch", json::object()));
@@ -258,7 +747,7 @@ json WaitForAppliedCommand(const json& queued, int timeout_ms) {
 
 bool IsSafeRelativePcgPath(const std::string& value) {
     const std::filesystem::path path(value);
-    if (value.empty() || path.is_absolute() || path.extension() != ".pcg") return false;
+    if (value.empty() || path.is_absolute() || (path.extension() != ".pcg" && path.extension() != ".picg")) return false;
     for (const auto& component : path) {
         if (component == "..") return false;
     }
@@ -420,7 +909,7 @@ json BuildToolDefinitions() {
                     {"keyframes", {{"type", "array"}, {"minItems", 0}, {"maxItems", 500}, {"items", {{"type", "object"}, {"properties", {
                         {"id", {{"type", "string"}}},
                         {"timeSeconds", {{"type", "number"}}},
-                        {"interpolation", {{"type", "string"}, {"enum", json::array({"linear", "ease-in", "ease-out", "ease-in-out"})}}},
+                        {"interpolation", {{"type", "string"}, {"enum", json::array({"linear", "ease-in", "ease-out", "ease-in-out", "step"})}}},
                         {"value", {{"type", "object"}, {"description", "CameraCommand fields: position, target, focalLengthMm, etc."}}},
                     }}, {"required", json::array({"timeSeconds", "value"})}}}}},
                     {"seekTimeSeconds", {{"type", "number"}, {"description", "Optional playhead time after applying keys."}}},
@@ -593,17 +1082,17 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_kb_status"},
-            {"description", "Read PCG-AI knowledge-base status: index root, chunk count, engine, last error."},
+            {"description", "Read PICG knowledge-base status: index root, chunk count, engine, last error."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
             {"name", "pcg_kb_reindex"},
-            {"description", "Force a full rebuild of the PCG-AI knowledge-base index from .pcg-ai/rules and .pcg-ai/kb."},
+            {"description", "Force a full rebuild of the PICG knowledge-base index from .pcg-ai/rules and .pcg-ai/kb."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
             {"name", "pcg_kb_search"},
-            {"description", "BM25 search over PCG-AI project rules and experience notes under .pcg-ai/. Returns ranked chunks with path/heading/score/excerpt."},
+            {"description", "BM25 search over PICG project rules and experience notes under .pcg-ai/. Returns ranked chunks with path/heading/score/excerpt."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {
@@ -626,7 +1115,7 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_kb_get"},
-            {"description", "Read a full markdown file from the PCG-AI knowledge base by .pcg-ai-relative path (e.g. rules/graph-authoring/bridge.md)."},
+            {"description", "Read a full markdown file from the PICG knowledge base by .pcg-ai-relative path (e.g. rules/graph-authoring/bridge.md)."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {{"path", {{"type", "string"}}}}},
@@ -670,6 +1159,162 @@ json CallToolInternal(
     const std::string editor_session_id = bound_editor_session_id.empty()
         ? arguments.value("editorSessionId", "")
         : bound_editor_session_id;
+    if (name == "pcg_list_editor_sessions") {
+        const json result = ListEditorSessions();
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_bind_editor_session") {
+        const json result = BindEditorSession(arguments.value("editorSessionId", ""));
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_list_library_items") {
+        const json result = ListLibraryItems(arguments);
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_get_recipe") {
+        json result = LoadRecipeById(arguments.value("recipeId", ""), arguments.value("detail", "compact") == "full");
+        if (result.value("ok", false) && arguments.contains("expectedVersion") && arguments["expectedVersion"].is_number_integer() &&
+            arguments["expectedVersion"].get<int>() != result.value("version", 0)) {
+            return ToolResult({{"ok", false}, {"error", "recipe_version_mismatch"}, {"recipeId", arguments.value("recipeId", "")},
+                {"expectedVersion", arguments["expectedVersion"]}, {"actualVersion", result.value("version", 0)}, {"contentHash", result.value("contentHash", "")}}, true);
+        }
+        const std::string since = RevisionArgument(arguments);
+        if (result.value("ok", false) && !since.empty() && since == result.value("contentHash", "")) {
+            result = {{"ok", true}, {"notModified", true}, {"recipeId", arguments.value("recipeId", "")}, {"contentHash", since}};
+        }
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_describe_scene") {
+        const json document = GetEditorDocument(editor_session_id);
+        const json shot_document = GetEditorShot(editor_session_id);
+        json shot = shot_document.value("shot", json::object());
+        shot["shotHash"] = shot_document.value("shotHash", "");
+        const json result = DescribeScene(document, shot, arguments);
+        return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_get_component") {
+        const json document = GetEditorDocument(editor_session_id);
+        if (!document.value("ok", false)) return ToolResult(document, true);
+        const json shot_document = GetEditorShot(editor_session_id);
+        json shot = shot_document.value("shot", json::object());
+        shot["shotHash"] = shot_document.value("shotHash", "");
+        const std::string component_id = arguments.value("componentId", "");
+        const auto components = CollectSceneComponents(document.value("graph", json::object()));
+        const auto found = components.find(component_id);
+        if (found == components.end()) {
+            json available = json::array();
+            for (const auto& [id, _] : components) available.push_back(id);
+            return ToolResult({{"ok", false}, {"error", "component_not_found"}, {"componentId", component_id}, {"availableComponentIds", available}}, true);
+        }
+        json result = ComponentSummary(component_id, found->second, shot);
+        result["ok"] = true;
+        result["graphHash"] = document.value("graphHash", "");
+        result["shotHash"] = shot_document.value("shotHash", "");
+        if (arguments.value("includeMembers", false) || arguments.value("detail", "compact") == "full") result["members"] = found->second.members;
+        if (arguments.value("includeConnections", false) || arguments.value("detail", "compact") == "full") result["dependencies"] = found->second.dependencies;
+        if (arguments.value("includeRecipe", false) && !found->second.semantic.value("recipeId", "").empty()) {
+            result["recipe"] = LoadRecipeById(found->second.semantic.value("recipeId", ""), arguments.value("detail", "compact") == "full");
+        }
+        return ToolResult(result);
+    }
+    if (name == "pcg_upsert_component_semantics") {
+        const json document = GetEditorDocument(editor_session_id);
+        if (!document.value("ok", false)) return ToolResult(document, true);
+        json graph = document.value("graph", json::object());
+        const json* scope = ResolveSemanticScope(graph, document.value("editPath", json::array()));
+        if (scope == nullptr) return ToolResult({{"ok", false}, {"error", "semantic_scope_unavailable"}, {"editPath", document.value("editPath", json::array())}}, true);
+        const std::string owner_id = arguments.value("ownerNodeId", "");
+        const json semantic = arguments.value("semantic", json::object());
+        const std::string component_id = semantic.value("componentId", "");
+        if (owner_id.empty() || component_id.empty()) return ToolResult({{"ok", false}, {"error", "ownerNodeId and semantic.componentId are required"}}, true);
+        json members = semantic.value("memberNodeIds", json::array({owner_id}));
+        if (!members.is_array() || members.empty() || std::find(members.begin(), members.end(), owner_id) == members.end()) {
+            return ToolResult({{"ok", false}, {"error", "owner_missing_from_members"}, {"fieldPath", "semantic.memberNodeIds"}}, true);
+        }
+        std::set<std::string> member_ids;
+        for (const auto& member : members) {
+            if (!member.is_string() || !HasNodeId(*scope, member.get<std::string>())) return ToolResult({{"ok", false}, {"error", "member_node_not_found"}, {"memberNodeId", member}, {"editPath", document.value("editPath", json::array())}}, true);
+            if (!member_ids.insert(member.get<std::string>()).second) return ToolResult({{"ok", false}, {"error", "duplicate_member"}, {"memberNodeId", member}}, true);
+        }
+        if (!semantic.value("recipeId", "").empty()) {
+            const json recipe = LoadRecipeById(semantic.value("recipeId", ""), false);
+            if (!recipe.value("ok", false)) return ToolResult(recipe, true);
+        }
+        for (const auto& node : scope->value("nodes", json::array())) {
+            const std::string node_id = node.value("id", "");
+            const json existing = node.value("data", json::object()).value("__semantic", json::object());
+            if (node_id != owner_id && existing.value("componentId", "") == component_id) return ToolResult({{"ok", false}, {"error", "duplicate_component_owner"}, {"existingOwnerNodeId", node_id}}, true);
+            if (node_id == owner_id || !existing.value("memberNodeIds", json::array()).is_array()) continue;
+            for (const auto& existing_member : existing["memberNodeIds"]) if (existing_member.is_string() && member_ids.count(existing_member.get<std::string>())) {
+                return ToolResult({{"ok", false}, {"error", "duplicate_member_ownership"}, {"memberNodeId", existing_member}, {"existingOwnerNodeId", node_id}}, true);
+            }
+        }
+        const json queued = QueueGraphCommand({{"type", "applyGraphOps"}, {"operations", json::array({{{"op", "patch_node"}, {"nodeId", owner_id}, {"patch", {{"__semantic", semantic}}}}})}}, arguments.value("ifGraphHash", ""), false, editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_instantiate_library_items") {
+        const json document = GetEditorDocument(editor_session_id);
+        if (!document.value("ok", false)) return ToolResult(document, true);
+        const json built = BuildLibraryInstances(document.value("graph", json::object()), arguments.value("items", json::array()));
+        if (!built.value("ok", false)) return ToolResult(built, true);
+        if (built.value("changeCount", 0) == 0) return ToolResult({{"ok", true}, {"graphHash", document.value("graphHash", "")}, {"changeCount", 0}, {"skipped", built.value("skipped", json::array())}});
+        const json queued = QueueGraphCommand({{"type", "replaceGraph"}, {"graph", built["graph"]}}, arguments.value("ifGraphHash", ""), true, editor_session_id);
+        json applied = WaitForAppliedCommand(queued, CommandTimeout(arguments));
+        if (!applied.value("isError", false)) {
+            applied["structuredContent"]["components"] = built["created"];
+            applied["structuredContent"]["changeCount"] = built["changeCount"];
+        }
+        return applied;
+    }
+    if (name == "pcg_apply_previs_spec") {
+        const json spec = arguments.value("spec", json::object());
+        const json document = GetEditorDocument(editor_session_id);
+        if (!spec.is_object() || !document.value("ok", false)) return ToolResult(document.value("ok", false) ? json{{"ok", false}, {"error", "spec object is required"}} : document, true);
+        json instances = json::array();
+        for (const auto* key : {"libraryItems", "instances", "rooms", "props", "characters"}) {
+            const json entries = spec.value(key, json::array());
+            if (entries.is_array()) for (const auto& entry : entries) instances.push_back(entry);
+        }
+        json graph = document.value("graph", json::object());
+        json built = {{"ok", true}, {"graph", graph}, {"created", json::array()}, {"changeCount", 0}};
+        if (!instances.empty()) built = BuildLibraryInstances(graph, instances);
+        if (!built.value("ok", false)) return ToolResult(built, true);
+        const json requested_shot_operations = spec.value("shotOperations", json::array());
+        if (!requested_shot_operations.is_array()) return ToolResult({{"ok", false}, {"error", "spec.shotOperations must be an array"}}, true);
+        json shot_operations = json::array();
+        if (spec.contains("shot") && spec["shot"].is_object()) {
+            json operation = spec["shot"];
+            operation["op"] = "set_shot";
+            shot_operations.push_back(std::move(operation));
+        }
+        for (const auto& instance : instances) {
+            if (!instance.is_object() || instance.value("instanceId", "").empty()) continue;
+            json operation = {{"op", "upsert_component"}, {"componentId", instance.value("instanceId", "")}};
+            if (instance.contains("libraryId")) operation["assetId"] = instance["libraryId"];
+            json semantic = instance.value("semantic", json::object());
+            for (const auto& created : built.value("created", json::array())) if (created.value("componentId", "") == instance.value("instanceId", "")) semantic = created.value("semantic", semantic);
+            if (semantic.contains("role")) operation["role"] = semantic["role"];
+            if (semantic.contains("bounds")) operation["bounds"] = semantic["bounds"];
+            if (semantic.contains("anchors")) operation["anchors"] = semantic["anchors"];
+            operation["transform"] = {{"position", Vec3Or(instance.value("position", json::array()), json::array({0, 0, 0}))}, {"rotationEulerDeg", Vec3Or(instance.value("rotation", json::array()), json::array({0, 0, 0}))}, {"scale", Vec3Or(instance.value("scale", json::array()), json::array({1, 1, 1}))}};
+            shot_operations.push_back(std::move(operation));
+        }
+        if (spec.contains("camera") && spec["camera"].is_object()) {
+            json operation = spec["camera"];
+            operation["op"] = "upsert_camera";
+            if (!operation.contains("id")) operation["id"] = "previs_camera";
+            shot_operations.push_back(std::move(operation));
+        }
+        for (const auto& operation : requested_shot_operations) shot_operations.push_back(operation);
+        if (shot_operations.empty()) shot_operations.push_back({{"op", "set_shot"}});
+        const json queued = QueuePrevisCommand({{"type", "applyPrevisSpec"}, {"graph", built["graph"]}, {"shotOperations", shot_operations}},
+            arguments.value("ifGraphHash", ""), arguments.value("ifShotHash", ""), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_save_project") {
+        const json result = SaveProjectFiles(arguments, editor_session_id);
+        return ToolResult(result, !result.value("ok", false));
+    }
     if (name == "pcg_get_editor_context") {
         const json result = GetEditorContext(editor_session_id);
         return ToolResult(result, !result.value("ok", false));
@@ -680,6 +1325,13 @@ json CallToolInternal(
     }
     if (name == "pcg_get_graph") {
         const json result = RedactGraphToolResult(GetEditorDocument(editor_session_id));
+        if (arguments.value("detail", "full") == "compact" && result.value("ok", false)) {
+            json compact = DescribeScene(result, json::object(), arguments);
+            compact["graphPath"] = result.value("graphPath", "");
+            compact["editPath"] = result.value("editPath", json::array());
+            compact["editorSessionId"] = result.value("editorSessionId", "");
+            return ToolResult(compact);
+        }
         return ToolResult(result, !result.value("ok", false));
     }
     if (name == "pcg_get_node_types") {
@@ -892,7 +1544,27 @@ json CallToolInternal(
     }
     if (name == "pcg_get_shot") {
         const json result = GetEditorShot(editor_session_id);
+        if (arguments.value("detail", "full") == "compact" && result.value("ok", false)) {
+            const json shot = result.value("shot", json::object());
+            return ToolResult({
+                {"ok", true}, {"shotHash", result.value("shotHash", "")}, {"graphHash", result.value("graphHash", "")},
+                {"graphPath", result.value("graphPath", "")}, {"editorSessionId", result.value("editorSessionId", "")},
+                {"shot", {{"name", shot.value("name", "")}, {"durationSeconds", shot.value("durationSeconds", 0.0)},
+                    {"fps", shot.value("fps", 24)}, {"width", shot.value("width", 1920)}, {"height", shot.value("height", 1080)},
+                    {"activeCameraId", shot.value("activeCameraId", "")}, {"componentCount", shot.value("components", json::array()).size()},
+                    {"objectAnimationCount", shot.value("objectAnimations", json::array()).size()}, {"cameraCount", shot.value("cameras", json::array()).size()}}},
+            });
+        }
         return ToolResult(result, !result.value("ok", false));
+    }
+    if (name == "pcg_apply_shot_ops") {
+        const json operations = arguments.value("operations", json());
+        if (!operations.is_array() || operations.empty() || operations.size() > 100) {
+            return ToolResult({{"ok", false}, {"error", "operations must contain 1-100 operations"}}, true);
+        }
+        const json queued = QueueShotCommand({{"type", "applyShotOps"}, {"operations", operations}},
+            arguments.value("ifShotHash", ""), editor_session_id);
+        return WaitForAppliedCommand(queued, CommandTimeout(arguments));
     }
     if (name == "pcg_set_camera_keyframes") {
         const json keyframes = arguments.value("keyframes", json());
@@ -941,6 +1613,11 @@ json CallToolInternal(
             {{"type", "selectCamera"}, {"cameraId", arguments.value("cameraId", "")}},
             arguments.value("ifShotHash", ""), editor_session_id);
         return WaitForAppliedCommand(queued, CommandTimeout(arguments));
+    }
+    if (name == "pcg_export_shot") {
+        const json queued = QueueShotCommand({{"type", "exportShot"}}, arguments.value("ifShotHash", ""), editor_session_id);
+        const json applied = WaitForAppliedCommand(queued, std::max(1000, std::min(120000, arguments.value("timeoutMs", 120000))));
+        return CopyExportedShot(applied, arguments);
     }
     if (name == "pcg_preview_shot") {
         json command = {{"type", "previewShot"}, {"play", arguments.value("play", false)}};
@@ -1084,7 +1761,7 @@ json HandleMessage(const json& message) {
         return SuccessResponse(id, {
             {"protocolVersion", kProtocolVersion},
             {"capabilities", {{"tools", {{"listChanged", false}}}}},
-            {"serverInfo", {{"name", "pcg-server"}, {"version", "1.0.0"}}},
+            {"serverInfo", {{"name", "picg-server"}, {"version", "1.0.0"}}},
             {"instructions", "Use editor context first. Discover node schemas with pcg_get_node_types. Pass graphHash to every write for optimistic locking; prefer one atomic pcg_apply_graph_ops batch, then validate, cook, capture, and save."},
         });
     }
@@ -1117,31 +1794,215 @@ void SendMcpResponse(const httplib::Request& req, httplib::Response& res, const 
 
 }  // namespace
 
+std::string CanonicalPcgToolName(const std::string& name) {
+    return name.rfind("picg_", 0) == 0 ? "pcg_" + name.substr(5) : name;
+}
+
 json GetPcgToolDefinitions() {
-    return BuildToolDefinitions();
+    json definitions = BuildToolDefinitions();
+    definitions.push_back({
+        {"name", "pcg_apply_shot_ops"},
+        {"description", "Atomically edit the live PICG shot. All operations validate before a single undoable commit. Object operations: upsert_component; set_object_keyframes; set_action_clip; set_visibility_range. Camera operations: set_shot; upsert_camera; upsert_motion_curve; set_transform; set_keyframes; connect; disconnect; remove_node; select. Coordinates are meters in Three.js world space; object and camera transforms use Euler degrees. Read picg_get_shot for ifShotHash."},
+        {"inputSchema", {
+            {"type", "object"},
+            {"properties", {
+                {"operations", {{"type", "array"}, {"minItems", 1}, {"maxItems", 100}, {"items", {
+                    {"type", "object"}, {"properties", {{"op", {{"type", "string"}, {"enum", json::array({"set_shot", "upsert_component", "set_object_keyframes", "set_action_clip", "set_visibility_range", "upsert_camera", "upsert_motion_curve", "set_transform", "set_keyframes", "connect", "disconnect", "remove_node", "select"})}}}}},
+                    {"required", json::array({"op"})}
+                }}}},
+                {"ifShotHash", {{"type", "string"}}},
+                {"editorSessionId", {{"type", "string"}}},
+                {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}}
+            }},
+            {"required", json::array({"operations", "ifShotHash"})}, {"additionalProperties", false}
+        }}
+    });
+    auto& operation = definitions.back()["inputSchema"]["properties"]["operations"]["items"];
+    auto& fields = operation["properties"];
+    for (const auto* field : {"id", "nodeId", "cameraId", "componentId", "assetId", "clip", "edgeId", "source", "target", "name", "presetId", "role"}) fields[field] = {{"type", "string"}};
+    for (const auto* field : {"durationSeconds", "fps", "width", "height", "startSeconds", "playbackRate", "fromSeconds", "untilSeconds"}) fields[field] = {{"type", "number"}};
+    const json vector = {{"type", "array"}, {"minItems", 3}, {"maxItems", 3}, {"items", {{"type", "number"}}}};
+    fields["translation"] = vector;
+    fields["rotationEulerDeg"] = vector;
+    fields["controlPoints"] = {{"type", "array"}, {"minItems", 2}, {"maxItems", 500}, {"items", vector}};
+    fields["closed"] = {{"type", "boolean"}};
+    fields["lookMode"] = {{"type", "string"}, {"enum", json::array({"tangent", "target"})}};
+    fields["mode"] = {{"type", "string"}, {"enum", json::array({"replace", "upsert"})}};
+    fields["loop"] = {{"type", "boolean"}};
+    fields["transform"] = {{"type", "object"}};
+    fields["bounds"] = {{"type", "object"}};
+    fields["anchors"] = {{"type", "object"}};
+    for (const auto& definition : definitions) {
+        const auto name = definition.value("name", "");
+        if (name == "pcg_set_camera") {
+            fields["camera"] = definition["inputSchema"];
+            fields["camera"]["properties"].erase("timeoutMs");
+            fields["camera"]["properties"].erase("editorSessionId");
+            fields["camera"]["properties"]["pathProgress"] = {{"type", "number"}, {"minimum", 0}, {"maximum", 1}};
+        }
+        if (name == "pcg_set_camera_keyframes") fields["keyframes"] = definition["inputSchema"]["properties"]["keyframes"];
+    }
+    fields["keyframes"] = {{"type", "array"}, {"maxItems", 500}, {"items", {{"type", "object"}}}};
+    operation["additionalProperties"] = false;
+    definitions.push_back({
+        {"name", "pcg_export_shot"},
+        {"description", "Encode the active camera's entire shot at its configured frame rate and resolution, and save a playable MP4 (or WebM fallback) under exports/previs. Returns frameCount, format, workspace-relative path and local video URL. Requires an open Preview and current ifShotHash. Does not modify the shot. Do not repeat after a timeout while the editor still shows encoding."},
+        {"inputSchema", {{"type", "object"}, {"properties", {
+            {"ifShotHash", {{"type", "string"}}}, {"editorSessionId", {{"type", "string"}}},
+            {"outputRootId", {{"type", "string"}}}, {"relativePath", {{"type", "string"}}},
+            {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 120000}, {"default", 120000}}}
+        }}, {"required", json::array({"ifShotHash"})}, {"additionalProperties", false}}}
+    });
+    const json read_options = {
+        {"detail", {{"type", "string"}, {"enum", json::array({"compact", "full"})}, {"default", "compact"}}},
+        {"sinceRevision", {{"oneOf", json::array({{{"type", "string"}}, {{"type", "integer"}}})}}},
+        {"fields", {{"type", "array"}, {"items", {{"type", "string"}}}}},
+        {"editorSessionId", {{"type", "string"}}},
+    };
+    const json transform_vector = {{"type", "array"}, {"minItems", 3}, {"maxItems", 3}, {"items", {{"type", "number"}}}};
+    const json library_request = {
+        {"type", "object"},
+        {"properties", {
+            {"libraryId", {{"type", "string"}}}, {"name", {{"type", "string"}}}, {"instanceId", {{"type", "string"}}},
+            {"parameters", {{"type", "object"}}}, {"position", transform_vector}, {"rotation", transform_vector}, {"scale", transform_vector},
+            {"semantic", {{"type", "object"}}}, {"layoutX", {{"type", "number"}}}, {"layoutY", {{"type", "number"}}},
+        }},
+        {"required", json::array({"instanceId"})}, {"additionalProperties", false},
+    };
+    definitions.push_back({
+        {"name", "pcg_list_editor_sessions"},
+        {"description", "List online PICG editor pages and the persistent page binding."},
+        {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_bind_editor_session"},
+        {"description", "Bind future MCP calls without editorSessionId to one online editor page. Pass an empty id to clear."},
+        {"inputSchema", {{"type", "object"}, {"properties", {{"editorSessionId", {{"type", "string"}}}}}, {"required", json::array({"editorSessionId"})}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_list_library_items"},
+        {"description", "Query reusable PICG Library assets without loading their complete Subgraph documents."},
+        {"inputSchema", {{"type", "object"}, {"properties", {
+            {"category", {{"type", "string"}}}, {"query", {{"type", "string"}}}, {"role", {{"type", "string"}}},
+            {"detail", read_options["detail"]}, {"sinceRevision", read_options["sinceRevision"]}, {"fields", read_options["fields"]},
+        }}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_instantiate_library_items"},
+        {"description", "Atomically instantiate 1-100 Library assets, deduplicate definitions, create final transforms and attach unique scene semantics. Repeated stable instanceIds are idempotent."},
+        {"inputSchema", {{"type", "object"}, {"properties", {
+            {"items", {{"type", "array"}, {"minItems", 1}, {"maxItems", 100}, {"items", library_request}}},
+            {"ifGraphHash", {{"type", "string"}}}, {"editorSessionId", {{"type", "string"}}},
+            {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+        }}, {"required", json::array({"items", "ifGraphHash"})}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_describe_scene"},
+        {"description", "Return a compact semantic component tree, transforms, bounds, recipes, dependencies and unclassified count; no full graph or Wiki prose."},
+        {"inputSchema", {{"type", "object"}, {"properties", read_options}, {"additionalProperties", false}}},
+    });
+    json component_properties = read_options;
+    component_properties["componentId"] = {{"type", "string"}};
+    component_properties["includeMembers"] = {{"type", "boolean"}, {"default", false}};
+    component_properties["includeConnections"] = {{"type", "boolean"}, {"default", false}};
+    component_properties["includeRecipe"] = {{"type", "boolean"}, {"default", false}};
+    definitions.push_back({
+        {"name", "pcg_get_component"},
+        {"description", "Expand one semantic scene component by stable componentId without returning the entire Graph."},
+        {"inputSchema", {{"type", "object"}, {"properties", component_properties}, {"required", json::array({"componentId"})}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_get_recipe"},
+        {"description", "Read an exact shared semantic Recipe. Compact returns metadata, summary and content hash; full includes the body."},
+        {"inputSchema", {{"type", "object"}, {"properties", {{"recipeId", {{"type", "string"}}}, {"expectedVersion", {{"type", "integer"}, {"minimum", 1}}}, {"detail", read_options["detail"]}, {"sinceRevision", read_options["sinceRevision"]}}}, {"required", json::array({"recipeId"})}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_upsert_component_semantics"},
+        {"description", "Validate and atomically attach complete component semantics to one owner node in the current Graph or Subgraph scope."},
+        {"inputSchema", {{"type", "object"}, {"properties", {
+            {"ownerNodeId", {{"type", "string"}}}, {"semantic", {{"type", "object"}}}, {"ifGraphHash", {{"type", "string"}}},
+            {"editorSessionId", {{"type", "string"}}}, {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+        }}, {"required", json::array({"ownerNodeId", "semantic", "ifGraphHash"})}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_apply_previs_spec"},
+        {"description", "Atomically apply a high-level previs spec across Graph and Shot. Uses Library instance declarations plus shot operations; stable ids make repeated submits idempotent."},
+        {"inputSchema", {{"type", "object"}, {"properties", {
+            {"spec", {{"type", "object"}, {"properties", {
+                {"shot", {{"type", "object"}}}, {"camera", {{"type", "object"}}},
+                {"libraryItems", {{"type", "array"}, {"items", library_request}}}, {"instances", {{"type", "array"}, {"items", library_request}}},
+                {"rooms", {{"type", "array"}, {"items", library_request}}}, {"props", {{"type", "array"}, {"items", library_request}}},
+                {"characters", {{"type", "array"}, {"items", library_request}}},
+                {"shotOperations", {{"type", "array"}, {"maxItems", 100}, {"items", {{"type", "object"}}}}},
+            }}, {"additionalProperties", false}}}, {"ifGraphHash", {{"type", "string"}}}, {"ifShotHash", {{"type", "string"}}},
+            {"editorSessionId", {{"type", "string"}}}, {"timeoutMs", {{"type", "integer"}, {"minimum", 1000}, {"maximum", 30000}, {"default", 10000}}},
+        }}, {"required", json::array({"spec", "ifGraphHash", "ifShotHash"})}, {"additionalProperties", false}}},
+    });
+    definitions.push_back({
+        {"name", "pcg_save_project"},
+        {"description", "Save matching .picg, .picgshot and .picgproject files beneath a configured allowlisted output root; absolute paths and traversal are rejected."},
+        {"inputSchema", {{"type", "object"}, {"properties", {
+            {"outputRootId", {{"type", "string"}}}, {"relativePath", {{"type", "string"}}},
+            {"ifGraphHash", {{"type", "string"}}}, {"ifShotHash", {{"type", "string"}}}, {"editorSessionId", {{"type", "string"}}},
+        }}, {"required", json::array({"outputRootId", "relativePath", "ifGraphHash", "ifShotHash"})}, {"additionalProperties", false}}},
+    });
+    for (auto& definition : definitions) {
+        const std::string tool_name = definition.value("name", "");
+        if (tool_name != "pcg_get_graph" && tool_name != "pcg_get_shot") continue;
+        auto& properties = definition["inputSchema"]["properties"];
+        properties["detail"] = read_options["detail"];
+        properties["sinceRevision"] = read_options["sinceRevision"];
+        properties["fields"] = read_options["fields"];
+    }
+    // Advertise PICG names while preserving every existing pcg_* caller.
+    for (auto& definition : definitions) {
+        const std::string name = definition.value("name", "");
+        if (name.rfind("pcg_", 0) == 0) definition["name"] = "picg_" + name.substr(4);
+        std::string description = definition.value("description", "");
+        size_t at = 0;
+        while ((at = description.find("pcg_", at)) != std::string::npos) {
+            description.replace(at, 4, "picg_"); at += 5;
+        }
+        definition["description"] = description;
+    }
+    return definitions;
 }
 
 json CallPcgTool(
     const std::string& name,
     const json& arguments,
     const std::string& editor_session_id) {
-    return CallToolInternal(name, arguments, editor_session_id);
+    json adjusted = arguments;
+    if (name.rfind("picg_", 0) == 0 && !adjusted.contains("detail")) {
+        const std::string canonical = CanonicalPcgToolName(name);
+        if (canonical == "pcg_get_graph" || canonical == "pcg_get_shot" || canonical == "pcg_describe_scene" ||
+            canonical == "pcg_get_component" || canonical == "pcg_get_recipe" || canonical == "pcg_list_library_items") {
+            adjusted["detail"] = "compact";
+        }
+    }
+    return CallToolInternal(CanonicalPcgToolName(name), adjusted, editor_session_id);
 }
 
 bool PcgToolRequiresApproval(const std::string& name) {
-    return PcgToolMutatesGraph(name) || PcgToolMutatesShot(name);
+    return PcgToolMutatesGraph(name) || PcgToolMutatesShot(name) || CanonicalPcgToolName(name) == "pcg_export_shot";
 }
 
-bool PcgToolMutatesGraph(const std::string& name) {
+bool PcgToolMutatesGraph(const std::string& requested_name) {
+    const auto name = CanonicalPcgToolName(requested_name);
     return name == "pcg_patch_node" ||
            name == "pcg_bake_oriented_sdf" ||
            name == "pcg_apply_graph_ops" ||
            name == "pcg_replace_graph" ||
+           name == "pcg_instantiate_library_items" ||
+           name == "pcg_upsert_component_semantics" ||
+           name == "pcg_apply_previs_spec" ||
+           name == "pcg_save_project" ||
            name == "pcg_save_graph";
 }
 
-bool PcgToolMutatesShot(const std::string& name) {
-    return name == "pcg_set_camera_keyframes" ||
+bool PcgToolMutatesShot(const std::string& requested_name) {
+    const auto name = CanonicalPcgToolName(requested_name);
+    return name == "pcg_apply_shot_ops" || name == "pcg_apply_previs_spec" || name == "pcg_set_camera_keyframes" ||
            name == "pcg_upsert_camera" ||
            name == "pcg_connect_cameras" ||
            name == "pcg_select_camera";

@@ -1,6 +1,7 @@
 // exportGraph.ts — Convert React Flow state to Graph JSON v1/v2.
 
 import type { Node, Edge } from '@xyflow/react';
+import { normalizeShotDocument, syncShotCameras, type ShotDocument } from './shot';
 import type {
   GraphJson,
   GraphNode,
@@ -73,7 +74,7 @@ function toGraphEdge(edge: Edge): GraphEdge {
 /**
  * Triggers a browser download of the graph as a .json file.
  */
-export function downloadGraph(graph: GraphJson, filename = 'graph.pcg'): void {
+export function downloadGraph(graph: GraphJson, filename = 'graph.picg'): void {
   const blob = new Blob([JSON.stringify(graph, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -111,6 +112,7 @@ export async function exportToSchema(graph: GraphJson): Promise<{ ok: boolean; e
 export async function saveGraphToFile(
   graph: GraphJson,
   filePath: string,
+  shot?: ShotDocument,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch('/api/save-graph', {
@@ -119,6 +121,7 @@ export async function saveGraphToFile(
       body: JSON.stringify({
         filePath,
         graphData: graph,
+        ...(shot ? { shotData: normalizeShotDocument(syncShotCameras({ ...shot, graphPath: filePath })) } : {}),
       }, null, 2),
     });
     const data = (await res.json()) as { ok?: boolean; error?: string };

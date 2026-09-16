@@ -209,7 +209,7 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
       <section className="pcg-settings" role="dialog" aria-modal="true" aria-labelledby="pcg-settings-title">
         <header className="pcg-settings__header">
           <div>
-            <h2 id="pcg-settings-title">PCG Settings</h2>
+            <h2 id="pcg-settings-title">PICG Settings</h2>
             <p>Editor, local runtime, and AI Provider connections.</p>
           </div>
           <button type="button" className="pcg-settings__close" onClick={onClose} aria-label="Close settings">×</button>
@@ -328,7 +328,7 @@ export default function SettingsDialog({ open, onClose, onProvidersChanged }: Se
                             ? 'Kimi Coding API · Anthropic-compatible · fixed endpoint'
                             : selectedProvider.id === 'openai-compatible'
                               ? 'Custom OpenAI-compatible endpoint'
-                              : 'Managed by the embedded PCG Agent runtime'}</p>
+                              : 'Managed by the embedded PICG Agent runtime'}</p>
                         </div>
                         <span className={`pcg-settings__connection is-${selectedProvider.connection.status}`}>
                           {selectedProvider.connection.status}

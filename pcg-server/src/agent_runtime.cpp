@@ -766,7 +766,7 @@ HttpResult Http(
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
     curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PCG-AI-Agent/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PICG-Agent/1.0");
     if (!body.empty() || method == "POST" || method == "PUT") {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.data());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
@@ -905,7 +905,7 @@ std::vector<std::string> CredentialHeaders(const std::string& provider, const js
     std::vector<std::string> headers = {"Authorization: Bearer " + key, "Content-Type: application/json"};
     if (provider == "openrouter") {
         headers.push_back("HTTP-Referer: http://127.0.0.1");
-        headers.push_back("X-Title: PCG-AI");
+        headers.push_back("X-Title: PICG");
     }
     if (provider == "github-copilot") {
         headers.push_back("Openai-Intent: conversation-edits");
@@ -1145,20 +1145,21 @@ json AgentTools() {
 
 const char* SystemPrompt() {
     return
-        "You are PCG-AI's embedded procedural-content expert. Turn user intent and references into reliable, "
-        "editable PCG graphs; reason in terms of graph stages, data flow, parameters, seeds, geometry, materials, "
+        "You are PICG's embedded procedural-content expert. Turn user intent and references into reliable, "
+        "editable PICG graphs; reason in terms of graph stages, data flow, parameters, seeds, geometry, materials, "
         "and final output. Prefer procedural, reusable structure over one-off geometry.\n\n"
-        "Evidence first: call pcg_get_editor_context, then inspect the selected node or live graph. Before using a "
-        "node, query pcg_get_node_types by exact type or category. The live manifest is authoritative: never invent "
+        "Evidence first: call picg_get_editor_context, then inspect the selected node or live graph. Before using a "
+        "node, query picg_get_node_types by exact type or category. The live manifest is authoritative: never invent "
         "node types, properties, defaults, ranges, pin IDs, or pin compatibility. Do not repeat an identical read "
         "while the graphHash is unchanged.\n\n"
-        "PCG MCP workflow: use pcg_patch_node for one existing node and pcg_apply_graph_ops for a related batch; use "
-        "pcg_replace_graph only for an intentional full-document replacement from root scope. Give every node and edge "
+        "PICG MCP workflow: use picg_patch_node for one existing node and picg_apply_graph_ops for a related batch; use "
+        "picg_replace_graph only for an intentional full-document replacement from root scope. Give every node and edge "
         "a unique ID, use explicit manifest-backed handles, and send the latest graphHash with every write. When several "
         "editor pages are available, ask which page to use. On conflict, timeout, or stale state, refresh context and "
         "re-plan instead of replaying a write. Save only when requested or when intentionally updating the current named graph.\n\n"
-        "For multi-step work, start with one concise progress sentence. After a write, run pcg_validate, pcg_cook, and "
-        "pcg_capture_preview; inspect the result against the request and iterate when evidence shows a mismatch. Finish "
+        "Cinematic previs: use picg_get_shot and picg_apply_shot_ops to author camera rigs, Motion Curves and property keyframes atomically. Camera movement creates a Transform; shot data stays in the .picgshot sidecar. Use pathProgress for rail timing, key lens/focus/exposure independently, preview at exact times, and save with picg_save_graph.\n\n"
+        "For multi-step work, start with one concise progress sentence. After a write, run picg_validate, picg_cook, and "
+        "picg_capture_preview; inspect the result against the request and iterate when evidence shows a mismatch. Finish "
         "with a concise summary of changes and validation. Explain blockers plainly and do not report success without tool evidence.";
 }
 
@@ -1741,7 +1742,7 @@ HttpResult HttpStreamCompletion(const std::string& url, const std::vector<std::s
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https,http");
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PCG-AI-Agent/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PICG-Agent/1.0");
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, CurlProgress);
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, cancelled);
@@ -1933,9 +1934,9 @@ void AddErrorPart(TurnState& turn, const json& error) {
 }
 
 bool CacheableReadTool(const std::string& name) {
-    return name == "pcg_get_editor_context" || name == "pcg_get_node" ||
-           name == "pcg_list_nodes" || name == "pcg_get_graph" || name == "pcg_get_node_types" ||
-           name == "pcg_get_shot";
+    return name == "picg_get_editor_context" || name == "picg_get_node" ||
+           name == "picg_list_nodes" || name == "picg_get_graph" || name == "picg_get_node_types" ||
+           name == "picg_get_shot";
 }
 
 void RunTurn(TurnState& turn, const EventEmitter& emit) {
@@ -2090,8 +2091,9 @@ bool BuildUserMessage(const httplib::Request& req, const json& input, httplib::R
             static_cast<unsigned char>(file.content[1]) == 0xd8 &&
             static_cast<unsigned char>(file.content[2]) == 0xff;
         const bool image = declared_image && (png || jpeg);
-        const bool text_file = lower.size() >= 4 && (lower.rfind(".txt") == lower.size() - 4 ||
-            lower.rfind(".json") == lower.size() - 5 || lower.rfind(".pcg") == lower.size() - 4);
+        const auto extension = std::filesystem::path(lower).extension().string();
+        const bool text_file = extension == ".txt" || extension == ".json" || extension == ".pcg" ||
+            extension == ".picg" || extension == ".picgshot" || extension == ".picgproject";
         if (image) {
             message["content"].push_back({
                 {"type", "image"}, {"name", file.filename},
@@ -2106,7 +2108,7 @@ bool BuildUserMessage(const httplib::Request& req, const json& input, httplib::R
                 {"size", file.content.size()}, {"attachment", true},
             });
         } else {
-            JsonResponse(res, 400, ErrorBody("unsupported_attachment", "Only UTF-8 .txt/.json/.pcg and PNG/JPEG attachments are supported."));
+            JsonResponse(res, 400, ErrorBody("unsupported_attachment", "Only UTF-8 text, JSON, PICG project/shot/graph files (including legacy .pcg) and PNG/JPEG attachments are supported."));
             return false;
         }
     }
@@ -2483,7 +2485,7 @@ void HandleAgentOAuthCallback(const httplib::Request& req, httplib::Response& re
         {"expires", NowMs() + parsed.value("expires_in", 3600) * 1000LL},
     });
     res.status = 200;
-    res.set_content("<!doctype html><title>PCG-AI</title><p>Provider connected. You can close this window.</p>", "text/html; charset=utf-8");
+    res.set_content("<!doctype html><title>PICG</title><p>Provider connected. You can close this window.</p>", "text/html; charset=utf-8");
 }
 
 void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {

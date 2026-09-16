@@ -533,7 +533,7 @@ export function exportPreviewMeshGlb(
   for (const part of parts) binary.set(part.bytes, part.offset);
 
   const gltf = {
-    asset: { version: '2.0', generator: 'PCG-AI Web GLB Exporter' },
+    asset: { version: '2.0', generator: 'PICG Web GLB Exporter' },
     scene: 0,
     scenes: [{ name: options.name, nodes: [0] }],
     nodes,

@@ -272,7 +272,7 @@ Player 当前同样通过 localhost HTTP 请求外置 `pcg-server`，不会把 `
 
 ## 9. 完成后的心智模型
 
-回顾整个教程，PCG-AI 的完整架构：
+回顾整个教程，PICG 的完整架构：
 
 ```
 Web 画布 / Unity GraphView

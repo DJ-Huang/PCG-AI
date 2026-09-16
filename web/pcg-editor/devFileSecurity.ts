@@ -15,8 +15,8 @@ export function resolveWorkspaceGraphPath(workspaceRoot: string, filePath: unkno
   const root = path.resolve(workspaceRoot);
   const resolved = path.resolve(root, filePath);
   assertInsideWorkspace(root, resolved);
-  if (path.extname(resolved).toLowerCase() !== '.pcg') {
-    throw new Error('Graph path must be a .pcg file inside the workspace');
+  if (!['.pcg', '.picg'].includes(path.extname(resolved).toLowerCase())) {
+    throw new Error('Graph path must be a .picg or .pcg file inside the workspace');
   }
   return resolved;
 }
@@ -33,4 +33,5 @@ export function assertWorkspaceGraphParent(workspaceRoot: string, filePath: stri
   const root = fs.realpathSync(path.resolve(workspaceRoot));
   const realParent = fs.realpathSync(path.dirname(filePath));
   assertInsideWorkspace(root, realParent);
+  if (fs.existsSync(filePath)) assertInsideWorkspace(root, fs.realpathSync(filePath));
 }

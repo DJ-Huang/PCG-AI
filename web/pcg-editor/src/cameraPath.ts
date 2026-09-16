@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-import { sampleCameraTrack } from './cameraMotion';
+import { sampleCameraTrack, samplePathProgress } from './cameraMotion';
+import { applyCameraTransform, findCameraTransform } from './cameraTransform';
 import { defaultPhysicalCamera, type PhysicalCameraState } from './physicalCamera';
 import {
   findShotCamera,
@@ -71,7 +72,7 @@ export function applyMotionCurveToCamera(
   timeSeconds: number,
   durationSeconds: number,
 ): PhysicalCameraState {
-  const u = durationSeconds > 0 ? timeSeconds / durationSeconds : 0;
+  const u = samplePathProgress(curve.cameraKeyframes ?? [], timeSeconds, durationSeconds);
   const sampled = sampleMotionCurve(curve, u);
   if (!sampled) return state;
   const position = new THREE.Vector3(...sampled.position);
@@ -81,7 +82,7 @@ export function applyMotionCurveToCamera(
   return {
     ...state,
     position: sampled.position,
-    target: target.toArray() as [number, number, number],
+    target: curve.lookMode === 'target' ? state.target : target.toArray() as [number, number, number],
   };
 }
 
@@ -95,13 +96,17 @@ export function sampleShotCameraWorld(
   const isActive = cameraId === shot.activeCameraId;
   const base = isActive ? shot.camera : station.camera;
   const keyframes = isActive ? shot.cameraKeyframes : station.cameraKeyframes;
-  const sampled = sampleCameraTrack(
+  let sampled = sampleCameraTrack(
     base,
     keyframes,
     timeSeconds,
     shot.width / Math.max(shot.height, 1),
   );
   const curve = findCameraPathCurve(shot, cameraId);
-  if (!curve) return sampled;
-  return applyMotionCurveToCamera(sampled, curve, timeSeconds, shot.durationSeconds);
+  if (curve) {
+    const posed = applyMotionCurveToCamera(sampled, curve, timeSeconds, shot.durationSeconds);
+    // The curve supplies position/tangent; authored channels (including look target) override it.
+    sampled = sampleCameraTrack(posed, curve.cameraKeyframes ?? [], timeSeconds, shot.width / Math.max(shot.height, 1));
+  }
+  return applyCameraTransform(sampled, findCameraTransform(shot, cameraId));
 }

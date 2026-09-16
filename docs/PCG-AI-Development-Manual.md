@@ -1,4 +1,4 @@
-# PCG-AI 学习开发手册
+# PICG 学习开发手册
 
 > **版本**：随当前仓库结构维护；具体支持矩阵以 `README.md` 与 CI 为准
 > **范围**：算法原理、工程架构、数据流协议、开发指南
@@ -27,7 +27,7 @@
 
 ### 1.1 定位
 
-PCG-AI 是一个**跨引擎程序化内容生成（PCG）框架**，核心理念：
+PICG 是一个**跨引擎程序化内容生成（PCG）框架**，核心理念：
 
 ```
 Graph JSON（编辑器无关的图数据契约）→ pcg-server → C++ 核心执行 → Unity / Web 预览
@@ -104,7 +104,7 @@ Unity / Web editor
 
 ### 2.1 三层契约
 
-PCG-AI 的核心设计是**编辑器无关的图数据契约**：
+PICG 的核心设计是**编辑器无关的图数据契约**：
 
 | 层 | 文件 | 谁消费 | 通用性 |
 |----|------|--------|--------|
@@ -116,7 +116,7 @@ PCG-AI 的核心设计是**编辑器无关的图数据契约**：
 
 ### 2.2 UE PCG 节点模型对齐
 
-PCG-AI 在独立 C++ 库中复刻 UE PCG 的四件套：
+PICG 在独立 C++ 库中复刻 UE PCG 的四件套：
 
 | UE PCG 组件 | 职责 | pcg-core 对应 |
 |-------------|------|----------------|
@@ -504,7 +504,7 @@ Blender `bevel_mesh_blender` 对轴对齐盒体有快捷路径，返回 `PcgMesh
 
 #### 6.4.1 算法路线
 
-PCG-AI 拒绝 Blender Fast (Float) 路径，采用 **Exact Solver**（对齐 Blender Exact + Houdini Boolean 2.0）：
+PICG 拒绝 Blender Fast (Float) 路径，采用 **Exact Solver**（对齐 Blender Exact + Houdini Boolean 2.0）：
 
 ```
 Step 0: [可选] resolve_self_intersections(operand)     // useSelf

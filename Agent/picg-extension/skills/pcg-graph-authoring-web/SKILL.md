@@ -1,7 +1,7 @@
 ---
 name: pcg-graph-authoring-web
 description: >-
-  Create complete production-ready web assets through PCG-AI: plan and author
+  Create complete production-ready web assets through PICG: plan and author
   `.pcg` graphs, validate and cook the white model via the pcg-server HTTP API,
   validate UV/projection, create and bind materials and textures, output a
   reproducible exported asset (glTF / web scene), render it, and apply
@@ -13,7 +13,7 @@ description: >-
   `/pcg-graph-authoring-web`.
 ---
 
-# PCG Web complete-asset production
+# PICG Web complete-asset production
 
 Create a finished web asset, not merely a `.pcg` graph or a white model. The asset is complete only at `FINAL_ACCEPTED` under the shared production specification.
 

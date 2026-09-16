@@ -33,6 +33,8 @@ void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res);
 void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res);
 
 nlohmann::json GetEditorContext(const std::string& editor_session_id = "");
+nlohmann::json ListEditorSessions();
+nlohmann::json BindEditorSession(const std::string& editor_session_id);
 nlohmann::json GetEditorNode(
     const std::string& node_id,
     const std::string& editor_session_id = "");
@@ -55,6 +57,11 @@ nlohmann::json QueueGraphCommand(
     const std::string& editor_session_id = "");
 nlohmann::json QueueShotCommand(
     nlohmann::json command,
+    const std::string& expected_shot_hash,
+    const std::string& editor_session_id = "");
+nlohmann::json QueuePrevisCommand(
+    nlohmann::json command,
+    const std::string& expected_graph_hash,
     const std::string& expected_shot_hash,
     const std::string& editor_session_id = "");
 nlohmann::json QueuePreviewShotCommand(

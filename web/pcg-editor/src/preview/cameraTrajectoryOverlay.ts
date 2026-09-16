@@ -114,6 +114,13 @@ export function syncCameraTrajectoryOverlay(
   timeSeconds = 0,
   selectedNodeId?: string | null,
 ): void {
+  group.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line) {
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      materials.forEach((material) => material.dispose());
+    }
+  });
   group.clear();
   if (!shot) {
     group.visible = false;

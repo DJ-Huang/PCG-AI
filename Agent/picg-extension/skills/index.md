@@ -32,4 +32,4 @@
 
 ---
 
-`Agent/picg-extension/skills/` 为 PCG Agent Skill **真源**（PCG-AI 仓内）。各 skill 内 `SHARED_DIR` / `SHARED_SCRIPTS_DIR` 仍按相对路径解析；勿在联接层当第二真源编辑。
+`Agent/picg-extension/skills/` 为 PICG Agent Skill **真源**（PICG 仓内）。各 skill 内 `SHARED_DIR` / `SHARED_SCRIPTS_DIR` 仍按相对路径解析；勿在联接层当第二真源编辑。

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -18,17 +18,22 @@ import {
 
 import {
   applyCameraGraphEdgeChanges,
+  addShotCamera,
+  addShotMotionCurve,
+  connectShotCameras,
   applyCameraGraphNodeChanges,
   connectCameraGraph,
   preserveFlowNodeLayout,
   shotCamerasToFlow,
 } from './cameraGraph';
 import CameraNode from './nodes/CameraNode';
-import { SHOT_OUTPUT_ID, selectShotNode, type ShotDocument } from './shot';
+import { downloadShot, parseShotFile } from './shotFile';
+import { layoutShotGraph, selectShotNode, type ShotDocument } from './shot';
 
 const cameraNodeTypes = {
   Camera: CameraNode,
   MotionCurve: CameraNode,
+  CameraTransform: CameraNode,
   ShotOutput: CameraNode,
 };
 
@@ -94,7 +99,6 @@ function CameraWorkspaceCanvas({ shot, onShotChange, onRequestCreateCamera }: Ca
   }, [onShotChange, shot]);
 
   const onNodeClick: NodeMouseHandler = useCallback((_event, node: Node) => {
-    if (node.id === SHOT_OUTPUT_ID) return;
     onShotChange(selectShotNode(shot, node.id));
   }, [onShotChange, shot]);
 
@@ -117,6 +121,11 @@ function CameraWorkspaceCanvas({ shot, onShotChange, onRequestCreateCamera }: Ca
       onConnect={onConnect}
       onNodeClick={onNodeClick}
       onPaneContextMenu={onPaneContextMenu}
+      onKeyDown={(event) => {
+        if (event.key.toLowerCase() === 'f' && !(event.target as HTMLElement).closest('input,select,textarea')) {
+          event.preventDefault(); event.stopPropagation(); void fitView(CAMERA_FIT_VIEW_OPTIONS);
+        }
+      }}
       nodeTypes={cameraNodeTypes}
       minZoom={0.05}
       maxZoom={2}
@@ -127,14 +136,45 @@ function CameraWorkspaceCanvas({ shot, onShotChange, onRequestCreateCamera }: Ca
     >
       <Background variant={BackgroundVariant.Lines} gap={24} color="#2b2b2b" />
       <Controls />
-      <MiniMap pannable zoomable />
+      {nodes.length > 8 && <MiniMap pannable zoomable style={{ width: 120, height: 80 }} />}
     </ReactFlow>
   );
 }
 
 export default function CameraWorkspace(props: CameraWorkspaceProps) {
+  const input = useRef<HTMLInputElement>(null);
+  const [fileError, setFileError] = useState('');
+  const [exportedShot, setExportedShot] = useState<{ path: string; url: string } | null>(null);
   return (
     <div className="pcg-camera-workspace">
+      <div className="picg-camera-workspace-tools">
+        <button onClick={() => props.onShotChange(addShotCamera(props.shot))}>+ Camera</button>
+        <button onClick={() => props.onShotChange(layoutShotGraph(props.shot))}>Arrange</button>
+        <button onClick={() => {
+          let next = addShotMotionCurve(props.shot);
+          next = connectShotCameras(next, next.selectedNodeId, next.activeCameraId);
+          const id = next.selectedNodeId;
+          props.onShotChange({ ...next, motionCurves: next.motionCurves.map((curve) => curve.id !== id ? curve : { ...curve,
+            position: { x: next.cameras.find((camera) => camera.id === next.activeCameraId)!.position.x, y: 0 },
+            cameraKeyframes: [
+              { id: `${id}_start`, timeSeconds: 0, interpolation: 'linear', value: { pathProgress: 0 } },
+              { id: `${id}_end`, timeSeconds: next.durationSeconds, interpolation: 'ease-in-out', value: { pathProgress: 1 } },
+            ] }) });
+        }}>+ Motion Curve → Camera</button>
+        <button onClick={async () => {
+          try { setExportedShot(await downloadShot(props.shot)); setFileError(''); }
+          catch (error) { setFileError(error instanceof Error ? error.message : String(error)); }
+        }}>Export shot</button>
+        <button onClick={() => input.current?.click()}>Import shot</button>
+        <input ref={input} hidden type="file" accept=".picgshot,.json" onChange={async (event) => {
+          const file = event.target.files?.[0]; event.target.value = '';
+          if (!file) return;
+          try { props.onShotChange(parseShotFile(await file.text())); setFileError(''); }
+          catch (error) { setFileError(error instanceof Error ? error.message : String(error)); }
+        }} />
+        {fileError && <span role="alert">{fileError}</span>}
+        {exportedShot && <a className="picg-export-link" href={exportedShot.url} download title={exportedShot.path}>Saved shot</a>}
+      </div>
       <ReactFlowProvider>
         <CameraWorkspaceCanvas {...props} />
       </ReactFlowProvider>

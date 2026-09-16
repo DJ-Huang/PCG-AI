@@ -115,9 +115,9 @@ row 4:  out (x=200)
 }
 ```
 
-## Semantic mapping (Houdini ↔ PCG-AI)
+## Semantic mapping (Houdini ↔ PICG)
 
-| Houdini | PCG-AI node |
+| Houdini | PICG node |
 |---------|-------------|
 | Sweep SOP (curve × curve) | `SweepAlongSpline` + `CreateSpline` profile |
 | Copy to Curves | `InstanceAlongSpline` |

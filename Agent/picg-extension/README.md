@@ -1,4 +1,4 @@
-# PCG Agent Extensions
+# PICG Agent Extensions
 
 PCG Graph 编图与完整资产交付 Skills（Unity/Tuanjie 与 Web 变体），含共享 Python 脚本与资产验收规范。
 
@@ -51,4 +51,4 @@ node scripts/setup-agent-skills.mjs --tools all --once
 
 ## 真源
 
-`Agent/picg-extension/skills/` 为 PCG Agent Skill **真源**。只在此处编辑，改后重跑 `Agent/setup.bat` / `Agent/setup.sh`。
+`Agent/picg-extension/skills/` 为 PICG Agent Skill **真源**。只在此处编辑，改后重跑 `Agent/setup.bat` / `Agent/setup.sh`。

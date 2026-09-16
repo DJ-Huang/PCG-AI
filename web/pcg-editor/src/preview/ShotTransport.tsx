@@ -18,6 +18,9 @@ interface ShotTransportProps {
   exporting: boolean;
   exportProgress: number;
   exportStatus: string;
+  exportHref?: string;
+  exportFilename?: string;
+  exportPath?: string;
   onPresetChange: (preset: CameraMotionPreset) => void;
   onApplyPreset: () => void;
   onTogglePlayback: () => void;
@@ -47,6 +50,7 @@ const PRESET_LABELS: Record<CameraMotionPreset, string> = {
 };
 
 const INTERPOLATION_LABELS: Record<ShotInterpolation, string> = {
+  step: 'Hold / cut',
   linear: 'Linear',
   'ease-in': 'Ease in',
   'ease-out': 'Ease out',
@@ -68,6 +72,9 @@ export default function ShotTransport({
   exporting,
   exportProgress,
   exportStatus,
+  exportHref,
+  exportFilename,
+  exportPath,
   onPresetChange,
   onApplyPreset,
   onTogglePlayback,
@@ -125,6 +132,8 @@ export default function ShotTransport({
       </div>
 
       <div className="pcg-animation__transport">
+        <button type="button" aria-label="Previous frame" disabled={exporting} onClick={() => onSeek(Math.max(0, timeSeconds - 1 / shot.fps))}>|‹</button>
+        <button type="button" aria-label="Next frame" disabled={exporting} onClick={() => onSeek(Math.min(shot.durationSeconds, timeSeconds + 1 / shot.fps))}>›|</button>
         <button
           type="button"
           className="pcg-animation__transport-button pcg-animation__transport-button--primary"
@@ -238,6 +247,8 @@ export default function ShotTransport({
       </label>
 
       <div className="pcg-shot__settings">
+        <label><span>Frame</span><input type="number" aria-label="Shot playhead frame" min={0} max={Math.round(shot.durationSeconds * shot.fps)}
+          value={Math.round(timeSeconds * shot.fps)} onChange={(event) => onSeek(Number(event.target.value) / shot.fps)} disabled={exporting} /></label>
         <label>
           <span>Sec</span>
           <input
@@ -306,6 +317,11 @@ export default function ShotTransport({
         )}
       </div>
       {exportStatus && <p className="pcg-shot__status">{exportStatus}</p>}
+      {exportHref && <p className="pcg-shot__status" title={exportPath}>
+        Last export: {' '}
+        <a href={exportHref} download={exportFilename}>Download video</a>{' · '}
+        <a href={exportHref} target="_blank" rel="noreferrer">Watch video</a>
+      </p>}
     </section>
   );
 }

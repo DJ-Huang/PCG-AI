@@ -26,7 +26,7 @@ wait_http() {
         fi
         sleep 0.2
     done
-    echo "[pcg-web] ERROR: $label did not become ready ($url)" >&2
+    echo "[picg-web] ERROR: $label did not become ready ($url)" >&2
     return 1
 }
 
@@ -57,23 +57,23 @@ find_pcg_server() {
 }
 
 if ! find_pcg_server; then
-    echo "[pcg-web] pcg-server not found; building..."
+    echo "[picg-web] pcg-server not found; building..."
     "$ROOT/scripts/build-pcg-server.sh"
 fi
-echo "[pcg-web] starting pcg-server on http://127.0.0.1:${PCG_PORT}"
+echo "[picg-web] starting pcg-server on http://127.0.0.1:${PCG_PORT}"
 "$ROOT/scripts/run-pcg-server.sh" &
 SERVER_PID=$!
 STARTED_SERVER=1
 wait_http "http://127.0.0.1:${PCG_PORT}/v1/health" "pcg-server"
 
 if port_listening "$VITE_PORT"; then
-    echo "[pcg-web] Vite already listening on http://${VITE_HOST}:${VITE_PORT}"
+    echo "[picg-web] Vite already listening on http://${VITE_HOST}:${VITE_PORT}"
 else
     if [[ ! -d "$ROOT/web/pcg-editor/node_modules" ]]; then
-        echo "[pcg-web] node_modules missing; running npm install..."
+        echo "[picg-web] node_modules missing; running npm install..."
         (cd "$ROOT/web/pcg-editor" && npm install)
     fi
-    echo "[pcg-web] starting web editor on http://${VITE_HOST}:${VITE_PORT}"
+    echo "[picg-web] starting web editor on http://${VITE_HOST}:${VITE_PORT}"
     (
         cd "$ROOT/web/pcg-editor"
         npm run dev -- --host "$VITE_HOST" --port "$VITE_PORT"
@@ -84,7 +84,7 @@ else
 fi
 
 echo ""
-echo "[pcg-web] ready"
+echo "[picg-web] ready"
 echo "  API:    http://127.0.0.1:${PCG_PORT}/v1/health"
 echo "  MCP:    http://127.0.0.1:${PCG_PORT}/mcp"
 echo "  Editor: http://${VITE_HOST}:${VITE_PORT}/"
@@ -99,7 +99,7 @@ elif [[ -n "$SERVER_PID" ]]; then
 elif [[ -n "$VITE_PID" ]]; then
     wait "$VITE_PID"
 else
-    echo "[pcg-web] both services were already running; nothing to wait on." >&2
+    echo "[picg-web] both services were already running; nothing to wait on." >&2
     trap - EXIT INT TERM
     exit 0
 fi

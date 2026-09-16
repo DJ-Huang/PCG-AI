@@ -242,8 +242,20 @@ function parseSemanticComponent(value: unknown, label: string): SemanticComponen
     return candidate as [number, number, number];
   };
   const semantic: SemanticComponent = { componentId };
+  if (typeof raw.label === 'string') semantic.label = raw.label;
   if (typeof raw.role === 'string') semantic.role = raw.role;
   if (typeof raw.zone === 'string') semantic.zone = raw.zone;
+  if (typeof raw.intent === 'string') semantic.intent = raw.intent;
+  if (typeof raw.recipeId === 'string' && raw.recipeId.trim()) semantic.recipeId = raw.recipeId.trim();
+  if (raw.memberNodeIds !== undefined) {
+    if (!Array.isArray(raw.memberNodeIds) || raw.memberNodeIds.some((id) => typeof id !== 'string' || !id.trim())) {
+      return { error: `${label}.memberNodeIds must be an array of non-empty strings.` };
+    }
+    if (new Set(raw.memberNodeIds).size !== raw.memberNodeIds.length) {
+      return { error: `${label}.memberNodeIds must not contain duplicates.` };
+    }
+    semantic.memberNodeIds = raw.memberNodeIds as string[];
+  }
   if (raw.bounds !== undefined) {
     if (!raw.bounds || typeof raw.bounds !== 'object' || Array.isArray(raw.bounds)) return { error: `${label}.bounds must be an object.` };
     const bounds = raw.bounds as Record<string, unknown>;

@@ -1,6 +1,6 @@
-# PCG-AI
+# PICG（程序化智能内容生成）
 
-PCG-AI is a procedural-content authoring stack built around editable graph files. It combines a React graph editor, a C++ geometry runtime and cook server, and a Unity/Tuanjie integration project.
+PICG is a procedural-content authoring stack built around editable graph files. It combines a React graph editor, a C++ geometry runtime and cook server, and a Unity/Tuanjie integration project.
 
 > Project status: active development. Graph and API compatibility may still change before a stable release.
 
@@ -25,14 +25,14 @@ PCG-AI is a procedural-content authoring stack built around editable graph files
 Clone the repository and initialize its submodule:
 
 ```bash
-git clone --recurse-submodules <repository-url>
-cd PCG-AI
+git clone --recurse-submodules <repository-url> PICG
+cd PICG
 ```
 
 On macOS or Linux, start the native server and Web editor together:
 
 ```bash
-./scripts/run-pcg-web.sh
+./scripts/run-picg-web.sh
 ```
 
 The script builds missing native artifacts, installs missing Web dependencies and starts:
@@ -66,7 +66,7 @@ See [Getting Started](docs/getting-started.md) for the complete first-run and Un
 ## Repository layout
 
 ```text
-PCG-AI/
+PICG/
 ├── Agent/                 Agent skills and reusable PCG workflow tooling
 ├── docs/                  User, architecture and integration documentation
 ├── examples/              Graphs, tests, subgraphs, showcases and storyboards
@@ -159,6 +159,7 @@ See [Unity/README.md](Unity/README.md) for scene locations, sample conventions a
 Start at the [documentation index](docs/README.md). Important guides include:
 
 - [Getting Started](docs/getting-started.md)
+- [PICG cinematic previs: cameras, motion curves, keyframes and export](docs/picg-cinematic-previs.md)
 - [Architecture](docs/architecture.md)
 - [PCG server](docs/pcg-server.md)
 - [Node reference](docs/node-reference.md)

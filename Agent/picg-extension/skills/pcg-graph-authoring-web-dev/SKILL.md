@@ -15,7 +15,7 @@ description: >-
   never park at a white-model or pipeline REWORK.
 ---
 
-# PCG Web complete-asset production — development validation
+# PICG Web complete-asset production — development validation
 
 Produce the exact same finished asset and use the exact same acceptance standard as `pcg-graph-authoring-web`. This is a strict superset: it adds one PCG-specific validation gate; it does not replace the material, texture, export, render, or final scoring workflow.
 

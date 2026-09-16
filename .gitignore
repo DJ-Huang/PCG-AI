@@ -79,6 +79,8 @@ schema/editor-export.pcg
 library/web-cache/
 web/pcg-editor/public/assets/uploads/
 examples/**/artifacts/
+exports/previs/
+exports/documents/
 
 # Local plans, captures and scratch work
 Plan/

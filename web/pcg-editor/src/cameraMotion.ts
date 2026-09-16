@@ -23,6 +23,7 @@ export type CameraMotionPreset = (typeof CAMERA_MOTION_PRESETS)[number];
 
 function ease(interpolation: ShotInterpolation, t: number): number {
   const x = THREE.MathUtils.clamp(t, 0, 1);
+  if (interpolation === 'step') return x < 1 ? 0 : 1;
   if (interpolation === 'ease-in') return x * x;
   if (interpolation === 'ease-out') return 1 - (1 - x) * (1 - x);
   if (interpolation === 'ease-in-out') return x * x * (3 - 2 * x);
@@ -41,7 +42,7 @@ function lerpVec3(
   return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 }
 
-function interpolateCamera(
+export function interpolateCamera(
   from: PhysicalCameraState,
   to: PhysicalCameraState,
   t: number,
@@ -102,39 +103,50 @@ export function sampleCameraTrack(
   timeSeconds: number,
   outputAspect: number,
 ): PhysicalCameraState {
-  const ordered = keyframes
-    .map((keyframe, index) => ({ keyframe, index }))
-    .sort((a, b) => a.keyframe.timeSeconds - b.keyframe.timeSeconds || a.index - b.index);
-  const points: Array<{
-    timeSeconds: number;
-    interpolation: ShotInterpolation;
-    state: PhysicalCameraState;
-  }> = [{ timeSeconds: 0, interpolation: 'linear', state: base }];
-  for (const { keyframe } of ordered) {
-    const previous = points[points.length - 1].state;
-    const state = mergeCameraCommand(previous, keyframe.value, outputAspect);
-    if (keyframe.timeSeconds === points[points.length - 1].timeSeconds) {
-      points[points.length - 1] = {
-        timeSeconds: keyframe.timeSeconds,
-        interpolation: keyframe.interpolation,
-        state,
-      };
-    } else {
-      points.push({
-        timeSeconds: keyframe.timeSeconds,
-        interpolation: keyframe.interpolation,
-        state,
-      });
+  const ordered = [...keyframes].filter((key) => Number.isFinite(key.timeSeconds))
+    .sort((a, b) => a.timeSeconds - b.timeSeconds);
+  let previous = base;
+  const resolved = ordered.map((key) => {
+    const state = mergeCameraCommand(previous, key.value, outputAspect);
+    const fields = new Set(Object.keys(key.value));
+    // Commands such as fov / focusOnTarget author their resolved channels.
+    for (const field of Object.keys(base) as Array<keyof PhysicalCameraState>) {
+      if (JSON.stringify(state[field]) !== JSON.stringify(previous[field])) fields.add(field);
     }
+    previous = state;
+    return { ...key, state, fields };
+  });
+  const result = { ...base };
+  for (const field of Object.keys(base) as Array<keyof PhysicalCameraState>) {
+    const keys = [...new Map(resolved.filter((key) => key.fields.has(field)).map((key) => [key.timeSeconds, key])).values()];
+    let from = { timeSeconds: 0, state: base };
+    let sampled = base;
+    for (const key of keys) {
+      if (key.timeSeconds <= Math.max(timeSeconds, 0)) {
+        from = key;
+        sampled = key.state;
+      } else {
+        const t = (Math.max(timeSeconds, 0) - from.timeSeconds) / Math.max(key.timeSeconds - from.timeSeconds, Number.EPSILON);
+        sampled = interpolateCamera(from.state, key.state, ease(key.interpolation, t));
+        break;
+      }
+    }
+    Object.assign(result, { [field]: sampled[field] });
   }
-  const time = Math.max(0, timeSeconds);
-  if (time <= points[0].timeSeconds || points.length === 1) return points[0].state;
-  const nextIndex = points.findIndex((point) => point.timeSeconds >= time);
-  if (nextIndex < 0) return points[points.length - 1].state;
-  const from = points[nextIndex - 1];
-  const to = points[nextIndex];
-  const duration = Math.max(to.timeSeconds - from.timeSeconds, Number.EPSILON);
-  return interpolateCamera(from.state, to.state, ease(to.interpolation, (time - from.timeSeconds) / duration));
+  return result;
+}
+
+export function samplePathProgress(keys: readonly ShotCameraKeyframe[], time: number, duration: number): number {
+  const progressKeys = keys.filter((key) => Number.isFinite(key.value.pathProgress)).sort((a, b) => a.timeSeconds - b.timeSeconds);
+  if (!progressKeys.length) return THREE.MathUtils.clamp(time / Math.max(duration, 0.001), 0, 1);
+  let from = { timeSeconds: 0, value: { pathProgress: 0 } };
+  for (const key of progressKeys) {
+    const value = THREE.MathUtils.clamp(key.value.pathProgress!, 0, 1);
+    if (key.timeSeconds > time) return lerp(from.value.pathProgress, value,
+      ease(key.interpolation, (time - from.timeSeconds) / Math.max(key.timeSeconds - from.timeSeconds, Number.EPSILON)));
+    from = { timeSeconds: key.timeSeconds, value: { pathProgress: value } };
+  }
+  return from.value.pathProgress;
 }
 
 function keyframe(

@@ -440,7 +440,7 @@ export default function AgentPanel({
             <button type="button" className="pcg-agent__header-button" title="Collapse Agent panel" aria-label="Collapse Agent panel" onClick={() => setCollapsed(true)}>‹</button>
           </div>
 
-          {!connected && <div className="pcg-agent__connection-notice"><span>{connectionError || 'Connect an AI Provider in PCG Settings to start.'}</span><button type="button" onClick={onOpenSettings}>Open Settings</button></div>}
+          {!connected && <div className="pcg-agent__connection-notice"><span>{connectionError || 'Connect an AI Provider in PICG Settings to start.'}</span><button type="button" onClick={onOpenSettings}>Open Settings</button></div>}
           {connected && connectionError && <div className="pcg-agent__connection-notice"><span>{connectionError}</span><button type="button" onClick={() => setConnectionError('')}>Dismiss</button></div>}
 
           {showHistory ? (

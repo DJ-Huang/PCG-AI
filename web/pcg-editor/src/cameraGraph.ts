@@ -69,6 +69,8 @@ export function addShotMotionCurve(
     },
     controlPoints: createDefaultMotionCurvePoints(driver),
     closed: false,
+    lookMode: 'tangent',
+    cameraKeyframes: [],
   };
   return {
     ...synced,
@@ -120,10 +122,12 @@ export function removeShotCamera(shot: ShotDocument, cameraId: string): ShotDocu
   const cameras = shot.cameras.filter((camera) => camera.id !== cameraId);
   const nextActive = shot.activeCameraId === cameraId ? cameras[0] : findShotCamera(shot, shot.activeCameraId);
   if (!nextActive) return shot;
+  const removed = new Set([cameraId, ...shot.cameraTransforms.filter((rig) => rig.cameraId === cameraId).map((rig) => rig.id)]);
   return {
     ...shot,
     cameras,
-    cameraEdges: shot.cameraEdges.filter((edge) => edge.source !== cameraId && edge.target !== cameraId),
+    cameraTransforms: shot.cameraTransforms.filter((rig) => rig.cameraId !== cameraId),
+    cameraEdges: shot.cameraEdges.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target)),
     activeCameraId: nextActive.id,
     selectedNodeId: nextActive.id,
     camera: nextActive.camera,
@@ -162,8 +166,12 @@ export function upsertShotCamera(
     const patched = cameras.find((camera) => camera.id === added.id) ?? added;
     return {
       ...created,
-      cameras,
-      activeCameraId: patched.id,
+      cameras: cameras.map((camera) => camera.id === added.id ? { ...camera, id } : camera),
+      cameraEdges: created.cameraEdges.map((edge) => ({ ...edge,
+        id: edge.id.replace(added.id, id), source: edge.source === added.id ? id : edge.source,
+        target: edge.target === added.id ? id : edge.target })),
+      selectedNodeId: id,
+      activeCameraId: id,
       camera: patched.camera,
       cameraKeyframes: patched.cameraKeyframes,
     };
@@ -267,7 +275,7 @@ export function setMotionCurvePoints(
   curveId: string,
   controlPoints: [number, number, number][],
 ): ShotDocument {
-  if (controlPoints.length < 2) return shot;
+  if (controlPoints.length < 2 || controlPoints.some((point) => point.length !== 3 || !point.every(Number.isFinite))) return shot;
   return {
     ...shot,
     motionCurves: shot.motionCurves.map((curve) => (
@@ -341,6 +349,13 @@ export function connectShotCameras(shot: ShotDocument, source: string, target: s
   const sourceIsCamera = shot.cameras.some((camera) => camera.id === source);
   const targetIsCamera = shot.cameras.some((camera) => camera.id === target);
   const targetIsOutput = target === SHOT_OUTPUT_ID;
+  const sourceRig = shot.cameraTransforms.find((entry) => entry.id === source);
+  const targetRig = shot.cameraTransforms.find((entry) => entry.id === target);
+  if (sourceRig || targetRig) {
+    if (!((sourceRig && targetIsOutput) || (targetRig?.cameraId === source))) return shot;
+    if (shot.cameraEdges.some((edge) => edge.source === source && edge.target === target)) return shot;
+    return { ...shot, cameraEdges: [...shot.cameraEdges, { id: `e_${source}_${target}`, source, target }] };
+  }
   if (sourceIsCurve && !targetIsCamera) return shot;
   if (sourceIsCamera && !targetIsCamera && !targetIsOutput) return shot;
   if (!sourceIsCurve && !sourceIsCamera) return shot;
@@ -388,6 +403,10 @@ export function preserveFlowNodeLayout(nodes: Node[], previous: readonly Node[])
 export function shotCamerasToFlow(shot: ShotDocument): { nodes: Node[]; edges: Edge[] } {
   const selectedId = shot.selectedNodeId || shot.activeCameraId;
   const nodes: Node[] = [
+    ...shot.cameraTransforms.map((rig) => ({
+      id: rig.id, type: 'CameraTransform', position: rig.position, selected: rig.id === selectedId,
+      data: { kind: 'transform', name: rig.name, bodyName: 'Transform', active: rig.id === selectedId },
+    })),
     ...shot.motionCurves.map((curve) => ({
       id: curve.id,
       type: 'MotionCurve',
@@ -445,8 +464,18 @@ export function applyCameraGraphNodeChanges(shot: ShotDocument, changes: NodeCha
   for (const curve of shot.motionCurves) {
     if (!remaining.has(curve.id)) next = removeShotMotionCurve(next, curve.id);
   }
+  for (const rig of shot.cameraTransforms) {
+    if (!remaining.has(rig.id)) {
+      const cameraEdges = next.cameraEdges.filter((edge) => edge.source !== rig.id && edge.target !== rig.id);
+      if (!cameraEdges.some((edge) => edge.source === rig.cameraId && edge.target === SHOT_OUTPUT_ID)) {
+        cameraEdges.push({ id: `e_${rig.cameraId}_out`, source: rig.cameraId, target: SHOT_OUTPUT_ID });
+      }
+      next = { ...next, cameraTransforms: next.cameraTransforms.filter((entry) => entry.id !== rig.id), cameraEdges };
+    }
+  }
   return {
     ...next,
+    cameraTransforms: next.cameraTransforms.map((rig) => ({ ...rig, position: nextNodes.find((node) => node.id === rig.id)?.position ?? rig.position })),
     cameras: next.cameras.map((camera) => {
       const node = nextNodes.find((entry) => entry.id === camera.id);
       return node ? { ...camera, position: node.position } : camera;

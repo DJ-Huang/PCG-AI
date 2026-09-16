@@ -1,0 +1,196 @@
+{
+  "version": "1.0",
+  "name": "PICG Camera Previs",
+  "graphPath": "examples/tests/picg-camera-previs.picg",
+  "graphHash": "",
+  "parameterOverrides": {},
+  "durationSeconds": 4,
+  "fps": 24,
+  "width": 1280,
+  "height": 720,
+  "components": [],
+  "objectAnimations": [],
+  "cameras": [
+    {
+      "id": "cam_a",
+      "name": "Hero rail",
+      "presetId": "full_frame",
+      "position": {
+        "x": 80,
+        "y": 160
+      },
+      "camera": {
+        "position": [
+          5,
+          2.5,
+          6
+        ],
+        "target": [
+          0,
+          1,
+          0
+        ],
+        "up": [
+          0,
+          1,
+          0
+        ],
+        "projection": "perspective",
+        "focalLengthMm": 28,
+        "sensorWidthMm": 36,
+        "sensorHeightMm": 24,
+        "sensorFit": "auto",
+        "shiftX": 0,
+        "shiftY": 0,
+        "apertureFstop": 4,
+        "apertureBlades": 0,
+        "apertureRotationDeg": 0,
+        "apertureRatio": 1,
+        "focusDistance": 8,
+        "dofEnabled": true,
+        "exposure": 1,
+        "near": 0.01,
+        "far": 5000,
+        "orthographicScale": 6
+      },
+      "cameraKeyframes": []
+    }
+  ],
+  "motionCurves": [
+    {
+      "id": "hero_rail",
+      "name": "Dolly and lens",
+      "position": {
+        "x": 80,
+        "y": 0
+      },
+      "controlPoints": [
+        [
+          5,
+          2.5,
+          6
+        ],
+        [
+          3,
+          2,
+          5
+        ],
+        [
+          0.5,
+          1.8,
+          4.8
+        ],
+        [
+          -1.8,
+          1.7,
+          4.5
+        ]
+      ],
+      "closed": false,
+      "cameraKeyframes": [
+        {
+          "id": "rail_in",
+          "timeSeconds": 0,
+          "interpolation": "linear",
+          "value": {
+            "apertureFstop": 4,
+            "focalLengthMm": 28,
+            "focusDistance": 8,
+            "pathProgress": 0
+          }
+        },
+        {
+          "id": "rail_out",
+          "timeSeconds": 4,
+          "interpolation": "ease-in-out",
+          "value": {
+            "apertureFstop": 2.8,
+            "focalLengthMm": 42,
+            "focusDistance": 4.6,
+            "pathProgress": 1
+          }
+        }
+      ],
+      "lookMode": "target"
+    }
+  ],
+  "cameraTransforms": [
+    {
+      "id": "cam_a_transform",
+      "name": "Transform",
+      "cameraId": "cam_a",
+      "position": {
+        "x": 80,
+        "y": 320
+      },
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "rotationEulerDeg": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "cameraEdges": [
+    {
+      "id": "e_hero_rail_cam_a",
+      "source": "hero_rail",
+      "target": "cam_a"
+    },
+    {
+      "id": "e_cam_a_cam_a_transform",
+      "source": "cam_a",
+      "target": "cam_a_transform"
+    },
+    {
+      "id": "e_cam_a_transform_out",
+      "source": "cam_a_transform",
+      "target": "shot_output"
+    }
+  ],
+  "activeCameraId": "cam_a",
+  "selectedNodeId": "cam_a",
+  "shotOutputPosition": {
+    "x": 80,
+    "y": 480
+  },
+  "camera": {
+    "position": [
+      5,
+      2.5,
+      6
+    ],
+    "target": [
+      0,
+      1,
+      0
+    ],
+    "up": [
+      0,
+      1,
+      0
+    ],
+    "projection": "perspective",
+    "focalLengthMm": 28,
+    "sensorWidthMm": 36,
+    "sensorHeightMm": 24,
+    "sensorFit": "auto",
+    "shiftX": 0,
+    "shiftY": 0,
+    "apertureFstop": 4,
+    "apertureBlades": 0,
+    "apertureRotationDeg": 0,
+    "apertureRatio": 1,
+    "focusDistance": 8,
+    "dofEnabled": true,
+    "exposure": 1,
+    "near": 0.01,
+    "far": 5000,
+    "orthographicScale": 6
+  },
+  "cameraKeyframes": []
+}

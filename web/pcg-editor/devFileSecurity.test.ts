@@ -24,10 +24,12 @@ afterEach(() => {
 });
 
 describe('dev file security', () => {
-  it('accepts only .pcg paths inside the workspace', () => {
+  it('accepts PICG and legacy PCG paths only inside the workspace', () => {
     const workspace = temporaryDirectory('pcg-workspace-');
     expect(resolveWorkspaceGraphPath(workspace, 'shots/city.pcg'))
       .toBe(path.join(workspace, 'shots/city.pcg'));
+    expect(resolveWorkspaceGraphPath(workspace, 'shots/city.picg'))
+      .toBe(path.join(workspace, 'shots/city.picg'));
     expect(() => resolveWorkspaceGraphPath(workspace, '../escape.pcg')).toThrow(/inside the workspace/);
     expect(() => resolveWorkspaceGraphPath(workspace, 'shots/city.json')).toThrow(/inside the workspace/);
   });
@@ -49,5 +51,15 @@ describe('dev file security', () => {
     const graphPath = resolveWorkspaceGraphPath(workspace, 'linked/escape.pcg');
 
     expect(() => assertWorkspaceGraphParent(workspace, graphPath)).toThrow(/inside the workspace/);
+  });
+
+  it('rejects sidecar writes when an existing file is a symlink outside the workspace', () => {
+    const workspace = temporaryDirectory('picg-workspace-');
+    const outside = temporaryDirectory('picg-outside-');
+    const destination = path.join(outside, 'private.json');
+    fs.writeFileSync(destination, '{}');
+    const shot = path.join(workspace, 'shot.picgshot');
+    fs.symlinkSync(destination, shot);
+    expect(() => assertWorkspaceGraphParent(workspace, shot)).toThrow(/inside the workspace/);
   });
 });

@@ -4,13 +4,13 @@
 
 ## 学习目标
 读完后，你能够：
-- 用自己的话描述 PCG-AI 的系统边界和最小执行闭环
+- 用自己的话描述 PICG 的系统边界和最小执行闭环
 - 从公开入口追踪到最终输出
 - 说明各核心模块的依赖方向和数据流方向
 
 ## 1. 先看一次完整运行
 
-PCG-AI 的核心是一条 **Web/Unity 编辑 → Graph JSON → localhost HTTP 服务 → C++ 执行 → 预览** 的数据管线。
+PICG 的核心是一条 **Web/Unity 编辑 → Graph JSON → localhost HTTP 服务 → C++ 执行 → 预览** 的数据管线。
 
 最简操作：
 
@@ -237,7 +237,7 @@ PcgPreview.cs: OnDrawGizmos()                 // Scene 渲染
 
 ## 8. 自检
 
-1. PCG-AI 的 C++ 核心和 Unity 插件之间通过什么机制通信？数据格式是什么？
+1. PICG 的 C++ 核心和 Unity 插件之间通过什么机制通信？数据格式是什么？
 2. 一个 Graph JSON 从输入到输出经过哪些处理阶段？每个阶段的输入和输出分别是什么？
 3. `PcgGeometry` 和 `PcgMeshData` 有什么区别？为什么要区分？
 4. Cook Cache 如何判断一个节点是否需要重新执行？

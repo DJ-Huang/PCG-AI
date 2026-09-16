@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { CAMERA_PIN_COLOR } from '../cameraGraph';
 
 interface CameraNodeData {
-  kind?: 'camera' | 'output' | 'curve';
+  kind?: 'camera' | 'output' | 'curve' | 'transform';
   name?: string;
   bodyName?: string;
   presetId?: string;
@@ -15,13 +15,14 @@ const PILL_COLOR = {
   camera: '#3d5a80',
   output: '#355a4a',
   curve: '#8a6230',
+  transform: '#6b5790',
 } as const;
 
 export default function CameraNode({ type, selected, data }: NodeProps) {
   const node = data as CameraNodeData;
   const isOutput = type === 'ShotOutput' || node.kind === 'output';
   const isCurve = type === 'MotionCurve' || node.kind === 'curve';
-  const kind = isOutput ? 'output' : isCurve ? 'curve' : 'camera';
+  const kind = isOutput ? 'output' : isCurve ? 'curve' : node.kind === 'transform' ? 'transform' : 'camera';
   const bodyName = node.bodyName || (isCurve ? 'Motion Curve' : 'Camera');
   const stationName = node.name || (isOutput ? 'Shot Output' : bodyName);
   const previewing = node.active === true;

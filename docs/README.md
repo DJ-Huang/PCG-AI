@@ -1,10 +1,11 @@
-# Documentation
+# PICG Documentation
 
-Use this page as the stable entry point for PCG-AI documentation.
+Use this page as the stable entry point for PICG documentation.
 
 ## Start here
 
 - [Getting Started](getting-started.md) — install, run and verify the full stack.
+- [Cinematic previs](picg-cinematic-previs.md) — camera rigs, motion curves, lens/focus animation and video export.
 - [Architecture](architecture.md) — component boundaries and data flow.
 - [Examples](../examples/README.md) — graph, test, subgraph and showcase layout.
 - [Unity project](../Unity/README.md) — Unity/Tuanjie setup and sample scenes.
@@ -27,4 +28,3 @@ Use this page as the stable entry point for PCG-AI documentation.
 - [End-to-end demo](DEMO.md)
 
 Historical plans, raw debug logs, generated screenshots and editor caches are intentionally excluded from the public repository. Durable behavior belongs in these guides, tests or the project knowledge base under `.pcg-ai/`.
-

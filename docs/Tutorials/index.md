@@ -1,11 +1,11 @@
-# PCG-AI：从零到一技术教程
+# PICG：从零到一技术教程
 
 > 面向：全栈开发者（熟悉 C++/C#/TS/React，不了解本工程）
 > 基于分支 `dev/07-w3`、commit `f50d744`，扫描于 2026-07-15
 > 源码基线：working tree（仅 `.codely-cli/settings.json` 有改动，不影响源码证据）
 
 ## 你将学会什么
-- 解释 PCG-AI 的系统架构和 Web/Unity→HTTP→C++ 数据流
+- 解释 PICG 的系统架构和 Web/Unity→HTTP→C++ 数据流
 - 追踪从 Graph JSON 到 Scene 预览的完整执行路径
 - 理解 C++ 核心的拓扑排序、Cook Cache、Element 系统和几何内核
 - 诊断端到端链路的常见故障

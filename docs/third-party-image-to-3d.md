@@ -1,6 +1,6 @@
 # 第三方图生 3D API（Meshy / Tripo / …）
 
-PCG-AI 把云端「图生 3D」厂商接入成 **Graph 节点**：Editor 侧负责鉴权、HTTP、轮询与本地缓存。普通预览仍由 `ImportMesh` 路径读取下载网格；高保真程序化交付由 `pcg-server` 烘焙无拓扑定向采样，交给 `pcg-core` 的 `OrientedSdfSurface` 在 Cook 时重建新网格，再可接 `ActionRig` 建立语义组件、蒙皮和动画。来源若本来就是已绑定的自包含 GLB，则改走 `PreserveGltfRig`，保留原 skin/animation，不重新猜权重。
+PICG 把云端「图生 3D」厂商接入成 **Graph 节点**：Editor 侧负责鉴权、HTTP、轮询与本地缓存。普通预览仍由 `ImportMesh` 路径读取下载网格；高保真程序化交付由 `pcg-server` 烘焙无拓扑定向采样，交给 `pcg-core` 的 `OrientedSdfSurface` 在 Cook 时重建新网格，再可接 `ActionRig` 建立语义组件、蒙皮和动画。来源若本来就是已绑定的自包含 GLB，则改走 `PreserveGltfRig`，保留原 skin/animation，不重新猜权重。
 
 本页是用户说明 + 后续厂商扩展清单。节点属性以 `schema/node-manifest.json` 为准。
 
@@ -76,7 +76,7 @@ Source Image / URL
 
 [`img2threejs`](https://github.com/img2threejs/img2threejs) 并不是把任意单网格 GLB 自动识别成“绝对正确”的零件后再自动绑骨。它公开的 GLB character pipeline 把 GLB 当测量基准，先重建表面，再从模型实测比例建立 skeleton/weights；文档还明确说明来源通常没有 rig。其通用建模工作流是先写语义规格，再用可参数化几何或表面场重建，最后通过固定相机和确定性脚本逐轮验收。[官方 showcase](https://github.com/img2threejs/img2threejs-showcase) 的程序化案例会组合 primitive、extrude、tube、程序化材质和显式部件层级；例如 [War-Hauler 源码](https://github.com/img2threejs/img2threejs-showcase/blob/main/src/demos/warhauler/createWarHaulerModel.ts) 同时使用了 `ExtrudeGeometry`、`TubeGeometry`、重复零件和显式层级。
 
-PCG-AI 在吸收这条重建/绑定路线之外，又为“来源本来就有正确 rig”的生产输入补了一条独立的无损保留路线，避免把原 skin 和 animation 丢掉后再猜一次：
+PICG 在吸收这条重建/绑定路线之外，又为“来源本来就有正确 rig”的生产输入补了一条独立的无损保留路线，避免把原 skin 和 animation 丢掉后再猜一次：
 
 ```text
 图片 / 未绑定 GLB
@@ -95,7 +95,7 @@ PCG-AI 在吸收这条重建/绑定路线之外，又为“来源本来就有正
 
 本工程采用相同原则，但把 Three.js factory 换成可编辑 `.pcg` 图：
 
-| img2threejs 方法 | PCG-AI 对应能力 | 状态 |
+| img2threejs 方法 | PICG 对应能力 | 状态 |
 | --- | --- | --- |
 | 先列 `detailInventory` / 语义部件，再分阶段构建 | AssetSpec、语义 Subgraph、图参数、Agent 的 camera → silhouette → form → accessory → material → lighting 修正顺序 | 已接入 |
 | primitive、lathe、extrude、loft、curve sweep、CSG | `Box/Sphere/Capsule/Torus`、`RevolveMesh`、`ExtrudeMesh`、`LoftMesh`、`SweepAlongSpline`、`BooleanMesh` | 已有 |
@@ -120,7 +120,7 @@ PCG-AI 在吸收这条重建/绑定路线之外，又为“来源本来就有正
 - **投影优先的人像拟合**：2D landmarks → 参数化模板 → 相机求解 → 去光照 → 纹理投影。PCG 已有投影节点，但还没有通用 landmarks、de-light 和置信度链路。
 - **外部学习型证据**：SAM2、Depth Anything、MediaPipe 等只作为可选先验；没有模型来源、版本和置信度时，不应让它们自动通过 PCG 验收。
 
-`OrientedSdfSurface` 的算法路线参考 img2threejs 官方 [GLB character pipeline](https://github.com/img2threejs/img2threejs/blob/main/integrations/glb_character_pipeline/PIPELINE.md)、[SDF surface exporter](https://github.com/img2threejs/img2threejs/blob/main/integrations/glb_character_pipeline/python/export_sdf_surfaces.py) 和 [Surface codec](https://github.com/img2threejs/img2threejs-showcase/blob/main/src/demos/girl-character/surfaceCodec.ts)。动画侧则严格区分“重新绑定”与“原 rig 保留”：前者使用可编辑 component tree 和 geodesic/rigid skin，后者以 glTF skin/animation 索引为真源。PCG-AI 的表面重建实现为独立 C++ 稀疏场/OPC codec，并保留其 [Apache-2.0](https://github.com/img2threejs/img2threejs/blob/main/LICENSE) 来源说明。visual hull、landmark fitting 和 learned depth 仍保留为后续独立节点/服务，不与基础 Cook 隐式耦合。
+`OrientedSdfSurface` 的算法路线参考 img2threejs 官方 [GLB character pipeline](https://github.com/img2threejs/img2threejs/blob/main/integrations/glb_character_pipeline/PIPELINE.md)、[SDF surface exporter](https://github.com/img2threejs/img2threejs/blob/main/integrations/glb_character_pipeline/python/export_sdf_surfaces.py) 和 [Surface codec](https://github.com/img2threejs/img2threejs-showcase/blob/main/src/demos/girl-character/surfaceCodec.ts)。动画侧则严格区分“重新绑定”与“原 rig 保留”：前者使用可编辑 component tree 和 geodesic/rigid skin，后者以 glTF skin/animation 索引为真源。PICG 的表面重建实现为独立 C++ 稀疏场/OPC codec，并保留其 [Apache-2.0](https://github.com/img2threejs/img2threejs/blob/main/LICENSE) 来源说明。visual hull、landmark fitting 和 learned depth 仍保留为后续独立节点/服务，不与基础 Cook 隐式耦合。
 
 ### Unity 编辑器
 

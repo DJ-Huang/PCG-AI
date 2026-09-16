@@ -57,7 +57,7 @@ export default function AgentHistory(props: AgentHistoryProps) {
               <div key={session.id} className={`pcg-agent-history__item ${session.id === props.activeSessionId ? 'is-active' : ''}`}>
                 <button type="button" className="pcg-agent-history__open" onClick={() => props.onOpen(session.id)}>
                   <strong>{session.title}</strong>
-                  <span>{session.graphName || session.modelId || 'PCG Agent'} · {new Date(session.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>{session.graphName || session.modelId || 'PICG Agent'} · {new Date(session.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </button>
                 <div className="pcg-agent-history__actions">
                   <button type="button" title="Rename chat" onClick={() => props.onRename(session)}>✎</button>

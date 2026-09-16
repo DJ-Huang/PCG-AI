@@ -1,7 +1,7 @@
 ---
 name: pcg-graph-authoring-unity
 description: >-
-  Create complete production-ready Unity assets through PCG-AI: plan and author
+  Create complete production-ready Unity assets through PICG: plan and author
   `.pcg` graphs, validate and cook the white model in a clean Unity/Tuanjie
   scene, validate UV/projection, create and bind materials and textures, output
   a reproducible prefab, render it, and apply full-asset acceptance. Use for

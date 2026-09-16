@@ -1,4 +1,4 @@
-// App.tsx — PCG Graph Editor (Web) with three-panel layout.
+// App.tsx — PICG · 程序化智能内容生成 (Web) with three-panel layout.
 // Features: manifest-driven nodes, Inspector, Blackboard, port drag-to-search,
 // node search, Copy Raw Data, undo/redo, keyboard shortcuts.
 
@@ -30,7 +30,7 @@ import ManifestNode from './nodes/ManifestNode';
 import SubgraphNode, { SubgraphInterfaceNode } from './nodes/SubgraphNode';
 import { defaultData } from './graphSchema';
 import type { GraphParameter, GraphSubgraph, GraphNode, GraphEdge } from './graphSchema';
-import { exportGraph, downloadGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
+import { exportGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
 import { importGraphFromFile, parseGraphJson, syncNodeCounterFromNodes } from './importGraph';
 import { clearEditorSession, loadEditorSession, saveEditorSession } from './editorSession';
 import { isValidConnection } from './connectionValidation';
@@ -66,6 +66,11 @@ import SettingsDialog from './SettingsDialog';
 import { useEditorBridge } from './editorBridge';
 import CameraWorkspace from './CameraWorkspace';
 import CameraInspector from './CameraInspector';
+import CameraCurveEditor from './CameraCurveEditor';
+import { downloadProject, loadWorkspaceProject, parseShotFile } from './shotFile';
+import WorkspaceFileDialog from './WorkspaceFileDialog';
+import { applyShotOperations } from './shotOperations';
+import { useShotHistory } from './useShotHistory';
 import {
   addShotCamera,
   addShotMotionCurve,
@@ -74,6 +79,7 @@ import {
 } from './cameraGraph';
 import {
   replaceCameraKeyframes,
+  editableCameraKeyframes,
   upsertCameraKeyframe,
 } from './cameraTrack';
 import {
@@ -105,7 +111,7 @@ import {
   bakeBaseColorTextureIntoOpc1,
   makeVertexColorMaterialData,
 } from './orientedPointColorBake';
-import { createDefaultShot, selectShotCamera, syncShotCameras, type ShotDocument } from './shot';
+import { createDefaultShot, layoutShotGraph, selectShotCamera, type ShotDocument } from './shot';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -221,7 +227,12 @@ function PcgEditor() {
   const [cameraSearchConfig, setCameraSearchConfig] = useState<Omit<CameraSearchPanelConfig, 'onSelect'> | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
-  const [shot, setShot] = useState<ShotDocument>(restored?.shot ?? createDefaultShot());
+  const [fileDialog, setFileDialog] = useState<'open' | 'save' | null>(null);
+  const [exportedProject, setExportedProject] = useState<{ path: string; url: string } | null>(null);
+  const { shot, apply: recordShot, reset: setShot, undo: undoShot, redo: redoShot, canUndo: canUndoShot, canRedo: canRedoShot } = useShotHistory(restored?.shot ?? createDefaultShot());
+  const [shotTime, setShotTime] = useState(0);
+  const [autoKey, setAutoKey] = useState(false);
+  const [selectedCurvePoint, setSelectedCurvePoint] = useState(0);
   const [workspaceTab, setWorkspaceTab] = useState<'graph' | 'cameras'>('graph');
   const shotRef = useRef(shot);
   shotRef.current = shot;
@@ -869,7 +880,7 @@ function PcgEditor() {
   );
   const installBridgeGraph = useCallback(
     (parsed: ReturnType<typeof parseAndValidateGraph> & { ok: true }, nextEditPath: string[]) => {
-      commit('PCG MCP graph edit');
+      commit('PICG MCP graph edit');
       nodeCounter = syncNodeCounterFromNodes(parsed.parsed.nodes);
       setNodes(parsed.parsed.nodes);
       setEdges(parsed.parsed.edges);
@@ -885,16 +896,49 @@ function PcgEditor() {
     [commit, setNodes, setEdges],
   );
   const applyShotDocument = useCallback((next: ShotDocument) => {
-    const synced = syncShotCameras(next);
+    const prev = shotRef.current;
+    const structureChanged = prev.cameras.length !== next.cameras.length || prev.motionCurves.length !== next.motionCurves.length
+      || prev.cameraTransforms.length !== next.cameraTransforms.length || JSON.stringify(prev.cameraEdges) !== JSON.stringify(next.cameraEdges);
+    const synced = recordShot(structureChanged ? layoutShotGraph(next) : next);
     shotRef.current = synced;
-    setShot(synced);
     return synced;
-  }, []);
+  }, [recordShot]);
   const applyBridgeCommands = useCallback(
     async (commands: QueuedGraphCommand[]): Promise<GraphCommandResult[]> => {
       const results: GraphCommandResult[] = [];
       for (const command of commands) {
         try {
+          if (command.type === 'exportShot') {
+            const viewport = previewViewportRef.current;
+            if (!viewport) throw new Error('Open Preview before exporting');
+            const detail = await viewport.exportShot();
+            if (!detail.path) throw new Error('Video encoded, but local save failed. Use Download video in the editor.');
+            results.push({ id: command.id, ok: true, detail });
+            continue;
+          }
+          if (command.type === 'applyShotOps') {
+            const next = applyShotDocument(applyShotOperations(shotRef.current, command.operations));
+            setWorkspaceTab('cameras');
+            results.push({ id: command.id, ok: true, detail: { cameraId: next.activeCameraId, selectedNodeId: next.selectedNodeId,
+              cameraCount: next.cameras.length, curveCount: next.motionCurves.length, transformCount: next.cameraTransforms.length } });
+            continue;
+          }
+          if (command.type === 'applyPrevisSpec') {
+            const validated = parseAndValidateGraph(command.graph);
+            if (!validated.ok) throw new Error(validated.error);
+            const nextShot = applyShotOperations(shotRef.current, command.shotOperations);
+            installBridgeGraph(validated, []);
+            const next = applyShotDocument(nextShot);
+            setWorkspaceTab('cameras');
+            setStatus(`PICG MCP applied previs spec (${validated.parsed.nodes.length} nodes, ${next.components.length} components)`);
+            results.push({ id: command.id, ok: true, detail: {
+              rootNodes: validated.parsed.nodes.length,
+              subgraphs: validated.parsed.subgraphs.length,
+              componentCount: next.components.length,
+              cameraCount: next.cameras.length,
+            } });
+            continue;
+          }
           if (command.type === 'setCameraKeyframes') {
             let next = command.cameraId
               ? selectShotCamera(shotRef.current, command.cameraId)
@@ -960,10 +1004,11 @@ function PcgEditor() {
             const saved = await saveGraphToFile(
               bridgeGraph,
               targetPath,
+              shotRef.current,
             );
             if (!saved.ok) throw new Error(saved.error ?? 'unknown save error');
             if (command.path !== undefined) setCurrentFilename(targetPath);
-            setStatus(`Saved to ${targetPath} through PCG MCP`);
+            setStatus(`Saved to ${targetPath} through PICG MCP`);
             results.push({ id: command.id, ok: true, detail: { path: targetPath } });
             continue;
           }
@@ -972,7 +1017,7 @@ function PcgEditor() {
             const validated = parseAndValidateGraph(command.graph);
             if (!validated.ok) throw new Error(validated.error);
             installBridgeGraph(validated, []);
-            setStatus(`PCG MCP replaced graph (${validated.parsed.nodes.length} root nodes)`);
+            setStatus(`PICG MCP replaced graph (${validated.parsed.nodes.length} root nodes)`);
             results.push({
               id: command.id,
               ok: true,
@@ -991,11 +1036,11 @@ function PcgEditor() {
           const applied = applyGraphOperations(bridgeGraph, editPath, operations);
           if (!applied.ok) throw new Error(applied.error);
           installBridgeGraph({ ok: true, parsed: applied.parsed }, editPath);
-          setStatus(`PCG MCP applied ${operations.length} graph operation(s)`);
+          setStatus(`PICG MCP applied ${operations.length} graph operation(s)`);
           results.push({ id: command.id, ok: true, detail: applied.detail });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          setStatus(`PCG MCP command failed: ${message}`);
+          setStatus(`PICG MCP command failed: ${message}`);
           results.push({ id: command.id, ok: false, error: message });
         }
       }
@@ -1091,6 +1136,26 @@ function PcgEditor() {
       const target = e.target as HTMLElement;
       // Skip if typing in an input/select
       if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
+      if (target.isContentEditable || e.defaultPrevented) return;
+
+      if (workspaceTab === 'cameras' && !e.metaKey && !e.ctrlKey) {
+        const viewport = previewViewportRef.current;
+        if (e.code === 'Space') {
+          e.preventDefault(); viewport?.toggleShotPlayback(); return;
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault(); viewport?.pauseShot();
+          const document = shotRef.current;
+          const delta = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 10 : 1) / document.fps;
+          viewport?.seekShot(document, (viewport.getShotTime() ?? 0) + delta); return;
+        }
+        if (e.key.toLowerCase() === 'w' || e.key.toLowerCase() === 'e') {
+          e.preventDefault(); viewport?.setCameraTool(e.key.toLowerCase() === 'w' ? 'translate' : 'rotate'); return;
+        }
+        if (e.shiftKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault(); setCameraSearchConfig({ x: window.innerWidth / 2, y: window.innerHeight / 2 }); return;
+        }
+      }
 
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
@@ -1115,9 +1180,9 @@ function PcgEditor() {
       } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
-          redo();
+          if (workspaceTab === 'cameras') redoShot(); else redo();
         } else {
-          undo();
+          if (workspaceTab === 'cameras') undoShot(); else undo();
         }
       } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
@@ -1126,7 +1191,7 @@ function PcgEditor() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openSearchAt, fitView, openSettings, undo, redo, workspaceTab]);
+  }, [openSearchAt, fitView, openSettings, undo, redo, undoShot, redoShot, workspaceTab]);
 
   // ── Node drag undo ─────────────────────────────────
 
@@ -1174,19 +1239,13 @@ function PcgEditor() {
 
   // ── Import / Export ─────────────────────────────────
 
-  const handleExport = () => {
-    const graph = exportGraph(nodes, edges, parameters, subgraphs);
-    downloadGraph(graph);
-    setStatus('Downloaded graph.pcg');
-  };
-
   const handleSave = async () => {
     if (!currentFilename) {
-      handleExport();
+      setFileDialog('save');
       return;
     }
     const graph = exportGraph(nodes, edges, parameters, subgraphs);
-    const result = await saveGraphToFile(graph, currentFilename);
+    const result = await saveGraphToFile(graph, currentFilename, shotRef.current);
     if (result.ok) {
       setStatus(`Saved to ${currentFilename}`);
     } else {
@@ -1213,7 +1272,17 @@ function PcgEditor() {
     event.target.value = '';
     if (!file) return;
 
-    const result = await importGraphFromFile(file);
+    let importedShot: ShotDocument | null = null;
+    let importFile = file;
+    if (file.name.endsWith('.picgproject')) {
+      try {
+        const project = JSON.parse(await file.text());
+        if (project.format !== 'PICG-project' || !project.graph) throw new Error('Not a PICG project');
+        importedShot = parseShotFile(JSON.stringify(project.shot));
+        importFile = new File([JSON.stringify(project.graph)], file.name.replace(/\.picgproject$/, '.picg'), { type: 'application/json' });
+      } catch (error) { setStatus(`Import failed: ${String(error)}`); return; }
+    }
+    const result = await importGraphFromFile(importFile);
     if (!result.ok) {
       setStatus(`Import failed: ${result.error}`);
       return;
@@ -1227,9 +1296,11 @@ function PcgEditor() {
     setParameters(result.parameters);
     setSubgraphs(result.subgraphs);
     setSelectedNode(null);
+    setInfoNodeId(null);
+    setPreviewTargetId(null);
     setPreviewParameterValuesByScope({});
-    setCurrentFilename(file.name);
-    setShot({ ...createDefaultShot(), graphPath: file.name });
+    setCurrentFilename(importFile.name);
+    setShot(importedShot ?? { ...createDefaultShot(), graphPath: importFile.name });
     setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params, ${result.subgraphs.length} subgraphs)`);
   };
 
@@ -1253,16 +1324,43 @@ function PcgEditor() {
     setStatus('New graph created');
   };
 
-  const handleSaveAs = () => {
-    const filename = currentFilename || 'graph.pcg';
-    const graph = exportGraph(nodes, edges, parameters, subgraphs);
-    downloadGraph(graph, filename);
-    setStatus(`Saved as ${filename}`);
+  const submitProjectPath = async (filename: string) => {
+    if (fileDialog === 'save') {
+      const result = await saveGraphToFile(exportGraph(nodes, edges, parameters, subgraphs), filename, shotRef.current);
+      if (!result.ok) throw new Error(result.error ?? 'Save failed');
+      setCurrentFilename(filename);
+      setStatus(`Saved ${filename} and camera setup`);
+      return;
+    }
+    const project = await loadWorkspaceProject(filename);
+    nodeCounter = syncNodeCounterFromNodes(project.graph.nodes);
+    commit();
+    setEditPath([]);
+    setNodes(project.graph.nodes); setEdges(project.graph.edges);
+    setParameters(project.graph.parameters); setSubgraphs(project.graph.subgraphs);
+    setSelectedNode(null); setPreviewTargetId(null); setInfoNodeId(null);
+    setPreviewParameterValuesByScope({});
+    setCurrentFilename(filename); setShot(project.shot);
+    setStatus(`Opened ${filename}${project.hasShot ? ' with camera setup' : ' (no saved cameras)'}`);
   };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || fileDialog) return;
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        if (event.shiftKey) setFileDialog('save'); else void handleSave();
+      } else if (event.key.toLowerCase() === 'o') {
+        event.preventDefault(); setFileDialog('open');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   const handleShowInProject = async () => {
     if (!currentFilename) {
-      setStatus('No file imported — import a .pcg file first');
+      setStatus('Save or open a workspace project first');
       return;
     }
     const result = await revealInFinder(currentFilename);
@@ -1593,9 +1691,11 @@ function PcgEditor() {
     <div className="pcg-app">
       {/* Toolbar — aligned with Unity: left=New/Save/Save As/Show in Project, right=Parameters/Inspector */}
       <div className="pcg-toolbar">
+        <span className="picg-brand" title="程序化智能内容生成">PICG</span>
         <button type="button" onClick={() => handleNewGraph()} title="New Graph">New</button>
-        <button type="button" onClick={handleSave} title="Save Graph">Save</button>
-        <button type="button" onClick={handleSaveAs} title="Save As">Save As...</button>
+        <button type="button" onClick={() => setFileDialog('open')} title="Open project (⌘O)">Open</button>
+        <button type="button" onClick={handleSave} title="Save project and cameras (⌘S)">Save</button>
+        <button type="button" onClick={() => setFileDialog('save')} title="Save As (⌘⇧S)">Save As...</button>
         <button type="button" onClick={handleShowInProject} title="Show in Project">Show in Project</button>
         <span className="pcg-toolbar__spacer" />
         <button
@@ -1631,18 +1731,29 @@ function PcgEditor() {
           Preview
         </button>
         <span className="pcg-toolbar__separator" />
-        <button type="button" onClick={openSettings} title="PCG Settings (⌘,)">Settings</button>
+        <button type="button" onClick={openSettings} title="PICG Settings (⌘,)">Settings</button>
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pcg,.json,application/json"
+          accept=".picg,.pcg,.picgproject,.json,application/json"
           className="pcg-toolbar__file-input"
           onChange={handleImportFile}
         />
         <button type="button" className="pcg-toolbar__import" onClick={handleImportClick}>Import</button>
+        <button type="button" onClick={async () => {
+          try {
+            const result = await downloadProject(exportGraph(nodes, edges, parameters, subgraphs), shot, currentFilename);
+            setExportedProject(result);
+            setStatus(`Exported ${result.path}`);
+          } catch (error) { setStatus(`Export failed: ${String(error)}`); }
+        }}>Export project</button>
+        {exportedProject && <a className="picg-export-link" href={exportedProject.url} download title={exportedProject.path}>Download project</a>}
         <button type="button" className="pcg-toolbar__export" onClick={handleSendToUnity}>Send to Unity</button>
         {status && <span className="pcg-toolbar__status">{status}</span>}
       </div>
+
+      {fileDialog && <WorkspaceFileDialog mode={fileDialog} initialPath={currentFilename || 'examples/my-shot.picg'}
+        onSubmit={submitProjectPath} onClose={() => setFileDialog(null)} />}
 
       <SettingsDialog
         open={showSettings}
@@ -1693,6 +1804,11 @@ function PcgEditor() {
             selectedNodeId={selectedNode?.id ?? null}
             shot={shot}
             onShotChange={applyShotDocument}
+            cameraWorkspace={workspaceTab === 'cameras'}
+            autoKey={autoKey}
+            onShotTimeChange={setShotTime}
+            selectedCurvePoint={selectedCurvePoint}
+            onSelectCurvePoint={setSelectedCurvePoint}
           />
         )}
         <div className="pcg-graph-container">
@@ -1787,12 +1903,17 @@ function PcgEditor() {
           </>
           )}
           </div>
+          {workspaceTab === 'cameras' && <CameraCurveEditor shot={shot} time={shotTime} onShotChange={applyShotDocument}
+            onSeek={(time) => { previewViewportRef.current?.pauseShot(); previewViewportRef.current?.seekShot(shotRef.current, time); }} />}
           {workspaceTab === 'cameras' ? (
           <div className="pcg-status-bar">
             <span>
-              {shot.cameras.length} cameras · {shot.motionCurves?.length ?? 0} curves · {shot.cameraEdges.length} wires · {shot.cameraKeyframes.length} keys on {shot.activeCameraId}
+              {shot.cameras.length} cameras · {shot.motionCurves?.length ?? 0} curves · {shot.cameraEdges.length} wires · {editableCameraKeyframes(shot).length} keys
             </span>
-            <span className="pcg-status-bar__shortcuts">Space: Create camera · click a camera to key it in Preview</span>
+            <button type="button" onClick={undoShot} disabled={!canUndoShot}>↶ Undo</button>
+            <button type="button" onClick={redoShot} disabled={!canRedoShot}>↷ Redo</button>
+            <button type="button" aria-pressed={autoKey} onClick={() => setAutoKey(!autoKey)}>{autoKey ? '● Auto key' : '○ Auto key'}</button>
+            <span className="pcg-status-bar__shortcuts" title="Space: play/pause · Arrow keys: frame · Shift+Arrow: 10 frames · W/E: move/rotate · Shift+A: add camera">Space ▶ · W/E</span>
           </div>
           ) : (
           <div className="pcg-status-bar">
@@ -1811,7 +1932,7 @@ function PcgEditor() {
           )}
         </div>
         {showInspector && workspaceTab === 'cameras' && (
-          <CameraInspector shot={shot} onShotChange={applyShotDocument} />
+          <CameraInspector shot={shot} onShotChange={applyShotDocument} time={shotTime} autoKey={autoKey} selectedCurvePoint={selectedCurvePoint} onSelectCurvePoint={setSelectedCurvePoint} />
         )}
         {showInspector && workspaceTab === 'graph' && (
           <Inspector

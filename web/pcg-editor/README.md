@@ -1,4 +1,4 @@
-# PCG Web Editor
+# PICG Web Editor
 
 The Web editor is the browser authoring client for `pcg-server`.
 
@@ -12,7 +12,7 @@ The Web editor is the browser authoring client for `pcg-server`.
 From the repository root:
 
 ```bash
-./scripts/run-pcg-web.sh
+./scripts/run-picg-web.sh
 ```
 
 Or run the Web application separately:
@@ -24,6 +24,8 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:5173`.
+
+For camera gizmos, Transform rigs, motion/property curves, project saving and video export, see the [PICG cinematic previs guide](../../docs/picg-cinematic-previs.md).
 
 ## Commands
 
@@ -60,7 +62,7 @@ While the editor is open it publishes the in-memory graph, selection, subgraph s
 ```json
 {
   "mcpServers": {
-    "pcg": {
+    "picg": {
       "url": "http://127.0.0.1:17890/mcp"
     }
   }
@@ -73,7 +75,7 @@ Use the latest `graphHash` for every write. Graph operations are applied through
 
 Provider accounts are configured in **Settings → AI Providers**. Credentials are submitted only to the localhost server and are never stored in the browser or repository. Read/cook/capture tools run automatically; graph writes pause for an approval card tied to the current graph hash.
 
-Supported attachments are PNG/JPEG and UTF-8 `.txt`, `.json` or `.pcg` files. Chat history and attachments are stored in the user's application-support directory, outside the repository.
+Supported attachments are PNG/JPEG, UTF-8 text/JSON, `.picg`, `.picgshot`, `.picgproject`, and legacy `.pcg` files. Chat history and attachments are stored in the user's application-support directory, outside the repository.
 
 ## Examples
 

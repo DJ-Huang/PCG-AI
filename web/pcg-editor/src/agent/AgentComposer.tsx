@@ -12,7 +12,7 @@ export interface AgentAttachment {
   previewUrl: string | null;
 }
 
-const ACCEPT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.txt', '.json', '.pcg'];
+const ACCEPT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.txt', '.json', '.picg', '.picgshot', '.picgproject', '.pcg'];
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 function isAccepted(file: File): boolean {

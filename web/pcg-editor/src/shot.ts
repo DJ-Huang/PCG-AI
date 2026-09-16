@@ -13,7 +13,7 @@ import {
 } from './physicalCamera';
 import type { PreviewParameterValue } from './previewParameters';
 
-export type ShotInterpolation = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+export type ShotInterpolation = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'step';
 
 export interface ShotTransform {
   position: [number, number, number];
@@ -28,6 +28,15 @@ export interface ShotComponent {
   bounds?: SemanticBounds;
   anchors?: Record<string, [number, number, number]>;
   transform: ShotTransform;
+  visibleFromSeconds?: number;
+  visibleUntilSeconds?: number;
+}
+
+export interface ShotObjectKeyframe {
+  id: string;
+  timeSeconds: number;
+  interpolation: ShotInterpolation;
+  transform: Partial<ShotTransform>;
 }
 
 export interface ShotObjectAnimation {
@@ -36,6 +45,7 @@ export interface ShotObjectAnimation {
   startSeconds: number;
   playbackRate: number;
   loop: boolean;
+  keyframes?: ShotObjectKeyframe[];
 }
 
 export interface ShotCameraKeyframe {
@@ -66,9 +76,35 @@ export interface ShotMotionCurve {
   position: { x: number; y: number };
   controlPoints: [number, number, number][];
   closed: boolean;
+  cameraKeyframes?: ShotCameraKeyframe[];
+  lookMode?: 'tangent' | 'target';
+}
+
+/** Camera-space rig, stored in the shot sidecar rather than the geometry graph. */
+export interface ShotCameraTransform {
+  id: string;
+  name: string;
+  cameraId: string;
+  position: { x: number; y: number };
+  translation: [number, number, number];
+  rotationEulerDeg: [number, number, number];
 }
 
 export const SHOT_OUTPUT_ID = 'shot_output';
+
+export function layoutShotGraph(shot: ShotDocument): ShotDocument {
+  const cameras = shot.cameras.map((camera, index) => ({ ...camera, position: { x: 80 + index * 360, y: 160 } }));
+  const cameraPosition = (id: string) => cameras.find((camera) => camera.id === id)?.position ?? { x: 80, y: 160 };
+  return { ...shot, cameras,
+    motionCurves: shot.motionCurves.map((curve, index) => ({ ...curve, position: {
+      x: shot.cameraEdges.some((edge) => edge.source === curve.id)
+        ? cameraPosition(shot.cameraEdges.find((edge) => edge.source === curve.id)!.target).x
+        : 80 + (cameras.length + index) * 360, y: 0,
+    } })),
+    cameraTransforms: shot.cameraTransforms.map((rig) => ({ ...rig, position: { x: cameraPosition(rig.cameraId).x, y: 320 } })),
+    shotOutputPosition: { x: cameras[0]?.position.x ?? 80, y: 480 },
+  };
+}
 
 export interface ShotDocument {
   version: '1.0';
@@ -84,6 +120,7 @@ export interface ShotDocument {
   objectAnimations: ShotObjectAnimation[];
   cameras: ShotCamera[];
   motionCurves: ShotMotionCurve[];
+  cameraTransforms: ShotCameraTransform[];
   cameraEdges: ShotCameraEdge[];
   activeCameraId: string;
   selectedNodeId: string;
@@ -98,7 +135,7 @@ const DEFAULT_TRANSFORM: ShotTransform = {
   scale: [1, 1, 1],
 };
 
-const DEFAULT_OUTPUT_POSITION = { x: 420, y: 160 };
+const DEFAULT_OUTPUT_POSITION = { x: 80, y: 480 };
 
 export function createDefaultCamera(
   id = 'cam_a',
@@ -134,6 +171,7 @@ export function createDefaultShot(name = 'Shot 01'): ShotDocument {
     objectAnimations: [],
     cameras: [camera],
     motionCurves: [],
+    cameraTransforms: [],
     cameraEdges: [{ id: 'e_cam_a_out', source: camera.id, target: SHOT_OUTPUT_ID }],
     activeCameraId: camera.id,
     selectedNodeId: camera.id,
@@ -181,6 +219,8 @@ function normalizeComponents(value: unknown): ShotComponent[] {
       ...(raw.bounds ? { bounds: raw.bounds } : {}),
       ...(raw.anchors ? { anchors: raw.anchors } : {}),
       transform: normalizeTransform(raw.transform),
+      ...(typeof raw.visibleFromSeconds === 'number' ? { visibleFromSeconds: finiteNumber(raw.visibleFromSeconds, 0, 0, 3600) } : {}),
+      ...(typeof raw.visibleUntilSeconds === 'number' ? { visibleUntilSeconds: finiteNumber(raw.visibleUntilSeconds, 3600, 0, 3600) } : {}),
     });
   }
   return result;
@@ -199,6 +239,18 @@ function normalizeObjectAnimations(value: unknown): ShotObjectAnimation[] {
       startSeconds: finiteNumber(raw.startSeconds, 0, 0, 3600),
       playbackRate: finiteNumber(raw.playbackRate, 1, 0.01, 100),
       loop: raw.loop === true,
+      ...(Array.isArray(raw.keyframes) ? { keyframes: raw.keyframes.flatMap((entry, index): ShotObjectKeyframe[] => {
+        if (!entry || typeof entry !== 'object') return [];
+        const key = entry as Partial<ShotObjectKeyframe>;
+        const interpolation: ShotInterpolation = ['linear', 'ease-in', 'ease-out', 'ease-in-out', 'step'].includes(key.interpolation ?? '')
+          ? key.interpolation as ShotInterpolation : 'linear';
+        if (typeof key.timeSeconds !== 'number' || !Number.isFinite(key.timeSeconds) || !key.transform || typeof key.transform !== 'object') return [];
+        const transform: Partial<ShotTransform> = {};
+        if (key.transform.position) transform.position = vec3(key.transform.position, DEFAULT_TRANSFORM.position);
+        if (key.transform.rotationEulerDeg) transform.rotationEulerDeg = vec3(key.transform.rotationEulerDeg, DEFAULT_TRANSFORM.rotationEulerDeg);
+        if (key.transform.scale) transform.scale = vec3(key.transform.scale, DEFAULT_TRANSFORM.scale);
+        return [{ id: typeof key.id === 'string' && key.id ? key.id : `object_key_${index + 1}`, timeSeconds: finiteNumber(key.timeSeconds, 0, 0, 3600), interpolation, transform }];
+      }).sort((a, b) => a.timeSeconds - b.timeSeconds) } : {}),
     }];
   });
 }
@@ -217,7 +269,7 @@ function normalizeCameraKeyframes(value: unknown, durationSeconds: number): Shot
     if (!entry || typeof entry !== 'object') return [];
     const key = entry as Partial<ShotCameraKeyframe>;
     if (!key.value || typeof key.value !== 'object') return [];
-    const interpolation: ShotInterpolation = ['linear', 'ease-in', 'ease-out', 'ease-in-out']
+    const interpolation: ShotInterpolation = ['linear', 'ease-in', 'ease-out', 'ease-in-out', 'step']
       .includes(key.interpolation ?? '') ? key.interpolation as ShotInterpolation : 'linear';
     return [{
       id: typeof key.id === 'string' && key.id ? key.id : `camera_key_${index + 1}`,
@@ -271,10 +323,12 @@ function normalizeCameraEdges(
   value: unknown,
   cameraIds: Set<string>,
   curveIds: Set<string>,
+  transforms: ShotCameraTransform[],
 ): ShotCameraEdge[] {
-  const validSource = (id: string) => cameraIds.has(id) || curveIds.has(id);
-  const validTarget = (id: string) => id === SHOT_OUTPUT_ID || cameraIds.has(id);
-  if (Array.isArray(value) && value.length > 0) {
+  const transformIds = new Set(transforms.map((entry) => entry.id));
+  const validSource = (id: string) => cameraIds.has(id) || curveIds.has(id) || transformIds.has(id);
+  const validTarget = (id: string) => id === SHOT_OUTPUT_ID || cameraIds.has(id) || transformIds.has(id);
+  if (Array.isArray(value)) {
     const ids = new Set<string>();
     const edges: ShotCameraEdge[] = [];
     value.forEach((entry, index) => {
@@ -285,20 +339,22 @@ function normalizeCameraEdges(
       if (!validSource(source) || !validTarget(target) || source === target) return;
       if (curveIds.has(source) && !cameraIds.has(target)) return;
       if (cameraIds.has(source) && curveIds.has(target)) return;
+      if (transformIds.has(source) && target !== SHOT_OUTPUT_ID) return;
+      if (transformIds.has(target) && transforms.find((entry) => entry.id === target)?.cameraId !== source) return;
       const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `e_${source}_${target}_${index + 1}`;
       if (ids.has(id)) return;
       ids.add(id);
       edges.push({ id, source, target });
     });
-    if (edges.length > 0) return edges;
+    return edges;
   }
   const first = [...cameraIds][0];
   return first ? [{ id: `e_${first}_out`, source: first, target: SHOT_OUTPUT_ID }] : [];
 }
 
-function normalizeMotionCurves(value: unknown): ShotMotionCurve[] {
+function normalizeMotionCurves(value: unknown, durationSeconds: number, reservedIds: Set<string>): ShotMotionCurve[] {
   if (!Array.isArray(value)) return [];
-  const ids = new Set<string>();
+  const ids = new Set(reservedIds);
   const curves: ShotMotionCurve[] = [];
   value.forEach((entry, index) => {
     if (!entry || typeof entry !== 'object') return;
@@ -321,6 +377,8 @@ function normalizeMotionCurves(value: unknown): ShotMotionCurve[] {
       position: normalizeGraphPosition(raw.position, { x: 80 + curves.length * 320, y: 0 }),
       controlPoints: controlPoints.length >= 2 ? controlPoints : [[-1.5, 1.5, 4], [0, 1.5, 3], [1.8, 1.2, 1.2]],
       closed: raw.closed === true,
+      cameraKeyframes: normalizeCameraKeyframes(raw.cameraKeyframes, durationSeconds),
+      lookMode: raw.lookMode === 'target' ? 'target' : 'tangent',
     });
   });
   return curves;
@@ -337,6 +395,7 @@ export function syncShotCameras(shot: ShotDocument): ShotDocument {
   return {
     ...shot,
     motionCurves: shot.motionCurves ?? [],
+    cameraTransforms: shot.cameraTransforms ?? [],
     selectedNodeId: shot.selectedNodeId || active.id,
     cameras: shot.cameras.map((camera) => (
       camera.id === active.id
@@ -368,8 +427,11 @@ export function selectShotCamera(shot: ShotDocument, cameraId: string): ShotDocu
 export function selectShotNode(shot: ShotDocument, nodeId: string): ShotDocument {
   if (nodeId === SHOT_OUTPUT_ID) return { ...shot, selectedNodeId: nodeId };
   if (findShotMotionCurve(shot, nodeId)) {
-    return { ...syncShotCameras(shot), selectedNodeId: nodeId };
+    const target = shot.cameraEdges.find((edge) => edge.source === nodeId)?.target;
+    return { ...(target ? selectShotCamera(shot, target) : syncShotCameras(shot)), selectedNodeId: nodeId };
   }
+  const transform = shot.cameraTransforms?.find((entry) => entry.id === nodeId);
+  if (transform) return { ...selectShotCamera(shot, transform.cameraId), selectedNodeId: nodeId };
   return selectShotCamera(shot, nodeId);
 }
 
@@ -383,14 +445,29 @@ export function normalizeShotDocument(value: unknown): ShotDocument {
   );
   const cameraKeyframes = normalizeCameraKeyframes(raw.cameraKeyframes, durationSeconds);
   const cameras = normalizeCameras(raw.cameras, camera, cameraKeyframes, durationSeconds);
-  const motionCurves = normalizeMotionCurves(raw.motionCurves);
   const cameraIds = new Set(cameras.map((entry) => entry.id));
+  const motionCurves = normalizeMotionCurves(raw.motionCurves, durationSeconds, cameraIds);
   const curveIds = new Set(motionCurves.map((entry) => entry.id));
+  const usedIds = new Set([...cameraIds, ...curveIds, SHOT_OUTPUT_ID]);
+  const rigCameras = new Set<string>();
+  const cameraTransforms = (Array.isArray(raw.cameraTransforms) ? raw.cameraTransforms : []).flatMap((entry): ShotCameraTransform[] => {
+    if (!entry || typeof entry.id !== 'string' || !entry.id.trim() || usedIds.has(entry.id)
+      || !cameraIds.has(entry.cameraId) || rigCameras.has(entry.cameraId)) return [];
+    usedIds.add(entry.id);
+    rigCameras.add(entry.cameraId);
+    const station = cameras.find((camera) => camera.id === entry.cameraId)!;
+    return [{
+      id: entry.id, name: typeof entry.name === 'string' ? entry.name : 'Transform', cameraId: entry.cameraId,
+      position: normalizeGraphPosition(entry.position, { x: station.position.x, y: station.position.y + 160 }),
+      translation: vec3(entry.translation, [0, 0, 0]),
+      rotationEulerDeg: vec3(entry.rotationEulerDeg, [0, 0, 0]),
+    }];
+  });
   const requestedActive = typeof raw.activeCameraId === 'string' ? raw.activeCameraId : cameras[0].id;
   const active = cameras.find((entry) => entry.id === requestedActive) ?? cameras[0];
   const hasCameraList = Array.isArray(raw.cameras) && raw.cameras.length > 0;
   const requestedSelected = typeof raw.selectedNodeId === 'string' ? raw.selectedNodeId : active.id;
-  const selectedNodeId = cameraIds.has(requestedSelected) || curveIds.has(requestedSelected) || requestedSelected === SHOT_OUTPUT_ID
+  const selectedNodeId = usedIds.has(requestedSelected)
     ? requestedSelected
     : active.id;
   return {
@@ -409,7 +486,8 @@ export function normalizeShotDocument(value: unknown): ShotDocument {
     objectAnimations: normalizeObjectAnimations(raw.objectAnimations),
     cameras,
     motionCurves,
-    cameraEdges: normalizeCameraEdges(raw.cameraEdges, cameraIds, curveIds),
+    cameraTransforms,
+    cameraEdges: normalizeCameraEdges(raw.cameraEdges, cameraIds, curveIds, cameraTransforms),
     activeCameraId: active.id,
     selectedNodeId,
     shotOutputPosition: normalizeGraphPosition(raw.shotOutputPosition, DEFAULT_OUTPUT_POSITION),

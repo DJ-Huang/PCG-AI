@@ -16,8 +16,14 @@ export interface SemanticBounds {
 export interface SemanticComponent {
   /** Stable agent query key, e.g. "doorway_opening". Same ids aggregate. */
   componentId: string;
+  label?: string;
   role?: string;
   zone?: string;
+  intent?: string;
+  /** Stable shared structure knowledge id, not scene-instance prose. */
+  recipeId?: string;
+  /** Nodes in this scope that form the component, including the semantic owner. */
+  memberNodeIds?: string[];
   /** Explicit AABB; required for negative space and recommended for aggregates. */
   bounds?: SemanticBounds;
   anchors?: Record<string, [number, number, number]>;

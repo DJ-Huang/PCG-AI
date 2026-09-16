@@ -1,4 +1,5 @@
 import { findCameraPathCurve, sampleShotCameraWorld } from './cameraPath';
+import { cameraStateToCommand } from './cameraMotion';
 import type { CameraCommand, PhysicalCameraState } from './physicalCamera';
 import {
   normalizeShotDocument,
@@ -8,7 +9,27 @@ import {
   type ShotInterpolation,
 } from './shot';
 
-const INTERPOLATIONS: ShotInterpolation[] = ['linear', 'ease-in', 'ease-out', 'ease-in-out'];
+const INTERPOLATIONS: ShotInterpolation[] = ['linear', 'ease-in', 'ease-out', 'ease-in-out', 'step'];
+
+export function editableMotionCurve(shot: ShotDocument) {
+  return shot.motionCurves.find((curve) => curve.id === shot.selectedNodeId)
+    ?? findCameraPathCurve(shot, shot.activeCameraId);
+}
+
+export function editableCameraKeyframes(shot: ShotDocument): ShotCameraKeyframe[] {
+  const curve = editableMotionCurve(shot);
+  return curve ? curve.cameraKeyframes ?? [] : shot.cameraKeyframes;
+}
+
+function writeCameraKeyframes(shot: ShotDocument, keys: ShotCameraKeyframe[]): ShotDocument {
+  const curve = editableMotionCurve(shot);
+  return curve ? { ...shot, motionCurves: shot.motionCurves.map((entry) => entry.id === curve.id ? { ...entry, cameraKeyframes: keys } : entry) }
+    : syncShotCameras({ ...shot, cameraKeyframes: keys });
+}
+
+export function snapShotTime(shot: ShotDocument, time: number): number {
+  return Number.isFinite(time) ? Math.min(shot.durationSeconds, Math.max(0, Math.round(time * shot.fps) / shot.fps)) : 0;
+}
 
 export function canonicalShotPayload(shot: ShotDocument): string {
   return JSON.stringify(normalizeShotDocument(shot));
@@ -45,92 +66,102 @@ export function upsertCameraKeyframe(
   shot: ShotDocument,
   keyframe: Partial<ShotCameraKeyframe> & { value: CameraCommand },
 ): ShotDocument {
-  const nextKey = normalizeCameraKeyframe(keyframe, shot.cameraKeyframes.length, shot.durationSeconds);
+  const keys = editableCameraKeyframes(shot);
+  const nextKey = normalizeCameraKeyframe(keyframe, keys.length, shot.durationSeconds);
   if (!nextKey) return shot;
+  nextKey.timeSeconds = snapShotTime(shot, nextKey.timeSeconds);
   const epsilon = keyframeTimeEpsilon(shot.fps);
-  const existingIndex = shot.cameraKeyframes.findIndex((candidate) => (
-    candidate.id === nextKey.id
+  const existingIndex = keys.findIndex((candidate) => (
+    (keyframe.id && candidate.id === keyframe.id)
     || Math.abs(candidate.timeSeconds - nextKey.timeSeconds) <= epsilon
   ));
-  const keyframes = [...shot.cameraKeyframes];
+  const keyframes = [...keys];
   if (existingIndex >= 0) {
-    keyframes[existingIndex] = {
-      ...keyframes[existingIndex],
-      ...nextKey,
-      id: keyframes[existingIndex].id,
-    };
+    const old = keyframes[existingIndex];
+    keyframes[existingIndex] = { ...old, ...nextKey, id: old.id, value: { ...old.value, ...nextKey.value } };
   } else {
+    const ids = new Set(keys.map((key) => key.id));
+    for (let i = keys.length + 1; ids.has(nextKey.id); i++) nextKey.id = `camera_key_${i}`;
     keyframes.push(nextKey);
   }
-  return syncShotCameras({ ...shot, cameraKeyframes: sortKeyframes(keyframes) });
+  return writeCameraKeyframes(shot, sortKeyframes(keyframes));
 }
 
 export function removeCameraKeyframe(shot: ShotDocument, keyframeId: string): ShotDocument {
-  return syncShotCameras({
-    ...shot,
-    cameraKeyframes: shot.cameraKeyframes.filter((keyframe) => keyframe.id !== keyframeId),
-  });
+  return writeCameraKeyframes(shot, editableCameraKeyframes(shot).filter((key) => key.id !== keyframeId));
 }
 
-export function moveCameraKeyframeTime(
-  shot: ShotDocument,
-  keyframeId: string,
-  timeSeconds: number,
-): ShotDocument {
-  return syncShotCameras({
-    ...shot,
-    cameraKeyframes: sortKeyframes(shot.cameraKeyframes.map((keyframe) => (
-      keyframe.id === keyframeId
-        ? { ...keyframe, timeSeconds: Math.min(shot.durationSeconds, Math.max(0, timeSeconds)) }
-        : keyframe
-    ))),
-  });
+/** Curve editing changes one property; other keys at the same frame stay put. */
+export function removeCameraChannelKey(shot: ShotDocument, keyframeId: string, field: keyof CameraCommand): ShotDocument {
+  return writeCameraKeyframes(shot, editableCameraKeyframes(shot).flatMap((key) => {
+    if (key.id !== keyframeId) return [key];
+    const value = { ...key.value };
+    delete value[field];
+    return Object.keys(value).length ? [{ ...key, value }] : [];
+  }));
 }
 
-export function replaceCameraKeyframes(
-  shot: ShotDocument,
-  keyframes: readonly Partial<ShotCameraKeyframe>[],
-): ShotDocument {
-  const normalized = keyframes.flatMap((keyframe, index) => {
-    const next = normalizeCameraKeyframe(keyframe, index, shot.durationSeconds);
-    return next ? [next] : [];
+export function moveCameraChannelKey(shot: ShotDocument, keyframeId: string, field: keyof CameraCommand, timeSeconds: number): { shot: ShotDocument; keyframeId: string } {
+  const unchanged = { shot, keyframeId };
+  if (!Number.isFinite(timeSeconds)) return unchanged;
+  const keys = editableCameraKeyframes(shot);
+  const source = keys.find((key) => key.id === keyframeId);
+  const time = snapShotTime(shot, timeSeconds);
+  if (!source || source.value[field] === undefined || source.timeSeconds === time) return unchanged;
+  const target = keys.find((key) => key.id !== keyframeId && Math.abs(key.timeSeconds - time) <= keyframeTimeEpsilon(shot.fps));
+  if (target?.value[field] !== undefined) return unchanged;
+  const value = { [field]: source.value[field] };
+  const remaining = { ...source.value }; delete remaining[field];
+  const hasRemaining = Object.keys(remaining).length > 0;
+  let nextId = target?.id ?? (hasRemaining ? `${source.id}_${field}` : source.id);
+  if (!target && hasRemaining) {
+    const ids = new Set(keys.map((key) => key.id));
+    for (let i = 2; ids.has(nextId); i++) nextId = `${source.id}_${field}_${i}`;
+  }
+  const nextKeys = keys.flatMap((key) => {
+    if (key.id === source.id) return hasRemaining ? [{ ...key, value: remaining }] : [];
+    if (key.id === target?.id) return [{ ...key, value: { ...key.value, ...value } }];
+    return [key];
   });
-  return syncShotCameras({ ...shot, cameraKeyframes: sortKeyframes(normalized) });
+  if (!target) nextKeys.push({ ...source, id: nextId, timeSeconds: time, value });
+  return { shot: writeCameraKeyframes(shot, sortKeyframes(nextKeys)), keyframeId: nextId };
 }
 
-export function setKeyframeInterpolation(
-  shot: ShotDocument,
-  keyframeId: string,
-  interpolation: ShotInterpolation,
-): ShotDocument {
-  return syncShotCameras({
-    ...shot,
-    cameraKeyframes: shot.cameraKeyframes.map((keyframe) => (
-      keyframe.id === keyframeId ? { ...keyframe, interpolation } : keyframe
-    )),
-  });
+export function moveCameraKeyframeTime(shot: ShotDocument, keyframeId: string, timeSeconds: number): ShotDocument {
+  if (!Number.isFinite(timeSeconds)) return shot;
+  const time = snapShotTime(shot, timeSeconds);
+  const keys = editableCameraKeyframes(shot);
+  // A drag must never silently delete another key at the destination frame.
+  if (keys.some((key) => key.id !== keyframeId && Math.abs(key.timeSeconds - time) <= keyframeTimeEpsilon(shot.fps))) return shot;
+  return writeCameraKeyframes(shot, sortKeyframes(keys.map((key) => key.id === keyframeId ? { ...key, timeSeconds: time } : key)));
 }
 
-export function setKeyframeCamera(
-  shot: ShotDocument,
-  keyframeId: string,
-  camera: PhysicalCameraState,
-): ShotDocument {
-  const value = cameraStateToCommand(camera);
-  return syncShotCameras({
-    ...shot,
-    cameraKeyframes: shot.cameraKeyframes.map((keyframe) => (
-      keyframe.id === keyframeId ? { ...keyframe, value } : keyframe
-    )),
-  });
+export function replaceCameraKeyframes(shot: ShotDocument, keyframes: readonly Partial<ShotCameraKeyframe>[]): ShotDocument {
+  let next = writeCameraKeyframes(shot, []);
+  for (const [index, key] of keyframes.entries()) {
+    const normalized = normalizeCameraKeyframe(key, index, shot.durationSeconds);
+    if (normalized) next = upsertCameraKeyframe(next, normalized);
+  }
+  return next;
 }
 
-export function findKeyframeAtTime(
-  shot: ShotDocument,
-  timeSeconds: number,
-): ShotCameraKeyframe | null {
-  const epsilon = keyframeTimeEpsilon(shot.fps);
-  return shot.cameraKeyframes.find((keyframe) => Math.abs(keyframe.timeSeconds - timeSeconds) <= epsilon) ?? null;
+export function setKeyframeInterpolation(shot: ShotDocument, keyframeId: string, interpolation: ShotInterpolation): ShotDocument {
+  if (!INTERPOLATIONS.includes(interpolation)) return shot;
+  return writeCameraKeyframes(shot, editableCameraKeyframes(shot).map((key) => key.id === keyframeId ? { ...key, interpolation } : key));
+}
+
+export function setKeyframeCamera(shot: ShotDocument, keyframeId: string, camera: PhysicalCameraState): ShotDocument {
+  return patchKeyframeValue(shot, keyframeId, cameraStateToCommand(camera));
+}
+
+export function patchKeyframeValue(shot: ShotDocument, keyframeId: string, value: CameraCommand): ShotDocument {
+  return writeCameraKeyframes(shot, editableCameraKeyframes(shot).map((key) => (
+    key.id === keyframeId ? { ...key, value: { ...key.value, ...value } } : key
+  )));
+}
+
+export function findKeyframeAtTime(shot: ShotDocument, timeSeconds: number): ShotCameraKeyframe | null {
+  return editableCameraKeyframes(shot).find((key) => Math.abs(key.timeSeconds - timeSeconds) <= keyframeTimeEpsilon(shot.fps)) ?? null;
 }
 
 export interface CameraTrajectoryPoint {
@@ -144,7 +175,7 @@ export function cameraTrajectoryPoints(
   shot: ShotDocument,
   samplesPerSegment = 8,
 ): CameraTrajectoryPoint[] {
-  const keys = sortKeyframes(shot.cameraKeyframes);
+  const keys = sortKeyframes(editableCameraKeyframes(shot));
   if (keys.length === 0) {
     if (findCameraPathCurve(shot, shot.activeCameraId)) {
       const points: CameraTrajectoryPoint[] = [];

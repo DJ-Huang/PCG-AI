@@ -35,7 +35,13 @@ struct BridgeState {
     std::condition_variable preview_changed;
     std::condition_variable camera_changed;
     std::unordered_map<std::string, EditorState> editors;
-    uint64_t next_patch_id = 1;
+    std::string bound_editor_session_id;
+    // A browser keeps its last command cursor across transient server restarts.
+    // Time-prefix ids prevent a restarted server from reusing a cursor value and
+    // making a fresh command look already consumed.
+    uint64_t next_patch_id = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count()) * 1000ull;
     std::condition_variable command_changed;
     std::unordered_map<uint64_t, json> command_results;
     std::deque<uint64_t> command_result_order;
@@ -69,6 +75,7 @@ json EditorChoicesLocked(const BridgeState& state) {
             {"shotHash", editor.session.value("shotHash", "")},
             {"nodeCount", graph.value("nodes", json::array()).size()},
             {"updatedAt", editor.session.value("updatedAt", 0ll)},
+            {"bound", id == state.bound_editor_session_id},
         });
     }
     return choices;
@@ -94,6 +101,11 @@ EditorState* ResolveEditorLocked(BridgeState& state, const std::string& requeste
     if (!requested_id.empty()) {
         const auto it = state.editors.find(requested_id);
         return it != state.editors.end() && IsOnlineLocked(it->second) ? &it->second : nullptr;
+    }
+    if (!state.bound_editor_session_id.empty()) {
+        const auto bound = state.editors.find(state.bound_editor_session_id);
+        if (bound != state.editors.end() && IsOnlineLocked(bound->second)) return &bound->second;
+        state.bound_editor_session_id.clear();
     }
     EditorState* resolved = nullptr;
     for (auto& [_, editor] : state.editors) {
@@ -192,7 +204,22 @@ const json* FindCurrentNode(const json& session, const std::string& node_id) {
 
 json ShotSummary(const json& shot) {
     const json cameras = shot.value("cameras", json::array());
-    const json keys = shot.value("cameraKeyframes", json::array());
+    const json curves = shot.value("motionCurves", json::array());
+    const json transforms = shot.value("cameraTransforms", json::array());
+    auto key_count = [](const json& node) -> std::size_t {
+        if (!node.is_object()) return 0;
+        const auto keys = node.find("cameraKeyframes");
+        return keys != node.end() && keys->is_array() ? keys->size() : 0;
+    };
+    std::size_t keyframe_count = 0;
+    if (cameras.is_array() && !cameras.empty()) {
+        for (const auto& camera : cameras) keyframe_count += key_count(camera);
+    } else {
+        keyframe_count = key_count(shot);
+    }
+    if (curves.is_array()) {
+        for (const auto& curve : curves) keyframe_count += key_count(curve);
+    }
     return {
         {"name", shot.value("name", "")},
         {"durationSeconds", shot.value("durationSeconds", 0.0)},
@@ -201,11 +228,13 @@ json ShotSummary(const json& shot) {
         {"height", shot.value("height", 1080)},
         {"activeCameraId", shot.value("activeCameraId", "")},
         {"cameraCount", cameras.is_array() ? cameras.size() : 0},
-        {"keyframeCount", keys.is_array() ? keys.size() : 0},
+        {"motionCurveCount", curves.is_array() ? curves.size() : 0},
+        {"transformCount", transforms.is_array() ? transforms.size() : 0},
+        {"keyframeCount", keyframe_count},
     };
 }
 
-enum class CommandLock { Graph, Shot, None };
+enum class CommandLock { Graph, Shot, Both, None };
 
 json QueueEditorCommandLocked(
     BridgeState& state,
@@ -219,7 +248,7 @@ json QueueEditorCommandLocked(
     }
     const std::string current_graph_hash = editor.session.value("graphHash", "");
     const std::string current_shot_hash = editor.session.value("shotHash", "");
-    if (lock == CommandLock::Graph) {
+    if (lock == CommandLock::Graph || lock == CommandLock::Both) {
         if (expected_hash.empty()) {
             return {{"ok", false}, {"status", 428}, {"error", "ifGraphHash is required"}};
         }
@@ -229,7 +258,8 @@ json QueueEditorCommandLocked(
                 {"expectedGraphHash", expected_hash}, {"currentGraphHash", current_graph_hash},
             };
         }
-    } else if (lock == CommandLock::Shot) {
+    }
+    if (lock == CommandLock::Shot || lock == CommandLock::Both) {
         if (expected_hash.empty()) {
             return {{"ok", false}, {"status", 428}, {"error", "ifShotHash is required"}};
         }
@@ -543,9 +573,12 @@ void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res) 
     }
     json patches = json::array();
     for (const auto& patch : editor->patches) {
-        if (patch.value("id", 0ull) > after) patches.push_back(patch);
+        // The deque contains only unacknowledged commands. Returning them is
+        // safe even when a browser cursor survived a server restart or an ACK
+        // was lost; the editor applies one at a time and ACK removes it.
+        patches.push_back(patch);
     }
-    JsonResponse(res, 200, {{"ok", true}, {"patches", patches}});
+    JsonResponse(res, 200, {{"ok", true}, {"patches", patches}, {"after", after}});
 }
 
 void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) {
@@ -635,6 +668,43 @@ json GetEditorContext(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     return ContextLocked(state, editor_session_id);
+}
+
+json ListEditorSessions() {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    const json editors = EditorChoicesLocked(state);
+    return {
+        {"ok", true},
+        {"editors", editors},
+        {"count", editors.size()},
+        {"boundEditorSessionId", state.bound_editor_session_id},
+    };
+}
+
+json BindEditorSession(const std::string& editor_session_id) {
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    if (editor_session_id.empty()) {
+        state.bound_editor_session_id.clear();
+        return {{"ok", true}, {"boundEditorSessionId", ""}};
+    }
+    const auto found = state.editors.find(editor_session_id);
+    if (found == state.editors.end() || !IsOnlineLocked(found->second)) {
+        return {
+            {"ok", false},
+            {"error", "editor_session_unavailable"},
+            {"editorSessionId", editor_session_id},
+            {"editors", EditorChoicesLocked(state)},
+        };
+    }
+    state.bound_editor_session_id = editor_session_id;
+    return {
+        {"ok", true},
+        {"boundEditorSessionId", editor_session_id},
+        {"graphHash", found->second.session.value("graphHash", "")},
+        {"shotHash", found->second.session.value("shotHash", "")},
+    };
 }
 
 json GetEditorNode(const std::string& node_id, const std::string& editor_session_id) {
@@ -779,6 +849,34 @@ json QueueShotCommand(
     }
     return QueueEditorCommandLocked(
         state, *editor, std::move(command), CommandLock::Shot, expected_shot_hash, false);
+}
+
+json QueuePrevisCommand(
+    json command,
+    const std::string& expected_graph_hash,
+    const std::string& expected_shot_hash,
+    const std::string& editor_session_id) {
+    if (!command.is_object() || !command.contains("type") || !command["type"].is_string()) {
+        return {{"ok", false}, {"status", 400}, {"error", "command type is required"}};
+    }
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (editor == nullptr) {
+        json error = EditorSelectionErrorLocked(state, editor_session_id);
+        error["status"] = 409;
+        return error;
+    }
+    if (expected_graph_hash.empty() || expected_shot_hash.empty()) {
+        return {{"ok", false}, {"status", 428}, {"error", "ifGraphHash and ifShotHash are required"}};
+    }
+    if (editor->session.value("graphHash", "") != expected_graph_hash) {
+        return {{"ok", false}, {"status", 409}, {"error", "graph_conflict"}, {"currentGraphHash", editor->session.value("graphHash", "")}};
+    }
+    if (editor->session.value("shotHash", "") != expected_shot_hash) {
+        return {{"ok", false}, {"status", 409}, {"error", "shot_conflict"}, {"currentShotHash", editor->session.value("shotHash", "")}};
+    }
+    return QueueEditorCommandLocked(state, *editor, std::move(command), CommandLock::None, "", true);
 }
 
 json QueuePreviewShotCommand(json command, const std::string& editor_session_id) {

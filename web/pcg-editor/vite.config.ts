@@ -4,6 +4,8 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { registerPrevisFileRoutes } from './previsFileRoutes.js';
+import { registerDocumentFileRoutes } from './documentFileRoutes.js';
 import {
   assertWorkspaceGraphParent,
   resolveExistingWorkspaceGraphPath,
@@ -112,6 +114,8 @@ function exportGraphPlugin(): Plugin {
   return {
     name: 'pcg-export-graph',
     configureServer(server) {
+      registerPrevisFileRoutes(server, WORKSPACE_ROOT);
+      registerDocumentFileRoutes(server, WORKSPACE_ROOT);
       server.middlewares.use('/api/export-graph', (req, res, next) => {
         if (req.method !== 'POST') {
           next();
@@ -161,6 +165,13 @@ function exportGraphPlugin(): Plugin {
             fs.mkdirSync(path.dirname(resolved), { recursive: true });
             assertWorkspaceGraphParent(WORKSPACE_ROOT, resolved);
             fs.writeFileSync(resolved, JSON.stringify(graphData, null, 2), 'utf8');
+            if (parsed.shotData) {
+              const shotPath = resolved.replace(/\.(picg|pcg)$/i, '.picgshot');
+              assertWorkspaceGraphParent(WORKSPACE_ROOT, shotPath);
+              const temporary = `${shotPath}.${process.pid}.tmp`;
+              fs.writeFileSync(temporary, JSON.stringify(parsed.shotData, null, 2), { encoding: 'utf8', flag: 'wx' });
+              fs.renameSync(temporary, shotPath);
+            }
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ ok: true, path: resolved }));
           } catch (err) {
@@ -245,7 +256,22 @@ function exportGraphPlugin(): Plugin {
         });
       });
 
-      // Load a .pcg graph file from disk (for the /review route)
+      server.middlewares.use('/api/load-shot', (req, res, next) => {
+        if (req.method !== 'GET') { next(); return; }
+        try {
+          const url = new URL(req.url ?? '', 'http://localhost');
+          const graphPath = resolveExistingWorkspaceGraphPath(WORKSPACE_ROOT, url.searchParams.get('path'));
+          const shotPath = graphPath.replace(/\.(picg|pcg)$/i, '.picgshot');
+          assertWorkspaceGraphParent(WORKSPACE_ROOT, shotPath);
+          res.setHeader('Content-Type', 'application/json');
+          res.end(fs.readFileSync(shotPath, 'utf8'));
+        } catch (error) {
+          res.statusCode = 404;
+          res.end(JSON.stringify({ ok: false, error: String(error) }));
+        }
+      });
+
+      // Load a .picg / legacy .pcg graph file from disk (for the /review route)
       // GET /api/load-graph?path=<relative-path>
       server.middlewares.use('/api/load-graph', (req, res, next) => {
         if (req.method !== 'GET') {

@@ -7,6 +7,7 @@
   "description": "约 1.75 米高的站立人物代理，具有清晰头身比例和局部 +Z 朝向。",
   "semantic": {
     "componentId": "human_proxy_standing",
+    "recipeId": "pcg.recipe:previs:character-proxy",
     "role": "character",
     "bounds": {
       "center": [0, 0.875, 0],

@@ -205,7 +205,7 @@ export function buildProceduralReferencePrompt(manifest: ProceduralReferenceMani
     .map((view) => `${view.id}: azimuth ${view.azimuth}°, elevation ${view.elevation}°`)
     .join('; ');
   return [
-    '执行 Tripo GLB-mediated 程序化重建。附件 PNG 是 PCG Web 预览器刚刚从参考 GLB 采集的固定机位、多诊断通道基准，JSON 是同批次的相机、pass 与来源清单。',
+    '执行 Tripo GLB-mediated 程序化重建。附件 PNG 是 PICG Web 预览器刚刚从参考 GLB 采集的固定机位、多诊断通道基准，JSON 是同批次的相机、pass 与来源清单。',
     '',
     `参考 GLB：${manifest.reference.path}`,
     `源图证据：${manifest.reference.sourceImageFile ?? manifest.reference.sourceImage ?? '未提供'}`,
@@ -219,7 +219,7 @@ export function buildProceduralReferencePrompt(manifest: ProceduralReferenceMani
     '2. 该来源的语义标签未经验证。除非实时清单证明为多部件，否则把区域命名当作视觉假设并明确记录。',
     '2.1 颜色、花纹和配饰以源图证据为主；GLB 截图若因导入链未携带贴图而呈白色，不得据此把程序化材质误判为全白。',
     '3. 先调用 pcg_get_editor_context，检索项目 PCG KB 的 graph-contract、assembly-bevel 与对应资产类型规则，再按精确类型调用 pcg_get_node_types；不得臆造节点、属性或 pin。',
-    '4. 先写 AssetSpec：比例、连续主体体积、语义部件、连接关系、材质、SDF cellSize/support/isoOffset、参数与确定性 seed；随后只通过 PCG MCP 在当前 Web 编辑器中创建独立、可编辑的程序化图。',
+    '4. 先写 AssetSpec：比例、连续主体体积、语义部件、连接关系、材质、SDF cellSize/support/isoOffset、参数与确定性 seed；随后只通过 PICG MCP 在当前 Web 编辑器中创建独立、可编辑的程序化图。',
     '5. 每次结构写入后执行 Houdini 风格 top-down 布局；主链同 X、行距约 160、同层兄弟横距至少 320，并保存命名图。',
     '6. 运行 pcg_validate、pcg_cook、pcg_capture_preview；程序化结果必须复用 JSON 中完全相同的 target、distance、lens、near/far、曝光、六个方位和 beauty / alpha-silhouette / semantic-id / depth / normal / roughness-material-id 六种 renderPass。',
     '6.1 JSON 的 reference.meshBandProfile 是参考 GLB 的脚底对齐、身高归一化定量轮廓；候选的同构数据位于每次 pcg_capture_preview 返回的 metadata.meshBandProfile。逐高度带比较 widthP90、depthP90、centroidX、centroidZ，以定位比例和错位，但不得用单一总分替代视觉验收。',

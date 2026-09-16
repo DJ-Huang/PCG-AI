@@ -2,9 +2,9 @@
 
 ## 目标
 
-PCG-AI 的多材质系统采用 Houdini SOP 的核心模型：材质是面（primitive/face）属性，Group 只负责选择面，`AssignMaterial` 负责写入材质名，最后一个赋值覆盖同一面上的旧值。Houdini 的 Material SOP 同样支持一组 `Group + Material` 赋值，底层写入 primitive `shop_materialpath`；同一 primitive 被多次赋值时最后一项生效。[SideFX Material SOP](https://www.sidefx.com/docs/houdini/nodes/sop/material.html)
+PICG 的多材质系统采用 Houdini SOP 的核心模型：材质是面（primitive/face）属性，Group 只负责选择面，`AssignMaterial` 负责写入材质名，最后一个赋值覆盖同一面上的旧值。Houdini 的 Material SOP 同样支持一组 `Group + Material` 赋值，底层写入 primitive `shop_materialpath`；同一 primitive 被多次赋值时最后一项生效。[SideFX Material SOP](https://www.sidefx.com/docs/houdini/nodes/sop/material.html)
 
-PCG-AI 不在 Graph JSON 中保存 Unity 资产引用。Graph 只保存稳定的材质名，例如 `body_paint`、`glass`、`rubber`；`PcgGraphComponent` 再把这些名字绑定到项目中的 Unity `Material` 资产。
+PICG 不在 Graph JSON 中保存 Unity 资产引用。Graph 只保存稳定的材质名，例如 `body_paint`、`glass`、`rubber`；`PcgGraphComponent` 再把这些名字绑定到项目中的 Unity `Material` 资产。
 
 ## 节点体系
 
@@ -39,7 +39,7 @@ Output
 
 例如给盒子的顶面单独赋材质：先用 `FaceGroupByNormal(outputGroup="top", direction=(0,1,0), spreadAngle=5)` 建立 `top` 面组，再用一个全局 `AssignMaterial` 写底材，最后用 `AssignMaterial(group="top")` 覆盖顶面。
 
-这对应 Houdini Material SOP 的多条 assignment。PCG-AI 用可链式节点表达列表，优点是每次覆盖都可单独预览、参数化、禁用或插入到分支中。规则如下：
+这对应 Houdini Material SOP 的多条 assignment。PICG 用可链式节点表达列表，优点是每次覆盖都可单独预览、参数化、禁用或插入到分支中。规则如下：
 
 - 空 `group` 是基础/兜底材质，通常放在第一层。
 - 后续节点只覆盖命中的面；未命中的面保留旧材质。

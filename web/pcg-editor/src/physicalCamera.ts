@@ -190,6 +190,8 @@ type Vec3Tuple = [number, number, number];
 /** Camera command payload accepted from MCP / the bridge. All fields optional;
  *  omitted fields keep the current session state. */
 export interface CameraCommand {
+  /** Normalized Motion Curve progress; evaluated by the shot path sampler. */
+  pathProgress?: number;
   position?: Vec3Tuple;
   target?: Vec3Tuple;
   up?: Vec3Tuple;

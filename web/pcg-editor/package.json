@@ -1,5 +1,5 @@
 {
-  "name": "pcg-editor",
+  "name": "picg-editor",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "vitest run",
-    "test:shot": "vitest run src/physicalCamera.test.ts src/cameraMotion.test.ts src/shot.test.ts src/cameraTrack.test.ts src/cameraGraph.test.ts src/cameraPresets.test.ts src/cameraPath.test.ts src/previsExport.test.ts src/preview/ShotTransport.test.tsx",
+    "test:shot": "vitest run src/physicalCamera.test.ts src/cameraMotion.test.ts src/shot.test.ts src/cameraTrack.test.ts src/cameraGraph.test.ts src/cameraPresets.test.ts src/cameraPath.test.ts src/cameraEditing.test.ts src/useShotHistory.test.tsx src/CameraCurveEditor.test.tsx src/previsExport.test.ts src/preview/ShotTransport.test.tsx",
     "test:agent": "vitest run src/agent src/SettingsDialog.test.tsx",
     "test:review-camera": "vitest run src/reviewCamera.test.ts",
     "test:security": "vitest run devFileSecurity.test.ts",

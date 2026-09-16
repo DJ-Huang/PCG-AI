@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 
 import { getAgentToken } from './agent/agentClient';
 import { canonicalShotPayload } from './cameraTrack';
@@ -125,6 +126,8 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     }
     if (!response.ok) throw new Error(`session sync failed: HTTP ${response.status}`);
   }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, shotText, sessionKey, options.nodeManifest, options.sessionId, options.shot.activeCameraId]);
+  const pushSessionRef = useRef(pushSession);
+  pushSessionRef.current = pushSession;
 
   useEffect(() => {
     const debounce = window.setTimeout(() => void pushSession().catch(console.warn), 250);
@@ -209,9 +212,16 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
             const lockOk = shotCommand
               ? (patch.type === 'previewShot' || sameShot)
               : sameGraph;
-            const results = samePath && lockOk
-              ? await applyCommandsRef.current([patch])
-              : [{
+            let results: GraphCommandResult[];
+            if (samePath && lockOk) {
+              let applied!: Promise<GraphCommandResult[]>;
+              flushSync(() => { applied = applyCommandsRef.current([patch]); });
+              results = await applied;
+              // Publish the committed document before acknowledging the write.
+              // The next Agent read must observe this command's new hash.
+              flushSync(() => {});
+              await pushSessionRef.current();
+            } else results = [{
                 id: patch.id,
                 ok: false,
                 error: samePath

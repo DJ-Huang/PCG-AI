@@ -1,11 +1,11 @@
 ---
 name: pcg-kb-write
-description: 把 PCG-AI 工程经验安全写入项目内 .pcg-ai/kb/ 知识库（BM25 检索）。三种模式：Quick Capture（碎片进 kb/inbox/）、Distill（泛化后写入 kb/pitfalls|concepts|tips|research/）、Distill Inbox（整理 kb/inbox/）。触发词：记到 PCG 知识库、写入 pcg kb、沉淀 PCG 踩坑、整理 pcg inbox、/pcg-kb-write。
+description: 把 PICG 工程经验安全写入项目内 .pcg-ai/kb/ 知识库（BM25 检索）。三种模式：Quick Capture（碎片进 kb/inbox/）、Distill（泛化后写入 kb/pitfalls|concepts|tips|research/）、Distill Inbox（整理 kb/inbox/）。触发词：记到 PCG 知识库、写入 pcg kb、沉淀 PCG 踩坑、整理 pcg inbox、/pcg-kb-write。
 ---
 
 # pcg-kb-write
 
-把内容安全写入 PCG-AI 工程内置知识库 `.pcg-ai/kb/`，分为三种模式：
+把内容安全写入 PICG 工程内置知识库 `.pcg-ai/kb/`，分为三种模式：
 
 - **Quick Capture**：保存碎片或用户原话到 `kb/inbox/`，不做泛化。
 - **Distill**：先判断能否跨功能复用，再检索、路由、确认、合并、校验。
@@ -81,7 +81,7 @@ tags: ["type/inbox", "area/pcg"]
 
 ### 与全局 Vault 的分工
 
-- PCG-AI 工程机制、pcg-server/native/Web 编辑器踩坑 → 本库（`pcg_kb_*`）。
+- PICG 工程机制、pcg-server/native/Web 编辑器踩坑 → 本库（`pcg_kb_*`）。
 - 跨项目通用经验（Unity 编辑器通坑、协作流程、全局平台能力）→ obsidian-write → Vault。
 - 同一条经验两边都有价值时，主写本库，提示用户可另存 Vault；不要静默双写。
 
@@ -100,7 +100,7 @@ tags: ["type/inbox", "area/pcg"]
 ## Red Flags
 
 - ❌ 写入路径不在工程 `.pcg-ai/` 下，或硬编码绝对路径。
-- ❌ 把 PCG-AI 工程经验写进 Obsidian Vault（应写本库），或未走 obsidian-write 就写全局库。
+- ❌ 把 PICG 工程经验写进 Obsidian Vault（应写本库），或未走 obsidian-write 就写全局库。
 - ❌ `pit-*`、`cpt-*`、`tip-*` 的标题或正文仍依赖当前功能、某张具体图或单次调试流水。
 - ❌ 未 `pcg_kb_search` 查重就新建，或未经确认静默覆盖已有笔记；未完成蒸馏就删除 inbox 源文件。
 - ❌ 用"全平台""永远"等绝对结论替代平台/版本/设备条件，或没有证据却标 `verified_true`。

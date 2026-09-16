@@ -1,0 +1,668 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "stage",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "width": 12,
+        "height": 0.2,
+        "depth": 12
+      }
+    },
+    {
+      "id": "stage_pose",
+      "type": "TransformMesh",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          -0.1,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "stage_mat",
+      "type": "Material",
+      "position": {
+        "x": 320,
+        "y": 160
+      },
+      "data": {
+        "materialName": "stage",
+        "shaderId": "pcg.standard-pbr",
+        "baseColor": "#687582",
+        "baseColorMap": "",
+        "metallic": 0,
+        "metallicMap": "",
+        "roughness": 0.8,
+        "roughnessMap": "",
+        "normalMap": "",
+        "normalScale": 1,
+        "aoMap": "",
+        "aoIntensity": 1,
+        "emissiveColor": "#000000",
+        "emissiveMap": "",
+        "emissiveIntensity": 0,
+        "opacity": 1,
+        "alphaMode": "opaque",
+        "alphaCutoff": 0.5,
+        "doubleSided": false,
+        "unityShaderGuid": "",
+        "unityShaderName": "",
+        "unityPropertiesJson": "{}"
+      }
+    },
+    {
+      "id": "stage_surface",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 0,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": ""
+      }
+    },
+    {
+      "id": "subject",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "width": 0.8,
+        "height": 1.7,
+        "depth": 0.5
+      }
+    },
+    {
+      "id": "subject_pose",
+      "type": "TransformMesh",
+      "position": {
+        "x": 720,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.85,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "subject_mat",
+      "type": "Material",
+      "position": {
+        "x": 1040,
+        "y": 160
+      },
+      "data": {
+        "materialName": "subject",
+        "shaderId": "pcg.standard-pbr",
+        "baseColor": "#ed9a48",
+        "baseColorMap": "",
+        "metallic": 0,
+        "metallicMap": "",
+        "roughness": 0.8,
+        "roughnessMap": "",
+        "normalMap": "",
+        "normalScale": 1,
+        "aoMap": "",
+        "aoIntensity": 1,
+        "emissiveColor": "#000000",
+        "emissiveMap": "",
+        "emissiveIntensity": 0,
+        "opacity": 1,
+        "alphaMode": "opaque",
+        "alphaCutoff": 0.5,
+        "doubleSided": false,
+        "unityShaderGuid": "",
+        "unityShaderName": "",
+        "unityPropertiesJson": "{}"
+      }
+    },
+    {
+      "id": "subject_surface",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 720,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": ""
+      }
+    },
+    {
+      "id": "backdrop",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1440,
+        "y": 0
+      },
+      "data": {
+        "width": 10,
+        "height": 3.5,
+        "depth": 0.3
+      }
+    },
+    {
+      "id": "backdrop_pose",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1440,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          1.75,
+          3.5
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "backdrop_mat",
+      "type": "Material",
+      "position": {
+        "x": 1760,
+        "y": 160
+      },
+      "data": {
+        "materialName": "backdrop",
+        "shaderId": "pcg.standard-pbr",
+        "baseColor": "#30495d",
+        "baseColorMap": "",
+        "metallic": 0,
+        "metallicMap": "",
+        "roughness": 0.8,
+        "roughnessMap": "",
+        "normalMap": "",
+        "normalScale": 1,
+        "aoMap": "",
+        "aoIntensity": 1,
+        "emissiveColor": "#000000",
+        "emissiveMap": "",
+        "emissiveIntensity": 0,
+        "opacity": 1,
+        "alphaMode": "opaque",
+        "alphaCutoff": 0.5,
+        "doubleSided": false,
+        "unityShaderGuid": "",
+        "unityShaderName": "",
+        "unityPropertiesJson": "{}"
+      }
+    },
+    {
+      "id": "backdrop_surface",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 1440,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": ""
+      }
+    },
+    {
+      "id": "plinth",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 2160,
+        "y": 0
+      },
+      "data": {
+        "width": 1.5,
+        "height": 0.3,
+        "depth": 1.2
+      }
+    },
+    {
+      "id": "plinth_pose",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2160,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          2.5,
+          0.15,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post"
+      }
+    },
+    {
+      "id": "plinth_mat",
+      "type": "Material",
+      "position": {
+        "x": 2480,
+        "y": 160
+      },
+      "data": {
+        "materialName": "plinth",
+        "shaderId": "pcg.standard-pbr",
+        "baseColor": "#c4d2d8",
+        "baseColorMap": "",
+        "metallic": 0,
+        "metallicMap": "",
+        "roughness": 0.8,
+        "roughnessMap": "",
+        "normalMap": "",
+        "normalScale": 1,
+        "aoMap": "",
+        "aoIntensity": 1,
+        "emissiveColor": "#000000",
+        "emissiveMap": "",
+        "emissiveIntensity": 0,
+        "opacity": 1,
+        "alphaMode": "opaque",
+        "alphaCutoff": 0.5,
+        "doubleSided": false,
+        "unityShaderGuid": "",
+        "unityShaderName": "",
+        "unityPropertiesJson": "{}"
+      }
+    },
+    {
+      "id": "plinth_surface",
+      "type": "AssignMaterial",
+      "position": {
+        "x": 2160,
+        "y": 320
+      },
+      "data": {
+        "group": "",
+        "materialName": ""
+      }
+    },
+    {
+      "id": "scene",
+      "type": "MergeMesh",
+      "position": {
+        "x": 0,
+        "y": 480
+      },
+      "data": {}
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": {
+        "x": 0,
+        "y": 640
+      },
+      "data": {
+        "label": "PICG previs stage"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_stage_pose",
+      "source": "stage",
+      "target": "stage_pose",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_stage_surface",
+      "source": "stage_pose",
+      "target": "stage_surface",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_stage_mat",
+      "source": "stage_mat",
+      "target": "stage_surface",
+      "sourceHandle": "out",
+      "targetHandle": "material"
+    },
+    {
+      "id": "e_stage_merge",
+      "source": "stage_surface",
+      "target": "scene",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_subject_pose",
+      "source": "subject",
+      "target": "subject_pose",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_subject_surface",
+      "source": "subject_pose",
+      "target": "subject_surface",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_subject_mat",
+      "source": "subject_mat",
+      "target": "subject_surface",
+      "sourceHandle": "out",
+      "targetHandle": "material"
+    },
+    {
+      "id": "e_subject_merge",
+      "source": "subject_surface",
+      "target": "scene",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_backdrop_pose",
+      "source": "backdrop",
+      "target": "backdrop_pose",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_backdrop_surface",
+      "source": "backdrop_pose",
+      "target": "backdrop_surface",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_backdrop_mat",
+      "source": "backdrop_mat",
+      "target": "backdrop_surface",
+      "sourceHandle": "out",
+      "targetHandle": "material"
+    },
+    {
+      "id": "e_backdrop_merge",
+      "source": "backdrop_surface",
+      "target": "scene",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_plinth_pose",
+      "source": "plinth",
+      "target": "plinth_pose",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_plinth_surface",
+      "source": "plinth_pose",
+      "target": "plinth_surface",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_plinth_mat",
+      "source": "plinth_mat",
+      "target": "plinth_surface",
+      "sourceHandle": "out",
+      "targetHandle": "material"
+    },
+    {
+      "id": "e_plinth_merge",
+      "source": "plinth_surface",
+      "target": "scene",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_output",
+      "source": "scene",
+      "target": "output",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [],
+  "subgraphs": []
+}

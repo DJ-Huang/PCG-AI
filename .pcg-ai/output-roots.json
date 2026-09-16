@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "roots": {
+    "workspace": ".",
+    "what-if-tlou": "/Users/djhuang/MyMovieDesign/PROJECTS/What-If-TLOU/previs"
+  }
+}

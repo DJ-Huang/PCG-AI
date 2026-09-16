@@ -6,7 +6,7 @@ Skill id: **`pcg-graph-authoring-unity`**.
 
 ## Core philosophy
 
-| Principle | img2threejs | PCG-AI equivalent |
+| Principle | img2threejs | PICG equivalent |
 |-----------|-------------|-------------------|
 | Output is code, not a neural mesh | TypeScript `THREE.Group` factory | `.pcg` graph JSON + Unity cook |
 | Scripts enforce structure | `validate_sculpt_spec.py`, gates | `validate_pcg.py`, manifest |
@@ -258,7 +258,7 @@ Do not claim 0.95+ from one ambiguous photo unless the object is simple and symm
 
 ## Scripts (shared + Unity-specific)
 
-| img2threejs | PCG-AI script | Role |
+| img2threejs | PICG script | Role |
 |-------------|---------------|------|
 | `new_pre_spec_assessment` / `new_sculpt_spec` | `SHARED_SCRIPTS_DIR/new_authoring_plan.py` | Starter `*-plan.json` |
 | `validate_sculpt_spec --strict-quality` | `SHARED_SCRIPTS_DIR/validate_plan.py --strict-quality` | Block shallow plans |

@@ -1,4 +1,4 @@
-# PCG Web complete-asset workflow
+# PICG Web complete-asset workflow
 
 This is the single production workflow for both `pcg-graph-authoring-web` and `pcg-graph-authoring-web-dev`. Do not treat a `.pcg`, a cooked mesh, or a white model as the finished result.
 

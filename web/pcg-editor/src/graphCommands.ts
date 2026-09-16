@@ -46,10 +46,16 @@ export type QueuedGraphCommand = QueuedCommandBase & (
   | { type: 'connectCameras'; source: string; target: string }
   | { type: 'selectCamera'; cameraId: string }
   | { type: 'previewShot'; cameraId?: string; timeSeconds?: number; play?: boolean }
+  | { type: 'applyShotOps'; operations: unknown[] }
+  | { type: 'applyPrevisSpec'; graph: GraphJson; shotOperations: unknown[] }
+  | { type: 'exportShot' }
 );
 
 export function isShotCommand(command: QueuedGraphCommand): boolean {
   return command.type === 'setCameraKeyframes'
+    || command.type === 'applyShotOps'
+    || command.type === 'applyPrevisSpec'
+    || command.type === 'exportShot'
     || command.type === 'upsertCamera'
     || command.type === 'connectCameras'
     || command.type === 'selectCamera'
