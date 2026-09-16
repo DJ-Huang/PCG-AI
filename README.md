@@ -1,16 +1,49 @@
-# PCG-AI
+# PICG
 
-PCG-AI is a procedural-content authoring stack built around editable graph files. It combines a React graph editor, a C++ geometry runtime and cook server, and a Unity/Tuanjie integration project.
+**Procedural Intelligent Content Generation · 程序化智能内容生成**
 
-> Project status: active development. Graph and API compatibility may still change before a stable release.
+PICG is a cross-engine procedural content generation framework built around editable graph assets. It combines a React-based graph editor, a C++17 geometry runtime, a localhost HTTP/MCP cook server, and Unity/Tuanjie integration.
 
-## What is included
+> **PICG（程序化智能内容生成）** 面向程序化内容生产与智能化工作流：内容逻辑以可移植的 Graph 数据为核心，由统一的 C++ Runtime 执行，并可在 Web、Unity / Tuanjie 以及 Agent 工作流中复用。
 
-- A browser editor based on React Flow with live 3D preview.
-- A C++17 procedural geometry runtime with a C API.
-- A localhost HTTP/MCP server for validation, cooking, preview capture and agent workflows.
-- A Unity/Tuanjie editor integration that cooks through `pcg-server`.
-- Versioned graph schemas, a manifest-backed node catalog, reusable subgraphs and curated examples.
+The project follows one core idea: **authoring tools and engine integrations should be interchangeable front ends, while graph data and execution semantics remain portable and consistent.** Graphs can be authored manually or through agent-assisted workflows, executed by the same native core, and previewed across different environments.
+
+> **Project status:** active development. Graph schemas, APIs and integration details may still change before a stable release.
+
+## Core capabilities
+
+- **Graph-first authoring** — editable, versioned graph files form the shared contract between editors, runtimes and integrations.
+- **Native procedural runtime** — a C++17 geometry and graph execution core exposed through a C API.
+- **Web authoring and preview** — a React Flow based editor with live 3D preview and GLB export workflows.
+- **Unity / Tuanjie integration** — editor-side graph workflows backed by the same external `pcg-server` runtime.
+- **Agent-ready workflows** — localhost HTTP and MCP endpoints for validation, cooking, preview capture and automated content workflows.
+- **Reusable content building blocks** — manifest-backed node definitions, subgraphs, schemas and curated examples.
+
+## Architecture
+
+PICG separates authoring, execution and engine integration into independent layers:
+
+```text
+Web / Unity / Tuanjie / Agent workflows
+                 │
+                 │ Graph JSON
+                 ▼
+             pcg-server
+                 │
+                 ▼
+              pcg-core
+                 │
+        geometry / points / materials
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+   Web preview       Engine preview
+   + GLB export      + FBX / scene data
+```
+
+This keeps the graph contract editor-independent while using the C++ runtime as the single execution layer.
+
+More detail is available in [Architecture](docs/architecture.md).
 
 ## Quick start
 
@@ -25,8 +58,8 @@ PCG-AI is a procedural-content authoring stack built around editable graph files
 Clone the repository and initialize its submodule:
 
 ```bash
-git clone --recurse-submodules <repository-url>
-cd PCG-AI
+git clone --recurse-submodules https://github.com/DJ-Huang/PICG.git
+cd PICG
 ```
 
 On macOS or Linux, start the native server and Web editor together:
@@ -66,8 +99,8 @@ See [Getting Started](docs/getting-started.md) for the complete first-run and Un
 ## Repository layout
 
 ```text
-PCG-AI/
-├── Agent/                 Agent skills and reusable PCG workflow tooling
+PICG/
+├── Agent/                 Agent skills and reusable procedural workflow tooling
 ├── docs/                  User, architecture and integration documentation
 ├── examples/              Graphs, tests, subgraphs, showcases and storyboards
 ├── library/               Canonical built-in subgraph library
@@ -80,20 +113,6 @@ PCG-AI/
 └── web/pcg-editor/        Vite + React authoring application
 ```
 
-The main data flow is:
-
-```text
-Web or Unity graph editor
-        │ graph JSON
-        ▼
-pcg-server ──► pcg-core ──► geometry / points / materials / preview data
-        │
-        ├──► Web preview and GLB export
-        └──► Unity scene preview and FBX export
-```
-
-More detail is available in [Architecture](docs/architecture.md).
-
 ## Examples
 
 All repository-level examples live under [examples/](examples/README.md):
@@ -104,7 +123,7 @@ All repository-level examples live under [examples/](examples/README.md):
 - `examples/showcases/` — complete reference-driven case studies
 - `examples/storyboards/` — sequence and layout blockouts
 
-Unity-specific scenes and materials live under `Unity/Assets/Samples/PCG-AI/`. Generated review work belongs in `Unity/Assets/PCG-AI-Workspace/`, which is intentionally ignored.
+Unity-specific scenes, materials and sample conventions are documented in [Unity/README.md](Unity/README.md).
 
 Review a repository graph in the browser with:
 
@@ -114,13 +133,13 @@ http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 
 ## Build and validation
 
-Native runtime:
+### Native runtime
 
 ```bash
 ./scripts/build-pcg-core.sh --run-tests
 ```
 
-Web editor:
+### Web editor
 
 ```bash
 cd web/pcg-editor
@@ -130,7 +149,7 @@ npm run build
 npx vitest run
 ```
 
-Repository contracts:
+### Repository contracts
 
 ```bash
 python3 scripts/validate-manifest.py
@@ -138,7 +157,9 @@ python3 scripts/validate-subgraph-schema.py
 python3 scripts/validate-builtin-library.py
 ```
 
-Server smoke test, after starting `pcg-server`:
+### Server smoke test
+
+After starting `pcg-server`:
 
 ```bash
 ./scripts/verify-pcg-server.sh
@@ -163,7 +184,6 @@ Start at the [documentation index](docs/README.md). Important guides include:
 - [PCG server](docs/pcg-server.md)
 - [Node reference](docs/node-reference.md)
 - [Subgraph library](library/README.md)
-- [Development manual](docs/PCG-AI-Development-Manual.md)
 
 ## Contributing and security
 
