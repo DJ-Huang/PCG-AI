@@ -182,7 +182,7 @@ async function sendToUnity(graph) {
 | 服务端连接 | Unity: PCG → Server → Health Check | 显示服务健康与核心版本 | 服务未启动或地址错误 |
 | JSON 验证 | pcg_validate_graph(example.pcg) | PCG_OK | 解析器问题 |
 | 点生成 | Run example.pcg → Scene Gizmo | 100 个青色球体 | 执行引擎问题 |
-| Mesh 生成 | Run bridge-demo.pcg → Scene mesh | 桥梁网格 | 几何内核问题 |
+| Mesh 生成 | Run stone-arch-bridge.pcg → Scene mesh | 桥梁网格 | 几何内核问题 |
 | Web → Unity | Send to Unity → GraphView 自动重载 | 画布更新 | 文件桥接问题 |
 | Player | 启动外置服务后运行 Player | cook 成功；停服时错误明确 | 服务地址或网络边界问题 |
 

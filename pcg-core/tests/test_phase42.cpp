@@ -3,8 +3,6 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
-#include <sstream>
 #include <string>
 
 namespace {
@@ -15,14 +13,6 @@ void expect_code(PcgResultCode actual, PcgResultCode expected, const char* label
         std::printf("FAIL: %s expected %d got %d\n", label, static_cast<int>(expected), static_cast<int>(actual));
         std::exit(1);
     }
-}
-
-std::string read_file(const char* path)
-{
-    std::ifstream file(path);
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
 }
 
 } // namespace
@@ -123,12 +113,6 @@ int main()
     expect_code(pcg_execute_graph(voronoi_graph, 3, out, sizeof(out)), PCG_OK, "voronoi execute");
     assert(std::strstr(out, "\"splines\"") != nullptr);
     std::printf("PASS: voronoi pipeline\n");
-
-    const std::string demo_graph = read_file("../../examples/graphs/phase42-demo.pcg");
-    assert(!demo_graph.empty());
-    expect_code(pcg_validate_graph(demo_graph.c_str(), err, sizeof(err)), PCG_OK, "phase42 demo validate");
-    expect_code(pcg_execute_graph(demo_graph.c_str(), 42, out, sizeof(out)), PCG_OK, "phase42 demo execute");
-    std::printf("PASS: examples/graphs/phase42-demo.pcg\n");
 
     return 0;
 }

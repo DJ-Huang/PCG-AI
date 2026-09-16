@@ -442,7 +442,7 @@ int run_tests() {
         }
     }
 
-    // car.pcg body_subdiv -> body_bevel exact parameter regression.
+    // Body subdivision -> bevel exact-parameter regression.
     {
         const PcgGeometry body = create_box_geometry(4.2, 0.8, 1.8);
         const PcgGeometry subdivided = subdivide_geometry(

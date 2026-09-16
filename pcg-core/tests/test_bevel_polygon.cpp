@@ -793,7 +793,7 @@ int run_tests() {
         std::printf("  Oracle dump (CC L2): verts=%zu faces=%zu bad_edges=%d -> %s\n",
             cc_result.points().size(), cc_result.faces().size(), cc_bad, dump_cc);
 
-        // car.pcg body_subdiv -> body_bevel parameters with dimensions baked
+        // Body subdivision -> bevel parameters with dimensions baked.
         // into CreateBoxMesh geometry (not represented as object scale).
         const char* dump_car = std::getenv("PCG_BEVEL_DUMP_CAR");
         if (!dump_car) dump_car = "/tmp/pcg-bevel-pcg-car-cc1.json";

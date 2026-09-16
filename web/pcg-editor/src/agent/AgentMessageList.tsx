@@ -112,7 +112,7 @@ export default function AgentMessageList({ messages, pendingCalls, decisions, on
           setFollow(element.scrollHeight - element.scrollTop - element.clientHeight < 72);
         }}
       >
-        {messages.length === 0 && <div className="pcg-agent__empty">Start a new chat to inspect, validate, or author the live PCG graph.</div>}
+        {messages.length === 0 && <div className="pcg-agent__empty"><div className="pcg-agent__welcome-icon" aria-hidden="true">✦</div><strong>Hi! I’m your PCG assistant.</strong><p>Build, refine, and understand your procedural world. Describe what you want to create, or ask about the current graph.</p><span className="pcg-agent__welcome-hint">Start with an idea in the message box below.</span></div>}
         {messages.map((message) => (
           <article key={message.id} className={`pcg-agent-turn pcg-agent-turn--${message.role}`}>
             {message.role === 'user' ? (

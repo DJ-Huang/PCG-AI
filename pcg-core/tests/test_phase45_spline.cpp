@@ -267,84 +267,6 @@ bool run_condition_outline_golden()
     return true;
 }
 
-bool run_condition_outline_graph()
-{
-    using namespace pcg::internal::data;
-
-    // CMake add_test WORKING_DIRECTORY = ${CMAKE_CURRENT_SOURCE_DIR}/tests (= pcg-core/tests).
-    const char* candidates[] = {
-        "../../examples/tests/test-condition-outline.pcg",
-        "../examples/tests/test-condition-outline.pcg",
-        "examples/tests/test-condition-outline.pcg",
-    };
-    std::ifstream gin;
-    std::string graph_path;
-    for (const char* path : candidates) {
-        gin.open(path);
-        if (gin) {
-            graph_path = path;
-            break;
-        }
-        gin.clear();
-    }
-    if (!gin) {
-        std::printf("FAIL: cannot open test-condition-outline.pcg\n");
-        return false;
-    }
-    std::string graph((std::istreambuf_iterator<char>(gin)), std::istreambuf_iterator<char>());
-
-    std::vector<char> json_out(1 << 20);
-    int kind = 0;
-    int vertex_count = 0;
-    int index_count = 0;
-    char err[512] = {};
-    const PcgResultCode rc = pcg_execute_graph_v7(
-        graph.c_str(), 42, nullptr, 0, nullptr, 0, nullptr, 0, &kind, json_out.data(),
-        static_cast<int>(json_out.size()), nullptr, 0, nullptr, 0, nullptr, nullptr, &vertex_count,
-        &index_count, nullptr, nullptr, 0, err, sizeof(err));
-    if (rc != PCG_OK) {
-        std::printf("FAIL: condition outline graph cook (%s): %s\n", graph_path.c_str(), err);
-        return false;
-    }
-    if (kind != PCG_RESULT_KIND_JSON) {
-        std::printf("FAIL: condition outline graph kind=%d expected JSON\n", kind);
-        return false;
-    }
-    const auto payload = nlohmann::json::parse(json_out.data());
-    if (!payload.contains("splines") || !payload["splines"].is_array() ||
-        payload["splines"].empty()) {
-        std::printf("FAIL: condition outline graph JSON missing splines\n");
-        return false;
-    }
-
-    std::ifstream golden_in("fixtures/condition-outline-golden.json");
-    if (!golden_in) {
-        std::printf("FAIL: cannot open condition-outline golden for graph comparison\n");
-        return false;
-    }
-    nlohmann::json golden_root;
-    golden_in >> golden_root;
-    nlohmann::json expected_case;
-    for (const auto& test_case : golden_root.value("cases", nlohmann::json::array())) {
-        if (test_case.value("id", std::string()) == "closed_duplicate_smooth") {
-            expected_case = test_case;
-            break;
-        }
-    }
-    if (!expected_case.is_object()) {
-        std::printf("FAIL: closed_duplicate_smooth golden case missing\n");
-        return false;
-    }
-
-    const PcgSplineData actual = PcgSplineData::from_json(payload);
-    if (!splines_match(actual, expected_case["expected"], "condition outline graph")) {
-        return false;
-    }
-    std::printf("PASS: condition outline graph matches golden (%s, %s)\n",
-                expected_case.value("id", std::string("case")).c_str(), graph_path.c_str());
-    return true;
-}
-
 } // namespace
 
 int main()
@@ -723,9 +645,6 @@ int main()
 
     if (!run_condition_outline_golden())
         return 1;
-    if (!run_condition_outline_graph())
-        return 1;
-
     std::printf("All phase45 spline tests passed.\n");
     return 0;
 }

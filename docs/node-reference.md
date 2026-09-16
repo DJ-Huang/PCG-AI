@@ -4006,15 +4006,9 @@ CopyAttributes(tag, values=tree/rock)
 
 | 文件 | 说明 |
 |------|------|
-| `demo.pcg` | 综合演示（Box → Bevel + 基础 mesh 流水线） |
-| `bridge-demo.pcg` | 桥梁场景（Sweep + Bevel） |
 | `boolean-test.pcg` | Boolean CSG 四种操作演示 |
-| `car.pcg` / `lowpoly-car.pcg` / `lowpoly-car-2.pcg` | 程序化车辆生成 |
-| `lowpoly-sedan.pcg` | 低多边形轿车 |
-| `excavator.pcg` | 挖掘机场景 |
 | `spiral-staircase.pcg` | 螺旋楼梯（InstanceAlongSpline + Sweep） |
 | `stone-arch-bridge.pcg` | 石拱桥（BooleanMesh + BevelMesh） |
-| `village-demo.pcg` | 村落场景（点生成 + 地形 + 实例放置） |
 | `lot-extrude-demo.pcg` | Labs Lot Subdivision：平面 → 切 lot → PolyExtrude |
 | `lot-city-demo.pcg` | Lot 城市场景：地块挤出 + 建筑散布 + 道路 Sweep（分件 Bevel 再 Merge） |
 
@@ -4024,15 +4018,10 @@ CopyAttributes(tag, values=tree/rock)
 
 | 文件 | 测试链路 | 验证内容 |
 |------|---------|---------|
-| `test-cylinder.pcg` | `CreateCylinderMesh → Output` | 圆柱生成、顶点/索引数、cap winding |
-| `test-outline-solid.pcg` | `CreateSpline → OutlineSolid → Output` | 闭合轮廓×厚度焊接实体、front/back/rim |
-| `test-condition-outline.pcg` | `CreateSpline → ConditionOutline → Output` | 平滑/RDP/protectSpans；JSON spline sink |
 | `test-revolve-bevel.pcg` | `CreateSpline → RevolveMesh → BevelMesh → Output` | 回转体生成、BevelMesh 几何链保持 |
-| `test-spiral-sweep.pcg` | `CreateSpiralSpline → SweepAlongSpline → Output` | 螺旋线采样、Sweep 扫掠 |
-| `test-color-uv-material.pcg` | `CreateCylinderMesh → UVTexture → VertexColor → AssignMaterial → Output` | RGBA colors（含 alpha）、UV0、material metadata 跨 native boundary 传递 |
 | `test-project-texture.pcg` | `ImageTexture → ProjectTexture + CreateCylinderMesh → Output` | texture descriptor repeat 读取、planar UV 投射 |
 
-> **验证步骤**：在 Unity Editor 中打开 PCG Graph Editor → File → Open .pcg → Cook → 检查 Scene View mesh、Console 无报错。`test-color-uv-material.pcg` 可通过 mesh.colors / mesh.uv 长度验证属性传递。
+> **验证步骤**：在 Unity Editor 中打开 PCG Graph Editor → File → Open .pcg → Cook → 检查 Scene View mesh、Console 无报错。
 
 ### ForEachBegin
 

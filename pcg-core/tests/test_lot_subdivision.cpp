@@ -487,40 +487,6 @@ void test_instanced_city_example_graphs()
     const std::filesystem::path root =
         std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
 
-    // --- Infra: Mesh with lot_pad + road slots ---
-    {
-        auto document = load_example_json(root, "examples/graphs/lot-city-infra.pcg");
-        shrink_lot_params(document, /*iterations=*/2, /*min_size=*/4.0);
-        char error[1024] = {};
-        Graph graph;
-        const std::string json = document.dump();
-        expect(parse_graph(json.c_str(), graph, error, sizeof(error)) == PCG_OK,
-               std::string("infra parse: ") + error);
-        expect(validate_graph_structure(graph, error, sizeof(error)) == PCG_OK,
-               std::string("infra validate: ") + error);
-        GraphExecutionResult result;
-        expect(execute_graph(graph, 17, result, error, sizeof(error)) == PCG_OK,
-               std::string("infra execute: ") + error);
-        expect(result.kind == GraphResultKind::Mesh, "infra result kind is Mesh");
-        expect(!result.mesh.vertices().empty() && result.mesh.triangles().size() >= 3,
-               "infra mesh non-empty");
-        const auto& slots = result.mesh.material_slots();
-        bool has_pad = false;
-        bool has_road = false;
-        for (const auto& slot : slots) {
-            if (slot == "lot_pad")
-                has_pad = true;
-            if (slot == "road")
-                has_road = true;
-        }
-        expect(has_pad, "infra has lot_pad material slot");
-        expect(has_road, "infra has road material slot");
-        std::printf("lot-city-infra: verts=%zu tris=%zu slots=%zu\n",
-                    result.mesh.vertices().size(),
-                    result.mesh.triangles().size() / 3,
-                    slots.size());
-    }
-
     // --- Buildings: multi-prototype GPU Points via MergeSpawnPoints ---
     {
         auto document = load_example_json(root, "examples/graphs/lot-city-buildings-instanced.pcg");

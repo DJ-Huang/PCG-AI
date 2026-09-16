@@ -10,5 +10,5 @@
 | geometryDoD | Box matches 24×21×16; dark 5 m podium; 4-bay storefronts; 4×4 upper 3-pane windows; side window column; rear-center roof bulkhead |
 | materialSlots | `bldg_podium`, `bldg_upper`, `bldg_frame`, `bldg_glass`, `bldg_roof` (Standard PBR, bound via AssignMaterial) |
 | variation | `BayCount` 2–8, `TypicalFloorCount` 1–8, `BaySpacing` 4–8 m |
-| outputs | `examples/showcases/six-story-grid-building/six-story-grid-building.pcg`; review `/review?graph=examples/showcases/six-story-grid-building/six-story-grid-building.pcg` |
+| outputs | The procedural graph was removed; reference and evidence images remain for record. |
 | acceptance | worst required ortho view ≥ 0.9 before FINAL_ACCEPTED |

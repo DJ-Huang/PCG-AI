@@ -57,7 +57,7 @@ To launch both services with one command on macOS or Linux, use `./scripts/run-p
 Use the editor's import action, or open a deterministic review route:
 
 ```text
-http://127.0.0.1:5173/review?graph=examples/graphs/bridge-demo.pcg
+http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 ```
 
 Paths passed to `?graph=` are repository-relative and must remain inside the workspace.
@@ -104,4 +104,3 @@ Run **PCG → Server → Health Check**, then verify the graph against `schema/n
 ### A showcase references a missing `artifacts/` file
 
 Large generated exports are deliberately ignored. Recreate them from the included graph or place the local result in that showcase's `artifacts/` directory.
-

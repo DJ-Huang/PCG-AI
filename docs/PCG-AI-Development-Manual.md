@@ -893,7 +893,7 @@ Windows PowerShell：
 
 ```bash
 python3 scripts/validate-manifest.py
-python3 .agents/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/bridge-demo.pcg
+python3 .agents/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/stone-arch-bridge.pcg
 ```
 
 ---

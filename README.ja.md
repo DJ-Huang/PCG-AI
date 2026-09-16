@@ -137,6 +137,20 @@ Unity 固有のシーン、マテリアル、サンプル規約については [
 http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 ```
 
+## Showcase
+
+`examples/` から選んだグラフを、Web エディタ上の編集可能なノードグラフとライブプレビューで紹介します。
+
+| サンプル | プレビュー | 実演内容 |
+| --- | --- | --- |
+| [Lot city buildings](examples/graphs/lot-city-buildings-procedural.pcg) | <img src="docs/showcase/lot-city-buildings-procedural.png" alt="プロシージャルな都市建築グラフと 3D プレビュー" width="360"> | 区画、道路、再利用可能な建物ロジックから建物群を生成する、プロシージャルな街区アセンブリ。 |
+| [Biohazard canister](examples/graphs/biohazard-canister.pcg) | <img src="docs/showcase/biohazard-canister.png" alt="バイオハザード缶のグラフと 3D プレビュー" width="360"> | スプライン、プリミティブ、ベベル、変形、マージの各ステージで構成する、詳細なハードサーフェスアセンブリ。 |
+| [M9 bayonet](examples/graphs/m9-bayonet.pcg) | <img src="docs/showcase/m9-bayonet.png" alt="M9 バヨネットのグラフとワイヤーフレームプレビュー" width="360"> | Outline Solid、Boolean カット、ベベル、マテリアル割り当てを組み合わせるハードサーフェスプロップ。 |
+| [Spiral staircase](examples/graphs/spiral-staircase.pcg) | <img src="docs/showcase/spiral-staircase.png" alt="螺旋階段のグラフと 3D プレビュー" width="360"> | Sweep とインスタンシングを組み合わせる、スプライン駆動の階段アセンブリ。 |
+| [Terrain demo](examples/graphs/terrain-demo.pcg) | <img src="docs/showcase/terrain-demo.png" alt="Terrain グラフとハイトフィールドプレビュー" width="360"> | 段丘化、ぼかし、ノイズ変形、侵食を扱うハイトフィールド地形ワークフロー。 |
+| [Tripo YoYo puppy](examples/showcases/tripo-yoyo-puppy/procedural.pcg) | <img src="docs/showcase/tripo-yoyo-puppy.png" alt="Tripo YoYo puppy グラフ、マテリアル、Action Rig のプレビュー" width="360"> | Oriented SDF サーフェス、マテリアル割り当て、Action Rig を組み合わせるインポート済みキャラクターワークフロー。 |
+| [Wooden cabin](examples/showcases/wooden-cabin/wooden-cabin.pcg) | <img src="docs/showcase/wooden-cabin.png" alt="木造キャビンのグラフと 3D プレビュー" width="360"> | 壁、屋根、ポーチのサブグラフを組み合わせて完成形のキャビンを作る、再利用可能な建物アセンブリ。 |
+
 ## ビルドと検証
 
 ### ネイティブランタイム
@@ -195,6 +209,6 @@ python3 scripts/validate-builtin-library.py
 
 Pull Request を作成する前に [CONTRIBUTING.md](CONTRIBUTING.md) を、脆弱性を報告する前に [SECURITY.md](SECURITY.md) を確認してください。コミュニティの行動規範は [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)、メディアの出所とサードパーティー条件は [ASSET_LICENSES.md](ASSET_LICENSES.md) に記載されています。
 
-## ライセンス状況
+## ライセンス
 
-現時点ではオープンソースライセンスは選定されていません。著作権者によって `LICENSE` ファイルが追加されるまでは、このリポジトリは法的にはオープンソースではなく、再利用権も付与されません。公開リリース前に MIT、Apache-2.0、またはその他のライセンスを選定し、アセット権利の確認を完了してください。
+PICG は [Apache License 2.0](LICENSE) の下で公開されています。
