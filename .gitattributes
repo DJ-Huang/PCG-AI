@@ -1,17 +1,28 @@
 * text=auto eol=lf
 
 *.bat text eol=crlf
+*.cmd text eol=crlf
 *.ps1 text eol=crlf
-*.scene text eol=lf
-*.unity text eol=lf
+*.scene text eol=lf linguist-generated=true
+*.unity text eol=lf linguist-generated=true
 *.meta text eol=lf
-*.asset text eol=lf
+*.asset text eol=lf linguist-generated=true
+*.gltf text eol=lf
 
-*.fbx binary
-*.gif binary
-*.glb binary
-*.gltf binary
-*.hdr binary
+*.png binary
 *.jpg binary
 *.jpeg binary
-*.png binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.hdr binary
+*.glb binary
+*.fbx binary
+*.dll binary
+*.dylib binary
+*.so binary
+*.a binary
+*.lib binary
+*.zip binary
+
+docs/node-reference.md linguist-generated=true

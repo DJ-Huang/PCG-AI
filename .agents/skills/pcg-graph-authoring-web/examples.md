@@ -1,8 +1,8 @@
 # PCG Graph Examples — Houdini Top-Down Layout
 
-**Purpose:** curated **wiring / layout** snippets for the skill. These are **not** a substitute for `node-manifest.json`, `.pcg-ai/rules/` strategy docs, or project **Golden Graphs** (`.pcg-ai/golden-graphs/`).
+**Purpose:** curated **wiring / layout** snippets for the skill. These are **not** a substitute for `node-manifest.json`, `.picg/rules/` strategy docs, or project **Golden Graphs** (`.picg/golden-graphs/`).
 
-**High-quality full graphs:** project `.pcg-ai/golden-graphs/` only. **Do not** open repo `examples/*.pcg` / Unity demos to model a new asset. Prefer this markdown for pin chains; prefer project rules + Golden Graphs (`.pcg-ai/`) for modeling decisions.
+**High-quality full graphs:** project `.picg/golden-graphs/` only. **Do not** open repo `examples/*.pcg` / Unity demos to model a new asset. Prefer this markdown for pin chains; prefer project rules + Golden Graphs (`.picg/`) for modeling decisions.
 
 All positions use: `SPINE_X=200`, `ROW_STEP_Y=160`, `COL_STEP_X=320` (same-row `|Δx| ≥ 320`).
 Every node should set `data.__nodeTitle` (Unity shows that, not `id`).
@@ -115,9 +115,9 @@ row 4:  out (x=200)
 }
 ```
 
-## Semantic mapping (Houdini ↔ PCG-AI)
+## Semantic mapping (Houdini ↔ PICG)
 
-| Houdini | PCG-AI node |
+| Houdini | PICG node |
 |---------|-------------|
 | Sweep SOP (curve × curve) | `SweepAlongSpline` + `CreateSpline` profile |
 | Copy to Curves | `InstanceAlongSpline` |

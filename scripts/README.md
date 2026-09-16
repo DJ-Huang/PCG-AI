@@ -19,8 +19,6 @@ Run these commands from the repository root unless a script says otherwise.
 | --- | --- |
 | `sync-manifest.sh` | Copy the canonical node manifest to Web/Unity consumers |
 | `build_library_index.py` | Validate/index `library/` and sync Web/Unity copies |
-| `setup-agent-skills.mjs` | Install/link repository agent skills |
-| `link-agent-skills.mjs` | Maintain local skill links |
 
 ## Validation
 
@@ -30,9 +28,12 @@ Scripts named `validate-*` check a focused contract. Some require only source fi
 python3 scripts/validate-manifest.py
 python3 scripts/validate-subgraph-schema.py
 python3 scripts/validate-builtin-library.py
+python3 scripts/check-doc-language.py
+python3 scripts/check-markdown-links.py
 ```
 
 Then use `verify-pcg-server.sh` for an end-to-end server smoke test. See each script's module docstring or `--help` output for prerequisites.
 
-Generated build directories are ignored and can be removed safely between runs.
+`sanitize-unity-sample-scenes.py` removes reproducible preview Mesh subassets and cached cook results from Unity sample scenes. CI runs it with `--check`; run it without that flag after saving a generated preview into a source scene.
 
+Generated build directories are ignored and can be removed safely between runs.

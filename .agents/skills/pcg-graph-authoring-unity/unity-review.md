@@ -1,17 +1,17 @@
-# Unity / Tuanjie review gate (P0 — mandatory)
+# Unity review gate (P0 — mandatory)
 
-This skill is **Unity-bound**. Visual validation **must** go through the `user-tuanjie` MCP.
+This skill is **Unity-bound**. Visual validation **must** go through the `user-unity` MCP.
 Do **not** judge fidelity from a cluttered existing scene, a random user screenshot, or memory.
 
 Cheatsheet: [scripts.md](scripts.md) · C# templates: [`scripts/unity/`](scripts/unity/)
 
 ## Hard rules
 
-1. **Connect Tuanjie before any cook / screenshot / SceneView judgment.**
+1. **Connect Unity before any cook / screenshot / SceneView judgment.**
 2. **Always open or create a dedicated review scene** that contains **only** the graph under review (+ studio light + camera). Hide or do not load other demo content.
 3. **Screenshot from that clean scene**, then `make_comparison_sheet.py` vs the reference.
 4. Scripts never score visuals — agent vision does, after the sheet exists.
-5. If no reachable Unity/Tuanjie instance matches the workspace: **stop and ask the user** (dev-gate §7). Do not guess another project.
+5. If no reachable Unity instance matches the workspace: **stop and ask the user** (dev-gate §7). Do not guess another project.
 
 ## Connect protocol (every session / every review cycle)
 
@@ -20,13 +20,13 @@ Follow workspace **dev-gate §7** exactly:
 ```text
 1. unity_list_instances({ probe: true })
 2. Prefer instance whose projectRoot is the current workspace Unity project
-   (e.g. …/PCG-AI-cursor/Unity) or contains the workspace.
+   (e.g. …/PICG-cursor/Unity) or contains the workspace.
 3. If 0 workspace-related OR ≥2 ambiguous → ask_user with pid / projectRoot / port.
 4. unity_select_instance({ project: "<Unity project root>" })  # or unique pid/port
 5. unity_ping → must succeed before manage_* / execute_csharp_script / read_console
 ```
 
-MCP server id: **`user-tuanjie`**.
+MCP server id: **`user-unity`**.
 
 Receipt line after connect (required in the agent reply):
 
@@ -42,8 +42,8 @@ If ping fails: report `Unity MCP: unavailable` and **do not** claim visual pass/
 
 | Item | Value |
 |------|-------|
-| Preview scene dir | **`Assets/PCG-AI-Workspace/Scenes`** |
-| Scene file | `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene` |
+| Preview scene dir | **`Assets/PICG-Workspace/Scenes`** |
+| Scene file | `Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene` |
 
 Always create / overwrite Preview scenes here. **Do not** `ask_user` for scene location. **Do not** use `Assets/Scenes/` unless the user explicitly overrides. Ensure the folder exists (template mkdir) before save.
 
@@ -59,12 +59,12 @@ B. Create a fresh review scene (prefer C# to avoid path quirks):
 
 ```text
 execute_csharp_script: scripts/unity/create_review_scene.cs.txt
-  → Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene
+  → Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene
 ```
 
    Or MCP: `manage_scene` action `create` with
-   `params: { "name": "PcgReview_<slug>", "path": "Assets/PCG-AI-Workspace/Scenes" }`
-   → file at `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene`.
+   `params: { "name": "PcgReview_<slug>", "path": "Assets/PICG-Workspace/Scenes" }`
+   → file at `Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene`.
    **Do not** pass a path that already ends in `.scene` as the directory (MCP may nest
    `….scene/….scene`).
 C. execute_csharp_script with scripts/unity/setup_pcg_review_subject.cs.txt
@@ -85,7 +85,7 @@ H. Optional: manage_scene load previous scene; leave PcgReview_* scene on disk f
 
 | Item | Pattern |
 |------|---------|
-| Scene | `Assets/PCG-AI-Workspace/Scenes/PcgReview_<graph-slug>.scene` |
+| Scene | `Assets/PICG-Workspace/Scenes/PcgReview_<graph-slug>.scene` |
 | Root GO | `PCG_Review_<graph-slug>` |
 | Reference archive | `ref_<graph-slug>.<ext>` next to `*-plan.json` (via `archive_reference.py`; never a URL/chat attachment) |
 | Screenshot | `Unity/screenshots/SceneView_YYYY-MM-DD_HH-MM-SS.png` |
@@ -97,8 +97,8 @@ H. Optional: manage_scene load previous scene; leave PcgReview_* scene on disk f
 
 | Anti-pattern | Why |
 |--------------|-----|
-| Ask where to create the Preview scene | Path is fixed: `Assets/PCG-AI-Workspace/Scenes` |
-| Write Preview scenes under `Assets/Scenes/` | Wrong default; use `Assets/PCG-AI-Workspace/Scenes` |
+| Ask where to create the Preview scene | Path is fixed: `Assets/PICG-Workspace/Scenes` |
+| Write Preview scenes under `Assets/Scenes/` | Wrong default; use `Assets/PICG-Workspace/Scenes` |
 | Screenshot the user's busy Test / Demo scene | Other meshes dominate framing |
 | Only `SetActive(false)` on siblings in a shared scene | Easy to miss lights/skyboxes/UI; state leaks |
 | Score from an old screenshot without recook | Stale geometry |
@@ -132,14 +132,14 @@ Paths are Unity project-relative (`Application.dataPath/..` for disk writes unde
 ## Minimal tool sequence (copy)
 
 ```text
-CallMcpTool user-tuanjie unity_list_instances { probe: true }
-CallMcpTool user-tuanjie unity_select_instance { project: "<ws>/Unity" }
-CallMcpTool user-tuanjie unity_ping {}
-CallMcpTool user-tuanjie manage_scene { action: get_active }   # remember prior scene
-CallMcpTool user-tuanjie execute_csharp_script { script: <create_review_scene.cs.txt> }
-CallMcpTool user-tuanjie execute_csharp_script { script: <setup_pcg_review_subject.cs.txt> }
-CallMcpTool user-tuanjie read_console { action: get, types: ["error"], count: 30 }
-CallMcpTool user-tuanjie execute_csharp_script { script: <capture_sceneview_png.cs.txt> }
+CallMcpTool user-unity unity_list_instances { probe: true }
+CallMcpTool user-unity unity_select_instance { project: "<ws>/Unity" }
+CallMcpTool user-unity unity_ping {}
+CallMcpTool user-unity manage_scene { action: get_active }   # remember prior scene
+CallMcpTool user-unity execute_csharp_script { script: <create_review_scene.cs.txt> }
+CallMcpTool user-unity execute_csharp_script { script: <setup_pcg_review_subject.cs.txt> }
+CallMcpTool user-unity read_console { action: get, types: ["error"], count: 30 }
+CallMcpTool user-unity execute_csharp_script { script: <capture_sceneview_png.cs.txt> }
 Shell: python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference … --render … --out …
 # agent vision → append_review.py
 ```

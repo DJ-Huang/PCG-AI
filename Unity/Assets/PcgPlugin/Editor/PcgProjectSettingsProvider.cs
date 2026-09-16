@@ -9,9 +9,9 @@ namespace DJTechEditor.PCG
         [SettingsProvider]
         public static SettingsProvider CreateProvider()
         {
-            var provider = new SettingsProvider("Project/PCG AI", SettingsScope.Project)
+            var provider = new SettingsProvider("Project/PICG", SettingsScope.Project)
             {
-                label = "PCG AI",
+                label = "PICG",
                 guiHandler = _ =>
                 {
                     var logging = PcgProjectSettings.IsLogEnabled;

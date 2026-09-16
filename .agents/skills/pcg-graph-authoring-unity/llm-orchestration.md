@@ -6,7 +6,7 @@ Skill id: **`pcg-graph-authoring-unity`**.
 
 ## Core philosophy
 
-| Principle | img2threejs | PCG-AI equivalent |
+| Principle | img2threejs | PICG equivalent |
 |-----------|-------------|-------------------|
 | Output is code, not a neural mesh | TypeScript `THREE.Group` factory | `.pcg` graph JSON + Unity cook |
 | Scripts enforce structure | `validate_sculpt_spec.py`, gates | `validate_pcg.py`, manifest |
@@ -14,7 +14,7 @@ Skill id: **`pcg-graph-authoring-unity`**.
 | Spec before codegen | `ObjectSculptSpec` JSON | Graph Authoring Plan + module table |
 | Staged passes | blockout → material → … | module-plan → blockout → assembly → materials → validate |
 | Local knowledge, not memory | BM25 on `docs/specs/vocabulary/*.jsonl` | `pcg_kb_search(category="rules")` + `pcg_kb_get` |
-| Controlled vocabulary | `grimoire/glossary/3d_vocabulary.md` | `.pcg-ai/rules/` + manifest property names |
+| Controlled vocabulary | `grimoire/glossary/3d_vocabulary.md` | `.picg/rules/` + manifest property names |
 | One correction action per cycle | `continue \| refine-spec \| refine-code \| …` | Same, mapped to graph/spec/cook |
 
 **Division of labor:** `validate_pcg.py` checks JSON contract, pins, layout, parameter bindings, Merge→Bevel warnings. It does **not** judge silhouette fidelity. The agent inspects Unity screenshots for that.
@@ -32,7 +32,7 @@ Skill id: **`pcg-graph-authoring-unity`**.
 6. If the target is open in Web Editor: context → node types/full graph → atomic MCP authoring for CURRENT PASS
    Otherwise use direct .pcg authoring as the offline/compatibility fallback
 7. MCP validate/cook, then pcg_save_graph; validate_pcg.py checks the saved deliverable
-8. create_review_scene → Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene (fixed; no ask)
+8. create_review_scene → Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene (fixed; no ask)
 9. setup_pcg_review_subject + cook → capture_sceneview_png
 10. make_comparison_sheet.py → one side-by-side PNG (no score)
 11. Agent vision → append_review.py (exactly ONE action; reference + vision notes required)
@@ -43,7 +43,7 @@ Run validation after every substantive edit, not only at the end. Script flags: 
 
 For MCP edits, fetch a fresh `graphHash` before every write, use one atomic
 batch per coherent pass, and wait for `applied=true`. Re-read and recompute on
-conflict. MCP owns graph creation; Tuanjie/Unity MCP still owns the independent
+conflict. MCP owns graph creation; Unity MCP still owns the independent
 clean-scene asset acceptance.
 
 ## Reference persistence and re-hydration (P0)
@@ -191,15 +191,15 @@ Weapon/skin subjects with patterned finishes: treat as **complex+** even if bare
 
 ## Local spec search (mandatory)
 
-**Reference hygiene:** curated graphs live in project `.pcg-ai/golden-graphs/` (excluded from BM25 — access via `pcg_golden_graph_list` / `pcg_golden_graph_get`). Do **not** load workspace `examples/**/*.pcg` as local specs. Skill `examples.md` is wiring-only.
+**Reference hygiene:** curated graphs live in project `.picg/golden-graphs/` (excluded from BM25 — access via `pcg_golden_graph_list` / `pcg_golden_graph_get`). Do **not** load workspace `examples/**/*.pcg` as local specs. Skill `examples.md` is wiring-only.
 
 Mirror img2threejs `localSpecSearch` — **pipeline stage, not optional memory**:
 
-1. `pcg_kb_search(query="编图 + 模型类型 + 意图", category="rules", top_k=10)`
+1. `pcg_kb_search(query="graph authoring + model type + intent", category="rules", top_k=10)`
 2. `pcg_kb_get` for `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, and the matching type rule
 3. Record `rule_id` hits in the plan (`localRuleHits`)
 4. Build graph from returned evidence; do not invent domain topology when a rule exists
-5. If `pcg_kb_search` fails: read `<workspace>/.pcg-ai/rules/graph-authoring/` files directly (fallback paths in `SKILL.md`)
+5. If `pcg_kb_search` fails: read `<workspace>/.picg/rules/graph-authoring/` files directly (fallback paths in `SKILL.md`)
 
 ## Self-correction (one action per review cycle — autonomous)
 
@@ -258,13 +258,13 @@ Do not claim 0.95+ from one ambiguous photo unless the object is simple and symm
 
 ## Scripts (shared + Unity-specific)
 
-| img2threejs | PCG-AI script | Role |
+| img2threejs | PICG script | Role |
 |-------------|---------------|------|
 | `new_pre_spec_assessment` / `new_sculpt_spec` | `SHARED_SCRIPTS_DIR/new_authoring_plan.py` | Starter `*-plan.json` |
 | `validate_sculpt_spec --strict-quality` | `SHARED_SCRIPTS_DIR/validate_plan.py --strict-quality` | Block shallow plans |
 | `forge/next.py` | `SHARED_SCRIPTS_DIR/report_pass.py` | Current pass + next command |
 | `orchestrate_passes.py` | `SHARED_SCRIPTS_DIR/orchestrate_passes.py` | status / check / sync |
-| Browser render | **Tuanjie MCP** + `PcgReview_*` scene + `scripts/unity/*.cs.txt` | Clean cook + SceneView PNG |
+| Browser render | **Unity MCP** + `PcgReview_*` scene + `scripts/unity/*.cs.txt` | Clean cook + SceneView PNG |
 | `make_comparison_sheet.py` | `SHARED_SCRIPTS_DIR/make_comparison_sheet.py` | Reference vs SceneView sheet |
 | `append_review.py` | `SHARED_SCRIPTS_DIR/append_review.py` | Review history + pipeline advance |
 | (graph validate) | `SHARED_SCRIPTS_DIR/validate_pcg.py` | `.pcg` JSON / layout / pins |

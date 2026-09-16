@@ -27,7 +27,6 @@ void expect(bool condition, const char* message)
 PcgMeshData execute_mesh_graph(const std::string& graph)
 {
     std::vector<uint8_t> mesh_buffer(1024 * 1024);
-    char json_output[1024] = {};
     char error[512] = {};
     int kind = PCG_RESULT_KIND_NONE;
     int vertex_count = 0;
@@ -35,7 +34,7 @@ PcgMeshData execute_mesh_graph(const std::string& graph)
 
     const PcgResultCode code = pcg_execute_graph_v7(
         graph.c_str(), 42, nullptr, 0, nullptr, 0, nullptr, 0, &kind,
-        json_output, sizeof(json_output), mesh_buffer.data(),
+        nullptr, 0, mesh_buffer.data(),
         static_cast<int>(mesh_buffer.size()), nullptr, 0, nullptr, nullptr,
         &vertex_count, &index_count, nullptr, nullptr, 0, error, sizeof(error));
     expect(code == PCG_OK, error[0] == '\0' ? "compact Sweep+Bevel graph executes" : error);

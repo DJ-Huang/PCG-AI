@@ -1,4 +1,4 @@
-# Unity and Tuanjie generated directories
+# Unity generated directories
 /Library/
 /Logs/
 /MemoryCaptures/
@@ -28,14 +28,14 @@
 /UpgradeLog*.htm
 
 # Generated PCG authoring workspaces and exports
-/Assets/PCG-AI-Workspace/
-/Assets/PCG-AI-Workspace.meta
+/Assets/PICG-Workspace/
+/Assets/PICG-Workspace.meta
 /Assets/Exports/
 /Assets/Exports.meta
 
 # Platform exports and caches
 /AndroidProjects/
-/TuanjieShaderCache/
+/UnityShaderCache/
 
 # OS metadata
 .DS_Store

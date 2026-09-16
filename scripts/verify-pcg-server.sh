@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PCG_SERVER_PORT:-17890}"
 BASE="http://127.0.0.1:${PORT}"
-GRAPH="${1:-$ROOT/examples/graphs/boolean-subtract-box.pcg}"
+GRAPH="${1:-$ROOT/examples/tests/test-outline-solid-columns.pcg}"
 export COMPARE_NATIVE="${COMPARE_NATIVE:-1}"
 
 echo "==> GET $BASE/v1/health"

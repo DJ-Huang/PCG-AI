@@ -1,9 +1,10 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import http from 'node:http';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { assetFilesPlugin } from './assetFiles.ts';
 
 const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
 const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
@@ -190,8 +191,9 @@ function exportGraphPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, error: 'Missing filePath' }));
               return;
             }
-            const resolved = path.resolve(__dirname, '..', filePath);
-            exec(`open -R "${resolved}"`, (err) => {
+            const resolved = fs.realpathSync(path.resolve(WORKSPACE_ROOT, filePath));
+            if (path.extname(resolved).toLowerCase() !== '.pcg' || !fs.statSync(resolved).isFile()) throw new Error('Choose a .pcg file');
+            execFile('/usr/bin/open', ['-R', resolved], (err) => {
               if (err) {
                 res.statusCode = 500;
                 res.end(JSON.stringify({ ok: false, error: String(err) }));
@@ -288,5 +290,5 @@ function exportGraphPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), exportGraphPlugin(), cookProxyPlugin()],
+  plugins: [react(), assetFilesPlugin(WORKSPACE_ROOT), exportGraphPlugin(), cookProxyPlugin()],
 });

@@ -35,7 +35,7 @@ curl -s http://127.0.0.1:17890/v1/health
 2. **PCG → Server → Health Check**
 3. Cook / Export FBX as usual — both hit the server.
 
-URL: Project Settings → PCG AI, or **PCG → Server → Set Server URL…**
+URL: Project Settings → PICG, or **PCG → Server → Set Server URL…**
 
 ## API
 
@@ -93,7 +93,7 @@ request format. PDF is intentionally not exposed in this release.
 
 Chat metadata, Timeline Parts, and attachment files survive browser refreshes
 and server restarts under
-`~/Library/Application Support/PCG-AI/Agent/Sessions/`. Directories use `0700`
+`~/Library/Application Support/PICG/Agent/Sessions/`. Directories use `0700`
 and files use `0600` on macOS; history responses expose attachment metadata,
 not local paths or bytes. `PCG_AGENT_SESSIONS_PATH` overrides this root for
 isolated tests. A failed or interrupted latest Turn can be retried without
@@ -101,7 +101,7 @@ duplicating its user message; attachment Turns require selecting the files
 again so stale bytes are never replayed implicitly.
 
 Credentials are stored separately in
-`~/Library/Application Support/PCG-AI/credentials.json`. Its directory uses
+`~/Library/Application Support/PICG/credentials.json`. Its directory uses
 `0700`, the file uses `0600`, and updates use an atomic replacement so a crash
 cannot leave a partial secret file. Only non-sensitive Provider/model/account
 metadata is written to `agent.json`. Set `PCG_AGENT_CREDENTIALS_PATH` for an
@@ -118,7 +118,7 @@ authorization prompt. Reconnect each Provider once after upgrading; subsequent
 refreshes, chats, restarts, and rebuilds use the protected file without a
 prompt.
 
-OAuth buttons remain unavailable until the matching PCG-AI-owned Client ID is
+OAuth buttons remain unavailable until the matching PICG-owned Client ID is
 present. Do not use another application's registered Client ID:
 
 ```bash

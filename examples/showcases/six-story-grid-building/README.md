@@ -4,7 +4,7 @@ This showcase reconstructs a six-story building from front, side and top referen
 
 ## Contents
 
-- `six-story-grid-building.pcg` — final procedural graph.
+- The final procedural graph has been removed from this repository.
 - `six-story-grid-building-asset-spec.md` — scope and acceptance contract.
 - `six-story-grid-building-geometry.md` — geometry decisions.
 - `ref_*` — admitted source views.
@@ -13,8 +13,7 @@ This showcase reconstructs a six-story building from front, side and top referen
 Review route:
 
 ```text
-http://127.0.0.1:5173/review?graph=examples/showcases/six-story-grid-building/six-story-grid-building.pcg
+No runnable review graph remains in this directory.
 ```
 
 Per-pass plans, authoring scripts and comparison sheets are deliberately excluded from the public case.
-

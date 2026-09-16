@@ -6,7 +6,7 @@ Skill id: **`pcg-graph-authoring-web`**. Three-view jobs: also read [`triview.md
 
 ## Core philosophy
 
-| Principle | img2threejs | PCG-AI equivalent |
+| Principle | img2threejs | PICG equivalent |
 |-----------|-------------|-------------------|
 | Output is code, not a neural mesh | TypeScript `THREE.Group` factory | `.pcg` graph JSON + pcg-server cook |
 | Scripts enforce structure | `validate_sculpt_spec.py`, gates | `validate_pcg.py`, manifest |
@@ -14,7 +14,7 @@ Skill id: **`pcg-graph-authoring-web`**. Three-view jobs: also read [`triview.md
 | Spec before codegen | `ObjectSculptSpec` JSON | Graph Authoring Plan + module table |
 | Staged passes | blockout → material → … | module-plan → blockout → assembly → materials → validate |
 | Local knowledge, not memory | BM25 on `docs/specs/vocabulary/*.jsonl` | `pcg_kb_search(category="rules")` + `pcg_kb_get` |
-| Controlled vocabulary | `grimoire/glossary/3d_vocabulary.md` | `.pcg-ai/rules/` + manifest property names |
+| Controlled vocabulary | `grimoire/glossary/3d_vocabulary.md` | `.picg/rules/` + manifest property names |
 | One correction action per cycle | `continue \| refine-spec \| refine-code \| …` | Same, mapped to graph/spec/cook |
 
 **Division of labor:** `validate_pcg.py` checks JSON contract, pins, layout, parameter bindings, Merge→Bevel warnings. It does **not** judge silhouette fidelity. The agent inspects web screenshots for that.
@@ -206,15 +206,15 @@ Weapon/skin subjects with patterned finishes: treat as **complex+** even if bare
 
 ## Local spec search (mandatory)
 
-**Reference hygiene:** curated graphs live in project `.pcg-ai/golden-graphs/` (excluded from BM25 — access via `pcg_golden_graph_list` / `pcg_golden_graph_get`). Do **not** load workspace `examples/**/*.pcg` as local specs. Skill `examples.md` is wiring-only.
+**Reference hygiene:** curated graphs live in project `.picg/golden-graphs/` (excluded from BM25 — access via `pcg_golden_graph_list` / `pcg_golden_graph_get`). Do **not** load workspace `examples/**/*.pcg` as local specs. Skill `examples.md` is wiring-only.
 
 Mirror img2threejs `localSpecSearch` — **pipeline stage, not optional memory**:
 
-1. `pcg_kb_search(query="编图 + 模型类型 + 意图", category="rules", top_k=10)`
+1. `pcg_kb_search(query="graph authoring + model type + intent", category="rules", top_k=10)`
 2. `pcg_kb_get` for `rules/graph-authoring/graph-contract.md`, `rules/graph-authoring/assembly-bevel.md`, `rules/graph-authoring/triview.md` when front/side/top exist, and the matching type rule
 3. Record `rule_id` hits in the plan (`localRuleHits`)
 4. Build graph from returned evidence; do not invent domain topology when a rule exists
-5. If `pcg_kb_search` fails: read `<workspace>/.pcg-ai/rules/graph-authoring/` files directly (fallback paths in `SKILL.md`)
+5. If `pcg_kb_search` fails: read `<workspace>/.picg/rules/graph-authoring/` files directly (fallback paths in `SKILL.md`)
 
 ## Self-correction (one action per review cycle — autonomous)
 
@@ -226,7 +226,7 @@ After cook + screenshot: pick **one** action, apply it, and **immediately** run 
 | `refine-plan` | Wrong module split, missing part in inventory, wrong strategy rule |
 | `refine-graph` | Plan sound but nodes/wiring/values wrong |
 | `refine-cook` | Graph correct but web preview wrong (cook result, material binding, scale) |
-| `request-input` | Missing `front`/`side`/`top` after the first image (ask in that order); **or** last resort: reference unusable, Web editor still offline after start attempts. Do not invent orthos. Do not use this to ask “是否继续”. |
+| `request-input` | Missing `front`/`side`/`top` after the first image (ask in that order); **or** last resort: reference unusable, Web editor still offline after start attempts. Do not invent orthographic views. Do not use this to ask whether to continue. |
 | `stop` | Fidelity ≥ **0.9** and DoD met on every required view **and** later complete-asset stages finished (`FINAL_ACCEPTED`); **or** 12 refine cycles with no measurable improvement; **or** pipeline GAP (dev skill) |
 
 Root-cause guide (img2threejs-aligned):
@@ -273,7 +273,7 @@ Do not claim 0.95+ from one ambiguous photo unless the object is simple and symm
 
 ## Scripts (shared + web-specific)
 
-| img2threejs | PCG-AI script | Role |
+| img2threejs | PICG script | Role |
 |-------------|---------------|------|
 | `new_pre_spec_assessment` / `new_sculpt_spec` | `SHARED_SCRIPTS_DIR/new_authoring_plan.py` | Starter `*-plan.json` |
 | `validate_sculpt_spec --strict-quality` | `SHARED_SCRIPTS_DIR/validate_plan.py --strict-quality` | Block shallow plans |

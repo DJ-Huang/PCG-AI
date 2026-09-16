@@ -1,0 +1,50 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import AssetLibraryPanel from './AssetLibraryPanel';
+import { assetFileRequest } from './assetFilesClient';
+vi.mock('./assetFilesClient', () => ({ assetFileRequest: vi.fn() }));
+const request = vi.mocked(assetFileRequest);
+const example = { root: '/project/examples', files: [{ name: 'tower.pcg', path: 'buildings/tower.pcg' }, { name: 'road.pcg', path: 'road.pcg' }], truncated: false, warnings: [] };
+beforeEach(() => { localStorage.clear(); request.mockReset(); request.mockResolvedValue(example); });
+afterEach(cleanup);
+describe('Assets file browser', () => {
+  it('lists Examples by default, filters by relative path and opens the selected graph', async () => {
+    const onOpen = vi.fn();
+    render(<AssetLibraryPanel onOpen={onOpen} onClose={vi.fn()} />);
+    expect(await screen.findByTitle('Open buildings/tower.pcg')).toBeInTheDocument();
+    expect(request.mock.calls[0][0]).toEqual({ action: 'list', folder: 'examples' });
+    fireEvent.change(screen.getByLabelText('Search assets'), { target: { value: 'buildings' } });
+    expect(screen.queryByTitle('Open road.pcg')).not.toBeInTheDocument();
+    request.mockResolvedValueOnce({ text: '{"version":"2.0"}', filename: 'examples/buildings/tower.pcg' });
+    fireEvent.click(screen.getByTitle('Open buildings/tower.pcg'));
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith({ text: '{"version":"2.0"}', filename: 'examples/buildings/tower.pcg' }));
+  });
+  it('validates, saves and restores custom folders, and removes only the configuration', async () => {
+    const props = { onOpen: vi.fn(), onClose: vi.fn() };
+    const view = render(<AssetLibraryPanel {...props} />);
+    await screen.findByTitle('Open road.pcg');
+    fireEvent.click(screen.getByRole('button', { name: 'Configure asset folders' }));
+    fireEvent.change(screen.getByLabelText('Add a folder'), { target: { value: '/custom/graphs' } });
+    request.mockResolvedValue({ ...example, root: '/custom/graphs', files: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Add folder' }));
+    await waitFor(() => expect(screen.getByLabelText('Asset folder')).toHaveValue('/custom/graphs'));
+    view.unmount(); render(<AssetLibraryPanel {...props} />);
+    expect(screen.getByLabelText('Asset folder')).toHaveValue('/custom/graphs');
+    fireEvent.click(screen.getByRole('button', { name: 'Configure asset folders' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove folder' }));
+    expect(screen.getByLabelText('Asset folder')).toHaveValue('examples');
+    expect(screen.queryByRole('option', { name: '/custom/graphs' })).not.toBeInTheDocument();
+    expect(request.mock.calls.every(([operation]) => operation.action === 'list')).toBe(true);
+  });
+  it('keeps invalid folders out of the saved configuration and displays the error', async () => {
+    render(<AssetLibraryPanel onOpen={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByTitle('Open road.pcg');
+    fireEvent.click(screen.getByRole('button', { name: 'Configure asset folders' }));
+    fireEvent.change(screen.getByLabelText('Add a folder'), { target: { value: '/missing' } });
+    request.mockRejectedValueOnce(new Error('Folder does not exist'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add folder' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Folder does not exist');
+    expect(screen.getByLabelText('Asset folder')).toHaveValue('examples');
+    expect(screen.queryByRole('option', { name: '/missing' })).not.toBeInTheDocument();
+  });
+});

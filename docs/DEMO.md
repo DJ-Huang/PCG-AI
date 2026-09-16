@@ -1,51 +1,37 @@
-# PCG Graph AI — End-to-End Demo
+# PICG End-to-End Demo
 
-Reproduce the full loop: **Web edit → Graph JSON → pcg-server cook → Unity preview**.
+This walkthrough verifies the native backend, Web editor, and optional Unity client with one graph.
 
 ## Prerequisites
 
-- CMake 3.20+（macOS / Windows）
-- Node.js `^20.19.0` or `>=22.12.0`
-- Unity / Tuanjie Editor
-- Localhost `pcg-server`（Unity 不再加载 PcgCore dylib/dll）
-
-## 1. Build and start C++ backend
+Install Node.js `^20.19.0` or `>=22.12.0`, CMake 3.20+, and a C++17 compiler. Initialize submodules from the repository root:
 
 ```bash
-./scripts/build-pcg-server.sh
-./scripts/run-pcg-server.sh
+git submodule update --init --recursive
 ```
 
-Windows: `.\scripts\build-pcg-server.ps1 -Run`
-
-Health: `curl -s http://127.0.0.1:17890/v1/health`  
-Details: [`pcg-server.md`](pcg-server.md)
-
-## 2. Editor loop
-
-### Web editor
+## Start the backend and Web editor
 
 ```bash
-cd web/pcg-editor
-npm ci
-npm run dev
+./scripts/run-pcg-web.sh
 ```
 
-1. Open http://localhost:5173
-2. Edit the graph
-3. Click **Send to Unity** → writes `schema/editor-export.pcg`
+Confirm that `http://127.0.0.1:17890/v1/health` reports `"ok": true`, then open `http://127.0.0.1:5173`.
 
-### Unity Editor
+Import `examples/graphs/stone-arch-bridge.pcg`, validate it, cook it, and inspect the preview. A successful demo has no graph-validation errors, produces non-empty geometry, and remains stable after a second cook.
 
-1. Open `Unity/` project
-2. **PCG → Server → Health Check**（确认后端在线）
-3. **PCG → Set Watched Graph…** → `schema/editor-export.pcg`
-4. Enable Auto Reload / Reload；Scene 预览应更新
+## Optional Unity verification
+
+1. Open `Unity/` in Unity 2022.3 or Unity 1.6.x.
+2. Keep `pcg-server` running.
+3. Choose **PCG > Server > Health Check**.
+4. Open a sample scene or select a `.pcg` asset and run the graph.
+
+Unity should display the same graph output through the HTTP backend. It must not require a copied native library.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---------|-----|
-| Cook / Health 失败 | 启动 `run-pcg-server.sh`；检查端口 17890 |
-| 预览无变化 | 确认 watched `.pcg` 路径；手动 Reload |
-| `UnknownNode` | `scripts/sync-manifest.sh` 后重建 `pcg-server` |
+- Rebuild and restart `pcg-server` after native code changes.
+- Validate node types and handles against `schema/node-manifest.json`.
+- Recreate ignored showcase exports rather than committing `artifacts/` directories.
+- See [Getting Started](getting-started.md) and [PCG Server](pcg-server.md) for platform-specific details.

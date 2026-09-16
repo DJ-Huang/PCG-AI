@@ -9,7 +9,7 @@ visuals. Agent vision inspects the comparison sheet and supplies fidelity / acti
 Shared scripts: `../shared/pcg-scripts/` (generic Python helpers, shared across Unity/web variants).
 Unity C# templates: `scripts/unity/` (this skill directory).
 
-**Unity gate (P0):** before any visual `continue`, follow [unity-review.md](unity-review.md) — `user-tuanjie` connect + new `PcgReview_*` scene + SceneView capture. Templates in `scripts/unity/`.
+**Unity gate (P0):** before any visual `continue`, follow [unity-review.md](unity-review.md) — `user-unity` connect + new `PcgReview_*` scene + SceneView capture. Templates in `scripts/unity/`.
 
 ## new_authoring_plan.py
 
@@ -157,7 +157,7 @@ after the layout pass and after each substantive `.pcg` edit.
 5. Auto params + auto saveDir → author .pcg for that pass (no ask_user)
 6. layout_pcg.py → relayout root + every inline Subgraph definition
 7. validate_pcg.py
-8. create_review_scene.cs.txt → Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene  (fixed; no ask)
+8. create_review_scene.cs.txt → Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene  (fixed; no ask)
 9. execute_csharp_script setup_pcg_review_subject.cs.txt → cook
 10. execute_csharp_script capture_sceneview_png.cs.txt
 11. make_comparison_sheet.py --reference <archived ref_<slug>> --render …
@@ -173,7 +173,7 @@ After any context compaction: read `<plan-stem>-RESUME.md` → plan.json → arc
 
 | File | Use with |
 |------|----------|
-| `create_review_scene.cs.txt` | `execute_csharp_script` — Empty scene → `Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene` |
+| `create_review_scene.cs.txt` | `execute_csharp_script` — Empty scene → `Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene` |
 | `setup_pcg_review_subject.cs.txt` | `execute_csharp_script` — load `.pcg`, cook, frame SceneView |
 | `capture_sceneview_png.cs.txt` | `execute_csharp_script` — write `screenshots/SceneView_*.png` |
 

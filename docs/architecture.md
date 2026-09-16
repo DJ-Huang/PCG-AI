@@ -1,6 +1,6 @@
 # Architecture
 
-PCG-AI separates authoring, execution and host integration so the same graph can be edited in the browser or Unity while the native runtime remains the execution source of truth.
+PICG separates authoring, execution and host integration so the same graph can be edited in the browser or Unity while the native runtime remains the execution source of truth.
 
 ## Components
 
@@ -51,7 +51,7 @@ The versioned schemas are kept in `schema/`. `schema/editor-export.pcg` is a loc
 - Native builds: `pcg-core/build/`, `pcg-server/build/`, `pcg-fbx-exporter/build*/`
 - Web dependencies and output: `web/pcg-editor/node_modules/`, `web/pcg-editor/dist/`
 - Unity state: `Unity/Library/`, `Unity/Temp/`, `Unity/Logs/`, `Unity/UserSettings/`
-- Unity review work: `Unity/Assets/PCG-AI-Workspace/`
+- Unity review work: `Unity/Assets/PICG-Workspace/`
 - Large showcase exports: `examples/**/artifacts/`
 
 These paths are reproducible or machine-local and must not be committed.

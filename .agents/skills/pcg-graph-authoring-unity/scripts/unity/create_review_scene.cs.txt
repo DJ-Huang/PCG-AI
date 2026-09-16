@@ -1,9 +1,9 @@
 // create_review_scene.cs.txt
-// Paste into user-tuanjie execute_csharp_script after replacing tokens.
+// Paste into user-unity execute_csharp_script after replacing tokens.
 // Tokens: __REVIEW_SLUG__
 //
 // Opens a brand-new Empty scene and saves it under the fixed preview dir:
-//   Assets/PCG-AI-Workspace/Scenes/PcgReview_<slug>.scene
+//   Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene
 // Never ask the user for a scene path — this directory is the SSOT.
 // Prefer this over manage_scene create when path nesting is unreliable.
 
@@ -12,17 +12,17 @@ using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 
 string slug = "__REVIEW_SLUG__";
-string dir = "Assets/PCG-AI-Workspace/Scenes";
+string dir = "Assets/PICG-Workspace/Scenes";
 string path = dir + "/PcgReview_" + slug + ".scene";
 
-if (!AssetDatabase.IsValidFolder("Assets/PCG-AI-Workspace"))
+if (!AssetDatabase.IsValidFolder("Assets/PICG-Workspace"))
 {
     if (!AssetDatabase.IsValidFolder("Assets"))
         return "FAIL Assets missing";
-    AssetDatabase.CreateFolder("Assets", "PCG-AI-Workspace");
+    AssetDatabase.CreateFolder("Assets", "PICG-Workspace");
 }
 if (!AssetDatabase.IsValidFolder(dir))
-    AssetDatabase.CreateFolder("Assets/PCG-AI-Workspace", "Scenes");
+    AssetDatabase.CreateFolder("Assets/PICG-Workspace", "Scenes");
 
 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 if (!EditorSceneManager.SaveScene(scene, path))

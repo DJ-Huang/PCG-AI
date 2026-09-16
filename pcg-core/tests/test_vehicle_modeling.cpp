@@ -31,12 +31,11 @@ void expect(bool condition, const char* message)
 
 Result execute(const char* graph)
 {
-    std::vector<char> json_output(4096);
     std::vector<unsigned char> mesh_output(2 * 1024 * 1024);
     Result result;
     result.code = pcg_execute_graph_v7(
         graph, 42, nullptr, 0, nullptr, 0, nullptr, 0, &result.kind,
-        json_output.data(), static_cast<int>(json_output.size()),
+        nullptr, 0,
         mesh_output.data(), static_cast<int>(mesh_output.size()), nullptr, 0,
         nullptr, nullptr, &result.vertices, &result.indices, nullptr, nullptr, 0,
         result.error, sizeof(result.error));

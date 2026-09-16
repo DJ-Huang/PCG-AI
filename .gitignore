@@ -5,6 +5,13 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+*~
+*.orig
+*.rej
+.fleet/
+.zed/
+.history/
+.vs/
 
 # Local agent and editor state
 .codely/
@@ -27,6 +34,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.npm/
+.pnpm-store/
 
 # CMake and native build outputs
 **/build/
@@ -45,13 +54,21 @@ pnpm-debug.log*
 *.pdb
 *.so
 *.so.*
+*.dSYM/
+**/CMakeUserPresets.json
+.cache/
+.clangd/
 
 # Python
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
 
-# Unity / Tuanjie generated state
+# Unity generated state
 Unity/Library/
 Unity/Logs/
 Unity/MemoryCaptures/
@@ -68,11 +85,14 @@ Unity/*.user
 Unity/UpgradeLog*.htm
 Unity/mono_crash*.json
 Unity/.com-unity-codely.json
-Unity/Assets/PCG-AI-Workspace/
-Unity/Assets/PCG-AI-Workspace.meta
+Unity/Assets/PICG-Workspace/
+Unity/Assets/PICG-Workspace.meta
 Unity/Assets/Exports/
 Unity/Assets/Exports.meta
 Unity/screenshots/
+Unity/Recordings/
+Unity/Crashes/
+Unity/ServerData/
 
 # Generated runtime/editor artifacts
 schema/editor-export.pcg
@@ -88,3 +108,15 @@ screenshots/
 artstation-capture-out/
 webpage-capture-out/
 url-content-out/
+
+# Local environment, credentials and test reports
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.log
+test-results/
+junit*.xml
+lcov.info

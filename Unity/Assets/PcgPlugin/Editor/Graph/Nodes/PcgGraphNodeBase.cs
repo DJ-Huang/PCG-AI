@@ -450,7 +450,7 @@ namespace DJTechEditor.PCG.Graph
             if (connector != null)
                 connector.style.display = DisplayStyle.None;
 
-            // Also try by USS class name (Tuanjie may use different internal name)
+            // Also try by USS class name (Unity may use different internal name)
             var connectorByClass = port.Query<VisualElement>(className: "connector").First();
             if (connectorByClass != null)
                 connectorByClass.style.display = DisplayStyle.None;

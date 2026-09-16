@@ -9,7 +9,7 @@ description: >-
   inputs, regeneration, performance, and AssetSpec-consistent output. It also
   runs a deterministic root/Subgraph layout pass before graph validation. Use
   for `/pcg-graph-authoring-web-dev`, PCG pipeline validation, three-view /
-  三视图 / orthographic reconstruction, capability-gap assessment, Subgraph layout, PCG MCP graph authoring and seed/performance validation, or
+  three-view / orthographic reconstruction, capability-gap assessment, Subgraph layout, PCG MCP graph authoring and seed/performance validation, or
   generator development. Stop only for a real capability GAP that needs
   user override, unusable references, or a dead editor after start attempts —
   never park at a white-model or pipeline REWORK.
@@ -131,7 +131,7 @@ An obviously impossible required operation may be surfaced during planning, but 
 
 Use the same autonomous defaults, receipts, refinement loop, blockers, durable deliverables, and `FINAL_ACCEPTED` definition as the standard variant. Keep working through geometry, UV, materials, textures, export, and final scoring in the same session. Do not park at `GRAPH_WRITTEN`, `WHITE_MODEL_APPROVED`, or pipeline `REWORK`.
 
-Ask only for missing `front` / `side` / `top` after the first reference image, a genuinely unusable reference, a Web editor that will not come online after start attempts, or an explicit pipeline `GAP`. Do not ask about parameters, save locations, material choices, or “是否继续”.
+Ask only for missing `front` / `side` / `top` after the first reference image, a genuinely unusable reference, a Web editor that will not come online after start attempts, or an explicit pipeline `GAP`. Do not ask about parameters, save locations, material choices, or whether to continue.
 
 Legal `stop` is only: `FINAL_ACCEPTED`; twelve consecutive refine cycles with no measurable improvement (report residual gaps, do not lower the bar); or `GAP` / `INEFFICIENT` awaiting override.
 

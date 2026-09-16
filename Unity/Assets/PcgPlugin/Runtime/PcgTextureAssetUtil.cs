@@ -16,7 +16,7 @@ namespace DJTechRuntime.PCG
 
         private static readonly string[] BuiltinExtraContainers =
         {
-            "Resources/tuanjie_builtin_extra",
+            "Resources/unity_builtin_extra",
             "Resources/unity_builtin_extra",
         };
 
@@ -32,7 +32,7 @@ namespace DJTechRuntime.PCG
                 stored.StartsWith(WebAssetPrefix, StringComparison.OrdinalIgnoreCase))
                 return TryGetPortableResourceKey(stored, out _);
 
-            // Any path returned by AssetDatabase.GetAssetPath (incl. Resources/tuanjie_builtin_extra/Name).
+            // Any path returned by AssetDatabase.GetAssetPath (incl. Resources/unity_builtin_extra/Name).
             return stored.IndexOf('/') >= 0;
         }
 

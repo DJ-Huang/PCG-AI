@@ -81,7 +81,7 @@ export default function AgentPanel({
 }: AgentPanelProps) {
   const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
   const [sending, setSending] = useState(false);
-  const [width, setWidth] = useState(380);
+  const [width, setWidth] = useState(() => Math.max(300, Math.min(380, Math.round(window.innerWidth * 0.23))));
   const [collapsed, setCollapsed] = useState(false);
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providerId, setProviderId] = useState('');

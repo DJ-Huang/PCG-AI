@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cook the Standard PBR example through pcg-server and verify its material contract."""
+"""Cook the Standard PBR test fixture through pcg-server and verify its material contract."""
 
 import argparse
 import json
@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_GRAPH = ROOT / "examples" / "material-standard-pbr.pcg"
+DEFAULT_GRAPH = ROOT / "examples" / "tests" / "test-standard-pbr-material.pcg"
 RESULT_HEADER_SIZE = 56
 RESULT_MAGIC = 0x52474350
 MESH_MAGIC = 0x4D474350

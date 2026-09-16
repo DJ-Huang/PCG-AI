@@ -45,7 +45,7 @@ describe('exportPreviewMeshGlb', () => {
     expect(view.getUint32(4, true)).toBe(2);
     expect(view.getUint32(8, true)).toBe(result.byteLength);
     const json = glbJson(result);
-    expect(json.asset.generator).toBe('PCG-AI Web GLB Exporter');
+    expect(json.asset.generator).toBe('PICG Web GLB Exporter');
     expect(json.nodes[0].extras.pcgGraph).toBe('examples/showcases/tripo-yoyo-puppy/procedural.pcg');
     expect(json.nodes[0].children).toEqual([1]);
     expect(json.meshes[0].primitives[0].material).toBe(0);

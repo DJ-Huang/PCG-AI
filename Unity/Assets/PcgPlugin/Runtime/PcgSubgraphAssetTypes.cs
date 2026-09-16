@@ -492,7 +492,7 @@ namespace DJTechRuntime.PCG
         /// <summary>
         /// Normalize AssetDatabase GUIDs for stable comparison.
         /// Classic Unity 32-hex GUIDs (optional hyphens) become lowercase hex without hyphens.
-        /// Opaque engine GUIDs (e.g. Tuanjie long form) are preserved as AssetDatabase returns them.
+        /// Opaque engine GUIDs (e.g. Unity long form) are preserved as AssetDatabase returns them.
         /// </summary>
         public static string Canonicalize(string guid)
         {

@@ -253,10 +253,8 @@ bool execute_mesh_graph_with_textures(const char* graph_json,
     int vertex_count = 0;
     int index_count = 0;
     std::vector<uint8_t> mesh_buf(8 * 1024 * 1024);
-    char json_out[256] = {};
-
     const PcgResultCode rc = pcg_execute_graph_v3(
-        graph_json, seed, textures, texture_count, &kind, json_out, sizeof(json_out),
+        graph_json, seed, textures, texture_count, &kind, nullptr, 0,
         mesh_buf.data(), static_cast<int>(mesh_buf.size()), &vertex_count, &index_count, err,
         err_size);
     if (rc != PCG_OK)

@@ -1,8 +1,8 @@
 ---
 name: pcg-graph-authoring-unity
 description: >-
-  Create complete production-ready Unity assets through PCG-AI: plan and author
-  `.pcg` graphs, validate and cook the white model in a clean Unity/Tuanjie
+  Create complete production-ready Unity assets through PICG: plan and author
+  `.pcg` graphs, validate and cook the white model in a clean Unity
   scene, validate UV/projection, create and bind materials and textures, output
   a reproducible prefab, render it, and apply full-asset acceptance. Use for
   PCG graph authoring, reference-image reconstruction, procedural Unity asset
@@ -62,7 +62,7 @@ AssetSpec
 
 The graph-authoring reference preserves the mandatory manifest/rule/Golden-Graph retrieval, top-to-bottom graph layout, independent root/Subgraph layout pass, node naming, physical sizing, module/Subgraph rules, per-part bevel rule, parameters, clean-scene cook, and visual refinement loop. Use the shared Python helper scripts from `SHARED_SCRIPTS_DIR` and Unity review templates from `AUTHORING_SKILL_DIR/scripts/unity/`.
 
-Use PCG MCP as the primary graph-authoring path when the target is open in the Web editor: discover the live manifest, read or replace the full document, apply atomic structural passes, validate/cook/capture, and save the `.pcg` through the editor with `ifGraphHash`. It is the graph creation surface, not the Unity acceptance surface: keep saved-file validation and the mandatory Tuanjie/Unity clean-scene cook, screenshot, prefab, and final render gates.
+Use PCG MCP as the primary graph-authoring path when the target is open in the Web editor: discover the live manifest, read or replace the full document, apply atomic structural passes, validate/cook/capture, and save the `.pcg` through the editor with `ifGraphHash`. It is the graph creation surface, not the Unity acceptance surface: keep saved-file validation and the mandatory Unity clean-scene cook, screenshot, prefab, and final render gates.
 
 ## Autonomous production defaults
 

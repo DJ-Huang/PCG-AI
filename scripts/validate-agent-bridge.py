@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument("--base", default="http://127.0.0.1:17890")
     parser.add_argument(
         "--graph",
-        default=str(Path(__file__).resolve().parents[1] / "examples/graphs/boolean-subtract-box.pcg"),
+        default=str(Path(__file__).resolve().parents[1] / "examples/tests/test-outline-solid-columns.pcg"),
     )
     args = parser.parse_args()
     graph = json.loads(Path(args.graph).read_text(encoding="utf-8"))
@@ -71,7 +71,7 @@ def main() -> None:
     v2_subgraph = json.loads(
         (
             Path(__file__).resolve().parents[1]
-            / "examples/showcases/wooden-cabin/web.pcg"
+            / "examples/showcases/wooden-cabin/wooden-cabin.pcg"
         ).read_text(encoding="utf-8")
     )
     selected = graph["nodes"][0]["id"]
@@ -256,7 +256,7 @@ def main() -> None:
         "replaceGraph",
     )
     assert replace_command["graph"]["version"] == "2.0"
-    assert len(replace_command["graph"]["subgraphs"]) == 5
+    assert len(replace_command["graph"]["subgraphs"]) == 6
     _, save_command = call_and_ack(
         13,
         "pcg_save_graph",

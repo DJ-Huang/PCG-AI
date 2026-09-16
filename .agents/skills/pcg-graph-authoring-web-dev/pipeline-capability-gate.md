@@ -6,7 +6,7 @@ It validates the generator itself. It does not replace geometry validation, UV/p
 
 ## Purpose and verdicts
 
-Validate that the current PCG-AI pipeline can produce the AssetSpec efficiently, repeatably, and without stale or hidden failure states.
+Validate that the current PICG pipeline can produce the AssetSpec efficiently, repeatably, and without stale or hidden failure states.
 
 | Verdict | Meaning | Next action |
 |---|---|---|
@@ -20,7 +20,7 @@ Never call `MergeMesh` a Boolean/fuse, turn a variable-section form into a box s
 
 ## Required evidence
 
-Load the AssetSpec, the shared `pcg-graph-authoring.md`, the current `schema/node-manifest.json`, applicable PCG rules, and the generated graph. Golden Graphs under `<workspace>/.pcg-ai/golden-graphs/` may support an allowed composition; repo examples and web demos may not.
+Load the AssetSpec, the shared `pcg-graph-authoring.md`, the current `schema/node-manifest.json`, applicable PCG rules, and the generated graph. Golden Graphs under `<workspace>/.picg/golden-graphs/` may support an allowed composition; repo examples and web demos may not.
 
 Before testing, create a compact demand inventory that describes outcomes rather than desired node names:
 
@@ -91,13 +91,13 @@ When any demand is `missing` or `approximate-inefficient`, do both research trac
 1. Find the relevant Houdini SOP/HDA pattern in SideFX documentation or official examples.
 2. Use `agent-reach` to research mature alternatives such as Unreal PCG/Geometry Script, Blender Geometry Nodes, established DCC workflows, or a relevant open-source implementation.
 
-Report the exact unmet demand, evidence, Houdini/mature-solution approach, missing PCG-AI node/property/composition, expected fidelity impact, and recommended product change. Do not continue graph authoring or downstream material work until the user explicitly says to override the gap.
+Report the exact unmet demand, evidence, Houdini/mature-solution approach, missing PICG node/property/composition, expected fidelity impact, and recommended product change. Do not continue graph authoring or downstream material work until the user explicitly says to override the gap.
 
 ```text
 PCG Pipeline: GAP
 Task: <one line>
 Demand: <outcome> → missing|inefficient (<why>)
-PCG-AI evidence: <manifest/rule evidence>
+PICG evidence: <manifest/rule evidence>
 Houdini: <SOP/pattern + source>
 Mature solution: <source>
 Product gap: <node/property/composition to add>

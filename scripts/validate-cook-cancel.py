@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PORT = os.environ.get("PCG_SERVER_PORT", "17890")
 BASE = f"http://127.0.0.1:{PORT}"
-FAST_GRAPH = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "examples/graphs/boolean-subtract-box.pcg")
+FAST_GRAPH = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "examples/tests/test-outline-solid-columns.pcg")
 SLOW_GRAPH = Path(
     os.environ.get("PCG_CANCEL_SLOW_GRAPH", str(ROOT / "examples/graphs/lot-city-demo.pcg"))
 )

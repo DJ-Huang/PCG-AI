@@ -30,7 +30,7 @@ import ManifestNode from './nodes/ManifestNode';
 import SubgraphNode, { SubgraphInterfaceNode } from './nodes/SubgraphNode';
 import { defaultData } from './graphSchema';
 import type { GraphParameter, GraphSubgraph, GraphNode, GraphEdge } from './graphSchema';
-import { exportGraph, downloadGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
+import { exportGraph, downloadGraph, saveGraphToFile, revealInFinder } from './exportGraph';
 import { importGraphFromFile, parseGraphJson, syncNodeCounterFromNodes } from './importGraph';
 import { clearEditorSession, loadEditorSession, saveEditorSession } from './editorSession';
 import { isValidConnection } from './connectionValidation';
@@ -92,7 +92,10 @@ import {
   bakeBaseColorTextureIntoOpc1,
   makeVertexColorMaterialData,
 } from './orientedPointColorBake';
+import { Brand, EditorMenu, Icon } from './EditorChrome';
+import AssetLibraryPanel from './AssetLibraryPanel';
 import './App.css';
+import './EditorChrome.css';
 
 // Map every manifest node type to the generic ManifestNode component.
 // Using { default: ManifestNode } alone causes React Flow to pass type='default'
@@ -183,7 +186,9 @@ function PcgEditor() {
   const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>(restored?.subgraphs ?? []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
-  const [showAgent, setShowAgent] = useState(false);
+  const [showAgent, setShowAgent] = useState(() => window.innerWidth >= 1280);
+  const [showAssets, setShowAssets] = useState(false);
+  const [showGraph, setShowGraph] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [providerRevision, setProviderRevision] = useState(0);
   const [agentLaunchRequest, setAgentLaunchRequest] = useState<AgentLaunchRequest | null>(null);
@@ -1004,8 +1009,16 @@ function PcgEditor() {
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       // Skip if typing in an input/select
-      if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable || e.defaultPrevented) return;
+      if (target.closest('[role=menu], [role=dialog]') || showSettings) return;
+      if ((target.closest('button, a') && (e.code === 'Space' || e.key === 'Enter'))) return;
 
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+        else if (e.key === ',') { e.preventDefault(); openSettings(); }
+        return;
+      }
+      if (!showGraph && (e.code === 'Space' || e.key.toLowerCase() === 'f')) return;
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         openSearchAt(window.innerWidth / 2, window.innerHeight / 2);
@@ -1019,21 +1032,11 @@ function PcgEditor() {
       } else if (e.key === 'i' || e.key === 'I') {
         e.preventDefault();
         setShowInspector((v) => !v);
-      } else if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          redo();
-        } else {
-          undo();
-        }
-      } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-        e.preventDefault();
-        openSettings();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openSearchAt, fitView, openSettings, undo, redo]);
+  }, [openSearchAt, fitView, openSettings, undo, redo, showSettings, showGraph]);
 
   // ── Node drag undo ─────────────────────────────────
 
@@ -1093,21 +1096,17 @@ function PcgEditor() {
       return;
     }
     const graph = exportGraph(nodes, edges, parameters, subgraphs);
+    if (/^(?:\/|[A-Za-z]:[\\/])/.test(currentFilename)) {
+      const filename = currentFilename.split(/[\\/]/).pop() || 'graph.pcg';
+      downloadGraph(graph, filename);
+      setStatus(`Downloaded ${filename} — external source unchanged`);
+      return;
+    }
     const result = await saveGraphToFile(graph, currentFilename);
     if (result.ok) {
       setStatus(`Saved to ${currentFilename}`);
     } else {
       setStatus(`Save failed: ${result.error ?? 'unknown error'}`);
-    }
-  };
-
-  const handleSendToUnity = async () => {
-    const graph = exportGraph(nodes, edges, parameters, subgraphs);
-    const result = await exportToSchema(graph);
-    if (result.ok) {
-      setStatus('Saved to schema/editor-export.pcg — use PCG → Reload Watched Graph in Unity');
-    } else {
-      setStatus(`Send failed: ${result.error ?? 'unknown error'} (is npm run dev running?)`);
     }
   };
 
@@ -1139,6 +1138,22 @@ function PcgEditor() {
     setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params, ${result.subgraphs.length} subgraphs)`);
   };
 
+  const handleOpenAsset = ({ text, filename }: { text: string; filename: string }) => {
+    const result = parseGraphJson(text);
+    if (!result.ok) throw new Error(result.error);
+    previewAbortRef.current?.abort();
+    nodeCounter = syncNodeCounterFromNodes(result.nodes);
+    commit();
+    setEditPath([]);
+    setNodes(result.nodes); setEdges(result.edges);
+    setParameters(result.parameters); setSubgraphs(result.subgraphs);
+    setSelectedNode(null); setInfoNodeId(null); setPreviewTargetId(null);
+    setPreviewParameterValuesByScope({}); setPreviewData(null); setPreviewError(null);
+    setCurrentFilename(filename); setShowGraph(true);
+    setStatus(`Opened ${filename}`);
+    requestAnimationFrame(() => fitView({ ...GRAPH_FIT_VIEW_OPTIONS, duration: 200 }));
+  };
+
   // ── New / Save As / Show in Project ────────────────
 
   const handleNewGraph = () => {
@@ -1159,7 +1174,7 @@ function PcgEditor() {
   };
 
   const handleSaveAs = () => {
-    const filename = currentFilename || 'graph.pcg';
+    const filename = currentFilename.split(/[\\/]/).pop() || 'graph.pcg';
     const graph = exportGraph(nodes, edges, parameters, subgraphs);
     downloadGraph(graph, filename);
     setStatus(`Saved as ${filename}`);
@@ -1175,6 +1190,20 @@ function PcgEditor() {
       setStatus(`Show in Project failed: ${result.error ?? 'unknown error'}`);
     }
   };
+
+  useEffect(() => {
+    const onFileKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.defaultPrevented || showSettings) return;
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        if (event.shiftKey) handleSaveAs(); else void handleSave();
+      } else if (event.key.toLowerCase() === 'o') {
+        event.preventDefault(); handleImportClick();
+      }
+    };
+    window.addEventListener('keydown', onFileKey);
+    return () => window.removeEventListener('keydown', onFileKey);
+  });
 
   // ── Preview cook ────────────────────────────────────
 
@@ -1244,6 +1273,7 @@ function PcgEditor() {
 
   const togglePreview = useCallback(async () => {
     if (showPreview) {
+      setShowGraph(true);
       previewAbortRef.current?.abort();
       const jobId = previewJobIdRef.current;
       if (jobId) {
@@ -1495,58 +1525,34 @@ function PcgEditor() {
     <SubgraphsContext.Provider value={subgraphs}>
     <CurrentSubgraphContext.Provider value={currentSubgraph}>
     <div className="pcg-app">
-      {/* Toolbar — aligned with Unity: left=New/Save/Save As/Show in Project, right=Parameters/Inspector */}
-      <div className="pcg-toolbar">
-        <button type="button" onClick={() => handleNewGraph()} title="New Graph">New</button>
-        <button type="button" onClick={handleSave} title="Save Graph">Save</button>
-        <button type="button" onClick={handleSaveAs} title="Save As">Save As...</button>
-        <button type="button" onClick={handleShowInProject} title="Show in Project">Show in Project</button>
-        <span className="pcg-toolbar__spacer" />
-        <button
-          type="button"
-          className={showAgent ? 'pcg-toolbar__toggle--active' : ''}
-          onClick={() => setShowAgent((v) => !v)}
-          title="Toggle Agent panel"
-        >
-          Agent
-        </button>
-        <button
-          type="button"
-          className={showBlackboard ? 'pcg-toolbar__toggle--active' : ''}
-          onClick={() => setShowBlackboard((v) => !v)}
-          title="Toggle Parameters (P)"
-        >
-          Parameters
-        </button>
-        <button
-          type="button"
-          className={showInspector ? 'pcg-toolbar__toggle--active' : ''}
-          onClick={() => setShowInspector((v) => !v)}
-          title="Toggle Inspector (I)"
-        >
-          Inspector
-        </button>
-        <button
-          type="button"
-          className={showPreview ? 'pcg-toolbar__toggle--active' : ''}
-          onClick={() => void togglePreview()}
-          title="Toggle 3D Preview (requires pcg-server)"
-        >
-          Preview
-        </button>
-        <span className="pcg-toolbar__separator" />
-        <button type="button" onClick={openSettings} title="PCG Settings (⌘,)">Settings</button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pcg,.json,application/json"
-          className="pcg-toolbar__file-input"
-          onChange={handleImportFile}
-        />
-        <button type="button" className="pcg-toolbar__import" onClick={handleImportClick}>Import</button>
-        <button type="button" className="pcg-toolbar__export" onClick={handleSendToUnity}>Send to Unity</button>
-        {status && <span className="pcg-toolbar__status">{status}</span>}
-      </div>
+      <header className="pcg-topbar">
+        <div className="pcg-topbar__start">
+          <Brand />
+          <EditorMenu label="Main menu" className="pcg-file-menu" items={[
+            { label: 'File', icon: 'folder', children: [
+              { label: 'New graph', icon: 'file', onSelect: handleNewGraph },
+              { label: 'Import…', icon: 'folder', shortcut: '⌘/Ctrl O', onSelect: handleImportClick },
+              { label: 'Save', icon: 'save', shortcut: '⌘/Ctrl S', separator: true, onSelect: () => void handleSave() },
+              { label: 'Save As…', icon: 'download', shortcut: '⇧ ⌘/Ctrl S', onSelect: handleSaveAs },
+              { label: 'Show in Project', icon: 'folder', separator: true, disabled: !currentFilename, onSelect: () => void handleShowInProject() },
+            ] },
+            { label: 'Edit', icon: 'undo', children: [
+              { label: 'Undo', icon: 'undo', shortcut: '⌘/Ctrl Z', disabled: !canUndo, onSelect: undo },
+              { label: 'Redo', icon: 'redo', shortcut: '⇧ ⌘/Ctrl Z', disabled: !canRedo, onSelect: redo },
+            ] },
+            { label: 'Windows', icon: 'windows', children: [
+              { label: 'Agent', checked: showAgent, onSelect: () => setShowAgent((value) => !value) },
+              { label: 'Preview', checked: showPreview, onSelect: () => void togglePreview() },
+              { label: 'PCG Graph', checked: showGraph, disabled: showGraph && !showPreview, onSelect: () => setShowGraph((value) => !value) },
+              { label: 'Assets', checked: showAssets, onSelect: () => setShowAssets((value) => !value) },
+            ] },
+            { label: 'Settings', icon: 'settings', separator: true, shortcut: '⌘/Ctrl ,', onSelect: openSettings },
+          ]}><Icon name="menu" /></EditorMenu>
+        </div>
+        <span className="pcg-document-name" title={currentFilename || 'Untitled graph'}><Icon name="file" />{currentFilename?.split(/[\\/]/).pop() || 'Untitled graph'}</span>
+        <span className="pcg-topbar__workspace">Procedural workspace</span>
+        <input ref={fileInputRef} type="file" accept=".pcg,.json,application/json" className="pcg-toolbar__file-input" onChange={handleImportFile} />
+      </header>
 
       <SettingsDialog
         open={showSettings}
@@ -1556,6 +1562,13 @@ function PcgEditor() {
 
       {/* Main: three-panel layout */}
       <div className="pcg-main">
+        <nav className="pcg-activity-rail" aria-label="Workspace panels">
+          <button type="button" aria-pressed={showAgent} onClick={() => setShowAgent((value) => !value)} title="Toggle Agent"><Icon name="agent" /><span>Agent</span></button>
+          <button type="button" aria-pressed={showAssets} onClick={() => setShowAssets((value) => !value)} title="Toggle Assets"><Icon name="folder" /><span>Assets</span></button>
+          <span className="pcg-activity-rail__spacer" />
+          <button type="button" onClick={openSettings} title="Settings" aria-label="Settings"><Icon name="settings" /></button>
+        </nav>
+        {showAssets && <AssetLibraryPanel onClose={() => setShowAssets(false)} onOpen={handleOpenAsset} />}
         {showAgent && (
           <AgentPanel
             onApplyActions={applyAgentActions}
@@ -1586,6 +1599,7 @@ function PcgEditor() {
             loading={previewLoading}
             error={previewError}
             onRefresh={() => void requestPreviewCook()}
+            onClose={() => void togglePreview()}
             parameters={viewParameters}
             parameterNodeIds={previewParameterNodeIds}
             parameterValues={previewParameterValues}
@@ -1597,7 +1611,14 @@ function PcgEditor() {
             selectedNodeId={selectedNode?.id ?? null}
           />
         )}
-        <div className="pcg-graph-container">
+        <div className="pcg-graph-container" style={showGraph ? undefined : { display: 'none' }}>
+          <div className="pcg-panel-heading pcg-graph-heading">
+            <Icon name="graph" /><strong>PCG Graph</strong>
+            <div className="pcg-panel-heading__actions">
+              <button type="button" className="pcg-icon-button" title="Add node (Space)" aria-label="Add node" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); openSearchAt(Math.min(rect.left, window.innerWidth - 340), rect.bottom + 8); }}><Icon name="search" /></button>
+              <button type="button" className="pcg-icon-button" title="Fit graph (F)" aria-label="Fit graph" onClick={() => fitView({ ...GRAPH_FIT_VIEW_OPTIONS, duration: 200 })}><Icon name="fit" /></button>
+            </div>
+          </div>
           {/* Breadcrumb — visible while editing inside a subgraph */}
           {editPath.length > 0 && (
             <div className="pcg-breadcrumb">
@@ -1653,7 +1674,7 @@ function PcgEditor() {
             fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
             deleteKeyCode={['Delete', 'Backspace']}
           >
-            <Background variant={BackgroundVariant.Lines} gap={24} color="#2b2b2b" />
+            <Background variant={BackgroundVariant.Lines} gap={24} color="#212a34" />
             <Controls />
             <MiniMap pannable zoomable />
           </ReactFlow>
@@ -1665,12 +1686,6 @@ function PcgEditor() {
               {viewNodes.length} nodes · {viewEdges.length} edges · {viewParameters.length} params · {subgraphs.length} subgraphs
             </span>
             <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit · P: Parameters · I: Inspector</span>
-            {(canUndo || canRedo) && (
-              <span className="pcg-status-bar__undo">
-                <button type="button" onClick={undo} disabled={!canUndo} className="pcg-status-bar__btn">↶ Undo</button>
-                <button type="button" onClick={redo} disabled={!canRedo} className="pcg-status-bar__btn">↷ Redo</button>
-              </span>
-            )}
           </div>
         </div>
         {showInspector && (
@@ -1687,6 +1702,8 @@ function PcgEditor() {
           />
         )}
       </div>
+
+      <footer className="pcg-workspace-status"><span className="pcg-workspace-status__message" role="status" title={status}>{status || 'Ready'}</span><span>PICG · Graph editor</span></footer>
 
       {/* Floating: Node Search Panel */}
       {searchConfig && (

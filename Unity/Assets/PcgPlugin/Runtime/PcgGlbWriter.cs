@@ -97,7 +97,7 @@ namespace DJTechRuntime.PCG
             var indexByteOffset = Align4(positionByteLength);
             var totalBinLength = indexByteOffset + indexCount * 4;
             return "{"
-                   + "\"asset\":{\"version\":\"2.0\",\"generator\":\"PCG-AI PcgGlbWriter\"},"
+                   + "\"asset\":{\"version\":\"2.0\",\"generator\":\"PICG PcgGlbWriter\"},"
                    + "\"scene\":0,\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"mesh\":0}],"
                    + "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0},\"indices\":1,\"mode\":4}]}],"
                    + "\"bufferViews\":["

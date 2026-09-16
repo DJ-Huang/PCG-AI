@@ -1,5 +1,5 @@
 // capture_sceneview_png.cs.txt
-// Paste into user-tuanjie execute_csharp_script after replacing tokens.
+// Paste into user-unity execute_csharp_script after replacing tokens.
 // Tokens: __SCREENSHOT_REL__   (project-relative, e.g. screenshots/SceneView_2026-07-31_22-40-00.png)
 //
 // Captures the focused SceneView into a PNG under the Unity project root.

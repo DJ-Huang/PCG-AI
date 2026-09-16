@@ -1,12 +1,12 @@
 ---
 name: pcg-graph-authoring-web
 description: >-
-  Create complete production-ready web assets through PCG-AI: plan and author
+  Create complete production-ready web assets through PICG: plan and author
   `.pcg` graphs, validate and cook the white model via the pcg-server HTTP API,
   validate UV/projection, create and bind materials and textures, output a
   reproducible exported asset (glTF / web scene), render it, and apply
   full-asset acceptance. Use for PCG graph authoring for web, reference-image
-  reconstruction, three-view / 三视图 / orthographic front-side-top reconstruction,
+  reconstruction, three-view / orthographic front-side-top reconstruction,
   procedural web asset production, bridge/building/vehicle/
   scatter generators, Subgraphs, graph parameters, PCG cooking via pcg-server,
   PCG MCP graph creation/editing, materialized web asset delivery, or

@@ -44,7 +44,7 @@ npm run test:library         # built-in library consistency
 The deterministic review page loads a repository-relative graph path:
 
 ```text
-http://127.0.0.1:5173/review?graph=examples/graphs/bridge-demo.pcg
+http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 ```
 
 The development server resolves the path from the repository root and rejects paths outside it. The review route uses the local cook server and supports fixed cameras, preview quality controls, parameter overrides and GLB export.

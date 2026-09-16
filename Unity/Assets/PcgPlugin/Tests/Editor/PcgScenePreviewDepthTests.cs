@@ -271,7 +271,7 @@ namespace DJTechEditor.PCG.Tests
                     }
 
                     var view = camera.worldToCameraMatrix;
-                    // SceneView/Tuanjie's shader path expects the raw Camera
+                    // SceneView/Unity's shader path expects the raw Camera
                     // projection; its SV_POSITION conversion supplies API depth.
                     var projection = camera.projectionMatrix;
                     var compare = PcgScenePreviewRenderer.ResolveDepthCompare(

@@ -89,6 +89,7 @@ import {
   type PhysicalCameraState,
 } from './physicalCamera';
 import CameraPopover from './preview/CameraPopover';
+import { Icon } from './EditorChrome';
 import AnimationTransport from './preview/AnimationTransport';
 import RigPosePanel from './preview/RigPosePanel';
 import {
@@ -119,6 +120,7 @@ interface PreviewViewportProps {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  onClose?: () => void;
   parameters?: GraphParameter[];
   parameterNodeIds?: ReadonlySet<string>;
   parameterValues?: PreviewParameterValues;
@@ -306,7 +308,7 @@ const MIN_WIDTH = 320;
 const MAX_WIDTH = 2400;
 
 const defaultWidth = () =>
-  Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round((window.innerWidth * 2) / 3)));
+  Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(window.innerWidth * 0.43)));
 const EMPTY_PARAMETERS: GraphParameter[] = [];
 const EMPTY_PARAMETER_NODE_IDS = new Set<string>();
 const EMPTY_PARAMETER_VALUES: PreviewParameterValues = {};
@@ -348,6 +350,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
   loading,
   error,
   onRefresh,
+  onClose,
   parameters = EMPTY_PARAMETERS,
   parameterNodeIds = EMPTY_PARAMETER_NODE_IDS,
   parameterValues = EMPTY_PARAMETER_VALUES,
@@ -1923,6 +1926,7 @@ const PreviewViewport = forwardRef<PreviewViewportHandle, PreviewViewportProps>(
         onMouseDown={onResizeStart}
         title="Drag to resize"
       />
+      {!reviewMode && <div className="pcg-panel-heading pcg-preview-heading"><Icon name="preview" /><strong>Preview</strong><span className="pcg-panel-heading__muted">Viewport</span>{onClose && <button type="button" className="pcg-icon-button" aria-label="Close Preview" onClick={onClose}><Icon name="close" /></button>}</div>}
       {splineEdit && (
         <div className="pcg-preview__header">
           <span
