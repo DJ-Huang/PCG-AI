@@ -50,106 +50,59 @@ URL: Project Settings → PICG, or **PCG → Server → Set Server URL…**
 | PUT / GET | `/v1/session` | Web in-memory graph and editor context |
 | POST | `/v1/session/heartbeat` | lightweight editor liveness heartbeat |
 | PUT / GET | `/v1/preview/screenshot` | live WebGL PNG upload/download |
+| GET | `/v1/preview/metadata` | metadata for the latest preview capture |
 | POST | `/v1/preview/request-capture` | allocate a correlated capture request |
+| POST | `/v1/camera/command` | queue a camera command for the editor |
+| PUT / GET | `/v1/camera/state` | applied editor camera state |
 | PATCH | `/v1/graph/nodes/:id` | legacy optimistic-lock node-patch entry point |
 | GET / POST | `/v1/graph/patches`, `/v1/graph/patches/ack` | queued graph-command delivery and apply acknowledgement |
 | POST | `/mcp` | MCP Streamable HTTP; SSE response via `Accept` |
-| GET | `/v1/agent/providers` | Provider/auth status and model catalog; never returns credentials |
-| POST / DELETE | `/v1/agent/providers/:id/connect/key`, `/connection` | validate/connect or remove a Provider credential |
-| POST | `/v1/agent/providers/:id/oauth/start` | start browser PKCE or device-code OAuth |
-| GET | `/v1/agent/oauth/:attemptId/status` | poll a pending OAuth attempt |
-| GET / PUT | `/v1/agent/settings` | read/select the active connected Provider and tool-capable model |
-| POST | `/v1/agent/turns` | multipart message/attachments with chunked SSE response |
-| POST | `/v1/agent/turns/:id/decision`, `/cancel` | resolve graph-write approvals or cancel a Turn |
-| GET | `/v1/agent/sessions?query=&cursor=&limit=` | search and page durable local chat history |
-| GET / PATCH / DELETE | `/v1/agent/sessions/:id` | open, rename, or permanently delete a chat and its attachments |
+| GET | `/v1/third-party/tripo/status` | Tripo configuration status and masked key hint; never returns the key |
+| PUT / DELETE | `/v1/third-party/tripo/config` | store or clear a local Tripo API key |
+| POST | `/v1/third-party/tripo/generate` | explicit image-to-3D generation with progress/result SSE |
+| GET | `/v1/third-party/cache/:file` | read a cached GLB |
+| POST | `/v1/reconstruct/oriented-sdf` | measure a source mesh into topology-free oriented samples |
+| GET | `/v1/assets/preserved-gltf` | retrieve a workspace GLB for rig/animation preservation |
+| GET | `/v1/kb/status`, `/v1/kb/list` | project-local knowledge-base status and file listing |
+| POST | `/v1/kb/reindex` | rebuild the project-local knowledge index |
+| GET / POST | `/v1/kb/search`, `/v1/kb/get` | search or read project-local notes |
+| GET | `/v1/golden-graphs/list` | list reusable graph templates |
+| GET / POST | `/v1/golden-graphs/get` | read a graph template |
 
-## Embedded multi-Provider Agent
+The editor session endpoints synchronize the live graph, selection, camera, and preview. They are not conversation storage.
 
-`pcg-server` owns the Provider registry, credential validation, model catalog,
-session history, Provider protocol adapters, tool loop, and approval state. It
-supports OpenAI Responses, Anthropic Messages, Gemini `generateContent`, and
-OpenAI-compatible Chat Completions. Provider/model deltas and tool events use
-the fixed SSE contract:
+## 3D generation and credentials
 
-```text
-turn.created → reasoning.started / .delta / .completed
-             → message.started / .delta / .completed
-             → tool.call / tool.result
-             → approval.required → decision → … → turn.completed
-             ↘ turn.error
-```
+The Web Settings dialog is dedicated to **3D Generation** API configuration.
+Configure Tripo there, or supply `PCG_TRIPO_API_KEY` to `pcg-server`.
+`PCG_TRIPO_BASE_URL` can override its API endpoint. An environment key takes
+precedence over a stored key; clearing the stored key does not unset an
+environment variable.
 
-Every Timeline event carries stable session, Turn, message, Part, and ordinal
-identifiers where applicable. Only reasoning text actually returned by the
-Provider is shown. Tool Parts retain complete input, structured output,
-duration, cache state, and errors; identical read calls at an unchanged graph
-hash are cached and eventually receive a loop-breaker result.
+A `Tripo3DGenerator` node calls the cloud service only when the user explicitly
+chooses **Generate** or **Regenerate**. The server uploads the image, creates
+and polls the task, and caches the GLB under `library/web-cache/TripoCache/`.
+Normal cooking and preview load that local result instead of starting another
+cloud job. See [Third-party image-to-3D](third-party-image-to-3d.md).
 
-The runtime limits a Turn to 12 tool rounds, 32 calls, five minutes, eight
-attachments, 10 MiB per attachment, and 24 MiB total. PNG/JPEG bytes and UTF-8
-`.txt/.json/.pcg` content are mapped into each Provider's native multimodal
-request format. PDF is intentionally not exposed in this release.
+The independent credential store defaults to
+`~/Library/Application Support/PICG/credentials.json` when `HOME` is set.
+Use `PCG_CREDENTIALS_PATH` to select an explicit file location, including for
+isolated tests or managed installations. On POSIX systems, the store file uses
+`0600` permissions and the application-owned directory uses `0700`; Windows
+uses the permissions of the selected user directory. Writes replace the file
+atomically and preserve unrelated credential entries.
 
-Chat metadata, Timeline Parts, and attachment files survive browser refreshes
-and server restarts under
-`~/Library/Application Support/PICG/Agent/Sessions/`. Directories use `0700`
-and files use `0600` on macOS; history responses expose attachment metadata,
-not local paths or bytes. `PCG_AGENT_SESSIONS_PATH` overrides this root for
-isolated tests. A failed or interrupted latest Turn can be retried without
-duplicating its user message; attachment Turns require selecting the files
-again so stale bytes are never replayed implicitly.
+On macOS, explicitly set `PCG_CREDENTIAL_STORE=keychain` to select Keychain;
+`PCG_KEYCHAIN_SERVICE` can override its service identifier. Development builds
+default to the protected file to avoid authorization prompts caused by changing
+binary identities. Existing storage-location aliases remain supported for
+credential compatibility. Neither the browser nor `.pcg` files persist API keys.
 
-Credentials are stored separately in
-`~/Library/Application Support/PICG/credentials.json`. Its directory uses
-`0700`, the file uses `0600`, and updates use an atomic replacement so a crash
-cannot leave a partial secret file. Only non-sensitive Provider/model/account
-metadata is written to `agent.json`. Set `PCG_AGENT_CREDENTIALS_PATH` for an
-isolated file, or explicitly set `PCG_AGENT_CREDENTIAL_STORE=keychain` to use
-the macOS Keychain in a stably signed distribution. Development builds default
-to the protected file because an ad-hoc binary changes identity after rebuilds
-and would otherwise repeatedly trigger macOS authorization prompts. Provider
-errors are normalized before they reach JSON, SSE, or logs, so upstream
-response bodies and secrets are not reflected.
+## External MCP clients
 
-Existing development credentials that were saved by an older build remain in
-Keychain but are not read automatically, because doing so would recreate the
-authorization prompt. Reconnect each Provider once after upgrading; subsequent
-refreshes, chats, restarts, and rebuilds use the protected file without a
-prompt.
-
-OAuth buttons remain unavailable until the matching PICG-owned Client ID is
-present. Do not use another application's registered Client ID:
-
-```bash
-export PCG_OPENAI_OAUTH_CLIENT_ID='...'
-export PCG_GITHUB_OAUTH_CLIENT_ID='...'
-export PCG_XAI_OAUTH_CLIENT_ID='...'
-```
-
-ChatGPT uses browser PKCE with the server's actual listen port. GitHub and xAI
-use device authorization with expiry, denial handling, and `slow_down`
-backoff. OpenAI/xAI refresh tokens are refreshed early under a per-Provider
-single-flight lock. Claude Pro/Max OAuth is an extension point only; Anthropic
-uses API Key authentication in this release.
-
-Kimi for Coding is a fixed API-Key Provider at
-`https://api.kimi.com/coding/v1`. Credential validation uses its `/models`
-catalog, while turns use the Anthropic-compatible `/messages` protocol. The
-web app exposes it in **Settings → AI Providers**; the Agent panel never asks
-for or manages credentials directly.
-
-The deterministic runtime validation uses isolated config, credential, and
-session paths plus a local fake OpenAI-compatible Provider:
-
-```bash
-python3 scripts/validate-agent-runtime.py
-```
-
-## External Agent MCP
-
-Cursor and OpenCode connect directly to the same native process—there is no
-stdio child process or Node sidecar:
+External clients connect directly to the native process—there is no stdio
+child process or Node sidecar:
 
 ```json
 {
@@ -161,24 +114,30 @@ stdio child process or Node sidecar:
 }
 ```
 
-Keep the Web editor open for graph authoring and live Preview capture. Available tools:
+Configure AI accounts, models, and conversation behavior in the external
+client. PICG supplies the graph tools and live editor connection, not the
+client's model runtime.
+
+Keep the Web editor open for graph authoring and live Preview capture. Available tools include:
 
 - `pcg_get_editor_context`, `pcg_get_node`, `pcg_list_nodes`
 - `pcg_get_graph`, `pcg_get_node_types`
 - `pcg_patch_node`, `pcg_apply_graph_ops`
 - `pcg_replace_graph`, `pcg_save_graph`
 - `pcg_validate`, `pcg_cook`
-- `pcg_capture_preview`
+- `pcg_capture_preview`, `pcg_set_camera`, `pcg_get_camera`
+- `pcg_bake_oriented_sdf`, `pcg_get_component_bounds`, `pcg_solve_camera`, `pcg_validate_camera_frame`
+- `pcg_kb_*`, `pcg_golden_graph_list`, `pcg_golden_graph_get`
 
 The MCP surface supports complete graph creation, including nodes, edges,
 parameters, positions, and inline Subgraphs. Use `pcg_get_node_types` instead
 of inventing manifest property or pin names, then read `pcg_get_graph` before
 writing.
 
-Every write requires the latest `graphHash` as `ifGraphHash`. The server queues
-one command at a time and returns only after the Web editor reports whether it
-was actually applied. `pcg_apply_graph_ops` applies 1–500 operations atomically
-as one Undo step; any invalid operation rejects the whole batch.
+Every graph write requires the latest `graphHash` as `ifGraphHash`. The server
+queues one command at a time and returns only after the Web editor reports
+whether it was actually applied. `pcg_apply_graph_ops` applies 1–500 operations
+atomically as one Undo step; any invalid operation rejects the whole batch.
 `pcg_replace_graph` is root-scope only and validates the complete graph before
 queueing. `pcg_save_graph` accepts only workspace-relative `.pcg` paths and
 rejects absolute paths, parent traversal, and workspace escapes.
@@ -196,16 +155,30 @@ operation. An `apply_timeout` response reports whether the still-pending
 command was cancelled; if it may already have been fetched, refresh the graph
 before deciding whether to retry.
 
-Set `PCG_AGENT_TOKEN` to require the same bearer token on all Agent bridge REST
-routes and `/mcp`. With no token, only the localhost listener is exposed and the
-server logs a development-mode warning.
+## Localhost authentication
 
-Protocol validation:
+Set `PCG_SERVER_TOKEN` to require a bearer token on editor-bridge REST routes,
+Tripo routes, and `/mcp`. Existing token aliases remain supported for
+compatibility. With no token, only the localhost listener is exposed and the
+server logs a development-mode warning. This is not a remote-deployment
+security model; see [SECURITY.md](../SECURITY.md).
+
+Start both Vite and `pcg-server` with the same token environment. For accepted
+localhost editor requests, the server-side Vite proxy supplies the token when
+no explicit Authorization header is present; the token is not embedded in the
+browser bundle. External MCP clients must send their own matching
+`Authorization: Bearer …` header. Do not enter server tokens into a graph or
+commit them to client configuration.
+
+Protocol validation (against a fresh local server without a token):
 
 ```bash
 python3 scripts/validate-agent-bridge.py --base http://127.0.0.1:17890
-opencode mcp list
 ```
+
+Despite its historical filename, this script exercises the editor REST/MCP
+protocol: graph synchronization, optimistic locking, command acknowledgements,
+cooking, and preview capture.
 
 ## Scope
 
