@@ -28,6 +28,22 @@ PICG (Procedural Intelligent Content Generation) treats the `.pcg` file as the p
 
 > **Project status:** active development. Web authoring and Unity integration are available now. Other host integrations listed below are planned, and graph schemas and APIs may still change before a stable release.
 
+## Showcase
+
+Each example below is an editable graph shown beside its live Web preview—not a one-off baked render.
+
+| Example | Preview | What it demonstrates |
+| --- | --- | --- |
+| [Lot city buildings](examples/graphs/lot-city-buildings-procedural.pcg) | <img src="docs/showcase/lot-city-buildings-procedural.png" alt="Procedural lot city buildings graph and 3D preview" width="360"> | Buildings derived from lots, roads, and reusable assembly logic. |
+| [Biohazard canister](examples/graphs/biohazard-canister.pcg) | <img src="docs/showcase/biohazard-canister.png" alt="Biohazard canister graph and 3D preview" width="360"> | Hard-surface construction with splines, primitives, bevels, transforms, and merge stages. |
+| [M9 bayonet](examples/graphs/m9-bayonet.pcg) | <img src="docs/showcase/m9-bayonet.png" alt="M9 bayonet graph and wireframe preview" width="360"> | Outline solids, Boolean cuts, bevels, UVs, and material assignment. |
+| [Spiral staircase](examples/graphs/spiral-staircase.pcg) | <img src="docs/showcase/spiral-staircase.png" alt="Spiral staircase graph and 3D preview" width="360"> | Spline-driven construction with sweep and instancing operations. |
+| [Terrain demo](examples/graphs/terrain-demo.pcg) | <img src="docs/showcase/terrain-demo.png" alt="Terrain graph and heightfield preview" width="360"> | Heightfield terracing, blur, noise distortion, and erosion. |
+| [Tripo YoYo puppy](examples/showcases/tripo-yoyo-puppy/procedural.pcg) | <img src="docs/showcase/tripo-yoyo-puppy.png" alt="Tripo YoYo puppy graph with material and action rig preview" width="360"> | A Tripo-assisted reference workflow refined into procedural surfacing, materials, semantic components, and an action rig. |
+| [Wooden cabin](examples/showcases/wooden-cabin/wooden-cabin.pcg) | <img src="docs/showcase/wooden-cabin.png" alt="Wooden cabin graph and 3D preview" width="360"> | Reusable wall, roof, and porch subgraphs assembled into a finished building. |
+
+More graphs, fixtures, and case studies live under [examples/](examples/README.md).
+
 ## One graph, multiple platforms
 
 PICG separates the graph contract and C++ execution semantics from each host's editor, renderer, scene objects, and runtime bindings. The goal is simple: create an asset once, keep one procedural `.pcg` source, and use it wherever the scene lives.
@@ -124,22 +140,6 @@ Future Unreal, Blender, Godot, and Three.js adapters are expected to reuse the s
 - **Unity integration** — editor and runtime components using the same graph contract and external native cook service.
 - **Agent-native workflow** — MCP plus an embedded multi-provider Agent that can operate the live graph and viewport.
 - **Reference-assisted creation** — image inputs and Meshy/Tripo nodes can feed a procedural, engine-oriented finishing workflow.
-
-## Showcase
-
-Each example below is an editable graph shown beside its live Web preview—not a one-off baked render.
-
-| Example | Preview | What it demonstrates |
-| --- | --- | --- |
-| [Lot city buildings](examples/graphs/lot-city-buildings-procedural.pcg) | <img src="docs/showcase/lot-city-buildings-procedural.png" alt="Procedural lot city buildings graph and 3D preview" width="360"> | Buildings derived from lots, roads, and reusable assembly logic. |
-| [Biohazard canister](examples/graphs/biohazard-canister.pcg) | <img src="docs/showcase/biohazard-canister.png" alt="Biohazard canister graph and 3D preview" width="360"> | Hard-surface construction with splines, primitives, bevels, transforms, and merge stages. |
-| [M9 bayonet](examples/graphs/m9-bayonet.pcg) | <img src="docs/showcase/m9-bayonet.png" alt="M9 bayonet graph and wireframe preview" width="360"> | Outline solids, Boolean cuts, bevels, UVs, and material assignment. |
-| [Spiral staircase](examples/graphs/spiral-staircase.pcg) | <img src="docs/showcase/spiral-staircase.png" alt="Spiral staircase graph and 3D preview" width="360"> | Spline-driven construction with sweep and instancing operations. |
-| [Terrain demo](examples/graphs/terrain-demo.pcg) | <img src="docs/showcase/terrain-demo.png" alt="Terrain graph and heightfield preview" width="360"> | Heightfield terracing, blur, noise distortion, and erosion. |
-| [Tripo YoYo puppy](examples/showcases/tripo-yoyo-puppy/procedural.pcg) | <img src="docs/showcase/tripo-yoyo-puppy.png" alt="Tripo YoYo puppy graph with material and action rig preview" width="360"> | A Tripo-assisted reference workflow refined into procedural surfacing, materials, semantic components, and an action rig. |
-| [Wooden cabin](examples/showcases/wooden-cabin/wooden-cabin.pcg) | <img src="docs/showcase/wooden-cabin.png" alt="Wooden cabin graph and 3D preview" width="360"> | Reusable wall, roof, and porch subgraphs assembled into a finished building. |
-
-More graphs, fixtures, and case studies live under [examples/](examples/README.md).
 
 ## Quick start
 
