@@ -1,16 +1,55 @@
-# PCG-AI
+<p align="right">
+  <strong>English</strong> | <a href="README.ja.md">日本語</a>
+</p>
 
-PCG-AI is a procedural-content authoring stack built around editable graph files. It combines a React graph editor, a C++ geometry runtime and cook server, and a Unity/Tuanjie integration project.
+<p align="center">
+  <img src="docs/picg-logo.png" alt="PICG — Procedural Intelligent Content Generation" width="400">
+</p>
 
-> Project status: active development. Graph and API compatibility may still change before a stable release.
+# PICG
 
-## What is included
+**Procedural Intelligent Content Generation**
 
-- A browser editor based on React Flow with live 3D preview.
-- A C++17 procedural geometry runtime with a C API.
-- A localhost HTTP/MCP server for validation, cooking, preview capture and agent workflows.
-- A Unity/Tuanjie editor integration that cooks through `pcg-server`.
-- Versioned graph schemas, a manifest-backed node catalog, reusable subgraphs and curated examples.
+PICG is a cross-engine procedural content generation framework built around editable graph assets and intelligent content workflows. It combines a React-based graph editor, a C++17 geometry runtime, a localhost HTTP/MCP cook server, and Unity/Tuanjie integration.
+
+The project follows one core idea: **authoring tools and engine integrations should be interchangeable front ends, while graph data and execution semantics remain portable and consistent.** Graphs can be authored manually or through agent-assisted workflows, executed by the same native core, and previewed across different environments.
+
+> **Project status:** active development. Graph schemas, APIs, and integration details may still change before a stable release.
+
+## Core capabilities
+
+- **Graph-first authoring** — editable, versioned graph files form the shared contract between editors, runtimes, and integrations.
+- **Native procedural runtime** — a C++17 geometry and graph execution core exposed through a C API.
+- **Web authoring and preview** — a React Flow based editor with live 3D preview and GLB export workflows.
+- **Unity / Tuanjie integration** — editor-side graph workflows backed by the same external `pcg-server` runtime.
+- **Agent-ready workflows** — localhost HTTP and MCP endpoints for validation, cooking, preview capture, and automated content workflows.
+- **Reusable content building blocks** — manifest-backed node definitions, subgraphs, schemas, and curated examples.
+
+## Architecture
+
+PICG separates authoring, execution, and engine integration into independent layers:
+
+```text
+Web / Unity / Tuanjie / Agent workflows
+                 │
+                 │ Graph JSON
+                 ▼
+             pcg-server
+                 │
+                 ▼
+              pcg-core
+                 │
+        geometry / points / materials
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+   Web preview       Engine preview
+   + GLB export      + FBX / scene data
+```
+
+This keeps the graph contract editor-independent while using the C++ runtime as the single execution layer.
+
+More detail is available in [Architecture](docs/architecture.md).
 
 ## Quick start
 
@@ -25,8 +64,8 @@ PCG-AI is a procedural-content authoring stack built around editable graph files
 Clone the repository and initialize its submodule:
 
 ```bash
-git clone --recurse-submodules <repository-url>
-cd PCG-AI
+git clone --recurse-submodules https://github.com/DJ-Huang/PICG.git
+cd PICG
 ```
 
 On macOS or Linux, start the native server and Web editor together:
@@ -35,7 +74,7 @@ On macOS or Linux, start the native server and Web editor together:
 ./scripts/run-pcg-web.sh
 ```
 
-The script builds missing native artifacts, installs missing Web dependencies and starts:
+The script builds missing native artifacts, installs missing Web dependencies, and starts:
 
 - Web editor: `http://127.0.0.1:5173`
 - Health endpoint: `http://127.0.0.1:17890/v1/health`
@@ -66,33 +105,19 @@ See [Getting Started](docs/getting-started.md) for the complete first-run and Un
 ## Repository layout
 
 ```text
-PCG-AI/
-├── Agent/                 Agent skills and reusable PCG workflow tooling
-├── docs/                  User, architecture and integration documentation
-├── examples/              Graphs, tests, subgraphs, showcases and storyboards
+PICG/
+├── Agent/                 Agent skills and reusable procedural workflow tooling
+├── docs/                  User, architecture, and integration documentation
+├── examples/              Graphs, tests, subgraphs, showcases, and storyboards
 ├── library/               Canonical built-in subgraph library
 ├── pcg-core/              C++ graph runtime and geometry algorithms
 ├── pcg-fbx-exporter/      Standalone FBX export library
 ├── pcg-server/            Local HTTP/MCP cook and agent backend
 ├── schema/                Graph schemas and node manifest
-├── scripts/               Build, run, sync and validation commands
+├── scripts/               Build, run, sync, and validation commands
 ├── Unity/                 Unity/Tuanjie integration project and curated samples
 └── web/pcg-editor/        Vite + React authoring application
 ```
-
-The main data flow is:
-
-```text
-Web or Unity graph editor
-        │ graph JSON
-        ▼
-pcg-server ──► pcg-core ──► geometry / points / materials / preview data
-        │
-        ├──► Web preview and GLB export
-        └──► Unity scene preview and FBX export
-```
-
-More detail is available in [Architecture](docs/architecture.md).
 
 ## Examples
 
@@ -104,7 +129,7 @@ All repository-level examples live under [examples/](examples/README.md):
 - `examples/showcases/` — complete reference-driven case studies
 - `examples/storyboards/` — sequence and layout blockouts
 
-Unity-specific scenes and materials live under `Unity/Assets/Samples/PCG-AI/`. Generated review work belongs in `Unity/Assets/PCG-AI-Workspace/`, which is intentionally ignored.
+Unity-specific scenes, materials, and sample conventions are documented in [Unity/README.md](Unity/README.md).
 
 Review a repository graph in the browser with:
 
@@ -114,13 +139,13 @@ http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 
 ## Build and validation
 
-Native runtime:
+### Native runtime
 
 ```bash
 ./scripts/build-pcg-core.sh --run-tests
 ```
 
-Web editor:
+### Web editor
 
 ```bash
 cd web/pcg-editor
@@ -130,7 +155,7 @@ npm run build
 npx vitest run
 ```
 
-Repository contracts:
+### Repository contracts
 
 ```bash
 python3 scripts/validate-manifest.py
@@ -138,7 +163,9 @@ python3 scripts/validate-subgraph-schema.py
 python3 scripts/validate-builtin-library.py
 ```
 
-Server smoke test, after starting `pcg-server`:
+### Server smoke test
+
+After starting `pcg-server`:
 
 ```bash
 ./scripts/verify-pcg-server.sh
@@ -152,7 +179,7 @@ Open `Unity/` as the project root. Unity does not load `PcgCore` or the FBX expo
 
 The repository contains no machine-local Unity package references. Optional local editor integrations should be installed in the developer's own environment instead of being committed to `Packages/manifest.json`.
 
-See [Unity/README.md](Unity/README.md) for scene locations, sample conventions and generated-directory rules.
+See [Unity/README.md](Unity/README.md) for scene locations, sample conventions, and generated-directory rules.
 
 ## Documentation
 
@@ -163,7 +190,6 @@ Start at the [documentation index](docs/README.md). Important guides include:
 - [PCG server](docs/pcg-server.md)
 - [Node reference](docs/node-reference.md)
 - [Subgraph library](library/README.md)
-- [Development manual](docs/PCG-AI-Development-Manual.md)
 
 ## Contributing and security
 
@@ -171,4 +197,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [SECUR
 
 ## License status
 
-No open-source license has been selected yet. Until a `LICENSE` file is added by the copyright holder, the repository is not legally open source and reuse rights are not granted. Select MIT, Apache-2.0 or another license and complete the asset-rights review before the public release.
+No open-source license has been selected yet. Until a `LICENSE` file is added by the copyright holder, the repository is not legally open source and reuse rights are not granted. Select MIT, Apache-2.0, or another license and complete the asset-rights review before the public release.
