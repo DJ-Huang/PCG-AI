@@ -38,6 +38,7 @@ import {
   type ReviewCameraView,
 } from './reviewCamera';
 import { exportPreviewMeshGlb } from './previewGlbExport';
+import { requireSynchronizedParameters, requireTrustworthyCook, type EvaluationEvidence } from './reviewEvidence';
 
 interface ReviewState {
   loading: boolean;
@@ -52,6 +53,7 @@ interface PcgReviewApi {
   capture: (options?: Parameters<PreviewViewportHandle['captureFrame']>[0]) => (
     ReturnType<PreviewViewportHandle['captureFrame']>
   );
+  getEvaluationEvidence: () => EvaluationEvidence;
   downloadGlb: () => Promise<string | null>;
   animations: string[];
   components: string[];
@@ -110,8 +112,20 @@ export default function ReviewPage() {
   const [exporting, setExporting] = useState(false);
 
   const graphPath = query.graphPath;
+  const evaluationRef = useRef<EvaluationEvidence | null>(null);
+  const sourceGraphRef = useRef<GraphJson | null>(null);
+  const invalidateEvidence = useCallback(() => {
+    cookAbortRef.current?.abort();
+    cookAbortRef.current = null;
+    if (cookJobIdRef.current) void cancelCook(cookJobIdRef.current);
+    evaluationRef.current = null;
+    const host = window as unknown as { __pcgReady?: boolean; __pcgReview?: PcgReviewApi };
+    host.__pcgReady = false;
+    if (host.__pcgReview) host.__pcgReview.ready = false;
+  }, []);
 
   const cook = useCallback(async () => {
+    invalidateEvidence();
     if (!graphPath) {
       setState({ loading: false, error: 'Missing ?graph= query parameter', data: null });
       return;
@@ -126,9 +140,11 @@ export default function ReviewPage() {
     setState({ loading: true, error: null, data: null });
 
     try {
-      const res = await fetch(`/api/load-graph?path=${encodeURIComponent(graphPath)}`);
+      const res = await fetch(`/api/load-graph?path=${encodeURIComponent(graphPath)}`, { signal: abort.signal });
+      if (cookAbortRef.current !== abort) return;
       if (!res.ok) {
         const text = await res.text();
+        if (cookAbortRef.current !== abort) return;
         let msg = text;
         try {
           const parsed = JSON.parse(text);
@@ -139,6 +155,8 @@ export default function ReviewPage() {
       }
 
       const nextGraph = (await res.json()) as GraphJson;
+      if (cookAbortRef.current !== abort) return;
+      sourceGraphRef.current = nextGraph;
       const resolvedValues = resolvePreviewParameterValues(
         nextGraph.parameters ?? [],
         parameterValuesRef.current,
@@ -151,8 +169,9 @@ export default function ReviewPage() {
         parameterValuesRef.current = resolvedValues;
         return resolvedValues;
       });
+      const effectiveGraph = applyPreviewParameterOverrides(nextGraph, resolvedValues);
       const response = await cookGraphPreviewBudgeted(
-        applyPreviewParameterOverrides(nextGraph, resolvedValues),
+        effectiveGraph,
         42,
         abort.signal,
         jobId,
@@ -161,6 +180,11 @@ export default function ReviewPage() {
       if (cookAbortRef.current !== abort) return;
 
       if (response.ok && response.data) {
+        evaluationRef.current = {
+          version: 1, graph: effectiveGraph, sourceGraph: nextGraph, seed: 42,
+          cook: JSON.parse(response.data.cook.json || '{}') as Record<string, unknown>,
+          fullResolution: response.data.previewQuality?.fullResolution ?? true,
+        };
         setState({ loading: false, error: null, data: response.data });
       } else {
         setState({ loading: false, error: response.error ?? 'Cook failed', data: null });
@@ -170,7 +194,7 @@ export default function ReviewPage() {
         setState({ loading: false, error: String(err), data: null });
       }
     }
-  }, [graphPath]);
+  }, [graphPath, invalidateEvidence]);
 
   useEffect(() => {
     const timer = setTimeout(() => void cook(), 600);
@@ -206,28 +230,43 @@ export default function ReviewPage() {
   );
 
   const updateParameterValue = useCallback((parameterId: string, value: PreviewParameterValue) => {
-    setParameterValues((current) => ({ ...current, [parameterId]: value }));
-  }, []);
+    invalidateEvidence();
+    parameterValuesRef.current = { ...parameterValuesRef.current, [parameterId]: value };
+    setParameterValues(parameterValuesRef.current);
+  }, [invalidateEvidence]);
 
   const resetParameters = useCallback(() => {
-    setParameterValues(resolvePreviewParameterValues(parameters, undefined));
-  }, [parameters]);
+    invalidateEvidence();
+    parameterValuesRef.current = resolvePreviewParameterValues(parameters, undefined);
+    setParameterValues(parameterValuesRef.current);
+  }, [parameters, invalidateEvidence]);
 
   const saveParameterDefaults = useCallback(async () => {
     if (!graph || !graphPath) return;
-    const saved = savePreviewParameterDefaults(graph.nodes, parameters, parameterValues);
-    const nextGraph: GraphJson = {
-      ...graph,
-      nodes: saved.nodes,
-      parameters: saved.parameters,
-    };
-    const result = await saveGraphToFile(nextGraph, graphPath);
-    if (!result.ok) {
-      setState((current) => ({ ...current, error: `Save defaults failed: ${result.error ?? 'unknown error'}` }));
-      return;
+    try {
+      const latest = await fetch(`/api/load-graph?path=${encodeURIComponent(graphPath)}`);
+      if (!latest.ok || JSON.stringify(await latest.json()) !== JSON.stringify(graph)) {
+        setState((current) => ({ ...current, error: 'Graph changed on disk; reload before saving defaults' }));
+        return;
+      }
+      const saved = savePreviewParameterDefaults(graph.nodes, parameters, parameterValues);
+      const nextGraph: GraphJson = {
+        ...graph,
+        nodes: saved.nodes,
+        parameters: saved.parameters,
+      };
+      const result = await saveGraphToFile(nextGraph, graphPath);
+      if (!result.ok) {
+        setState((current) => ({ ...current, error: `Save defaults failed: ${result.error ?? 'unknown error'}` }));
+        return;
+      }
+      setGraph(nextGraph);
+      invalidateEvidence();
+      void cook();
+    } catch (error) {
+      setState((current) => ({ ...current, error: `Save defaults failed: ${String(error)}` }));
     }
-    setGraph(nextGraph);
-  }, [graph, graphPath, parameters, parameterValues]);
+  }, [graph, graphPath, parameters, parameterValues, invalidateEvidence, cook]);
 
   const downloadGlb = useCallback(async (): Promise<string | null> => {
     if (!state.data?.mesh || !graphPath || !graph || exporting) return null;
@@ -237,6 +276,9 @@ export default function ReviewPage() {
       parameters.map((parameter) => [parameter.name, parameterValues[parameter.id] ?? parameter.default]),
     );
     try {
+      const exportEvaluation = evaluationRef.current;
+      if (!exportEvaluation) throw new Error('Parameters or graph are waiting for a new cook');
+      requireSynchronizedParameters(graph);
       const preserved = viewportRef.current?.getPreservedGltfBytes() ?? null;
       let exportData = state.data;
       if (!preserved) {
@@ -252,6 +294,10 @@ export default function ReviewPage() {
         }
         exportData = fullResponse.data;
       }
+      if (evaluationRef.current !== exportEvaluation) {
+        throw new Error('Graph or parameters changed during export; re-cook before exporting');
+      }
+      requireTrustworthyCook(exportData.cook.json, exportData.cook.code);
       const bytes = preserved ?? exportPreviewMeshGlb(
         exportData.mesh!,
         exportData.materials,
@@ -283,6 +329,7 @@ export default function ReviewPage() {
   }, [exporting, graph, graphPath, parameterValues, parameters, query.frontAxis, state.data]);
 
   const markReady = useCallback((pose: ReviewCameraPose | null) => {
+    if (!evaluationRef.current) return;
     const api: PcgReviewApi = {
       ready: true,
       camera: pose,
@@ -296,6 +343,14 @@ export default function ReviewPage() {
         return next;
       },
       capture: (options) => viewportRef.current?.captureFrame(options) ?? null,
+      getEvaluationEvidence: () => {
+        const evidence = evaluationRef.current;
+        if (!evidence || !sourceGraphRef.current || !api.ready) throw new Error('No current evaluation');
+        requireSynchronizedParameters(sourceGraphRef.current);
+        requireTrustworthyCook(JSON.stringify(evidence.cook), 0);
+        if (!evidence.fullResolution) throw new Error('Use Full quality for final review');
+        return structuredClone(evidence);
+      },
       downloadGlb,
       get animations() { return viewportRef.current?.listAnimations() ?? []; },
       get components() { return viewportRef.current?.listComponents() ?? []; },
@@ -338,6 +393,16 @@ export default function ReviewPage() {
     }, 220);
     return () => clearTimeout(timer);
   }, [state.loading, state.error, state.data, reviewView, query.frontAxis, query.sideView, markReady]);
+
+  let acceptanceWarning = '';
+  if (graph && state.data) {
+    try {
+      requireSynchronizedParameters(graph);
+      requireTrustworthyCook(state.data.cook.json, state.data.cook.code);
+    } catch (error) {
+      acceptanceWarning = error instanceof Error ? error.message : String(error);
+    }
+  }
 
   const slug = graphPath
     ? graphPath.split('/').pop()?.replace(/\.pcg$|\.json$/, '') ?? 'review'
@@ -388,7 +453,11 @@ export default function ReviewPage() {
             aria-label="Preview quality"
             value={quality}
             disabled={state.loading}
-            onChange={(event) => setQuality(event.target.value as PreviewQualityMode)}
+            onChange={(event) => {
+              invalidateEvidence();
+              qualityRef.current = event.target.value as PreviewQualityMode;
+              setQuality(qualityRef.current);
+            }}
           >
             <option value="adaptive">Adaptive</option>
             <option value="full">Full</option>
@@ -417,6 +486,7 @@ export default function ReviewPage() {
           </span>
         )}
       </div>
+      {acceptanceWarning && <div role="alert" style={{ padding: '8px 12px' }}>{acceptanceWarning}</div>}
       <div style={{ flex: 1, minHeight: 0 }}>
         <PreviewViewport
           ref={viewportRef}
