@@ -1,35 +1,25 @@
-# PCG Skills Index
+# PICG skills
 
-These skills cover PCG graph authoring and complete-asset delivery. Shared scripts and asset contracts live under `shared/` and are referenced by relative path rather than installed as independent skills.
+Select one authoring platform. Read only the reference needed for the current operation; shared documents are resources, not additional skills to activate.
 
-## Unity
-
-| Skill | Typical triggers | Purpose |
-| --- | --- | --- |
-| [pcg-graph-authoring-unity](./pcg-graph-authoring-unity/SKILL.md) | `/pcg-graph-authoring-unity`, `.pcg`, PCG graph authoring, Houdini layout, Scene view review | Author a PCG graph and require clean-scene Unity validation and visual review. The legacy `pcg-graph-authoring` name redirects here. |
-| [pcg-graph-authoring-unity-dev](./pcg-graph-authoring-unity-dev/SKILL.md) | `/pcg-graph-authoring-unity-dev`, pipeline validation, capability assessment | Adds the Pipeline Capability Gate to the Unity workflow and stops only for a verified capability gap. |
-
-## Web
-
-| Skill | Typical triggers | Purpose |
-| --- | --- | --- |
-| [pcg-graph-authoring-web](./pcg-graph-authoring-web/SKILL.md) | `/pcg-graph-authoring-web`, Web PCG authoring, three-view reconstruction, WebGL review | Author through the live Web editor and require Vite, `pcg-server`, cooking, capture, and complete-asset acceptance. |
-| [pcg-graph-authoring-web-dev](./pcg-graph-authoring-web-dev/SKILL.md) | `/pcg-graph-authoring-web-dev`, Web pipeline validation, three-view reconstruction | Adds generator structure, seed, boundary, regeneration, performance, and capability-gap validation. |
-
-## Compatibility redirect
-
-| Skill | Purpose |
+| Skill | Use when |
 | --- | --- |
-| [pcg-graph-authoring](./pcg-graph-authoring/SKILL.md) | Redirects the legacy name to `pcg-graph-authoring-unity`. |
+| [pcg-graph-authoring-web](pcg-graph-authoring-web/SKILL.md) | Creating or editing a graph in the Web editor, or delivering an explicitly requested Web asset. |
+| [pcg-graph-authoring-unity](pcg-graph-authoring-unity/SKILL.md) | Authoring a graph for Unity or validating/delivering a Unity asset. |
+| [pcg-graph-authoring](pcg-graph-authoring/SKILL.md) | The generic command is used and the authoring platform needs routing. |
+| [pcg-kb-write](pcg-kb-write/SKILL.md) | Capturing or distilling knowledge into the project's `.picg/kb/`. |
 
-## Shared resources
+A node repair ends with the repaired graph and relevant checks. A requested blockout ends with a validated blockout. Only complete-asset requests activate materials, export/prefab, and final-asset acceptance. Generator reliability checks are available in either platform skill without a separate variant.
 
-| Path | Purpose |
+## Shared references
+
+| Resource | Read for |
 | --- | --- |
-| [shared/pcg-scripts/](./shared/pcg-scripts/) | Python orchestration for plans, validation, layout, comparison sheets, and `.pcgr` parsing. |
-| [shared/pcg-unity-complete-asset/](./shared/pcg-unity-complete-asset/) | Unity complete-asset workflow and acceptance contracts. |
-| [shared/pcg-web-complete-asset/](./shared/pcg-web-complete-asset/) | Web complete-asset workflow and acceptance contracts. |
+| [Graph authoring](shared/graph-authoring.md) | PICG document, layout, parameter, and geometry contracts. |
+| [Live MCP](shared/pcg-mcp.md) | Session targeting, safe atomic edits, conflicts, validation and saves. |
+| [Reference workflow](shared/reference-workflow.md) | Image evidence, assumptions, durable plans and visual iteration. |
+| [Generator validation](shared/generator-validation.md) | Determinism, boundary inputs, regeneration and performance tests. |
+| [Complete assets](shared/complete-asset-workflow.md) | Stage-specific delivery and evidence for finished assets. |
+| [Script reference](shared/script-reference.md) | Optional planning, layout, validation and review helpers. |
 
-## Source of truth
-
-`.agents/skills/` is the source of truth inside the PICG repository. Relative `SHARED_DIR` and `SHARED_SCRIPTS_DIR` references must continue to resolve from each skill. Never edit installed or linked copies as a second source.
+`.agents/skills/` is the only maintained source. Keep references repository-relative and keep platform-specific review and integration details in their platform directory.

@@ -1,31 +1,38 @@
-// create_review_scene.cs.txt
-// Paste into user-unity execute_csharp_script after replacing tokens.
-// Tokens: __REVIEW_SLUG__
-//
-// Opens a brand-new Empty scene and saves it under the fixed preview dir:
-//   Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene
-// Never ask the user for a scene path — this directory is the SSOT.
-// Prefer this over manage_scene create when path nesting is unreliable.
-
+// Template for a Unity editor script-execution tool; replace __REVIEW_SLUG__
+// with a validated, escaped alphanumeric/hyphen/underscore slug before running.
+// Refuses to discard unsaved scene content and never overwrites a review file.
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 
 string slug = "__REVIEW_SLUG__";
-string dir = "Assets/PICG-Workspace/Scenes";
-string path = dir + "/PcgReview_" + slug + ".scene";
+if (!Regex.IsMatch(slug, @"\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\z"))
+    return "FAIL invalid review slug";
+if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling)
+    return "BLOCKED editor is playing or compiling";
 
-if (!AssetDatabase.IsValidFolder("Assets/PICG-Workspace"))
+for (int i = 0; i < SceneManager.sceneCount; ++i)
 {
-    if (!AssetDatabase.IsValidFolder("Assets"))
-        return "FAIL Assets missing";
-    AssetDatabase.CreateFolder("Assets", "PICG-Workspace");
+    var existing = SceneManager.GetSceneAt(i);
+    if (existing.isDirty || (string.IsNullOrEmpty(existing.path) && existing.rootCount > 0))
+        return "BLOCKED unsaved scene content: " + existing.name;
 }
+
+string dir = "Assets/PICG-Workspace/Scenes";
+if (!AssetDatabase.IsValidFolder("Assets"))
+    return "FAIL Assets missing";
+if (!AssetDatabase.IsValidFolder("Assets/PICG-Workspace"))
+    AssetDatabase.CreateFolder("Assets", "PICG-Workspace");
 if (!AssetDatabase.IsValidFolder(dir))
     AssetDatabase.CreateFolder("Assets/PICG-Workspace", "Scenes");
 
+string path = AssetDatabase.GenerateUniqueAssetPath(dir + "/PcgReview_" + slug + ".unity");
+var previousSetup = EditorSceneManager.GetSceneManagerSetup();
 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 if (!EditorSceneManager.SaveScene(scene, path))
+{
+    EditorSceneManager.RestoreSceneManagerSetup(previousSetup);
     return "FAIL save " + path;
-
+}
 return "OK " + path + " roots=" + scene.rootCount;

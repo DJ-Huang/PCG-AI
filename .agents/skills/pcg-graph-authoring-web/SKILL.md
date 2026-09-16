@@ -1,82 +1,26 @@
 ---
 name: pcg-graph-authoring-web
-description: >-
-  Create complete production-ready web assets through PICG: plan and author
-  `.pcg` graphs, validate and cook the white model via the pcg-server HTTP API,
-  validate UV/projection, create and bind materials and textures, output a
-  reproducible exported asset (glTF / web scene), render it, and apply
-  full-asset acceptance. Use for PCG graph authoring for web, reference-image
-  reconstruction, three-view / orthographic front-side-top reconstruction,
-  procedural web asset production, bridge/building/vehicle/
-  scatter generators, Subgraphs, graph parameters, PCG cooking via pcg-server,
-  PCG MCP graph creation/editing, materialized web asset delivery, or
-  `/pcg-graph-authoring-web`.
+description: Create, edit, or review PICG graphs in the live Web editor; deliver Web assets when explicitly requested. Use for Web-targeted PCG work or /pcg-graph-authoring-web.
 ---
 
-# PCG Web complete-asset production
+# PCG authoring for Web
 
-Create a finished web asset, not merely a `.pcg` graph or a white model. The asset is complete only at `FINAL_ACCEPTED` under the shared production specification.
+Deliver the requested scope: a node fix, graph, blockout, generator, or finished asset. A graph-only request does not require textures or GLB export.
 
-## Single source of truth
+## Core path
 
-Resolve these paths relative to this skill directory before work:
+Read [graph authoring](../shared/graph-authoring.md) for PICG constraints and [live MCP](../shared/pcg-mcp.md) before editing the open Web graph. Target the correct session, discover the needed node schemas, apply a coherent change, validate/cook as relevant, inspect affected output, and save the intended graph. Preserve unrelated work.
 
-```text
-SHARED_DIR = ../shared/pcg-web-complete-asset
-SHARED_SCRIPTS_DIR = ../shared/pcg-scripts
-PCG_MCP_CONTRACT = ../shared/pcg-mcp.md
-AUTHORING_SKILL_DIR = .
-```
+For live-editor tasks, MCP is the authoring surface. A saved-file edit is not a substitute for an acknowledged canvas update. Recover an unavailable editor when possible; otherwise report that live work is blocked rather than claiming it was applied.
 
-`SHARED_DIR` is authoritative for the complete production workflow, AssetSpec, geometry validation, materials, textures, web integration, final score, and recovery rules. `SHARED_SCRIPTS_DIR` holds the generic Python helper scripts shared across all target variants (Unity, web, …). `PCG_MCP_CONTRACT` is authoritative for live editor schema discovery, complete graph creation/editing/saving, native validation/cook, Preview capture, conflict handling, and fallbacks. `AUTHORING_SKILL_DIR/scripts/web/` holds web-specific review scripts and templates. Do not copy, redefine, or weaken those rules here. If a required shared path is missing, stop and report the missing installation rather than silently falling back to a divergent workflow.
+## Read as needed
 
-## Mandatory read order
+| Task | Reference |
+| --- | --- |
+| Reconstruct from one or more images | [Reference workflow](../shared/reference-workflow.md); [three-view details](triview.md) only for orthographic constraints. |
+| Saved-graph visual acceptance | [Web review](web-review.md). Live Preview is useful during edits; final saved output needs a clean review. |
+| Complete materialized/exported asset | [Web asset workflow](../shared/pcg-web-complete-asset/workflow.md). |
+| Reusable generator or reliability request | [Generator validation](../shared/generator-validation.md). |
+| Helper commands or wiring example | [Scripts](scripts.md) or [examples](examples.md), only the relevant section. |
 
-1. Read `PCG_MCP_CONTRACT`, then `SHARED_DIR/workflow.md`, `asset-contract.md`, and `pcg-graph-authoring.md` before planning a new graph or a material rebuild.
-2. For a reference-image job, read `llm-orchestration.md`, `scripts.md`, and `web-review.md` before the first graph write or review cook. If the user supplies front/side/top drawings, also read `triview.md`.
-3. Read each shared stage reference immediately before that stage: `geometry-validation.md`, `material-workflow.md`, `texture-workflow.md`, `web-integration.md`, and `final-acceptance.md`.
-4. On any failure, read `SHARED_DIR/error-codes.md` and repair the earliest failed stage.
-
-## Reference persistence and re-hydration (P0, reference-image jobs)
-
-The reference image is not durable memory: context compaction drops pasted images and URLs rot, while material/texture/final stages run long after first observation.
-
-- **Collect views first:** after the first reference image, ask the user in order for `front` → `side` → `top` (one view per turn) unless those files are already supplied. Do not crop a composite sheet. See `triview.md`.
-- **Archive first:** run `SHARED_SCRIPTS_DIR/archive_reference.py` immediately after `new_authoring_plan.py`. For a three-view job use `--front/--side/--top` on the plan, then `archive_reference.py --from-plan --require-triview`. The plan points at archived `ref_<slug>_<view>` files; never feed later stages a URL or chat attachment.
-- **Observation on disk:** `observation.layers`, `viewObservations`, `crossViewConstraints`, and `visualTokens` live in `*-plan.json`, enforced by `validate_plan.py --strict-quality`.
-- **Re-hydrate at every stage entry** (geometry, UV, material, texture, asset export, final acceptance) and after any compaction: read `<plan-stem>-RESUME.md` → `*-plan.json` (observation + visualTokens + reviewHistory) → archived reference → latest `cmp_*.png`. Refresh the RESUME file via `SHARED_SCRIPTS_DIR/report_pass.py <plan> --resume` at each stage transition and review cycle.
-
-## Execute the complete workflow
-
-Follow the shared stage contract exactly:
-
-```text
-AssetSpec
-→ PCG plan and graph authoring
-→ root/Subgraph layout pass
-→ white-model cook and geometry validation
-→ UV/projection validation
-→ material plan
-→ texture production/import
-→ web material creation and binding
-→ exported asset output (glTF / web scene)
-→ final fully textured render and acceptance
-```
-
-The graph-authoring reference preserves the mandatory manifest/rule/Golden-Graph retrieval, top-to-bottom graph layout, independent root/Subgraph layout pass, node naming, physical sizing, module/Subgraph rules, per-part bevel rule, parameters, clean-scene cook, and visual refinement loop. Use the shared Python helper scripts from `SHARED_SCRIPTS_DIR` and web review templates from `AUTHORING_SKILL_DIR/scripts/web/`.
-
-Use PCG MCP on the **open Web editor page** as the only graph-construction path: `pcg_get_editor_context` binds to that page; `pcg_apply_graph_ops` / `pcg_patch_node` / `pcg_replace_graph` create nodes and wires on the canvas; `pcg_validate` / `pcg_cook` / `pcg_capture_preview` are the rapid loop; `pcg_save_graph` persists. Do not author by `Write` of a full `.pcg` or a generator script. Keep `validate_pcg.py` and `/review` as saved-file acceptance after save.
-
-If the editor is offline, start Vite + pcg-server and retry MCP. Do not fall back to disk authoring.
-
-## Autonomous production defaults
-
-Apply sensible graph parameters, save directories, material values, texture resolution, and the fixed Vite `/review?graph=` route without pausing. Record the receipt and assumptions. Continue through every stage in the same session until `FINAL_ACCEPTED` or a legal stop. Do not end at a graph file, white model, or “next I will…”.
-
-Ask for missing `front` / `side` / `top` after the first reference image (see `triview.md`). Also ask when a reference is genuinely unusable, the Web editor will not come online after start attempts, a required source asset is unavailable, or the user explicitly requested interactive control. Unknown back faces, material inference, bevel taste, Subgraph partitioning, and parameter candidates are normal production decisions—make and record the best-supported choice.
-
-## Completion and handoff
-
-Never report success based on a graph canvas, white-model image, placeholder texture, or default material. Deliver the AssetSpec, valid graph, geometry/UV/material/export receipts, and the final fully textured render score defined by `final-acceptance.md`.
-
-This standard variant has no PCG pipeline-validation stage. Use `pcg-graph-authoring-web-dev` when the user also needs the generator itself stress-tested for structure, exposed parameters, seed determinism, boundary inputs, regeneration, and output consistency.
+Use the supplied views; do not demand a three-view set for an ordinary single-image task. Continue useful corrections within scope, and report the saved path, actual validation/render evidence and residual limitations. Full-asset acceptance applies only when a full asset was requested.
