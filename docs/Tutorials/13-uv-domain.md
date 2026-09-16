@@ -1,6 +1,6 @@
 # UV Domain：对标 Houdini 的三源契约
 
-> [返回目录](index.md) | 前置：[数据模型](04-data-model.md) | Plan：`WorkLog/.../Plan/2026-07-18-uv-houdini-align-lean.md`
+> [返回目录](index.md) | 前置：[数据模型](04-data-model.md) | 本文不依赖仓库外的计划文件。
 
 ## 学习目标
 

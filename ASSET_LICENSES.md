@@ -14,6 +14,6 @@ The repository's future software license will not automatically grant rights to 
 
 - Reference images and evidence under `examples/showcases/`.
 - Generated models and source images under `Unity/Assets/Samples/PCG-AI/Showcases/`.
-- Texture sets copied into `assets/`, the Web public directory and Unity resources.
+- Texture sets under `web/pcg-editor/public/assets/` and Unity resources.
 
 For each item, record its author/source, applicable license or service terms, and whether redistribution is permitted. Remove anything whose provenance cannot be verified. Large local showcase exports under `examples/**/artifacts/` are ignored and are not part of the repository.

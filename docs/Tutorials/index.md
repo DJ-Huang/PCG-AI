@@ -2,7 +2,7 @@
 
 > 面向：全栈开发者（熟悉 C++/C#/TS/React，不了解本工程）
 > 基于分支 `dev/07-w3`、commit `f50d744`，扫描于 2026-07-15
-> 源码基线：working tree（仅 `.codely-cli/settings.json` 有改动，不影响源码证据）
+> 源码基线：请以当前 `git status` 和已跟踪源码为准；本教程不依赖任何本地 IDE 状态目录。
 
 ## 你将学会什么
 - 解释 PCG-AI 的系统架构和 Web/Unity→HTTP→C++ 数据流
