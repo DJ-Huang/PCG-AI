@@ -1,27 +1,29 @@
+<p align="right">
+  <strong>English</strong> | <a href="README.ja.md">日本語</a>
+</p>
+
 # PICG
 
-**Procedural Intelligent Content Generation · 程序化智能内容生成**
+**Procedural Intelligent Content Generation**
 
-PICG is a cross-engine procedural content generation framework built around editable graph assets. It combines a React-based graph editor, a C++17 geometry runtime, a localhost HTTP/MCP cook server, and Unity/Tuanjie integration.
-
-> **PICG（程序化智能内容生成）** 面向程序化内容生产与智能化工作流：内容逻辑以可移植的 Graph 数据为核心，由统一的 C++ Runtime 执行，并可在 Web、Unity / Tuanjie 以及 Agent 工作流中复用。
+PICG is a cross-engine procedural content generation framework built around editable graph assets and intelligent content workflows. It combines a React-based graph editor, a C++17 geometry runtime, a localhost HTTP/MCP cook server, and Unity/Tuanjie integration.
 
 The project follows one core idea: **authoring tools and engine integrations should be interchangeable front ends, while graph data and execution semantics remain portable and consistent.** Graphs can be authored manually or through agent-assisted workflows, executed by the same native core, and previewed across different environments.
 
-> **Project status:** active development. Graph schemas, APIs and integration details may still change before a stable release.
+> **Project status:** active development. Graph schemas, APIs, and integration details may still change before a stable release.
 
 ## Core capabilities
 
-- **Graph-first authoring** — editable, versioned graph files form the shared contract between editors, runtimes and integrations.
+- **Graph-first authoring** — editable, versioned graph files form the shared contract between editors, runtimes, and integrations.
 - **Native procedural runtime** — a C++17 geometry and graph execution core exposed through a C API.
 - **Web authoring and preview** — a React Flow based editor with live 3D preview and GLB export workflows.
 - **Unity / Tuanjie integration** — editor-side graph workflows backed by the same external `pcg-server` runtime.
-- **Agent-ready workflows** — localhost HTTP and MCP endpoints for validation, cooking, preview capture and automated content workflows.
-- **Reusable content building blocks** — manifest-backed node definitions, subgraphs, schemas and curated examples.
+- **Agent-ready workflows** — localhost HTTP and MCP endpoints for validation, cooking, preview capture, and automated content workflows.
+- **Reusable content building blocks** — manifest-backed node definitions, subgraphs, schemas, and curated examples.
 
 ## Architecture
 
-PICG separates authoring, execution and engine integration into independent layers:
+PICG separates authoring, execution, and engine integration into independent layers:
 
 ```text
 Web / Unity / Tuanjie / Agent workflows
@@ -68,7 +70,7 @@ On macOS or Linux, start the native server and Web editor together:
 ./scripts/run-pcg-web.sh
 ```
 
-The script builds missing native artifacts, installs missing Web dependencies and starts:
+The script builds missing native artifacts, installs missing Web dependencies, and starts:
 
 - Web editor: `http://127.0.0.1:5173`
 - Health endpoint: `http://127.0.0.1:17890/v1/health`
@@ -101,14 +103,14 @@ See [Getting Started](docs/getting-started.md) for the complete first-run and Un
 ```text
 PICG/
 ├── Agent/                 Agent skills and reusable procedural workflow tooling
-├── docs/                  User, architecture and integration documentation
-├── examples/              Graphs, tests, subgraphs, showcases and storyboards
+├── docs/                  User, architecture, and integration documentation
+├── examples/              Graphs, tests, subgraphs, showcases, and storyboards
 ├── library/               Canonical built-in subgraph library
 ├── pcg-core/              C++ graph runtime and geometry algorithms
 ├── pcg-fbx-exporter/      Standalone FBX export library
 ├── pcg-server/            Local HTTP/MCP cook and agent backend
 ├── schema/                Graph schemas and node manifest
-├── scripts/               Build, run, sync and validation commands
+├── scripts/               Build, run, sync, and validation commands
 ├── Unity/                 Unity/Tuanjie integration project and curated samples
 └── web/pcg-editor/        Vite + React authoring application
 ```
@@ -123,7 +125,7 @@ All repository-level examples live under [examples/](examples/README.md):
 - `examples/showcases/` — complete reference-driven case studies
 - `examples/storyboards/` — sequence and layout blockouts
 
-Unity-specific scenes, materials and sample conventions are documented in [Unity/README.md](Unity/README.md).
+Unity-specific scenes, materials, and sample conventions are documented in [Unity/README.md](Unity/README.md).
 
 Review a repository graph in the browser with:
 
@@ -173,7 +175,7 @@ Open `Unity/` as the project root. Unity does not load `PcgCore` or the FBX expo
 
 The repository contains no machine-local Unity package references. Optional local editor integrations should be installed in the developer's own environment instead of being committed to `Packages/manifest.json`.
 
-See [Unity/README.md](Unity/README.md) for scene locations, sample conventions and generated-directory rules.
+See [Unity/README.md](Unity/README.md) for scene locations, sample conventions, and generated-directory rules.
 
 ## Documentation
 
@@ -191,4 +193,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [SECUR
 
 ## License status
 
-No open-source license has been selected yet. Until a `LICENSE` file is added by the copyright holder, the repository is not legally open source and reuse rights are not granted. Select MIT, Apache-2.0 or another license and complete the asset-rights review before the public release.
+No open-source license has been selected yet. Until a `LICENSE` file is added by the copyright holder, the repository is not legally open source and reuse rights are not granted. Select MIT, Apache-2.0, or another license and complete the asset-rights review before the public release.
