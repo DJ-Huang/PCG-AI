@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-PCG-AI is in active development. Security fixes are applied to the latest branch only until versioned releases are published.
+PICG is in active development. Security fixes are applied to the latest branch only until versioned releases are published.
 
 ## Reporting a vulnerability
 

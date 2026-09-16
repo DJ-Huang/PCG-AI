@@ -31,7 +31,7 @@ The `phase*` graphs are compatibility samples for earlier runtime milestones. Fi
 - `tripo-yoyo-puppy/` — third-party reference and procedural reconstruction.
 - `wooden-cabin/` — reference-driven cabin graph for Web review.
 
-Unity scenes, materials and import metadata live in `Unity/Assets/Samples/PCG-AI/` because they must stay inside the Unity project. They are indexed in [Unity/README.md](../Unity/README.md).
+Unity scenes, materials and import metadata live in `Unity/Assets/Samples/PICG/` because they must stay inside the Unity project. They are indexed in [Unity/README.md](../Unity/README.md).
 
 ## Review in the browser
 

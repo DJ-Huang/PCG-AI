@@ -10,7 +10,7 @@
 
 **Procedural Intelligent Content Generation**
 
-PICG は、編集可能なグラフアセットとインテリジェントなコンテンツワークフローを中心に設計された、クロスエンジン対応のプロシージャルコンテンツ生成フレームワークです。React ベースのグラフエディタ、C++17 のジオメトリランタイム、localhost 上で動作する HTTP/MCP Cook サーバー、そして Unity/Tuanjie 統合を組み合わせています。
+PICG は、編集可能なグラフアセットとインテリジェントなコンテンツワークフローを中心に設計された、クロスエンジン対応のプロシージャルコンテンツ生成フレームワークです。React ベースのグラフエディタ、C++17 のジオメトリランタイム、localhost 上で動作する HTTP/MCP Cook サーバー、そして Unity 統合を組み合わせています。
 
 このプロジェクトの中心となる考え方は、**オーサリングツールやエンジン統合を交換可能なフロントエンドとして扱いながら、グラフデータと実行セマンティクスを移植可能かつ一貫した形に保つこと**です。グラフは手動でも Agent 支援ワークフローでも作成でき、同一のネイティブコアで実行し、複数の環境でプレビューできます。
 
@@ -21,7 +21,7 @@ PICG は、編集可能なグラフアセットとインテリジェントなコ
 - **Graph-first オーサリング** — 編集可能でバージョン管理されたグラフファイルを、エディタ、ランタイム、各種統合の共通契約として使用します。
 - **ネイティブのプロシージャルランタイム** — C API を通じて公開される C++17 ベースのジオメトリおよびグラフ実行コア。
 - **Web オーサリングとプレビュー** — React Flow ベースのエディタ、リアルタイム 3D プレビュー、GLB エクスポートワークフロー。
-- **Unity / Tuanjie 統合** — 外部 `pcg-server` ランタイムを利用するエディタ側のグラフワークフロー。
+- **Unity 統合** — 外部 `pcg-server` ランタイムを利用するエディタ側のグラフワークフロー。
 - **Agent 対応ワークフロー** — 検証、Cook、プレビューキャプチャ、自動化されたコンテンツワークフロー向けの localhost HTTP/MCP エンドポイント。
 - **再利用可能なコンテンツ構成要素** — manifest ベースのノード定義、サブグラフ、スキーマ、厳選されたサンプル。
 
@@ -30,7 +30,7 @@ PICG は、編集可能なグラフアセットとインテリジェントなコ
 PICG は、オーサリング、実行、エンジン統合を独立したレイヤーに分離しています。
 
 ```text
-Web / Unity / Tuanjie / Agent workflows
+Web / Unity / Agent workflows
                  │
                  │ Graph JSON
                  ▼
@@ -59,7 +59,7 @@ Web / Unity / Tuanjie / Agent workflows
 - CMake 3.20+
 - C++17 対応コンパイラ
 - CMake が自動的に提供しない環境では libcurl の開発ファイル
-- Unity プロジェクトを利用する場合は Unity 2022.3 または Tuanjie 1.6.x
+- Unity プロジェクトを利用する場合は Unity 2022.3 または Unity 1.6.x
 
 リポジトリをクローンし、サブモジュールを初期化します。
 
@@ -115,7 +115,7 @@ PICG/
 ├── pcg-server/            Local HTTP/MCP cook and agent backend
 ├── schema/                Graph schemas and node manifest
 ├── scripts/               Build, run, sync, and validation commands
-├── Unity/                 Unity/Tuanjie integration project and curated samples
+├── Unity/                 Unity integration project and curated samples
 └── web/pcg-editor/        Vite + React authoring application
 ```
 
@@ -187,7 +187,7 @@ python3 scripts/validate-builtin-library.py
 
 スクリプト一覧については [scripts/README.md](scripts/README.md) を参照してください。
 
-## Unity / Tuanjie
+## Unity
 
 `Unity/` をプロジェクトルートとして開きます。Unity は `PcgCore` や FBX exporter をプロセス内で直接ロードしません。Cook を行う前に `pcg-server` を起動し、**PCG → Server → Health Check** で接続を確認してください。
 
@@ -207,7 +207,7 @@ python3 scripts/validate-builtin-library.py
 
 ## コントリビューションとセキュリティ
 
-Pull Request を作成する前に [CONTRIBUTING.md](CONTRIBUTING.md) を、脆弱性を報告する前に [SECURITY.md](SECURITY.md) を確認してください。コミュニティの行動規範は [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)、メディアの出所とサードパーティー条件は [ASSET_LICENSES.md](ASSET_LICENSES.md) に記載されています。
+Pull Request を作成する前に [CONTRIBUTING.md](CONTRIBUTING.md) を、脆弱性を報告する前に [SECURITY.md](SECURITY.md) を確認してください。コミュニティの行動規範は [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) に記載されています。
 
 ## ライセンス
 

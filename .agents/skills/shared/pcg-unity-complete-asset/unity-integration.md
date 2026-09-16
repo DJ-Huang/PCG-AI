@@ -1,6 +1,6 @@
 # Unity integration
 
-Use the selected workspace Unity/Tuanjie instance and the clean review-scene rules in `AUTHORING_SKILL_DIR/unity-review.md`. Create durable assets; a working temporary scene is not a delivery.
+Use the selected workspace Unity instance and the clean review-scene rules in `AUTHORING_SKILL_DIR/unity-review.md`. Create durable assets; a working temporary scene is not a delivery.
 
 ## Required integration sequence
 

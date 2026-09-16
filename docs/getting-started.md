@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide brings up `pcg-server`, the Web editor and the optional Unity/Tuanjie client from a fresh clone.
+This guide brings up `pcg-server`, the Web editor and the optional Unity client from a fresh clone.
 
 ## 1. Prepare the repository
 
@@ -62,15 +62,15 @@ http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 
 Paths passed to `?graph=` are repository-relative and must remain inside the workspace.
 
-## 6. Use the Unity/Tuanjie project
+## 6. Use the Unity project
 
-1. Open the `Unity/` directory in Unity 2022.3 or Tuanjie 1.6.x.
+1. Open the `Unity/` directory in Unity 2022.3 or Unity 1.6.x.
 2. Wait for package import and script compilation.
 3. Keep `pcg-server` running.
 4. Choose **PCG → Server → Health Check**.
-5. Open a scene under `Assets/Samples/PCG-AI/` or a `.pcg` asset in the Project window.
+5. Open a scene under `Assets/Samples/PICG/` or a `.pcg` asset in the Project window.
 
-Do not commit `Library/`, `Temp/`, IDE project files, `Assets/Exports/` or `Assets/PCG-AI-Workspace/`. They are generated locally.
+Do not commit `Library/`, `Temp/`, IDE project files, `Assets/Exports/` or `Assets/PICG-Workspace/`. They are generated locally.
 
 ## 7. Verify the checkout
 

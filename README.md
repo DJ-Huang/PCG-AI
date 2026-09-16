@@ -26,7 +26,7 @@
 
 PICG (Procedural Intelligent Content Generation) treats the `.pcg` file as the portable source of truth for an asset. Author it visually, ask an AI agent to build it through MCP, or start from an image with Meshy/Tripo assistance—then keep the result editable, reproducible, and ready for engine integration.
 
-> **Project status:** active development. Web authoring and Unity/Tuanjie integration are available now. Other host integrations listed below are planned, and graph schemas and APIs may still change before a stable release.
+> **Project status:** active development. Web authoring and Unity integration are available now. Other host integrations listed below are planned, and graph schemas and APIs may still change before a stable release.
 
 ## One graph, multiple platforms
 
@@ -35,7 +35,7 @@ PICG separates the graph contract and C++ execution semantics from each host's e
 | Platform | Status | Integration direction |
 | --- | --- | --- |
 | **Web editor** | **Available** | Visual graph authoring, live Three.js preview, review captures, Agent window, GLB export |
-| **Unity / Tuanjie** | **Available** | Graph editor, Scene view workflow, FBX/GLB output, materials, splines, Terrain, GPU instancing, and runtime components |
+| **Unity** | **Available** | Graph editor, Scene view workflow, FBX/GLB output, materials, splines, Terrain, GPU instancing, and runtime components |
 | **Unreal Engine** | **Planned** | Native editor and scene integration backed by the same graph and host-data contracts |
 | **Blender** | **Planned** | DCC authoring, procedural iteration, and interchange without rewriting asset logic |
 | **Godot** | **Planned** | Editor and runtime host adapter for the shared graph format |
@@ -111,7 +111,7 @@ This makes Meshy and Tripo useful for ideation, reference reconstruction, topolo
 
 PICG integrations are intended to go deeper than file export. A host adapter can provide engine scene data as graph inputs and apply cooked results back to native engine objects.
 
-Unity/Tuanjie already demonstrates this direction with graph assets and inspectors, Scene view previews, material bindings, spline inputs, Terrain read/write, GPU-instanced scatter, and `PcgRuntimeRunner` for Player-side graph execution. The current Player path uses a same-machine `pcg-server` sidecar; it is not yet a self-contained offline runtime. See [Unity runtime](docs/Tutorials/07-unity-runtime.md) for the exact deployment boundary.
+Unity already demonstrates this direction with graph assets and inspectors, Scene view previews, material bindings, spline inputs, Terrain read/write, GPU-instanced scatter, and `PcgRuntimeRunner` for Player-side graph execution. The current Player path uses a same-machine `pcg-server` sidecar; it is not yet a self-contained offline runtime. See [Unity runtime](docs/Tutorials/07-unity-runtime.md) for the exact deployment boundary.
 
 Future Unreal, Blender, Godot, and Three.js adapters are expected to reuse the same versioned graph and native execution core while implementing their own scene bindings, materials, asset import, and runtime lifecycle.
 
@@ -121,7 +121,7 @@ Future Unreal, Blender, Godot, and Three.js adapters are expected to reuse the s
 - **Native procedural core** — C++17 geometry and graph execution with deterministic parameters and seeds.
 - **Production graph building blocks** — primitives, splines, scattering, terrain/heightfields, Boolean and bevel workflows, materials, subgraphs, imports, assembly, and rig metadata.
 - **Web authoring and review** — React Flow graph editing, Three.js preview, diagnostic capture modes, animation controls, and full-quality GLB export.
-- **Unity/Tuanjie integration** — editor and runtime components using the same graph contract and external native cook service.
+- **Unity integration** — editor and runtime components using the same graph contract and external native cook service.
 - **Agent-native workflow** — MCP plus an embedded multi-provider Agent that can operate the live graph and viewport.
 - **Reference-assisted creation** — image inputs and Meshy/Tripo nodes can feed a procedural, engine-oriented finishing workflow.
 
@@ -149,13 +149,13 @@ More graphs, fixtures, and case studies live under [examples/](examples/README.m
 - CMake 3.20+
 - A C++17 compiler
 - libcurl development files where CMake does not provide them automatically
-- Optional: Unity 2022.3 or Tuanjie 1.6.x for the Unity project
+- Optional: Unity 2022.3 or Unity 1.6.x for the Unity project
 
 Clone the repository and initialize its submodule:
 
 ```bash
-git clone --recurse-submodules https://github.com/DJ-Huang/PCG-AI.git
-cd PCG-AI
+git clone --recurse-submodules https://github.com/DJ-Huang/PICG.git
+cd PICG
 ```
 
 On macOS or Linux, start the native server and Web editor together:
@@ -210,7 +210,7 @@ The C++ runtime is the execution source of truth. Editors and engines act as int
 ## Repository layout
 
 ```text
-PCG-AI/
+PICG/
 ├── .agents/               Agent skills and procedural asset workflows
 ├── docs/                  User, architecture, runtime, and integration guides
 ├── examples/              Graphs, tests, subgraphs, showcases, and storyboards
@@ -220,7 +220,7 @@ PCG-AI/
 ├── pcg-server/            Local HTTP/MCP cook, Agent, cache, and export backend
 ├── schema/                Versioned graph schemas and node manifest
 ├── scripts/               Build, run, sync, and validation commands
-├── Unity/                 Unity/Tuanjie editor and runtime integration
+├── Unity/                 Unity editor and runtime integration
 └── web/pcg-editor/        Vite + React graph editor and Three.js viewport
 ```
 
@@ -234,6 +234,7 @@ PCG-AI/
 python3 scripts/validate-manifest.py
 python3 scripts/validate-subgraph-schema.py
 python3 scripts/validate-builtin-library.py
+python3 scripts/check-doc-language.py
 
 # Server smoke test (with pcg-server running)
 ./scripts/verify-pcg-server.sh
@@ -257,12 +258,15 @@ The complete script catalog is documented in [scripts/README.md](scripts/README.
 - [PCG server, embedded Agent, and MCP](docs/pcg-server.md)
 - [Third-party image-to-3D](docs/third-party-image-to-3d.md)
 - [Node reference](docs/node-reference.md)
-- [Unity / Tuanjie project](Unity/README.md)
+- [Unity project](Unity/README.md)
 - [Subgraph library](library/README.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+- [Maintainer workflows](docs/maintainer-workflows.md)
 
 ## Contributing and security
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [SECURITY.md](SECURITY.md) before reporting a vulnerability. Community expectations are described in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Media provenance and third-party terms are tracked in [ASSET_LICENSES.md](ASSET_LICENSES.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [SECURITY.md](SECURITY.md) before reporting a vulnerability. Community expectations are described in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), project decisions in [GOVERNANCE.md](GOVERNANCE.md), and support boundaries in [SUPPORT.md](SUPPORT.md).
 
 ## License
 

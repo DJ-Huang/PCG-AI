@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "cn.tuanjie.codely.bridge": "1.0.69",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.2d.tilemap": "1.0.0",
     "com.unity.ads": "4.4.2",

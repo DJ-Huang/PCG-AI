@@ -18,7 +18,7 @@ Saved-file `validate_pcg.py` and the Vite `/review` route remain independent **a
 | Persist the authored graph | `pcg_save_graph` | Saves the full live document to a workspace-relative `.pcg` path |
 | Fast native validation, cook metrics, or current viewport capture | PCG MCP | Rapid feedback only; not a substitute for saved `/review` ortho cameras |
 | Prove manifest/pin/layout correctness of the saved deliverable | `validate_pcg.py` | MCP validation covers the live full graph, not all authoring/style checks |
-| Final Unity acceptance | Tuanjie/Unity MCP clean scene | The Web viewport is not Unity runtime evidence |
+| Final Unity acceptance | Unity MCP clean scene | The Web viewport is not Unity runtime evidence |
 | Final Web acceptance of a saved graph | Vite `/review` + Playwright `front/side/top/three-quarter` | Stable clean page, canvas capture, per-view comparison |
 
 ## Open the Web page, then MCP (P0)

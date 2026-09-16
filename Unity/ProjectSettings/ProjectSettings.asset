@@ -13,8 +13,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: DefaultCompany
-  productName: Unity
+  companyName: DJ Huang
+  productName: PICG
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -289,8 +289,8 @@ PlayerSettings:
   declareTempsInMain: 1
   declareImmCBAsConst: 1
   clonedFromGUID: 3c72c65a16f0acb438eed22b8b16c24a
-  templatePackageId: cn.tuanjie.template.urp-blank@3.0.3
-  templateDefaultScene: Assets/Samples/PCG-AI/Demos/Overview.scene
+  templatePackageId: com.unity.template.urp@14.0.9
+  templateDefaultScene: Assets/Samples/PICG/Demos/Overview.scene
   useCustomMainManifest: 0
   useCustomLauncherManifest: 0
   useCustomMainGradleTemplate: 0
@@ -968,7 +968,7 @@ PlayerSettings:
   suppressCommonWarnings: 1
   allowUnsafeCode: 0
   useDeterministicCompilation: 1
-  additionalIl2CppArgs: --linker-flags="C:\Users\DONGJU~1.HUA\AppData\Local\Temp\PcgCoreIl2CppLink\PcgCore.lib"
+  additionalIl2CppArgs:
   scriptingRuntimeVersion: 1
   monoAOTCompilation: 0
   gcIncremental: 0
@@ -1065,7 +1065,6 @@ PlayerSettings:
   forceOpenHarmonySDCardPermission: 0
   openHarmonyUseLowAccuracyLocation: 0
   openHarmonyPredefinedPermissions: []
-  openHarmonyUseTuanjieLogo: 1
   openHarmonyLaunchImage: {fileID: 0}
   openHarmonyLaunchBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
   OpenHarmonyKeystoreName: 
@@ -1075,7 +1074,6 @@ PlayerSettings:
   OpenHarmonyCompatibleSdkVersion: 14
   OpenHarmonyUseCustomKeystore: 0
   OpenHarmonyUseCustomModuleJsonFive: 0
-  OpenHarmonyUseCustomTuanjiePlayerAbility: 0
   apiCompatibilityLevel: 6
   weixinMiniGameMemorySize: 32
   weixinMiniGameExceptionSupport: 1

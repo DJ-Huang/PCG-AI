@@ -1,9 +1,9 @@
 // setup_pcg_review_subject.cs.txt
-// Paste into user-tuanjie execute_csharp_script after replacing tokens.
+// Paste into user-unity execute_csharp_script after replacing tokens.
 // Tokens: __GRAPH_ASSET_PATH__  __REVIEW_SLUG__
 //
 // Creates a clean subject in the CURRENT open scene
-// (prefer a fresh Assets/PCG-AI-Workspace/Scenes/PcgReview_* scene):
+// (prefer a fresh Assets/PICG-Workspace/Scenes/PcgReview_* scene):
 //   Directional light + Camera + PcgGraphComponent GO, cook, frame SceneView.
 // Does not load other demo hierarchies.
 

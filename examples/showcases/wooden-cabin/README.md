@@ -5,7 +5,7 @@ This directory groups the repository-level wooden-cabin case outputs:
 - `wooden-cabin.pcg` — reference-driven graph.
 - `reference.png` — admitted visual reference.
 
-Unity materials, scenes and a second reference-locked variant live under `Unity/Assets/Samples/PCG-AI/Showcases/`.
+Unity materials, scenes and a second reference-locked variant live under `Unity/Assets/Samples/PICG/Showcases/`.
 
 Review route:
 

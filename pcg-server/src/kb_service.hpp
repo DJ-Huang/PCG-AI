@@ -10,7 +10,7 @@
 
 namespace pcg_server {
 
-/** Project-local knowledge base rooted at <workspace>/.pcg-ai/. Indexes rules/
+/** Project-local knowledge base rooted at <workspace>/.picg/. Indexes rules/
     and kb/ markdown via BM25; serves golden-graphs .pcg templates by class. */
 void ConfigureKbRoot(const std::filesystem::path& workspace_root);
 std::filesystem::path GetKbRoot();

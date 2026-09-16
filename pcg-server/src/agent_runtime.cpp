@@ -51,7 +51,7 @@ constexpr size_t kMaxAttachments = 8;
 constexpr int kMaxToolRounds = 12;
 constexpr int kMaxToolCalls = 32;
 constexpr int kTurnTimeoutSeconds = 300;
-constexpr const char* kKeychainService = "PCG-AI Agent";
+constexpr const char* kKeychainService = "PICG Agent";
 constexpr const char* kFileCredentialStore = "protected-file";
 constexpr const char* kKeychainCredentialStore = "macos-keychain";
 
@@ -385,7 +385,7 @@ std::filesystem::path ConfigPath() {
     const std::filesystem::path root = home && *home
         ? std::filesystem::path(home)
         : std::filesystem::temp_directory_path();
-    return root / "Library" / "Application Support" / "PCG-AI" / "agent.json";
+    return root / "Library" / "Application Support" / "PICG" / "agent.json";
 }
 
 const char* KeychainService() {
@@ -766,7 +766,7 @@ HttpResult Http(
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
     curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PCG-AI-Agent/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PICG-Agent/1.0");
     if (!body.empty() || method == "POST" || method == "PUT") {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.data());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
@@ -905,7 +905,7 @@ std::vector<std::string> CredentialHeaders(const std::string& provider, const js
     std::vector<std::string> headers = {"Authorization: Bearer " + key, "Content-Type: application/json"};
     if (provider == "openrouter") {
         headers.push_back("HTTP-Referer: http://127.0.0.1");
-        headers.push_back("X-Title: PCG-AI");
+        headers.push_back("X-Title: PICG");
     }
     if (provider == "github-copilot") {
         headers.push_back("Openai-Intent: conversation-edits");
@@ -1145,7 +1145,7 @@ json AgentTools() {
 
 const char* SystemPrompt() {
     return
-        "You are PCG-AI's embedded procedural-content expert. Turn user intent and references into reliable, "
+        "You are PICG's embedded procedural-content expert. Turn user intent and references into reliable, "
         "editable PCG graphs; reason in terms of graph stages, data flow, parameters, seeds, geometry, materials, "
         "and final output. Prefer procedural, reusable structure over one-off geometry.\n\n"
         "Evidence first: call pcg_get_editor_context, then inspect the selected node or live graph. Before using a "
@@ -1741,7 +1741,7 @@ HttpResult HttpStreamCompletion(const std::string& url, const std::vector<std::s
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https,http");
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PCG-AI-Agent/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "PICG-Agent/1.0");
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, CurlProgress);
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, cancelled);
@@ -2480,7 +2480,7 @@ void HandleAgentOAuthCallback(const httplib::Request& req, httplib::Response& re
         {"expires", NowMs() + parsed.value("expires_in", 3600) * 1000LL},
     });
     res.status = 200;
-    res.set_content("<!doctype html><title>PCG-AI</title><p>Provider connected. You can close this window.</p>", "text/html; charset=utf-8");
+    res.set_content("<!doctype html><title>PICG</title><p>Provider connected. You can close this window.</p>", "text/html; charset=utf-8");
 }
 
 void HandleAgentTurn(const httplib::Request& req, httplib::Response& res) {

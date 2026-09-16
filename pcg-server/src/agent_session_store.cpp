@@ -27,7 +27,7 @@ std::filesystem::path SessionsRoot() {
     }
     const char* home = std::getenv("HOME");
     const auto root = home && *home ? std::filesystem::path(home) : std::filesystem::temp_directory_path();
-    return root / "Library" / "Application Support" / "PCG-AI" / "Agent" / "Sessions";
+    return root / "Library" / "Application Support" / "PICG" / "Agent" / "Sessions";
 }
 
 bool ValidId(const std::string& id) {

@@ -62,10 +62,9 @@ PcgResultCode execute_mesh_graph(const char* json, int seed, int& vertex_count, 
 {
     std::vector<uint8_t> mesh_buf(8 * 1024 * 1024);
     int kind = 0;
-  char json_out[4096];
     char err[512];
     const PcgResultCode rc = pcg_execute_graph_v7(
-        json, seed, nullptr, 0, nullptr, 0, nullptr, 0, &kind, json_out, sizeof(json_out),
+        json, seed, nullptr, 0, nullptr, 0, nullptr, 0, &kind, nullptr, 0,
         mesh_buf.data(), static_cast<int>(mesh_buf.size()), nullptr, 0, nullptr, nullptr,
         &vertex_count, &index_count, nullptr, nullptr, 0, err, sizeof(err));
     if (rc != PCG_OK)

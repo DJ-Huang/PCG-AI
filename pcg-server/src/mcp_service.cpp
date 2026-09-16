@@ -493,17 +493,17 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_kb_status"},
-            {"description", "Read PCG-AI knowledge-base status: index root, chunk count, engine, last error."},
+            {"description", "Read PICG knowledge-base status: index root, chunk count, engine, last error."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
             {"name", "pcg_kb_reindex"},
-            {"description", "Force a full rebuild of the PCG-AI knowledge-base index from .pcg-ai/rules and .pcg-ai/kb."},
+            {"description", "Force a full rebuild of the PICG knowledge-base index from .picg/rules and .picg/kb."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
             {"name", "pcg_kb_search"},
-            {"description", "BM25 search over PCG-AI project rules and experience notes under .pcg-ai/. Returns ranked chunks with path/heading/score/excerpt."},
+            {"description", "BM25 search over PICG project rules and experience notes under .picg/. Returns ranked chunks with path/heading/score/excerpt."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {
@@ -517,7 +517,7 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_kb_list"},
-            {"description", "List markdown files indexed in .pcg-ai/rules and .pcg-ai/kb."},
+            {"description", "List markdown files indexed in .picg/rules and .picg/kb."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {{"category", {{"type", "string"}}}}},
@@ -526,7 +526,7 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_kb_get"},
-            {"description", "Read a full markdown file from the PCG-AI knowledge base by .pcg-ai-relative path (e.g. rules/graph-authoring/bridge.md)."},
+            {"description", "Read a full markdown file from the PICG knowledge base by .picg-relative path (e.g. rules/graph-authoring/bridge.md)."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {{"path", {{"type", "string"}}}}},
@@ -536,7 +536,7 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_golden_graph_list"},
-            {"description", "List .pcg golden-graph templates under .pcg-ai/golden-graphs/, optionally filtered by class (weapon/vehicle/bridge/building/scatter/prop/other)."},
+            {"description", "List .pcg golden-graph templates under .picg/golden-graphs/, optionally filtered by class (weapon/vehicle/bridge/building/scatter/prop/other)."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {{"class", {{"type", "string"}}}}},
@@ -545,7 +545,7 @@ json BuildToolDefinitions() {
         },
         {
             {"name", "pcg_golden_graph_get"},
-            {"description", "Fetch a golden-graph .pcg template by stem name (e.g. m9-bayonet) or relative path under .pcg-ai/golden-graphs/."},
+            {"description", "Fetch a golden-graph .pcg template by stem name (e.g. m9-bayonet) or relative path under .picg/golden-graphs/."},
             {"inputSchema", {
                 {"type", "object"},
                 {"properties", {{"name", {{"type", "string"}}}}},

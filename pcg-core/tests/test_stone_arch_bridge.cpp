@@ -37,14 +37,13 @@ int main()
     // 2. Execute
     std::vector<uint8_t> mesh_buf(8 * 1024 * 1024);
     int kind = 0;
-    char json_out[4096] = {};
     int vertex_count = 0;
     int index_count = 0;
 
     const PcgResultCode code = pcg_execute_graph_v7(
         graph.c_str(), 42,
         nullptr, 0, nullptr, 0, nullptr, 0,
-        &kind, json_out, sizeof(json_out),
+        &kind, nullptr, 0,
         mesh_buf.data(), static_cast<int>(mesh_buf.size()),
         nullptr, 0, nullptr, nullptr,
         &vertex_count, &index_count,

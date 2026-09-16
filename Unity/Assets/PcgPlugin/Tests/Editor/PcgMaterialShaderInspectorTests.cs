@@ -42,7 +42,7 @@ namespace DJTechEditor.PCG.Tests
             AssertType(properties, "_TestVector", "Vector");
             AssertType(properties, "_TestFloat", "Float");
             AssertType(properties, "_TestRange", "Range");
-            // This Tuanjie Shader importer reports ShaderLab Int properties as Float.
+            // This Unity Shader importer reports ShaderLab Int properties as Float.
             // The inspector follows ShaderUtil's reflected type, while the runtime
             // material path still accepts explicit Int entries from engines that expose it.
             AssertType(properties, "_TestInt", "Float");

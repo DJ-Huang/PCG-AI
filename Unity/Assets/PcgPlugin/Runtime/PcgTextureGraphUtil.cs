@@ -80,7 +80,7 @@ namespace DJTechRuntime.PCG
                 {
                     sb.AppendLine(
                         $"- ImageTexture node '{nodeId}': could not read pixels from '{stored}'. " +
-                        "Re-assign the texture in Graph Inspector (built-in textures need container/name, e.g. Resources/tuanjie_builtin_extra/Default-Particle).");
+                        "Re-assign the texture in Graph Inspector (built-in textures need container/name, e.g. Resources/unity_builtin_extra/Default-Particle).");
                 }
             }
 

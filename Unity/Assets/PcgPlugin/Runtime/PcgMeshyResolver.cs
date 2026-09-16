@@ -189,7 +189,7 @@ namespace DJTechRuntime.PCG
             {
                 error =
                     $"Meshy3DGenerator '{nodeId}': API key missing. " +
-                    "Open PCG → Settings (or Project Settings → PCG AI) and enter your Meshy API key.";
+                    "Open PCG → Settings (or Project Settings → PICG) and enter your Meshy API key.";
                 return false;
             }
 
@@ -598,7 +598,7 @@ namespace DJTechRuntime.PCG
             {
                 error =
                     $"Tripo3DGenerator '{nodeId}': API key missing. " +
-                    "Open PCG → Settings (or Project Settings → PCG AI) and enter your Tripo API key.";
+                    "Open PCG → Settings (or Project Settings → PICG) and enter your Tripo API key.";
                 return false;
             }
 

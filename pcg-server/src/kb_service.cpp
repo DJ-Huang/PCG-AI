@@ -272,7 +272,7 @@ void ConfigureKbRoot(const fs::path& workspace_root) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mu);
     state.workspace_root = workspace_root;
-    state.kb_root = workspace_root / ".pcg-ai";
+    state.kb_root = workspace_root / ".picg";
     state.indexed = false;
 }
 
@@ -363,7 +363,7 @@ json KbGet(const std::string& relative_path) {
     std::lock_guard<std::mutex> lock(state.mu);
     if (state.kb_root.empty()) return {{"ok", false}, {"error", "kb_root_not_configured"}};
     if (!IsSafeRelative(relative_path, ".md")) {
-        return {{"ok", false}, {"error", "path must be a .pcg-ai-relative .md without parent traversal"}};
+        return {{"ok", false}, {"error", "path must be a .picg-relative .md without parent traversal"}};
     }
     const auto full = state.kb_root / relative_path;
     if (!fs::exists(full)) return {{"ok", false}, {"error", "not_found"}, {"path", relative_path}};

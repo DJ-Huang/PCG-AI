@@ -393,7 +393,7 @@ std::string NormalizeExtension(std::string ext) {
 }
 
 std::filesystem::path WorkspaceRoot() {
-    // ConfigureKbRoot() stores <workspace>/.pcg-ai — the workspace is its parent.
+    // ConfigureKbRoot() stores <workspace>/.picg — the workspace is its parent.
     const auto kb_root = GetKbRoot();
     if (!kb_root.empty() && kb_root.has_parent_path()) return kb_root.parent_path();
     return std::filesystem::current_path();

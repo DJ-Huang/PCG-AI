@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install repository-check dependencies
+        run: python3 -m pip install "jsonschema>=4.23,<5"
+      - name: Validate repository contracts
+        run: |
+          python3 scripts/check-doc-language.py
+          python3 scripts/check-markdown-links.py
+          python3 scripts/validate-manifest.py
+          python3 scripts/validate-subgraph-schema.py
+          python3 scripts/validate-builtin-library.py
+          python3 scripts/sanitize-unity-sample-scenes.py --check Unity/Assets/Samples/PICG
+          python3 scripts/generate-node-reference.py
+          git diff --exit-code -- docs/node-reference.md
+          test -z "$(git ls-files -ci --exclude-standard)"
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/pcg-editor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/pcg-editor/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npx vitest run
+
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: Configure
+        run: cmake -S pcg-core -B pcg-core/build-ci -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build pcg-core/build-ci --parallel 4
+      - name: Test
+        run: ctest --test-dir pcg-core/build-ci --output-on-failure --label-regex fast --parallel 4
+
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: Configure
+        run: cmake -S pcg-server -B pcg-server/build-ci -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build pcg-server/build-ci --parallel 4
+
+  fbx-exporter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S pcg-fbx-exporter -B pcg-fbx-exporter/build-ci -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build pcg-fbx-exporter/build-ci --parallel 4
+      - name: Test
+        run: ctest --test-dir pcg-fbx-exporter/build-ci --output-on-failure

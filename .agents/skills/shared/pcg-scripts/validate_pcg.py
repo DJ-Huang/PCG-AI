@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a PCG-AI .pcg graph against schema/node-manifest.json."""
+"""Validate a PICG .pcg graph against schema/node-manifest.json."""
 
 from __future__ import annotations
 
@@ -882,7 +882,7 @@ def validate_graph(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Validate a PCG-AI .pcg graph against schema/node-manifest.json."
+        description="Validate a PICG .pcg graph against schema/node-manifest.json."
     )
     parser.add_argument("graphs", nargs="+", help=".pcg file(s) to validate")
     parser.add_argument(

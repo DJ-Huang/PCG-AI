@@ -626,12 +626,12 @@ void test_instanced_city_example_graphs()
         }
 
         for (const char* asset : {
-                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_tall_flat.pcgsubgraph",
-                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_tall_flat_wide.pcgsubgraph",
-                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_medium_pitched.pcgsubgraph",
-                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_medium_pitched_wide.pcgsubgraph",
-                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_short_flat.pcgsubgraph",
-                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_short_flat_wide.pcgsubgraph",
+                 "Unity/Assets/Samples/PICG/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_tall_flat.pcgsubgraph",
+                 "Unity/Assets/Samples/PICG/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_tall_flat_wide.pcgsubgraph",
+                 "Unity/Assets/Samples/PICG/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_medium_pitched.pcgsubgraph",
+                 "Unity/Assets/Samples/PICG/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_medium_pitched_wide.pcgsubgraph",
+                 "Unity/Assets/Samples/PICG/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_short_flat.pcgsubgraph",
+                 "Unity/Assets/Samples/PICG/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_short_flat_wide.pcgsubgraph",
              })
             test_building_asset_wrapper(root, asset);
     }

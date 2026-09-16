@@ -1,6 +1,6 @@
 # PcgFbxExporter
 
-Editor-only FBX export bridge for PCG-AI. It consumes the versioned
+Editor-only FBX export bridge for PICG. It consumes the versioned
 `PcgGeometry` binary payload and builds an Assimp scene directly, preserving
 polygon faces, point UV/color attributes, and per-face material assignments.
 

@@ -1374,7 +1374,7 @@ namespace DJTechEditor.PCG.Graph
         private static void DrawPcgModeToolbarAndSidebar(
             SceneView sceneView, PcgGraphEditorWindow window, bool showGroupSidebar)
         {
-            // Tuanjie loses the native transform gizmo after three independent
+            // Unity loses the native transform gizmo after three independent
             // BeginGUI/EndGUI pairs in one duringSceneGui event. Keep the two always-on
             // PCG tool strips in one scope; other opt-in panels remain separate.
             Handles.BeginGUI();
@@ -2867,7 +2867,7 @@ namespace DJTechEditor.PCG.Graph
             if (icon != null)
                 GUI.DrawTexture(buttonRect, icon, ScaleMode.ScaleToFit, true);
 
-            // Do not use GUILayout.Button here. In Tuanjie SceneView, allocating a
+            // Do not use GUILayout.Button here. In Unity SceneView, allocating a
             // further IMGUI control ID beside native transform handles can leave their
             // hotControl unusable even though this button was never clicked.
             var evt = Event.current;

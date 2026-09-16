@@ -1,10 +1,10 @@
-# PCG-AI Agent Instructions
+# PICG Agent Instructions
 
 These instructions apply to every agent working in this repository.
 
 ## PCG Expert Role
 
-You are PCG-AI's procedural-content expert. Turn user intent and references into reliable, editable PCG graphs; reason in terms of graph stages, data flow, parameters, seeds, geometry, materials, and final output. Prefer procedural, reusable structure over one-off geometry.
+You are PICG's procedural-content expert. Turn user intent and references into reliable, editable PCG graphs; reason in terms of graph stages, data flow, parameters, seeds, geometry, materials, and final output. Prefer procedural, reusable structure over one-off geometry.
 
 ## Evidence First
 
@@ -16,32 +16,33 @@ Web graph work happens **on the open editor page through PCG MCP**: `pcg_apply_g
 
 ## Project Knowledge Base
 
-PCG-AI 的规则、经验、Golden Graphs 全部内置在项目 `.pcg-ai/` 目录，由 pcg-server 通过 BM25 直接检索（`pcg_kb_*` 工具），**优先于** 全局 Vault。本项目内 `user-vault-rag` MCP **已启用**，但只用于查跨项目通用知识，详见下方"检索路由"。
+PICG rules, experience notes, and Golden Graphs live in the project-local `.picg/` directory. `pcg-server` indexes them with BM25 through the `pcg_kb_*` tools. This project-local source takes precedence over the global Vault. The `user-vault-rag` MCP may be enabled, but it is only for reusable cross-project knowledge.
 
-- 规则/经验检索（**默认入口**）→ `pcg_kb_search(query, top_k?, category?)`，category 可选 `rules` 或 `kb`
-- 列出规则文件 → `pcg_kb_list(category?)`
-- 读完整规则文件 → `pcg_kb_get(path)`（path 相对 `.pcg-ai/`，如 `rules/graph-authoring/bridge.md`）
-- Golden Graph 模板 → `pcg_golden_graph_list(class?)` / `pcg_golden_graph_get(name)`
-- 索引状态/重建 → `pcg_kb_status` / `pcg_kb_reindex`
-- 经验回写/沉淀 → `pcg-kb-write` Skill（写入 `.pcg-ai/kb/`；跨项目通用经验才走 obsidian-write → Vault）
+- Search rules and experience by default with `pcg_kb_search(query, top_k?, category?)`; category is `rules` or `kb`.
+- List files with `pcg_kb_list(category?)`.
+- Read a complete project note with `pcg_kb_get(path)`, using a path relative to `.picg/` such as `rules/graph-authoring/bridge.md`.
+- Read templates with `pcg_golden_graph_list(class?)` and `pcg_golden_graph_get(name)`.
+- Inspect or rebuild the index with `pcg_kb_status` and `pcg_kb_reindex`.
+- Write project experience with the `pcg-kb-write` skill. Only genuinely cross-project knowledge belongs in the global Vault through `obsidian-write`.
 
-编图前先 `pcg_kb_search` 查 `rules/graph-authoring/` 下对应模型类型 + `graph-contract` + `assembly-bevel`；工程问题查 `rules/engineering/pcg-ai-development.md`。需要参考 `.pcg` 模板时用 `pcg_golden_graph_*`，不要从 `examples/**` 或 Unity demo 挖新图。
+Before graph authoring, search for the matching model rule plus `graph-contract` and `assembly-bevel`. For engineering work, read `rules/engineering/picg-development.md`. Use `pcg_golden_graph_*` for `.pcg` templates; do not mine `examples/**` or Unity demos for new authoring strategy.
 
-## 检索路由（避免 vault-rag 干扰）
+## Retrieval routing
 
-本项目内同时使用 `pcg_kb_*` 和全局 `vault_search` / `rule_search`，必须按下表路由，避免把 HMIRP/其它工程的经验错套到 PCG-AI：
+Use the following routing to prevent unrelated HMIRP or other-project knowledge from being applied to PICG:
 
-| 问题类型 | 用什么 | 不用什么 |
+| Question type | Use | Do not use |
 | --- | --- | --- |
-| PCG 编图 / 图契约 / 节点用法 / Golden Graph / 工程内 pcg-core、web、Unity 插件 | `pcg_kb_search` / `pcg_kb_get` / `pcg_golden_graph_*` | ~~`rule_search(domain="pcg")`~~（Vault 侧 PCG 规则已迁移到 `.pcg-ai/`，`Rules/pcg/` 为空） |
-| 跨项目通用：C# / Unity 编辑器通坑 / 渲染管线 / 性能优化 / 协作流程 | `vault_search`（Vault 内置排除 `PCG AI Rule/`，不会污染） | — |
-| HMIRP / FRP / Stable / HMICore / URP 信号 | **本项目不触发**（见全局 `dev-gate.md`），即使 vault_search 命中也忽略 | — |
-| 拿不准归属时 | 先 `pcg_kb_search`；无结果再 `vault_search`，并在引用时标注来源 | — |
+| PCG graph authoring, graph contracts, node behavior, Golden Graphs, `pcg-core`, Web, or Unity plugin work | `pcg_kb_search`, `pcg_kb_get`, `pcg_golden_graph_*` | Global `rule_search(domain="pcg")`; those rules have moved into `.picg/` |
+| Reusable cross-project C#, Unity editor, rendering, performance, or collaboration knowledge | `vault_search` | Project-local notes as if they were global policy |
+| HMIRP, FRP, Stable, HMICore, or URP-specific signals | Ignore in this project even if a global search returns them | HMIRP or rendering rules as PICG constraints |
+| Unclear ownership | Search `pcg_kb_search` first, then `vault_search` only if needed and label the source | Unscoped global retrieval |
 
-约束：
-- **不要**在 PCG-AI 项目里跑 `rule_search(domain="pcg")` 或 `rule_search` 不带 domain —— 前者空，后者会拉 `Rules/core/hmirp-*` 噪声
-- **不要**把 `vault_search` 命中的 HMIRP/渲染规则当作 PCG-AI 的约束；PCG-AI 的真源是 `.pcg-ai/rules/`
-- 若发现同一主题两边都有内容，**以 `.pcg-ai/` 为准**，并通过 `pcg-kb-write` 把缺口补进项目库
+Constraints:
+
+- Do not call global `rule_search(domain="pcg")` or unscoped `rule_search` in this repository.
+- Do not treat HMIRP or unrelated rendering hits from `vault_search` as PICG constraints.
+- When both stores cover the same topic, `.picg/` is authoritative for this repository. Use `pcg-kb-write` to close project-local gaps.
 
 ## PCG MCP Workflow
 

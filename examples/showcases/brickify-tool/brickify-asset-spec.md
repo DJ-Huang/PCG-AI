@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | `assetId` | `brickify-tool` |
-| `intent` | A procedural "brickify" generator that turns any source 3D shape into a voxel-like array of interlocking toy-brick instances — a PCG-AI adaptation of the Houdini Fundamentals lesson "Nodes, Networks and Digital Assets." |
+| `intent` | A procedural "brickify" generator that turns any source 3D shape into a voxel-like array of interlocking toy-brick instances — a PICG adaptation of the Houdini Fundamentals lesson "Nodes, Networks and Digital Assets." |
 | `references` | SideFX *Node Networks and Assets* Foundations tutorial, Document v2.0 (Oct 2021), pages 1–16 |
 | `scale` | Stylized scale; brick prototype ≈ 0.2 × 0.2 × 0.2 m; source shape proxy ≈ 3 × 4 × 2 m |
 | `modules` | `single_brick` (Subgraph) — the brick prototype created via box → extrude → bevel → subdivide; root graph handles shape selection, point generation, copy-to-points, color/material, and output |
@@ -58,9 +58,9 @@
 - SortGeometry orders points bottom-to-top (Y axis)
 - Known differences from the Houdini workflow are documented in this AssetSpec
 
-## Houdini → PCG-AI Node Mapping Summary
+## Houdini → PICG Node Mapping Summary
 
-| Houdini SOP | PCG-AI Node | Status |
+| Houdini SOP | PICG Node | Status |
 |---|---|---|
 | Box | `CreateBoxMesh` | ✅ covered |
 | PolyExtrude (inset/extrude) | `PolyExtrude` | ✅ covered |

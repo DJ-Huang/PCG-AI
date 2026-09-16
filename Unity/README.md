@@ -1,13 +1,13 @@
-# Unity / Tuanjie Project
+# Unity Project
 
-Open this directory, not the repository root, in Unity 2022.3 or Tuanjie 1.6.x.
+Open this directory, not the repository root, in Unity 2022.3 or Unity 1.6.x.
 
 ## Project layout
 
 ```text
 Assets/
 ├── PcgPlugin/                 Runtime, editor integration, tests and fixtures
-├── Samples/PCG-AI/
+├── Samples/PICG/
 │   ├── Demos/                 Curated end-to-end scenes
 │   ├── Showcases/             Finished asset case studies
 │   └── Validation/            Small visual validation scenes
@@ -15,14 +15,14 @@ Assets/
 └── StreamingAssets/pcg/       Runtime graph input
 ```
 
-Generated review scenes belong in `Assets/PCG-AI-Workspace/`. Generated FBX/GLB exports belong in `Assets/Exports/`. Both directories are ignored so running an authoring workflow does not pollute the repository.
+Generated review scenes belong in `Assets/PICG-Workspace/`. Generated FBX/GLB exports belong in `Assets/Exports/`. Both directories are ignored so running an authoring workflow does not pollute the repository.
 
 ## First run
 
 1. Build and start `pcg-server` from the repository root.
 2. Open this project and wait for import/compilation to finish.
 3. Choose **PCG → Server → Health Check**.
-4. Open `Assets/Samples/PCG-AI/Demos/Overview.scene` or another sample.
+4. Open `Assets/Samples/PICG/Demos/Overview.scene` or another sample.
 
 The Unity editor communicates with C++ over localhost HTTP. Do not copy `PcgCore` or `PcgFbxExporter` libraries into `Assets/PcgPlugin/Plugins/`.
 
@@ -35,6 +35,8 @@ The Unity editor communicates with C++ over localhost HTTP. Do not copy `PcgCore
 - `Validation/` — focused outline behavior scenes.
 
 Unity `.meta` files are part of the source tree. Always move or rename an asset together with its `.meta` file so scene and prefab GUID references remain valid.
+
+Sample scenes intentionally omit cooked preview Mesh subassets and cached result payloads. Keep `pcg-server` running and run the graph after opening a scene to regenerate its preview. Before committing a sample scene, run `python3 scripts/sanitize-unity-sample-scenes.py Unity/Assets/Samples/PICG` from the repository root.
 
 ## Local packages
 
@@ -55,7 +57,6 @@ For any script change:
 
 - `Library/`, `Temp/`, `Logs/`, `obj/`, `UserSettings/`
 - generated `.csproj` and `.sln` files
-- `Assets/PCG-AI-Workspace/`
+- `Assets/PICG-Workspace/`
 - `Assets/Exports/`
 - screenshots and crash reports
-

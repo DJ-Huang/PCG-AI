@@ -1,6 +1,6 @@
 # Code of Conduct
 
-We want PCG-AI to be a constructive, technically curious and welcoming project.
+We want PICG to be a constructive, technically curious and welcoming project.
 
 ## Expected behavior
 

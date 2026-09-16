@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve PCG-AI. Keep changes focused, reproducible and easy to review.
+Thanks for helping improve PICG. Keep changes focused, reproducible and easy to review.
 
 ## Before opening a pull request
 
@@ -43,9 +43,9 @@ For Unity changes, let the editor compile, check a clean Console, run the releva
 - Treat `schema/node-manifest.json` as the source of truth for node types, properties and pins.
 - Keep graphs in top-down layout and validate/cook them before submission.
 - Put repository examples under the matching `examples/` category.
-- Record media provenance and redistribution terms in `ASSET_LICENSES.md` when adding reference images, textures, models or generated outputs.
-- Put Unity-only samples under `Unity/Assets/Samples/PCG-AI/`.
-- Never commit `Unity/Assets/PCG-AI-Workspace/`, `Unity/Assets/Exports/`, build folders or raw evidence dumps.
+- Include source, authorship, and redistribution evidence in the pull request when adding reference images, textures, models, or generated outputs.
+- Put Unity-only samples under `Unity/Assets/Samples/PICG/`.
+- Never commit `Unity/Assets/PICG-Workspace/`, `Unity/Assets/Exports/`, build folders or raw evidence dumps.
 - Preserve Unity `.meta` files when moving assets.
 
 ## Generated copies
@@ -68,4 +68,4 @@ Commit the canonical source and its required synchronized copies together.
 
 Avoid unrelated formatting or refactors in the same pull request. Do not include credentials, private URLs, personal filesystem paths, crash dumps or editor histories.
 
-By contributing, you confirm that you have the right to submit the code and assets. A project license still needs to be selected before public contributions can be accepted under clear terms.
+By contributing, you confirm that you have the right to submit the code and assets under the repository's Apache-2.0 license. Media and third-party assets must have compatible redistribution rights.

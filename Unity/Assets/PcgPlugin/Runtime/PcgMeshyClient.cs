@@ -392,7 +392,7 @@ namespace DJTechRuntime.PCG
             };
             if (string.IsNullOrWhiteSpace(PcgMeshySettings.ApiKey))
             {
-                result.Error = "Meshy API key is empty. Set it in PCG → Settings or Project Settings → PCG AI.";
+                result.Error = "Meshy API key is empty. Set it in PCG → Settings or Project Settings → PICG.";
                 return result;
             }
             if (string.IsNullOrWhiteSpace(request.Prompt))
@@ -513,7 +513,7 @@ namespace DJTechRuntime.PCG
         private static GenerateResult? ValidateBasic(string outputPrimaryPath, string inputError)
         {
             if (string.IsNullOrWhiteSpace(PcgMeshySettings.ApiKey))
-                return Failure("Meshy API key is empty. Set it in PCG → Settings or Project Settings → PCG AI.");
+                return Failure("Meshy API key is empty. Set it in PCG → Settings or Project Settings → PICG.");
             if (inputError != null)
                 return Failure(inputError);
             if (string.IsNullOrWhiteSpace(outputPrimaryPath))
@@ -833,7 +833,7 @@ namespace DJTechRuntime.PCG
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 result.Error =
-                    "Tripo API key is empty. Set it in PCG → Settings or Project Settings → PCG AI (Tripo section).";
+                    "Tripo API key is empty. Set it in PCG → Settings or Project Settings → PICG (Tripo section).";
                 return result;
             }
 

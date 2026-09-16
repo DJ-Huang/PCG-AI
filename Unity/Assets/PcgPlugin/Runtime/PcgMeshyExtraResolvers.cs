@@ -152,7 +152,7 @@ namespace DJTechRuntime.PCG
                 return true;
             error =
                 $"{label} '{nodeId}': API key missing. " +
-                "Open PCG → Settings (or Project Settings → PCG AI) and enter your Meshy API key.";
+                "Open PCG → Settings (or Project Settings → PICG) and enter your Meshy API key.";
             return false;
         }
 

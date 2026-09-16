@@ -1,34 +1,23 @@
 # Cable Generator
 
-沿一条 spline 路径生成圆截面电缆/线缆网格。
+The Cable Generator subgraph creates a cable mesh along an input spline.
 
-## 输入
+## Input
 
-| pin | 类型 | 说明 |
-|---|---|---|
-| `path` | SpatialSpline | 电缆中心线路径 |
+- `path`: the spline that controls the cable centreline.
 
-## 输出
+## Output
 
-| pin | 类型 | 说明 |
-|---|---|---|
-| `out` | SpatialGeometry | 扫掠后的电缆网格（两端加盖、平滑着色） |
+- `mesh`: the generated cable mesh.
 
-## 参数
+## Parameters
 
-| 参数 | 类型 | 默认 | 范围 | 说明 |
-|---|---|---|---|---|
-| Segment Length | number | 0.25 | 0.05 – 2 | 重采样分段长度，越小越平滑 |
-| Thickness | number | 0.03 | 0.002 – 0.5 | 电缆半径 |
-| Sides | integer | 8 | 3 – 32 | 圆截面边数 |
+Use the metadata and subgraph interface for the current parameter names and defaults. Typical controls include radius, radial segments, path resampling, and optional sag or noise.
 
-## 内部结构
+## Internal structure
 
-```
-SubgraphInput(path) → ResampleSpline(spacing) → SweepAlongSpline(circle) → SubgraphOutput(out)
-```
+The subgraph resamples the path when required, builds a stable frame, sweeps a circular profile, and outputs the resulting mesh. Frame continuity is important on tight curves because abrupt normal changes can twist the section.
 
-## 已知限制
+## Limits
 
-- 不做悬垂（sag/重力形变）：当前节点集没有逐点形变节点，需要垂度时先在外部把路径 spline 调成目标形状再接入。
-- 端盖固定开启；需要开口端时展开副本自行修改 `capStart/capEnd`。
+The generator models geometry, not physical cable simulation. Very small radii, self-intersecting paths, or insufficient path resolution can produce poor topology. Validate silhouette, normals, UV continuity, and scale in the target client.

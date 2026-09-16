@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(pcg-fbx-exporter VERSION 1.0.0 LANGUAGES CXX)
+project(pcg-fbx-exporter VERSION 0.1.0 LANGUAGES CXX)
 
 option(PCG_FBX_ENABLE_READBACK_TESTS "Build Assimp FBX importer for round-trip tests" OFF)
 
