@@ -21,6 +21,13 @@
 namespace pcg::internal {
 namespace {
 
+// Group member geometry is an editor-only highlight sidecar. Expanding every
+// polygon ring for a scanned/reconstructed hero mesh duplicates the binary
+// geometry as hundreds of megabytes of decimal JSON (and repeats it per node).
+// Preserve exact group counts for large groups, but keep interactive member
+// details only while they remain practical to render in the editor.
+constexpr size_t kMaxGroupHighlightMembers = 20000;
+
 PcgResultCode fail(char* err_buf, int err_buf_size, PcgResultCode code, const char* message)
 {
     write_error(err_buf, err_buf_size, message);
@@ -52,12 +59,14 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
         const auto domain = static_cast<geometry::GroupDomain>(d);
         for (const auto& name : geometry.groups().group_names(domain)) {
             const auto& members = geometry.groups().members(domain, name);
+            const bool include_highlight_detail =
+                members.size() <= kMaxGroupHighlightMembers;
             auto memberArray = nlohmann::json::array();
             auto edgeEndpoints = nlohmann::json::array();
             auto facePolygons = nlohmann::json::array();
             auto pointPositions = nlohmann::json::array();
             int face_count = 0;
-            for (geometry::GroupId id : members) {
+            if (include_highlight_detail) for (geometry::GroupId id : members) {
                 if (d == static_cast<int>(geometry::GroupDomain::Face)) {
                     // Expand face index into constituent mesh triangles
                     if (id >= 0 && id < static_cast<geometry::GroupId>(face_to_tri.size())) {
@@ -140,11 +149,17 @@ nlohmann::json build_group_stats(const data::PcgGeometry& geometry)
             auto entry = nlohmann::json::object({
                 {"name", name},
                 {"domain", kDomainNames[d]},
-                {"count", d == static_cast<int>(geometry::GroupDomain::Face)
-                    ? face_count
-                    : static_cast<int>(memberArray.size())},
+                {"count", include_highlight_detail
+                    ? (d == static_cast<int>(geometry::GroupDomain::Face)
+                        ? face_count
+                        : static_cast<int>(memberArray.size()))
+                    : static_cast<int>(members.size())},
                 {"members", std::move(memberArray)},
             });
+            if (!include_highlight_detail) {
+                entry["detailTruncated"] = true;
+                entry["detailLimit"] = kMaxGroupHighlightMembers;
+            }
             if (d == static_cast<int>(geometry::GroupDomain::Edge))
                 entry["edgeEndpoints"] = std::move(edgeEndpoints);
             if (d == static_cast<int>(geometry::GroupDomain::Face) && !facePolygons.empty())
@@ -743,6 +758,109 @@ bool discover_foreach_regions(
     return true;
 }
 
+// ── Preview pick attribution ─────────────────────────────
+// Stamps a primitive int attribute with a stable per-node code so a preview
+// consumer can map a picked triangle back to the graph node that produced it.
+// Faces already stamped by an upstream node are left untouched; only
+// unattributed faces (freshly created, or rebuilt by topology-dropping ops
+// like Bevel/Boolean) take the current node's code.
+constexpr const char* kSourceNodeAttr = "__pcg_src";
+
+int64_t source_node_code(const std::string& node_id)
+{
+    uint64_t hash = 14695981039346656037ull; // FNV-1a 64
+    for (const unsigned char c : node_id) {
+        hash ^= c;
+        hash *= 1099511628211ull;
+    }
+    return static_cast<int64_t>(hash | 1ull); // 0 is reserved = unattributed
+}
+
+void stamp_geometry_source(data::PcgGeometry& geometry, int64_t code)
+{
+    const size_t face_count = geometry.faces().size();
+    data::AttributeArray* attr =
+        geometry.attributes().find(data::AttributeOwner::Primitive, kSourceNodeAttr);
+    if (!attr) {
+        data::AttributeArray& created = geometry.attributes().create_int(
+            data::AttributeOwner::Primitive, kSourceNodeAttr, 1, {0});
+        created.resize(face_count);
+        attr = &created;
+    } else if (attr->schema().type != data::AttributeType::Int) {
+        return;
+    } else if (attr->size() != face_count) {
+        // Topology grew without remapping the attribute (e.g. faces appended
+        // without propagate_geometry_data). Appended faces land at the tail
+        // with default 0 and get stamped below.
+        attr->resize(face_count);
+    }
+    auto& values = attr->int_values_mut();
+    for (size_t i = 0; i < face_count; ++i) {
+        if (values[i] == 0)
+            values[i] = code;
+    }
+}
+
+void stamp_collection_sources(data::PcgDataCollection& collection, int64_t code)
+{
+    for (auto& item : collection.items_mut()) {
+        if (!item.geometry)
+            continue;
+        if (item.geometry.use_count() == 1) {
+            // Freshly cooked output is uniquely owned by this collection.
+            stamp_geometry_source(const_cast<data::PcgGeometry&>(*item.geometry), code);
+            continue;
+        }
+        auto stamped = std::make_shared<data::PcgGeometry>(*item.geometry);
+        stamp_geometry_source(*stamped, code);
+        item.geometry = std::move(stamped);
+    }
+}
+
+/// Emits source_nodes (node id per index) + triangle_sources (index per
+/// triangle, -1 = unattributed) aligned with compute_split_normals triangle
+/// order, which is the PCGM mesh blob the web preview raycasts against.
+void attach_source_mapping(nlohmann::json& json,
+                           const Graph& graph,
+                           const data::PcgGeometry& geometry)
+{
+    const data::AttributeArray* attr =
+        geometry.attributes().find(data::AttributeOwner::Primitive, kSourceNodeAttr);
+    std::unordered_map<int64_t, std::string> id_by_code;
+    for (const auto& node : graph.nodes)
+        id_by_code.emplace(source_node_code(node.id), node.id);
+
+    auto source_nodes = nlohmann::json::array();
+    auto triangle_sources = nlohmann::json::array();
+    std::unordered_map<int64_t, size_t> index_by_code;
+
+    const auto& points = geometry.points();
+    const auto& faces = geometry.faces();
+    for (size_t fi = 0; fi < faces.size(); ++fi) {
+        const auto& face = faces[fi];
+        if (face.size() < 3)
+            continue;
+        int source_index = -1;
+        if (attr && attr->schema().type == data::AttributeType::Int && fi < attr->size()) {
+            const int64_t code = attr->int_values()[fi];
+            if (code != 0) {
+                if (const auto idx_it = index_by_code.find(code); idx_it != index_by_code.end()) {
+                    source_index = static_cast<int>(idx_it->second);
+                } else if (const auto id_it = id_by_code.find(code); id_it != id_by_code.end()) {
+                    source_index = static_cast<int>(source_nodes.size());
+                    index_by_code[code] = source_nodes.size();
+                    source_nodes.push_back(id_it->second);
+                }
+            }
+        }
+        const size_t tri_count = data::triangulate_face_corners(points, face).size();
+        for (size_t t = 0; t < tri_count; ++t)
+            triangle_sources.push_back(source_index);
+    }
+    json["source_nodes"] = std::move(source_nodes);
+    json["triangle_sources"] = std::move(triangle_sources);
+}
+
 PcgResultCode cook_single_node(
     const Graph& graph,
     const GraphNode& node,
@@ -827,6 +945,10 @@ PcgResultCode cook_single_node(
         return rc;
 
     outputs[node.id] = std::move(ctx.outputs);
+    // Stamp unconditionally: the node cache reuses upstream outputs across
+    // preview-sink renames, so stamps must exist (and be identical) whether or
+    // not this particular cook has a preview sink.
+    stamp_collection_sources(outputs[node.id], source_node_code(node.id));
     const uint64_t out_hash = (cache && allow_cache)
         ? input_hash
         : compute_output_hash(outputs[node.id]);
@@ -1314,6 +1436,8 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json["node_groups"] = per_node_groups;
         out_result.json["node_attrs"] = per_node_attrs;
         out_result.json["geometry_export"] = "sink_geometry";
+        if (graph_has_preview_sink(graph))
+            attach_source_mapping(out_result.json, graph, *geometry);
         if (!out_result.mesh.metadata().raw().empty())
             out_result.json["mesh_metadata"] = out_result.mesh.metadata().raw();
         return PCG_OK;
@@ -1330,6 +1454,8 @@ PcgResultCode execute_graph(const Graph& graph,
         out_result.json["node_groups"] = per_node_groups;
         out_result.json["node_attrs"] = per_node_attrs;
         out_result.json["geometry_export"] = "sink_geometry";
+        if (graph_has_preview_sink(graph))
+            attach_source_mapping(out_result.json, graph, *geometry);
         if (!out_result.mesh.metadata().raw().empty())
             out_result.json["mesh_metadata"] = out_result.mesh.metadata().raw();
         return PCG_OK;

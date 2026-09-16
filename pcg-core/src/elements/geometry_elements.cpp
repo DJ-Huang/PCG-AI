@@ -225,6 +225,91 @@ public:
     }
 };
 
+class GroupByRangeElement final : public IPcgElement {
+public:
+    const char* type_name() const override { return "GroupByRange"; }
+
+    PcgResultCode execute(PcgContext& ctx) const override
+    {
+        if (!ctx.node)
+            return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupByRange missing node");
+
+        const std::string group_name = ctx.node->data.value("groupName", std::string("range_group"));
+        const std::string entity = ctx.node->data.value("entity", std::string("points"));
+        const std::string range_type = ctx.node->data.value("rangeType", std::string("startLength"));
+        const int start = ctx.node->data.value("start", 0);
+        const int length = ctx.node->data.value("length", 10);
+        const int end = ctx.node->data.value("end", 0);
+        const int select_of = std::max(1, ctx.node->data.value("selectOf", 2));
+        const int offset = ctx.node->data.value("offset", 0);
+
+        auto compute_range = [&](int count) -> std::vector<int> {
+            std::vector<int> members;
+            if (count <= 0)
+                return members;
+
+            if (range_type == "startLength") {
+                const int s = std::min(start, count);
+                const int e = std::min(s + length, count);
+                for (int i = s; i < e; ++i)
+                    members.push_back(i);
+            } else if (range_type == "startEnd") {
+                const int s = std::min(start, count);
+                const int e = std::min(end + 1, count);
+                for (int i = s; i < e; ++i)
+                    members.push_back(i);
+            } else {
+                // everyN: select every selectOf-th element, offset by offset
+                for (int i = 0; i < count; ++i) {
+                    if ((i + offset) % select_of == 0)
+                        members.push_back(i);
+                }
+            }
+            return members;
+        };
+
+        const data::PcgTaggedData* input = ctx.inputs.find("in");
+        if (input && input->points) {
+            const auto& pts = input->points->points();
+            const auto members = compute_range(static_cast<int>(pts.size()));
+            data::PcgPointData output = *input->points;
+            auto& out_pts = output.points_mut();
+            for (int idx : members) {
+                if (idx >= 0 && static_cast<size_t>(idx) < out_pts.size())
+                    out_pts[static_cast<size_t>(idx)].attributes[group_name] = 1.0;
+            }
+            emit_points(ctx, std::move(output));
+            return PCG_OK;
+        }
+
+        if (input && input->geometry) {
+            data::PcgGeometry output = *input->geometry;
+            const bool primitives = entity == "primitives";
+            const int count = primitives
+                ? static_cast<int>(output.faces().size())
+                : static_cast<int>(output.points().size());
+            const auto members = compute_range(count);
+            const auto domain = primitives
+                ? geometry::GroupDomain::Face
+                : geometry::GroupDomain::Point;
+            output.groups().ensure_group(domain, group_name);
+            for (int idx : members)
+                output.groups().add(domain, group_name, idx);
+            emit_geometry(ctx, std::move(output));
+            return PCG_OK;
+        }
+
+        if (input && input->mesh) {
+            data::PcgMeshData output = *input->mesh;
+            // Mesh has no group system; write nothing and pass through.
+            emit_mesh(ctx, std::move(output));
+            return PCG_OK;
+        }
+
+        return fail_ctx(ctx, PCG_ERR_EXECUTION, "GroupByRange missing input");
+    }
+};
+
 } // namespace
 
 void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<IPcgElement>>& map)
@@ -234,6 +319,7 @@ void register_geometry_elements(std::unordered_map<std::string, std::unique_ptr<
     map.emplace("FaceGroupByNormal", std::make_unique<FaceGroupByNormalElement>());
     map.emplace("GroupPromote", std::make_unique<GroupPromoteElement>());
     map.emplace("GroupDelete", std::make_unique<GroupDeleteElement>());
+    map.emplace("GroupByRange", std::make_unique<GroupByRangeElement>());
 }
 
 } // namespace pcg::internal::elements

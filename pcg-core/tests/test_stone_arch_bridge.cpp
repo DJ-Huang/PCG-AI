@@ -20,9 +20,9 @@ static std::string read_file(const char* path)
 
 int main()
 {
-    const std::string graph = read_file("../../examples/stone-arch-bridge.pcg");
+    const std::string graph = read_file("../../examples/graphs/stone-arch-bridge.pcg");
     if (graph.empty()) {
-        std::printf("FAIL: could not read examples/stone-arch-bridge.pcg\n");
+        std::printf("FAIL: could not read examples/graphs/stone-arch-bridge.pcg\n");
         return 1;
     }
 

@@ -23,7 +23,7 @@ namespace DJTechEditor.PCG.Graph
         private static readonly string[] OutputPinTypes =
         {
             "Any", "Param", "SpatialPoint", "SpatialSpline", "SpatialSurface",
-            "SpatialMesh", "SpatialGeometry", "Texture", "HeightField",
+            "SpatialMesh", "SpatialGeometry", "Texture", "HeightField", "Material",
         };
 
         public PcgSubgraphInterfacePanel(PcgGraphView graphView)

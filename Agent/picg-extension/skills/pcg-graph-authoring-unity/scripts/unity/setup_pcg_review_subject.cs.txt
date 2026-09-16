@@ -1,0 +1,101 @@
+// setup_pcg_review_subject.cs.txt
+// Paste into user-tuanjie execute_csharp_script after replacing tokens.
+// Tokens: __GRAPH_ASSET_PATH__  __REVIEW_SLUG__
+//
+// Creates a clean subject in the CURRENT open scene
+// (prefer a fresh Assets/PCG-AI-Workspace/Scenes/PcgReview_* scene):
+//   Directional light + Camera + PcgGraphComponent GO, cook, frame SceneView.
+// Does not load other demo hierarchies.
+
+using System.IO;
+using DJTechEditor.PCG;
+using DJTechRuntime.PCG;
+using UnityEditor;
+using UnityEngine;
+
+string graphAssetPath = "__GRAPH_ASSET_PATH__";
+string slug = "__REVIEW_SLUG__";
+string goName = "PCG_Review_" + slug;
+
+// Remove prior review subject with the same name (idempotent reruns).
+var existing = GameObject.Find(goName);
+if (existing != null)
+    Object.DestroyImmediate(existing);
+
+// Studio light
+if (GameObject.Find("PCG_Review_Sun") == null)
+{
+    var sun = new GameObject("PCG_Review_Sun");
+    sun.transform.rotation = Quaternion.Euler(48f, -32f, 0f);
+    var light = sun.AddComponent<Light>();
+    light.type = LightType.Directional;
+    light.intensity = 1.15f;
+    light.color = new Color(1f, 0.97f, 0.92f);
+}
+
+// Camera (for GameView fallback; framing uses SceneView)
+if (Camera.main == null && Object.FindObjectOfType<Camera>() == null)
+{
+    var camGo = new GameObject("PCG_Review_Camera");
+    camGo.tag = "MainCamera";
+    var cam = camGo.AddComponent<Camera>();
+    cam.clearFlags = CameraClearFlags.SolidColor;
+    cam.backgroundColor = new Color(0.12f, 0.12f, 0.14f, 1f);
+    cam.transform.position = new Vector3(0.4f, 0.2f, -0.6f);
+    cam.transform.LookAt(Vector3.zero);
+}
+
+AssetDatabase.ImportAsset(graphAssetPath, ImportAssetOptions.ForceUpdate);
+var asset = AssetDatabase.LoadAssetAtPath<PcgGraphAsset>(graphAssetPath);
+if (asset == null)
+{
+    // Hydrate transient asset from disk if importer lag
+    var full = Path.GetFullPath(Path.Combine(Application.dataPath, "..", graphAssetPath));
+    if (!File.Exists(full))
+        return "FAIL missing graph: " + graphAssetPath;
+    asset = ScriptableObject.CreateInstance<PcgGraphAsset>();
+    asset.name = Path.GetFileNameWithoutExtension(graphAssetPath);
+    asset.SetGraphJson(File.ReadAllText(full));
+}
+
+var go = new GameObject(goName);
+var comp = go.AddComponent<PcgGraphComponent>();
+comp.GraphAsset = asset;
+// Disk SSOT for this Agent cook only — clear session flag after so Graph Editor
+// authoring / Node Preview is not stuck on PreferDiskGraph for the rest of the session.
+comp.PreferDiskGraph = true;
+PcgGraphExecutionBridge.SessionPreferDiskGraph = true;
+comp.RequestPreviewCook(immediate: true);
+
+for (int i = 0; i < 50; i++)
+{
+    if (!comp.IsAsyncCookInProgress)
+        break;
+    System.Threading.Thread.Sleep(100);
+}
+
+var filters = go.GetComponentsInChildren<MeshFilter>(true);
+var bounds = new Bounds(go.transform.position, Vector3.zero);
+bool has = false;
+int verts = 0;
+foreach (var mf in filters)
+{
+    if (mf.sharedMesh == null) continue;
+    verts += mf.sharedMesh.vertexCount;
+    var b = mf.sharedMesh.bounds;
+    b.center = mf.transform.TransformPoint(b.center);
+    b.size = mf.transform.TransformVector(b.size);
+    if (!has) { bounds = b; has = true; }
+    else bounds.Encapsulate(b);
+}
+
+var view = SceneView.lastActiveSceneView;
+if (view != null && has)
+{
+    view.Frame(bounds, false);
+    view.Repaint();
+}
+
+PcgGraphExecutionBridge.SessionPreferDiskGraph = false;
+
+return $"OK go={goName} verts={verts} async={comp.IsAsyncCookInProgress} status={comp.LastAsyncCookStatus} bounds={(has ? bounds.size.ToString() : "empty")}";

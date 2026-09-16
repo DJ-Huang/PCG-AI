@@ -276,7 +276,7 @@ void test_example_graphs()
 {
     const std::filesystem::path root =
         std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
-    for (const char* rel : {"examples/lot-extrude-demo.pcg", "examples/lot-city-demo.pcg"}) {
+    for (const char* rel : {"examples/graphs/lot-extrude-demo.pcg", "examples/graphs/lot-city-demo.pcg"}) {
         const auto path = root / rel;
         std::ifstream in(path);
         expect(static_cast<bool>(in), std::string("open example: ") + path.string());
@@ -489,7 +489,7 @@ void test_instanced_city_example_graphs()
 
     // --- Infra: Mesh with lot_pad + road slots ---
     {
-        auto document = load_example_json(root, "examples/lot-city-infra.pcg");
+        auto document = load_example_json(root, "examples/graphs/lot-city-infra.pcg");
         shrink_lot_params(document, /*iterations=*/2, /*min_size=*/4.0);
         char error[1024] = {};
         Graph graph;
@@ -523,7 +523,7 @@ void test_instanced_city_example_graphs()
 
     // --- Buildings: multi-prototype GPU Points via MergeSpawnPoints ---
     {
-        auto document = load_example_json(root, "examples/lot-city-buildings-instanced.pcg");
+        auto document = load_example_json(root, "examples/graphs/lot-city-buildings-instanced.pcg");
         test_building_classification_and_scale_micrograph();
         expect(!has_foreach(document), "buildings graph must not use ForEach");
         expect(count_root_node_type(document, "StaticMeshSpawner") == 6,
@@ -660,12 +660,12 @@ void test_instanced_city_example_graphs()
         }
 
         for (const char* asset : {
-                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_tall_flat.pcgsubgraph",
-                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_tall_flat_wide.pcgsubgraph",
-                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_medium_pitched.pcgsubgraph",
-                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_medium_pitched_wide.pcgsubgraph",
-                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_short_flat.pcgsubgraph",
-                 "Unity/Assets/PcgPlugin/Examples/PCGDemo/lot-city-demo/subgraphs/building_short_flat_wide.pcgsubgraph",
+                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_tall_flat.pcgsubgraph",
+                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_tall_flat_wide.pcgsubgraph",
+                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_medium_pitched.pcgsubgraph",
+                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_medium_pitched_wide.pcgsubgraph",
+                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_short_flat.pcgsubgraph",
+                 "Unity/Assets/Samples/PCG-AI/Demos/GraphGallery/Graphs/lot-city-demo/subgraphs/building_short_flat_wide.pcgsubgraph",
              })
             test_building_asset_wrapper(root, asset);
     }

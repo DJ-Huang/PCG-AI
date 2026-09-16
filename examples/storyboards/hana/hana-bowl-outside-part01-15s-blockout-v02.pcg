@@ -1,0 +1,2335 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "room_floor_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "width": 10,
+        "height": 0.2,
+        "depth": 8,
+        "__nodeTitle": "室内地面 体积"
+      }
+    },
+    {
+      "id": "room_floor_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 0,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "室内地面"
+      }
+    },
+    {
+      "id": "porch_floor_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 100,
+        "y": 0
+      },
+      "data": {
+        "width": 10,
+        "height": 0.15,
+        "depth": 4,
+        "__nodeTitle": "门廊地面 体积"
+      }
+    },
+    {
+      "id": "porch_floor_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 100,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.05,
+          6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门廊地面",
+        "__semantic": {
+          "componentId": "porch",
+          "role": "exterior_platform",
+          "zone": "outside",
+          "bounds": {
+            "center": [
+              0,
+              0.05,
+              6
+            ],
+            "size": [
+              10,
+              0.15,
+              4
+            ]
+          },
+          "camera": {
+            "include": true
+          }
+        }
+      }
+    },
+    {
+      "id": "yard_ground_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {
+        "width": 16,
+        "height": 0.1,
+        "depth": 8,
+        "__nodeTitle": "门外地面 体积"
+      }
+    },
+    {
+      "id": "yard_ground_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          -0.08,
+          12
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门外地面",
+        "__semantic": {
+          "componentId": "yoyo_wait_zone",
+          "role": "character_wait_zone",
+          "zone": "outside",
+          "bounds": {
+            "center": [
+              0,
+              0,
+              10
+            ],
+            "size": [
+              4,
+              0.2,
+              3
+            ]
+          },
+          "anchors": {
+            "wait": [
+              0,
+              0.1,
+              10
+            ]
+          },
+          "camera": {
+            "include": false,
+            "scaleRole": "character"
+          }
+        }
+      }
+    },
+    {
+      "id": "left_wall_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 300,
+        "y": 0
+      },
+      "data": {
+        "width": 0.2,
+        "height": 3.2,
+        "depth": 8,
+        "__nodeTitle": "左侧墙体 体积"
+      }
+    },
+    {
+      "id": "left_wall_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 300,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -5,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "左侧墙体"
+      }
+    },
+    {
+      "id": "right_wall_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "data": {
+        "width": 0.2,
+        "height": 3.2,
+        "depth": 8,
+        "__nodeTitle": "右侧墙体 体积"
+      }
+    },
+    {
+      "id": "right_wall_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 400,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          5,
+          1.6,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "右侧墙体"
+      }
+    },
+    {
+      "id": "back_wall_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 500,
+        "y": 0
+      },
+      "data": {
+        "width": 10,
+        "height": 3.2,
+        "depth": 0.2,
+        "__nodeTitle": "后侧墙体 体积"
+      }
+    },
+    {
+      "id": "back_wall_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 500,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          1.6,
+          -4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "后侧墙体"
+      }
+    },
+    {
+      "id": "front_left_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 600,
+        "y": 0
+      },
+      "data": {
+        "width": 3.5,
+        "height": 3.2,
+        "depth": 0.2,
+        "__nodeTitle": "门洞左侧墙体 体积"
+      }
+    },
+    {
+      "id": "front_left_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 600,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -3.25,
+          1.6,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门洞左侧墙体",
+        "__semantic": {
+          "componentId": "doorway_opening",
+          "role": "negative_space",
+          "zone": "doorway",
+          "bounds": {
+            "center": [
+              0,
+              1.55,
+              4
+            ],
+            "size": [
+              3.2,
+              3,
+              0.2
+            ]
+          },
+          "anchors": {
+            "focus": [
+              0,
+              1.35,
+              4
+            ]
+          },
+          "camera": {
+            "include": true
+          }
+        }
+      }
+    },
+    {
+      "id": "front_right_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 700,
+        "y": 0
+      },
+      "data": {
+        "width": 3.5,
+        "height": 3.2,
+        "depth": 0.2,
+        "__nodeTitle": "门洞右侧墙体 体积"
+      }
+    },
+    {
+      "id": "front_right_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 700,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          3.25,
+          1.6,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门洞右侧墙体"
+      }
+    },
+    {
+      "id": "door_jamb_l_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 800,
+        "y": 0
+      },
+      "data": {
+        "width": 0.2,
+        "height": 3.2,
+        "depth": 0.35,
+        "__nodeTitle": "门洞左门框 体积"
+      }
+    },
+    {
+      "id": "door_jamb_l_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 800,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -1.5,
+          1.6,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门洞左门框"
+      }
+    },
+    {
+      "id": "door_jamb_r_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 900,
+        "y": 0
+      },
+      "data": {
+        "width": 0.2,
+        "height": 3.2,
+        "depth": 0.35,
+        "__nodeTitle": "门洞右门框 体积"
+      }
+    },
+    {
+      "id": "door_jamb_r_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 900,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          1.5,
+          1.6,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门洞右门框"
+      }
+    },
+    {
+      "id": "door_header_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1000,
+        "y": 0
+      },
+      "data": {
+        "width": 3.2,
+        "height": 0.2,
+        "depth": 0.35,
+        "__nodeTitle": "门洞上横梁 体积"
+      }
+    },
+    {
+      "id": "door_header_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1000,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          3.1,
+          4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门洞上横梁"
+      }
+    },
+    {
+      "id": "door_leaf_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1100,
+        "y": 0
+      },
+      "data": {
+        "width": 0.15,
+        "height": 3,
+        "depth": 2.8,
+        "__nodeTitle": "向左侧打开的门扇 体积"
+      }
+    },
+    {
+      "id": "door_leaf_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1100,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -4.82,
+          1.5,
+          2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "向左侧打开的门扇"
+      }
+    },
+    {
+      "id": "threshold_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1200,
+        "y": 0
+      },
+      "data": {
+        "width": 3.2,
+        "height": 0.16,
+        "depth": 0.45,
+        "__nodeTitle": "外门槛 体积"
+      }
+    },
+    {
+      "id": "threshold_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1200,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.12,
+          4.18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "外门槛",
+        "__semantic": {
+          "componentId": "threshold",
+          "role": "transition",
+          "zone": "doorway",
+          "bounds": {
+            "center": [
+              0,
+              0.12,
+              4.18
+            ],
+            "size": [
+              3.2,
+              0.16,
+              0.45
+            ]
+          },
+          "anchors": {
+            "focus": [
+              0,
+              0.12,
+              4.18
+            ]
+          },
+          "camera": {
+            "include": true
+          }
+        }
+      }
+    },
+    {
+      "id": "table_top_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1300,
+        "y": 0
+      },
+      "data": {
+        "width": 3,
+        "height": 0.16,
+        "depth": 1.6,
+        "__nodeTitle": "室内餐桌桌面 体积"
+      }
+    },
+    {
+      "id": "table_top_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1300,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -2.5,
+          1.45,
+          -1.6
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "室内餐桌桌面",
+        "__semantic": {
+          "componentId": "interior_table",
+          "role": "furniture",
+          "zone": "interior_left_rear",
+          "bounds": {
+            "center": [
+              -2.5,
+              0.75,
+              -1.6
+            ],
+            "size": [
+              3,
+              1.5,
+              1.6
+            ]
+          },
+          "camera": {
+            "occluder": true,
+            "scaleRole": "human_scale"
+          }
+        }
+      }
+    },
+    {
+      "id": "table_leg_fl_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1400,
+        "y": 0
+      },
+      "data": {
+        "width": 0.16,
+        "height": 1.45,
+        "depth": 0.16,
+        "__nodeTitle": "餐桌前左腿 体积"
+      }
+    },
+    {
+      "id": "table_leg_fl_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1400,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -3.75,
+          0.72,
+          -2.2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "餐桌前左腿"
+      }
+    },
+    {
+      "id": "table_leg_fr_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1500,
+        "y": 0
+      },
+      "data": {
+        "width": 0.16,
+        "height": 1.45,
+        "depth": 0.16,
+        "__nodeTitle": "餐桌前右腿 体积"
+      }
+    },
+    {
+      "id": "table_leg_fr_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1500,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -1.25,
+          0.72,
+          -2.2
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "餐桌前右腿"
+      }
+    },
+    {
+      "id": "table_leg_bl_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1600,
+        "y": 0
+      },
+      "data": {
+        "width": 0.16,
+        "height": 1.45,
+        "depth": 0.16,
+        "__nodeTitle": "餐桌后左腿 体积"
+      }
+    },
+    {
+      "id": "table_leg_bl_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1600,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -3.75,
+          0.72,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "餐桌后左腿"
+      }
+    },
+    {
+      "id": "table_leg_br_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1700,
+        "y": 0
+      },
+      "data": {
+        "width": 0.16,
+        "height": 1.45,
+        "depth": 0.16,
+        "__nodeTitle": "餐桌后右腿 体积"
+      }
+    },
+    {
+      "id": "table_leg_br_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1700,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -1.25,
+          0.72,
+          -1
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "餐桌后右腿"
+      }
+    },
+    {
+      "id": "chair_seat_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "width": 0.9,
+        "height": 0.14,
+        "depth": 0.9,
+        "__nodeTitle": "室内椅面 体积"
+      }
+    },
+    {
+      "id": "chair_seat_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1800,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -2.5,
+          0.85,
+          -2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "室内椅面"
+      }
+    },
+    {
+      "id": "chair_back_mesh",
+      "type": "CreateBoxMesh",
+      "position": {
+        "x": 1900,
+        "y": 0
+      },
+      "data": {
+        "width": 0.9,
+        "height": 1.5,
+        "depth": 1,
+        "__nodeTitle": "室内椅背 体积"
+      }
+    },
+    {
+      "id": "chair_back_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 1900,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          -2.5,
+          1.5,
+          -2.4
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "室内椅背"
+      }
+    },
+    {
+      "id": "bowl_landing_mesh",
+      "type": "CreateCylinderMesh",
+      "position": {
+        "x": 2300,
+        "y": 0
+      },
+      "data": {
+        "radius": 0.38,
+        "height": 0.12,
+        "radialSegments": 24,
+        "heightSegments": 2,
+        "capTop": true,
+        "capBottom": true,
+        "__nodeTitle": "门外碗落点 标记"
+      }
+    },
+    {
+      "id": "bowl_landing_xform",
+      "type": "TransformMesh",
+      "position": {
+        "x": 2300,
+        "y": 160
+      },
+      "data": {
+        "group": "",
+        "groupType": "guess",
+        "transformOrder": "srt",
+        "rotateOrder": "xyz",
+        "translate": [
+          0,
+          0.23,
+          5.18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "shear": [
+          0,
+          0,
+          0
+        ],
+        "uniformScale": 1,
+        "pivotTranslate": [
+          0,
+          0,
+          0
+        ],
+        "pivotRotate": [
+          0,
+          0,
+          0
+        ],
+        "preTransformOrder": "srt",
+        "preRotateOrder": "xyz",
+        "preTranslate": [
+          0,
+          0,
+          0
+        ],
+        "preRotate": [
+          0,
+          0,
+          0
+        ],
+        "preScale": [
+          1,
+          1,
+          1
+        ],
+        "preShear": [
+          0,
+          0,
+          0
+        ],
+        "recomputePointNormals": false,
+        "preserveNormalLength": true,
+        "invertTransform": false,
+        "outputTransform": false,
+        "outputAttribute": "xform",
+        "outputMultiplyOrder": "post",
+        "__nodeTitle": "门外碗落点",
+        "__semantic": {
+          "componentId": "bowl_landing",
+          "role": "prop_landing",
+          "zone": "outside",
+          "bounds": {
+            "center": [
+              0,
+              0.23,
+              5.18
+            ],
+            "size": [
+              0.76,
+              0.12,
+              0.76
+            ]
+          },
+          "anchors": {
+            "landing": [
+              0,
+              0.23,
+              5.18
+            ]
+          },
+          "camera": {
+            "include": true,
+            "scaleRole": "small_prop"
+          }
+        }
+      }
+    },
+    {
+      "id": "set_merge",
+      "type": "MergeMesh",
+      "position": {
+        "x": 1150,
+        "y": 520
+      },
+      "data": {
+        "__nodeTitle": "Hana 门口吃饭空间锁"
+      }
+    },
+    {
+      "id": "out",
+      "type": "Output",
+      "position": {
+        "x": 1150,
+        "y": 700
+      },
+      "data": {
+        "label": "Output",
+        "__nodeTitle": "输出"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_room_floor",
+      "source": "room_floor_mesh",
+      "target": "room_floor_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_porch_floor",
+      "source": "porch_floor_mesh",
+      "target": "porch_floor_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_yard_ground",
+      "source": "yard_ground_mesh",
+      "target": "yard_ground_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_left_wall",
+      "source": "left_wall_mesh",
+      "target": "left_wall_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_right_wall",
+      "source": "right_wall_mesh",
+      "target": "right_wall_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_back_wall",
+      "source": "back_wall_mesh",
+      "target": "back_wall_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_front_left",
+      "source": "front_left_mesh",
+      "target": "front_left_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_front_right",
+      "source": "front_right_mesh",
+      "target": "front_right_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_jamb_l",
+      "source": "door_jamb_l_mesh",
+      "target": "door_jamb_l_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_jamb_r",
+      "source": "door_jamb_r_mesh",
+      "target": "door_jamb_r_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_header",
+      "source": "door_header_mesh",
+      "target": "door_header_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_leaf",
+      "source": "door_leaf_mesh",
+      "target": "door_leaf_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_threshold",
+      "source": "threshold_mesh",
+      "target": "threshold_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_top",
+      "source": "table_top_mesh",
+      "target": "table_top_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_fl",
+      "source": "table_leg_fl_mesh",
+      "target": "table_leg_fl_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_fr",
+      "source": "table_leg_fr_mesh",
+      "target": "table_leg_fr_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_bl",
+      "source": "table_leg_bl_mesh",
+      "target": "table_leg_bl_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_br",
+      "source": "table_leg_br_mesh",
+      "target": "table_leg_br_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_chair_seat",
+      "source": "chair_seat_mesh",
+      "target": "chair_seat_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_chair_back",
+      "source": "chair_back_mesh",
+      "target": "chair_back_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bowl_landing",
+      "source": "bowl_landing_mesh",
+      "target": "bowl_landing_xform",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_room_floor_xform_merge",
+      "source": "room_floor_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_porch_floor_xform_merge",
+      "source": "porch_floor_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_yard_ground_xform_merge",
+      "source": "yard_ground_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_left_wall_xform_merge",
+      "source": "left_wall_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_right_wall_xform_merge",
+      "source": "right_wall_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_back_wall_xform_merge",
+      "source": "back_wall_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_front_left_xform_merge",
+      "source": "front_left_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_front_right_xform_merge",
+      "source": "front_right_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_jamb_l_xform_merge",
+      "source": "door_jamb_l_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_jamb_r_xform_merge",
+      "source": "door_jamb_r_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_header_xform_merge",
+      "source": "door_header_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_door_leaf_xform_merge",
+      "source": "door_leaf_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_threshold_xform_merge",
+      "source": "threshold_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_top_xform_merge",
+      "source": "table_top_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_fl_xform_merge",
+      "source": "table_leg_fl_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_fr_xform_merge",
+      "source": "table_leg_fr_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_bl_xform_merge",
+      "source": "table_leg_bl_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_table_leg_br_xform_merge",
+      "source": "table_leg_br_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_chair_seat_xform_merge",
+      "source": "chair_seat_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_chair_back_xform_merge",
+      "source": "chair_back_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_bowl_landing_xform_merge",
+      "source": "bowl_landing_xform",
+      "target": "set_merge",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "e_merge_out",
+      "source": "set_merge",
+      "target": "out",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ],
+  "parameters": [],
+  "subgraphs": []
+}

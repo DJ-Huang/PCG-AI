@@ -10,22 +10,22 @@
 
 ## 1. 先看一次完整运行
 
-PCG-AI 的核心是一条 **Web 画布编辑 → Graph JSON → C++ 执行 → Unity 预览** 的数据管线。
+PCG-AI 的核心是一条 **Web/Unity 编辑 → Graph JSON → localhost HTTP 服务 → C++ 执行 → 预览** 的数据管线。
 
 最简操作：
 
 1. **Web 编辑器**（`web/pcg-editor/`）：`npm run dev` → 浏览器打开 `localhost:5173` → 调整节点参数 → 点击 **Send to Unity**
-2. **C++ 核心**（`pcg-core/`）：接收 Graph JSON → 拓扑排序 → 逐节点执行 → 输出 Mesh/Points/Geometry 二进制
-3. **Unity 预览**（`Unity/Assets/PcgPlugin/`）：P/Invoke 调用 C++ → 解析二进制结果 → Scene 视图渲染 Gizmo/Mesh
+2. **本地服务端**（`pcg-server/`）：通过 HTTP 接收 Graph JSON 与资源 → 调用 `pcg-core` → 返回版本化 cook 载荷
+3. **Unity 预览**（`Unity/Assets/PcgPlugin/`）：请求本地服务端 → 解析二进制结果 → Scene 视图渲染 Gizmo/Mesh
 
 或者，直接在 Unity 内使用 **GraphView 编辑器**（`PCG → Graph Editor`）编辑图，无需 Web。
 
 最简验证命令：
 
-```powershell
-# 验证 C++ 核心已就绪（M0 里程碑）
-# Unity 菜单：PCG → Print PcgCore Version
-# Console 应输出：pcg-core 0.1.2 (bmesh-tier1)
+```bash
+./scripts/build-pcg-server.sh
+./scripts/run-pcg-server.sh
+# Unity 菜单：PCG → Server → Health Check
 ```
 
 证据：E-001。
@@ -37,7 +37,8 @@ PCG-AI 的核心是一条 **Web 画布编辑 → Graph JSON → C++ 执行 → U
 | 组件 | 职责 | 技术栈 |
 |------|------|--------|
 | **pcg-core** | 唯一算法执行体：图解析、拓扑排序、节点执行、几何计算、二进制序列化 | C++17, CMake, nlohmann/json |
-| **Unity PcgPlugin** | 引擎绑定：P/Invoke、结果解析、Scene 预览、GraphView 编辑器 | C#, Unity 2022.3+ |
+| **pcg-server** | localhost HTTP/MCP 边界：验证、cook、预览与 FBX 导出 | C++17, HTTP |
+| **Unity PcgPlugin** | 引擎绑定：HTTP 客户端、结果解析、Scene 预览、GraphView 编辑器 | C#, Unity 2022.3+ |
 | **Web pcg-editor** | 轻量图编辑器：React Flow 画布、导出 JSON | TypeScript, Vite, @xyflow/react |
 | **Schema** | 数据契约：Graph JSON 定义 + Node Manifest（SSOT） | JSON Schema |
 
@@ -80,7 +81,8 @@ flowchart LR
     E1 --> E2["PlaceInScene<br/>execute()"]
     E2 --> S["Sink 检测<br/>(无出边节点)"]
     S --> R["write_execution_result()<br/>序列化结果"]
-    R --> U["Unity PcgNative<br/>P/Invoke 接收"]
+    R --> H["pcg-server<br/>HTTP 响应封装"]
+    H --> U["Unity PcgCookClient<br/>HTTP 接收"]
     U --> PR["PcgPreview<br/>Scene Gizmo 渲染"]
 ```
 
@@ -106,15 +108,17 @@ flowchart LR
 | `pcg-core/src/geometry/` | 几何内核（BMesh/Sweep/Boolean/BVH） | [06 几何内核](06-geometry-kernel.md) |
 | `pcg-core/src/cook_hash.cpp` | Cook Cache 哈希计算 | [03 图执行引擎](03-graph-executor.md) |
 | `pcg-core/src/graph_cook_cache.cpp` | per-node 输入哈希缓存 | [03 图执行引擎](03-graph-executor.md) |
+| `pcg-server/` | Unity/Web 共用的 localhost HTTP/MCP 服务 | [端到端](09-end-to-end-debug.md) |
 | `schema/node-manifest.json` | 节点 Pin/参数定义（SSOT） | [01 Graph JSON](01-graph-json-and-schema.md) |
 | `schema/graph-schema-v2.json` | JSON Schema v2 | [01 Graph JSON](01-graph-json-and-schema.md) |
-| `Unity/.../Runtime/PcgNative.cs` | P/Invoke 绑定 | [07 Unity 运行时](07-unity-runtime.md) |
+| `Unity/.../Runtime/PcgCookClient.cs` | localhost HTTP cook 客户端 | [07 Unity 运行时](07-unity-runtime.md) |
+| `Unity/.../Runtime/PcgNative.cs` | 保持调用方兼容的 C# 门面 | [07 Unity 运行时](07-unity-runtime.md) |
 | `Unity/.../Runtime/PcgResultParser.cs` | 二进制结果解析 | [07 Unity 运行时](07-unity-runtime.md) |
 | `Unity/.../Runtime/PcgGraphComponent.cs` | MonoBehaviour 生命周期管理 | [07 Unity 运行时](07-unity-runtime.md) |
 | `Unity/.../Editor/Graph/PcgGraphEditorWindow.cs` | GraphView 编辑器窗口 | [08 Unity 编辑器](08-unity-graph-editor.md) |
 | `Unity/.../Editor/Graph/PcgGraphView.cs` | 画布交互（拖拽/连线/选择） | [08 Unity 编辑器](08-unity-graph-editor.md) |
 | `web/pcg-editor/src/` | Web 编辑器源码 | [09 端到端](09-end-to-end-debug.md) |
-| `scripts/build-pcg-core.ps1` | 一键构建+拷贝+测试 | [09 端到端](09-end-to-end-debug.md) |
+| `scripts/build-pcg-core.sh` / `.ps1` | 构建核心并运行回归测试 | [09 端到端](09-end-to-end-debug.md) |
 
 ## 5. 核心概念
 
@@ -202,10 +206,12 @@ struct Graph {
       → if JSON:     write JSON string
 ```
 
-**Step 5: Unity 接收**（证据：E-038, E-039, E-040）
+**Step 5: 服务端封装与 Unity 接收**（证据：E-038, E-039, E-040）
 
 ```
-PcgNative.cs: pcg_execute_graph_v8(...)      // P/Invoke 调用
+pcg-server: POST /v1/cook                    // 调用 C++ 核心并封装结果
+PcgCookClient.cs: ExecuteGraph(...)           // localhost HTTP 请求
+PcgNative.cs: ExecuteGraph(...)               // 兼容门面
 PcgResultParser.cs: ParseMeshBinary(...)      // 解析二进制
 PcgGraphComponent.cs: OnCookResult(...)      // 更新预览
 PcgPreview.cs: OnDrawGizmos()                 // Scene 渲染
@@ -221,14 +227,13 @@ PcgPreview.cs: OnDrawGizmos()                 // Scene 渲染
 
 **可执行验证**（需要构建环境）：
 
-```powershell
+```bash
 # 构建 C++ 核心并运行测试
-cd F:\ForkProject\PCG-AI
-.\scripts\build-pcg-core.ps1 -RunTests
-# 预期：ctest 全绿，输出 PcgCore.dll
+./scripts/build-pcg-core.sh --run-tests
+# 预期：ctest 全绿
 ```
 
-如果上述命令不可用，可以在 Unity 中通过 **PCG → Print PcgCore Version** 验证原生库已加载。
+联调 Unity 前运行 `./scripts/run-pcg-server.sh`，再通过 **PCG → Server → Health Check** 验证连接。
 
 ## 8. 自检
 
@@ -240,7 +245,7 @@ cd F:\ForkProject\PCG-AI
 <details>
 <summary>参考答案</summary>
 
-1. 通过 **P/Invoke**（C# `DllImport` 调用 C ABI 函数）通信。数据格式为 **二进制协议**（Mesh binary v2: 20B header + positions + indices + optional blocks；Point binary v1: 16B header + positions + optional attrs）或 JSON 字符串。证据：E-038, E-019, E-020。
+1. Unity 通过 localhost **HTTP** 调用 `pcg-server`，服务端再调用 C++ 核心。响应使用版本化 cook 容器，内部承载 Mesh/Point/Geometry 等二进制块或 JSON。证据：E-038, E-019, E-020。
 2. 五个阶段：① `pcg_validate_graph` 验证 JSON 结构 → ② `parse_graph` 解析为 `Graph` 结构 → ③ `topological_order` 拓扑排序 → ④ 逐节点 `execute()` 执行 → ⑤ `write_execution_result` 序列化结果。输入是 JSON 字符串，输出是 binary buffer 或 JSON 字符串。证据：E-004, E-008。
 3. `PcgGeometry` 存储 **n-gon 面**（非三角形），保留原始拓扑结构，用于精确的几何操作（bevel、boolean、group）。`PcgMeshData` 是 **已三角化** 的网格（vertices + triangles），用于最终输出。区分的原因是延迟三角化——节点输出 raw geometry，Sink 处统一三角化，避免中间步骤丢失 n-gon 信息。证据：E-017, D-004。
 4. Cook Cache 为每个节点计算 **input_hash**（基于节点参数 + seed + 上游输出哈希）。如果 hash 与缓存中的一致，则跳过执行。图结构变化（节点增删改）时，结构哈希不匹配，整个缓存被 clear。证据：E-011。
@@ -262,7 +267,7 @@ cd F:\ForkProject\PCG-AI
 - E-029：`geometry/bmesh.hpp` — BMesh 半边结构
 - E-035：`internal/graph_types.hpp` — Graph 结构定义
 - E-036：`schema/node-manifest.json` — 节点定义 SSOT
-- E-038：`Runtime/PcgNative.cs` — P/Invoke 绑定
+- E-038：`Runtime/PcgCookClient.cs`、`Runtime/PcgNative.cs` — HTTP 客户端与兼容门面
 
 ## 10. 下一步
 

@@ -13,9 +13,12 @@
 #include "elements/vehicle_modeling_elements.hpp"
 #include "elements/building_elements.hpp"
 #include "elements/heightfield_elements.hpp"
+#include "elements/houdini_sop_elements.hpp"
 #include "elements/assembly_elements.hpp"
 #include "elements/facade_foundation_elements.hpp"
 #include "elements/topology_parity_elements.hpp"
+#include "elements/oriented_sdf_surface.hpp"
+#include "elements/add_elements.hpp"
 
 #include "internal/error_util.hpp"
 
@@ -195,6 +198,7 @@ void register_builtin_elements()
     register_phase42_elements(map);
     register_mesh_elements(map);
     register_geometry_elements(map);
+    register_add_elements(map);
     register_boolean_elements(map);
     register_mesh_scatter_elements(map);
     register_spline_elements(map);
@@ -207,6 +211,8 @@ void register_builtin_elements()
     register_assembly_elements(map);
     register_facade_foundation_elements(map);
     register_topology_parity_elements(map);
+    register_oriented_sdf_surface_elements(map);
+    register_houdini_sop_elements(map);
 }
 
 const IPcgElement* find_element(const std::string& type)

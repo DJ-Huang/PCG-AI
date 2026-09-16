@@ -1,32 +1,80 @@
-# React + TypeScript + Vite
+# PCG Web Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The Web editor is the browser authoring client for `pcg-server`.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js `^20.19.0` or `>=22.12.0`
+- A running `pcg-server` at `http://127.0.0.1:17890`
 
-## React Compiler
+## Run
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+From the repository root:
 
-## Expanding the Oxlint configuration
+```bash
+./scripts/run-pcg-web.sh
+```
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Or run the Web application separately:
+
+```bash
+cd web/pcg-editor
+npm ci
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`.
+
+## Commands
+
+```bash
+npm run dev                  # development server
+npm run lint                 # oxlint
+npm run build                # TypeScript + production bundle
+npx vitest run               # complete unit/component suite
+npm run test:agent           # embedded Agent-focused tests
+npm run test:graph-commands  # graph command protocol validation
+npm run test:library         # built-in library consistency
+```
+
+`node_modules/` and `dist/` are generated and must not be committed.
+
+## Review route
+
+The deterministic review page loads a repository-relative graph path:
+
+```text
+http://127.0.0.1:5173/review?graph=examples/graphs/bridge-demo.pcg
+```
+
+The development server resolves the path from the repository root and rejects paths outside it. The review route uses the local cook server and supports fixed cameras, preview quality controls, parameter overrides and GLB export.
+
+## Unity handoff
+
+**Send to Unity** writes `schema/editor-export.pcg` during development. That file is a local handoff target and is intentionally ignored. In Unity, select it with **PCG → Set Watched Graph…** or export/import the graph manually.
+
+## External Agent bridge
+
+While the editor is open it publishes the in-memory graph, selection, subgraph scope, preview target, node manifest and graph hash to `pcg-server`.
 
 ```json
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  "mcpServers": {
+    "pcg": {
+      "url": "http://127.0.0.1:17890/mcp"
+    }
   }
 }
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Use the latest `graphHash` for every write. Graph operations are applied through the normal undo stack; a stale hash returns `graph_conflict` rather than overwriting editor changes.
+
+## Built-in Agent
+
+Provider accounts are configured in **Settings → AI Providers**. Credentials are submitted only to the localhost server and are never stored in the browser or repository. Read/cook/capture tools run automatically; graph writes pause for an approval card tied to the current graph hash.
+
+Supported attachments are PNG/JPEG and UTF-8 `.txt`, `.json` or `.pcg` files. Chat history and attachments are stored in the user's application-support directory, outside the repository.
+
+## Examples
+
+Repository examples are kept in `examples/`, not under `web/`. See [examples/README.md](../../examples/README.md) for the catalog and review URLs.

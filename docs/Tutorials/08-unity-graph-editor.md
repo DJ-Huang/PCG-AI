@@ -262,7 +262,7 @@ public sealed class PcgGraphView : GraphView
 - E-044：`Editor/Graph/Nodes/PcgManifestNodeView.cs` — Manifest 驱动节点
 - E-045：`Editor/Graph/PcgGraphView.cs` — 画布交互
 - E-046：`Editor/Graph/PcgCreateSplineSceneHandles.cs` — Scene spline 编辑
-- E-047：`Editor/PcgIl2CppBuildProcessor.cs` — IL2CPP 链接
+- E-047：`Editor/PcgIl2CppBuildProcessor.cs` — 构建时确认不执行原生核心链接
 
 ## 9. 下一步
 - [09 端到端调试与验证](09-end-to-end-debug.md) — 全链路联调、Web 编辑器、构建与 CI

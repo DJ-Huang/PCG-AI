@@ -24,8 +24,6 @@ done
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_DIR="$ROOT/pcg-fbx-exporter"
 BUILD_DIR="$SOURCE_DIR/build-macos"
-UNITY_PLUGINS="$ROOT/Unity/Assets/PcgPlugin/Plugins/Editor/macOS"
-
 cmake -S "$SOURCE_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE="$CONFIGURATION"
 cmake --build "$BUILD_DIR" --config "$CONFIGURATION" -j"$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 

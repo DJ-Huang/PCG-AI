@@ -171,10 +171,17 @@ PcgResultCode write_execution_result(const pcg::internal::GraphExecutionResult& 
 
         if (out_json && out_json_size > 0 && result.json.is_object() && !result.json.empty()) {
             const auto serialized = result.json.dump();
-            if (static_cast<int>(serialized.size()) + 1 <= out_json_size)
+            if (static_cast<int>(serialized.size()) + 1 <= out_json_size) {
                 std::strncpy(out_json, serialized.c_str(), static_cast<size_t>(out_json_size - 1));
-            else
+            } else {
+                char message[256];
+                std::snprintf(message, sizeof(message),
+                              "JSON buffer too small (need %zu bytes, got %d)",
+                              serialized.size() + 1, out_json_size);
+                pcg::internal::write_error(err_buf, err_buf_size, message);
                 out_json[0] = '\0';
+                return PCG_ERR_EXECUTION;
+            }
         } else if (out_json && out_json_size > 0)
             out_json[0] = '\0';
 

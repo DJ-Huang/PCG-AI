@@ -7,6 +7,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { getNodeTypeDefs, getCategoryColor } from './nodeManifest';
 import { resolveUpstreamGroups, type AvailableGroup } from './groupResolver';
 import type { NodeData } from './graphSchema';
+import { findSubgraph, getSubgraphId, getSubgraphNodeTitle, useSubgraphs } from './subgraphs';
 
 interface NodeInfoPanelProps {
   node: Node;
@@ -20,11 +21,78 @@ interface NodeInfoPanelProps {
 export default function NodeInfoPanel({ node, nodes, edges, x, y, onClose }: NodeInfoPanelProps) {
   const def = getNodeTypeDefs(node.type ?? '');
   const data = node.data as NodeData;
+  const subgraphs = useSubgraphs();
 
   const upstreamGroups = useMemo(
     () => resolveUpstreamGroups(node.id, nodes, edges),
     [node.id, nodes, edges],
   );
+
+  if (node.type === 'Subgraph') {
+    const subgraphId = getSubgraphId(data);
+    const subgraph = findSubgraph(subgraphs, subgraphId);
+    const title = getSubgraphNodeTitle(data, subgraph);
+    const color = getCategoryColor('Structural');
+    return (
+      <div className="pcg-node-info-panel" style={{ left: x, top: y }}>
+        <div className="pcg-node-info-panel__header" style={{ background: color }}>
+          {title}
+          {onClose && (
+            <button
+              type="button"
+              className="pcg-node-info-panel__close"
+              onClick={onClose}
+              title="Close"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <div className="pcg-node-info-panel__type">Subgraph · Structural</div>
+        {!subgraph && (
+          <div className="pcg-node-info-panel__section">
+            <div className="pcg-node-info-panel__group-row">
+              <span className="pcg-node-info-panel__prop-value">
+                Missing definition: {subgraphId || '(unset)'}
+              </span>
+            </div>
+          </div>
+        )}
+        {subgraph && (
+          <>
+            <div className="pcg-node-info-panel__section">
+              <div className="pcg-node-info-panel__section-title">Pins</div>
+              {subgraph.inputs.map((pin) => (
+                <div key={pin.id} className="pcg-node-info-panel__pin-row">
+                  <span className="pcg-node-info-panel__pin-dir">→</span>
+                  <span className="pcg-node-info-panel__pin-label">{pin.name}</span>
+                  <span className="pcg-node-info-panel__pin-type">Any</span>
+                </div>
+              ))}
+              {subgraph.outputs.map((pin) => (
+                <div key={pin.id} className="pcg-node-info-panel__pin-row">
+                  <span className="pcg-node-info-panel__pin-dir">←</span>
+                  <span className="pcg-node-info-panel__pin-label">{pin.name}</span>
+                  <span className="pcg-node-info-panel__pin-type">{pin.pinType || 'Any'}</span>
+                </div>
+              ))}
+            </div>
+            <div className="pcg-node-info-panel__section">
+              <div className="pcg-node-info-panel__section-title">Contents</div>
+              <div className="pcg-node-info-panel__prop-row">
+                <span className="pcg-node-info-panel__prop-key">Nodes</span>
+                <span className="pcg-node-info-panel__prop-value">{subgraph.nodes.length}</span>
+              </div>
+              <div className="pcg-node-info-panel__prop-row">
+                <span className="pcg-node-info-panel__prop-key">Edges</span>
+                <span className="pcg-node-info-panel__prop-value">{subgraph.edges.length}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (!def) return null;
 

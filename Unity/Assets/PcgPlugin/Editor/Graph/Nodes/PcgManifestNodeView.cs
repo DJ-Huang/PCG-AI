@@ -30,6 +30,7 @@ namespace DJTechEditor.PCG.Graph
         public PcgManifestNodeView(ManifestNodeDef def)
         {
             _def = def;
+            ConfigurePreviewSupport(def.supportsPreview);
             title = def.displayName ?? def.type;
             BuildGroupBadge();
         }

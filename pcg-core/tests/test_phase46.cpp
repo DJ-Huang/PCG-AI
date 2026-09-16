@@ -336,6 +336,62 @@ int main()
         std::printf("PASS: GroupDelete graph cook\n");
     }
 
+    {
+        const char* large_group_graph = R"({
+          "version": "1.0",
+          "nodes": [
+            {"id":"grid","type":"CreateGridMesh","data":{
+              "sizeX":10,"sizeY":10,"rows":200,"cols":200,"plane":"xz"}},
+            {"id":"grp","type":"GroupCreate","data":{
+              "outputGroup":"dense_faces","domain":"face","enableBaseGroup":true,
+              "enableEdges":false,"enableBounding":false,"enableNormals":false,
+              "enableRandom":false}},
+            {"id":"out","type":"Output","data":{}}
+          ],
+          "edges": [
+            {"id":"e1","source":"grid","target":"grp","sourceHandle":"out","targetHandle":"in"},
+            {"id":"e2","source":"grp","target":"out","sourceHandle":"out","targetHandle":"in"}
+          ]
+        })";
+        std::vector<char> json_buffer(8 * 1024 * 1024, 0);
+        std::vector<uint8_t> mesh_buffer(16 * 1024 * 1024, 0);
+        int kind = 0;
+        int vertex_count = 0;
+        int index_count = 0;
+        char err_buffer[512] = {};
+        const PcgResultCode code = pcg_execute_graph_v2(
+            large_group_graph, 42, &kind, json_buffer.data(),
+            static_cast<int>(json_buffer.size()), mesh_buffer.data(),
+            static_cast<int>(mesh_buffer.size()), &vertex_count, &index_count,
+            err_buffer, static_cast<int>(sizeof(err_buffer)));
+        if (code != PCG_OK) {
+            std::printf("Large group graph error: %s\n", err_buffer);
+            fail("Large group graph cook failed");
+        }
+        const auto result = nlohmann::json::parse(json_buffer.data());
+        bool found_truncated = false;
+        for (const auto* collection : {&result["groups"], &result["node_groups"]}) {
+            if (!collection->is_array())
+                continue;
+            for (const auto& group : *collection) {
+                if (group.value("name", std::string()) != "dense_faces")
+                    continue;
+                if (group.value("count", 0) <= 20000)
+                    fail("Large group summary lost the exact member count");
+                if (!group.value("detailTruncated", false))
+                    fail("Large group highlight detail was not marked truncated");
+                if (!group["members"].empty())
+                    fail("Large group should not duplicate member geometry in JSON");
+                found_truncated = true;
+            }
+        }
+        if (!found_truncated)
+            fail("Large group truncation summary missing");
+        if (std::strlen(json_buffer.data()) >= 1024 * 1024)
+            fail("Large group execution JSON should remain below one megabyte");
+        std::printf("PASS: large group highlight sidecar is bounded\n");
+    }
+
     bevel::BevelEdgeSelection edge_sel;
     edge_sel.exclude_unshared = true;
     const PcgMeshData beveled =

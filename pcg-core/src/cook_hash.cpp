@@ -132,6 +132,7 @@ uint64_t hash_geometry(const data::PcgGeometry& geometry)
     h = hash_combine(h, static_cast<uint64_t>(detail.shade_mode));
     double cusp = detail.cusp_angle_deg;
     h = hash_bytes(&cusp, sizeof(double), h);
+    h = hash_combine(h, hash_json(geometry.metadata().raw()));
 
     if (geometry.has_colors() && !geometry.colors().empty())
         h = hash_bytes(geometry.colors().data(),
@@ -328,7 +329,8 @@ uint64_t compute_node_input_hash(const GraphNode& node,
             h = hash_combine(h, hash_mesh(*mesh));
     }
 
-    if (node.type == "ImportMesh" || node.type == "Meshy3DGenerator" || node.type == "Tripo3DGenerator" ||
+    if (node.type == "ImportMesh" || node.type == "PreserveGltfRig" ||
+        node.type == "Meshy3DGenerator" || node.type == "Tripo3DGenerator" ||
         node.type == "MeshyTextTo3D" || node.type == "MeshyMeshOps" || node.type == "MeshyRetexture") {
         if (meshes) {
             if (const data::PcgMeshData* mesh = meshes->find(node.id))

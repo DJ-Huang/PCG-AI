@@ -9,6 +9,8 @@ project(pcg-server
     LANGUAGES CXX
 )
 
+find_package(CURL REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -33,12 +35,20 @@ add_executable(pcg-server
     src/main.cpp
     src/cook_service.cpp
     src/agent_service.cpp
+    src/agent_runtime.cpp
+    src/agent_session_store.cpp
+    src/session_service.cpp
+    src/mcp_service.cpp
+    src/kb_service.cpp
+    src/third_party_service.cpp
+    src/surface_reconstruction_service.cpp
     "${PCG_FBX_DIR}/src/pcg_fbx_exporter.cpp"
     "${PCG_FBX_DIR}/src/geometry_binary_reader.cpp"
 )
 target_include_directories(pcg-server PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../pcg-core/src"
     "${PCG_FBX_DIR}/include"
     "${PCG_FBX_DIR}/src"
 )
@@ -46,6 +56,7 @@ target_link_libraries(pcg-server PRIVATE
     PcgCoreStatic
     assimp::assimp
     nlohmann_json::nlohmann_json
+    CURL::libcurl
 )
 target_compile_definitions(pcg-server PRIVATE PCG_FBX_EXPORTS)
 
@@ -58,4 +69,8 @@ endif()
 if(UNIX)
     find_package(Threads REQUIRED)
     target_link_libraries(pcg-server PRIVATE Threads::Threads)
+endif()
+
+if(APPLE)
+    target_link_libraries(pcg-server PRIVATE "-framework Security" "-framework CoreFoundation")
 endif()

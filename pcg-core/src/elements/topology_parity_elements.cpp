@@ -311,8 +311,18 @@ public:
         if (ctx.inputs.find_heightfield("in") != nullptr)
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             "SortGeometry does not support HeightField input");
-        if (ctx.inputs.find_points("in") != nullptr)
-            return fail_ctx(ctx, PCG_ERR_EXECUTION, "SortGeometry does not support Point input");
+
+        if (ctx.inputs.find_points("in") != nullptr ||
+            (ctx.inputs.find("in") && ctx.inputs.find("in")->points)) {
+            const auto input =
+                get_points_input(ctx, "in", "SortGeometry missing points input");
+            std::string error;
+            auto sorted = sort_point_data(input, options.points, &error);
+            if (!error.empty())
+                return fail_ctx(ctx, PCG_ERR_EXECUTION, error.c_str());
+            emit_points(ctx, std::move(sorted));
+            return PCG_OK;
+        }
 
         if (ctx.inputs.find_splines("in") != nullptr ||
             (ctx.inputs.find("in") && ctx.inputs.find("in")->splines)) {

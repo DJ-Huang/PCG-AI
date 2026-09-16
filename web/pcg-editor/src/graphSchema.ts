@@ -7,6 +7,23 @@ import { defaultDataFor } from './nodeManifest';
 export type NodeType = string;
 export type NodeData = Record<string, unknown>;
 
+/** Story/layout metadata in Unity world space (+Y up), separate from cook inputs. */
+export interface SemanticBounds {
+  center: [number, number, number];
+  size: [number, number, number];
+}
+
+export interface SemanticComponent {
+  /** Stable agent query key, e.g. "doorway_opening". Same ids aggregate. */
+  componentId: string;
+  role?: string;
+  zone?: string;
+  /** Explicit AABB; required for negative space and recommended for aggregates. */
+  bounds?: SemanticBounds;
+  anchors?: Record<string, [number, number, number]>;
+  camera?: { include?: boolean; occluder?: boolean; scaleRole?: string };
+}
+
 export interface Vec2 {
   x: number;
   y: number;
@@ -46,6 +63,8 @@ export interface GraphSubgraph {
   nodes: GraphNode[];
   edges: GraphEdge[];
   parameters?: GraphParameter[];
+  /** Semantic aggregate owned by this reusable Subgraph definition. */
+  semantic?: SemanticComponent;
 }
 
 // ── Parameters ─────────────────────────────────────────

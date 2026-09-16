@@ -1,0 +1,136 @@
+{
+  "version": "2.0",
+  "name": "Cable Generator",
+  "contentHash": "8036a0a46678ddf5bba634022475c596ccb30d686efbed99a231f559fcd0c672",
+  "inputs": [
+    {
+      "id": "path",
+      "name": "Path",
+      "pinType": "SpatialSpline"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "out",
+      "name": "Geometry",
+      "pinType": "SpatialGeometry"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "segmentLength",
+      "name": "Segment Length",
+      "type": "number",
+      "default": 0.25,
+      "exposed": true,
+      "targetNode": "resample",
+      "targetProperty": "spacing",
+      "hasRange": true,
+      "min": 0.05,
+      "max": 2
+    },
+    {
+      "id": "thickness",
+      "name": "Thickness",
+      "type": "number",
+      "default": 0.03,
+      "exposed": true,
+      "targetNode": "sweep",
+      "targetProperty": "radius",
+      "hasRange": true,
+      "min": 0.002,
+      "max": 0.5
+    },
+    {
+      "id": "sides",
+      "name": "Sides",
+      "type": "integer",
+      "default": 8,
+      "exposed": true,
+      "targetNode": "sweep",
+      "targetProperty": "columns",
+      "hasRange": true,
+      "min": 3,
+      "max": 32
+    }
+  ],
+  "nodes": [
+    {
+      "id": "subgraph_input",
+      "type": "SubgraphInput",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "data": {}
+    },
+    {
+      "id": "resample",
+      "type": "ResampleSpline",
+      "position": {
+        "x": 200,
+        "y": 160
+      },
+      "data": {
+        "mode": "spacing",
+        "spacing": 0.25,
+        "maintainLastVertex": true
+      }
+    },
+    {
+      "id": "sweep",
+      "type": "SweepAlongSpline",
+      "position": {
+        "x": 200,
+        "y": 320
+      },
+      "data": {
+        "surfaceShape": "circle",
+        "radius": 0.03,
+        "columns": 8,
+        "capStart": true,
+        "capEnd": true,
+        "shadeMode": "smooth"
+      }
+    },
+    {
+      "id": "subgraph_output",
+      "type": "SubgraphOutput",
+      "position": {
+        "x": 200,
+        "y": 480
+      },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "subgraph_input",
+      "target": "resample",
+      "sourceHandle": "path",
+      "targetHandle": "in",
+      "sourcePinType": "SpatialSpline",
+      "targetPinType": "Any"
+    },
+    {
+      "id": "e2",
+      "source": "resample",
+      "target": "sweep",
+      "sourceHandle": "out",
+      "targetHandle": "backbone",
+      "sourcePinType": "SpatialSpline",
+      "targetPinType": "SpatialSpline"
+    },
+    {
+      "id": "e3",
+      "source": "sweep",
+      "target": "subgraph_output",
+      "sourceHandle": "out",
+      "targetHandle": "out",
+      "sourcePinType": "SpatialMesh",
+      "targetPinType": "SpatialGeometry"
+    }
+  ],
+  "subgraphs": []
+}

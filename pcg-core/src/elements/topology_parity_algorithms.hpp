@@ -232,6 +232,9 @@ data::PcgGeometry sort_geometry(const data::PcgGeometry& input,
 data::PcgSplineData sort_spline_data(const data::PcgSplineData& input,
                                      const SortGeometryOptions& options,
                                      std::string* error_out = nullptr);
+data::PcgPointData sort_point_data(const data::PcgPointData& input,
+                                   const SortDomainOptions& options,
+                                   std::string* error_out = nullptr);
 data::PcgSplineData carve_spline_data(const data::PcgSplineData& input,
                                       const CarveSplineOptions& options);
 /// Houdini Carve Extract: points at each U location (and original vertices when keep_original).

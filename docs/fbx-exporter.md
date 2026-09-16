@@ -4,8 +4,8 @@
 
 `FBX Export` is a Houdini-style, explicit Editor ROP node. It accepts any
 polygon-geometry (`SpatialMesh`) output, cooks only that node's upstream graph,
-and sends the resulting `PcgGeometry` binary directly to an independent native
-exporter. Preview cooks, parameter-change cooks, Play Mode, and Player builds do
+and sends the resulting `PcgGeometry` binary through `pcg-server` to the native
+exporter module. Preview cooks, parameter-change cooks, Play Mode, and Player builds do
 not write files.
 
 ```text
@@ -58,14 +58,15 @@ intentionally rejects non-polygon results instead of silently inventing a mesh.
 
 ## Runtime isolation
 
-- Managed P/Invoke and export orchestration live in `PcgPlugin.Editor.asmdef`.
-- Native binaries live under `Plugins/Editor/<platform>` and are disabled for
-  Standalone Player import.
+- Unity export orchestration lives in `PcgPlugin.Editor.asmdef` and calls
+  `POST /v1/export-fbx` on the localhost server.
+- The exporter is linked into `pcg-server`; Unity contains no exporter native
+  binary and performs no P/Invoke.
 - During ordinary cooks, an `FBX Export` branch is removed when a normal
   `Output` exists. If it is the graph's only terminal, it becomes a passive
   `Output`. The file path and other exporter settings are stripped first.
-- The module consumes the versioned `PCGG v2` buffer and does not link to
-  `PcgCore`, keeping the ABI boundary explicit.
+- The exporter module consumes the versioned `PCGG v2` buffer produced by the
+  core, keeping the geometry boundary explicit.
 
 ## Usage
 

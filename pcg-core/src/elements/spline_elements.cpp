@@ -270,12 +270,33 @@ public:
         if (!ctx.node)
             return fail_ctx(ctx, PCG_ERR_EXECUTION, "CreateArcSpline missing node");
 
+        const auto& data = ctx.node->data;
         CreateArcSplineOptions opts;
-        opts.radius = ctx.node->data.value("radius", 1.0);
-        opts.start_angle_deg = ctx.node->data.value("startAngle", 0.0);
-        opts.end_angle_deg = ctx.node->data.value("endAngle", 180.0);
-        opts.segments = ctx.node->data.value("segments", 16);
-        opts.axis = ctx.node->data.value("axis", "z");
+        const double radius = data.value("radius", 1.0);
+        opts.radius_x = data.value("radiusX", radius);
+        opts.radius_y = data.contains("radiusY") ? data.value("radiusY", radius) : radius;
+        opts.start_angle_deg = data.value("startAngle", 0.0);
+        opts.end_angle_deg = data.value("endAngle", 180.0);
+        opts.divisions = data.contains("divisions") ? data.value("divisions", 16)
+                                                    : data.value("segments", 16);
+
+        if (data.contains("orientation")) {
+            opts.orientation = data.value("orientation", "xy");
+        } else {
+            const std::string axis = data.value("axis", "z");
+            if (axis == "x" || axis == "X")
+                opts.orientation = "yz";
+            else if (axis == "y" || axis == "Y")
+                opts.orientation = "zx";
+            else
+                opts.orientation = "xy";
+        }
+
+        opts.arc_type = data.value("arcType", "openArc");
+        opts.center = read_vector_param(data, "center", {0.0, 0.0, 0.0});
+        opts.rotate_deg = read_vector_param(data, "rotate", {0.0, 0.0, 0.0});
+        opts.uniform_scale = data.value("uniformScale", 1.0);
+        opts.reverse = data.value("reverse", false);
 
         data::PcgSplineData spline_data = create_arc_spline_data(opts);
         if (spline_data.splines().empty())

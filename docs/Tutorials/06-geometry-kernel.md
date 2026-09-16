@@ -273,7 +273,7 @@ struct Cell {
 
 ### 6.3 步骤
 ```powershell
-cd F:\ForkProject\PCG-AI
+cd /path/to/PCG-AI
 .\scripts\build-pcg-core.ps1 -RunTests
 # 关注以下测试输出：
 # test_bevel_manifold

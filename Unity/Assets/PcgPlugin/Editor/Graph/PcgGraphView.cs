@@ -2497,7 +2497,11 @@ namespace DJTechEditor.PCG.Graph
                     compatible.Add(def.type);
             }
 
-            if (compatible.Count == 0)
+            var hasLibraryMatch = !string.IsNullOrEmpty(pinType) && PcgBuiltinLibrary.All.Any(item =>
+                isOutput ? PcgBuiltinLibrary.HasCompatibleInput(item, pinType)
+                         : PcgBuiltinLibrary.HasCompatibleOutput(item, pinType));
+
+            if (compatible.Count == 0 && !hasLibraryMatch)
                 return;
 
             // Convert screen position to graph position for node spawn
@@ -2506,7 +2510,7 @@ namespace DJTechEditor.PCG.Graph
             Vector2 graphPos = PanelToGraphPosition(panelPos);
 
             m_SearchWindow.SetSpawnPosition(graphPos);
-            m_SearchWindow.SetPortDragContext(port, compatible);
+            m_SearchWindow.SetPortDragContext(port, compatible, pinType);
 
             SearchWindow.Open(new SearchWindowContext(screenPosition), m_SearchWindow);
         }
@@ -2953,19 +2957,85 @@ namespace DJTechEditor.PCG.Graph
             return false;
         }
 
-        internal void CreateExternalSubgraphNode(string assetGuid, PcgSubgraphAsset asset, Vector2 graphPosition)
+        public void CreateLibrarySubgraphNode(string libraryId, Vector2 graphPosition)
+        {
+            if (!PcgBuiltinLibrary.TryFind(libraryId, out var item))
+            {
+                Debug.LogWarning($"[PCG] Unknown builtin library entry: {libraryId}");
+                return;
+            }
+            if (!PcgBuiltinLibrary.TryLoadAsset(item, out var guid, out var asset))
+            {
+                Debug.LogWarning($"[PCG] Builtin library asset missing: {PcgBuiltinLibrary.AssetPathFor(item)}");
+                return;
+            }
+            CreateExternalSubgraphNode(guid, asset, graphPosition);
+        }
+
+        public void CreateLibraryNodeAndConnect(
+            PcgBuiltinLibrary.LibraryItem item, Vector2 position, Port draggedPort)
+        {
+            if (!PcgBuiltinLibrary.TryLoadAsset(item, out var guid, out var asset))
+            {
+                Debug.LogWarning($"[PCG] Builtin library asset missing: {PcgBuiltinLibrary.AssetPathFor(item)}");
+                return;
+            }
+
+            var view = CreateExternalSubgraphNode(guid, asset, position);
+            if (view == null || draggedPort == null)
+                return;
+
+            var sourceNode = draggedPort.node as PcgGraphNodeBase;
+            if (sourceNode == null)
+                return;
+
+            var isOutputDrag = draggedPort.direction == Direction.Output;
+            var sourceHandle = draggedPort.userData as string ?? draggedPort.portName;
+            var pinType = ResolveNodePinType(sourceNode, sourceHandle, isOutputDrag);
+
+            RecordUndo("Connect Library Subgraph");
+            if (isOutputDrag)
+            {
+                foreach (var pin in item.inputs)
+                {
+                    if (pin.pinType != "Any" && !PcgNodeManifest.PinTypesCompatible(pinType, pin.pinType))
+                        continue;
+                    var input = view.FindInputPort(pin.id);
+                    if (input == null)
+                        continue;
+                    AddElement(draggedPort.ConnectTo(input));
+                    break;
+                }
+            }
+            else
+            {
+                foreach (var pin in item.outputs)
+                {
+                    if (pin.pinType != "Any" && !PcgNodeManifest.PinTypesCompatible(pin.pinType, pinType))
+                        continue;
+                    var output = view.FindOutputPort(pin.id);
+                    if (output == null)
+                        continue;
+                    AddElement(output.ConnectTo(draggedPort));
+                    break;
+                }
+            }
+            CommitState();
+        }
+
+        internal PcgExternalSubgraphNodeView CreateExternalSubgraphNode(string assetGuid, PcgSubgraphAsset asset, Vector2 graphPosition)
         {
             if (asset == null || !asset.ImportSucceeded)
             {
                 Debug.LogWarning("[PCG] Cannot drop an invalid SubgraphAsset.");
-                return;
+                return null;
             }
 
             var guid = PcgAssetGuidUtility.Canonicalize(assetGuid);
             if (!PcgSubgraphAssetSerializer.TryFromJson(asset.SourceJson, out var assetDoc, out var error))
             {
                 Debug.LogError($"[PCG] Failed to read SubgraphAsset: {error}");
-                return;
+                return null;
             }
 
             if (m_HostWindow is PcgGraphEditorWindow host &&
@@ -2974,7 +3044,7 @@ namespace DJTechEditor.PCG.Graph
             {
                 EditorUtility.DisplayDialog("Cannot Drop Subgraph Asset",
                     "A Subgraph Asset cannot reference itself.", "OK");
-                return;
+                return null;
             }
 
             RecordUndo("Add Subgraph Asset");
@@ -3009,6 +3079,7 @@ namespace DJTechEditor.PCG.Graph
                 m_RootDocument.version = "3.0";
             CommitState();
             NotifyDocumentChanged();
+            return view;
         }
 
         private void CreateSubgraphAssetFromSelection()

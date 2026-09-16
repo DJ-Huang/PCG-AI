@@ -607,6 +607,98 @@ void test_import_dependency_hash()
     expect(first != second, "ImportMesh external file invalidates cook hash");
 }
 
+void test_action_rig_metadata_contract()
+{
+    const auto rig = nlohmann::json{
+        {"schemaVersion", 1},
+        {"bones", nlohmann::json::array({
+            {{"id", "root"}, {"parent", nullptr},
+             {"head", {0.0, 0.0, 0.0}}, {"tail", {0.0, 0.5, 0.0}},
+             {"radius", 0.4}},
+            {{"id", "head"}, {"parent", "root"},
+             {"head", {0.0, 0.5, 0.0}}, {"tail", {0.0, 0.9, 0.0}},
+             {"radius", 0.25}},
+        })},
+        {"components", nlohmann::json::array({
+            {{"id", "body"}, {"bone", "root"}, {"detachable", false}},
+            {{"id", "head"}, {"bone", "head"}, {"detachable", true}},
+        })},
+        {"clips", nlohmann::json::array({
+            {{"name", "nod"}, {"duration", 1.0}, {"loop", true},
+             {"tracks", nlohmann::json::array({
+                 {{"bone", "head"}, {"property", "quaternion"},
+                  {"times", {0.0, 0.5, 1.0}},
+                  {"values", {0.0, 0.0, 0.0, 1.0,
+                               0.2, 0.0, 0.0, 0.9797959,
+                               0.0, 0.0, 0.0, 1.0}}},
+             })}},
+        })},
+    };
+    const auto document = nlohmann::json{
+        {"version", "2.0"},
+        {"nodes", nlohmann::json::array({
+            {{"id", "box"}, {"type", "CreateBoxMesh"},
+             {"position", {{"x", 0.0}, {"y", 0.0}}},
+             {"data", {{"width", 1.0}, {"height", 1.0}, {"depth", 1.0}}}},
+            {{"id", "rig"}, {"type", "ActionRig"},
+             {"position", {{"x", 0.0}, {"y", 160.0}}},
+             {"data", {{"rigJson", rig.dump()}, {"skinMode", "geodesic"},
+                       {"maxInfluences", 4}, {"falloff", 5.0},
+                       {"geodesicResolution", 48},
+                       {"componentMode", "dominantBone"},
+                       {"splitComponents", true}, {"autoplay", "nod"},
+                       {"playbackSpeed", 1.25}}}},
+            {{"id", "output"}, {"type", "Output"},
+             {"position", {{"x", 0.0}, {"y", 320.0}}},
+             {"data", nlohmann::json::object()}},
+        })},
+        {"edges", nlohmann::json::array({
+            {{"id", "box-rig"}, {"source", "box"}, {"target", "rig"},
+             {"sourceHandle", "out"}, {"targetHandle", "in"},
+             {"sourcePinType", "SpatialMesh"}, {"targetPinType", "SpatialGeometry"}},
+            {{"id", "rig-output"}, {"source", "rig"}, {"target", "output"},
+             {"sourceHandle", "out"}, {"targetHandle", "in"},
+             {"sourcePinType", "SpatialGeometry"}, {"targetPinType", "Any"}},
+        })},
+    };
+    const auto output = execute_geometry_graph(document);
+    expect(output.points().size() == 8 && output.faces().size() == 6,
+           "ActionRig must not change rest geometry");
+    expect(output.metadata().has("pcg_action_runtime"),
+           "ActionRig emits action runtime metadata");
+    const auto& metadata = output.metadata().get("pcg_action_runtime");
+    expect(metadata["rig"]["bones"].size() == 2 && metadata["rig"]["clips"].size() == 1,
+           "ActionRig preserves bones and clips");
+    expect(metadata["autoplay"] == "nod" && near(metadata["playbackSpeed"], 1.25),
+           "ActionRig preserves playback options");
+    expect(metadata["skinMode"] == "geodesic" && metadata["geodesicResolution"] == 48,
+           "ActionRig preserves solid geodesic binding options");
+
+    const auto tree_rig = nlohmann::json{
+        {"schemaVersion", 2},
+        {"componentTree", nlohmann::json::array({
+            {{"id", "body"}, {"parent", nullptr}, {"pivot", {0.0, 0.0, 0.0}},
+             {"tip", {0.0, 0.5, 0.0}}, {"radius", 0.4}, {"joint", true},
+             {"role", "structural"}},
+            {{"id", "head"}, {"parent", "body"}, {"pivot", {0.0, 0.5, 0.0}},
+             {"tip", {0.0, 0.9, 0.0}}, {"radius", 0.25}, {"joint", true},
+             {"role", "structural"}, {"detachable", true}},
+            {{"id", "hair"}, {"parent", "head"}, {"pivot", {0.0, 0.8, 0.0}},
+             {"radius", 0.2}, {"joint", false}, {"role", "hair"}, {"skin", "rigid"}},
+        })},
+        {"clips", nlohmann::json::array()},
+    };
+    auto tree_document = document;
+    tree_document["nodes"][1]["data"]["rigJson"] = tree_rig.dump();
+    tree_document["nodes"][1]["data"]["componentMode"] = "semanticRegion";
+    tree_document["nodes"][1]["data"]["autoplay"] = "";
+    const auto tree_output = execute_geometry_graph(tree_document);
+    expect(tree_output.metadata().get("pcg_action_runtime")["rig"]["schemaVersion"] == 2,
+           "ActionRig accepts componentTree schema v2");
+    expect(tree_output.metadata().get("pcg_action_runtime")["componentMode"] == "semanticRegion",
+           "ActionRig preserves semantic-region ownership mode");
+}
+
 void test_attribute_default_hash()
 {
     PcgGeometry first;
@@ -635,6 +727,7 @@ int main()
     test_bend_mesh();
     test_topology_remap_contract();
     test_import_dependency_hash();
+    test_action_rig_metadata_contract();
     test_attribute_default_hash();
     std::printf("test_assembly_nodes: all tests passed\n");
     return 0;

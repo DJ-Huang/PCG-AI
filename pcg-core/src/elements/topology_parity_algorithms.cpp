@@ -1981,6 +1981,102 @@ data::PcgSplineData sort_spline_data(const data::PcgSplineData& input,
     return output;
 }
 
+data::PcgPointData sort_point_data(const data::PcgPointData& input,
+                                   const SortDomainOptions& options,
+                                   std::string* error_out)
+{
+    const auto& pts = input.points();
+    const size_t count = pts.size();
+    if (count == 0)
+        return input;
+
+    const std::string method = resolve_sort_method(options);
+    const bool needs_work = method != "nochange" || options.reverse || options.sort_indices;
+    if (!needs_work)
+        return input;
+
+    std::vector<size_t> order(count);
+    std::iota(order.begin(), order.end(), 0);
+
+    if (method == "random") {
+        uint32_t rng = static_cast<uint32_t>(options.seed);
+        for (size_t i = count; i > 1; --i) {
+            rng = rng * 1664525u + 1013904223u;
+            const size_t j = rng % i;
+            std::swap(order[i - 1], order[j]);
+        }
+    } else if (method == "axis") {
+        const std::string axis = options.axis.empty() ? "x" : options.axis;
+        const int comp = axis == "y" ? 1 : (axis == "z" ? 2 : 0);
+        std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+            const double va = comp == 0 ? pts[a].x : (comp == 1 ? pts[a].y : pts[a].z);
+            const double vb = comp == 0 ? pts[b].x : (comp == 1 ? pts[b].y : pts[b].z);
+            return va < vb;
+        });
+    } else if (method == "proximity") {
+        std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+            const double da = (pts[a].x - options.proximity_point.x) * (pts[a].x - options.proximity_point.x) +
+                              (pts[a].y - options.proximity_point.y) * (pts[a].y - options.proximity_point.y) +
+                              (pts[a].z - options.proximity_point.z) * (pts[a].z - options.proximity_point.z);
+            const double db = (pts[b].x - options.proximity_point.x) * (pts[b].x - options.proximity_point.x) +
+                              (pts[b].y - options.proximity_point.y) * (pts[b].y - options.proximity_point.y) +
+                              (pts[b].z - options.proximity_point.z) * (pts[b].z - options.proximity_point.z);
+            return da < db;
+        });
+    } else if (method == "vector") {
+        std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+            const double da = pts[a].x * options.vector.x + pts[a].y * options.vector.y + pts[a].z * options.vector.z;
+            const double db = pts[b].x * options.vector.x + pts[b].y * options.vector.y + pts[b].z * options.vector.z;
+            return da < db;
+        });
+    } else if (method == "attribute") {
+        if (options.attribute_name.empty()) {
+            if (error_out)
+                *error_out = "SortGeometry attribute name is required";
+            return input;
+        }
+        std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+            const double va = pts[a].attributes.value(options.attribute_name, 0.0);
+            const double vb = pts[b].attributes.value(options.attribute_name, 0.0);
+            return va < vb;
+        });
+    } else if (method == "shift") {
+        const int offset = options.offset >= 0 ? options.offset % static_cast<int>(count) : count - (-options.offset % static_cast<int>(count));
+        std::vector<size_t> shifted(count);
+        for (size_t i = 0; i < count; ++i)
+            shifted[i] = order[(i + static_cast<size_t>(offset)) % count];
+        order = std::move(shifted);
+    }
+
+    if (options.reverse)
+        std::reverse(order.begin(), order.end());
+
+    if (options.sort_indices) {
+        data::PcgPointData output = input;
+        auto& out_pts = output.points_mut();
+        for (size_t i = 0; i < count; ++i)
+            out_pts[i].attributes[options.ordering_attribute] = static_cast<double>(order[i]);
+        return output;
+    }
+
+    // Check identity.
+    bool identity = true;
+    for (size_t i = 0; i < order.size(); ++i) {
+        if (order[i] != i) {
+            identity = false;
+            break;
+        }
+    }
+    if (identity)
+        return input;
+
+    data::PcgPointData output;
+    output.points_mut().reserve(count);
+    for (size_t i = 0; i < count; ++i)
+        output.add_point(pts[order[i]]);
+    return output;
+}
+
 std::vector<double> spline_vertex_u(const data::PcgSpline& spline, bool arc_length_u)
 {
     const size_t n = spline.points.size();

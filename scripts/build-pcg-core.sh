@@ -52,7 +52,6 @@ done
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORE_DIR="$ROOT/pcg-core"
 BUILD_DIR="$CORE_DIR/build"
-UNITY_PLUGINS="$ROOT/Unity/Assets/PcgPlugin/Plugins/macOS"
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 echo "==> Configuring pcg-core ($CONFIGURATION)"

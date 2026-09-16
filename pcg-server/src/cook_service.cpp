@@ -118,10 +118,14 @@ bool TryParseNeedBytes(const std::string& error, std::string& kind, int& need_by
     if (need_bytes <= 0) {
         return false;
     }
-    if (error.find("Point binary") != std::string::npos) {
+    if (error.find("JSON buffer") != std::string::npos) {
+        kind = "json";
+    } else if (error.find("Point binary") != std::string::npos) {
         kind = "points";
-    } else {
+    } else if (error.find("Mesh binary") != std::string::npos) {
         kind = "mesh";
+    } else {
+        return false;
     }
     return true;
 }
@@ -780,6 +784,10 @@ void HandleCook(const httplib::Request& req, httplib::Response& res) {
                 }
                 if (need_kind == "points" && static_cast<int>(points_buf.size()) < need_bytes) {
                     points_buf.assign(static_cast<size_t>(need_bytes), 0);
+                    continue;
+                }
+                if (need_kind == "json" && static_cast<int>(json_buf.size()) < need_bytes) {
+                    json_buf.assign(static_cast<size_t>(need_bytes), 0);
                     continue;
                 }
                 if (need_kind == "mesh" && static_cast<int>(mesh_buf.size()) < need_bytes) {

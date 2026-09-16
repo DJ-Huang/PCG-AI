@@ -1,32 +1,90 @@
-# >>> Codely setup.bat (synced rules — do not commit) >>>
-# Source: Codely main repo sync/ + CODELY.md — re-run setup.bat to refresh
-Unity/.vs/
-pcg-core/.deps/
-pcg-core/build-debug/
-pcg-core/build-manual/
-pcg-core/build/
-pcg-fbx-exporter/build*/
-pcg-server/build/
-schema/graph-schema.json
-web/pcg-editor/dist/
-web/pcg-editor/node_modules/
-tools/artstation-capture/node_modules/
-tools/artstation-capture/out/
-tools/artstation-capture/.browser-profile/
-artstation-capture-out/
-webpage-capture-out/
-url-content-out/
+# Operating systems and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local agent and editor state
+.codely/
+.codely-cli/
+.codely-link/
+.codegraph/*
+!.codegraph/.gitignore
+.cursor/rules/
+.opencode/
+.playwright-cli/
+.trae/
+.dbg/
+
+# Node.js
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# CMake and native build outputs
+**/build/
+**/build-*/
+**/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/compile_commands.json
+*.a
+*.dylib
+*.dll
+*.exe
+*.o
+*.obj
+!pcg-core/tests/fixtures/*.obj
+*.pdb
+*.so
+*.so.*
+
+# Python
 **/__pycache__/
-*.pyc
-# <<< Codely setup.bat >>>
-*.DS_Store
-.codely/clipboard/
-.codely-cli/auto-saves/
-.codely-cli/tool-outputs/
-.opencode/node_modules/
-.codely-cli/settings.json
+*.py[cod]
+.pytest_cache/
+
+# Unity / Tuanjie generated state
+Unity/Library/
+Unity/Logs/
+Unity/MemoryCaptures/
+Unity/Obj/
+Unity/obj/
+Unity/Temp/
+Unity/UserSettings/
+Unity/Build/
+Unity/Builds/
+Unity/*.csproj
+Unity/*.sln
+Unity/*.slnx
+Unity/*.user
+Unity/UpgradeLog*.htm
+Unity/mono_crash*.json
+Unity/.com-unity-codely.json
+Unity/Assets/PCG-AI-Workspace/
+Unity/Assets/PCG-AI-Workspace.meta
+Unity/Assets/Exports/
+Unity/Assets/Exports.meta
+Unity/screenshots/
+
+# Generated runtime/editor artifacts
+schema/editor-export.pcg
+library/web-cache/
+web/pcg-editor/public/assets/uploads/
+examples/**/artifacts/
+
+# Local plans, captures and scratch work
 Plan/
 mem-log/
 tmp/
-.codely-cli/
-.playwright-cli/
+screenshots/
+artstation-capture-out/
+webpage-capture-out/
+url-content-out/

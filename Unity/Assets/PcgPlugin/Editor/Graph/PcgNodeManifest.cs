@@ -96,6 +96,7 @@ namespace DJTechEditor.PCG.Graph
         public string type;
         public string displayName;
         public string category;
+        public bool supportsPreview = true;
         public List<ManifestPinDef> inputs = new();
         public List<ManifestPinDef> outputs = new();
         public Dictionary<string, ManifestPropertyDef> properties = new();
@@ -333,6 +334,8 @@ namespace DJTechEditor.PCG.Graph
                 type = GetString(nodeDict, "type"),
                 displayName = GetString(nodeDict, "displayName", GetString(nodeDict, "type")),
                 category = GetString(nodeDict, "category", "Other"),
+                supportsPreview = !nodeDict.TryGetValue("supportsPreview", out var supportsPreviewValue)
+                    || Convert.ToBoolean(supportsPreviewValue, CultureInfo.InvariantCulture),
                 inspectorSectionLayout = GetString(nodeDict, "inspectorSectionLayout", "foldouts"),
             };
 

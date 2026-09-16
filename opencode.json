@@ -1,20 +1,9 @@
 {
-  "instructions": [
-    ".opencode/rules/*.mdc"
-  ],
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "unity": {
-      "type": "local",
-      "command": [
-        "powershell",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "/Users/djhuang/.aisync/mcp/unity/unity-mcp-stdio.ps1",
-        "/Users/djhuang/PCG-AI"
-      ],
+    "pcg": {
+      "type": "remote",
+      "url": "http://127.0.0.1:17890/mcp",
       "enabled": true
     }
   }

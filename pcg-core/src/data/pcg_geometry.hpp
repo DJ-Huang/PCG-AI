@@ -61,6 +61,8 @@ public:
     const geometry::GroupTable& groups() const { return groups_; }
     GeometryDetailMeta& detail() { return detail_; }
     const GeometryDetailMeta& detail() const { return detail_; }
+    PcgMetadata& metadata() { return metadata_; }
+    const PcgMetadata& metadata() const { return metadata_; }
     AttributeTable& attributes() { return attributes_; }
     const AttributeTable& attributes() const { return attributes_; }
 
@@ -104,6 +106,7 @@ private:
     std::vector<std::vector<int>> faces_;
     geometry::GroupTable groups_;
     GeometryDetailMeta detail_;
+    PcgMetadata metadata_;
     AttributeTable attributes_;
     std::vector<PcgColor> colors_;
     bool has_colors_ = false;

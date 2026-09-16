@@ -1,6 +1,6 @@
 # PCG-AI 学习开发手册
 
-> **版本**：基于 2026-07-13 代码库快照（72 commits，22/22 CTest 绿）
+> **版本**：随当前仓库结构维护；具体支持矩阵以 `README.md` 与 CI 为准
 > **范围**：算法原理、工程架构、数据流协议、开发指南
 > **维护**：随主分支演进同步更新
 
@@ -30,7 +30,7 @@
 PCG-AI 是一个**跨引擎程序化内容生成（PCG）框架**，核心理念：
 
 ```
-Graph JSON（编辑器无关的图数据契约）→ C++ 核心执行 → Unity / Unreal / Web 预览
+Graph JSON（编辑器无关的图数据契约）→ pcg-server → C++ 核心执行 → Unity / Web 预览
 ```
 
 - **不自研 Block 注册表框架**，直接对齐 Unreal Engine PCG 节点模型（Settings / Element / Context / DataCollection）
@@ -41,10 +41,10 @@ Graph JSON（编辑器无关的图数据契约）→ C++ 核心执行 → Unity 
 
 | 里程碑 | 内容 | 状态 |
 |--------|------|------|
-| M0 | 原生库就绪：`pcg_get_version()` 在 Unity Console 输出 | ✅ |
+| M0 | 核心库与回归测试就绪 | ✅ |
 | M2 | Web 编辑 → JSON → C++ 执行 → Unity Gizmo 预览闭环 | ✅ |
 | M2.5 | Unity GraphView 编辑器（替代 Web 优先路径） | ✅ |
-| M3 | IL2CPP Windows Standalone 发布 | ✅ |
+| M3 | Unity 改用外置 localhost `pcg-server`，不再打包原生插件 | ✅ |
 | M4 | Phase 4.1：13 UE 命名标准节点 + manifest 驱动 | ✅ |
 | M4.4 | Mesh Surface Scatter + 场景绑定模型 | ✅ (4.4a–c) |
 | M4.6 | PcgGeometry + Group 几何语义层 | ✅ |
@@ -57,8 +57,8 @@ Graph JSON（编辑器无关的图数据契约）→ C++ 核心执行 → Unity 
 
 ```
 PCG-AI/
-├── pcg-core/                    # C++ 核心（CMake，DLL + LIB 双产物）
-│   ├── include/pcg_api.h        # 对外 C API（唯一公开接口，v1→v7 additive）
+├── pcg-core/                    # C++ 核心与算法测试（CMake）
+│   ├── include/pcg_api.h        # 对外 C API（唯一公开接口，v1→v10 additive）
 │   ├── src/
 │   │   ├── data/                # 数据模型：PcgGeometry, GroupTable, PcgMeshData, PcgPointData...
 │   │   ├── geometry/            # 几何内核：BMesh, Sweep, Boolean, BVH, Robust Predicates...
@@ -67,43 +67,35 @@ PCG-AI/
 │   │   ├── graph_parser.cpp     # Graph JSON 解析
 │   │   ├── cook_hash.cpp        # 参数 hash + 脏缓存
 │   │   └── pcg_core.cpp         # C API 导出层
-│   └── tests/                   # 22 个 CTest target
+│   └── tests/                   # CTest 回归测试
 │
+├── pcg-server/                  # localhost HTTP/MCP 服务，链接 pcg-core
 ├── schema/                      # Graph JSON 契约（Web / C++ / Unity 共用）
 │   ├── graph-schema-v2.json     # JSON Schema v2
 │   ├── node-manifest.json       # 节点 Pin / 参数定义（SSOT）
-│   └── *.pcg                    # 示例图
+│   └── editor-export.pcg        # 本地 Web→Unity 交接文件（不入库）
 │
 ├── Unity/Assets/PcgPlugin/      # Unity 插件
-│   ├── Runtime/                 # PcgNative (P/Invoke), GraphLoader, ResultParser, Component...
+│   ├── Runtime/                 # HTTP cook 客户端、GraphLoader、ResultParser、Component...
 │   ├── Editor/Graph/            # GraphView 编辑器 + NodeInspector + SceneHandles
-│   └── Plugins/                 # PcgCore.dll (Win64) / libPcgCore.dylib (macOS)
+│   └── Editor/                  # 服务端设置、预览、导入与导出工具
 │
-├── web/pcg-editor/              # Web 编辑器（Vite + React + ReactFlow，后补）
+├── Unity/Assets/Samples/PCG-AI/ # Unity demos、showcases 与 validation scenes
+├── web/pcg-editor/              # Web 编辑器（Vite + React + ReactFlow）
 ├── scripts/                     # 构建脚本（PowerShell + Bash）
-├── examples/                    # 分发用示例图
+├── examples/                    # graphs / subgraphs / tests / showcases / storyboards
 └── docs/                        # 文档
 ```
 
 ### 1.4 数据流总览
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
-│  编辑器      │────▶│  Graph JSON  │────▶│  pcg-core 执行    │
-│  (Unity/Web) │◀────│  (.pcg)     │◀────│  (C++ DLL/LIB)   │
-└─────────────┘     └──────────────┘     └────────┬─────────┘
-                                                   │
-                                          ┌────────▼─────────┐
-                                          │  Binary / JSON    │
-                                          │  Result           │
-                                          └────────┬─────────┘
-                                                   │
-                                    ┌──────────────┼──────────────┐
-                                    ▼              ▼              ▼
-                              ┌──────────┐  ┌──────────┐  ┌──────────┐
-                              │ Unity    │  │ Web 3D   │  │ Unreal   │
-                              │ Mesh/Gizmo│ │ Preview  │  │ (远期)   │
-                              └──────────┘  └──────────┘  └──────────┘
+Unity / Web editor
+    → Graph JSON + external resources
+    → localhost pcg-server (HTTP / MCP)
+    → pcg-core execution
+    → versioned binary / JSON cook payload
+    → Unity Scene or Web preview
 ```
 
 ---
@@ -727,7 +719,8 @@ fixed (byte* ptr = data)
 
 | 文件 | 职责 |
 |------|------|
-| `PcgNative.cs` | P/Invoke 声明，buffer 分配，BlockCopy 裁剪 |
+| `PcgCookClient.cs` | localhost HTTP 请求与 cook 载荷解包 |
+| `PcgNative.cs` | 保持现有调用方兼容的 C# 门面与协议常量 |
 | `PcgGraphLoader.cs` | Graph JSON 加载 + 执行调用 |
 | `PcgResultParser.cs` | Binary mesh/point 解析（v1/v2 兼容） |
 | `PcgGraphComponent.cs` | 场景组件：GraphAsset 绑定 + Cook 调度 + 预览 |
@@ -892,7 +885,7 @@ ctest --test-dir pcg-core/build -R 'test_bridge_bevel|test_phase43|test_phase45_
 
 ```bash
 python3 scripts/validate-manifest.py
-python3 .cursor/skills/pcg-graph-authoring/scripts/validate_pcg.py examples/bridge-demo.pcg
+python3 Agent/picg-extension/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/bridge-demo.pcg
 ```
 
 ---
@@ -1047,13 +1040,13 @@ PCG_API PcgResultCode pcg_execute_graph_v8(
 
 ```bash
 # 1. 创建 .pcg 文件（Houdini 自上而下布局，ROW_STEP_Y=160）
-# examples/my-demo.pcg
+# examples/graphs/my-demo.pcg
 
 # 2. 校验
-python3 .cursor/skills/pcg-graph-authoring/scripts/validate_pcg.py examples/my-demo.pcg
+python3 Agent/picg-extension/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/my-demo.pcg
 
-# 3. 拷贝到 Unity Demo
-cp examples/my-demo.pcg Unity/Assets/PCGDemo/
+# 3. 如需随 Unity 示例分发，将副本放入 Assets/Samples/PCG-AI，保留对应 .meta/GUID
+# 一般情况下只保留 examples/graphs/ 中的仓库真源，Unity 直接从文件运行即可。
 ```
 
 ---
@@ -1158,7 +1151,7 @@ cp examples/my-demo.pcg Unity/Assets/PCGDemo/
 
 | 文件 | 职责 |
 |------|------|
-| `pcg-core/include/pcg_api.h` | 对外 C API（v1→v7） |
+| `pcg-core/include/pcg_api.h` | 对外 C API（v1→v10） |
 | `pcg-core/src/graph_executor.cpp` | 图执行 + Sink 输出 + group stats + node stats |
 | `pcg-core/src/graph_parser.cpp` | Graph JSON 解析 |
 | `pcg-core/src/cook_hash.cpp` | 参数 hash + 脏缓存 |
@@ -1187,7 +1180,8 @@ cp examples/my-demo.pcg Unity/Assets/PCGDemo/
 
 | 文件 | 职责 |
 |------|------|
-| `PcgNative.cs` | P/Invoke + buffer 管理 |
+| `PcgCookClient.cs` | HTTP cook 请求与结果容器解包 |
+| `PcgNative.cs` | 兼容门面 + 协议常量 |
 | `PcgGraphLoader.cs` | 图加载 + 执行 |
 | `PcgResultParser.cs` | Binary 解析（v1/v2） |
 | `PcgGraphComponent.cs` | 场景组件 + Cook 调度 |

@@ -6,14 +6,14 @@
 import { useState, useContext, useRef, useEffect } from 'react';
 import { Handle, Position, NodeToolbar, type NodeProps } from '@xyflow/react';
 import { getNodeTypeDefs, getPinTypeColor } from '../nodeManifest';
-import { NodeActionsContext } from '../nodeActions';
+import { NodeActionsContext, useIsPreviewTarget } from '../nodeActions';
 
 export default function ManifestNode({ id, type, selected, data }: NodeProps) {
   const [showGroupPopup, setShowGroupPopup] = useState(false);
   const [hovered, setHovered] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { onInfo, onPreview, previewTargetId } = useContext(NodeActionsContext);
-  const previewing = previewTargetId === id;
+  const { onInfo, onPreview } = useContext(NodeActionsContext);
+  const previewing = useIsPreviewTarget(id);
 
   // The toolbar is portaled outside the node DOM, so hide on a short delay:
   // moving the pointer from the node onto the toolbar must not dismiss it.
@@ -88,24 +88,26 @@ export default function ManifestNode({ id, type, selected, data }: NodeProps) {
         >
           ℹ
         </button>
-        <button
-          type="button"
-          className={`nodrag pcg-node-toolbar__btn${previewing ? ' pcg-node-toolbar__btn--previewing' : ''}`}
-          title={
-            def.outputs.length === 0
-              ? 'No output to preview'
-              : previewing
-                ? 'Clear node preview (back to full-graph preview)'
-                : 'Preview this node'
-          }
-          disabled={def.outputs.length === 0}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPreview(id);
-          }}
-        >
-          ▶
-        </button>
+        {def.supportsPreview !== false && (
+          <button
+            type="button"
+            className={`nodrag pcg-node-toolbar__btn${previewing ? ' pcg-node-toolbar__btn--previewing' : ''}`}
+            title={
+              def.outputs.length === 0
+                ? 'No output to preview'
+                : previewing
+                  ? 'Clear node preview (back to full-graph preview)'
+                  : 'Preview this node'
+            }
+            disabled={def.outputs.length === 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreview(id);
+            }}
+          >
+            ▶
+          </button>
+        )}
       </NodeToolbar>
 
       <div className={`pcg-node${selected ? ' pcg-node--selected' : ''}${previewing ? ' pcg-node--previewing' : ''}`}>

@@ -73,6 +73,7 @@ public:
     PcgDataType primary_type() const;
 
     const std::vector<PcgTaggedData>& items() const { return items_; }
+    std::vector<PcgTaggedData>& items_mut() { return items_; }
 
 private:
     static nlohmann::json build_point_sink_json(const PcgTaggedData& item);

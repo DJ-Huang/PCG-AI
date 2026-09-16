@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${PCG_SERVER_PORT:-17890}"
 BASE="http://127.0.0.1:${PORT}"
-GRAPH="${1:-$ROOT/examples/boolean-subtract-box.pcg}"
+GRAPH="${1:-$ROOT/examples/graphs/boolean-subtract-box.pcg}"
 export COMPARE_NATIVE="${COMPARE_NATIVE:-1}"
 
 echo "==> GET $BASE/v1/health"
@@ -75,7 +75,6 @@ root = "$ROOT"
 dylib_candidates = [
     f"{root}/pcg-server/build/pcg-core/libPcgCore.dylib",
     f"{root}/pcg-core/build/libPcgCore.dylib",
-    f"{root}/Unity/Assets/PcgPlugin/Plugins/macOS/libPcgCore.dylib",
 ]
 dylib = next((p for p in dylib_candidates if os.path.isfile(p)), None)
 if not dylib:

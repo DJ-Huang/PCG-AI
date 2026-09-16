@@ -248,6 +248,7 @@ public:
         nlohmann::json out{
             {"kind", "texture"},
             {"slotId", ctx.node->id},
+            {"source", ctx.node->data.value("texture", std::string())},
             {"repeatX", repeat_x},
             {"repeatY", repeat_y},
         };
@@ -270,6 +271,7 @@ public:
         nlohmann::json out{
             {"kind", "texture"},
             {"slotId", ctx.node->id},
+            {"source", ctx.node->data.value("path", std::string())},
         };
         ctx.outputs.add("out", data::PcgDataType::Param, std::move(out));
         return PCG_OK;

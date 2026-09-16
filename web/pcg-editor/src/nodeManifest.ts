@@ -6,7 +6,7 @@ import manifestJson from '../../../schema/node-manifest.json';
 // ── Types ──────────────────────────────────────────────
 
 export type PinType = 'SpatialPoint' | 'SpatialSpline' | 'SpatialSurface' | 'SpatialMesh' |
-  'SpatialGeometry' | 'Texture' | 'HeightField' | 'Param' | 'Any';
+  'SpatialGeometry' | 'Texture' | 'HeightField' | 'Material' | 'Param' | 'Any';
 export type PropertyType =
   | 'integer'
   | 'number'
@@ -40,12 +40,40 @@ export interface ManifestProperty {
     equals?: number | boolean | string;
     oneOf?: Array<number | boolean | string>;
   };
+  visibleWhenAny?: ManifestCondition[];
+  /** Keep the row visible but disable its editor unless the condition matches. */
+  enabledWhen?: ManifestCondition;
+  enabledWhenAll?: ManifestCondition[];
   /** Boolean toggle companion: render the referenced property inline on the toggle row */
   companionField?: string;
+  /** Inspector foldout/tab section and stable Houdini parameter ordering. */
+  section?: string;
+  order?: number;
+  /** Compact row metadata shared with the Unity inspector. */
+  rowGroup?: string;
+  rowOrder?: number;
+  rowPrefix?: string;
+  indent?: boolean;
+  multiline?: boolean;
+  lines?: number;
   /** For groupSelect/groupMultiSelect: filter available groups by domain */
   groupDomain?: GroupDomain;
   /** True for outputGroup-style properties that define a new group name */
   isGroupOutput?: boolean;
+}
+
+export interface ManifestCondition {
+  property?: string;
+  equals?: number | boolean | string;
+  oneOf?: Array<number | boolean | string>;
+}
+
+export interface ManifestInspectorSection {
+  id: string;
+  label?: string;
+  foldout?: boolean;
+  defaultExpanded?: boolean;
+  header?: boolean;
 }
 
 export interface ManifestPin {
@@ -69,11 +97,19 @@ export interface ManifestNodeDef {
   type: string;
   displayName: string;
   category: string;
+  /** Whether the node can be cooked as an isolated viewport/scene preview target. */
+  supportsPreview?: boolean;
   inputs: ManifestPin[];
   outputs: ManifestPin[];
   properties: Record<string, ManifestProperty>;
   /** Groups this node produces on its output */
   outputGroups?: ManifestOutputGroup[];
+  /** Houdini parameter folders, rendered as foldouts or tabs. */
+  inspectorSections?: ManifestInspectorSection[];
+  inspectorSectionLayout?: 'foldouts' | 'tabs';
+  /** SideFX operator names represented by this PCG node. */
+  houdiniInternalNames?: string[];
+  documentationUrl?: string;
 }
 
 export interface NodeManifest {
@@ -137,6 +173,44 @@ export function getAllCategories(): string[] {
     categories.add(def.category);
   }
   return Array.from(categories);
+}
+
+/** Validates external Agent writes against the same manifest used by Inspector. */
+export function validateNodePropertyValue(
+  nodeType: string,
+  key: string,
+  value: unknown,
+): string | null {
+  const property = nodeMap.get(nodeType)?.properties[key];
+  if (!property) return `unknown property "${nodeType}.${key}"`;
+  const isFiniteNumber = typeof value === 'number' && Number.isFinite(value);
+  if (property.type === 'integer' && (!isFiniteNumber || !Number.isInteger(value))) {
+    return `${nodeType}.${key} requires an integer`;
+  }
+  if (property.type === 'number' && !isFiniteNumber) return `${nodeType}.${key} requires a number`;
+  if (property.type === 'boolean' && typeof value !== 'boolean') return `${nodeType}.${key} requires a boolean`;
+  if (
+    ['string', 'enum', 'groupSelect', 'groupMultiSelect', 'texture2d'].includes(property.type) &&
+    typeof value !== 'string'
+  ) {
+    return `${nodeType}.${key} requires a string`;
+  }
+  if (
+    property.type === 'vector3' &&
+    (!Array.isArray(value) || value.length !== 3 || !value.every((item) => typeof item === 'number' && Number.isFinite(item)))
+  ) {
+    return `${nodeType}.${key} requires a three-number vector`;
+  }
+  if (isFiniteNumber && property.minimum !== undefined && value < property.minimum) {
+    return `${nodeType}.${key} must be at least ${property.minimum}`;
+  }
+  if (isFiniteNumber && property.maximum !== undefined && value > property.maximum) {
+    return `${nodeType}.${key} must be at most ${property.maximum}`;
+  }
+  if (property.options && !property.options.some((option) => option.value === value)) {
+    return `${nodeType}.${key} is not a supported option`;
+  }
+  return null;
 }
 
 export function getNodesByCategory(): Map<string, ManifestNodeDef[]> {
@@ -251,6 +325,7 @@ export const PIN_TYPE_COLORS: Record<string, string> = {
   SpatialGeometry: '#ffaa33',
   Param: '#ffd700',
   Texture: '#b34dd9',
+  Material: '#e85d9e',
   Any: '#a6a6a6',
 };
 

@@ -1,8 +1,11 @@
 // Connection validation — manifest pinType-based, with "Any" wildcard support.
+// Subgraph instance pins resolve against the referenced subgraph definition.
 // Replaces the old hardcoded SpawnPoints→PlaceInScene rule.
 
 import type { Connection, Edge, Node } from '@xyflow/react';
-import { canConnect, getNodeTypeDefs } from './nodeManifest';
+import { getNodeTypeDefs, pinTypesCompatible } from './nodeManifest';
+import type { GraphSubgraph } from './graphSchema';
+import { resolveInputPinType, resolveOutputPinType } from './subgraphs';
 
 type ConnectLike = Connection | Edge;
 
@@ -16,6 +19,8 @@ export function isValidConnection(
   connection: ConnectLike,
   nodes: Node[],
   edges: Edge[],
+  subgraphs: GraphSubgraph[] = [],
+  currentSubgraph: GraphSubgraph | null = null,
 ): boolean {
   const { source, target, sourceHandle, targetHandle } = connection;
   if (!source || !target) return false;
@@ -25,10 +30,12 @@ export function isValidConnection(
   const targetNode = nodes.find((n) => n.id === target);
   if (!sourceNode?.type || !targetNode?.type) return false;
 
-  // Manifest-based pinType compatibility check
+  // PinType compatibility (subgraph-aware; manifest "Any" wildcard applies)
   const sHandle = sourceHandle ?? 'out';
   const tHandle = targetHandle ?? 'in';
-  if (!canConnect(sourceNode.type, sHandle, targetNode.type, tHandle)) return false;
+  const sourcePinType = resolveOutputPinType(sourceNode, sHandle, subgraphs, currentSubgraph);
+  const targetPinType = resolveInputPinType(targetNode, tHandle, subgraphs, currentSubgraph);
+  if (!pinTypesCompatible(sourcePinType, targetPinType)) return false;
 
   // Prevent duplicate edges. Non-variadic input pins accept only one source.
   const targetPin = getNodeTypeDefs(targetNode.type)?.inputs.find((pin) => pin.id === tHandle);

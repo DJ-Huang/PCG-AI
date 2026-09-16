@@ -33,7 +33,8 @@ flowchart LR
     subgraph "文件桥接"
         PCG["schema/editor-export.pcg<br/>Graph JSON 文件"]
     end
-    subgraph "C++ 核心"
+    subgraph "本地后端"
+        PS["pcg-server<br/>HTTP / MCP"]
         CC["pcg-core<br/>执行 + 二进制序列化"]
     end
     subgraph "Unity"
@@ -43,8 +44,10 @@ flowchart LR
     WE --> EG
     EG -->|POST /api/export-graph| PCG
     PCG -->|FileSystemWatcher| UE
-    UE -->|P/Invoke| CC
-    CC -->|Binary| UE
+    UE -->|POST /v1/cook| PS
+    PS --> CC
+    CC -->|Cook payload| PS
+    PS -->|HTTP response| UE
     UE --> SV
 ```
 
@@ -113,12 +116,11 @@ async function sendToUnity(graph) {
 
 `pcg-core/CMakeLists.txt` 定义构建目标（证据：E-052）：
 
-| 构建配置 | 产物 | 用途 |
+| 构建目标 | 产物 | 用途 |
 |----------|------|------|
-| DLL (Windows) | `PcgCore.dll` | Unity Editor (Windows) |
-| DLL (macOS) | `libPcgCore.dylib` | Unity Editor (macOS) |
-| Static (Windows) | `PcgCore.lib` | IL2CPP Player |
-| Static (macOS) | `libPcgCore.a` | IL2CPP Player (macOS) |
+| `PcgCore` | 平台原生核心库 | 链入服务端和 C++ 测试，不复制进 Unity |
+| `pcg-server` | 本机服务端可执行文件 | 为 Web 与 Unity 提供 HTTP/MCP cook |
+| CTest targets | 测试可执行文件 | 核心算法与协议回归 |
 
 ### 4.2 构建脚本
 
@@ -135,7 +137,7 @@ async function sendToUnity(graph) {
 
 ### 4.3 CTest 测试
 
-28 个测试 target 覆盖各模块（证据：E-055）：
+当前 CMake 注册了 46 个测试 target，覆盖以下模块（证据：E-055）：
 
 | 测试文件 | 覆盖模块 |
 |----------|----------|
@@ -170,18 +172,18 @@ async function sendToUnity(graph) {
 | 检查项 | 方法 | 预期 | 失败意味着 |
 |--------|------|------|------------|
 | C++ 核心 | `build-pcg-core.ps1 -RunTests` | ctest 全绿 | 编译或算法问题 |
-| Native 加载 | Unity: PCG → Print PcgCore Version | Console 输出版本号 | DLL 未就绪 |
+| 服务端连接 | Unity: PCG → Server → Health Check | 显示服务健康与核心版本 | 服务未启动或地址错误 |
 | JSON 验证 | pcg_validate_graph(example.pcg) | PCG_OK | 解析器问题 |
 | 点生成 | Run example.pcg → Scene Gizmo | 100 个青色球体 | 执行引擎问题 |
 | Mesh 生成 | Run bridge-demo.pcg → Scene mesh | 桥梁网格 | 几何内核问题 |
 | Web → Unity | Send to Unity → GraphView 自动重载 | 画布更新 | 文件桥接问题 |
-| IL2CPP | Build Windows Player → 运行 | Player 日志正常 | 静态链接问题 |
+| Player | 启动外置服务后运行 Player | cook 成功；停服时错误明确 | 服务地址或网络边界问题 |
 
 ### 5.2 故障诊断表
 
 | 失败信号 | 可能根因 | 定位步骤 | 恢复 |
 |----------|----------|----------|------|
-| `DllNotFoundException` | DLL 未复制/被锁定 | 检查 Plugins/x86_64/ | 重建 + 关闭 Unity 重拷 |
+| `Connection refused` / Health Check 失败 | `pcg-server` 未启动或端口不一致 | 检查服务日志与 Unity Server URL | 启动服务端并重新 Health Check |
 | `PCG_ERR_INVALID_JSON` | Graph JSON 格式错误 | 检查 version/nodes/edges | 修正 JSON |
 | `PCG_ERR_UNKNOWN_NODE` | 节点类型未注册 | 检查 type 拼写 | 修正或注册新 Element |
 | `PCG_ERR_CYCLE_DETECTED` | 图中有环 | 检查 edges 方向 | 移除形成环的边 |
@@ -204,13 +206,7 @@ Player 本期不链入 `PcgCore`。可选：
 .\scripts\verify-release-package.ps1 -PlayerBuildPath "Build\Windows"
 ```
 
-预期 Player 日志：
-```
-[PCG] Runtime executing graph: .../StreamingAssets/pcg/demo.pcg (core pcg-core 0.1.0)
-[PCG] Runtime OK — 100 points generated.
-```
-
-发布包不应包含 `PcgCore.dll`（仅 Editor 用）或 `.cpp` 源码。静态符号通过 `PcgCore.lib` 链入 `GameAssembly.dll`。
+Player 当前同样通过 localhost HTTP 请求外置 `pcg-server`，不会把 `PcgCore` 静态或动态链接进包体。发布验证应同时覆盖“服务在线可 cook”和“服务离线时错误明确”两种状态。
 
 ## 6. 动手实践
 
@@ -236,9 +232,8 @@ Player 本期不链入 `PcgCore`。可选：
 
 ### 6.2 C++ 测试验证
 
-```powershell
-cd F:\ForkProject\PCG-AI
-.\scripts\build-pcg-core.ps1 -RunTests
+```bash
+./scripts/build-pcg-core.sh --run-tests
 ```
 
 **预期**：所有 ctest target 通过。
@@ -252,15 +247,15 @@ cd F:\ForkProject\PCG-AI
 
 1. Web 编辑器的 **Send to Unity** 在生产构建中是否可用？为什么？
 2. C++ 侧和 C# 侧各有多少层 Cook Cache？它们分别缓存什么粒度？
-3. IL2CPP Player 中为什么不包含 `PcgCore.dll`？
+3. Player 中为什么不包含 `PcgCore` 原生库？
 4. `FileSystemWatcher` 的 `SelfSaveIgnoreSeconds` 如果设为 0 会发生什么？
 
 <details>
 <summary>参考答案</summary>
 
 1. 不可用。`Send to Unity` 依赖 Vite dev server 的 `POST /api/export-graph` 端点，该端点仅在开发模式下存在。生产构建不包含此 API。离线场景应使用 **Export JSON** 手动保存 `.pcg` 文件，再在 Unity 中 **Run Graph from File…** 加载。证据：E-051。
-2. 两层。C++ 侧的 `GraphCookCache` 在 per-node 级别缓存——节点输入哈希未变时跳过执行。C# 侧的 `PcgGraphCookCache` 在整个图级别缓存——参数 hash 未变时跳过 native 调用。证据：E-011, E-042。
-3. IL2CPP Player 使用静态链接（`PcgCore.lib`），符号直接链入 `GameAssembly.dll`。`PcgCore.dll` 是 Editor 用的动态库，不需要在 Player 中。`PcgIl2CppBuildProcessor` 处理构建时的 lib 链接。证据：E-047。
+2. 两层。C++ 侧的 `GraphCookCache` 在 per-node 级别缓存——节点输入哈希未变时跳过执行。C# 侧的 `PcgGraphCookCache` 在整个图级别缓存——参数 hash 未变时跳过 HTTP cook 请求。证据：E-011, E-042。
+3. Unity 端不再进程内加载核心库；Editor 与 Player 都通过 localhost HTTP 请求外置 `pcg-server`。`PcgIl2CppBuildProcessor` 只记录并约束这一边界，不执行原生链接。证据：E-047。
 4. 自身保存 `.pcg` 文件时 `FileSystemWatcher` 会立即检测到变化并触发重载，导致自身保存后立即被自己的写入事件触发重载，形成循环。`SelfSaveIgnoreSeconds = 1.0` 给了一个 1 秒的忽略窗口。证据：E-043。
 
 </details>
@@ -273,7 +268,7 @@ cd F:\ForkProject\PCG-AI
 - E-052：`pcg-core/CMakeLists.txt` — CMake 构建
 - E-053：`scripts/build-pcg-core.ps1` — 构建脚本
 - E-054：`.github/workflows/pcg-core-ci.yml` — CI
-- E-055：`pcg-core/tests/` — 28 个 CTest target
+- E-055：`pcg-core/tests/` 与 `pcg-core/CMakeLists.txt` — CTest targets
 
 ## 9. 完成后的心智模型
 
@@ -282,6 +277,8 @@ cd F:\ForkProject\PCG-AI
 ```
 Web 画布 / Unity GraphView
     ↓ Graph JSON (version 1.0, nodes + edges)
+pcg-server (localhost HTTP / MCP)
+    ↓ validated cook request
 pcg-core
     → parse_graph: JSON → Graph 结构
     → topological_order: Kahn 排序
@@ -290,9 +287,10 @@ pcg-core
         → 几何内核: BMesh (半边) / Sweep / Boolean CSG / GroupTable
     → Sink 检测 → 结果组装
     → write_execution_result: Binary (Mesh/Point/Geometry) 或 JSON
-    ↓ Binary Buffer
+    ↓ versioned cook payload via pcg-server
 Unity Runtime
-    → PcgNative P/Invoke
+    → PcgCookClient HTTP 请求
+    → PcgNative 兼容门面
     → PcgResultParser 解析二进制
     → PcgGraphComponent 更新预览
     → Scene View: Gizmo / Mesh / Polygon Wire / GPU Instancing
@@ -308,5 +306,4 @@ Unity Runtime
 
 ## 10. 下一步
 - 返回 [目录](index.md) 查看其他文档
-- 阅读 [Git 扫描记录](.git-scan-record.md) 了解项目演进历史
-- 阅读 [证据台账](.tutorial-evidence.md) 查看完整证据链
+- 阅读 [工程架构](../architecture.md) 了解当前组件边界

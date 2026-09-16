@@ -1,0 +1,65 @@
+name: repository quality
+
+on:
+  push:
+    paths:
+      - 'web/pcg-editor/**'
+      - 'schema/**'
+      - 'library/**'
+      - 'scripts/**'
+      - 'examples/**'
+      - 'Unity/Assets/PcgPlugin/Editor/BuiltinLibrary/**'
+      - '.github/workflows/quality.yml'
+  pull_request:
+    paths:
+      - 'web/pcg-editor/**'
+      - 'schema/**'
+      - 'library/**'
+      - 'scripts/**'
+      - 'examples/**'
+      - 'Unity/Assets/PcgPlugin/Editor/BuiltinLibrary/**'
+      - '.github/workflows/quality.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/pcg-editor/package-lock.json
+
+      - name: Install Python validation dependencies
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+
+      - name: Validate repository contracts
+        run: |
+          python scripts/validate-manifest.py
+          python scripts/validate-subgraph-schema.py
+          python scripts/validate-builtin-library.py
+
+      - name: Install Web dependencies
+        working-directory: web/pcg-editor
+        run: npm ci
+
+      - name: Lint Web editor
+        working-directory: web/pcg-editor
+        run: npm run lint
+
+      - name: Test Web editor
+        working-directory: web/pcg-editor
+        run: npx vitest run
+
+      - name: Build Web editor
+        working-directory: web/pcg-editor
+        run: npm run build
+

@@ -36,6 +36,31 @@ void assign_material(data::PcgMeshData& mesh, const std::string& material_name)
                        std::vector<uint32_t>(mesh.triangles().size() / 3, 0u));
 }
 
+namespace {
+
+void attach_material_definition(data::PcgMetadata& metadata,
+                                const std::string& material_name,
+                                const nlohmann::json& definition)
+{
+    if (material_name.empty() || !definition.is_object())
+        return;
+    nlohmann::json library = metadata.has("pbrMaterials") &&
+                                     metadata.get("pbrMaterials").is_object()
+        ? metadata.get("pbrMaterials")
+        : nlohmann::json::object();
+    library[material_name] = definition;
+    metadata.set("pbrMaterials", library);
+}
+
+} // namespace
+
+void attach_material_definition(data::PcgMeshData& mesh,
+                                const std::string& material_name,
+                                const nlohmann::json& definition)
+{
+    attach_material_definition(mesh.metadata(), material_name, definition);
+}
+
 void assign_material(data::PcgGeometry& geometry,
                      const std::string& material_name,
                      const std::vector<std::string>& face_groups)
@@ -57,6 +82,13 @@ void assign_material(data::PcgGeometry& geometry,
         }
     }
     geometry.set_face_materials(std::move(materials));
+}
+
+void attach_material_definition(data::PcgGeometry& geometry,
+                                const std::string& material_name,
+                                const nlohmann::json& definition)
+{
+    attach_material_definition(geometry.metadata(), material_name, definition);
 }
 
 } // namespace pcg::internal::elements

@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
+const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
 const PCG_SERVER_PORT = Number(process.env.PCG_SERVER_PORT) || 17890;
 const PCG_SERVER_HOST = '127.0.0.1';
 
@@ -22,6 +23,9 @@ function proxyToPcgServer(
   }
   if (req.headers.authorization) {
     headers.authorization = req.headers.authorization;
+  }
+  if (req.headers.accept) {
+    headers.accept = req.headers.accept;
   }
   const upstream = http.request(
     {
@@ -81,19 +85,19 @@ function cookProxyPlugin(): Plugin {
         }
         proxyToPcgServer(req, res, '/v1/health');
       });
-      server.middlewares.use('/api/agent/chat', (req, res, next) => {
-        if (req.method !== 'POST') {
+      server.middlewares.use('/api/agent', (req, res, next) => {
+        if (!['GET', 'POST', 'PUT', 'DELETE'].includes(req.method ?? '')) {
           next();
           return;
         }
-        proxyToPcgServer(req, res, '/v1/agent/chat');
+        proxyToPcgServer(req, res, `/v1/agent${req.url ?? ''}`);
       });
-      server.middlewares.use('/api/agent/health', (req, res, next) => {
-        if (req.method !== 'GET') {
+      server.middlewares.use('/api/editor-bridge', (req, res, next) => {
+        if (!['GET', 'PUT', 'POST', 'PATCH', 'DELETE'].includes(req.method ?? '')) {
           next();
           return;
         }
-        proxyToPcgServer(req, res, '/v1/agent/health');
+        proxyToPcgServer(req, res, `/v1${req.url ?? ''}`);
       });
     },
   };
@@ -148,8 +152,13 @@ function exportGraphPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, error: 'Missing filePath or graphData' }));
               return;
             }
-            // Resolve relative to workspace root (parent of web/)
-            const resolved = path.resolve(__dirname, '..', filePath);
+            const resolved = path.resolve(WORKSPACE_ROOT, filePath);
+            const relative = path.relative(WORKSPACE_ROOT, resolved);
+            if (relative.startsWith('..') || path.isAbsolute(relative) || path.extname(resolved) !== '.pcg') {
+              res.statusCode = 403;
+              res.end(JSON.stringify({ ok: false, error: 'Graph path must be a .pcg file inside the workspace' }));
+              return;
+            }
             fs.mkdirSync(path.dirname(resolved), { recursive: true });
             fs.writeFileSync(resolved, JSON.stringify(graphData, null, 2), 'utf8');
             res.setHeader('Content-Type', 'application/json');
@@ -196,6 +205,82 @@ function exportGraphPlugin(): Plugin {
             res.end(JSON.stringify({ ok: false, error: String(err) }));
           }
         });
+      });
+
+      // Upload a local image into public/assets/uploads/ (Tripo Source Image, …).
+      // POST /api/upload-texture?name=<file.png>  (raw bytes body, ≤ 20 MB)
+      // Returns { ok, storage: "pcg-resource://uploads/<file>" }.
+      server.middlewares.use('/api/upload-texture', (req, res, next) => {
+        if (req.method !== 'POST') {
+          next();
+          return;
+        }
+        const url = new URL(req.url ?? '', 'http://localhost');
+        const rawName = path.basename(url.searchParams.get('name') ?? '');
+        const safeName = rawName.replace(/[^A-Za-z0-9._-]/g, '_');
+        if (!/\.(png|jpe?g)$/i.test(safeName)) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: 'Only .png / .jpg images are supported' }));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        let total = 0;
+        req.on('data', (chunk: Buffer) => {
+          total += chunk.length;
+          if (total <= 20 * 1024 * 1024) chunks.push(chunk);
+        });
+        req.on('end', () => {
+          if (total > 20 * 1024 * 1024) {
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: false, error: 'Image exceeds the 20 MB limit' }));
+            return;
+          }
+          try {
+            const dir = path.resolve(__dirname, 'public/assets/uploads');
+            fs.mkdirSync(dir, { recursive: true });
+            const fileName = `${Date.now()}-${safeName}`;
+            fs.writeFileSync(path.join(dir, fileName), Buffer.concat(chunks));
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, storage: `pcg-resource://uploads/${fileName}` }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: String(err) }));
+          }
+        });
+      });
+
+      // Load a .pcg graph file from disk (for the /review route)
+      // GET /api/load-graph?path=<relative-path>
+      server.middlewares.use('/api/load-graph', (req, res, next) => {        if (req.method !== 'GET') {
+          next();
+          return;
+        }
+        const url = new URL(req.url ?? '', 'http://localhost');
+        const relPath = url.searchParams.get('path');
+        if (!relPath) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: 'Missing "path" query parameter' }));
+          return;
+        }
+        const resolved = path.resolve(__dirname, '../../', relPath);
+        if (!fs.existsSync(resolved)) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: `File not found: ${relPath}` }));
+          return;
+        }
+        try {
+          const content = fs.readFileSync(resolved, 'utf8');
+          res.setHeader('Content-Type', 'application/json');
+          res.end(content);
+        } catch (err) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ ok: false, error: String(err) }));
+        }
       });
     },
   };

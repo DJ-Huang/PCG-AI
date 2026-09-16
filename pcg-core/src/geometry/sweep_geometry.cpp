@@ -12,13 +12,6 @@ namespace {
 
 constexpr double kEpsilon = 1e-9;
 
-int64_t sweep_edge_key(int a, int b)
-{
-    if (a > b)
-        std::swap(a, b);
-    return static_cast<int64_t>(a) * 1000000 + b;
-}
-
 Vec3 mesh_centroid(const data::PcgMeshData& mesh)
 {
     if (mesh.vertices().empty())

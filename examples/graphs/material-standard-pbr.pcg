@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "id": "box",
+      "type": "CreateBoxMesh",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "width": 2.0,
+        "height": 2.0,
+        "depth": 2.0
+      }
+    },
+    {
+      "id": "material",
+      "type": "Material",
+      "position": { "x": 0, "y": 220 },
+      "data": {
+        "materialName": "brushed_copper",
+        "shaderId": "pcg.standard-pbr",
+        "baseColor": "#b87333",
+        "baseColorMap": "",
+        "metallic": 0.9,
+        "metallicMap": "",
+        "roughness": 0.28,
+        "roughnessMap": "",
+        "normalMap": "",
+        "normalScale": 1.0,
+        "aoMap": "",
+        "aoIntensity": 1.0,
+        "emissiveColor": "#000000",
+        "emissiveMap": "",
+        "emissiveIntensity": 0.0,
+        "opacity": 1.0,
+        "alphaMode": "opaque",
+        "alphaCutoff": 0.5,
+        "doubleSided": false,
+        "unityShaderGuid": "",
+        "unityShaderName": "",
+        "unityPropertiesJson": "{}"
+      }
+    },
+    {
+      "id": "assign",
+      "type": "AssignMaterial",
+      "position": { "x": 320, "y": 0 },
+      "data": { "materialName": "" }
+    },
+    {
+      "id": "output",
+      "type": "Output",
+      "position": { "x": 600, "y": 0 },
+      "data": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "mesh-to-assign",
+      "source": "box",
+      "target": "assign",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    },
+    {
+      "id": "material-to-assign",
+      "source": "material",
+      "target": "assign",
+      "sourceHandle": "out",
+      "targetHandle": "material"
+    },
+    {
+      "id": "assign-to-output",
+      "source": "assign",
+      "target": "output",
+      "sourceHandle": "out",
+      "targetHandle": "in"
+    }
+  ]
+}

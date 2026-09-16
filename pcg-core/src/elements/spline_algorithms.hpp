@@ -102,6 +102,27 @@ struct SweepAlongSplineOptions {
     double cusp_angle_deg = 30.0;
 };
 
+struct TaperedSweepStation {
+    double u = 0.0;
+    double rx = 1.0;
+    double rz = 1.0;
+    double twist_degrees = 0.0;
+};
+
+struct TaperedSweepOptions {
+    std::vector<TaperedSweepStation> stations;
+    double radius_scale = 1.0;
+    int radial_segments = 12;
+    double sample_spacing = 1.0;
+    bool cap_start = true;
+    bool cap_end = true;
+    double up_x = 0.0;
+    double up_y = 1.0;
+    double up_z = 0.0;
+    std::string shade_mode = "auto";
+    double cusp_angle_deg = 30.0;
+};
+
 struct InstanceAlongSplineOptions {
     double spacing = 5.0;
     double offset = 0.0;
@@ -123,11 +144,17 @@ struct CreateSpiralSplineOptions {
 data::PcgSplineData create_spiral_spline_data(const CreateSpiralSplineOptions& options);
 
 struct CreateArcSplineOptions {
-    double radius = 1.0;
+    double radius_x = 1.0;
+    double radius_y = 1.0;
     double start_angle_deg = 0.0;
     double end_angle_deg = 180.0;
-    int segments = 16;
-    std::string axis = "z";
+    int divisions = 16;
+    std::string orientation = "xy";
+    std::string arc_type = "openArc";
+    data::PcgVec3 center{0.0, 0.0, 0.0};
+    data::PcgVec3 rotate_deg{0.0, 0.0, 0.0};
+    double uniform_scale = 1.0;
+    bool reverse = false;
 };
 
 data::PcgSplineData create_arc_spline_data(const CreateArcSplineOptions& options);
@@ -162,6 +189,10 @@ data::PcgMeshData sweep_along_spline(const data::PcgSplineData& backbone,
 data::PcgGeometry sweep_along_spline_geometry(const data::PcgSplineData& backbone,
                                               const data::PcgSplineData* profile_spline,
                                               const SweepAlongSplineOptions& options);
+data::PcgGeometry tapered_sweep_along_spline_geometry(
+    const data::PcgSplineData& backbone,
+    const TaperedSweepOptions& options,
+    std::string* error = nullptr);
 data::PcgMeshData merge_meshes(const data::PcgMeshData& a, const data::PcgMeshData& b);
 data::PcgMeshData merge_meshes(const std::vector<data::PcgMeshData>& meshes);
 data::PcgMeshData instance_along_spline(const data::PcgSplineData& splines,

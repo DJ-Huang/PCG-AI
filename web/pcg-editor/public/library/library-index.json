@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "pcg.lib:cable:cable_generator",
+      "displayName": "Cable Generator",
+      "category": "Cable",
+      "file": "cable/cable_generator.pcgsubgraph",
+      "assetVersion": "1.0.0",
+      "contentHash": "8036a0a46678ddf5bba634022475c596ccb30d686efbed99a231f559fcd0c672",
+      "keywords": [
+        "cable",
+        "wire",
+        "电缆",
+        "线缆",
+        "spline",
+        "sweep",
+        "tube",
+        "pipe"
+      ],
+      "description": "沿输入 spline 扫掠出圆截面电缆。重采样控制分段密度，扫掠自动加盖并平滑着色。",
+      "inputs": [
+        {
+          "id": "path",
+          "name": "Path",
+          "pinType": "SpatialSpline"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "out",
+          "name": "Geometry",
+          "pinType": "SpatialGeometry"
+        }
+      ],
+      "parameters": [
+        {
+          "id": "segmentLength",
+          "name": "Segment Length",
+          "type": "number",
+          "default": 0.25,
+          "hasRange": true,
+          "min": 0.05,
+          "max": 2
+        },
+        {
+          "id": "thickness",
+          "name": "Thickness",
+          "type": "number",
+          "default": 0.03,
+          "hasRange": true,
+          "min": 0.002,
+          "max": 0.5
+        },
+        {
+          "id": "sides",
+          "name": "Sides",
+          "type": "integer",
+          "default": 8,
+          "hasRange": true,
+          "min": 3,
+          "max": 32
+        }
+      ],
+      "doc": "cable/cable_generator.md"
+    }
+  ]
+}

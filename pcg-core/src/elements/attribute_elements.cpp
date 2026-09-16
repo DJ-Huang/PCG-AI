@@ -1468,10 +1468,6 @@ public:
 
     PcgResultCode execute(PcgContext& ctx) const override
     {
-        const auto target =
-            get_geometry_input(ctx, "target", "AttributeTransfer missing target input");
-        const auto source =
-            get_geometry_input(ctx, "source", "AttributeTransfer missing source input");
         AttributeTransferOptions options;
         options.source_group = ctx.node->data.value("sourceGroup", std::string());
         options.source_group_type =
@@ -1504,6 +1500,84 @@ public:
             return fail_ctx(ctx, PCG_ERR_EXECUTION,
                             "AttributeTransfer: enable at least one attribute class");
 
+        // Point target: transfer source mesh attributes onto point cloud.
+        if (ctx.inputs.find_points("target") != nullptr) {
+            const auto target_points =
+                get_points_input(ctx, "target", "AttributeTransfer missing target input");
+            const auto source =
+                get_geometry_input(ctx, "source", "AttributeTransfer missing source input");
+
+            data::PcgGeometry target_geo;
+            target_geo.points_mut().reserve(target_points.points().size());
+            for (const auto& p : target_points.points())
+                target_geo.points_mut().push_back({p.x, p.y, p.z});
+
+            const auto transferred = attribute_transfer_geometry(target_geo, source, options);
+
+            data::PcgPointData output = target_points;
+            auto& out_pts = output.points_mut();
+            const auto point_attr_names =
+                transferred.attributes().names(data::AttributeOwner::Point);
+            for (size_t i = 0; i < out_pts.size() && i < transferred.points().size(); ++i) {
+                for (const auto& name : point_attr_names) {
+                    const auto* attr =
+                        transferred.attributes().find(data::AttributeOwner::Point, name);
+                    if (!attr)
+                        continue;
+                    const int tuple = std::max(1, attr->schema().tuple_size);
+                    const size_t base = i * static_cast<size_t>(tuple);
+                    if (attr->schema().type == data::AttributeType::Float) {
+                        const auto& vals = attr->float_values();
+                        if (tuple == 1) {
+                            out_pts[i].attributes[name] = vals.size() > base ? vals[base] : 0.0;
+                        } else {
+                            nlohmann::json arr = nlohmann::json::array();
+                            for (int c = 0; c < tuple && base + c < vals.size(); ++c)
+                                arr.push_back(vals[base + static_cast<size_t>(c)]);
+                            out_pts[i].attributes[name] = arr;
+                        }
+                    } else if (attr->schema().type == data::AttributeType::Int) {
+                        const auto& vals = attr->int_values();
+                        if (tuple == 1) {
+                            out_pts[i].attributes[name] =
+                                vals.size() > base ? static_cast<double>(vals[base]) : 0.0;
+                        } else {
+                            nlohmann::json arr = nlohmann::json::array();
+                            for (int c = 0; c < tuple && base + c < vals.size(); ++c)
+                                arr.push_back(static_cast<double>(vals[base + static_cast<size_t>(c)]));
+                            out_pts[i].attributes[name] = arr;
+                        }
+                    }
+                }
+            }
+
+            // Transfer detail attributes as uniform point attributes.
+            const auto detail_names =
+                transferred.attributes().names(data::AttributeOwner::Detail);
+            for (const auto& name : detail_names) {
+                const auto* attr =
+                    transferred.attributes().find(data::AttributeOwner::Detail, name);
+                if (!attr)
+                    continue;
+                for (auto& pt : out_pts) {
+                    if (attr->schema().type == data::AttributeType::Float) {
+                        const auto& vals = attr->float_values();
+                        pt.attributes[name] = vals.empty() ? 0.0 : vals[0];
+                    } else if (attr->schema().type == data::AttributeType::Int) {
+                        const auto& vals = attr->int_values();
+                        pt.attributes[name] = vals.empty() ? 0.0 : static_cast<double>(vals[0]);
+                    }
+                }
+            }
+
+            emit_points(ctx, std::move(output));
+            return PCG_OK;
+        }
+
+        const auto target =
+            get_geometry_input(ctx, "target", "AttributeTransfer missing target input");
+        const auto source =
+            get_geometry_input(ctx, "source", "AttributeTransfer missing source input");
         emit_geometry(ctx, attribute_transfer_geometry(target, source, options));
         return PCG_OK;
     }

@@ -247,7 +247,7 @@ struct GraphExecutionResult {
 
 ### 6.3 步骤
 ```powershell
-cd F:\ForkProject\PCG-AI
+cd /path/to/PCG-AI
 .\scripts\build-pcg-core.ps1 -RunTests
 # 关注：
 # test_executor — 验证基本执行、环检测、Sink 检测

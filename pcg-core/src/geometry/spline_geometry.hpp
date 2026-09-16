@@ -66,6 +66,13 @@ double polyline_length(const std::vector<Vec3>& polyline);
 /** Rotation-minimizing style frames using a stable up vector. */
 std::vector<Frame3> build_frames(const std::vector<Vec3>& polyline, const Vec3& up_hint = {0.0, 1.0, 0.0});
 
+/// Rotation-minimizing frames for organic sweeps. The previous normal is
+/// projected onto each new tangent plane so inflections do not introduce a
+/// Frenet-style 180 degree flip.
+std::vector<Frame3> build_parallel_transport_frames(
+    const std::vector<Vec3>& polyline,
+    const Vec3& up_hint = {0.0, 1.0, 0.0});
+
 Vec3 transform_local_to_world(const Frame3& frame, const Vec3& local);
 
 } // namespace pcg::internal::geometry

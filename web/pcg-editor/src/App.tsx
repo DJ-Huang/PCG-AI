@@ -11,6 +11,8 @@ import {
   MiniMap,
   ReactFlowProvider,
   addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -18,40 +20,78 @@ import {
   type Connection,
   type Node,
   type Edge,
+  type NodeChange,
+  type EdgeChange,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import ManifestNode from './nodes/ManifestNode';
+import SubgraphNode, { SubgraphInterfaceNode } from './nodes/SubgraphNode';
 import { defaultData } from './graphSchema';
-import type { GraphParameter, GraphSubgraph } from './graphSchema';
+import type { GraphParameter, GraphSubgraph, GraphNode, GraphEdge } from './graphSchema';
 import { exportGraph, downloadGraph, exportToSchema, saveGraphToFile, revealInFinder } from './exportGraph';
 import { importGraphFromFile, parseGraphJson, syncNodeCounterFromNodes } from './importGraph';
 import { clearEditorSession, loadEditorSession, saveEditorSession } from './editorSession';
 import { isValidConnection } from './connectionValidation';
 import {
+  SubgraphsContext,
+  CurrentSubgraphContext,
+  findSubgraph,
+  getSubgraphId,
+  isSubgraphInterfaceNode,
+  resolveInputPinType,
+  resolveOutputPinType,
+} from './subgraphs';
+import {
   getNodeTypeDefs,
-  getOutputPinType,
-  getInputPinType,
   getAllNodeTypes,
+  getNodeManifest,
+  validateNodePropertyValue,
   type ManifestProperty,
   type PinType,
 } from './nodeManifest';
 import { useUndoRedo } from './useUndoRedo';
 import Blackboard from './Blackboard';
-import AgentPanel from './agent/AgentPanel';
+import AgentPanel, { type AgentLaunchRequest } from './agent/AgentPanel';
 import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './agent/agentCommands';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
-import NodeSearchPanel, { type SearchPanelConfig } from './NodeSearchPanel';
-import PreviewViewport, { type SplineEditContext } from './PreviewViewport';
-import { cookGraphPreview, cancelCook, checkCookServer, buildPreviewCookGraph, prepareGraphForPreviewCook, newPreviewJobId, type PreviewData } from './previewCook';
-import { NodeActionsContext } from './nodeActions';
+import NodeSearchPanel, { type SearchPanelConfig, type NodeSearchSelection } from './NodeSearchPanel';
+import { loadLibrarySubgraph, type LibraryIndexItem } from './libraryManifest';
+import PreviewViewport, { type CaptureOptions, type PreviewViewportHandle, type SplineEditContext } from './PreviewViewport';
+import type { CameraCommand } from './physicalCamera';
+import SettingsDialog from './SettingsDialog';
+import { useEditorBridge } from './editorBridge';
+import {
+  applyGraphOperations,
+  parseAndValidateGraph,
+  type GraphCommandResult,
+  type QueuedGraphCommand,
+} from './graphCommands';
+import { cookGraphPreviewBudgeted, cancelCook, checkCookServer, buildPreviewCookGraph, buildSubgraphCookGraph, shouldAutoCookGraphPreview, newPreviewJobId, type PreviewData } from './previewCook';
+import {
+  applyPreviewParameterOverrides,
+  resolvePreviewParameterValues,
+  savePreviewParameterDefaults,
+  type PreviewParameterValue,
+  type PreviewParameterValues,
+} from './previewParameters';
+import { NodeActionsContext, getPreviewTargetId, setPreviewTargetId, usePreviewTargetId } from './nodeActions';
 import {
   getEffectiveControlPoints,
   isSplineAuthoringNode,
   serializeControlPoints,
 } from './splineControlPoints';
+import {
+  captureProceduralReferenceBundle,
+  loadProceduralSourceImageFile,
+} from './proceduralReference';
+import { buildOrientedSdfNodeData } from './thirdPartyClient';
+import {
+  bakeBaseColorTextureIntoOpc1,
+  makeVertexColorMaterialData,
+} from './orientedPointColorBake';
 import './App.css';
 
 // Map every manifest node type to the generic ManifestNode component.
@@ -59,10 +99,27 @@ import './App.css';
 // instead of the real type, so nodes render as "Unknown".
 const nodeTypes = {
   ...Object.fromEntries(getAllNodeTypes().map((def) => [def.type, ManifestNode])),
-  // Dynamic subgraph pins are preserved by import/export. Full nested graph
-  // authoring is intentionally outside this editor's current scope.
-  Subgraph: ManifestNode,
+  // Subgraph instance pins derive from the referenced definition (see
+  // SubgraphNode); nested contents are preserved by import/export.
+  Subgraph: SubgraphNode,
+  SubgraphInput: SubgraphInterfaceNode,
+  SubgraphOutput: SubgraphInterfaceNode,
 };
+
+// React Flow default minZoom is 0.5 — too high for dense PCG graphs.
+const GRAPH_MIN_ZOOM = 0.05;
+const GRAPH_MAX_ZOOM = 2;
+const GRAPH_FIT_VIEW_OPTIONS = {
+  minZoom: GRAPH_MIN_ZOOM,
+  maxZoom: GRAPH_MAX_ZOOM,
+  padding: 0.15,
+};
+
+function waitForPreviewPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
 
 const initialNodes: Node[] = [
   {
@@ -85,6 +142,18 @@ const initialEdges: Edge[] = [
 
 let nodeCounter = 100;
 
+function allocateNodeId(existingNodes: readonly Node[]): string {
+  // Module state can reset during Vite HMR while React preserves the live graph.
+  // Always resync against the active scope before allocating to avoid duplicate keys.
+  nodeCounter = Math.max(nodeCounter, syncNodeCounterFromNodes([...existingNodes]));
+  const existingIds = new Set(existingNodes.map((node) => node.id));
+  let candidate: string;
+  do {
+    candidate = `n${++nodeCounter}`;
+  } while (existingIds.has(candidate));
+  return candidate;
+}
+
 function restoreEditorSession() {
   const session = loadEditorSession();
   if (!session) return null;
@@ -105,6 +174,7 @@ function restoreEditorSession() {
 
 function PcgEditor() {
   const restoredRef = useRef(restoreEditorSession());
+  const editorSessionIdRef = useRef(crypto.randomUUID());
   const restored = restoredRef.current;
 
   const [nodes, setNodes, onNodesChange] = useNodesState(restored?.nodes ?? initialNodes);
@@ -113,14 +183,20 @@ function PcgEditor() {
   const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>(restored?.subgraphs ?? []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
-  const [showAgent, setShowAgent] = useState(true);
+  const [showAgent, setShowAgent] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [providerRevision, setProviderRevision] = useState(0);
+  const [agentLaunchRequest, setAgentLaunchRequest] = useState<AgentLaunchRequest | null>(null);
+  const [proceduralizingNodeId, setProceduralizingNodeId] = useState<string | null>(null);
   const [showInspector, setShowInspector] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewParameterValuesByScope, setPreviewParameterValuesByScope] = useState<Record<string, PreviewParameterValues>>({});
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewJobIdRef = useRef<string | null>(null);
+  const previewViewportRef = useRef<PreviewViewportHandle>(null);
   const [status, setStatus] = useState(
     restored
       ? `Restored last session${restored.filename ? `: ${restored.filename}` : ''} (${restored.nodes.length} nodes)`
@@ -130,7 +206,10 @@ function PcgEditor() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [currentFilename, setCurrentFilename] = useState<string>(restored?.filename ?? '');
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
-  const [previewTargetNodeId, setPreviewTargetNodeId] = useState<string | null>(null);
+  const previewTargetNodeId = usePreviewTargetId();
+
+  const openSettings = useCallback(() => setShowSettings(true), []);
+  const closeSettings = useCallback(() => setShowSettings(false), []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const connectingNodeId = useRef<string | null>(null);
@@ -151,20 +230,322 @@ function PcgEditor() {
     setSubgraphs,
   );
 
+  // ── Subgraph navigation (nested editing) ────────────
+  // Single document state: root nodes/edges/parameters plus subgraphs (whose
+  // defs carry their own interior nodes/edges/parameters). editPath selects
+  // which graph the canvas shows; every mutation routes to the owning slice,
+  // so undo/redo, export, and session persist always see the whole document.
+
+  const [editPath, setEditPath] = useState<string[]>([]);
+  const currentSubgraphId = editPath.length > 0 ? editPath[editPath.length - 1] : null;
+  const currentSubgraph = useMemo(
+    () => (currentSubgraphId ? findSubgraph(subgraphs, currentSubgraphId) ?? null : null),
+    [subgraphs, currentSubgraphId],
+  );
+
+  const viewNodes = useMemo(
+    () => (currentSubgraph ? currentSubgraph.nodes : nodes) as Node[],
+    [currentSubgraph, nodes],
+  );
+  const viewEdges = useMemo(
+    () => (currentSubgraph ? currentSubgraph.edges : edges) as Edge[],
+    [currentSubgraph, edges],
+  );
+  const viewParameters = useMemo(
+    () => (currentSubgraph ? (currentSubgraph.parameters ?? []) : parameters),
+    [currentSubgraph, parameters],
+  );
+  const previewParameterScope = currentSubgraphId ? `subgraph:${currentSubgraphId}` : 'root';
+  const previewParameterValues = useMemo(
+    () => resolvePreviewParameterValues(viewParameters, previewParameterValuesByScope[previewParameterScope]),
+    [viewParameters, previewParameterValuesByScope, previewParameterScope],
+  );
+  const previewParameterNodeIds = useMemo(
+    () => new Set(viewNodes.map((node) => node.id)),
+    [viewNodes],
+  );
+
+  /** Routes a nodes update to the root graph or the open subgraph definition. */
+  const setViewNodes = useCallback(
+    (updater: (nds: Node[]) => Node[]) => {
+      if (!currentSubgraphId) {
+        setNodes(updater);
+        return;
+      }
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? { ...sg, nodes: updater(sg.nodes as unknown as Node[]) as unknown as GraphNode[] }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, setNodes, setSubgraphs],
+  );
+
+  const setViewEdges = useCallback(
+    (updater: (eds: Edge[]) => Edge[]) => {
+      if (!currentSubgraphId) {
+        setEdges(updater);
+        return;
+      }
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? { ...sg, edges: updater(sg.edges as unknown as Edge[]) as unknown as GraphEdge[] }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, setEdges, setSubgraphs],
+  );
+
+  const setViewParameters = useCallback(
+    (next: GraphParameter[]) => {
+      if (!currentSubgraphId) {
+        setParameters(next);
+        return;
+      }
+      setSubgraphs((subs) =>
+        subs.map((sg) => (sg.id === currentSubgraphId ? { ...sg, parameters: next } : sg)),
+      );
+    },
+    [currentSubgraphId, setParameters, setSubgraphs],
+  );
+
+  const updatePreviewParameterValue = useCallback(
+    (parameterId: string, value: PreviewParameterValue) => {
+      setPreviewParameterValuesByScope((stored) => ({
+        ...stored,
+        [previewParameterScope]: {
+          ...resolvePreviewParameterValues(viewParameters, stored[previewParameterScope]),
+          [parameterId]: value,
+        },
+      }));
+    },
+    [previewParameterScope, viewParameters],
+  );
+
+  const resetPreviewParameters = useCallback(() => {
+    setPreviewParameterValuesByScope((stored) => ({
+      ...stored,
+      [previewParameterScope]: resolvePreviewParameterValues(viewParameters, undefined),
+    }));
+    setStatus('Preview parameters reset to defaults');
+  }, [previewParameterScope, viewParameters]);
+
+  const savePreviewParametersAsDefaults = useCallback(() => {
+    const saved = savePreviewParameterDefaults(
+      viewNodes as unknown as GraphNode[],
+      viewParameters,
+      previewParameterValues,
+    );
+    commit();
+    setViewNodes(() => saved.nodes as unknown as Node[]);
+    setViewParameters(saved.parameters);
+    setSelectedNode((selected) => {
+      if (!selected) return selected;
+      return (saved.nodes.find((node) => node.id === selected.id) as unknown as Node | undefined) ?? selected;
+    });
+    setStatus('Preview parameter values saved as defaults');
+  }, [viewNodes, viewParameters, previewParameterValues, commit, setViewNodes, setViewParameters]);
+
+  // Deletions flow through onNodesChange/onEdgesChange (not commit()-wrapped
+  // callers), so commit here on remove changes. React Flow fires the node
+  // remove and its cascade edge removes in the same tick — dedupe by timestamp
+  // so one Delete keypress produces one undo step.
+  const removeCommitRef = useRef(0);
+  const commitForRemove = useCallback(() => {
+    const now = performance.now();
+    if (now - removeCommitRef.current < 50) return;
+    removeCommitRef.current = now;
+    commit();
+  }, [commit]);
+
+  const onViewNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      if (!currentSubgraphId) {
+        if (changes.some((c) => c.type === 'remove')) commitForRemove();
+        onNodesChange(changes);
+        return;
+      }
+      // Interface nodes (SubgraphInput/Output) are structural — not deletable.
+      const filtered = changes.filter((c) => {
+        if (c.type !== 'remove') return true;
+        const node = currentSubgraph?.nodes.find((n) => n.id === c.id);
+        return !isSubgraphInterfaceNode(node?.type);
+      });
+      if (filtered.length === 0) return;
+      if (filtered.some((c) => c.type === 'remove')) commitForRemove();
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? {
+                ...sg,
+                nodes: applyNodeChanges(filtered, sg.nodes as unknown as Node[]) as unknown as GraphNode[],
+              }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, currentSubgraph, onNodesChange, setSubgraphs, commitForRemove],
+  );
+
+  const onViewEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      if (!currentSubgraphId) {
+        if (changes.some((c) => c.type === 'remove')) commitForRemove();
+        onEdgesChange(changes);
+        return;
+      }
+      // React Flow cascades node deletion to connected edges. When the node is
+      // a protected interface node, the cascade must be blocked too — cascade
+      // removes arrive unselected, while a user-deleted edge is selected first.
+      const filtered = changes.filter((c) => {
+        if (c.type !== 'remove') return true;
+        const edge = currentSubgraph?.edges.find((e) => e.id === c.id);
+        if (!edge) return true;
+        const selected = (edge as Edge).selected === true;
+        if (selected) return true;
+        const sourceNode = currentSubgraph?.nodes.find((n) => n.id === edge.source);
+        const targetNode = currentSubgraph?.nodes.find((n) => n.id === edge.target);
+        return !isSubgraphInterfaceNode(sourceNode?.type) && !isSubgraphInterfaceNode(targetNode?.type);
+      });
+      if (filtered.length === 0) return;
+      if (filtered.some((c) => c.type === 'remove')) commitForRemove();
+      setSubgraphs((subs) =>
+        subs.map((sg) =>
+          sg.id === currentSubgraphId
+            ? {
+                ...sg,
+                edges: applyEdgeChanges(filtered, sg.edges as unknown as Edge[]) as unknown as GraphEdge[],
+              }
+            : sg,
+        ),
+      );
+    },
+    [currentSubgraphId, currentSubgraph, onEdgesChange, setSubgraphs, commitForRemove],
+  );
+
+  // Navigation is view state, not a document change — no undo commit.
+  const navigateTo = useCallback(
+    (path: string[]) => {
+      setEditPath(path);
+      setSelectedNode(null);
+      setInfoNodeId(null);
+      setContextMenu(null);
+      setPreviewTargetId(null);
+      window.setTimeout(() => void fitView({ ...GRAPH_FIT_VIEW_OPTIONS, duration: 200 }), 50);
+    },
+    [fitView],
+  );
+
+  const enterSubgraph = useCallback(
+    (subgraphId: string) => {
+      if (!subgraphs.some((s) => s.id === subgraphId)) {
+        setStatus(`Cannot enter: subgraph "${subgraphId || '(unset)'}" is missing from this document`);
+        return;
+      }
+      navigateTo([...editPath, subgraphId]);
+    },
+    [editPath, subgraphs, navigateTo],
+  );
+
+  // ── Preview picking: executor ids are flattened from the root
+  // ("<instanceId>/<innerId>"), so resolve from the root scope regardless of
+  // which subgraph is currently open, then select + center the target node.
+  const handlePreviewPickNode = useCallback(
+    (flatId: string) => {
+      const segments = flatId.split('/').filter(Boolean);
+      if (segments.length === 0) return;
+
+      // Subgraph-interior cooks (editor inside a subgraph) emit unprefixed ids
+      // scoped to the open subgraph — resolve those against the current view.
+      let scopeNodes: Node[] =
+        segments.length === 1 && currentSubgraph ? viewNodes : (nodes as Node[]);
+      const path: string[] =
+        segments.length === 1 && currentSubgraph ? [...editPath] : [];
+      for (let i = 0; i < segments.length - 1; i++) {
+        const instance = scopeNodes.find((n) => n.id === segments[i]);
+        const sgId = instance?.type === 'Subgraph' ? getSubgraphId(instance.data) : null;
+        const def = sgId ? findSubgraph(subgraphs, sgId) : null;
+        if (!def) {
+          setStatus(`Pick: cannot resolve subgraph path in "${flatId}"`);
+          return;
+        }
+        path.push(sgId!);
+        scopeNodes = def.nodes as unknown as Node[];
+      }
+      const targetId = segments[segments.length - 1];
+      const target = scopeNodes.find((n) => n.id === targetId);
+      if (!target) {
+        setStatus(`Pick: node "${targetId}" no longer exists`);
+        return;
+      }
+
+      const samePath =
+        editPath.length === path.length && editPath.every((id, i) => id === path[i]);
+      if (!samePath) {
+        setEditPath(path);
+        setInfoNodeId(null);
+        setContextMenu(null);
+        setPreviewTargetId(null);
+      }
+
+      const markSelected = (nds: Node[]): Node[] =>
+        nds.map((n) => ({ ...n, selected: n.id === targetId }));
+      if (path.length === 0) {
+        setNodes((nds) => markSelected(nds as Node[]));
+      } else {
+        const scopeId = path[path.length - 1];
+        setSubgraphs((subs) =>
+          subs.map((sg) =>
+            sg.id === scopeId
+              ? { ...sg, nodes: markSelected(sg.nodes as unknown as Node[]) as unknown as GraphNode[] }
+              : sg,
+          ),
+        );
+      }
+      setSelectedNode(target);
+      window.setTimeout(
+        () => void fitView({ nodes: [{ id: targetId }], duration: 300, padding: 0.4, maxZoom: 1.5 }),
+        80,
+      );
+      setStatus(`Picked ${target.type ?? 'node'} "${targetId}"`);
+    },
+    [nodes, subgraphs, editPath, currentSubgraph, viewNodes, fitView, setNodes, setSubgraphs],
+  );
+
+  const onNodeDoubleClick: NodeMouseHandler = useCallback(
+    (_, node) => {
+      if (node.type !== 'Subgraph') return;
+      const id = getSubgraphId(node.data);
+      if (id) enterSubgraph(id);
+    },
+    [enterSubgraph],
+  );
+
+  // Undo can remove the definition being edited — bail back to root.
+  useEffect(() => {
+    if (editPath.length > 0 && !editPath.every((id) => subgraphs.some((s) => s.id === id))) {
+      setEditPath([]);
+    }
+  }, [editPath, subgraphs]);
+
   // ── Connection ──────────────────────────────────────
 
   const validateConnection = useCallback(
-    (conn: Connection | Edge) => isValidConnection(conn, nodes, edges),
-    [nodes, edges],
+    (conn: Connection | Edge) => isValidConnection(conn, viewNodes, viewEdges, subgraphs, currentSubgraph),
+    [viewNodes, viewEdges, subgraphs, currentSubgraph],
   );
 
   const onConnect = useCallback(
     (conn: Connection) => {
       if (!validateConnection(conn)) return;
       commit();
-      setEdges((eds) => addEdge(conn, eds));
+      setViewEdges((eds) => addEdge(conn, eds));
     },
-    [setEdges, validateConnection, commit],
+    [setViewEdges, validateConnection, commit],
   );
 
   const onConnectStart = useCallback((_: unknown, { nodeId, handleId, handleType }: { nodeId: string | null; handleId: string | null; handleType: string | null }) => {
@@ -188,14 +569,14 @@ function PcgEditor() {
       if (!nodeId || !handleId || !handleType) return;
 
       // Find the node and its pin type
-      const node = nodes.find((n) => n.id === nodeId);
+      const node = viewNodes.find((n) => n.id === nodeId);
       if (!node?.type) return;
 
       let pinType: PinType | undefined;
       if (handleType === 'source') {
-        pinType = getOutputPinType(node.type, handleId);
+        pinType = resolveOutputPinType(node, handleId, subgraphs, currentSubgraph);
       } else {
-        pinType = getInputPinType(node.type, handleId);
+        pinType = resolveInputPinType(node, handleId, subgraphs, currentSubgraph);
       }
       if (!pinType) return;
 
@@ -207,13 +588,39 @@ function PcgEditor() {
         y: clientY,
         filterPinType: pinType,
         isSourcePort: handleType === 'source',
-        onSelect: (nodeType) => {
+        onSelect: (selection: NodeSearchSelection | null) => {
           setSearchConfig(null);
-          if (!nodeType) return;
+          if (!selection) return;
 
           // Create new node at flow position
           const flowPos = screenToFlowPosition({ x: clientX, y: clientY });
-          const newId = `n${++nodeCounter}`;
+
+          if (selection.kind === 'library') {
+            const item: LibraryIndexItem = selection.item;
+            if (currentSubgraphId) {
+              setStatus('Library nodes can only be added at the root level');
+              return;
+            }
+            void loadLibrarySubgraph(item).then((subgraph) => {
+              const newId = allocateNodeId(viewNodes);
+              commit();
+              setSubgraphs((subs) => (subs.some((s) => s.id === subgraph.id) ? subs : [...subs, subgraph]));
+              setViewNodes((nds) => [
+                ...nds,
+                { id: newId, type: 'Subgraph', position: flowPos, data: { subgraphId: subgraph.id, __nodeTitle: item.displayName } },
+              ]);
+              const conn: Connection = handleType === 'source'
+                ? { source: nodeId, target: newId, sourceHandle: handleId, targetHandle: item.inputs[0]?.id ?? null }
+                : { source: newId, target: nodeId, sourceHandle: item.outputs[0]?.id ?? null, targetHandle: handleId };
+              if (validateConnection(conn)) {
+                setViewEdges((eds) => addEdge(conn, eds));
+              }
+            }).catch(() => setStatus(`Failed to load ${item.displayName}`));
+            return;
+          }
+
+          const nodeType = selection.nodeType;
+          const newId = allocateNodeId(viewNodes);
           const newNode: Node = {
             id: newId,
             type: nodeType,
@@ -221,7 +628,7 @@ function PcgEditor() {
             data: { ...defaultData(nodeType) },
           };
           commit();
-          setNodes((nds) => [...nds, newNode]);
+          setViewNodes((nds) => [...nds, newNode]);
 
           // Auto-connect
           let conn: Connection;
@@ -237,7 +644,7 @@ function PcgEditor() {
                 targetHandle: inputPin.id,
               };
               if (validateConnection(conn)) {
-                setEdges((eds) => addEdge(conn, eds));
+                setViewEdges((eds) => addEdge(conn, eds));
               }
             }
           } else {
@@ -252,7 +659,7 @@ function PcgEditor() {
                 targetHandle: handleId,
               };
               if (validateConnection(conn)) {
-                setEdges((eds) => addEdge(conn, eds));
+                setViewEdges((eds) => addEdge(conn, eds));
               }
             }
           }
@@ -264,7 +671,7 @@ function PcgEditor() {
       connectingHandleId.current = null;
       connectingHandleType.current = null;
     },
-    [nodes, setNodes, setEdges, screenToFlowPosition, commit, validateConnection],
+    [viewNodes, subgraphs, currentSubgraph, currentSubgraphId, setSubgraphs, setViewNodes, setViewEdges, screenToFlowPosition, commit, validateConnection],
   );
 
   // ── Node creation ───────────────────────────────────
@@ -272,7 +679,7 @@ function PcgEditor() {
   const createNodeAt = useCallback(
     (nodeType: string, x: number, y: number) => {
       const flowPos = screenToFlowPosition({ x, y });
-      const newId = `n${++nodeCounter}`;
+      const newId = allocateNodeId(viewNodes);
       const newNode: Node = {
         id: newId,
         type: nodeType,
@@ -280,21 +687,52 @@ function PcgEditor() {
         data: { ...defaultData(nodeType) },
       };
       commit();
-      setNodes((nds) => [...nds, newNode]);
+      setViewNodes((nds) => [...nds, newNode]);
+      setStatus(`Added ${nodeType}`);
     },
-    [setNodes, screenToFlowPosition, commit],
+    [viewNodes, setViewNodes, screenToFlowPosition, commit],
+  );
+
+  const createLibraryNodeAt = useCallback(
+    (item: LibraryIndexItem, x: number, y: number) => {
+      if (currentSubgraphId) {
+        setStatus('Library nodes can only be added at the root level');
+        return;
+      }
+      const flowPos = screenToFlowPosition({ x, y });
+      void loadLibrarySubgraph(item)
+        .then((subgraph) => {
+          const newId = allocateNodeId(viewNodes);
+          commit();
+          setSubgraphs((subs) => (subs.some((s) => s.id === subgraph.id) ? subs : [...subs, subgraph]));
+          setViewNodes((nds) => [
+            ...nds,
+            {
+              id: newId,
+              type: 'Subgraph',
+              position: flowPos,
+              data: { subgraphId: subgraph.id, __nodeTitle: item.displayName },
+            },
+          ]);
+          setStatus(`Added ${item.displayName}`);
+        })
+        .catch(() => setStatus(`Failed to load ${item.displayName}`));
+    },
+    [currentSubgraphId, viewNodes, setSubgraphs, setViewNodes, screenToFlowPosition, commit],
   );
 
   const openSearchAt = useCallback((x: number, y: number) => {
     setSearchConfig({
       x,
       y,
-      onSelect: (nodeType) => {
+      onSelect: (selection: NodeSearchSelection | null) => {
         setSearchConfig(null);
-        if (nodeType) createNodeAt(nodeType, x, y);
+        if (!selection) return;
+        if (selection.kind === 'library') createLibraryNodeAt(selection.item, x, y);
+        else createNodeAt(selection.nodeType, x, y);
       },
     });
-  }, [createNodeAt]);
+  }, [createNodeAt, createLibraryNodeAt]);
 
   // ── Selection ───────────────────────────────────────
 
@@ -319,7 +757,7 @@ function PcgEditor() {
   const updateNodeData = useCallback(
     (nodeId: string, patch: Record<string, unknown>) => {
       commit();
-      setNodes((nds) =>
+      setViewNodes((nds) =>
         nds.map((n) =>
           n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n,
         ),
@@ -329,7 +767,7 @@ function PcgEditor() {
         prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...patch } } : prev,
       );
     },
-    [setNodes, commit],
+    [setViewNodes, commit],
   );
 
   // ── Agent graph ops (actions dispatched from the agent panel) ──
@@ -340,20 +778,20 @@ function PcgEditor() {
         if (!getNodeTypeDefs(nodeType)) {
           throw new Error(`unknown node type "${nodeType}"`);
         }
-        const newId = `n${++nodeCounter}`;
+        const newId = allocateNodeId(viewNodes);
         const pos = position ?? screenToFlowPosition({
           x: window.innerWidth / 2,
           y: window.innerHeight / 2,
         });
-        setNodes((nds) => [
+        setViewNodes((nds) => [
           ...nds,
           { id: newId, type: nodeType, position: pos, data: { ...defaultData(nodeType) } },
         ]);
         return newId;
       },
       connectNodes: (source, target, sourceHandle, targetHandle) => {
-        const sourceNode = nodes.find((n) => n.id === source);
-        const targetNode = nodes.find((n) => n.id === target);
+        const sourceNode = viewNodes.find((n) => n.id === source);
+        const targetNode = viewNodes.find((n) => n.id === target);
         if (!sourceNode) throw new Error(`source node "${source}" not found`);
         if (!targetNode) throw new Error(`target node "${target}" not found`);
         const outPin = getNodeTypeDefs(sourceNode.type ?? '')?.outputs[0];
@@ -367,24 +805,140 @@ function PcgEditor() {
         if (!validateConnection(conn)) {
           throw new Error(`invalid connection ${source} → ${target}`);
         }
-        setEdges((eds) => addEdge(conn, eds));
+        setViewEdges((eds) => addEdge(conn, eds));
       },
       setNodeParam: (nodeId, key, value) => {
-        if (!nodes.some((n) => n.id === nodeId)) {
+        if (!viewNodes.some((n) => n.id === nodeId)) {
           throw new Error(`node "${nodeId}" not found`);
         }
-        setNodes((nds) =>
+        setViewNodes((nds) =>
           nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [key]: value } } : n)),
+        );
+        setSelectedNode((prev) =>
+          prev?.id === nodeId ? { ...prev, data: { ...prev.data, [key]: value } } : prev,
+        );
+      },
+      patchNode: (nodeId, patch) => {
+        const node = viewNodes.find((candidate) => candidate.id === nodeId);
+        if (!node) {
+          throw new Error(`node "${nodeId}" not found`);
+        }
+        for (const [key, value] of Object.entries(patch)) {
+          const error = validateNodePropertyValue(node.type ?? '', key, value);
+          if (error) throw new Error(error);
+        }
+        setViewNodes((nds) =>
+          nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n)),
+        );
+        setSelectedNode((prev) =>
+          prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...patch } } : prev,
         );
       },
     }),
-    [nodes, setNodes, setEdges, screenToFlowPosition, validateConnection],
+    [viewNodes, setViewNodes, setViewEdges, screenToFlowPosition, validateConnection],
   );
 
   const applyAgentActions = useCallback(
     (actions: AgentAction[]) => dispatchAgentActions(actions, agentOps, commit),
     [agentOps, commit],
   );
+
+  const bridgeGraph = useMemo(
+    () => exportGraph(nodes, edges, parameters, subgraphs),
+    [nodes, edges, parameters, subgraphs],
+  );
+  const installBridgeGraph = useCallback(
+    (parsed: ReturnType<typeof parseAndValidateGraph> & { ok: true }, nextEditPath: string[]) => {
+      commit('PCG MCP graph edit');
+      nodeCounter = syncNodeCounterFromNodes(parsed.parsed.nodes);
+      setNodes(parsed.parsed.nodes);
+      setEdges(parsed.parsed.edges);
+      setParameters(parsed.parsed.parameters);
+      setSubgraphs(parsed.parsed.subgraphs);
+      setEditPath(nextEditPath);
+      setSelectedNode(null);
+      setInfoNodeId(null);
+      setContextMenu(null);
+      setPreviewTargetId(null);
+      setPreviewParameterValuesByScope({});
+    },
+    [commit, setNodes, setEdges],
+  );
+  const applyBridgeCommands = useCallback(
+    async (commands: QueuedGraphCommand[]): Promise<GraphCommandResult[]> => {
+      const results: GraphCommandResult[] = [];
+      for (const command of commands) {
+        try {
+          if (command.type === 'saveGraph') {
+            const targetPath = command.path ?? currentFilename;
+            if (!targetPath) throw new Error('save path is required for an unnamed graph');
+            const saved = await saveGraphToFile(
+              bridgeGraph,
+              targetPath,
+            );
+            if (!saved.ok) throw new Error(saved.error ?? 'unknown save error');
+            if (command.path !== undefined) setCurrentFilename(targetPath);
+            setStatus(`Saved to ${targetPath} through PCG MCP`);
+            results.push({ id: command.id, ok: true, detail: { path: targetPath } });
+            continue;
+          }
+
+          if (command.type === 'replaceGraph') {
+            const validated = parseAndValidateGraph(command.graph);
+            if (!validated.ok) throw new Error(validated.error);
+            installBridgeGraph(validated, []);
+            setStatus(`PCG MCP replaced graph (${validated.parsed.nodes.length} root nodes)`);
+            results.push({
+              id: command.id,
+              ok: true,
+              detail: {
+                rootNodes: validated.parsed.nodes.length,
+                rootEdges: validated.parsed.edges.length,
+                subgraphs: validated.parsed.subgraphs.length,
+              },
+            });
+            continue;
+          }
+
+          const operations = command.type === 'setNodeParams'
+            ? [{ op: 'patch_node' as const, nodeId: command.nodeId, patch: command.patch }]
+            : command.operations;
+          const applied = applyGraphOperations(bridgeGraph, editPath, operations);
+          if (!applied.ok) throw new Error(applied.error);
+          installBridgeGraph({ ok: true, parsed: applied.parsed }, editPath);
+          setStatus(`PCG MCP applied ${operations.length} graph operation(s)`);
+          results.push({ id: command.id, ok: true, detail: applied.detail });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(`PCG MCP command failed: ${message}`);
+          results.push({ id: command.id, ok: false, error: message });
+        }
+      }
+      return results;
+    },
+    [bridgeGraph, currentFilename, editPath, installBridgeGraph],
+  );
+  const captureBridgePreview = useCallback(
+    (options?: CaptureOptions) => previewViewportRef.current?.captureFrame(options) ?? null,
+    [],
+  );
+  const applyBridgeCameraCommand = useCallback(
+    (command: CameraCommand) =>
+      (previewViewportRef.current?.applyCameraCommand(command) ?? null) as Record<string, unknown> | null,
+    [],
+  );
+  const syncEditorContext = useEditorBridge({
+    sessionId: editorSessionIdRef.current,
+    graph: bridgeGraph,
+    nodeManifest: getNodeManifest(),
+    graphPath: currentFilename,
+    editPath,
+    selectedNodeId: selectedNode?.id ?? null,
+    previewTargetNodeId,
+    applyCommands: applyBridgeCommands,
+    capturePreview: captureBridgePreview,
+    applyCameraCommand: applyBridgeCameraCommand,
+  });
 
   // ── Promote to parameter ───────────────────────────
 
@@ -393,7 +947,7 @@ function PcgEditor() {
       const def = getNodeTypeDefs(nodeType);
       if (!def) return;
 
-      const currentValue = (nodes.find((n) => n.id === nodeId)?.data as Record<string, unknown>)?.[propertyKey] ?? prop.default;
+      const currentValue = (viewNodes.find((n) => n.id === nodeId)?.data as Record<string, unknown>)?.[propertyKey] ?? prop.default;
       const hasRange = prop.minimum !== undefined && prop.maximum !== undefined;
 
       const paramType: GraphParameter['type'] =
@@ -415,9 +969,9 @@ function PcgEditor() {
         max: prop.maximum ?? 1,
       };
       commit();
-      setParameters((prev) => [...prev, newParam]);
+      setViewParameters([...viewParameters, newParam]);
     },
-    [nodes, commit],
+    [viewNodes, viewParameters, setViewParameters, commit],
   );
 
   // ── Bind/unbind parameter ──────────────────────────
@@ -425,8 +979,8 @@ function PcgEditor() {
   const bindParameter = useCallback(
     (nodeId: string, propertyKey: string, paramId: string | null) => {
       commit();
-      setParameters((prev) =>
-        prev.map((p) => {
+      setViewParameters(
+        viewParameters.map((p) => {
           // Clear any existing binding to this node.property
           if (p.targetNode === nodeId && p.targetProperty === propertyKey) {
             return { ...p, targetNode: '', targetProperty: '' };
@@ -441,7 +995,7 @@ function PcgEditor() {
         }),
       );
     },
-    [commit],
+    [viewParameters, setViewParameters, commit],
   );
 
   // ── Keyboard shortcuts ─────────────────────────────
@@ -458,7 +1012,7 @@ function PcgEditor() {
       } else if (e.key === 'f' || e.key === 'F') {
         if ((e.target as HTMLElement).closest('.pcg-preview')) return;
         e.preventDefault();
-        fitView({ duration: 200 });
+        fitView({ ...GRAPH_FIT_VIEW_OPTIONS, duration: 200 });
       } else if (e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         setShowBlackboard((v) => !v);
@@ -472,11 +1026,14 @@ function PcgEditor() {
         } else {
           undo();
         }
+      } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        openSettings();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [openSearchAt, fitView, undo, redo]);
+  }, [openSearchAt, fitView, openSettings, undo, redo]);
 
   // ── Node drag undo ─────────────────────────────────
 
@@ -496,7 +1053,7 @@ function PcgEditor() {
   }, []);
 
   const copyRawData = useCallback(async (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId);
+    const node = viewNodes.find((n) => n.id === nodeId);
     if (!node) return;
     const rawData = {
       id: node.id,
@@ -511,7 +1068,7 @@ function PcgEditor() {
       setStatus('Failed to copy to clipboard');
     }
     setContextMenu(null);
-  }, [nodes]);
+  }, [viewNodes]);
 
   // ── Graph pane right-click ─────────────────────────
 
@@ -571,11 +1128,13 @@ function PcgEditor() {
 
     nodeCounter = syncNodeCounterFromNodes(result.nodes);
     commit();
+    setEditPath([]);
     setNodes(result.nodes);
     setEdges(result.edges);
     setParameters(result.parameters);
     setSubgraphs(result.subgraphs);
     setSelectedNode(null);
+    setPreviewParameterValuesByScope({});
     setCurrentFilename(file.name);
     setStatus(`Imported ${result.filename ?? 'graph'} (${result.nodes.length} nodes, ${result.edges.length} edges, ${result.parameters.length} params, ${result.subgraphs.length} subgraphs)`);
   };
@@ -584,13 +1143,15 @@ function PcgEditor() {
 
   const handleNewGraph = () => {
     commit();
+    setEditPath([]);
     setNodes([]);
     setEdges([]);
     setParameters([]);
     setSubgraphs([]);
     setSelectedNode(null);
     setInfoNodeId(null);
-    setPreviewTargetNodeId(null);
+    setPreviewTargetId(null);
+    setPreviewParameterValuesByScope({});
     setCurrentFilename('');
     nodeCounter = 100;
     clearEditorSession();
@@ -617,9 +1178,12 @@ function PcgEditor() {
 
   // ── Preview cook ────────────────────────────────────
 
-  const requestPreviewCook = useCallback(async (targetOverride?: string | null) => {
-    if (nodes.length === 0) return;
-    const target = targetOverride === undefined ? previewTargetNodeId : targetOverride;
+  const requestPreviewCook = useCallback(async (targetOverride?: string | null): Promise<boolean> => {
+    if (viewNodes.length === 0) return false;
+    // Read the target from the store (not React state) so this callback's identity
+    // stays stable across ▶ clicks — a new identity would propagate through
+    // NodeActionsContext and re-render every node.
+    const target = targetOverride === undefined ? getPreviewTargetId() : targetOverride;
     previewAbortRef.current?.abort();
     const previousJobId = previewJobIdRef.current;
     if (previousJobId) {
@@ -632,30 +1196,41 @@ function PcgEditor() {
 
     setPreviewLoading(true);
     setPreviewError(null);
+    // Full document from root states; inside a subgraph, cook its interior in
+    // isolation via a synthetic Output node (interface nodes are stripped).
     let graph = exportGraph(nodes, edges, parameters, subgraphs);
+    if (currentSubgraph) {
+      graph = buildSubgraphCookGraph(currentSubgraph, graph.subgraphs ?? []);
+    }
+    graph = applyPreviewParameterOverrides(graph, previewParameterValues);
     if (target) {
-      const targetNode = nodes.find((n) => n.id === target);
-      const outputPin = targetNode ? getNodeTypeDefs(targetNode.type ?? '')?.outputs[0] : undefined;
+      const targetNode = graph.nodes.find((n) => n.id === target);
+      // Manifest nodes take their first declared output pin; subgraph instances
+      // take the first output pin of the referenced definition.
+      const outputPinId =
+        targetNode?.type === 'Subgraph'
+          ? findSubgraph(subgraphs, getSubgraphId(targetNode.data))?.outputs[0]?.id
+          : getNodeTypeDefs(targetNode?.type ?? '')?.outputs[0]?.id;
       const previewGraph =
-        targetNode && outputPin ? buildPreviewCookGraph(graph, target, outputPin.id) : null;
+        targetNode && outputPinId ? buildPreviewCookGraph(graph, target, outputPinId) : null;
       if (previewGraph) {
         graph = previewGraph;
       } else {
         // Preview target was deleted — fall back to the full graph.
-        setPreviewTargetNodeId(null);
+        setPreviewTargetId(null);
       }
-    } else {
-      graph = prepareGraphForPreviewCook(graph);
     }
-    const result = await cookGraphPreview(graph, 42, abort.signal, jobId);
-    if (previewAbortRef.current !== abort) return; // superseded by a newer cook
+    const result = await cookGraphPreviewBudgeted(graph, 42, abort.signal, jobId);
+    if (previewAbortRef.current !== abort) return false; // superseded by a newer cook
     setPreviewLoading(false);
     if (result.ok && result.data) {
       setPreviewData(result.data);
+      return true;
     } else if (result.error !== 'aborted') {
       setPreviewError(result.error ?? 'Cook failed');
     }
-  }, [nodes, edges, parameters, subgraphs, previewTargetNodeId]);
+    return false;
+  }, [nodes, edges, parameters, subgraphs, currentSubgraph, viewNodes.length, previewParameterValues]);
 
   const openPreview = useCallback(async () => {
     setShowPreview(true);
@@ -710,38 +1285,39 @@ function PcgEditor() {
 
   const handleNodePreview = useCallback(
     (nodeId: string) => {
-      // The target change retriggers the debounced effect below; skip its next
-      // run since the direct cook here already covers it (avoids a duplicate
-      // request whose cache-hit stats would mask the real exec numbers).
-      skipDebounceRef.current = true;
-      if (nodeId === previewTargetNodeId) {
+      if (nodeId === getPreviewTargetId()) {
         // Clicking ▶ on the current target clears it — back to full-graph preview.
-        setPreviewTargetNodeId(null);
+        setPreviewTargetId(null);
         void requestPreviewCook(null);
         return;
       }
-      setPreviewTargetNodeId(nodeId);
+      setPreviewTargetId(nodeId);
       if (!showPreview) {
+        // Opening the panel flips showPreview, which retriggers the debounced
+        // effect below; skip its next run since the direct cook here already
+        // covers it. (With the panel already open the effect does not re-run —
+        // the target lives outside its deps — so nothing needs skipping.)
+        skipDebounceRef.current = true;
         void openPreview();
       }
       void requestPreviewCook(nodeId);
     },
-    [showPreview, previewTargetNodeId, openPreview, requestPreviewCook],
+    [showPreview, openPreview, requestPreviewCook],
   );
 
   const nodeActions = useMemo(
-    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview, previewTargetId: previewTargetNodeId }),
-    [handleNodeInfo, handleNodePreview, previewTargetNodeId],
+    () => ({ onInfo: handleNodeInfo, onPreview: handleNodePreview }),
+    [handleNodeInfo, handleNodePreview],
   );
 
   const splineEditNode = useMemo(() => {
     const candidateIds = [previewTargetNodeId, selectedNode?.id].filter(Boolean) as string[];
     for (const id of candidateIds) {
-      const node = nodes.find((n) => n.id === id);
+      const node = viewNodes.find((n) => n.id === id);
       if (node?.type && isSplineAuthoringNode(node.type)) return node;
     }
     return null;
-  }, [nodes, previewTargetNodeId, selectedNode?.id]);
+  }, [viewNodes, previewTargetNodeId, selectedNode?.id]);
 
   const splineEdit = useMemo((): SplineEditContext | null => {
     if (!splineEditNode) return null;
@@ -777,6 +1353,7 @@ function PcgEditor() {
   const skipDebounceRef = useRef(false);
   useEffect(() => {
     if (!showPreview) return;
+    if (!shouldAutoCookGraphPreview({ nodes: viewNodes, edges: viewEdges })) return;
     if (skipDebounceRef.current) {
       skipDebounceRef.current = false;
       return;
@@ -788,12 +1365,135 @@ function PcgEditor() {
     return () => {
       if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
     };
-  }, [showPreview, selectedNode, requestPreviewCook]);
+  }, [showPreview, selectedNode, requestPreviewCook, viewNodes, viewEdges]);
+
+  const handleProceduralizeReference = useCallback(async (node: Node) => {
+    const data = node.data as Record<string, unknown>;
+    const referencePath = String(data.path ?? '').trim();
+    if (!referencePath) {
+      setStatus('Generate or assign a Tripo GLB before procedural reconstruction.');
+      return;
+    }
+    setProceduralizingNodeId(node.id);
+    setPreviewError(null);
+    setPreviewData(null);
+    setShowPreview(true);
+    setPreviewTargetId(node.id);
+    skipDebounceRef.current = true;
+    const existingSurface = viewNodes.find((candidate) => {
+      if (candidate.type !== 'OrientedSdfSurface') return false;
+      return String((candidate.data as Record<string, unknown>).sourceReference ?? '') === referencePath;
+    });
+    const bakedSurfaceNodeId = existingSurface?.id ?? allocateNodeId(viewNodes);
+    const existingMaterial = viewNodes.find((candidate) => {
+      if (candidate.type !== 'Material') return false;
+      const materialName = String((candidate.data as Record<string, unknown>).materialName ?? '');
+      return materialName === 'ReconstructedSourceMaterial' ||
+        materialName === 'ReconstructedVertexColorMaterial';
+    });
+    const bakedMaterialNodeId = existingMaterial?.id ?? allocateNodeId(viewNodes);
+    setStatus('Baking topology-free oriented samples from the Tripo GLB…');
+    try {
+      const previous = (existingSurface?.data ?? {}) as Record<string, unknown>;
+      const numberOrUndefined = (value: unknown) => typeof value === 'number' && Number.isFinite(value)
+        ? value
+        : undefined;
+      const baked = await buildOrientedSdfNodeData(referencePath, {
+        title: 'High-Fidelity Tripo SDF Surface',
+        componentId: 'reference.surface',
+        cellSize: numberOrUndefined(previous.cellSize),
+        supportRadiusCells: numberOrUndefined(previous.supportRadiusCells),
+        isoOffset: numberOrUndefined(previous.isoOffset),
+        maxActiveCells: numberOrUndefined(previous.maxActiveCells),
+        transferColors: typeof previous.transferColors === 'boolean' ? previous.transferColors : true,
+        transferUvs: typeof previous.transferUvs === 'boolean' ? previous.transferUvs : true,
+        flipUvV: typeof previous.flipUvV === 'boolean' ? previous.flipUvV : undefined,
+      });
+      setStatus(
+        `Baked ${baked.sourcePointCount.toLocaleString()} oriented samples from ` +
+        `${baked.sourceVertexCount.toLocaleString()} source vertices; cooking the fixed six-view reference…`,
+      );
+      await waitForPreviewPaint();
+      const cooked = await requestPreviewCook(node.id);
+      if (!cooked) throw new Error('The Tripo reference did not cook successfully.');
+      await waitForPreviewPaint();
+      const viewport = previewViewportRef.current;
+      if (!viewport) throw new Error('3D Preview is not ready.');
+      const sourceImage = String(data.texture ?? '').trim() || String(data.imageUrl ?? '').trim();
+      let sourceImageFile: File | null = null;
+      try {
+        sourceImageFile = await loadProceduralSourceImageFile(sourceImage);
+      } catch (error) {
+        console.warn('Could not attach Tripo source image; the manifest path remains available.', error);
+      }
+      const { request, manifest } = captureProceduralReferenceBundle(viewport, {
+        nodeId: node.id,
+        referencePath,
+        bakedSurfaceNodeId,
+        bakedMaterialNodeId,
+        sourceImage,
+        sourceImageFile,
+        graphPath: currentFilename,
+      });
+      let bakedNodeData = baked.nodeData;
+      let bakedMaterialData = baked.suggestedMaterialData;
+      const baseColorMap = typeof bakedMaterialData.baseColorMap === 'string'
+        ? bakedMaterialData.baseColorMap
+        : '';
+      const pointCloud = typeof bakedNodeData.pointCloud === 'string'
+        ? bakedNodeData.pointCloud
+        : '';
+      if (baseColorMap && pointCloud && baked.hasSourceUvs) {
+        setStatus('Projecting the Tripo base-colour texture into the dense oriented sample field…');
+        const colorBake = await bakeBaseColorTextureIntoOpc1(pointCloud, baseColorMap);
+        bakedNodeData = {
+          ...bakedNodeData,
+          pointCloud: colorBake.pointCloud,
+          transferColors: true,
+        };
+        bakedMaterialData = makeVertexColorMaterialData(bakedMaterialData);
+      }
+      const bakedNode: Node = {
+        id: bakedSurfaceNodeId,
+        type: 'OrientedSdfSurface',
+        position: existingSurface?.position ?? { x: node.position.x, y: node.position.y + 160 },
+        data: { ...defaultData('OrientedSdfSurface'), ...bakedNodeData },
+      };
+      const bakedMaterialNode: Node = {
+        id: bakedMaterialNodeId,
+        type: 'Material',
+        position: existingMaterial?.position ?? { x: node.position.x + 320, y: node.position.y + 160 },
+        data: { ...defaultData('Material'), ...bakedMaterialData },
+      };
+      commit();
+      setViewNodes((current) => {
+        let updated = existingSurface
+          ? current.map((candidate) => candidate.id === bakedSurfaceNodeId ? bakedNode : candidate)
+          : [...current, bakedNode];
+        updated = existingMaterial
+          ? updated.map((candidate) => candidate.id === bakedMaterialNodeId ? bakedMaterialNode : candidate)
+          : [...updated, bakedMaterialNode];
+        return updated;
+      });
+      setSelectedNode(bakedNode);
+      setPreviewTargetId(bakedSurfaceNodeId);
+      setAgentLaunchRequest(request);
+      setShowAgent(true);
+      const passCount = manifest.views.reduce((sum, view) => sum + view.passes.length, 0);
+      setStatus(`Created ${bakedSurfaceNodeId} from ${baked.sourcePointCount.toLocaleString()} samples (${Math.round(baked.payloadBytes / 1024).toLocaleString()} KiB, no source topology) + ${bakedMaterialNodeId} (texture-baked vertex colour); captured ${manifest.views.length} views / ${passCount} passes; Agent queued for ${manifest.targetGraphPath}`);
+    } catch (error) {
+      setStatus(`Procedural reference capture failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setProceduralizingNodeId(null);
+    }
+  }, [commit, currentFilename, requestPreviewCook, setViewNodes, viewNodes]);
 
   // ── Render ──────────────────────────────────────────
 
   return (
     <NodeActionsContext.Provider value={nodeActions}>
+    <SubgraphsContext.Provider value={subgraphs}>
+    <CurrentSubgraphContext.Provider value={currentSubgraph}>
     <div className="pcg-app">
       {/* Toolbar — aligned with Unity: left=New/Save/Save As/Show in Project, right=Parameters/Inspector */}
       <div className="pcg-toolbar">
@@ -835,6 +1535,7 @@ function PcgEditor() {
           Preview
         </button>
         <span className="pcg-toolbar__separator" />
+        <button type="button" onClick={openSettings} title="PCG Settings (⌘,)">Settings</button>
         <input
           ref={fileInputRef}
           type="file"
@@ -847,29 +1548,98 @@ function PcgEditor() {
         {status && <span className="pcg-toolbar__status">{status}</span>}
       </div>
 
+      <SettingsDialog
+        open={showSettings}
+        onClose={closeSettings}
+        onProvidersChanged={() => setProviderRevision((revision) => revision + 1)}
+      />
+
       {/* Main: three-panel layout */}
       <div className="pcg-main">
-        {showAgent && <AgentPanel onApplyActions={applyAgentActions} />}
-        {showBlackboard && (
-          <Blackboard
-            parameters={parameters}
-            nodes={nodes}
-            onParametersChange={(params) => {
-              commit();
-              setParameters(params);
+        {showAgent && (
+          <AgentPanel
+            onApplyActions={applyAgentActions}
+            onOpenSettings={openSettings}
+            syncEditorContext={syncEditorContext}
+            editorSessionId={editorSessionIdRef.current}
+            providerRevision={providerRevision}
+            launchRequest={agentLaunchRequest}
+            onLaunchConsumed={(requestId) => {
+              setAgentLaunchRequest((queued) => queued?.id === requestId ? null : queued);
             }}
           />
         )}
+        {showBlackboard && (
+          <Blackboard
+            parameters={viewParameters}
+            nodes={viewNodes}
+            onParametersChange={(params) => {
+              commit();
+              setViewParameters(params);
+            }}
+          />
+        )}
+        {showPreview && (
+          <PreviewViewport
+            ref={previewViewportRef}
+            data={previewData}
+            loading={previewLoading}
+            error={previewError}
+            onRefresh={() => void requestPreviewCook()}
+            parameters={viewParameters}
+            parameterNodeIds={previewParameterNodeIds}
+            parameterValues={previewParameterValues}
+            onParameterValueChange={updatePreviewParameterValue}
+            onResetParameters={resetPreviewParameters}
+            onSaveParameterDefaults={savePreviewParametersAsDefaults}
+            splineEdit={splineEditForViewport}
+            onPickNode={handlePreviewPickNode}
+            selectedNodeId={selectedNode?.id ?? null}
+          />
+        )}
         <div className="pcg-graph-container">
+          {/* Breadcrumb — visible while editing inside a subgraph */}
+          {editPath.length > 0 && (
+            <div className="pcg-breadcrumb">
+              <button
+                type="button"
+                className="pcg-breadcrumb__item"
+                onClick={() => navigateTo([])}
+              >
+                Root
+              </button>
+              {editPath.map((id, i) => (
+                <span key={`${id}-${i}`} className="pcg-breadcrumb__segment">
+                  <span className="pcg-breadcrumb__sep">/</span>
+                  <button
+                    type="button"
+                    className={`pcg-breadcrumb__item${i === editPath.length - 1 ? ' pcg-breadcrumb__item--current' : ''}`}
+                    onClick={() => navigateTo(editPath.slice(0, i + 1))}
+                  >
+                    {subgraphs.find((s) => s.id === id)?.name || id}
+                  </button>
+                </span>
+              ))}
+              <span className="pcg-breadcrumb__hint">Double-click empty space to go up</span>
+            </div>
+          )}
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            nodes={viewNodes}
+            edges={viewEdges}
+            onNodesChange={onViewNodesChange}
+            onEdgesChange={onViewEdgesChange}
             onConnect={onConnect}
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
             onNodeClick={onNodeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
+            onDoubleClick={(e) => {
+              // Double-click on empty canvas goes up one level (Unity-style).
+              const target = e.target as HTMLElement;
+              if (editPath.length > 0 && target.classList.contains('react-flow__pane')) {
+                navigateTo(editPath.slice(0, -1));
+              }
+            }}
             onPaneClick={onPaneClick}
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
@@ -877,7 +1647,10 @@ function PcgEditor() {
             onPaneContextMenu={onPaneContextMenu}
             isValidConnection={validateConnection}
             nodeTypes={nodeTypes}
+            minZoom={GRAPH_MIN_ZOOM}
+            maxZoom={GRAPH_MAX_ZOOM}
             fitView
+            fitViewOptions={GRAPH_FIT_VIEW_OPTIONS}
             deleteKeyCode={['Delete', 'Backspace']}
           >
             <Background variant={BackgroundVariant.Lines} gap={24} color="#2b2b2b" />
@@ -887,7 +1660,10 @@ function PcgEditor() {
 
           {/* Status bar */}
           <div className="pcg-status-bar">
-            <span>{nodes.length} nodes · {edges.length} edges · {parameters.length} params · {subgraphs.length} subgraphs</span>
+            <span>
+              {currentSubgraph && <span className="pcg-status-bar__path">{currentSubgraph.name || currentSubgraph.id}: </span>}
+              {viewNodes.length} nodes · {viewEdges.length} edges · {viewParameters.length} params · {subgraphs.length} subgraphs
+            </span>
             <span className="pcg-status-bar__shortcuts">Space: Create · F: Fit · P: Parameters · I: Inspector</span>
             {(canUndo || canRedo) && (
               <span className="pcg-status-bar__undo">
@@ -900,22 +1676,14 @@ function PcgEditor() {
         {showInspector && (
           <Inspector
             selectedNode={selectedNode}
-            parameters={parameters}
-            nodes={nodes}
-            edges={edges}
+            parameters={viewParameters}
+            nodes={viewNodes}
+            edges={viewEdges}
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}
-          />
-        )}
-        {showPreview && (
-          <PreviewViewport
-            data={previewData}
-            loading={previewLoading}
-            error={previewError}
-            onRefresh={() => void requestPreviewCook()}
-            onClose={() => void togglePreview()}
-            splineEdit={splineEditForViewport}
+            onProceduralizeReference={(node) => void handleProceduralizeReference(node)}
+            proceduralizingNodeId={proceduralizingNodeId}
           />
         )}
       </div>
@@ -931,7 +1699,7 @@ function PcgEditor() {
       {/* Floating: Node Info Panel (pinned via hover toolbar ℹ) */}
       {infoNodeId &&
         (() => {
-          const node = nodes.find((n) => n.id === infoNodeId);
+          const node = viewNodes.find((n) => n.id === infoNodeId);
           if (!node) return null;
           // Anchor to the node's right edge; recompute every render so the
           // panel sticks to the node when it moves or the viewport changes.
@@ -943,8 +1711,8 @@ function PcgEditor() {
           return (
             <NodeInfoPanel
               node={node}
-              nodes={nodes}
-              edges={edges}
+              nodes={viewNodes}
+              edges={viewEdges}
               x={anchor.x}
               y={anchor.y}
               onClose={() => setInfoNodeId(null)}
@@ -971,6 +1739,8 @@ function PcgEditor() {
         </>
       )}
     </div>
+    </CurrentSubgraphContext.Provider>
+    </SubgraphsContext.Provider>
     </NodeActionsContext.Provider>
   );
 }

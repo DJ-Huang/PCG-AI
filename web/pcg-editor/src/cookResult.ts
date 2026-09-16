@@ -59,6 +59,19 @@ export interface ParsedGeometry {
 
 const utf8 = new TextDecoder();
 
+// Block reinterpret helpers: the wire format is little-endian and every
+// supported platform (macOS/Windows, x64/arm64) is little-endian, so copying a
+// byte range into a fresh aligned buffer and viewing it as typed elements is
+// value-identical to per-element DataView reads, at memcpy speed. Callers
+// bounds-check before calling; slice() guarantees a 4-aligned fresh buffer.
+function copyFloat32(source: Uint8Array, byteOffset: number, count: number): Float32Array {
+  return new Float32Array(source.slice(byteOffset, byteOffset + count * 4).buffer);
+}
+
+function copyUint32(source: Uint8Array, byteOffset: number, count: number): Uint32Array {
+  return new Uint32Array(source.slice(byteOffset, byteOffset + count * 4).buffer);
+}
+
 function readBlob(view: DataView, state: { offset: number }): Uint8Array {
   if (state.offset + 4 > view.byteLength) throw new Error('Truncated blob length');
   const len = view.getUint32(state.offset, true);
@@ -164,46 +177,26 @@ export function parseGeometryBinary(data: Uint8Array): ParsedGeometry {
       if (chunkSize !== pointCount * 12) {
         throw new Error(`POINTS chunk bytes mismatch: ${chunkSize} != ${pointCount * 12}`);
       }
-      positions = new Float32Array(pointCount * 3);
-      for (let i = 0; i < pointCount * 3; i++) {
-        positions[i] = view.getFloat32(offset + i * 4, true);
-      }
+      positions = copyFloat32(data, offset, pointCount * 3);
     } else if (chunkId === CHUNK_FACE_OFFSETS) {
       if (faceOffsets) throw new Error('Duplicate FACE_OFFSETS chunk');
       if (chunkSize !== faceCount * 4) {
         throw new Error(`FACE_OFFSETS chunk bytes mismatch: ${chunkSize} != ${faceCount * 4}`);
       }
-      faceOffsets = new Uint32Array(faceCount);
-      for (let i = 0; i < faceCount; i++) {
-        faceOffsets[i] = view.getUint32(offset + i * 4, true);
-      }
+      faceOffsets = copyUint32(data, offset, faceCount);
     } else if (chunkId === CHUNK_FACE_INDICES) {
       if (faceIndices) throw new Error('Duplicate FACE_INDICES chunk');
       if (chunkSize % 4 !== 0) throw new Error('FACE_INDICES chunk size not a multiple of 4');
-      const count = chunkSize / 4;
-      faceIndices = new Uint32Array(count);
-      for (let i = 0; i < count; i++) {
-        faceIndices[i] = view.getUint32(offset + i * 4, true);
-      }
+      faceIndices = copyUint32(data, offset, chunkSize / 4);
     } else if (chunkId === CHUNK_TRIANGULATION) {
       if (chunkSize % 4 !== 0) throw new Error('TRIANGULATION chunk size not a multiple of 4');
-      const count = chunkSize / 4;
-      triangles = new Uint32Array(count);
-      for (let i = 0; i < count; i++) {
-        triangles[i] = view.getUint32(offset + i * 4, true);
-      }
+      triangles = copyUint32(data, offset, chunkSize / 4);
     } else if (chunkId === CHUNK_COLORS) {
       if (chunkSize % 16 !== 0) throw new Error('COLORS chunk size not a multiple of 16');
-      colors = new Float32Array(chunkSize / 4);
-      for (let i = 0; i < colors.length; i++) {
-        colors[i] = view.getFloat32(offset + i * 4, true);
-      }
+      colors = copyFloat32(data, offset, chunkSize / 4);
     } else if (chunkId === CHUNK_UVS) {
       if (chunkSize % 8 !== 0) throw new Error('UVS chunk size not a multiple of 8');
-      uvs = new Float32Array(chunkSize / 4);
-      for (let i = 0; i < uvs.length; i++) {
-        uvs[i] = view.getFloat32(offset + i * 4, true);
-      }
+      uvs = copyFloat32(data, offset, chunkSize / 4);
     }
     // GROUPS / MATERIAL / ATTRIBUTES / unknown chunks: skip by size.
 
@@ -246,11 +239,7 @@ export function parsePointBinary(data: Uint8Array): Float32Array {
   const pointCount = view.getUint32(8, true);
   const positionsBytes = pointCount * 12;
   if (16 + positionsBytes > data.byteLength) throw new Error('Point binary positions truncated');
-  const positions = new Float32Array(pointCount * 3);
-  for (let i = 0; i < pointCount * 3; i++) {
-    positions[i] = view.getFloat32(16 + i * 4, true);
-  }
-  return positions;
+  return copyFloat32(data, 16, pointCount * 3);
 }
 
 // Mesh binary ('PCGM', pcg_mesh_binary.cpp): flat-shading duplicated vertices
@@ -261,6 +250,10 @@ export interface ParsedMesh {
   normals: Float32Array | null;
   colors: Float32Array | null;
   uvs: Float32Array | null;
+  /** PCGM v3 material slot names in Unity submesh order. */
+  materialSlots: string[];
+  /** Per-triangle slot index (length = indexCount / 3) for PCGM v3. */
+  triangleMaterials: Uint32Array | null;
   vertexCount: number;
   indexCount: number;
 }
@@ -311,6 +304,7 @@ export interface ParsedSplines {
 const MESH_FLAG_NORMALS = 0x1;
 const MESH_FLAG_COLORS = 0x2;
 const MESH_FLAG_UVS = 0x4;
+const MESH_FLAG_MATERIALS = 0x8;
 
 export function parseMeshBinary(data: Uint8Array): ParsedMesh {
   if (data.byteLength < 16) throw new Error('Mesh binary payload is too small');
@@ -331,29 +325,22 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
     flags = view.getUint32(offset, true);
     offset += 4;
   }
+  let materialSectionSize = 0;
   if (version === 3) {
-    offset += 4; // material section size — materials are out of preview scope
+    materialSectionSize = view.getUint32(offset, true);
+    offset += 4;
   }
 
   const need = offset + vertexCount * 12 + indexCount * 4;
   if (need > data.byteLength) throw new Error('Mesh binary positions/indices truncated');
-  const positions = new Float32Array(vertexCount * 3);
-  for (let i = 0; i < vertexCount * 3; i++) {
-    positions[i] = view.getFloat32(offset + i * 4, true);
-  }
+  const positions = copyFloat32(data, offset, vertexCount * 3);
   offset += vertexCount * 12;
-  const indices = new Uint32Array(indexCount);
-  for (let i = 0; i < indexCount; i++) {
-    indices[i] = view.getUint32(offset + i * 4, true);
-  }
+  const indices = copyUint32(data, offset, indexCount);
   offset += indexCount * 4;
 
   const readFloatBlock = (count: number, what: string): Float32Array => {
     if (offset + count * 4 > data.byteLength) throw new Error(`Mesh binary ${what} truncated`);
-    const out = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      out[i] = view.getFloat32(offset + i * 4, true);
-    }
+    const out = copyFloat32(data, offset, count);
     offset += count * 4;
     return out;
   };
@@ -362,7 +349,48 @@ export function parseMeshBinary(data: Uint8Array): ParsedMesh {
   const colors = (flags & MESH_FLAG_COLORS) !== 0 ? readFloatBlock(vertexCount * 4, 'colors') : null;
   const uvs = (flags & MESH_FLAG_UVS) !== 0 ? readFloatBlock(vertexCount * 2, 'uvs') : null;
 
-  return { positions, indices, normals, colors, uvs, vertexCount, indexCount };
+  const materialSlots: string[] = [];
+  let triangleMaterials: Uint32Array | null = null;
+  if ((flags & MESH_FLAG_MATERIALS) !== 0) {
+    if (version !== 3 || materialSectionSize < 4 || offset + materialSectionSize > data.byteLength) {
+      throw new Error('Mesh binary material section is invalid');
+    }
+    const sectionEnd = offset + materialSectionSize;
+    const slotCount = view.getUint32(offset, true);
+    offset += 4;
+    if (slotCount > 65536) throw new Error('Mesh binary material slot count is unreasonable');
+    for (let slot = 0; slot < slotCount; slot++) {
+      if (offset + 4 > sectionEnd) throw new Error('Mesh binary material name length truncated');
+      const byteLength = view.getUint32(offset, true);
+      offset += 4;
+      if (offset + byteLength > sectionEnd) throw new Error('Mesh binary material name truncated');
+      materialSlots.push(utf8.decode(data.subarray(offset, offset + byteLength)));
+      offset += byteLength;
+    }
+    const triangleCount = indexCount / 3;
+    if (!Number.isInteger(triangleCount) || offset + triangleCount * 4 !== sectionEnd) {
+      throw new Error('Mesh binary triangle material table size mismatch');
+    }
+    triangleMaterials = copyUint32(data, offset, triangleCount);
+    for (const slot of triangleMaterials) {
+      if (slot >= materialSlots.length) throw new Error('Mesh binary triangle material slot out of range');
+    }
+    offset = sectionEnd;
+  } else if (materialSectionSize !== 0) {
+    throw new Error('Mesh binary contains an unexpected material section');
+  }
+
+  return {
+    positions,
+    indices,
+    normals,
+    colors,
+    uvs,
+    materialSlots,
+    triangleMaterials,
+    vertexCount,
+    indexCount,
+  };
 }
 
 function readU32(view: DataView, offset: number): number {
@@ -371,10 +399,6 @@ function readU32(view: DataView, offset: number): number {
 
 function readI32(view: DataView, offset: number): number {
   return view.getInt32(offset, true);
-}
-
-function readF32(view: DataView, offset: number): number {
-  return view.getFloat32(offset, true);
 }
 
 function readF64(view: DataView, offset: number): number {
@@ -431,11 +455,8 @@ export function parseHeightFieldBinary(data: Uint8Array): ParsedHeightField {
     }
     const name = utf8.decode(data.subarray(offset, offset + nameBytes));
     offset += nameBytes;
-    const values = new Float32Array(valueCount);
-    for (let v = 0; v < valueCount; v++) {
-      values[v] = readF32(view, offset);
-      offset += 4;
-    }
+    const values = copyFloat32(data, offset, valueCount);
+    offset += valueCount * 4;
     layers.push({ name, tupleSize, values });
   }
 
@@ -594,6 +615,8 @@ export function buildHeightFieldPreviewMesh(
     normals: null,
     colors: null,
     uvs: null,
+    materialSlots: [],
+    triangleMaterials: null,
     vertexCount,
     indexCount: indices.length,
   };
@@ -649,6 +672,75 @@ export function parseSplineJson(json: string): ParsedSplines | null {
     }
 
     return splines.length > 0 ? { splines } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Texture descriptor emitted by ImageTexture/MeshyImageGen when the preview
+ * target outputs a Texture pin (pcg-core mesh_elements.cpp). `source` is the
+ * node data storage string (pcg-resource://…, /assets/… or URL), empty when
+ * the node has no image baked yet.
+ */
+export interface ParsedTexture {
+  slotId: string;
+  source: string;
+  repeatX: number;
+  repeatY: number;
+}
+
+export function parseTextureJson(json: string): ParsedTexture | null {
+  if (!json.trim()) return null;
+  try {
+    const payload = JSON.parse(json) as {
+      kind?: unknown;
+      slotId?: unknown;
+      source?: unknown;
+      repeatX?: unknown;
+      repeatY?: unknown;
+    };
+    if (payload.kind !== 'texture' || typeof payload.slotId !== 'string') return null;
+    return {
+      slotId: payload.slotId,
+      source: typeof payload.source === 'string' ? payload.source : '',
+      repeatX: Number.isFinite(payload.repeatX) ? Number(payload.repeatX) : 1,
+      repeatY: Number.isFinite(payload.repeatY) ? Number(payload.repeatY) : 1,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Per-triangle node attribution emitted by pcg-core for preview-sink cooks.
+ * triangleSources[i] indexes sourceNodes for PCGM triangle i; -1 = unknown.
+ */
+export interface SourceMapping {
+  sourceNodes: string[];
+  triangleSources: Int32Array;
+}
+
+export function parseSourceMapping(json: string): SourceMapping | null {
+  if (!json.trim()) return null;
+  try {
+    const payload = JSON.parse(json) as {
+      source_nodes?: unknown;
+      triangle_sources?: unknown;
+    };
+    if (!Array.isArray(payload.source_nodes) || !Array.isArray(payload.triangle_sources)) {
+      return null;
+    }
+    const sourceNodes: string[] = [];
+    for (const entry of payload.source_nodes) {
+      if (typeof entry !== 'string') return null;
+      sourceNodes.push(entry);
+    }
+    const triangleSources = new Int32Array(payload.triangle_sources.length);
+    for (let i = 0; i < payload.triangle_sources.length; i++) {
+      triangleSources[i] = Number(payload.triangle_sources[i]) | 0;
+    }
+    return { sourceNodes, triangleSources };
   } catch {
     return null;
   }

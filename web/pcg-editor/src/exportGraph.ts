@@ -12,6 +12,8 @@ import type {
 
 /**
  * Converts React Flow state to Graph JSON, selecting v2 when subgraphs are present.
+ * Subgraph definitions may carry React Flow-only view state (selected/measured/
+ * dragging) after in-editor nested editing — strip it back to the wire format.
  */
 export function exportGraph(
   nodes: Node[],
@@ -24,7 +26,25 @@ export function exportGraph(
     nodes: nodes.map(toGraphNode),
     edges: edges.map(toGraphEdge),
     parameters,
-    subgraphs,
+    subgraphs: subgraphs.map(sanitizeSubgraph),
+  };
+}
+
+function sanitizeSubgraph(subgraph: GraphSubgraph): GraphSubgraph {
+  return {
+    ...subgraph,
+    nodes: subgraph.nodes.map((n) =>
+      toGraphNode({ ...n, type: n.type ?? 'Unknown' } as Node),
+    ),
+    edges: subgraph.edges.map((e) =>
+      toGraphEdge({
+        ...e,
+        data:
+          e.sourcePinType !== undefined || e.targetPinType !== undefined
+            ? { sourcePinType: e.sourcePinType, targetPinType: e.targetPinType }
+            : (e as Edge).data,
+      } as Edge),
+    ),
   };
 }
 
@@ -96,7 +116,10 @@ export async function saveGraphToFile(
     const res = await fetch('/api/save-graph', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filePath, graphData: graph }, null, 2),
+      body: JSON.stringify({
+        filePath,
+        graphData: graph,
+      }, null, 2),
     });
     const data = (await res.json()) as { ok?: boolean; error?: string };
     if (!res.ok) {

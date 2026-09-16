@@ -87,6 +87,8 @@ set(PCG_CORE_SOURCES
     src/heightfield_runtime.cpp
     src/elements/mesh_algorithms.cpp
     src/elements/geometry_algorithms.cpp
+    src/elements/add_algorithms.cpp
+    src/elements/add_elements.cpp
     src/elements/geometry_elements.cpp
     src/elements/bevel_blender.cpp
     src/elements/bevel_diag.cpp
@@ -141,6 +143,8 @@ set(PCG_CORE_SOURCES
     src/elements/facade_foundation_elements.cpp
     src/elements/topology_parity_algorithms.cpp
     src/elements/topology_parity_elements.cpp
+    src/elements/oriented_sdf_surface.cpp
+    src/elements/houdini_sop_elements.cpp
     src/elements/lot_subdivision_algorithms.cpp
     src/asset_path.cpp
 )
@@ -218,6 +222,12 @@ target_link_libraries(test_cook_cache PRIVATE PcgCoreStatic nlohmann_json::nlohm
 target_include_directories(test_cook_cache PRIVATE src)
 
 add_test(NAME test_cook_cache COMMAND test_cook_cache WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_pick_source_mapping tests/test_pick_source_mapping.cpp)
+target_link_libraries(test_pick_source_mapping PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_pick_source_mapping PRIVATE src)
+
+add_test(NAME test_pick_source_mapping COMMAND test_pick_source_mapping WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 add_executable(test_spawn_mesh_binary tests/test_spawn_mesh_binary.cpp)
 target_link_libraries(test_spawn_mesh_binary PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
@@ -405,6 +415,11 @@ target_link_libraries(test_point_relax PRIVATE PcgCoreStatic nlohmann_json::nloh
 target_include_directories(test_point_relax PRIVATE src)
 add_test(NAME test_point_relax COMMAND test_point_relax WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_points_from_volume tests/test_points_from_volume.cpp)
+target_link_libraries(test_points_from_volume PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_points_from_volume PRIVATE src)
+add_test(NAME test_points_from_volume COMMAND test_points_from_volume WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_facade_foundation tests/test_facade_foundation.cpp)
 target_link_libraries(test_facade_foundation PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_facade_foundation PRIVATE src)
@@ -415,10 +430,25 @@ target_link_libraries(test_topology_parity PRIVATE PcgCoreStatic nlohmann_json::
 target_include_directories(test_topology_parity PRIVATE src)
 add_test(NAME test_topology_parity COMMAND test_topology_parity WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
+add_executable(test_add tests/test_add.cpp)
+target_link_libraries(test_add PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_add PRIVATE src)
+add_test(NAME test_add COMMAND test_add WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
 add_executable(test_review_2026_07_27 tests/test_review_2026_07_27.cpp)
 target_link_libraries(test_review_2026_07_27 PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
 target_include_directories(test_review_2026_07_27 PRIVATE src)
 add_test(NAME test_review_2026_07_27 COMMAND test_review_2026_07_27 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_houdini_sop_elements tests/test_houdini_sop_elements.cpp)
+target_link_libraries(test_houdini_sop_elements PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_houdini_sop_elements PRIVATE src)
+add_test(NAME test_houdini_sop_elements COMMAND test_houdini_sop_elements WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+add_executable(test_oriented_sdf_surface tests/test_oriented_sdf_surface.cpp)
+target_link_libraries(test_oriented_sdf_surface PRIVATE PcgCoreStatic nlohmann_json::nlohmann_json)
+target_include_directories(test_oriented_sdf_surface PRIVATE src)
+add_test(NAME test_oriented_sdf_surface COMMAND test_oriented_sdf_surface WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # CTest is intentionally limited to focused functional regressions. Production
 # demo graphs belong in manual profiling, not in the build verification loop.
