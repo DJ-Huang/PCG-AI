@@ -423,7 +423,7 @@ void HandlePutCameraState(const httplib::Request& req, httplib::Response& res) {
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     const std::string session_id = body.value("sessionId", "");
-    const auto command_id = body.value("commandId", 0ull);
+    const uint64_t command_id = body.value("commandId", uint64_t{0});
     auto& state = State();
     {
         std::lock_guard<std::mutex> lock(state.mutex);
