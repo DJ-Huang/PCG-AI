@@ -32,7 +32,7 @@ npm run dev                  # development server
 npm run lint                 # oxlint
 npm run build                # TypeScript + production bundle
 npx vitest run               # complete unit/component suite
-npm run test:agent           # embedded Agent-focused tests
+npx vitest run src/SettingsDialog.test.tsx localProxy.test.ts  # settings and local proxy
 npm run test:graph-commands  # graph command protocol validation
 npm run test:library         # built-in library consistency
 ```
@@ -47,13 +47,13 @@ The deterministic review page loads a repository-relative graph path:
 http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg
 ```
 
-The development server resolves the path from the repository root and rejects paths outside it. The review route uses the local cook server and supports fixed cameras, preview quality controls, parameter overrides and GLB export.
+Use repository-relative graph paths. The review route uses the local cook server and supports fixed cameras, preview quality controls, parameter overrides and GLB export.
 
 ## Unity handoff
 
-**Send to Unity** writes `schema/editor-export.pcg` during development. That file is a local handoff target and is intentionally ignored. In Unity, select it with **PCG → Set Watched Graph…** or export/import the graph manually.
+Save or download a `.pcg` graph from the File menu, then import it into Unity or select its local path with **PCG → Set Watched Graph…**. `schema/editor-export.pcg` can be used as an ignored local handoff file; it is not a versioned asset.
 
-## External Agent bridge
+## External MCP clients
 
 While the editor is open it publishes the in-memory graph, selection, subgraph scope, preview target, node manifest and graph hash to `pcg-server`.
 
@@ -67,13 +67,19 @@ While the editor is open it publishes the in-memory graph, selection, subgraph s
 }
 ```
 
-Use the latest `graphHash` for every write. Graph operations are applied through the normal undo stack; a stale hash returns `graph_conflict` rather than overwriting editor changes.
+Configure model accounts and AI conversations in your external MCP client. The Web editor provides the visual graph and viewport; the external client invokes the server's tools.
 
-## Built-in Agent
+Use the latest `graphHash` for every write. Graph operations are applied through the normal undo stack; a stale hash returns `graph_conflict` rather than overwriting editor changes. See [the server guide](../../docs/pcg-server.md#external-mcp-clients) for tools and authentication.
 
-Provider accounts are configured in **Settings → AI Providers**. Credentials are submitted only to the localhost server and are never stored in the browser or repository. Read/cook/capture tools run automatically; graph writes pause for an approval card tied to the current graph hash.
+## 3D generation settings
 
-Supported attachments are PNG/JPEG and UTF-8 `.txt`, `.json` or `.pcg` files. Chat history and attachments are stored in the user's application-support directory, outside the repository.
+Open Settings from the gear button or with **Ctrl/Cmd + ,**. The dialog contains **3D Generation** API configuration, currently for Tripo.
+
+Save or clear the Tripo API key there. The key is held by the local server's protected credential store, never persisted in the browser, graph, or repository. `PCG_TRIPO_API_KEY` can supply the key through the server environment and takes precedence over a stored key.
+
+Add a `Tripo3DGenerator` node, assign a source image, and choose **Generate** in the Inspector. The resulting GLB is cached and its path is stored on the node. Cooking and preview load the local result without starting a cloud job. Continue procedural editing manually or through an external MCP client; generation does not automatically start a reconstruction/review conversation.
+
+See [Third-party image-to-3D](../../docs/third-party-image-to-3d.md) for generation, cache and credential boundaries.
 
 ## Examples
 

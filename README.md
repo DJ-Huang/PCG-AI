@@ -24,7 +24,7 @@
   <img src="https://img.shields.io/badge/Web-React%20%2B%20Three.js-111827.svg" alt="React and Three.js Web editor">
 </p>
 
-PICG (Procedural Intelligent Content Generation) treats the `.pcg` file as the portable source of truth for an asset. Author it visually, ask an AI agent to build it through MCP, or start from an image with Meshy/Tripo assistance—then keep the result editable, reproducible, and ready for engine integration.
+PICG (Procedural Intelligent Content Generation) treats the `.pcg` file as the portable source of truth for an asset. Author it visually, ask an external AI agent to build it through MCP, or start from an image with Meshy/Tripo assistance—then keep the result editable, reproducible, and ready for engine integration.
 
 > **Project status:** active development. Web authoring and Unity integration are available now. Other host integrations listed below are planned, and graph schemas and APIs may still change before a stable release.
 
@@ -50,7 +50,7 @@ PICG separates the graph contract and C++ execution semantics from each host's e
 
 | Platform | Status | Integration direction |
 | --- | --- | --- |
-| **Web editor** | **Available** | Visual graph authoring, live Three.js preview, review captures, Agent window, GLB export |
+| **Web editor** | **Available** | Visual graph authoring, live Three.js preview, review captures, Tripo generation, GLB export |
 | **Unity** | **Available** | Graph editor, Scene view workflow, FBX/GLB output, materials, splines, Terrain, GPU instancing, and runtime components |
 | **Unreal Engine** | **Planned** | Native editor and scene integration backed by the same graph and host-data contracts |
 | **Blender** | **Planned** | DCC authoring, procedural iteration, and interchange without rewriting asset logic |
@@ -66,8 +66,8 @@ PICG is designed around the complete asset journey rather than stopping at a gen
 ```text
 Image / prompt / design brief
             │
-            ├── AI Agent through MCP
-            ├── Built-in Agent window + your AI provider
+            ├── Visual graph authoring
+            ├── External AI clients through MCP
             └── Meshy / Tripo assisted generation
                          │
                          ▼
@@ -90,9 +90,9 @@ The target is a **game-ready asset pipeline**: reproducible geometry, engine-usa
 
 ### MCP-first graph authoring
 
-`pcg-server` exposes a Streamable HTTP MCP endpoint at `http://127.0.0.1:17890/mcp`. MCP clients such as Codex, Cursor, or OpenCode can inspect the live editor, discover node definitions from the manifest, create and wire nodes, edit parameters, validate, cook, capture the viewport, and save the graph.
+`pcg-server` exposes a Streamable HTTP MCP endpoint at `http://127.0.0.1:17890/mcp`. External MCP clients such as Codex, Cursor, or OpenCode can inspect the live editor, discover node definitions from the manifest, create and wire nodes, edit parameters, validate, cook, capture the viewport, and save the graph.
 
-The AI works against the same open graph you see—not a detached text mock-up. Graph-hash locking, atomic operations, validation, and visual capture make iterative asset creation practical and reviewable.
+The AI works against the same open graph you see—not a detached text mock-up. Graph-hash locking, atomic operations, validation, and visual capture make iterative asset creation practical and reviewable. Configure AI accounts and models in the external client; PICG's Web Settings is reserved for 3D generation API configuration.
 
 ```json
 {
@@ -104,20 +104,14 @@ The AI works against the same open graph you see—not a detached text mock-up. 
 }
 ```
 
-See [External Agent MCP](docs/pcg-server.md#external-agent-mcp) for the tool surface and authoring loop.
-
-### Built-in Agent window
-
-The Web editor also includes its own Agent workspace. Connect a supported provider in **Settings → AI Providers**, choose a tool-capable model, attach images or `.pcg` files, and create directly beside the graph and live viewport.
-
-The local Agent runtime supports OpenAI Responses, Anthropic Messages, Gemini `generateContent`, Kimi for Coding, and OpenAI-compatible Chat Completions. It includes durable local chat history, streaming tool calls, explicit approval for graph writes, retry/cancel controls, and protected local credential storage.
+See [External MCP clients](docs/pcg-server.md#external-mcp-clients) for the tool surface and authoring loop.
 
 ### Meshy and Tripo as procedural collaborators
 
 PICG can bring cloud generation into the graph without making an opaque generated mesh the end of the workflow:
 
 - **Meshy** nodes cover image-to-3D, text-to-3D, remesh/resize/UV unwrap, retexturing, and image generation in the Unity integration.
-- **Tripo** image-to-3D is available in both the Web and Unity workflows, including cached generation and an assisted Web path for turning a reference result into editable procedural stages.
+- **Tripo** image-to-3D is available in both the Web and Unity workflows. In the Web editor, configure the key in **Settings → 3D Generation**, then explicitly generate and cache a GLB from a `Tripo3DGenerator` node. Continue procedural graph editing manually or through an external MCP client.
 - Cloud calls are explicit and cached. Normal cook, preview, and graph editing reuse local results instead of silently spending API credits.
 - API keys stay in local protected storage or engine preferences; they are never written into `.pcg` files.
 
@@ -138,7 +132,7 @@ Future Unreal, Blender, Godot, and Three.js adapters are expected to reuse the s
 - **Production graph building blocks** — primitives, splines, scattering, terrain/heightfields, Boolean and bevel workflows, materials, subgraphs, imports, assembly, and rig metadata.
 - **Web authoring and review** — React Flow graph editing, Three.js preview, diagnostic capture modes, animation controls, and full-quality GLB export.
 - **Unity integration** — editor and runtime components using the same graph contract and external native cook service.
-- **Agent-native workflow** — MCP plus an embedded multi-provider Agent that can operate the live graph and viewport.
+- **External MCP automation** — external clients can operate the live graph and viewport through the local server.
 - **Reference-assisted creation** — image inputs and Meshy/Tripo nodes can feed a procedural, engine-oriented finishing workflow.
 
 ## Quick start
@@ -184,25 +178,25 @@ See [Getting Started](docs/getting-started.md) for separate-process commands and
 ## Architecture
 
 ```text
- Manual graph editing       Built-in Agent        External MCP clients
-          │                       │                        │
-          └───────────────────────┼────────────────────────┘
-                                  ▼
-                      Versioned .pcg graph contract
-                                  │
-                                  ▼
-                             pcg-server
-                    cook · MCP · Agent · cache · export
-                                  │
-                                  ▼
-                         pcg-core (C++17)
-                                  │
-              geometry · points · splines · materials · metadata
-                                  │
-             ┌────────────────────┴────────────────────┐
-             ▼                                         ▼
-     Web / Three.js preview                    Engine host adapters
-          + GLB export                     Unity now · more planned
+ Manual graph editing                 External MCP clients
+          │                                   │
+          └─────────────────┬─────────────────┘
+                            ▼
+                Versioned .pcg graph contract
+                            │
+                            ▼
+                       pcg-server
+          cook · MCP · 3D generation · cache · export
+                            │
+                            ▼
+                   pcg-core (C++17)
+                            │
+        geometry · points · splines · materials · metadata
+                            │
+           ┌────────────────┴────────────────┐
+           ▼                                 ▼
+   Web / Three.js preview            Engine host adapters
+        + GLB export              Unity now · more planned
 ```
 
 The C++ runtime is the execution source of truth. Editors and engines act as interchangeable authoring and host layers around the same graph semantics. Read [Architecture](docs/architecture.md) for the protocol and ownership boundaries.
@@ -211,13 +205,13 @@ The C++ runtime is the execution source of truth. Editors and engines act as int
 
 ```text
 PICG/
-├── .agents/               Agent skills and procedural asset workflows
+├── .agents/               External-client skills and procedural asset workflows
 ├── docs/                  User, architecture, runtime, and integration guides
 ├── examples/              Graphs, tests, subgraphs, showcases, and storyboards
 ├── library/               Canonical built-in subgraph library
 ├── pcg-core/              C++ graph runtime and geometry algorithms
 ├── pcg-fbx-exporter/      Standalone FBX export library
-├── pcg-server/            Local HTTP/MCP cook, Agent, cache, and export backend
+├── pcg-server/            Local HTTP/MCP cook, 3D generation, cache, and export backend
 ├── schema/                Versioned graph schemas and node manifest
 ├── scripts/               Build, run, sync, and validation commands
 ├── Unity/                 Unity editor and runtime integration
@@ -255,7 +249,7 @@ The complete script catalog is documented in [scripts/README.md](scripts/README.
 
 - [Getting Started](docs/getting-started.md)
 - [Architecture](docs/architecture.md)
-- [PCG server, embedded Agent, and MCP](docs/pcg-server.md)
+- [PCG server, 3D generation, and MCP](docs/pcg-server.md)
 - [Third-party image-to-3D](docs/third-party-image-to-3d.md)
 - [Node reference](docs/node-reference.md)
 - [Unity project](Unity/README.md)

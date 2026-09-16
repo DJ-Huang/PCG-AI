@@ -8,7 +8,7 @@ PICG separates authoring, execution and host integration so the same graph can b
 | --- | --- | --- |
 | `web/pcg-editor` | Graph editing, Web preview, review capture and GLB export | `schema/node-manifest.json` and graph JSON |
 | `Unity/Assets/PcgPlugin` | Unity graph assets, inspector, scene preview and server client | HTTP cook result and graph JSON |
-| `pcg-server` | Local HTTP/MCP boundary, cook orchestration, cache, agent and third-party services | REST/MCP endpoints |
+| `pcg-server` | Local HTTP/MCP boundary, cook orchestration, cache, protected credentials and third-party 3D generation | REST/MCP endpoints |
 | `pcg-core` | Parsing, validation, graph execution and geometry algorithms | C API in `pcg-core/include/pcg_api.h` |
 | `schema` | Versioned graph contracts and manifest-backed node definitions | JSON Schema and node manifest |
 | `library` | Canonical built-in reusable subgraphs | `.pcgsubgraph` plus `.libmeta.json` |
@@ -27,7 +27,9 @@ authoring client
     └◄── cook result / validation / preview metadata
 ```
 
-The Web editor also publishes its in-memory graph and preview state to the server. MCP clients can inspect and modify that live editor state with graph-hash optimistic locking. Unity uses the same server for native cooking and does not load native runtime libraries into the editor process.
+The Web editor also publishes its in-memory graph and preview state to the server. External MCP clients can inspect and modify that live editor state with graph-hash optimistic locking. Unity uses the same server for native cooking and does not load native runtime libraries into the editor process.
+
+AI accounts, model selection, and conversations are owned by external MCP clients. PICG's Web Settings only configures 3D generation APIs such as Tripo. Server authentication and protected credential storage are shared services independent of any model client. See [the server guide](pcg-server.md) for the current endpoints and configuration.
 
 ## Sources of truth
 
@@ -55,4 +57,3 @@ The versioned schemas are kept in `schema/`. `schema/editor-export.pcg` is a loc
 - Large showcase exports: `examples/**/artifacts/`
 
 These paths are reproducible or machine-local and must not be committed.
-

@@ -5,6 +5,7 @@ import { execFile } from 'node:child_process';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { assetFilesPlugin } from './assetFiles.ts';
+import { isLocalEditorRequest, proxyAuthorization } from './localProxy.ts';
 
 const SCHEMA_EXPORT = path.resolve(__dirname, '../../schema/editor-export.pcg');
 const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
@@ -16,14 +17,21 @@ function proxyToPcgServer(
   res: http.ServerResponse,
   serverPath: string,
 ) {
+  if (!isLocalEditorRequest(req.headers)) {
+    res.statusCode = 403;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ ok: false, error: 'Only local editor requests are allowed' }));
+    return;
+  }
   const headers: Record<string, string> = {
     'content-type': req.headers['content-type'] ?? 'application/octet-stream',
   };
   if (req.headers['content-length'] !== undefined) {
     headers['content-length'] = req.headers['content-length'];
   }
-  if (req.headers.authorization) {
-    headers.authorization = req.headers.authorization;
+  const authorization = proxyAuthorization(req.headers.authorization, process.env);
+  if (authorization) {
+    headers.authorization = authorization;
   }
   if (req.headers.accept) {
     headers.accept = req.headers.accept;
@@ -86,19 +94,18 @@ function cookProxyPlugin(): Plugin {
         }
         proxyToPcgServer(req, res, '/v1/health');
       });
-      server.middlewares.use('/api/agent', (req, res, next) => {
-        if (!['GET', 'POST', 'PUT', 'DELETE'].includes(req.method ?? '')) {
-          next();
-          return;
-        }
-        proxyToPcgServer(req, res, `/v1/agent${req.url ?? ''}`);
-      });
       server.middlewares.use('/api/editor-bridge', (req, res, next) => {
         if (!['GET', 'PUT', 'POST', 'PATCH', 'DELETE'].includes(req.method ?? '')) {
           next();
           return;
         }
         proxyToPcgServer(req, res, `/v1${req.url ?? ''}`);
+      });
+      // Removed and unknown API paths must not fall through to the SPA HTML.
+      server.middlewares.use('/api', (_req, res) => {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ ok: false, error: 'API endpoint not found' }));
       });
     },
   };

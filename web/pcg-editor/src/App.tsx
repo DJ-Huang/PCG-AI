@@ -47,14 +47,11 @@ import {
   getNodeTypeDefs,
   getAllNodeTypes,
   getNodeManifest,
-  validateNodePropertyValue,
   type ManifestProperty,
   type PinType,
 } from './nodeManifest';
 import { useUndoRedo } from './useUndoRedo';
 import Blackboard from './Blackboard';
-import AgentPanel, { type AgentLaunchRequest } from './agent/AgentPanel';
-import { dispatchAgentActions, type AgentAction, type AgentGraphOps } from './agent/agentCommands';
 import Inspector from './Inspector';
 import NodeInfoPanel from './NodeInfoPanel';
 import NodeSearchPanel, { type SearchPanelConfig, type NodeSearchSelection } from './NodeSearchPanel';
@@ -83,15 +80,6 @@ import {
   isSplineAuthoringNode,
   serializeControlPoints,
 } from './splineControlPoints';
-import {
-  captureProceduralReferenceBundle,
-  loadProceduralSourceImageFile,
-} from './proceduralReference';
-import { buildOrientedSdfNodeData } from './thirdPartyClient';
-import {
-  bakeBaseColorTextureIntoOpc1,
-  makeVertexColorMaterialData,
-} from './orientedPointColorBake';
 import { Brand, EditorMenu, Icon } from './EditorChrome';
 import AssetLibraryPanel from './AssetLibraryPanel';
 import './App.css';
@@ -117,12 +105,6 @@ const GRAPH_FIT_VIEW_OPTIONS = {
   maxZoom: GRAPH_MAX_ZOOM,
   padding: 0.15,
 };
-
-function waitForPreviewPaint(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-  });
-}
 
 const initialNodes: Node[] = [
   {
@@ -186,13 +168,9 @@ function PcgEditor() {
   const [subgraphs, setSubgraphs] = useState<GraphSubgraph[]>(restored?.subgraphs ?? []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showBlackboard, setShowBlackboard] = useState(false);
-  const [showAgent, setShowAgent] = useState(() => window.innerWidth >= 1280);
   const [showAssets, setShowAssets] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [providerRevision, setProviderRevision] = useState(0);
-  const [agentLaunchRequest, setAgentLaunchRequest] = useState<AgentLaunchRequest | null>(null);
-  const [proceduralizingNodeId, setProceduralizingNodeId] = useState<string | null>(null);
   const [showInspector, setShowInspector] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -775,78 +753,7 @@ function PcgEditor() {
     [setViewNodes, commit],
   );
 
-  // ── Agent graph ops (actions dispatched from the agent panel) ──
-
-  const agentOps = useMemo<AgentGraphOps>(
-    () => ({
-      addNode: (nodeType, position) => {
-        if (!getNodeTypeDefs(nodeType)) {
-          throw new Error(`unknown node type "${nodeType}"`);
-        }
-        const newId = allocateNodeId(viewNodes);
-        const pos = position ?? screenToFlowPosition({
-          x: window.innerWidth / 2,
-          y: window.innerHeight / 2,
-        });
-        setViewNodes((nds) => [
-          ...nds,
-          { id: newId, type: nodeType, position: pos, data: { ...defaultData(nodeType) } },
-        ]);
-        return newId;
-      },
-      connectNodes: (source, target, sourceHandle, targetHandle) => {
-        const sourceNode = viewNodes.find((n) => n.id === source);
-        const targetNode = viewNodes.find((n) => n.id === target);
-        if (!sourceNode) throw new Error(`source node "${source}" not found`);
-        if (!targetNode) throw new Error(`target node "${target}" not found`);
-        const outPin = getNodeTypeDefs(sourceNode.type ?? '')?.outputs[0];
-        const inPin = getNodeTypeDefs(targetNode.type ?? '')?.inputs[0];
-        const conn: Connection = {
-          source,
-          target,
-          sourceHandle: sourceHandle ?? outPin?.id ?? null,
-          targetHandle: targetHandle ?? inPin?.id ?? null,
-        };
-        if (!validateConnection(conn)) {
-          throw new Error(`invalid connection ${source} → ${target}`);
-        }
-        setViewEdges((eds) => addEdge(conn, eds));
-      },
-      setNodeParam: (nodeId, key, value) => {
-        if (!viewNodes.some((n) => n.id === nodeId)) {
-          throw new Error(`node "${nodeId}" not found`);
-        }
-        setViewNodes((nds) =>
-          nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [key]: value } } : n)),
-        );
-        setSelectedNode((prev) =>
-          prev?.id === nodeId ? { ...prev, data: { ...prev.data, [key]: value } } : prev,
-        );
-      },
-      patchNode: (nodeId, patch) => {
-        const node = viewNodes.find((candidate) => candidate.id === nodeId);
-        if (!node) {
-          throw new Error(`node "${nodeId}" not found`);
-        }
-        for (const [key, value] of Object.entries(patch)) {
-          const error = validateNodePropertyValue(node.type ?? '', key, value);
-          if (error) throw new Error(error);
-        }
-        setViewNodes((nds) =>
-          nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...patch } } : n)),
-        );
-        setSelectedNode((prev) =>
-          prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...patch } } : prev,
-        );
-      },
-    }),
-    [viewNodes, setViewNodes, setViewEdges, screenToFlowPosition, validateConnection],
-  );
-
-  const applyAgentActions = useCallback(
-    (actions: AgentAction[]) => dispatchAgentActions(actions, agentOps, commit),
-    [agentOps, commit],
-  );
+  // ── Editor bridge ──────────────────────────────────
 
   const bridgeGraph = useMemo(
     () => exportGraph(nodes, edges, parameters, subgraphs),
@@ -932,7 +839,7 @@ function PcgEditor() {
       (previewViewportRef.current?.applyCameraCommand(command) ?? null) as Record<string, unknown> | null,
     [],
   );
-  const syncEditorContext = useEditorBridge({
+  useEditorBridge({
     sessionId: editorSessionIdRef.current,
     graph: bridgeGraph,
     nodeManifest: getNodeManifest(),
@@ -1397,127 +1304,6 @@ function PcgEditor() {
     };
   }, [showPreview, selectedNode, requestPreviewCook, viewNodes, viewEdges]);
 
-  const handleProceduralizeReference = useCallback(async (node: Node) => {
-    const data = node.data as Record<string, unknown>;
-    const referencePath = String(data.path ?? '').trim();
-    if (!referencePath) {
-      setStatus('Generate or assign a Tripo GLB before procedural reconstruction.');
-      return;
-    }
-    setProceduralizingNodeId(node.id);
-    setPreviewError(null);
-    setPreviewData(null);
-    setShowPreview(true);
-    setPreviewTargetId(node.id);
-    skipDebounceRef.current = true;
-    const existingSurface = viewNodes.find((candidate) => {
-      if (candidate.type !== 'OrientedSdfSurface') return false;
-      return String((candidate.data as Record<string, unknown>).sourceReference ?? '') === referencePath;
-    });
-    const bakedSurfaceNodeId = existingSurface?.id ?? allocateNodeId(viewNodes);
-    const existingMaterial = viewNodes.find((candidate) => {
-      if (candidate.type !== 'Material') return false;
-      const materialName = String((candidate.data as Record<string, unknown>).materialName ?? '');
-      return materialName === 'ReconstructedSourceMaterial' ||
-        materialName === 'ReconstructedVertexColorMaterial';
-    });
-    const bakedMaterialNodeId = existingMaterial?.id ?? allocateNodeId(viewNodes);
-    setStatus('Baking topology-free oriented samples from the Tripo GLB…');
-    try {
-      const previous = (existingSurface?.data ?? {}) as Record<string, unknown>;
-      const numberOrUndefined = (value: unknown) => typeof value === 'number' && Number.isFinite(value)
-        ? value
-        : undefined;
-      const baked = await buildOrientedSdfNodeData(referencePath, {
-        title: 'High-Fidelity Tripo SDF Surface',
-        componentId: 'reference.surface',
-        cellSize: numberOrUndefined(previous.cellSize),
-        supportRadiusCells: numberOrUndefined(previous.supportRadiusCells),
-        isoOffset: numberOrUndefined(previous.isoOffset),
-        maxActiveCells: numberOrUndefined(previous.maxActiveCells),
-        transferColors: typeof previous.transferColors === 'boolean' ? previous.transferColors : true,
-        transferUvs: typeof previous.transferUvs === 'boolean' ? previous.transferUvs : true,
-        flipUvV: typeof previous.flipUvV === 'boolean' ? previous.flipUvV : undefined,
-      });
-      setStatus(
-        `Baked ${baked.sourcePointCount.toLocaleString()} oriented samples from ` +
-        `${baked.sourceVertexCount.toLocaleString()} source vertices; cooking the fixed six-view reference…`,
-      );
-      await waitForPreviewPaint();
-      const cooked = await requestPreviewCook(node.id);
-      if (!cooked) throw new Error('The Tripo reference did not cook successfully.');
-      await waitForPreviewPaint();
-      const viewport = previewViewportRef.current;
-      if (!viewport) throw new Error('3D Preview is not ready.');
-      const sourceImage = String(data.texture ?? '').trim() || String(data.imageUrl ?? '').trim();
-      let sourceImageFile: File | null = null;
-      try {
-        sourceImageFile = await loadProceduralSourceImageFile(sourceImage);
-      } catch (error) {
-        console.warn('Could not attach Tripo source image; the manifest path remains available.', error);
-      }
-      const { request, manifest } = captureProceduralReferenceBundle(viewport, {
-        nodeId: node.id,
-        referencePath,
-        bakedSurfaceNodeId,
-        bakedMaterialNodeId,
-        sourceImage,
-        sourceImageFile,
-        graphPath: currentFilename,
-      });
-      let bakedNodeData = baked.nodeData;
-      let bakedMaterialData = baked.suggestedMaterialData;
-      const baseColorMap = typeof bakedMaterialData.baseColorMap === 'string'
-        ? bakedMaterialData.baseColorMap
-        : '';
-      const pointCloud = typeof bakedNodeData.pointCloud === 'string'
-        ? bakedNodeData.pointCloud
-        : '';
-      if (baseColorMap && pointCloud && baked.hasSourceUvs) {
-        setStatus('Projecting the Tripo base-colour texture into the dense oriented sample field…');
-        const colorBake = await bakeBaseColorTextureIntoOpc1(pointCloud, baseColorMap);
-        bakedNodeData = {
-          ...bakedNodeData,
-          pointCloud: colorBake.pointCloud,
-          transferColors: true,
-        };
-        bakedMaterialData = makeVertexColorMaterialData(bakedMaterialData);
-      }
-      const bakedNode: Node = {
-        id: bakedSurfaceNodeId,
-        type: 'OrientedSdfSurface',
-        position: existingSurface?.position ?? { x: node.position.x, y: node.position.y + 160 },
-        data: { ...defaultData('OrientedSdfSurface'), ...bakedNodeData },
-      };
-      const bakedMaterialNode: Node = {
-        id: bakedMaterialNodeId,
-        type: 'Material',
-        position: existingMaterial?.position ?? { x: node.position.x + 320, y: node.position.y + 160 },
-        data: { ...defaultData('Material'), ...bakedMaterialData },
-      };
-      commit();
-      setViewNodes((current) => {
-        let updated = existingSurface
-          ? current.map((candidate) => candidate.id === bakedSurfaceNodeId ? bakedNode : candidate)
-          : [...current, bakedNode];
-        updated = existingMaterial
-          ? updated.map((candidate) => candidate.id === bakedMaterialNodeId ? bakedMaterialNode : candidate)
-          : [...updated, bakedMaterialNode];
-        return updated;
-      });
-      setSelectedNode(bakedNode);
-      setPreviewTargetId(bakedSurfaceNodeId);
-      setAgentLaunchRequest(request);
-      setShowAgent(true);
-      const passCount = manifest.views.reduce((sum, view) => sum + view.passes.length, 0);
-      setStatus(`Created ${bakedSurfaceNodeId} from ${baked.sourcePointCount.toLocaleString()} samples (${Math.round(baked.payloadBytes / 1024).toLocaleString()} KiB, no source topology) + ${bakedMaterialNodeId} (texture-baked vertex colour); captured ${manifest.views.length} views / ${passCount} passes; Agent queued for ${manifest.targetGraphPath}`);
-    } catch (error) {
-      setStatus(`Procedural reference capture failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setProceduralizingNodeId(null);
-    }
-  }, [commit, currentFilename, requestPreviewCook, setViewNodes, viewNodes]);
-
   // ── Render ──────────────────────────────────────────
 
   return (
@@ -1541,7 +1327,6 @@ function PcgEditor() {
               { label: 'Redo', icon: 'redo', shortcut: '⇧ ⌘/Ctrl Z', disabled: !canRedo, onSelect: redo },
             ] },
             { label: 'Windows', icon: 'windows', children: [
-              { label: 'Agent', checked: showAgent, onSelect: () => setShowAgent((value) => !value) },
               { label: 'Preview', checked: showPreview, onSelect: () => void togglePreview() },
               { label: 'PCG Graph', checked: showGraph, disabled: showGraph && !showPreview, onSelect: () => setShowGraph((value) => !value) },
               { label: 'Assets', checked: showAssets, onSelect: () => setShowAssets((value) => !value) },
@@ -1554,34 +1339,16 @@ function PcgEditor() {
         <input ref={fileInputRef} type="file" accept=".pcg,.json,application/json" className="pcg-toolbar__file-input" onChange={handleImportFile} />
       </header>
 
-      <SettingsDialog
-        open={showSettings}
-        onClose={closeSettings}
-        onProvidersChanged={() => setProviderRevision((revision) => revision + 1)}
-      />
+      <SettingsDialog open={showSettings} onClose={closeSettings} />
 
-      {/* Main: three-panel layout */}
+      {/* Main: workspace panels */}
       <div className="pcg-main">
         <nav className="pcg-activity-rail" aria-label="Workspace panels">
-          <button type="button" aria-pressed={showAgent} onClick={() => setShowAgent((value) => !value)} title="Toggle Agent"><Icon name="agent" /><span>Agent</span></button>
           <button type="button" aria-pressed={showAssets} onClick={() => setShowAssets((value) => !value)} title="Toggle Assets"><Icon name="folder" /><span>Assets</span></button>
           <span className="pcg-activity-rail__spacer" />
           <button type="button" onClick={openSettings} title="Settings" aria-label="Settings"><Icon name="settings" /></button>
         </nav>
         {showAssets && <AssetLibraryPanel onClose={() => setShowAssets(false)} onOpen={handleOpenAsset} />}
-        {showAgent && (
-          <AgentPanel
-            onApplyActions={applyAgentActions}
-            onOpenSettings={openSettings}
-            syncEditorContext={syncEditorContext}
-            editorSessionId={editorSessionIdRef.current}
-            providerRevision={providerRevision}
-            launchRequest={agentLaunchRequest}
-            onLaunchConsumed={(requestId) => {
-              setAgentLaunchRequest((queued) => queued?.id === requestId ? null : queued);
-            }}
-          />
-        )}
         {showBlackboard && (
           <Blackboard
             parameters={viewParameters}
@@ -1697,8 +1464,6 @@ function PcgEditor() {
             onUpdateNodeData={updateNodeData}
             onPromoteParameter={promoteParameter}
             onBindParameter={bindParameter}
-            onProceduralizeReference={(node) => void handleProceduralizeReference(node)}
-            proceduralizingNodeId={proceduralizingNodeId}
           />
         )}
       </div>
