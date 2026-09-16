@@ -108,8 +108,6 @@ interface InspectorProps {
   onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
   onPromoteParameter: (nodeId: string, nodeType: string, propertyKey: string, prop: ManifestProperty) => void;
   onBindParameter: (nodeId: string, propertyKey: string, paramId: string | null) => void;
-  onProceduralizeReference?: (node: Node) => void;
-  proceduralizingNodeId?: string | null;
 }
 
 /** Checks if a parameter type is compatible with a manifest property type. */
@@ -130,8 +128,6 @@ export default function Inspector({
   onUpdateNodeData,
   onPromoteParameter,
   onBindParameter,
-  onProceduralizeReference,
-  proceduralizingNodeId = null,
 }: InspectorProps) {
   const handleValueChange = useCallback(
     (nodeId: string, key: string, value: unknown) => {
@@ -433,8 +429,6 @@ export default function Inspector({
         <TripoGeneratePanel
           node={selectedNode}
           onUpdateNodeData={onUpdateNodeData}
-          onProceduralizeReference={onProceduralizeReference}
-          proceduralizing={proceduralizingNodeId === selectedNode.id}
         />
       )}
     </div>
@@ -518,13 +512,9 @@ function TripoImageUploadField({
 function TripoGeneratePanel({
   node,
   onUpdateNodeData,
-  onProceduralizeReference,
-  proceduralizing,
 }: {
   node: Node;
   onUpdateNodeData: (nodeId: string, patch: Record<string, unknown>) => void;
-  onProceduralizeReference?: (node: Node) => void;
-  proceduralizing: boolean;
 }) {
   const data = node.data as NodeData;
   const [busy, setBusy] = useState(false);
@@ -585,18 +575,6 @@ function TripoGeneratePanel({
         >
           {busy ? 'Generating…' : savedPath ? 'Regenerate' : 'Generate'}
         </button>
-        {savedPath && onProceduralizeReference && (
-          <div className="pcg-inspector__proceduralize">
-            <button
-              type="button"
-              disabled={busy || proceduralizing}
-              onClick={() => onProceduralizeReference(node)}
-            >
-              {proceduralizing ? 'Baking SDF + Capturing…' : 'High-Fidelity Proceduralize'}
-            </button>
-            <small>Bake oriented samples without source topology, reconstruct with sparse SDF + Surface Nets, then enforce six-view pixel comparison.</small>
-          </div>
-        )}
         {busy && progress !== null && (
           <div
             className="pcg-inspector__progress"

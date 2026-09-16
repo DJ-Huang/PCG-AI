@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { getAgentToken } from './agent/agentClient';
 import type { GraphCommandResult, QueuedGraphCommand } from './graphCommands';
 import type { GraphJson } from './graphSchema';
 import type { NodeManifest } from './nodeManifest';
@@ -38,10 +37,8 @@ interface PatchResponse {
 }
 
 function bridgeHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = getAgentToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
+  // The localhost proxy supplies server credentials; no token is kept in browser storage.
+  return { 'Content-Type': 'application/json' };
 }
 
 async function graphHash(serializedGraph: string): Promise<string> {
@@ -152,7 +149,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     if (!response.ok) throw new Error(`camera echo failed: HTTP ${response.status}`);
   }, [options.sessionId]);
 
-  // Maintain a recent screenshot even before an Agent explicitly requests one.
+  // Maintain a recent screenshot for editor integrations before an explicit capture request.
   useEffect(() => {
     const debounce = window.setTimeout(
       () => void uploadCapture(captureRequestRef.current).catch(console.warn),
@@ -220,7 +217,6 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     return () => window.clearInterval(timer);
   }, [editPathKey, uploadCapture, echoCameraState, options.sessionId]);
 
-  // Callers that are about to start an Agent turn can await this barrier so
-  // MCP tools observe the current selection instead of the debounced session.
+  // Integrations can await this barrier to publish selection changes immediately.
   return pushSession;
 }

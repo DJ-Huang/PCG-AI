@@ -7,7 +7,7 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "agent_service.hpp"
+#include "server_auth.hpp"
 
 namespace pcg_server {
 namespace {
@@ -248,7 +248,7 @@ json ContextLocked(const BridgeState& state, const std::string& editor_session_i
 }  // namespace
 
 void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     if (!body.contains("graph") || !body["graph"].is_object() ||
@@ -286,14 +286,14 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
 }
 
 void HandleGetSession(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
     const json context = GetEditorContext(editor_session_id);
     JsonResponse(res, context.value("ok", false) ? 200 : 409, context);
 }
 
 void HandleSessionHeartbeat(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     const std::string session_id = body.value("sessionId", "");
@@ -309,7 +309,7 @@ void HandleSessionHeartbeat(const httplib::Request& req, httplib::Response& res)
 }
 
 void HandlePutPreviewScreenshot(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     if (!body.contains("requestId") || !body["requestId"].is_number_unsigned() ||
@@ -342,7 +342,7 @@ void HandlePutPreviewScreenshot(const httplib::Request& req, httplib::Response& 
 }
 
 void HandleGetPreviewScreenshot(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     PreviewSnapshot snapshot;
     auto& state = State();
     {
@@ -367,7 +367,7 @@ void HandleGetPreviewScreenshot(const httplib::Request& req, httplib::Response& 
 }
 
 void HandleGetPreviewMetadata(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
@@ -390,7 +390,7 @@ void HandleGetPreviewMetadata(const httplib::Request& req, httplib::Response& re
 }
 
 void HandleRequestPreviewCapture(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body = json::object();
     if (!req.body.empty() && !ParseObjectBody(req, res, body)) return;
     const json options = body.value("options", json::object());
@@ -403,7 +403,7 @@ void HandleRequestPreviewCapture(const httplib::Request& req, httplib::Response&
 }
 
 void HandlePostCameraCommand(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     if (!body.contains("camera") || !body["camera"].is_object()) {
@@ -419,7 +419,7 @@ void HandlePostCameraCommand(const httplib::Request& req, httplib::Response& res
 }
 
 void HandlePutCameraState(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     const std::string session_id = body.value("sessionId", "");
@@ -443,7 +443,7 @@ void HandlePutCameraState(const httplib::Request& req, httplib::Response& res) {
 }
 
 void HandleGetCameraState(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
     const json state_json = GetCameraState(editor_session_id);
     if (state_json.value("ok", false)) {
@@ -454,7 +454,7 @@ void HandleGetCameraState(const httplib::Request& req, httplib::Response& res) {
 }
 
 void HandlePatchNode(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     if (!body.contains("patch") || !body["patch"].is_object()) {
@@ -469,7 +469,7 @@ void HandlePatchNode(const httplib::Request& req, httplib::Response& res) {
 }
 
 void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     uint64_t after = 0;
     try {
         if (req.has_param("after")) after = std::stoull(req.get_param_value("after"));
@@ -493,7 +493,7 @@ void HandleGetGraphPatches(const httplib::Request& req, httplib::Response& res) 
 }
 
 void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body;
     if (!ParseObjectBody(req, res, body)) return;
     if (!body.contains("ids") || !body["ids"].is_array()) {
