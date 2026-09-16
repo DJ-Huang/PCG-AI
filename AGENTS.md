@@ -2,6 +2,10 @@
 
 PICG combines a native procedural graph runtime, a Web editor, and Unity integration. Make the requested change; do not turn a documentation fix, graph tweak, or white-model request into an unrelated full-asset production job.
 
+## GitHub communication
+
+Write all pull request and issue titles, descriptions, and follow-up comments in English for this repository. Preserve code identifiers, paths, logs, and quoted source text where exact wording matters. Chat replies may follow the user's language.
+
 ## Find the relevant contract
 
 - Graph creation or editing: select one platform through the [skills index](.agents/skills/index.md). A complete asset, reference reconstruction, and generator testing are different scopes; load their references only when needed.
