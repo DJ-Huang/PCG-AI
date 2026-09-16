@@ -12,7 +12,7 @@
 
 PICG は、編集可能なグラフアセットとインテリジェントなコンテンツワークフローを中心に設計された、クロスエンジン対応のプロシージャルコンテンツ生成フレームワークです。React ベースのグラフエディタ、C++17 のジオメトリランタイム、localhost 上で動作する HTTP/MCP Cook サーバー、そして Unity 統合を組み合わせています。
 
-このプロジェクトの中心となる考え方は、**オーサリングツールやエンジン統合を交換可能なフロントエンドとして扱いながら、グラフデータと実行セマンティクスを移植可能かつ一貫した形に保つこと**です。グラフは手動でも Agent 支援ワークフローでも作成でき、同一のネイティブコアで実行し、複数の環境でプレビューできます。
+このプロジェクトの中心となる考え方は、**オーサリングツールやエンジン統合を交換可能なフロントエンドとして扱いながら、グラフデータと実行セマンティクスを移植可能かつ一貫した形に保つこと**です。グラフは手動でも外部 MCP クライアントからでも作成でき、同一のネイティブコアで実行し、複数の環境でプレビューできます。
 
 > **プロジェクトステータス:** 現在も活発に開発中です。安定版リリースまでは、グラフスキーマ、API、統合仕様が変更される可能性があります。
 
@@ -22,7 +22,8 @@ PICG は、編集可能なグラフアセットとインテリジェントなコ
 - **ネイティブのプロシージャルランタイム** — C API を通じて公開される C++17 ベースのジオメトリおよびグラフ実行コア。
 - **Web オーサリングとプレビュー** — React Flow ベースのエディタ、リアルタイム 3D プレビュー、GLB エクスポートワークフロー。
 - **Unity 統合** — 外部 `pcg-server` ランタイムを利用するエディタ側のグラフワークフロー。
-- **Agent 対応ワークフロー** — 検証、Cook、プレビューキャプチャ、自動化されたコンテンツワークフロー向けの localhost HTTP/MCP エンドポイント。
+- **外部 MCP クライアント連携** — 検証、Cook、プレビューキャプチャ、自動化されたコンテンツワークフロー向けの localhost HTTP/MCP エンドポイント。AI アカウントとモデルは外部クライアント側で設定します。
+- **3D 生成 API 設定** — Web の **Settings → 3D Generation** で Tripo の API キーを設定し、ノードの **Generate** 操作で明示的にモデルを生成します。
 - **再利用可能なコンテンツ構成要素** — manifest ベースのノード定義、サブグラフ、スキーマ、厳選されたサンプル。
 
 ## アーキテクチャ
@@ -30,7 +31,7 @@ PICG は、編集可能なグラフアセットとインテリジェントなコ
 PICG は、オーサリング、実行、エンジン統合を独立したレイヤーに分離しています。
 
 ```text
-Web / Unity / Agent workflows
+Web / Unity / External MCP clients
                  │
                  │ Graph JSON
                  ▼
@@ -106,13 +107,13 @@ npm run dev
 
 ```text
 PICG/
-├── .agents/               Agent skills and reusable procedural workflow tooling
+├── .agents/               External-client skills and reusable procedural workflow tooling
 ├── docs/                  User, architecture, and integration documentation
 ├── examples/              Graphs, tests, subgraphs, showcases, and storyboards
 ├── library/               Canonical built-in subgraph library
 ├── pcg-core/              C++ graph runtime and geometry algorithms
 ├── pcg-fbx-exporter/      Standalone FBX export library
-├── pcg-server/            Local HTTP/MCP cook and agent backend
+├── pcg-server/            Local HTTP/MCP cook, 3D generation, cache, and export backend
 ├── schema/                Graph schemas and node manifest
 ├── scripts/               Build, run, sync, and validation commands
 ├── Unity/                 Unity integration project and curated samples
@@ -201,7 +202,8 @@ python3 scripts/validate-builtin-library.py
 
 - [Getting Started](docs/getting-started.md)
 - [Architecture](docs/architecture.md)
-- [PCG server](docs/pcg-server.md)
+- [PCG server and external MCP clients](docs/pcg-server.md)
+- [Third-party image-to-3D](docs/third-party-image-to-3d.md)
 - [Node reference](docs/node-reference.md)
 - [Subgraph library](library/README.md)
 
