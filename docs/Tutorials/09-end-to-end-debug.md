@@ -158,12 +158,19 @@ async function sendToUnity(graph) {
 | `test_split_normals.cpp` | Split Normals |
 | ... | ... |
 
-### 4.4 CI
+### 4.4 本地持续验证
 
-`.github/workflows/pcg-core-ci.yml`（证据：E-054）：
-- 平台：`windows-latest`
-- 步骤：CMake Configure → Build → CTest
-- 触发：push/PR 到主分支
+当前检出不包含 GitHub Actions 工作流；提交前在本地执行同等的核心构建与 CTest：
+
+```bash
+./scripts/build-pcg-core.sh --run-tests
+```
+
+在 Windows PowerShell 中使用：
+
+```powershell
+.\scripts\build-pcg-core.ps1 -RunTests
+```
 
 ## 5. 端到端验证
 
@@ -267,7 +274,7 @@ Player 当前同样通过 localhost HTTP 请求外置 `pcg-server`，不会把 `
 - E-051：`web/pcg-editor/src/exportGraph.ts` — 导出机制
 - E-052：`pcg-core/CMakeLists.txt` — CMake 构建
 - E-053：`scripts/build-pcg-core.ps1` — 构建脚本
-- E-054：`.github/workflows/pcg-core-ci.yml` — CI
+- E-054：`scripts/build-pcg-core.sh` 与 `scripts/build-pcg-core.ps1` — 本地构建与 CTest 入口
 - E-055：`pcg-core/tests/` 与 `pcg-core/CMakeLists.txt` — CTest targets
 
 ## 9. 完成后的心智模型

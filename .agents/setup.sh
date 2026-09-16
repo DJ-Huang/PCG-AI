@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# PCG-AI Agent skills setup — junction picg-extension/skills to user profile
+# PCG-AI skills setup — junction .agents/skills to user profile
 set -euo pipefail
 
-AGENT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$AGENT_DIR/.." && pwd)"
+SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SKILLS_DIR/.." && pwd)"
 MODE="${1:-sync}"
 
 echo
 echo "============================================================"
-echo "  PCG-AI Agent Skills Setup  [$MODE]"
-echo "  Agent: $AGENT_DIR"
+echo "  PCG-AI Skills Setup  [$MODE]"
+echo "  Skills: $SKILLS_DIR"
 echo "  Repo:  $REPO_ROOT"
 echo "============================================================"
 echo

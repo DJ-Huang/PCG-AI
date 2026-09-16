@@ -26,7 +26,7 @@ library/
 3. 参数只暴露 `integer`/`number`（boolean 参数在现有序列化链路有大小写缺陷，暂缓）。
 4. 参数 `targetNode.targetProperty` 必须真实存在；默认值与节点内 data 保持一致。
 5. 布局：提交前跑
-   `python3 Agent/picg-extension/skills/shared/pcg-scripts/layout_pcg.py --in-place <asset>`（top-down，无上坡边）。
+   `python3 .agents/skills/shared/pcg-scripts/layout_pcg.py --in-place <asset>`（top-down，无上坡边）。
 6. 多部件装配遵守 `pcg/assembly-bevel`：单件 bevel 完再 merge。
 7. `keywords` 至少中英各一；`description` 一句话说清用途。
 8. 当前不支持：嵌套 subgraph、vector3 参数/属性（脚本会报明确错误，需要时先扩展脚本）。

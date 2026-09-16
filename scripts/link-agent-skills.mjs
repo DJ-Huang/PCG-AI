@@ -128,13 +128,13 @@ function linkCodelyExtension(extensionRoot, log) {
   if (pathEntryExists(linkPath)) removeForReplace(linkPath);
   linkDirectory(linkPath, extensionRoot);
   log(`\n[SKILLS:codely] junction -> ${linkPath}`);
-  log(`  [JUNCTION] Agent/${EXTENSION_DIR}/ -> extensions/${EXTENSION_DIR}`);
+  log(`  [JUNCTION] .agents/ -> extensions/${EXTENSION_DIR}`);
   return 1;
 }
 
 /**
  * Junction/symlink each skill under skillsSrc into user profile dirs.
- * Codely CLI gets Agent/picg-extension/ at extensions/picg-extension.
+ * Codely CLI gets .agents/ at extensions/picg-extension.
  */
 export function linkAgentSkillsForTools(tools, extensionRoot, skillsSrc, log = console.log) {
   if (!USER_HOME) {
@@ -191,7 +191,7 @@ function removeLink(p, log) {
 }
 
 /**
- * Remove junctions/symlinks that point into this repo's Agent/ tree.
+ * Remove junctions/symlinks that point into this repo's .agents/ tree.
  */
 export function unlinkAgentSkillsForTools(tools, extensionRoot, skillsSrc, log = console.log) {
   if (!USER_HOME) {

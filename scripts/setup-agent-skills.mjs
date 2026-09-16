@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * PCG-AI Agent skills setup:
- *   Skills -> junction/symlink Agent/picg-extension/skills/* to user profile skill dirs
- *   Codely CLI -> junction Agent/picg-extension/ to ~/.codely-cli/extensions/picg-extension/
+ * PCG-AI skills setup:
+ *   Skills -> junction/symlink .agents/skills/* to user profile skill dirs
+ *   Codely CLI -> junction .agents/ to ~/.codely-cli/extensions/picg-extension/
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,7 +12,7 @@ import { linkAgentSkillsForTools, unlinkAgentSkillsForTools } from './link-agent
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_ROOT = path.resolve(__dirname, '..');
-const EXTENSION_ROOT = path.join(SOURCE_ROOT, 'Agent', 'picg-extension');
+const EXTENSION_ROOT = path.join(SOURCE_ROOT, '.agents');
 const SKILLS_SRC = path.join(EXTENSION_ROOT, 'skills');
 
 /** @typedef {'cursor' | 'trae' | 'codely' | 'kimi' | 'opencode' | 'codex'} ToolId */
@@ -107,17 +107,17 @@ function parseCli(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  Agent/setup.bat
-  Agent/setup.bat unlink
+  .agents/setup.bat
+  .agents/setup.bat unlink
   node scripts/setup-agent-skills.mjs --tools cursor,trae,codely --once
 
-Skills source: Agent/picg-extension/skills/
-Codely CLI: junction Agent/picg-extension/ -> ~/.codely-cli/extensions/picg-extension/
+Skills source: .agents/skills/
+Codely CLI: junction .agents/ -> ~/.codely-cli/extensions/picg-extension/
 Other tools: junction each skill dir into ~/.{tool}/skills/
 
 Options:
   --once   Run once and exit (no interactive loop)
-  unlink   Remove links pointing to this repo's Agent/
+  unlink   Remove links pointing to this repo's .agents/
 `);
 }
 
@@ -157,7 +157,7 @@ async function main() {
   }
 
   console.log('============================================================');
-  console.log(`  PCG-AI Agent Skills Setup  [${cli.mode}]`);
+  console.log(`  PCG-AI Skills Setup  [${cli.mode}]`);
   console.log(`  Repo:   ${SOURCE_ROOT}`);
   console.log(`  Extension: ${EXTENSION_ROOT}`);
   console.log(`  Skills:    ${SKILLS_SRC}`);

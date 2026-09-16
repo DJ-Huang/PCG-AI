@@ -57,6 +57,7 @@ Graph JSON（编辑器无关的图数据契约）→ pcg-server → C++ 核心�
 
 ```
 PCG-AI/
+├── .agents/                    # Agent skills、扩展清单与安装入口
 ├── pcg-core/                    # C++ 核心与算法测试（CMake）
 │   ├── include/pcg_api.h        # 对外 C API（唯一公开接口，v1→v10 additive）
 │   ├── src/
@@ -874,18 +875,25 @@ ctest --test-dir pcg-core/build -R 'test_bridge_bevel|test_phase43|test_phase45_
 | `manifold_winding_bad_count` | 0 | winding 一致 |
 | `signed_volume` | > 0 | 法线朝外 |
 
-### 9.4 CI
+### 9.4 本地持续验证
 
-```yaml
-# .github/workflows/pcg-core-ci.yml
-# Windows windows-latest: Release 构建 + ctest
+当前检出不包含 GitHub Actions 工作流。提交前请在本地运行：
+
+```bash
+./scripts/build-pcg-core.sh --run-tests
+```
+
+Windows PowerShell：
+
+```powershell
+.\scripts\build-pcg-core.ps1 -RunTests
 ```
 
 ### 9.5 Schema 校验
 
 ```bash
 python3 scripts/validate-manifest.py
-python3 Agent/picg-extension/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/bridge-demo.pcg
+python3 .agents/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/bridge-demo.pcg
 ```
 
 ---
@@ -1043,7 +1051,7 @@ PCG_API PcgResultCode pcg_execute_graph_v8(
 # examples/graphs/my-demo.pcg
 
 # 2. 校验
-python3 Agent/picg-extension/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/my-demo.pcg
+python3 .agents/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/my-demo.pcg
 
 # 3. 如需随 Unity 示例分发，将副本放入 Assets/Samples/PCG-AI，保留对应 .meta/GUID
 # 一般情况下只保留 examples/graphs/ 中的仓库真源，Unity 直接从文件运行即可。
