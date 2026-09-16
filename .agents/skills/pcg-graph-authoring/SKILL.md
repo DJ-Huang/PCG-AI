@@ -1,17 +1,15 @@
 ---
 name: pcg-graph-authoring
-description: >-
-  REDIRECT — renamed to pcg-graph-authoring-unity. Use that skill for .pcg
-  authoring with mandatory Unity MCP clean-scene review. Triggers:
-  /pcg-graph-authoring, PCG graph, .pcg, Houdini layout (legacy name).
+description: Route the generic PCG authoring command to Web or Unity when the target platform is not already selected.
 ---
 
-# Moved → `pcg-graph-authoring-unity`
+# Select an authoring target
 
-This skill was renamed to **`pcg-graph-authoring-unity`**.
+Use the user's explicit target first, then the graph's workspace and active editor context. Do not infer Unity merely from the `.pcg` extension.
 
-**Read and follow:** `~/.cursor/skills/pcg-graph-authoring-unity/SKILL.md`
+- Web editor or Web asset: [pcg-graph-authoring-web](../pcg-graph-authoring-web/SKILL.md).
+- Unity project, prefab or Unity review: [pcg-graph-authoring-unity](../pcg-graph-authoring-unity/SKILL.md).
 
-Key change: visual validation **must** use `user-unity` MCP and a dedicated
-`PcgReview_<slug>.scene` so other scene objects cannot interfere
-(see `unity-review.md` in the new skill).
+Read only the selected skill. When both targets are explicitly requested, share the graph work but verify each target independently. Ask one focused question only when the target remains materially ambiguous after inspecting available context.
+
+This compatibility entry is a router, not another workflow. It does not require an installed Cursor skill, force a platform, or expand a graph-only request into a complete asset.
