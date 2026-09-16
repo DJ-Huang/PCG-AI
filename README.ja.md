@@ -2,6 +2,10 @@
   <a href="README.md">English</a> | <strong>日本語</strong>
 </p>
 
+<p align="center">
+  <img src="docs/picg-logo.png" alt="PICG — Procedural Intelligent Content Generation" width="400">
+</p>
+
 # PICG
 
 **Procedural Intelligent Content Generation**
