@@ -106,7 +106,7 @@ See [Getting Started](docs/getting-started.md) for the complete first-run and Un
 
 ```text
 PICG/
-├── Agent/                 Agent skills and reusable procedural workflow tooling
+├── .agents/               Agent skills and reusable procedural workflow tooling
 ├── docs/                  User, architecture, and integration documentation
 ├── examples/              Graphs, tests, subgraphs, showcases, and storyboards
 ├── library/               Canonical built-in subgraph library

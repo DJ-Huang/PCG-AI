@@ -1,13 +1,13 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-rem PCG-AI Agent skills setup — junction picg-extension/skills to user profile
+rem PCG-AI skills setup — junction .agents/skills to user profile
 rem   setup.bat
 rem   setup.bat unlink
 
-set "AGENT_DIR=%~dp0"
-if "%AGENT_DIR:~-1%"=="\" set "AGENT_DIR=%AGENT_DIR:~0,-1%"
-for %%I in ("%AGENT_DIR%\..") do set "REPO_ROOT=%%~fI"
+set "SKILLS_DIR=%~dp0"
+if "%SKILLS_DIR:~-1%"=="\" set "SKILLS_DIR=%SKILLS_DIR:~0,-1%"
+for %%I in ("%SKILLS_DIR%\..") do set "REPO_ROOT=%%~fI"
 set "MODE=sync"
 set "EXIT_CODE=0"
 
@@ -25,8 +25,8 @@ cd /d "%REPO_ROOT%" || (
 
 echo.
 echo ============================================================
-echo   PCG-AI Agent Skills Setup  [!MODE!]
-echo   Agent: %AGENT_DIR%
+echo   PCG-AI Skills Setup  [!MODE!]
+echo   Skills: %SKILLS_DIR%
 echo   Repo:  %REPO_ROOT%
 echo ============================================================
 echo.

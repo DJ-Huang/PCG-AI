@@ -54,7 +54,7 @@ When several editor pages are available, ask which page to use. On conflict, tim
 Retrieving `pcg/graph-contract` is not enough; layout must be **executed**.
 
 - Required orientation: Houdini-style **top-down**. Main chain shares the same X; row step ≈ 160; siblings on one row use X spacing ≥ 320. Left-to-right processing columns are a layout failure.
-- After any `pcg_apply_graph_ops` / `pcg_replace_graph` that adds, removes, or rewires nodes (not a one-off property tweak), run `Agent/picg-extension/skills/shared/pcg-scripts/layout_pcg.py` on the saved `.pcg` (or an equivalent top-down move_node pass), then push positions back to the live editor and re-save when updating the named graph.
+- After any `pcg_apply_graph_ops` / `pcg_replace_graph` that adds, removes, or rewires nodes (not a one-off property tweak), run `.agents/skills/shared/pcg-scripts/layout_pcg.py` on the saved `.pcg` (or an equivalent top-down move_node pass), then push positions back to the live editor and re-save when updating the named graph.
 - Do not report the **job** complete until layout is top-down **and** live `pcg_validate` / `pcg_cook` / `pcg_capture_preview` have passed **and** (for web complete-asset skills) later stages reach `FINAL_ACCEPTED` or a legal stop.
 
 ## Validation and Communication

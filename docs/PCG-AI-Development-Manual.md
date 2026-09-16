@@ -885,7 +885,7 @@ ctest --test-dir pcg-core/build -R 'test_bridge_bevel|test_phase43|test_phase45_
 
 ```bash
 python3 scripts/validate-manifest.py
-python3 Agent/picg-extension/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/bridge-demo.pcg
+python3 .agents/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/bridge-demo.pcg
 ```
 
 ---
@@ -1043,7 +1043,7 @@ PCG_API PcgResultCode pcg_execute_graph_v8(
 # examples/graphs/my-demo.pcg
 
 # 2. 校验
-python3 Agent/picg-extension/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/my-demo.pcg
+python3 .agents/skills/shared/pcg-scripts/validate_pcg.py examples/graphs/my-demo.pcg
 
 # 3. 如需随 Unity 示例分发，将副本放入 Assets/Samples/PCG-AI，保留对应 .meta/GUID
 # 一般情况下只保留 examples/graphs/ 中的仓库真源，Unity 直接从文件运行即可。

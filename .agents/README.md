@@ -36,7 +36,7 @@ Agent\setup.bat unlink
 |------|----------|
 | Cursor | `~/.cursor/skills/<skill-name>/` |
 | Trae | `~/.trae/skills/`、`~/.trae-cn/skills/` |
-| Codely CLI | `~/.codely-cli/extensions/picg-extension/` → `Agent/picg-extension/` |
+| Codely CLI | `~/.codely-cli/extensions/picg-extension/` → `.agents/` |
 | Kimi Code | `~/.kimi-code/skills/<skill-name>/` |
 | OpenCode | `~/.config/opencode/skills/<skill-name>/` |
 | Codex | `~/.codex/skills/<skill-name>/` |
@@ -51,4 +51,4 @@ node scripts/setup-agent-skills.mjs --tools all --once
 
 ## 真源
 
-`Agent/picg-extension/skills/` 为 PCG Agent Skill **真源**。只在此处编辑，改后重跑 `Agent/setup.bat` / `Agent/setup.sh`。
+`.agents/skills/` 为 PCG Agent Skill **真源**。只在此处编辑，改后重跑 `.agents/setup.bat` / `.agents/setup.sh`。
