@@ -9,14 +9,8 @@ verified_status: limited
 verified_by: "Web review camera presets and per-view capture receipts"
 ---
 
-# Orthographic three-view reconstruction
+# Orthographic reconstruction
 
-Front, side, and top orthographic references are geometry constraints. A perspective or three-quarter image is only a completeness check.
+Use this for supplied orthographic views or an explicit three-view reconstruction request, not to demand three new images after every single-photo task. The maintained procedure is [three-view reconstruction](../../../.agents/skills/pcg-graph-authoring-web/triview.md).
 
-- Archive each source as `front`, `side`, or `top`.
-- Use left-handed object space with +Y up; record the chosen front and side directions.
-- Width is constrained by front and top, height by front and side, and depth by side and top.
-- Give each dimension one owner and record conflicts beyond the chosen tolerance instead of silently averaging them.
-- Choose primitives and operations from the actual cross-section, not from a single perspective silhouette.
-
-Capture deterministic orthographic reviews for every required view after each dimension change. The lowest required-view score controls acceptance. A three-quarter review may still block completion when it reveals collapsed depth, intersections, or missing thickness.
+Preserve labelled sources, record the object frame, and constrain width with front/top, height with front/side and depth with side/top. Give dimensions one owner; record source conflicts instead of silently averaging them. Recheck affected required views after dimension changes. A failed required view cannot be averaged away, and an integrity view can reveal collapsed depth or intersections. A single-photo job may use perspective evidence while declaring hidden-surface uncertainty; it must not claim orthographic reconstruction without those sources.

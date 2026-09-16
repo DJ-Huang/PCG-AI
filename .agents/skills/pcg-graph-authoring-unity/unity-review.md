@@ -1,145 +1,21 @@
-# Unity review gate (P0 — mandatory)
+# Unity visual review
 
-This skill is **Unity-bound**. Visual validation **must** go through the `user-unity` MCP.
-Do **not** judge fidelity from a cluttered existing scene, a random user screenshot, or memory.
+Unity acceptance requires evidence from the intended Unity project. Web previews and static graph validation do not establish Unity imports, shaders, bindings or prefab behavior.
 
-Cheatsheet: [scripts.md](scripts.md) · C# templates: [`scripts/unity/`](scripts/unity/)
+## Connect without changing the wrong project
 
-## Hard rules
+Discover the available Unity connector's tools. A typical flow is list instances, select the matching project root, then ping; tool names and server IDs can vary by installation. Use request/workspace context to resolve the instance, and ask only when no correct instance is reachable or several remain ambiguous. Never choose an unrelated project to make a check pass.
 
-1. **Connect Unity before any cook / screenshot / SceneView judgment.**
-2. **Always open or create a dedicated review scene** that contains **only** the graph under review (+ studio light + camera). Hide or do not load other demo content.
-3. **Screenshot from that clean scene**, then `make_comparison_sheet.py` vs the reference.
-4. Scripts never score visuals — agent vision does, after the sheet exists.
-5. If no reachable Unity instance matches the workspace: **stop and ask the user** (dev-gate §7). Do not guess another project.
+## Preserve scene state
 
-## Connect protocol (every session / every review cycle)
+Record the loaded scene setup and active scene before review. Do not discard unsaved changes, silently save user scenes, or overwrite an existing review scene. The [creation template](scripts/unity/create_review_scene.cs.txt) refuses dirty/unsaved populated scenes and uses a fresh `.unity` path under `Assets/PICG-Workspace/Scenes`. Resolve any blocked scene state with the user or an explicitly safe workflow before continuing.
 
-Follow workspace **dev-gate §7** exactly:
+Create an isolated scene containing only the review subject, intended lighting and camera. Preserve existing review files; reuse a known task-owned scene only deliberately. Restore the previous scene setup when safe, or state the resulting editor state. Review paths are defaults, not permission to overwrite unrelated assets.
 
-```text
-1. unity_list_instances({ probe: true })
-2. Prefer instance whose projectRoot is the current workspace Unity project
-   (e.g. …/PICG-cursor/Unity) or contains the workspace.
-3. If 0 workspace-related OR ≥2 ambiguous → ask_user with pid / projectRoot / port.
-4. unity_select_instance({ project: "<Unity project root>" })  # or unique pid/port
-5. unity_ping → must succeed before manage_* / execute_csharp_script / read_console
-```
+## Cook, capture and inspect
 
-MCP server id: **`user-unity`**.
+Use [setup_pcg_review_subject.cs.txt](scripts/unity/setup_pcg_review_subject.cs.txt) with the intended graph asset. Wait for the requested cook to finish and confirm nonempty current output; the script returning after `RequestPreviewCook` is not completion evidence. Check console errors, transforms, bounds and material bindings before visual judgment.
 
-Receipt line after connect (required in the agent reply):
+Capture the isolated SceneView using [capture_sceneview_png.cs.txt](scripts/unity/capture_sceneview_png.cs.txt) or an equivalent available capture tool. Match the supplied reference viewpoint(s), inspect a depth/assembly view where needed, and keep fresh evidence linked to the current graph. Compare against archived sources using the [shared helper](../shared/script-reference.md). Do not score a cluttered demo scene, stale capture or missing output.
 
-```text
-Unity MCP: connected pid=<pid> project=<projectRoot> port=<port>
-```
-
-If ping fails: report `Unity MCP: unavailable` and **do not** claim visual pass/`continue` on a visual build pass.
-
-## Clean review scene (no interference)
-
-### Fixed preview directory (P0 — never ask)
-
-| Item | Value |
-|------|-------|
-| Preview scene dir | **`Assets/PICG-Workspace/Scenes`** |
-| Scene file | `Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene` |
-
-Always create / overwrite Preview scenes here. **Do not** `ask_user` for scene location. **Do not** use `Assets/Scenes/` unless the user explicitly overrides. Ensure the folder exists (template mkdir) before save.
-
-### Why
-
-Prior demos (lot-city, bridges, other props) in the same SceneView pollute silhouette, scale, and color judgment. Hiding objects ad-hoc is fragile; a **new empty review scene** is the default.
-
-### Procedure
-
-```text
-A. Record previous active scene path (manage_scene get_active) so you can restore later if the user wants.
-B. Create a fresh review scene (prefer C# to avoid path quirks):
-
-```text
-execute_csharp_script: scripts/unity/create_review_scene.cs.txt
-  → Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene
-```
-
-   Or MCP: `manage_scene` action `create` with
-   `params: { "name": "PcgReview_<slug>", "path": "Assets/PICG-Workspace/Scenes" }`
-   → file at `Assets/PICG-Workspace/Scenes/PcgReview_<slug>.scene`.
-   **Do not** pass a path that already ends in `.scene` as the directory (MCP may nest
-   `….scene/….scene`).
-C. execute_csharp_script with scripts/unity/setup_pcg_review_subject.cs.txt
-   - Pass GRAPH_ASSET_PATH (Unity asset path to .pcg / PcgGraphAsset)
-   - Optional MATERIAL_DIR for AssignMaterial bindings
-   - Creates GO "PCG_Review_<slug>" with PcgGraphComponent, Directional light, Camera
-   - Cooks via RequestPreviewCook(immediate: true)
-   - Frames SceneView.lastActiveSceneView on the cooked bounds
-D. read_console (errors) — fix cook errors before scoring
-E. execute_csharp_script with scripts/unity/capture_sceneview_png.cs.txt
-   - Writes Unity/screenshots/SceneView_<stamp>.png (project-relative)
-F. python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference … --render … --out …
-G. Agent vision on the sheet → append_review.py (one action)
-H. Optional: manage_scene load previous scene; leave PcgReview_* scene on disk for reruns
-```
-
-### Naming
-
-| Item | Pattern |
-|------|---------|
-| Scene | `Assets/PICG-Workspace/Scenes/PcgReview_<graph-slug>.scene` |
-| Root GO | `PCG_Review_<graph-slug>` |
-| Reference archive | `ref_<graph-slug>.<ext>` next to `*-plan.json` (via `archive_reference.py`; never a URL/chat attachment) |
-| Screenshot | `Unity/screenshots/SceneView_YYYY-MM-DD_HH-MM-SS.png` |
-| Comparison | `Unity/screenshots/cmp_<graph-slug>_<pass>.png` |
-
-`<graph-slug>` = `.pcg` basename without extension (e.g. `ghost-protocol-glock`).
-
-### Forbidden shortcuts
-
-| Anti-pattern | Why |
-|--------------|-----|
-| Ask where to create the Preview scene | Path is fixed: `Assets/PICG-Workspace/Scenes` |
-| Write Preview scenes under `Assets/Scenes/` | Wrong default; use `Assets/PICG-Workspace/Scenes` |
-| Screenshot the user's busy Test / Demo scene | Other meshes dominate framing |
-| Only `SetActive(false)` on siblings in a shared scene | Easy to miss lights/skyboxes/UI; state leaks |
-| Score from an old screenshot without recook | Stale geometry |
-| `continue` on visual pass without comparison sheet + Unity MCP ping | Violates orchestration gate |
-| Feed the comparison sheet a URL / chat attachment as reference | Not durable; archive first (`archive_reference.py`) |
-| Connect to a non-workspace Unity instance without ask_user | Wrong Library / wrong assets |
-
-## Template placeholders
-
-Replace before `execute_csharp_script`:
-
-| Token | Example |
-|-------|---------|
-| `__GRAPH_ASSET_PATH__` | `Assets/PcgPlugin/Examples/PCGDemo/ghost-protocol-glock/ghost-protocol-glock.pcg` |
-| `__REVIEW_SLUG__` | `ghost-protocol-glock` |
-| `__SCREENSHOT_REL__` | `screenshots/SceneView_2026-07-31_22-40-00.png` |
-
-Paths are Unity project-relative (`Application.dataPath/..` for disk writes under `screenshots/`).
-
-## Interaction with authoring passes
-
-| Pass | Unity MCP required? |
-|------|---------------------|
-| `module-plan` | No (plan/docs only) |
-| `blockout` … `material-pass` | **Yes** — clean scene + sheet before `continue` |
-| `parameters` | Yes if visual defaults change |
-| `validation` | `validate_pcg.py` + Unity cook smoke if graph ships in Unity |
-
-`append_review.py` requires `--reference-screenshot` (archived file), `--render-screenshot`, `--comparison-image`, and `--ai-vision-notes` for visual-pass `continue`.
-
-## Minimal tool sequence (copy)
-
-```text
-CallMcpTool user-unity unity_list_instances { probe: true }
-CallMcpTool user-unity unity_select_instance { project: "<ws>/Unity" }
-CallMcpTool user-unity unity_ping {}
-CallMcpTool user-unity manage_scene { action: get_active }   # remember prior scene
-CallMcpTool user-unity execute_csharp_script { script: <create_review_scene.cs.txt> }
-CallMcpTool user-unity execute_csharp_script { script: <setup_pcg_review_subject.cs.txt> }
-CallMcpTool user-unity read_console { action: get, types: ["error"], count: 30 }
-CallMcpTool user-unity execute_csharp_script { script: <capture_sceneview_png.cs.txt> }
-Shell: python3 ../shared/pcg-scripts/make_comparison_sheet.py --reference … --render … --out …
-# agent vision → append_review.py
-```
+For a complete-asset request, save and reload the actual prefab and inspect its persistent mesh/material references and final appearance. A temporary scene object is not prefab evidence. Report project/graph/prefab paths, cook and console results, screenshots and any blocked checks; preserve the [complete-asset acceptance contract](../shared/complete-asset-workflow.md).
