@@ -34,9 +34,8 @@ set(PCG_FBX_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../pcg-fbx-exporter")
 add_executable(pcg-server
     src/main.cpp
     src/cook_service.cpp
-    src/agent_service.cpp
-    src/agent_runtime.cpp
-    src/agent_session_store.cpp
+    src/server_auth.cpp
+    src/credential_store.cpp
     src/session_service.cpp
     src/mcp_service.cpp
     src/kb_service.cpp

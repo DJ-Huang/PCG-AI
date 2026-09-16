@@ -12,7 +12,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "agent_service.hpp"
+#include "server_auth.hpp"
 #include "cook_service.hpp"
 #include "kb_service.hpp"
 #include "session_service.hpp"
@@ -963,20 +963,8 @@ json CallPcgTool(
     return CallToolInternal(name, arguments, editor_session_id);
 }
 
-bool PcgToolRequiresApproval(const std::string&) {
-    return false;
-}
-
-bool PcgToolMutatesGraph(const std::string& name) {
-    return name == "pcg_patch_node" ||
-           name == "pcg_bake_oriented_sdf" ||
-           name == "pcg_apply_graph_ops" ||
-           name == "pcg_replace_graph" ||
-           name == "pcg_save_graph";
-}
-
 void HandleMcpPost(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     const json message = json::parse(req.body, nullptr, false);
     if (message.is_discarded()) {
         SendMcpResponse(req, res, ErrorResponse(nullptr, -32700, "Parse error"));
@@ -995,7 +983,7 @@ void HandleMcpPost(const httplib::Request& req, httplib::Response& res) {
 }
 
 void HandleMcpGet(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     res.status = 405;
     res.set_header("Allow", "POST");
     res.set_content(

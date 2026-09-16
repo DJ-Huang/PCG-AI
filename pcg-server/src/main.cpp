@@ -1,7 +1,4 @@
 #include "cook_service.hpp"
-#include "agent_service.hpp"
-#include "agent_runtime.hpp"
-#include "agent_session_store.hpp"
 #include "kb_service.hpp"
 #include "mcp_service.hpp"
 #include "session_service.hpp"
@@ -13,6 +10,7 @@
 #include <iostream>
 #include <string>
 
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #include "httplib.h"
@@ -20,6 +18,15 @@
 #include "pcg_fbx_api.h"
 
 namespace {
+
+// Initialize the HTTP client before request threads start. It outlives the
+// server so ongoing Tripo requests finish before global curl cleanup.
+struct CurlRuntime {
+    const CURLcode status = curl_global_init(CURL_GLOBAL_DEFAULT);
+    ~CurlRuntime() {
+        if (status == CURLE_OK) curl_global_cleanup();
+    }
+};
 
 int ParsePort(int argc, char** argv, int fallback) {
     for (int i = 1; i < argc; ++i) {
@@ -41,21 +48,19 @@ int ParsePort(int argc, char** argv, int fallback) {
                 << "  GET|POST /v1/kb/search\n"
                 << "  GET  /v1/kb/list\n"
                 << "  GET|POST /v1/kb/get\n"
-              << "  GET  /v1/golden-graphs/list\n"
-              << "  GET|POST /v1/golden-graphs/get\n"
-              << "  GET  /v1/third-party/tripo/status\n"
-              << "  PUT|DELETE /v1/third-party/tripo/config\n"
-              << "  POST /v1/third-party/tripo/generate\n"
-              << "  GET  /v1/third-party/cache/<file>\n"
-              << "  POST /v1/reconstruct/oriented-sdf\n"
-                << "  GET  /v1/agent/providers (Bearer PCG_AGENT_TOKEN when set)\n"
-                << "  POST /v1/agent/turns (multipart + SSE)\n"
-                << "  GET  /v1/agent/health\n"
+                << "  GET  /v1/golden-graphs/list\n"
+                << "  GET|POST /v1/golden-graphs/get\n"
+                << "  GET  /v1/third-party/tripo/status\n"
+                << "  PUT|DELETE /v1/third-party/tripo/config\n"
+                << "  POST /v1/third-party/tripo/generate\n"
+                << "  GET  /v1/third-party/cache/<file>\n"
+                << "  POST /v1/reconstruct/oriented-sdf\n"
                 << "  PUT|GET /v1/session\n"
                 << "  PUT|GET /v1/preview/screenshot\n"
                 << "  POST /v1/preview/request-capture\n"
                 << "  PATCH /v1/graph/nodes/:id\n"
-                << "  POST /mcp (MCP Streamable HTTP; optional SSE response)\n";
+                << "  POST /mcp (MCP Streamable HTTP; optional SSE response)\n"
+                << "  Set PCG_SERVER_TOKEN to protect editor, MCP and 3D generation APIs.\n";
             std::exit(0);
         }
     }
@@ -72,7 +77,11 @@ int ParsePort(int argc, char** argv, int fallback) {
 
 int main(int argc, char** argv) {
     const int port = ParsePort(argc, argv, 17890);
-    pcg_server::ConfigureAgentRuntime(port);
+    const CurlRuntime curl;
+    if (curl.status != CURLE_OK) {
+        std::cerr << "[pcg-server] could not initialize HTTP client" << std::endl;
+        return 1;
+    }
     pcg_server::ConfigureKbRoot(std::filesystem::current_path());
     pcg_server::ConfigureSurfaceReconstructionRoot(std::filesystem::current_path());
     httplib::Server svr;
@@ -88,7 +97,7 @@ int main(int argc, char** argv) {
         res.set_content(nlohmann::json{
             {"ok", false},
             {"error", {{"code", "internal_error"},
-                       {"message", "The local Agent runtime encountered an internal error."},
+                       {"message", "The local server encountered an internal error."},
                        {"retryable", true}}},
         }.dump(), "application/json");
     });
@@ -100,7 +109,7 @@ int main(int argc, char** argv) {
             {"fbx_version", pcg_fbx_get_version()},
             {"api", "v1"},
             {"mcp", {{"enabled", true}, {"endpoint", "/mcp"}, {"transport", "streamable-http"}}},
-            {"agent_bridge", pcg_server::GetBridgeHealth()},
+            {"editor_bridge", pcg_server::GetBridgeHealth()},
         };
         res.set_content(body.dump(), "application/json");
     });
@@ -109,24 +118,6 @@ int main(int argc, char** argv) {
     svr.Post("/v1/cancel", pcg_server::HandleCancel);
     svr.Post("/v1/validate", pcg_server::HandleValidate);
     svr.Post("/v1/cache/clear", pcg_server::HandleCacheClear);
-    svr.Post("/v1/agent/chat", pcg_server::HandleAgentChat);
-    svr.Get("/v1/agent/health", pcg_server::HandleAgentHealth);
-    svr.Get("/v1/agent/providers", pcg_server::HandleAgentProviders);
-    svr.Post(R"(/v1/agent/providers/([^/]+)/connect/key)", pcg_server::HandleAgentConnectKey);
-    svr.Delete(R"(/v1/agent/providers/([^/]+)/connection)", pcg_server::HandleAgentDeleteConnection);
-    svr.Post(R"(/v1/agent/providers/([^/]+)/validate)", pcg_server::HandleAgentValidateProvider);
-    svr.Get("/v1/agent/settings", pcg_server::HandleAgentGetSettings);
-    svr.Put("/v1/agent/settings", pcg_server::HandleAgentPutSettings);
-    svr.Post(R"(/v1/agent/providers/([^/]+)/oauth/start)", pcg_server::HandleAgentOAuthStart);
-    svr.Get(R"(/v1/agent/oauth/([^/]+)/status)", pcg_server::HandleAgentOAuthStatus);
-    svr.Get(R"(/v1/agent/oauth/callback/([^/]+))", pcg_server::HandleAgentOAuthCallback);
-    svr.Get("/v1/agent/sessions", pcg_server::HandleAgentListSessions);
-    svr.Get(R"(/v1/agent/sessions/([^/]+))", pcg_server::HandleAgentGetSession);
-    svr.Patch(R"(/v1/agent/sessions/([^/]+))", pcg_server::HandleAgentPatchSession);
-    svr.Delete(R"(/v1/agent/sessions/([^/]+))", pcg_server::HandleAgentDeleteSession);
-    svr.Post("/v1/agent/turns", pcg_server::HandleAgentTurn);
-    svr.Post(R"(/v1/agent/turns/([^/]+)/decision)", pcg_server::HandleAgentTurnDecision);
-    svr.Post(R"(/v1/agent/turns/([^/]+)/cancel)", pcg_server::HandleAgentTurnCancel);
     svr.Post("/v1/export-fbx", pcg_server::HandleExportFbx);
     svr.Get("/v1/kb/status", pcg_server::HandleKbStatus);
     svr.Post("/v1/kb/reindex", pcg_server::HandleKbReindex);

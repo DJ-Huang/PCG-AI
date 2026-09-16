@@ -1,11 +1,14 @@
 #include "third_party_service.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iterator>
 #include <string>
 #include <thread>
 #include <vector>
@@ -13,8 +16,8 @@
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
-#include "agent_runtime.hpp"
-#include "agent_service.hpp"
+#include "credential_store.hpp"
+#include "server_auth.hpp"
 #include "kb_service.hpp"
 
 namespace pcg_server {
@@ -83,7 +86,7 @@ json TripoStatus() {
                         : !stored_base.empty() ? stored_base
                                                : kTripoDefaultBaseUrl},
              {"keyHint", configured ? KeyHint(active_key) : ""},
-             {"credentialStore", AgentCredentialStoreName()},
+             {"credentialStore", CredentialStoreName()},
          }},
     };
 }
@@ -91,12 +94,12 @@ json TripoStatus() {
 }  // namespace
 
 void HandleThirdPartyTripoStatus(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     WriteJson(res, TripoStatus());
 }
 
 void HandleThirdPartyTripoConfigPut(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body = json::parse(req.body, nullptr, false);
     if (!body.is_object()) {
         WriteJson(res, ErrorBody("invalid_body", "Request body must be a JSON object."), 400);
@@ -128,7 +131,7 @@ void HandleThirdPartyTripoConfigPut(const httplib::Request& req, httplib::Respon
 }
 
 void HandleThirdPartyTripoConfigDelete(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     if (!DeleteProtectedCredential(kTripoCredentialName)) {
         WriteJson(res, ErrorBody(
             "credential_store_delete_failed", "Could not delete the Tripo credential."), 500);
@@ -702,7 +705,7 @@ std::string SseEvent(const std::string& event, const json& data) {
 }  // namespace
 
 void HandleThirdPartyTripoGenerate(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     json body = json::parse(req.body, nullptr, false);
     if (!body.is_object()) {
         WriteJson(res, ErrorBody("invalid_body", "Request body must be a JSON object."), 400);
@@ -731,7 +734,7 @@ void HandleThirdPartyTripoGenerate(const httplib::Request& req, httplib::Respons
 }
 
 void HandleThirdPartyCacheGet(const httplib::Request& req, httplib::Response& res) {
-    if (!CheckAgentAuth(req, res)) return;
+    if (!CheckServerAuth(req, res)) return;
     const std::string name = req.matches.size() > 1 ? req.matches[1].str() : "";
     const bool valid_name = !name.empty()
         && name.size() < 128

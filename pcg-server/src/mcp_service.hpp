@@ -12,13 +12,11 @@ namespace pcg_server {
 void HandleMcpPost(const httplib::Request& req, httplib::Response& res);
 void HandleMcpGet(const httplib::Request& req, httplib::Response& res);
 
-/** Shared tool surface used by both MCP HTTP and the embedded LLM agent. */
+/** Tool surface for external editor integrations over MCP HTTP. */
 nlohmann::json GetPcgToolDefinitions();
 nlohmann::json CallPcgTool(
     const std::string& name,
     const nlohmann::json& arguments = nlohmann::json::object(),
     const std::string& editor_session_id = "");
-bool PcgToolRequiresApproval(const std::string& name);
-bool PcgToolMutatesGraph(const std::string& name);
 
 }  // namespace pcg_server
