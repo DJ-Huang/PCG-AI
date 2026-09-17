@@ -11,6 +11,8 @@ This directory contains the serialized contracts shared by the Web editor, nativ
 - `subgraph-schema.json` — standalone `.pcgsubgraph` contract.
 - [custom-function-schema-v1.json](custom-function-schema-v1.json) — runtime-independent Custom Function static declarations.
 - [custom-function-contract.md](custom-function-contract.md) — semantic rules, stable IDs, transactions, persistence, and host handoff boundaries.
+- [script-operation-policy-v1.json](script-operation-policy-v1.json) — fail-closed capability policy and explicit allowlist for generic script-to-Core operation invocation.
+- [generated/pcg-script-operations-v1.d.ts](generated/pcg-script-operations-v1.d.ts) — generated declaration surface for the currently script-callable operation names.
 - `fixtures/` — small schema and parser fixtures, including the Custom Function contract/conformance corpus.
 - `example.pcg` — minimal v1 compatibility graph used by native tests.
 
@@ -27,13 +29,28 @@ Run from the repository root. The first command uses installed TypeScript (proje
 
 This is a static contract, not registration of an executable node. Custom Function host integration and Cook remain follow-up work; the contract fixture must not be advertised as a working native/Web/Unity modeling example.
 
+## Shared scripting operation bridge
+
+Issue #23 adds a Core-side generic invocation contract for future scripting hosts. `node-manifest.json` remains the source of parameter defaults and typed pins; `script-operation-policy-v1.json` adds capability classification, resource requirements and the explicit script-callable allowlist. Unlisted operations are treated as host-bound and denied by default. Graph-control nodes, recursive `CustomFunction`, and side-effecting operations are not callable through the generic bridge.
+
+The native bridge exposes runtime machine-readable discovery by combining the embedded node manifest with the generated policy, and the generated `.d.ts` exposes the current operation-name surface to JavaScript tooling. Regenerate/check the policy artifacts with:
+
+```sh
+python scripts/generate-script-operation-contract.py
+python scripts/generate-script-operation-contract.py --check
+python scripts/test-script-operation-contract.py
+```
+
+The bridge executes the same registered `IPcgElement` implementations used by visual graphs and propagates seed, native resource runtimes, cancellation, dependency descriptors and an invocation statistics sink. Script execution itself and checked JavaScript geometry handles remain #24 work.
+
 ## Node changes
 
 When adding or changing a node:
 
 1. Update `node-manifest.json` from verified native behavior.
 2. Update the C++ registration/executor and relevant tests.
-3. Run `./scripts/sync-manifest.sh`.
-4. Run `python3 scripts/validate-manifest.py`.
-5. Validate the Web build and Unity compilation.
+3. If scripting eligibility or capability changes, update `script-operation-policy-v1.json` and regenerate its artifacts.
+4. Run `./scripts/sync-manifest.sh`.
+5. Run `python3 scripts/validate-manifest.py`.
+6. Validate the Web build and Unity compilation.
 
