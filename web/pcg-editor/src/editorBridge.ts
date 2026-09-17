@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { mcpSessionControl, type McpSessionStatus } from './mcpSessionState';
 
 import type { GraphCommandResult, QueuedGraphCommand } from './graphCommands';
 import type { GraphJson } from './graphSchema';
@@ -23,7 +24,10 @@ interface EditorBridgeOptions {
   applyCameraCommand: (command: CameraCommand) => Record<string, unknown> | null;
 }
 
-interface SessionResponse {
+interface SessionResponse extends McpSessionStatus {
+  bridgeInstanceId?: number;
+  cancelledCaptureThrough?: number;
+  cancelledCameraThrough?: number;
   ok: boolean;
   captureRequestId?: number;
   captureOptions?: CaptureOptions;
@@ -33,7 +37,7 @@ interface SessionResponse {
 
 interface PatchResponse {
   ok: boolean;
-  patches?: QueuedGraphCommand[];
+  patches?: (QueuedGraphCommand & { editorSessionId?: string; aiControlRevision?: number })[];
 }
 
 function bridgeHeaders(): Record<string, string> {
@@ -67,6 +71,14 @@ async function postJson(path: string, body: unknown): Promise<Response> {
 export function useEditorBridge(options: EditorBridgeOptions): () => Promise<void> {
   const graphText = JSON.stringify(options.graph);
   const graphPath = options.graphPath;
+  const control = useSyncExternalStore(mcpSessionControl.subscribe, mcpSessionControl.getSnapshot);
+  const aiControlEnabled = control.sessionId === options.sessionId && control.enabled;
+  const aiControlRevision = control.sessionId === options.sessionId ? control.revision : 0;
+  // Do not publish query strings/fragments, which can contain client credentials.
+  const pageUrl = `${window.location.origin}${window.location.pathname}`;
+  useEffect(() => {
+    mcpSessionControl.attach(options.sessionId, graphPath, pageUrl);
+  }, [options.sessionId, graphPath, pageUrl]);
   const editPathKey = JSON.stringify(options.editPath);
   const selectedNodeId = options.selectedNodeId;
   const previewTargetNodeId = options.previewTargetNodeId;
@@ -79,7 +91,9 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
   const cameraCommandRef = useRef(0);
   const pollingRef = useRef(false);
   const clientRevisionRef = useRef(0);
-  const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId]);
+  const publishedControlRevisionRef = useRef(-1);
+  const bridgeInstanceRef = useRef<number | undefined>(undefined);
+  const sessionKey = JSON.stringify([graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, aiControlEnabled, aiControlRevision]);
   const latestSessionKeyRef = useRef(sessionKey);
   latestSessionKeyRef.current = sessionKey;
   applyCommandsRef.current = options.applyCommands;
@@ -94,6 +108,9 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
     hashRef.current = hash;
     const response = await putJson('/session', {
       sessionId: options.sessionId,
+      aiControlEnabled,
+      aiControlRevision,
+      pageUrl,
       clientRevision: ++clientRevisionRef.current,
       graphPath,
       editPath: JSON.parse(editPathKey) as string[],
@@ -110,17 +127,29 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       // snapshot (or a newer one), so the synchronization barrier is satisfied.
       if (conflict?.error === 'stale_session_update') return;
     }
-    if (!response.ok) throw new Error(`session sync failed: HTTP ${response.status}`);
-  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest, options.sessionId]);
+    if (!response.ok) {
+      mcpSessionControl.disconnect(options.sessionId);
+      throw new Error(`session sync failed: HTTP ${response.status}`);
+    }
+    const status = await response.json() as SessionResponse;
+    publishedControlRevisionRef.current = Math.max(publishedControlRevisionRef.current, aiControlRevision);
+    mcpSessionControl.report(options.sessionId, status);
+  }, [graphText, graphPath, editPathKey, selectedNodeId, previewTargetNodeId, sessionKey, options.nodeManifest, options.sessionId, aiControlEnabled, aiControlRevision, pageUrl]);
 
   useEffect(() => {
-    const debounce = window.setTimeout(() => void pushSession().catch(console.warn), 250);
+    // Consent changes are sent immediately; ordinary graph changes stay debounced.
+    const delay = publishedControlRevisionRef.current === aiControlRevision ? 250 : 0;
+    const debounce = window.setTimeout(() => void pushSession().catch((error) => {
+      mcpSessionControl.disconnect(options.sessionId);
+      console.warn(error);
+    }), delay);
     const heartbeat = window.setInterval(
       () => void (async () => {
         try {
           const response = await postJson('/session/heartbeat', { sessionId: options.sessionId });
           if (response.status === 409) await pushSession();
         } catch (error) {
+          mcpSessionControl.disconnect(options.sessionId);
           console.warn('[editor-bridge] heartbeat failed', error);
         }
       })(),
@@ -130,7 +159,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
       window.clearTimeout(debounce);
       window.clearInterval(heartbeat);
     };
-  }, [pushSession, options.sessionId]);
+  }, [pushSession, options.sessionId, aiControlRevision]);
 
   const uploadCapture = useCallback(async (requestId: number, captureOptions?: CaptureOptions) => {
     const capture = capturePreviewRef.current(captureOptions);
@@ -170,16 +199,33 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
         ]);
         if (sessionResponse.ok) {
           const session = (await sessionResponse.json()) as SessionResponse;
+          mcpSessionControl.report(options.sessionId, session);
+          if (session.bridgeInstanceId !== bridgeInstanceRef.current) {
+            // A restarted server uses fresh command counters; never retain an old cursor.
+            bridgeInstanceRef.current = session.bridgeInstanceId;
+            cursorRef.current = 0;
+            captureRequestRef.current = 0;
+            cameraCommandRef.current = 0;
+          }
+          const canApply = () => session.aiControlEnabled === true
+            && mcpSessionControl.allows(options.sessionId, session.aiControlRevision);
           const cameraCommandId = session.cameraCommandId ?? 0;
           if (cameraCommandId > cameraCommandRef.current) {
-            const applied = applyCameraCommandRef.current(session.cameraCommand ?? {});
             cameraCommandRef.current = cameraCommandId;
-            await echoCameraState(cameraCommandId, applied);
+            if (canApply() && cameraCommandId > (session.cancelledCameraThrough ?? 0)) {
+              const applied = applyCameraCommandRef.current(session.cameraCommand ?? {});
+              await echoCameraState(cameraCommandId, applied);
+            }
           }
           const requested = session.captureRequestId ?? 0;
-          if (requested > captureRequestRef.current && await uploadCapture(requested, session.captureOptions)) {
-            captureRequestRef.current = requested;
+          if (requested > captureRequestRef.current) {
+            if (!canApply() || requested <= (session.cancelledCaptureThrough ?? 0)
+              || await uploadCapture(requested, session.captureOptions)) {
+              captureRequestRef.current = requested;
+            }
           }
+        } else {
+          mcpSessionControl.disconnect(options.sessionId);
         }
         if (patchesResponse.ok) {
           const payload = (await patchesResponse.json()) as PatchResponse;
@@ -191,12 +237,15 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
             const currentPath = JSON.parse(editPathKey) as string[];
             const samePath = JSON.stringify(patch.editPath) === editPathKey;
             const sameGraph = !hashRef.current || patch.baseGraphHash === hashRef.current;
-            const results = samePath && sameGraph
+            const allowed = patch.editorSessionId === options.sessionId
+              && mcpSessionControl.allows(options.sessionId, patch.aiControlRevision);
+            const results = allowed && samePath && sameGraph
               ? await applyCommandsRef.current([patch])
               : [{
                 id: patch.id,
                 ok: false,
-                error: samePath ? 'graph_conflict' : `edit_path_changed:${currentPath.join('/')}`,
+                error: !allowed ? 'editor_control_revoked'
+                  : samePath ? 'graph_conflict' : `edit_path_changed:${currentPath.join('/')}`,
               }];
             await postJson('/graph/patches/ack', {
               sessionId: options.sessionId,
@@ -207,6 +256,7 @@ export function useEditorBridge(options: EditorBridgeOptions): () => Promise<voi
           }
         }
       } catch (error) {
+        mcpSessionControl.disconnect(options.sessionId);
         console.warn('[editor-bridge] poll failed', error);
       } finally {
         pollingRef.current = false;

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { McpSessionControl } from './McpSessionControl';
 
 export type IconName = 'menu' | 'agent' | 'folder' | 'graph' | 'preview' | 'settings' | 'search' | 'fit' | 'plus' | 'save' | 'file' | 'download' | 'undo' | 'redo' | 'close' | 'chevron' | 'windows';
 const paths: Record<IconName, string> = {
@@ -83,5 +84,5 @@ export function EditorMenu({ label, children, items, className = '' }: { label: 
   </div>;
 }
 export function Brand() {
-  return <div className="pcg-brand"><img src={`${import.meta.env.BASE_URL}picg-logo.png`} alt="PICG logo" /><span>PICG</span></div>;
+  return <><div className="pcg-brand"><img src={`${import.meta.env.BASE_URL}picg-logo.png`} alt="PICG logo" /><span>PICG</span></div><McpSessionControl /></>;
 }

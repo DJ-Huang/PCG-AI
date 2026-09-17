@@ -16,6 +16,7 @@
 #include "cook_service.hpp"
 #include "kb_service.hpp"
 #include "session_service.hpp"
+#include "editor_control.hpp"
 #include "surface_reconstruction_service.hpp"
 
 namespace pcg_server {
@@ -242,7 +243,7 @@ json WaitForAppliedCommand(const json& queued, int timeout_ms) {
             {"ok", false}, {"accepted", true}, {"applied", false},
             {"cancelled", cancelled}, {"error", "apply_timeout"}, {"commandId", command_id},
             {"hint", cancelled
-                ? "The queued command was cancelled before the Web editor applied it."
+                ? "The queued command was cancelled. An already-fetched command may have applied; refresh context before retrying."
                 : "The Web editor may have fetched the command; refresh context before retrying."},
         }, true);
     }
@@ -272,11 +273,21 @@ json SuccessResponse(const json& id, const json& result) {
     return {{"jsonrpc", "2.0"}, {"id", id}, {"result", result}};
 }
 
+bool NeedsEditorTarget(const std::string& name) {
+    return name != "pcg_list_editor_sessions" && name.rfind("pcg_kb_", 0) != 0 &&
+           name.rfind("pcg_golden_graph_", 0) != 0;
+}
+
 json BuildToolDefinitions() {
     json tools = json::array({
         {
+            {"name", "pcg_list_editor_sessions"},
+            {"description", "List online editor windows with their visible session label, full ID, page URL, document path and AI-control approval. This does not select or authorize a target. Show the choices to the user; never pick the first, latest, only or filename-matching window yourself."},
+            {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
+        },
+        {
             {"name", "pcg_get_editor_context"},
-            {"description", "Read the live Web editor path, selection, preview target, graph hash, and bridge status."},
+            {"description", "Read the user-selected, AI-approved Web editor's path, selection, preview target, graph hash and bridge status. Without editorSessionId this returns a selection-required error with candidates, never a default window."},
             {"inputSchema", {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}}},
         },
         {
@@ -555,10 +566,18 @@ json BuildToolDefinitions() {
         },
     });
     for (auto& tool : tools) {
-        tool["inputSchema"]["properties"]["editorSessionId"] = {
-            {"type", "string"},
-            {"description", "Web editor page id. Omit when exactly one page is online; when multiple pages are listed, ask the user which one to use."},
+        const std::string name = tool["name"].get<std::string>();
+        if (!NeedsEditorTarget(name)) continue;
+        auto& schema = tool["inputSchema"];
+        schema["properties"]["editorSessionId"] = {
+            {"type", "string"}, {"minLength", 1},
+            {"description", "Full ID explicitly chosen by the user from a visible editor with Allow AI control enabled. Required on every live operation, even with one window. Never infer or silently switch targets."},
         };
+        // Context keeps a discovery/error path for older clients; it never auto-selects.
+        if (name != "pcg_get_editor_context") {
+            if (!schema.contains("required")) schema["required"] = json::array();
+            schema["required"].push_back("editorSessionId");
+        }
     }
     return tools;
 }
@@ -570,6 +589,13 @@ json CallToolInternal(
     const std::string editor_session_id = bound_editor_session_id.empty()
         ? arguments.value("editorSessionId", "")
         : bound_editor_session_id;
+    if (name == "pcg_list_editor_sessions") {
+        const json health = GetBridgeHealth();
+        return ToolResult({
+            {"ok", true}, {"selectionRequired", true}, {"editors", health["editors"]},
+            {"message", "Ask the user to choose a visible window and enable Allow AI control there, then use its full editorSessionId. Listing does not grant consent."},
+        });
+    }
     if (name == "pcg_get_editor_context") {
         const json result = GetEditorContext(editor_session_id);
         return ToolResult(result, !result.value("ok", false));
@@ -739,6 +765,8 @@ json CallToolInternal(
         if (request_id == 0) return ToolResult(GetEditorContext(editor_session_id), true);
         PreviewSnapshot snapshot;
         if (!WaitForPreview(request_id, std::chrono::milliseconds(timeout), snapshot, editor_session_id)) {
+            const json context = GetEditorContext(editor_session_id);
+            if (!context.value("ok", false)) return ToolResult(context, true);
             return ToolResult({
                 {"ok", false}, {"error", "preview_timeout"}, {"requestId", request_id},
                 {"hint", "Keep the Web editor and Preview panel open."},
@@ -775,6 +803,8 @@ json CallToolInternal(
         json camera_state;
         const int timeout = CommandTimeout(arguments);
         if (!WaitForCameraState(command_id, std::chrono::milliseconds(timeout), camera_state, editor_session_id)) {
+            const json context = GetEditorContext(editor_session_id);
+            if (!context.value("ok", false)) return ToolResult(context, true);
             return ToolResult({
                 {"ok", false}, {"error", "camera_apply_timeout"}, {"commandId", command_id},
                 {"hint", "Keep the Web editor and Preview panel open."},
@@ -790,7 +820,7 @@ json CallToolInternal(
     }
     if (name == "pcg_get_component_bounds") {
         const json graph = GetEditorGraph(editor_session_id);
-        if (graph.is_null()) return ToolResult({{"ok", false}, {"error", "editor_offline"}}, true);
+        if (graph.is_null()) return ToolResult(GetEditorContext(editor_session_id), true);
         const std::string component_id = arguments.value("componentId", "");
         const auto components = CollectSemanticBounds(graph);
         const auto found = components.find(component_id);
@@ -803,7 +833,7 @@ json CallToolInternal(
     }
     if (name == "pcg_solve_camera" || name == "pcg_validate_camera_frame") {
         const json graph = GetEditorGraph(editor_session_id);
-        if (graph.is_null()) return ToolResult({{"ok", false}, {"error", "editor_offline"}}, true);
+        if (graph.is_null()) return ToolResult(GetEditorContext(editor_session_id), true);
         const auto components = CollectSemanticBounds(graph);
         const json required = name == "pcg_solve_camera" ? arguments.value("componentIds", json::array()) : arguments.value("requiredComponentIds", json::array());
         SemanticBounds requested;
@@ -835,7 +865,7 @@ json CallToolInternal(
     }
     if (name == "pcg_validate") {
         const json graph = GetEditorGraph(editor_session_id);
-        if (graph.is_null()) return ToolResult({{"ok", false}, {"error", "editor_offline"}}, true);
+        if (graph.is_null()) return ToolResult(GetEditorContext(editor_session_id), true);
         httplib::Request validate_req;
         httplib::Response validate_res;
         validate_req.body = graph.dump();
@@ -846,7 +876,7 @@ json CallToolInternal(
     }
     if (name == "pcg_cook") {
         const json graph = GetEditorGraph(editor_session_id);
-        if (graph.is_null()) return ToolResult({{"ok", false}, {"error", "editor_offline"}}, true);
+        if (graph.is_null()) return ToolResult(GetEditorContext(editor_session_id), true);
         httplib::Request cook_req;
         httplib::Response cook_res;
         cook_req.headers.emplace("Content-Type", "multipart/form-data; boundary=pcg-mcp");
@@ -920,7 +950,7 @@ json HandleMessage(const json& message) {
             {"protocolVersion", kProtocolVersion},
             {"capabilities", {{"tools", {{"listChanged", false}}}}},
             {"serverInfo", {{"name", "pcg-server"}, {"version", "1.0.0"}}},
-            {"instructions", "Use editor context first. Discover node schemas with pcg_get_node_types. Pass graphHash to every write for optimistic locking; prefer one atomic pcg_apply_graph_ops batch, then validate, cook, capture, and save."},
+            {"instructions", "First use pcg_list_editor_sessions and obtain the user's explicit window choice, unless the user already supplied its full ID. The user must enable Allow AI control in that visible page. Echo its label, ID and document path; pass editorSessionId on every live call. Never auto-select or switch an unavailable target. Then read context and node schemas; pass graphHash on every write and verify apply, validation, cook and save results."},
         });
     }
     if (method == "ping") return SuccessResponse(id, json::object());
@@ -960,7 +990,38 @@ json CallPcgTool(
     const std::string& name,
     const json& arguments,
     const std::string& editor_session_id) {
-    return CallToolInternal(name, arguments, editor_session_id);
+    if (!arguments.is_object())
+        return ToolResult({{"ok", false}, {"error", "arguments must be an object"}}, true);
+    if (arguments.contains("editorSessionId") && !arguments["editorSessionId"].is_string())
+        return ToolResult({{"ok", false}, {"error", "editorSessionId must be a string"}}, true);
+    const json definitions = GetPcgToolDefinitions();
+    const auto known = std::find_if(definitions.begin(), definitions.end(), [&](const json& tool) {
+        return tool["name"] == name;
+    });
+    if (known == definitions.end())
+        return ToolResult({{"ok", false}, {"error", "unknown_tool"}, {"name", name}}, true);
+    if (!NeedsEditorTarget(name)) return CallToolInternal(name, arguments, "");
+
+    const std::string requested = arguments.value("editorSessionId", "");
+    if (!editor_session_id.empty() && !requested.empty() && editor_session_id != requested)
+        return ToolResult({{"ok", false}, {"error", "editor_session_binding_mismatch"}}, true);
+    const std::string target_id = editor_session_id.empty() ? requested : editor_session_id;
+    // Check before expensive baking/validation too, not just when queuing a write.
+    const json context = GetEditorContext(target_id);
+    if (!context.value("ok", false)) return ToolResult(context, true);
+    const json& session = context["session"];
+    const json target = {
+        {"editorSessionId", target_id}, {"sessionLabel", context.value("sessionLabel", "")},
+        {"graphPathAtStart", session.value("graphPath", "")},
+        {"pageUrl", session.value("pageUrl", "")},
+        {"aiControlRevision", context.value("aiControlRevision", 0ll)},
+    };
+    const ScopedEditorControl control_scope(target_id, context.value("aiControlRevision", 0ll));
+    json result = CallToolInternal(name, arguments, target_id);
+    result["structuredContent"]["target"] = target;
+    // Keep both text-only clients and structured-content clients informed.
+    result["content"].push_back({{"type", "text"}, {"text", json{{"target", target}}.dump(2)}});
+    return result;
 }
 
 void HandleMcpPost(const httplib::Request& req, httplib::Response& res) {

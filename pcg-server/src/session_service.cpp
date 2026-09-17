@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "server_auth.hpp"
+#include "editor_control.hpp"
 
 namespace pcg_server {
 namespace {
@@ -28,9 +29,15 @@ struct EditorState {
     uint64_t camera_applied_id = 0;
     json camera_state = json::object();
     std::deque<json> patches;
+    std::deque<uint64_t> cancelled_commands;
+    uint64_t cancelled_capture_through = 0;
+    uint64_t cancelled_camera_through = 0;
+    int64_t last_mcp_access_at = 0;
 };
 
 struct BridgeState {
+    const int64_t instance_id = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
     std::mutex mutex;
     std::condition_variable preview_changed;
     std::condition_variable camera_changed;
@@ -57,6 +64,18 @@ bool IsOnlineLocked(const EditorState& editor) {
            std::chrono::steady_clock::now() - editor.last_seen <= kEditorOfflineAfter;
 }
 
+bool AllowsAiControl(const EditorState& editor) {
+    return editor.session.value("aiControlEnabled", false);
+}
+
+int64_t ControlRevision(const EditorState& editor) {
+    return editor.session.value("aiControlRevision", 0ll);
+}
+
+std::string SessionLabel(const std::string& id) {
+    return "PICG " + id.substr(0, 8);
+}
+
 json EditorChoicesLocked(const BridgeState& state) {
     json choices = json::array();
     for (const auto& [id, editor] : state.editors) {
@@ -64,18 +83,40 @@ json EditorChoicesLocked(const BridgeState& state) {
         const json graph = editor.session.value("graph", json::object());
         choices.push_back({
             {"editorSessionId", id},
+            {"sessionLabel", SessionLabel(id)},
+            {"pageUrl", editor.session.value("pageUrl", "")},
+            {"aiControlEnabled", AllowsAiControl(editor)},
             {"graphPath", editor.session.value("graphPath", "")},
             {"graphHash", editor.session.value("graphHash", "")},
             {"nodeCount", graph.value("nodes", json::array()).size()},
             {"updatedAt", editor.session.value("updatedAt", 0ll)},
         });
     }
+    // Ordering is for display only, never a preference or automatic target.
+    std::sort(choices.begin(), choices.end(), [](const json& a, const json& b) {
+        return a["editorSessionId"].get<std::string>() < b["editorSessionId"].get<std::string>();
+    });
     return choices;
 }
 
 json EditorSelectionErrorLocked(const BridgeState& state, const std::string& requested_id) {
     const json choices = EditorChoicesLocked(state);
     if (!requested_id.empty()) {
+        const auto found = state.editors.find(requested_id);
+        if (found != state.editors.end() && IsOnlineLocked(found->second) &&
+            !AllowsAiControl(found->second)) {
+            return {
+                {"ok", false}, {"error", "editor_session_confirmation_required"},
+                {"editorSessionId", requested_id}, {"editors", choices},
+                {"message", "Ask the user to enable Allow AI control in the intended editor's MCP session panel. Do not enable it through HTTP or choose another page."},
+            };
+        }
+        if (found != state.editors.end() && IsOnlineLocked(found->second) &&
+            !ScopedEditorControl::Matches(requested_id, ControlRevision(found->second))) {
+            return {{"ok", false}, {"error", "editor_control_revoked"},
+                    {"editorSessionId", requested_id},
+                    {"message", "The page's consent changed during this operation. Refresh context and obtain the user's target again; do not replay the operation."}};
+        }
         return {
             {"ok", false}, {"error", "editor_session_unavailable"},
             {"editorSessionId", requested_id}, {"editors", choices},
@@ -84,23 +125,52 @@ json EditorSelectionErrorLocked(const BridgeState& state, const std::string& req
     if (choices.empty()) return {{"ok", false}, {"error", "editor_offline"}, {"editors", choices}};
     return {
         {"ok", false}, {"error", "editor_session_required"},
-        {"message", "Multiple Web editor pages are online. Ask the user which page to use, then pass editorSessionId."},
+        {"message", "No editor is selected. Ask the user to choose a visible page and enable Allow AI control there; pass its full editorSessionId on every live call, even when only one page is online. Never infer a target from ordering or a filename."},
         {"editors", choices},
     };
 }
 
+// Browser synchronization uses exact identity but does not require AI approval.
 EditorState* ResolveEditorLocked(BridgeState& state, const std::string& requested_id) {
-    if (!requested_id.empty()) {
-        const auto it = state.editors.find(requested_id);
-        return it != state.editors.end() && IsOnlineLocked(it->second) ? &it->second : nullptr;
+    if (requested_id.empty()) return nullptr;
+    const auto it = state.editors.find(requested_id);
+    return it != state.editors.end() && IsOnlineLocked(it->second) ? &it->second : nullptr;
+}
+
+// Remote graph/preview operations additionally require a user opt-in from the page.
+// This prevents accidental targeting, not a hostile client with server credentials.
+EditorState* ResolveMcpEditorLocked(BridgeState& state, const std::string& requested_id) {
+    EditorState* editor = ResolveEditorLocked(state, requested_id);
+    if (editor == nullptr || !EditorControlAllowed(requested_id, true,
+            AllowsAiControl(*editor), ControlRevision(*editor))) return nullptr;
+    editor->last_mcp_access_at = EpochMillis();
+    return editor;
+}
+
+void CancelPendingControlLocked(BridgeState& state, EditorState& editor) {
+    for (const auto& command : editor.patches) {
+        const uint64_t id = command.value("id", 0ull);
+        state.command_results[id] = {
+            {"id", id}, {"ok", false}, {"cancelled", true},
+            {"error", "editor_control_revoked"},
+            {"inFlightMayHaveApplied", true},
+        };
+        state.command_result_order.push_back(id);
+        editor.cancelled_commands.push_back(id);
     }
-    EditorState* resolved = nullptr;
-    for (auto& [_, editor] : state.editors) {
-        if (!IsOnlineLocked(editor)) continue;
-        if (resolved != nullptr) return nullptr;
-        resolved = &editor;
+    editor.patches.clear();
+    while (editor.cancelled_commands.size() > 256) editor.cancelled_commands.pop_front();
+    while (state.command_result_order.size() > 256) {
+        state.command_results.erase(state.command_result_order.front());
+        state.command_result_order.pop_front();
     }
-    return resolved;
+    editor.cancelled_capture_through = editor.capture_request_id;
+    editor.cancelled_camera_through = editor.camera_command_id;
+    editor.capture_options = json::object();
+    editor.pending_camera_command = json::object();
+    state.command_changed.notify_all();
+    state.preview_changed.notify_all();
+    state.camera_changed.notify_all();
 }
 
 const EditorState* ResolveEditorLocked(const BridgeState& state, const std::string& requested_id) {
@@ -217,6 +287,7 @@ json QueueGraphCommandLocked(
     command["editPath"] = edit_path;
     command["createdAt"] = EpochMillis();
     command["editorSessionId"] = editor.session.value("sessionId", "");
+    command["aiControlRevision"] = ControlRevision(editor);
     editor.patches.push_back(command);
     return {{"ok", true}, {"accepted", true}, {"command", std::move(command)}};
 }
@@ -235,6 +306,13 @@ json ContextLocked(const BridgeState& state, const std::string& editor_session_i
         {"online", IsOnlineLocked(*editor)},
         {"session", std::move(session)},
         {"sessionRevision", editor->session_revision},
+        {"bridgeInstanceId", state.instance_id},
+        {"sessionLabel", SessionLabel(editor->session.value("sessionId", ""))},
+        {"aiControlEnabled", AllowsAiControl(*editor)},
+        {"aiControlRevision", ControlRevision(*editor)},
+        {"lastMcpAccessAt", editor->last_mcp_access_at},
+        {"cancelledCaptureThrough", editor->cancelled_capture_through},
+        {"cancelledCameraThrough", editor->cancelled_camera_through},
         {"captureRequestId", editor->capture_request_id},
         {"captureOptions", editor->capture_options},
         {"cameraCommandId", editor->camera_command_id},
@@ -254,6 +332,21 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
     if (!body.contains("graph") || !body["graph"].is_object() ||
         !body.contains("graphHash") || !body["graphHash"].is_string()) {
         JsonResponse(res, 400, {{"ok", false}, {"error", "session requires graph and graphHash"}});
+        return;
+    }
+    if ((body.contains("aiControlEnabled") && !body["aiControlEnabled"].is_boolean()) ||
+        (body.contains("aiControlRevision") &&
+         (!body["aiControlRevision"].is_number_integer() ||
+          body["aiControlRevision"].get<int64_t>() < 0)) ||
+        (body.contains("pageUrl") && !body["pageUrl"].is_string())) {
+        JsonResponse(res, 400, {{"ok", false}, {"error", "invalid AI control metadata"}});
+        return;
+    }
+    // Old clients do not implicitly grant permission.
+    const bool control_enabled = body.value("aiControlEnabled", false);
+    const int64_t control_revision = body.value("aiControlRevision", 0ll);
+    if (control_enabled && control_revision == 0) {
+        JsonResponse(res, 400, {{"ok", false}, {"error", "AI control requires a positive aiControlRevision"}});
         return;
     }
     auto& state = State();
@@ -278,6 +371,13 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
         });
         return;
     }
+    if (control_enabled != AllowsAiControl(editor) ||
+        control_revision != ControlRevision(editor)) {
+        // A new consent generation cannot inherit work queued under the old one.
+        CancelPendingControlLocked(state, editor);
+    }
+    body["aiControlEnabled"] = control_enabled;
+    body["aiControlRevision"] = control_revision;
     body["receivedAt"] = EpochMillis();
     editor.session = std::move(body);
     editor.last_seen = now;
@@ -288,7 +388,9 @@ void HandlePutSession(const httplib::Request& req, httplib::Response& res) {
 void HandleGetSession(const httplib::Request& req, httplib::Response& res) {
     if (!CheckServerAuth(req, res)) return;
     const std::string editor_session_id = req.has_param("sessionId") ? req.get_param_value("sessionId") : "";
-    const json context = GetEditorContext(editor_session_id);
+    auto& state = State();
+    std::lock_guard<std::mutex> lock(state.mutex);
+    const json context = ContextLocked(state, editor_session_id);
     JsonResponse(res, context.value("ok", false) ? 200 : 409, context);
 }
 
@@ -528,7 +630,9 @@ void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) 
                 editor->patches.begin(), editor->patches.end(), [&](const json& command) {
                     return command.value("id", 0ull) == id;
                 });
-            if (!pending) unknown_ids.push_back(id);
+            const bool cancelled = std::find(editor->cancelled_commands.begin(),
+                editor->cancelled_commands.end(), id) != editor->cancelled_commands.end();
+            if (!pending && !cancelled) unknown_ids.push_back(id);
         }
         if (!unknown_ids.empty()) {
             JsonResponse(res, 409, {
@@ -550,6 +654,14 @@ void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) 
             }
         }
         for (const uint64_t id : ids) {
+            // A page may acknowledge a request already cancelled by revocation.
+            // Do not resurrect or overwrite the cancellation receipt.
+            const auto cancelled = std::find(editor->cancelled_commands.begin(),
+                editor->cancelled_commands.end(), id);
+            if (cancelled != editor->cancelled_commands.end()) {
+                editor->cancelled_commands.erase(cancelled);
+                continue;
+            }
             json result = {{"id", id}, {"ok", true}};
             for (const auto& candidate : results) {
                 if (candidate.value("id", 0ull) == id) {
@@ -578,13 +690,15 @@ void HandleAckGraphPatches(const httplib::Request& req, httplib::Response& res) 
 json GetEditorContext(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
+    if (ResolveMcpEditorLocked(state, editor_session_id) == nullptr)
+        return EditorSelectionErrorLocked(state, editor_session_id);
     return ContextLocked(state, editor_session_id);
 }
 
 json GetEditorNode(const std::string& node_id, const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    const EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
     const json* node = FindCurrentNode(editor->session, node_id);
     if (node == nullptr) return {{"ok", false}, {"error", "node_not_found"}, {"nodeId", node_id}};
@@ -594,7 +708,7 @@ json GetEditorNode(const std::string& node_id, const std::string& editor_session
 json ListEditorNodes(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    const EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
     const json* graph = ResolveCurrentGraph(editor->session);
     if (graph == nullptr || !graph->contains("nodes")) return {{"ok", false}, {"error", "graph_unavailable"}};
@@ -607,7 +721,7 @@ json GetEditorNodeTypes(
     const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    const EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
     const json manifest = editor->session.value("nodeManifest", json());
     if (!manifest.is_object() || !manifest.contains("nodes") || !manifest["nodes"].is_array()) {
@@ -630,7 +744,7 @@ json GetEditorNodeTypes(
 json GetEditorDocument(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    const EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
     return {
         {"ok", true}, {"graph", editor->session.value("graph", json())},
@@ -651,7 +765,7 @@ json QueueNodePatch(
     }
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) {
         json error = EditorSelectionErrorLocked(state, editor_session_id);
         error["status"] = 409;
@@ -680,7 +794,7 @@ json QueueGraphCommand(
     }
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) {
         json error = EditorSelectionErrorLocked(state, editor_session_id);
         error["status"] = 409;
@@ -725,14 +839,14 @@ bool CancelGraphCommand(uint64_t command_id) {
 json GetEditorGraph(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    const EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     return editor == nullptr ? json() : editor->session.value("graph", json());
 }
 
 uint64_t RequestPreviewCapture(const std::string& editor_session_id, const json& options) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return 0;
     editor->capture_options = options.is_object() ? options : json::object();
     return ++editor->capture_request_id;
@@ -742,7 +856,7 @@ uint64_t RequestCameraCommand(const json& camera, const std::string& editor_sess
     if (!camera.is_object()) return 0;
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return 0;
     editor->pending_camera_command = camera;
     return ++editor->camera_command_id;
@@ -757,16 +871,21 @@ bool WaitForCameraState(
     std::unique_lock<std::mutex> lock(bridge.mutex);
     const bool ready = bridge.camera_changed.wait_for(lock, timeout, [&] {
         const EditorState* editor = ResolveEditorLocked(bridge, editor_session_id);
-        return editor != nullptr && editor->camera_applied_id >= command_id;
+        return editor == nullptr || !AllowsAiControl(*editor) ||
+               command_id <= editor->cancelled_camera_through ||
+               editor->camera_applied_id >= command_id;
     });
-    if (ready) state = ResolveEditorLocked(bridge, editor_session_id)->camera_state;
-    return ready;
+    const EditorState* editor = ResolveEditorLocked(bridge, editor_session_id);
+    if (!ready || editor == nullptr || !AllowsAiControl(*editor) ||
+        command_id <= editor->cancelled_camera_through) return false;
+    state = editor->camera_state;
+    return true;
 }
 
 json GetCameraState(const std::string& editor_session_id) {
     auto& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
-    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    const EditorState* editor = ResolveMcpEditorLocked(state, editor_session_id);
     if (editor == nullptr) return EditorSelectionErrorLocked(state, editor_session_id);
     if (!editor->camera_state.empty()) {
         return {
@@ -795,10 +914,15 @@ bool WaitForPreview(
     std::unique_lock<std::mutex> lock(state.mutex);
     const bool ready = state.preview_changed.wait_for(lock, timeout, [&] {
         const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
-        return editor != nullptr && editor->preview.request_id >= request_id && !editor->preview.png.empty();
+        return editor == nullptr || !AllowsAiControl(*editor) ||
+               request_id <= editor->cancelled_capture_through ||
+               (editor->preview.request_id >= request_id && !editor->preview.png.empty());
     });
-    if (ready) snapshot = ResolveEditorLocked(state, editor_session_id)->preview;
-    return ready;
+    const EditorState* editor = ResolveEditorLocked(state, editor_session_id);
+    if (!ready || editor == nullptr || !AllowsAiControl(*editor) ||
+        request_id <= editor->cancelled_capture_through) return false;
+    snapshot = editor->preview;
+    return true;
 }
 
 json GetBridgeHealth() {

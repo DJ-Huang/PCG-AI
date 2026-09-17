@@ -4,7 +4,11 @@ Use this when reading or changing a graph in the open Web editor. It does not re
 
 ## Target and state
 
-Start with `pcg_get_editor_context`. Confirm `ok`, `online`, the intended `editorSessionId` / `graphPath`, `editPath` and a current `graphHash`. Resolve the target from the request and context; ask only when multiple candidates remain ambiguous. Never overwrite an unrelated or unsaved graph just because it is open.
+Start with `pcg_list_editor_sessions` unless the user already supplied the full target ID. Show each candidate's visible `sessionLabel`, full `editorSessionId`, `graphPath` (or Untitled), `pageUrl` and approval state. Ask the user to choose; never infer a target from a filename, ordering, recency, focus, or the fact that only one candidate exists. A user-supplied full ID or an explicit choice from the displayed candidates is sufficient; do not ask again on every tool call.
+
+The user must enable **Allow AI control** in the intended page's MCP panel. They can use **Copy AI target** to paste an unambiguous choice into chat. Do not manufacture consent with a tool argument, enable it through HTTP/browser automation, or switch to another already-approved window. Listing is not selection or approval.
+
+Read `pcg_get_editor_context` with the chosen full `editorSessionId`. Confirm `ok`, `online`, approval, `graphPath`, `editPath` and current `graphHash`; echo the selected label, ID and path to the user before authoring. Include that same ID on every live read, write, camera, cook and capture call. Inspect returned `target` receipts. On unavailability or changed consent, stop and reconfirm rather than choosing a replacement. Refreshing a page creates a new unapproved ID. Permission to control a window is not permission to overwrite unrelated or unsaved work.
 
 Use `pcg_get_node` / `pcg_list_nodes` for focused inspection, `pcg_get_graph` for structural work, and `pcg_get_node_types` for exact type/property/pin schemas. Reuse unchanged reads within the operation; refresh after a write, conflict, reconnect or relevant external change.
 
@@ -33,6 +37,9 @@ Live Preview is rapid feedback. It is not evidence that the exported file or Uni
 
 | Result | Response |
 | --- | --- |
+| `editor_session_required` | Show the candidates and obtain the user's choice, even for one candidate. |
+| `editor_session_confirmation_required` | Ask the user to enable control in their chosen visible page. Do not bypass the UI. |
+| `editor_session_unavailable` / `editor_session_binding_mismatch` / `editor_control_revoked` | Stop; retain the selected ID, refresh discovery/context and reconfirm with the user. Never fall back to another window or replay queued work. |
 | `editor_offline` | Check Vite and pcg-server; start/reconnect them using the host's supported persistent process mechanism when permitted. Retry context; otherwise report the live operation blocked. |
 | `node_not_found` / `no_node_selected` | Refresh context and inspect the relevant scope. |
 | `root_scope_required` | Return the editor to root scope before replacement. |

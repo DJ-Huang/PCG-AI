@@ -79,6 +79,11 @@ def main() -> None:
     status, health = json_request(args.base, "/v1/health")
     assert status == 200 and health["ok"] and health["mcp"]["enabled"]
 
+    discovery = mcp(args.base, 100, "tools/call", {"name": "pcg_list_editor_sessions", "arguments": {}})
+    assert discovery["structuredContent"]["editors"] == [], "Use an isolated test server with no editor tabs."
+    no_editor = mcp(args.base, 101, "tools/call", {"name": "pcg_get_editor_context", "arguments": {}})
+    assert no_editor["structuredContent"]["error"] == "editor_offline"
+
     session = {
         "sessionId": f"bridge-integration-test-{uuid.uuid4()}",
         "clientRevision": 1,
@@ -96,6 +101,24 @@ def main() -> None:
     status, stale = json_request(args.base, "/v1/session", "PUT", session)
     assert status == 409 and stale["error"] == "stale_session_update"
 
+    # Upload/synchronization succeeds without AI approval, but live reads/writes do not.
+    one_unbound = mcp(args.base, 102, "tools/call", {"name": "pcg_get_editor_context", "arguments": {}})
+    assert one_unbound["structuredContent"]["error"] == "editor_session_required"
+    assert len(one_unbound["structuredContent"]["editors"]) == 1
+    for index, name in enumerate(("pcg_get_graph", "pcg_get_node_types", "pcg_set_camera", "pcg_patch_node")):
+        denied = mcp(args.base, 103 + index, "tools/call", {
+            "name": name, "arguments": {"editorSessionId": session["sessionId"], "confirmedByUser": True},
+        })
+        assert denied["isError"] and denied["structuredContent"]["error"] == "editor_session_confirmation_required"
+    malformed = mcp(args.base, 107, "tools/call", {"name": "pcg_get_graph", "arguments": {"editorSessionId": 42}})
+    assert malformed["isError"]
+    status, _ = json_request(args.base, "/v1/session/heartbeat", "POST", {"sessionId": session["sessionId"]})
+    assert status == 200
+    # The test fixture represents a user's UI action, not a model-provided MCP flag.
+    session.update(aiControlEnabled=True, aiControlRevision=1, clientRevision=2)
+    status, _ = json_request(args.base, "/v1/session", "PUT", session)
+    assert status == 200
+
     initialized = mcp(
         args.base,
         1,
@@ -109,29 +132,35 @@ def main() -> None:
     expected = {
         "pcg_get_editor_context", "pcg_get_node", "pcg_list_nodes", "pcg_capture_preview",
         "pcg_get_graph", "pcg_get_node_types", "pcg_patch_node", "pcg_apply_graph_ops",
-        "pcg_replace_graph", "pcg_save_graph", "pcg_validate", "pcg_cook",
+        "pcg_replace_graph", "pcg_save_graph", "pcg_validate", "pcg_cook", "pcg_list_editor_sessions",
     }
     assert expected <= names, names
+    for tool in tools["tools"]:
+        if tool["name"].startswith(("pcg_kb_", "pcg_golden_graph_")) or tool["name"] == "pcg_list_editor_sessions":
+            assert "editorSessionId" not in tool["inputSchema"].get("required", [])
+        elif tool["name"] != "pcg_get_editor_context":
+            assert "editorSessionId" in tool["inputSchema"]["required"]
 
-    context = mcp(args.base, 3, "tools/call", {"name": "pcg_get_editor_context", "arguments": {}})
+    context = mcp(args.base, 3, "tools/call", {"name": "pcg_get_editor_context", "arguments": {"editorSessionId": session["sessionId"]}})
     assert context["structuredContent"]["session"]["selectedNodeId"] == selected
-    node = mcp(args.base, 4, "tools/call", {"name": "pcg_get_node", "arguments": {}})
+    assert context["structuredContent"]["target"]["editorSessionId"] == session["sessionId"]
+    node = mcp(args.base, 4, "tools/call", {"name": "pcg_get_node", "arguments": {"editorSessionId": session["sessionId"]}})
     assert node["structuredContent"]["node"]["id"] == selected
-    document = mcp(args.base, 5, "tools/call", {"name": "pcg_get_graph", "arguments": {}})
+    document = mcp(args.base, 5, "tools/call", {"name": "pcg_get_graph", "arguments": {"editorSessionId": session["sessionId"]}})
     assert document["structuredContent"]["graph"]["nodes"][0]["id"] == selected
     node_types = mcp(
         args.base, 6, "tools/call",
-        {"name": "pcg_get_node_types", "arguments": {"nodeType": "CreateBoxMesh"}},
+        {"name": "pcg_get_node_types", "arguments": {"editorSessionId": session["sessionId"], "nodeType": "CreateBoxMesh"}},
     )
     assert node_types["structuredContent"]["count"] == 1
-    validation = mcp(args.base, 7, "tools/call", {"name": "pcg_validate", "arguments": {}})
+    validation = mcp(args.base, 7, "tools/call", {"name": "pcg_validate", "arguments": {"editorSessionId": session["sessionId"]}})
     assert validation["structuredContent"]["ok"] is True, validation
-    cook = mcp(args.base, 8, "tools/call", {"name": "pcg_cook", "arguments": {"seed": 42}})
+    cook = mcp(args.base, 8, "tools/call", {"name": "pcg_cook", "arguments": {"editorSessionId": session["sessionId"], "seed": 42}})
     assert cook["structuredContent"]["ok"] is True, cook
 
     status, conflict = json_request(
         args.base, f"/v1/graph/nodes/{selected}", "PATCH",
-        {"patch": {"width": 4.5}, "ifGraphHash": "stale"},
+        {"editorSessionId": session["sessionId"], "patch": {"width": 4.5}, "ifGraphHash": "stale"},
     )
     assert status == 409 and conflict["error"] == "graph_conflict"
     stale_ops = mcp(
@@ -139,6 +168,7 @@ def main() -> None:
         {
             "name": "pcg_apply_graph_ops",
             "arguments": {
+                "editorSessionId": session["sessionId"],
                 "operations": [{"op": "move_node", "nodeId": selected, "position": {"x": 1, "y": 2}}],
                 "ifGraphHash": "stale",
             },
@@ -149,14 +179,14 @@ def main() -> None:
 
     status, spoofed = json_request(
         args.base, "/v1/graph/patches/ack", "POST",
-        {"ids": [999999], "results": [{"id": 999999, "ok": True}]},
+        {"sessionId": session["sessionId"], "ids": [999999], "results": [{"id": 999999, "ok": True}]},
     )
     assert status == 409 and spoofed["error"] == "unknown_command_ids"
     unsafe_save = mcp(
         args.base, 90, "tools/call",
         {
             "name": "pcg_save_graph",
-            "arguments": {"path": "../escape.pcg", "ifGraphHash": "integration-hash-v1"},
+            "arguments": {"editorSessionId": session["sessionId"], "path": "../escape.pcg", "ifGraphHash": "integration-hash-v1"},
         },
     )
     assert unsafe_save["isError"] is True
@@ -167,6 +197,7 @@ def main() -> None:
         {
             "name": "pcg_apply_graph_ops",
             "arguments": {
+                "editorSessionId": session["sessionId"],
                 "operations": [{"op": "move_node", "nodeId": selected, "position": {"x": 3, "y": 4}}],
                 "ifGraphHash": "integration-hash-v1",
                 "timeoutMs": 1000,
@@ -177,19 +208,19 @@ def main() -> None:
     assert timed_out["structuredContent"]["error"] == "apply_timeout"
     assert timed_out["structuredContent"]["cancelled"] is True
     cancelled_id = timed_out["structuredContent"]["commandId"]
-    _, pending_after_timeout = json_request(args.base, "/v1/graph/patches?after=0")
+    _, pending_after_timeout = json_request(args.base, f"/v1/graph/patches?sessionId={session['sessionId']}&after=0")
     assert all(command["id"] != cancelled_id for command in pending_after_timeout["patches"])
     status, queued_patch = json_request(
         args.base, f"/v1/graph/nodes/{selected}", "PATCH",
-        {"patch": {"width": 4.5}, "ifGraphHash": "integration-hash-v1"},
+        {"editorSessionId": session["sessionId"], "patch": {"width": 4.5}, "ifGraphHash": "integration-hash-v1"},
     )
     assert status == 202 and queued_patch["accepted"] is True
     patch_id = queued_patch["patch"]["id"]
-    status, queued = json_request(args.base, "/v1/graph/patches?after=0")
+    status, queued = json_request(args.base, f"/v1/graph/patches?sessionId={session['sessionId']}&after=0")
     assert status == 200 and queued["patches"][0]["id"] == patch_id
     status, ack = json_request(
         args.base, "/v1/graph/patches/ack", "POST",
-        {"ids": [patch_id], "results": [{"id": patch_id, "ok": True}]},
+        {"sessionId": session["sessionId"], "ids": [patch_id], "results": [{"id": patch_id, "ok": True}]},
     )
     assert status == 200 and ack["acknowledged"] == 1
 
@@ -202,7 +233,7 @@ def main() -> None:
         def invoke():
             call_result["value"] = mcp(
                 args.base, request_id, "tools/call",
-                {"name": name, "arguments": arguments},
+                {"name": name, "arguments": {"editorSessionId": session["sessionId"], **arguments}},
             )
 
         command_thread = threading.Thread(target=invoke)
@@ -210,7 +241,7 @@ def main() -> None:
         command = None
         deadline = time.time() + 5
         while time.time() < deadline:
-            _, payload = json_request(args.base, f"/v1/graph/patches?after={command_cursor}")
+            _, payload = json_request(args.base, f"/v1/graph/patches?sessionId={session['sessionId']}&after={command_cursor}")
             patches = payload.get("patches", [])
             if patches:
                 command = patches[0]
@@ -223,7 +254,7 @@ def main() -> None:
             result["detail"] = detail
         status, command_ack = json_request(
             args.base, "/v1/graph/patches/ack", "POST",
-            {"ids": [command["id"]], "results": [result]},
+            {"sessionId": session["sessionId"], "ids": [command["id"]], "results": [result]},
         )
         assert status == 200 and command_ack["acknowledged"] == 1
         command_thread.join(timeout=7)
@@ -266,14 +297,14 @@ def main() -> None:
     )
     assert save_command["path"] == "tmp/agent-bridge-test.pcg"
 
-    _, capture_state = json_request(args.base, "/v1/session")
+    _, capture_state = json_request(args.base, f"/v1/session?sessionId={session['sessionId']}")
     baseline_capture_id = capture_state.get("captureRequestId", 0)
     capture_result = {}
 
     def capture_call():
         capture_result["value"] = mcp(
             args.base, 14, "tools/call",
-            {"name": "pcg_capture_preview", "arguments": {"timeoutMs": 5000}},
+            {"name": "pcg_capture_preview", "arguments": {"editorSessionId": session["sessionId"], "timeoutMs": 5000}},
         )
 
     thread = threading.Thread(target=capture_call)
@@ -281,7 +312,7 @@ def main() -> None:
     request_id = 0
     deadline = time.time() + 3
     while time.time() < deadline:
-        _, state = json_request(args.base, "/v1/session")
+        _, state = json_request(args.base, f"/v1/session?sessionId={session['sessionId']}")
         request_id = state.get("captureRequestId", 0)
         if request_id > baseline_capture_id:
             break
@@ -289,7 +320,7 @@ def main() -> None:
     assert request_id > baseline_capture_id
     status, uploaded = json_request(
         args.base, "/v1/preview/screenshot", "PUT",
-        {"requestId": request_id, "pngBase64": PNG_1X1, "metadata": {"source": "integration-test"}},
+        {"sessionId": session["sessionId"], "requestId": request_id, "pngBase64": PNG_1X1, "metadata": {"source": "integration-test"}},
     )
     assert status == 200 and uploaded["requestId"] == request_id
     thread.join(timeout=7)
@@ -310,6 +341,8 @@ def main() -> None:
     second_session = {
         **session,
         "sessionId": second_session_id,
+        "aiControlEnabled": False,
+        "aiControlRevision": 0,
         "clientRevision": 1,
         "graphPath": "other-page.pcg",
         "graphHash": "other-page-hash",
@@ -329,6 +362,13 @@ def main() -> None:
         args.base, 16, "tools/call",
         {"name": "pcg_get_graph", "arguments": {"editorSessionId": session["sessionId"]}},
     )
+    second_denied = mcp(args.base, 108, "tools/call", {
+        "name": "pcg_get_graph", "arguments": {"editorSessionId": second_session_id},
+    })
+    assert second_denied["structuredContent"]["error"] == "editor_session_confirmation_required"
+    second_session.update(aiControlEnabled=True, aiControlRevision=1, clientRevision=2)
+    status, _ = json_request(args.base, "/v1/session", "PUT", second_session)
+    assert status == 200
     second_document = mcp(
         args.base, 17, "tools/call",
         {"name": "pcg_get_graph", "arguments": {"editorSessionId": second_session_id}},
@@ -379,7 +419,42 @@ def main() -> None:
     assert not write_thread.is_alive()
     assert routed_write["value"]["structuredContent"]["applied"] is True
 
-    print("Agent bridge OK: per-page routing + MCP read/schema/atomic graph ops/replace/save/validate/cook/preview + REST locking/ack")
+    missing = mcp(args.base, 109, "tools/call", {
+        "name": "pcg_get_graph", "arguments": {"editorSessionId": "missing-page"},
+    })
+    assert missing["structuredContent"]["error"] == "editor_session_unavailable"
+
+    # Revocation cancels pending work and acknowledges late transport responses safely.
+    status, pending = json_request(args.base, f"/v1/graph/nodes/{selected}", "PATCH", {
+        "editorSessionId": session["sessionId"], "patch": {"width": 8}, "ifGraphHash": "integration-hash-v1",
+    })
+    assert status == 202 and pending["patch"]["aiControlRevision"] == 1
+    pending_id = pending["patch"]["id"]
+    session.update(aiControlEnabled=False, aiControlRevision=2, clientRevision=3)
+    status, _ = json_request(args.base, "/v1/session", "PUT", session)
+    assert status == 200
+    _, queue = json_request(args.base, f"/v1/graph/patches?sessionId={session['sessionId']}&after=0")
+    assert queue["patches"] == []
+    status, _ = json_request(args.base, "/v1/graph/patches/ack", "POST", {
+        "sessionId": session["sessionId"], "ids": [pending_id], "results": [{"id": pending_id, "ok": False}],
+    })
+    assert status == 200
+    revoked = mcp(args.base, 110, "tools/call", {
+        "name": "pcg_get_graph", "arguments": {"editorSessionId": session["sessionId"]},
+    })
+    assert revoked["structuredContent"]["error"] == "editor_session_confirmation_required"
+    session.update(aiControlEnabled=True, aiControlRevision=3, clientRevision=4)
+    status, _ = json_request(args.base, "/v1/session", "PUT", session)
+    assert status == 200
+    _, queue = json_request(args.base, f"/v1/graph/patches?sessionId={session['sessionId']}&after=0")
+    assert queue["patches"] == []
+    for fixture in (session, second_session):
+        fixture.update(aiControlEnabled=False, aiControlRevision=fixture["aiControlRevision"] + 1,
+                       clientRevision=fixture["clientRevision"] + 1)
+        status, _ = json_request(args.base, "/v1/session", "PUT", fixture)
+        assert status == 200
+
+    print("MCP session consent + bridge OK: per-page routing + MCP read/schema/atomic graph ops/replace/save/validate/cook/preview + REST locking/ack")
 
 
 if __name__ == "__main__":

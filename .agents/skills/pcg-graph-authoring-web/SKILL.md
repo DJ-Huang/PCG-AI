@@ -9,7 +9,7 @@ Deliver the requested scope: a node fix, graph, blockout, generator, or finished
 
 ## Core path
 
-Read [graph authoring](../shared/graph-authoring.md) for PICG constraints and [live MCP](../shared/pcg-mcp.md) before editing the open Web graph. Target the correct session, discover the needed node schemas, apply a coherent change, validate/cook as relevant, inspect affected output, and save the intended graph. Preserve unrelated work.
+Read [graph authoring](../shared/graph-authoring.md) for PICG constraints and [live MCP](../shared/pcg-mcp.md) before editing the open Web graph. Obtain the user's explicit session choice and in-page AI-control approval as described in the live MCP contract; never auto-select a window. Echo the chosen label/ID/path, keep that ID on every live call, discover the needed node schemas, apply a coherent change, validate/cook as relevant, inspect affected output, and save the intended graph. Preserve unrelated work.
 
 For live-editor tasks, MCP is the authoring surface. A saved-file edit is not a substitute for an acknowledged canvas update. Recover an unavailable editor when possible; otherwise report that live work is blocked rather than claiming it was applied.
 
