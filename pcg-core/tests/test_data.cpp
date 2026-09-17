@@ -5,6 +5,7 @@
 #include "data/pcg_param_data.hpp"
 #include "data/pcg_point_data.hpp"
 #include "data/pcg_spline_data.hpp"
+#include "cook_diagnostics.hpp"
 #include "elements/pcg_element.hpp"
 #include "scripting/operation_bridge.hpp"
 
@@ -21,6 +22,14 @@ namespace {
 bool cancel_immediately()
 {
     return true;
+}
+
+int cancellation_checks = 0;
+
+bool cancel_after_first_check()
+{
+    ++cancellation_checks;
+    return cancellation_checks >= 2;
 }
 
 } // namespace
@@ -149,6 +158,40 @@ int main()
     assert(invalid_result.diagnostic["code"] == "invalid_parameters");
     assert(invalid_result.diagnostic["path"] == "parameters.width");
 
+    // vector3 values must use the canonical 3-number representation and obey
+    // manifest component constraints instead of falling back inside native code.
+    pcg::internal::scripting::OperationInvocationRequest invalid_vector_request;
+    invalid_vector_request.operation = "TransformMesh";
+    invalid_vector_request.inputs.add_geometry("in", *bridge_geometry);
+    invalid_vector_request.parameters = {{"translate", "bad"}};
+    pcg::internal::scripting::OperationInvocationResult invalid_vector_result;
+    assert(pcg::internal::scripting::invoke_operation(invalid_vector_request, invalid_vector_result) == PCG_ERR_INVALID_ARGUMENT);
+    assert(invalid_vector_result.diagnostic["code"] == "invalid_parameters");
+    assert(invalid_vector_result.diagnostic["path"] == "parameters.translate");
+
+    invalid_vector_request.parameters = {{"scale", {-1.0, 1.0, 1.0}}};
+    invalid_vector_result = {};
+    assert(pcg::internal::scripting::invoke_operation(invalid_vector_request, invalid_vector_result) == PCG_ERR_INVALID_ARGUMENT);
+    assert(invalid_vector_result.diagnostic["code"] == "invalid_parameters");
+    assert(invalid_vector_result.diagnostic["path"] == "parameters.scale");
+    std::printf("PASS: operation bridge vector3 parameter validation\n");
+
+    // Reserved Core diagnostics are sidecars, not script-visible manifest pins.
+    // They must survive successful native execution without invalidating outputs.
+    pcg::internal::scripting::OperationInvocationRequest boolean_request;
+    boolean_request.operation = "BooleanMesh";
+    boolean_request.inputs.add_geometry("a", *bridge_geometry);
+    boolean_request.inputs.add_geometry("b", PcgGeometry{});
+    pcg::internal::scripting::OperationInvocationResult boolean_result;
+    assert(pcg::internal::scripting::invoke_operation(boolean_request, boolean_result) == PCG_OK);
+    assert(boolean_result.outputs.find_geometry("out") != nullptr);
+    const auto* boolean_diagnostic =
+        boolean_result.outputs.find_json(pcg::internal::kNodeDiagnosticTag);
+    assert(boolean_diagnostic != nullptr);
+    assert((*boolean_diagnostic)["outcome"] == "noop");
+    assert(boolean_result.diagnostic.is_null());
+    std::printf("PASS: operation bridge preserves native diagnostic sidecars\n");
+
     pcg::internal::scripting::OperationInvocationRequest cancelled_request;
     cancelled_request.operation = "CreateBoxMesh";
     cancelled_request.context.is_cancel_requested = &cancel_immediately;
@@ -156,6 +199,18 @@ int main()
     assert(pcg::internal::scripting::invoke_operation(cancelled_request, cancelled_result) == PCG_ERR_EXECUTION);
     assert(cancelled_result.diagnostic["code"] == "cancelled");
     assert(cancelled_result.outputs.items().empty());
+
+    // The first bridge cancellation check is false; BooleanMesh observes the
+    // second check while executing. The bridge must keep the stable cancelled
+    // diagnostic instead of converting the native PCG_ERR_EXECUTION to failure.
+    cancellation_checks = 0;
+    pcg::internal::scripting::OperationInvocationRequest mid_cancel_request;
+    mid_cancel_request.operation = "BooleanMesh";
+    mid_cancel_request.context.is_cancel_requested = &cancel_after_first_check;
+    pcg::internal::scripting::OperationInvocationResult mid_cancel_result;
+    assert(pcg::internal::scripting::invoke_operation(mid_cancel_request, mid_cancel_result) == PCG_ERR_EXECUTION);
+    assert(mid_cancel_result.diagnostic["code"] == "cancelled");
+    assert(mid_cancel_result.outputs.items().empty());
     std::printf("PASS: operation bridge structured diagnostics + cancellation\n");
 
     const auto discovery = pcg::internal::scripting::operation_discovery_json();
