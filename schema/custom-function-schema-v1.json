@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcg.example.com/custom-function-schema-v1.json",
+  "title": "PCG Custom Function static contract v1",
+  "description": "Stored in ordinary CustomFunction node.data.customFunction. Validate without parsing or executing source. Cross-field invariants and host integration are specified in custom-function-contract.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "language",
+    "languageVersion",
+    "apiVersion",
+    "entryPoint",
+    "source",
+    "seed",
+    "dependencies",
+    "parameters",
+    "parameterValues",
+    "inputs",
+    "outputs",
+    "primaryOutput"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "language": {"const": "javascript"},
+    "languageVersion": {"const": 1},
+    "apiVersion": {"const": "1"},
+    "entryPoint": {
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$",
+      "not": {"enum": ["default", "__proto__", "prototype", "constructor"]}
+    },
+    "source": {"type": "string"},
+    "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "parameters": {"type": "array", "items": {"$ref": "#/$defs/parameter"}},
+    "parameterValues": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/stableId"},
+      "additionalProperties": {"$ref": "#/$defs/literal"}
+    },
+    "inputs": {"type": "array", "items": {"$ref": "#/$defs/port"}},
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"allOf": [{"$ref": "#/$defs/port"}, {"not": {"anyOf": [{"required": ["default"]}]}}]}
+    },
+    "primaryOutput": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/stableId"}]}
+  },
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$",
+      "not": {"enum": ["__proto__", "prototype", "constructor"]}
+    },
+    "valueType": {"enum": ["integer", "number", "boolean", "string", "vector3"]},
+    "literal": {
+      "anyOf": [
+        {"type": "number"},
+        {"type": "boolean"},
+        {"type": "string"},
+        {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}
+      ]
+    },
+    "pinType": {
+      "enum": [
+        "Any",
+        "Param",
+        "SpatialPoint",
+        "SpatialSpline",
+        "SpatialSurface",
+        "SpatialMesh",
+        "SpatialGeometry",
+        "Texture",
+        "HeightField",
+        "Material"
+      ]
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "minimum": {"type": "number"},
+        "maximum": {"type": "number"},
+        "enum": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/literal"}},
+        "minItems": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "maxItems": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "type", "required"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "label": {"type": "string"},
+        "type": {"$ref": "#/$defs/valueType"},
+        "required": {"type": "boolean"},
+        "default": {"$ref": "#/$defs/literal"},
+        "constraints": {"$ref": "#/$defs/constraints"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "integer"}}, "required": ["type"]},
+          "then": {
+            "properties": {
+              "constraints": {
+                "properties": {
+                  "enum": {"items": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}}
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "number"}}, "required": ["type"]},
+          "then": {"properties": {"constraints": {"properties": {"enum": {"items": {"type": "number"}}}}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "boolean"}}, "required": ["type"]},
+          "then": {"properties": {"constraints": {"properties": {"enum": {"items": {"type": "boolean"}}}}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "string"}}, "required": ["type"]},
+          "then": {"properties": {"constraints": {"properties": {"enum": {"items": {"type": "string"}}}}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "vector3"}}, "required": ["type"]},
+          "then": {
+            "properties": {
+              "constraints": {
+                "properties": {
+                  "enum": {"items": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}}
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "integer"}}, "required": ["type"]},
+          "then": {
+            "properties": {"default": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}}
+          }
+        },
+        {
+          "if": {"properties": {"type": {"const": "number"}}, "required": ["type"]},
+          "then": {"properties": {"default": {"type": "number"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "boolean"}}, "required": ["type"]},
+          "then": {"properties": {"default": {"type": "boolean"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "string"}}, "required": ["type"]},
+          "then": {"properties": {"default": {"type": "string"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "vector3"}}, "required": ["type"]},
+          "then": {
+            "properties": {"default": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}}
+          }
+        },
+        {
+          "properties": {"constraints": {"not": {"anyOf": [{"required": ["minItems"]}, {"required": ["maxItems"]}]}}}
+        },
+        {
+          "if": {"properties": {"type": {"enum": ["integer", "number"]}}, "required": ["type"]},
+          "else": {
+            "properties": {"constraints": {"not": {"anyOf": [{"required": ["minimum"]}, {"required": ["maximum"]}]}}}
+          }
+        }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "pinType", "cardinality", "required"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "label": {"type": "string"},
+        "pinType": {"$ref": "#/$defs/pinType"},
+        "cardinality": {"enum": ["single", "many"]},
+        "required": {"type": "boolean"},
+        "valueType": {"$ref": "#/$defs/valueType"},
+        "default": {"anyOf": [{"$ref": "#/$defs/literal"}, {"type": "array", "items": {"$ref": "#/$defs/literal"}}]},
+        "constraints": {"$ref": "#/$defs/constraints"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"pinType": {"const": "Param"}}, "required": ["pinType"]},
+          "then": {"required": ["valueType"]},
+          "else": {"not": {"anyOf": [{"required": ["valueType"]}, {"required": ["default"]}]}}
+        },
+        {
+          "if": {"properties": {"cardinality": {"const": "single"}}, "required": ["cardinality"]},
+          "then": {
+            "properties": {"constraints": {"not": {"anyOf": [{"required": ["minItems"]}, {"required": ["maxItems"]}]}}}
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"enum": ["integer", "number"]}}, "required": ["valueType"]},
+          "else": {
+            "properties": {"constraints": {"not": {"anyOf": [{"required": ["minimum"]}, {"required": ["maximum"]}]}}}
+          }
+        },
+        {
+          "if": {"required": ["valueType"]},
+          "else": {"properties": {"constraints": {"not": {"anyOf": [{"required": ["enum"]}]}}}}
+        },
+        {
+          "if": {"properties": {"required": {"const": true}}, "required": ["required"]},
+          "then": {"properties": {"constraints": {"properties": {"maxItems": {"minimum": 1}}}}}
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "integer"}}, "required": ["valueType"]},
+          "then": {
+            "properties": {
+              "constraints": {
+                "properties": {
+                  "enum": {"items": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}}
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "number"}}, "required": ["valueType"]},
+          "then": {"properties": {"constraints": {"properties": {"enum": {"items": {"type": "number"}}}}}}
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "boolean"}}, "required": ["valueType"]},
+          "then": {"properties": {"constraints": {"properties": {"enum": {"items": {"type": "boolean"}}}}}}
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "string"}}, "required": ["valueType"]},
+          "then": {"properties": {"constraints": {"properties": {"enum": {"items": {"type": "string"}}}}}}
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "vector3"}}, "required": ["valueType"]},
+          "then": {
+            "properties": {
+              "constraints": {
+                "properties": {
+                  "enum": {"items": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}}
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "integer"}}, "required": ["valueType"]},
+          "then": {
+            "if": {"properties": {"cardinality": {"const": "many"}}, "required": ["cardinality"]},
+            "then": {
+              "properties": {
+                "default": {
+                  "type": "array",
+                  "items": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}
+                }
+              },
+              "allOf": [
+                {
+                  "if": {"properties": {"required": {"const": true}}, "required": ["required"]},
+                  "then": {"properties": {"default": {"minItems": 1}}}
+                }
+              ]
+            },
+            "else": {
+              "properties": {"default": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "number"}}, "required": ["valueType"]},
+          "then": {
+            "if": {"properties": {"cardinality": {"const": "many"}}, "required": ["cardinality"]},
+            "then": {
+              "properties": {"default": {"type": "array", "items": {"type": "number"}}},
+              "allOf": [
+                {
+                  "if": {"properties": {"required": {"const": true}}, "required": ["required"]},
+                  "then": {"properties": {"default": {"minItems": 1}}}
+                }
+              ]
+            },
+            "else": {"properties": {"default": {"type": "number"}}}
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "boolean"}}, "required": ["valueType"]},
+          "then": {
+            "if": {"properties": {"cardinality": {"const": "many"}}, "required": ["cardinality"]},
+            "then": {
+              "properties": {"default": {"type": "array", "items": {"type": "boolean"}}},
+              "allOf": [
+                {
+                  "if": {"properties": {"required": {"const": true}}, "required": ["required"]},
+                  "then": {"properties": {"default": {"minItems": 1}}}
+                }
+              ]
+            },
+            "else": {"properties": {"default": {"type": "boolean"}}}
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "string"}}, "required": ["valueType"]},
+          "then": {
+            "if": {"properties": {"cardinality": {"const": "many"}}, "required": ["cardinality"]},
+            "then": {
+              "properties": {"default": {"type": "array", "items": {"type": "string"}}},
+              "allOf": [
+                {
+                  "if": {"properties": {"required": {"const": true}}, "required": ["required"]},
+                  "then": {"properties": {"default": {"minItems": 1}}}
+                }
+              ]
+            },
+            "else": {"properties": {"default": {"type": "string"}}}
+          }
+        },
+        {
+          "if": {"properties": {"valueType": {"const": "vector3"}}, "required": ["valueType"]},
+          "then": {
+            "if": {"properties": {"cardinality": {"const": "many"}}, "required": ["cardinality"]},
+            "then": {
+              "properties": {
+                "default": {
+                  "type": "array",
+                  "items": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}
+                }
+              },
+              "allOf": [
+                {
+                  "if": {"properties": {"required": {"const": true}}, "required": ["required"]},
+                  "then": {"properties": {"default": {"minItems": 1}}}
+                }
+              ]
+            },
+            "else": {
+              "properties": {"default": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}}
+            }
+          }
+        }
+      ]
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "reference", "version", "contentHash"],
+      "properties": {
+        "id": {"$ref": "#/$defs/stableId"},
+        "kind": {"enum": ["resource", "module"]},
+        "reference": {"type": "string", "pattern": "\\S"},
+        "version": {"type": "string", "pattern": "\\S"},
+        "contentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
