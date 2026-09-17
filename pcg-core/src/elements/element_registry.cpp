@@ -24,6 +24,7 @@
 #include "scripting/operation_bridge.hpp"
 #include "node_manifest_embedded.hpp"
 
+#include "cook_diagnostics.hpp"
 #include "internal/error_util.hpp"
 
 #include <algorithm>
@@ -334,7 +335,41 @@ bool validate_property_value(const std::string& name,
                              std::string& reason)
 {
     const std::string type = spec.value("type", std::string());
-    bool valid = true;
+
+    auto validate_number_bounds = [&](double number, const std::string& component) {
+        if (!std::isfinite(number)) {
+            reason = "parameter '" + name + component + "' must be finite";
+            return false;
+        }
+        if (spec.contains("minimum") && number < spec["minimum"].get<double>()) {
+            reason = "parameter '" + name + component + "' is below its minimum";
+            return false;
+        }
+        if (spec.contains("maximum") && number > spec["maximum"].get<double>()) {
+            reason = "parameter '" + name + component + "' is above its maximum";
+            return false;
+        }
+        return true;
+    };
+
+    if (type == "vector3") {
+        if (!value.is_array() || value.size() != 3) {
+            reason = "parameter '" + name + "' must be a vector3 array with exactly 3 components";
+            return false;
+        }
+        static const char* kComponents[] = {"[0]", "[1]", "[2]"};
+        for (std::size_t i = 0; i < 3; ++i) {
+            if (!value[i].is_number()) {
+                reason = "parameter '" + name + kComponents[i] + "' must be a number";
+                return false;
+            }
+            if (!validate_number_bounds(value[i].get<double>(), kComponents[i]))
+                return false;
+        }
+        return true;
+    }
+
+    bool valid = false;
     if (type == "integer")
         valid = value.is_number_integer() || value.is_number_unsigned();
     else if (type == "number")
@@ -358,21 +393,12 @@ bool validate_property_value(const std::string& name,
     }
 
     if (!valid) {
-        reason = "parameter '" + name + "' has incompatible type or enum value";
+        reason = "parameter '" + name + "' has incompatible or unsupported type/value";
         return false;
     }
 
-    if (value.is_number()) {
-        const double number = value.get<double>();
-        if (spec.contains("minimum") && number < spec["minimum"].get<double>()) {
-            reason = "parameter '" + name + "' is below its minimum";
-            return false;
-        }
-        if (spec.contains("maximum") && number > spec["maximum"].get<double>()) {
-            reason = "parameter '" + name + "' is above its maximum";
-            return false;
-        }
-    }
+    if (value.is_number() && !validate_number_bounds(value.get<double>(), std::string()))
+        return false;
     return true;
 }
 
@@ -453,9 +479,13 @@ const nlohmann::json* find_pin(const nlohmann::json& pins, const std::string& id
 bool validate_collection(const data::PcgDataCollection& collection,
                          const nlohmann::json& pins,
                          std::string& bad_tag,
-                         std::string& reason)
+                         std::string& reason,
+                         bool allow_reserved_diagnostics = false)
 {
     for (const auto& item : collection.items()) {
+        if (allow_reserved_diagnostics && item.tag == kNodeDiagnosticTag)
+            continue;
+
         const nlohmann::json* pin = find_pin(pins, item.tag);
         if (!pin) {
             bad_tag = item.tag;
@@ -684,20 +714,22 @@ PcgResultCode invoke_operation(const OperationInvocationRequest& request,
     result.statistics["durationMs"] =
         std::chrono::duration<double, std::milli>(end - start).count();
 
+    // Cancellation is authoritative for this invocation and must be classified
+    // before a cooperative native element's generic PCG_ERR_EXECUTION result.
+    if (request.context.is_cancel_requested && request.context.is_cancel_requested()) {
+        return fail_invocation(result, PCG_ERR_EXECUTION, "cancelled",
+                               request.operation, "operation invocation cancelled during execution");
+    }
+
     if (code != PCG_OK) {
         const std::string message = error_buffer[0] != '\0'
             ? std::string(error_buffer) : "native operation failed";
         return fail_invocation(result, code, "operation_failed", request.operation, message);
     }
 
-    if (request.context.is_cancel_requested && request.context.is_cancel_requested()) {
-        return fail_invocation(result, PCG_ERR_EXECUTION, "cancelled",
-                               request.operation, "operation invocation cancelled during execution");
-    }
-
     std::string bad_output;
     std::string output_reason;
-    if (!validate_collection(ctx.outputs, metadata.outputs, bad_output, output_reason)) {
+    if (!validate_collection(ctx.outputs, metadata.outputs, bad_output, output_reason, true)) {
         return fail_invocation(result, PCG_ERR_EXECUTION, "incompatible_output",
                                request.operation, output_reason, "outputs." + bad_output);
     }
