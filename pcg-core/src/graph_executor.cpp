@@ -1,6 +1,7 @@
 #include "graph_executor.hpp"
 
 #include "cook_hash.hpp"
+#include "cook_diagnostics.hpp"
 #include "data/pcg_context.hpp"
 #include "data/pcg_geometry.hpp"
 #include "elements/facade_foundation_algorithms.hpp"
@@ -11,6 +12,7 @@
 #include "heightfield_runtime.hpp"
 
 #include <chrono>
+#include <exception>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
@@ -877,8 +879,10 @@ PcgResultCode cook_single_node(
     GraphPerfReport* perf,
     char* err_buf,
     int err_buf_size,
-    bool allow_cache)
+    bool allow_cache,
+    CookDiagnostics& diagnostics)
 {
+    allow_cache = allow_cache && !diagnostics.degraded();
     if (is_cancel_requested && is_cancel_requested())
         return fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, "Execution cancelled");
 
@@ -910,6 +914,7 @@ PcgResultCode cook_single_node(
         data::PcgDataCollection cached_outputs;
         uint64_t cached_output_hash = 0;
         if (cache->try_get(node.id, input_hash, cached_outputs, cached_output_hash)) {
+            diagnostics.append(cached_outputs, true);
             outputs[node.id] = std::move(cached_outputs);
             output_hashes[node.id] = cached_output_hash;
             if (perf)
@@ -940,7 +945,20 @@ PcgResultCode cook_single_node(
     if (input_code != PCG_OK)
         return input_code;
 
-    const PcgResultCode rc = element->execute(ctx);
+    PcgResultCode rc = PCG_OK;
+    try {
+        rc = element->execute(ctx);
+    } catch (const std::exception& exception) {
+        const std::string message = node.type + " [" + node.id + "] failed: " + exception.what();
+        ctx.outputs.add(kNodeDiagnosticTag, data::PcgDataType::Unknown, {
+            {"node_id", node.id}, {"node_type", node.type}, {"outcome", "failure"},
+            {"fallback_used", false}, {"reason", message},
+        });
+        rc = fail(err_buf, err_buf_size, PCG_ERR_EXECUTION, message.c_str());
+    }
+    diagnostics.append(ctx.outputs, false);
+    // A transient fallback must not poison this node or downstream caches.
+    allow_cache = allow_cache && !diagnostics.degraded();
     if (rc != PCG_OK)
         return rc;
 
@@ -980,7 +998,8 @@ PcgResultCode cook_foreach_region(
     bool (*is_cancel_requested)(),
     GraphPerfReport* perf,
     char* err_buf,
-    int err_buf_size)
+    int err_buf_size,
+    CookDiagnostics& diagnostics)
 {
     static const std::vector<const GraphEdge*> kNoIncomingEdges;
     const GraphNode* begin_node = node_by_id.at(region.begin_id);
@@ -1063,7 +1082,7 @@ PcgResultCode cook_foreach_region(
                 const PcgResultCode nested_rc = cook_foreach_region(
                     *nested_it->second, all_regions, foreach_by_begin, graph, node_by_id,
                     incoming_by_node, seed, outputs, output_hashes, textures, meshes, splines,
-                    heightfields, is_cancel_requested, perf, err_buf, err_buf_size);
+                    heightfields, is_cancel_requested, perf, err_buf, err_buf_size, diagnostics);
                 if (nested_rc != PCG_OK)
                     return nested_rc;
                 continue;
@@ -1078,7 +1097,7 @@ PcgResultCode cook_foreach_region(
             const PcgResultCode rc = cook_single_node(
                 graph, *body_node, seed, incoming, outputs, output_hashes,
                 textures, meshes, splines, heightfields, nullptr, is_cancel_requested,
-                perf, err_buf, err_buf_size, false);
+                perf, err_buf, err_buf_size, false, diagnostics);
             if (rc != PCG_OK)
                 return rc;
         }
@@ -1094,7 +1113,7 @@ PcgResultCode cook_foreach_region(
         const PcgResultCode end_rc = cook_single_node(
             graph, *end_node, seed, end_incoming, outputs, output_hashes,
             textures, meshes, splines, heightfields, nullptr, is_cancel_requested,
-            perf, err_buf, err_buf_size, false);
+            perf, err_buf, err_buf_size, false, diagnostics);
         if (end_rc != PCG_OK)
             return end_rc;
 
@@ -1191,7 +1210,7 @@ PcgResultCode cook_foreach_region(
 
 } // namespace
 
-PcgResultCode execute_graph(const Graph& graph,
+static PcgResultCode execute_graph_impl(const Graph& graph,
                             int seed,
                             GraphExecutionResult& out_result,
                             char* err_buf,
@@ -1202,7 +1221,8 @@ PcgResultCode execute_graph(const Graph& graph,
                             const HeightFieldRuntime* heightfields,
                             GraphCookCache* cache,
                             bool (*is_cancel_requested)(),
-                            GraphPerfReport* perf)
+                            GraphPerfReport* perf,
+                            CookDiagnostics& diagnostics)
 {
     elements::register_builtin_elements();
     if (perf)
@@ -1276,7 +1296,7 @@ PcgResultCode execute_graph(const Graph& graph,
             const PcgResultCode rc = cook_foreach_region(
                 *begin_it->second, foreach_regions, foreach_by_begin, graph, node_by_id,
                 incoming_by_node, seed, outputs, output_hashes, textures, meshes, splines,
-                heightfields, is_cancel_requested, perf, err_buf, err_buf_size);
+                heightfields, is_cancel_requested, perf, err_buf, err_buf_size, diagnostics);
             if (rc != PCG_OK)
                 return rc;
             continue;
@@ -1293,7 +1313,7 @@ PcgResultCode execute_graph(const Graph& graph,
         const PcgResultCode rc = cook_single_node(
             graph, *node, seed, incoming_edges, outputs, output_hashes, textures, meshes,
             splines, heightfields, cache, is_cancel_requested, perf, err_buf, err_buf_size,
-            true);
+            true, diagnostics);
         if (rc != PCG_OK)
             return rc;
     }
@@ -1524,6 +1544,30 @@ PcgResultCode execute_graph(const Graph& graph,
     out_result.json["node_groups"] = per_node_groups;
     out_result.json["node_attrs"] = per_node_attrs;
     return PCG_OK;
+}
+
+PcgResultCode execute_graph(const Graph& graph,
+                            int seed,
+                            GraphExecutionResult& out_result,
+                            char* err_buf,
+                            int err_buf_size,
+                            const TextureRuntime* textures,
+                            const MeshRuntime* meshes,
+                            const SplineRuntime* splines,
+                            const HeightFieldRuntime* heightfields,
+                            GraphCookCache* cache,
+                            bool (*is_cancel_requested)(),
+                            GraphPerfReport* perf)
+{
+    // Per-call state: independent cooks and nested ForEach executions cannot
+    // overwrite one another's receipts. Reset stale results on a failed cook.
+    out_result = GraphExecutionResult{};
+    CookDiagnostics diagnostics;
+    const PcgResultCode code = execute_graph_impl(
+        graph, seed, out_result, err_buf, err_buf_size, textures, meshes, splines,
+        heightfields, cache, is_cancel_requested, perf, diagnostics);
+    diagnostics.attach(out_result.json, code, graph, seed);
+    return code;
 }
 
 } // namespace pcg::internal
