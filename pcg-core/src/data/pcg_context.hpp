@@ -24,6 +24,15 @@ struct PcgContext {
     char* err_buf = nullptr;
     int err_buf_size = 0;
     bool (*is_cancel_requested)() = nullptr;
+
+    /**
+     * Optional invocation-scoped dependency descriptors and statistics sink.
+     * Visual graph execution may leave these null; the scripting operation
+     * bridge propagates the owning evaluation's contexts without creating
+     * hidden graph dependencies.
+     */
+    const nlohmann::json* dependencies = nullptr;
+    nlohmann::json* statistics = nullptr;
 };
 
 } // namespace pcg::internal
