@@ -234,8 +234,9 @@ export function validateCustomFunction(input: unknown, nodeId?: string): Result<
       if (!record(dep)) { add('CF_SCHEMA', path, 'Dependency must be an object'); return; }
       keys(dep, ['id', 'kind', 'reference', 'version', 'contentHash'], path);
       required(dep, ['id', 'kind', 'reference', 'version', 'contentHash'], path);
-      if (!validId(dep.id) || seen.has(String(dep.id))) add('CF_DEPENDENCY', `${path}/id`, 'Dependency IDs must be valid and unique');
-      seen.add(String(dep.id));
+      if (!validId(dep.id)) add('CF_DEPENDENCY', `${path}/id`, 'Dependency IDs must be valid and unique');
+      else if (seen.has(dep.id)) add('CF_DEPENDENCY', `${path}/id`, 'Dependency IDs must be valid and unique');
+      else seen.add(dep.id);
       if (dep.kind !== 'resource' && dep.kind !== 'module') add('CF_DEPENDENCY', `${path}/kind`, 'Expected resource or module metadata; this does not grant execution capability');
       for (const key of ['reference', 'version']) if (typeof dep[key] !== 'string' || !dep[key].trim()) add('CF_DEPENDENCY', `${path}/${key}`, 'Expected a nonempty, explicit dependency reference/version');
       if (typeof dep.contentHash !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(dep.contentHash)) add('CF_DEPENDENCY', `${path}/contentHash`, 'Pin dependency content with sha256:<64 lowercase hexadecimal digits>');
