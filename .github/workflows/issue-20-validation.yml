@@ -1,0 +1,23 @@
+name: Issue 20 temporary validation
+on:
+  push:
+    branches: [feat/20-composable-custom-function]
+    paths: [.github/workflows/issue-20-validation.yml]
+permissions:
+  contents: read
+jobs:
+  source-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Package source for isolated validation
+        run: |
+          tar --exclude=.git --exclude=node_modules --exclude=build --exclude='*.png' --exclude='*.jpg' --exclude='*.fbx' --exclude='*.glb' --exclude='*.unity' -czf /tmp/pcg-source.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-20-source
+          path: /tmp/pcg-source.tar.gz
+          retention-days: 1
