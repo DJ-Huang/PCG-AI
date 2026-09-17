@@ -1,0 +1,584 @@
+[
+  {"name": "valid baseline", "changes": [], "contractValid": true, "schemaValid": true},
+  {
+    "name": "optional native input",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "input",
+            "label": "In",
+            "pinType": "SpatialGeometry",
+            "cardinality": "single",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "many numeric default",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "numbers",
+            "label": "Numbers",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "many",
+            "required": true,
+            "default": [1, 2],
+            "constraints": {"minItems": 1, "maxItems": 3}
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "single vector default",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "vector",
+            "label": "Vector",
+            "pinType": "Param",
+            "valueType": "vector3",
+            "cardinality": "single",
+            "required": true,
+            "default": [1, 2, 3]
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "many vector defaults",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "vectors",
+            "label": "Vectors",
+            "pinType": "Param",
+            "valueType": "vector3",
+            "cardinality": "many",
+            "required": true,
+            "default": [[1, 2, 3], [4, 5, 6]]
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "optional empty many default",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "nums",
+            "label": "Numbers",
+            "pinType": "Param",
+            "valueType": "integer",
+            "cardinality": "many",
+            "required": false,
+            "default": []
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "literal enum default",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "v",
+            "label": "v",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "single",
+            "required": true,
+            "default": 2,
+            "constraints": {"enum": [1, 2, 3]}
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "parameter boolean",
+    "changes": [
+      {
+        "path": ["parameters"],
+        "value": [{"id": "flag", "label": "Flag", "type": "boolean", "required": true, "default": false}]
+      },
+      {"path": ["parameterValues"], "value": {"flag": true}}
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "parameter string",
+    "changes": [
+      {
+        "path": ["parameters"],
+        "value": [
+          {
+            "id": "s",
+            "label": "Text",
+            "type": "string",
+            "required": true,
+            "default": "x",
+            "constraints": {"enum": ["x", "y"]}
+          }
+        ]
+      },
+      {"path": ["parameterValues"], "value": {}}
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "primary selection absent",
+    "changes": [{"path": ["primaryOutput"], "value": null}],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "unknown source syntax is still inspectable",
+    "changes": [{"path": ["source"], "value": "while (true) {}\n this is deliberately invalid JS"}],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "future schema",
+    "changes": [{"path": ["schemaVersion"], "value": 2}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "future API",
+    "changes": [{"path": ["apiVersion"], "value": "2"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "typescript not implicitly transpiled",
+    "changes": [{"path": ["language"], "value": "typescript"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "unknown profile",
+    "changes": [{"path": ["languageVersion"], "value": 2}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "unknown field",
+    "changes": [{"path": ["bytecode"], "value": "not portable"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "invalid source type",
+    "changes": [{"path": ["source"], "value": null}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "default export forbidden",
+    "changes": [{"path": ["entryPoint"], "value": "default"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "negative seed",
+    "changes": [{"path": ["seed"], "value": -1}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "fractional seed",
+    "changes": [{"path": ["seed"], "value": 1.5}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "overflow seed",
+    "changes": [{"path": ["seed"], "value": 4294967296}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "unknown pin type",
+    "changes": [{"path": ["outputs", 0, "pinType"], "value": "THREE.Mesh"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "unknown cardinality",
+    "changes": [{"path": ["outputs", 0, "cardinality"], "value": "array"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "reserved ID",
+    "changes": [{"path": ["outputs", 0, "id"], "value": "__proto__"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "empty output list",
+    "changes": [{"path": ["outputs"], "value": []}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "primary label is not an ID",
+    "changes": [{"path": ["primaryOutput"], "value": "Body"}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "primary optional output",
+    "changes": [{"path": ["outputs", 0, "required"], "value": false}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "primary many output",
+    "changes": [{"path": ["outputs", 0, "cardinality"], "value": "many"}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "output defaults forbidden",
+    "changes": [{"path": ["outputs", 1, "default"], "value": 1}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "native default forbidden",
+    "changes": [{"path": ["outputs", 0, "default"], "value": {}}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "native valueType forbidden",
+    "changes": [{"path": ["outputs", 0, "valueType"], "value": "number"}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "native numeric constraints forbidden",
+    "changes": [{"path": ["outputs", 0, "constraints"], "value": {"minimum": 0}}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "Param valueType required",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [{"id": "x", "label": "X", "pinType": "Param", "required": true, "cardinality": "single"}]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "wrong typed default",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "v",
+            "label": "v",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "single",
+            "required": true,
+            "default": "2"
+          }
+        ]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "single number cannot default to array",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "v",
+            "label": "v",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "single",
+            "required": true,
+            "default": [1, 2, 3]
+          }
+        ]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "wrong vector length",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "x",
+            "label": "X",
+            "pinType": "Param",
+            "valueType": "vector3",
+            "required": true,
+            "cardinality": "single",
+            "default": [1, 2]
+          }
+        ]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "required many cannot default empty",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "x",
+            "label": "X",
+            "pinType": "Param",
+            "valueType": "number",
+            "required": true,
+            "cardinality": "many",
+            "default": []
+          }
+        ]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "single cannot set minItems",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "v",
+            "label": "v",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "single",
+            "required": true,
+            "constraints": {"minItems": 0}
+          }
+        ]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "empty enum",
+    "changes": [{"path": ["parameters", 0, "constraints"], "value": {"enum": []}}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "duplicate enum",
+    "changes": [{"path": ["parameters", 0, "constraints"], "value": {"enum": [1, 1]}}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "wrong enum type",
+    "changes": [{"path": ["parameters", 0, "constraints"], "value": {"enum": ["x"]}}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "inverted numeric range",
+    "changes": [{"path": ["parameters", 0, "constraints"], "value": {"minimum": 5, "maximum": 1}}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "default violates minimum",
+    "changes": [{"path": ["parameters", 0, "default"], "value": -1}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "value violates maximum",
+    "changes": [{"path": ["parameterValues", "width"], "value": 101}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "undeclared parameter",
+    "changes": [{"path": ["parameterValues", "extra"], "value": 2}],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "duplicate parameter ID",
+    "changes": [
+      {
+        "path": ["parameters"],
+        "value": [
+          {"id": "x", "label": "X", "type": "number", "required": false},
+          {"id": "x", "label": "Other label", "type": "number", "required": false}
+        ]
+      },
+      {"path": ["parameterValues"], "value": {}}
+    ],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "duplicate port ID",
+    "changes": [
+      {
+        "path": ["inputs"],
+        "value": [
+          {
+            "id": "v",
+            "label": "v",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "single",
+            "required": true
+          },
+          {
+            "id": "v",
+            "label": "v",
+            "pinType": "Param",
+            "valueType": "number",
+            "cardinality": "single",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": true
+  },
+  {
+    "name": "dependency missing pin",
+    "changes": [
+      {
+        "path": ["dependencies"],
+        "value": [{"id": "d", "kind": "resource", "reference": "wood", "version": "1"}]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "dependency bad hash",
+    "changes": [
+      {
+        "path": ["dependencies"],
+        "value": [{"id": "d", "kind": "module", "reference": "helpers", "version": "1", "contentHash": "latest"}]
+      }
+    ],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "pinned dependency metadata",
+    "changes": [
+      {
+        "path": ["dependencies"],
+        "value": [
+          {
+            "id": "d",
+            "kind": "resource",
+            "reference": "asset:wood",
+            "version": "1",
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    ],
+    "contractValid": true,
+    "schemaValid": true
+  },
+  {
+    "name": "missing inputs",
+    "changes": [{"path": ["inputs"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "missing outputs",
+    "changes": [{"path": ["outputs"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "missing parameters",
+    "changes": [{"path": ["parameters"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "missing parameterValues",
+    "changes": [{"path": ["parameterValues"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "missing dependencies",
+    "changes": [{"path": ["dependencies"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "missing seed",
+    "changes": [{"path": ["seed"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  },
+  {
+    "name": "missing source",
+    "changes": [{"path": ["source"], "remove": true}],
+    "contractValid": false,
+    "schemaValid": false
+  }
+]

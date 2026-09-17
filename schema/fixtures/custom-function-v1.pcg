@@ -1,0 +1,62 @@
+{
+  "version": "2.0",
+  "nodes": [
+    {
+      "id": "script1",
+      "type": "CustomFunction",
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "data": {
+        "__nodeTitle": "Contract fixture (not yet executable)",
+        "customFunction": {
+          "schemaVersion": 1,
+          "language": "javascript",
+          "languageVersion": 1,
+          "apiVersion": "1",
+          "entryPoint": "main",
+          "source": "export function main(ctx) {\n  return { body: ctx.pcg.box({ size: [ctx.params.width, 1, 1] }), count: 1 };\n}\n",
+          "seed": 42,
+          "dependencies": [],
+          "parameters": [
+            {
+              "id": "width",
+              "label": "Width",
+              "type": "number",
+              "required": true,
+              "default": 2,
+              "constraints": {
+                "minimum": 0.01,
+                "maximum": 100
+              }
+            }
+          ],
+          "parameterValues": {
+            "width": 3
+          },
+          "inputs": [],
+          "outputs": [
+            {
+              "id": "body",
+              "label": "Body",
+              "pinType": "SpatialGeometry",
+              "cardinality": "single",
+              "required": true
+            },
+            {
+              "id": "count",
+              "label": "Part count",
+              "pinType": "Param",
+              "valueType": "integer",
+              "cardinality": "single",
+              "required": true
+            }
+          ],
+          "primaryOutput": "body"
+        }
+      }
+    }
+  ],
+  "edges": []
+}
