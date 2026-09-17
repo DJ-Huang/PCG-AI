@@ -6,18 +6,34 @@ on:
 permissions:
   contents: read
 jobs:
-  source-bundle:
+  dependencies:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Package source for isolated validation
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch pinned native and editor dependencies
         run: |
-          tar --exclude=.git --exclude=node_modules --exclude=build --exclude='*.png' --exclude='*.jpg' --exclude='*.fbx' --exclude='*.glb' --exclude='*.unity' -czf /tmp/pcg-source.tar.gz .
+          cmake -S pcg-core -B /tmp/pcg-deps -DPCG_CORE_SKIP_TESTS=ON -DPCG_CORE_ENABLE_FBX_EXPORT=ON
+          git clone --depth 1 --branch v0.16.0 https://github.com/quickjs-ng/quickjs.git /tmp/quickjs
+          test "$(git -C /tmp/quickjs rev-parse HEAD)" = 10b99693cdc3f37cdf05114bc2d5225de495c4a3
+          cd web/pcg-editor && npm ci
+      - name: Package dependencies for offline verification
+        run: |
+          mkdir /tmp/bundle
+          cp -a /tmp/pcg-deps/_deps/json-src /tmp/bundle/json
+          cp -a /tmp/pcg-deps/_deps/assimp-src /tmp/bundle/assimp
+          cp -a /tmp/quickjs /tmp/bundle/quickjs
+          cp -a pcg-core/third_party/CDT /tmp/bundle/CDT
+          cp -a web/pcg-editor/node_modules /tmp/bundle/node_modules
+          tar --exclude=.git -C /tmp/bundle -czf /tmp/pcg-dependencies.tar.gz .
       - uses: actions/upload-artifact@v4
         with:
-          name: issue-20-source
-          path: /tmp/pcg-source.tar.gz
+          name: issue-20-dependencies
+          path: /tmp/pcg-dependencies.tar.gz
           retention-days: 1
