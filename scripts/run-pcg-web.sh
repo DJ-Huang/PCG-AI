@@ -23,6 +23,31 @@ port_listening() {
     lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
 }
 
+check_ports() {
+    if port_listening "$PCG_PORT"; then
+        echo "[pcg-web] ERROR: API port $PCG_PORT is already in use; choose another PCG_SERVER_PORT" >&2
+        return 1
+    fi
+    if port_listening "$VITE_PORT"; then
+        echo "[pcg-web] ERROR: editor port $VITE_PORT is already in use; choose another VITE_PORT" >&2
+        return 1
+    fi
+}
+
+find_pcg_server() {
+    local candidate
+    for candidate in \
+        "$ROOT/pcg-server/build/pcg-server" \
+        "$ROOT/pcg-server/build/Release/pcg-server" \
+        "$ROOT/pcg-server/build/Debug/pcg-server"; do
+        if [[ -x "$candidate" ]]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 wait_http() {
     local pid="$1" port="$2" url="$3" label="$4"
     local i
@@ -74,14 +99,7 @@ if [[ "$PCG_PORT" == "$VITE_PORT" ]]; then
     echo "[pcg-web] ERROR: PCG_SERVER_PORT and VITE_PORT must differ" >&2
     exit 1
 fi
-if port_listening "$PCG_PORT"; then
-    echo "[pcg-web] ERROR: API port $PCG_PORT is already in use; choose another PCG_SERVER_PORT" >&2
-    exit 1
-fi
-if port_listening "$VITE_PORT"; then
-    echo "[pcg-web] ERROR: editor port $VITE_PORT is already in use; choose another VITE_PORT" >&2
-    exit 1
-fi
+check_ports
 
 if [[ ! -f "$ROOT/web/pcg-editor/node_modules/vite/bin/vite.js" ]]; then
     if ! command -v npm >/dev/null 2>&1; then
@@ -92,12 +110,25 @@ if [[ ! -f "$ROOT/web/pcg-editor/node_modules/vite/bin/vite.js" ]]; then
     (cd "$ROOT/web/pcg-editor" && npm install)
 fi
 
+# Native configuration/build can take minutes on a fresh checkout. Complete
+# it before launching children; readiness is only for already-built services.
+if ! SERVER_BIN="$(find_pcg_server)"; then
+    echo "[pcg-web] pcg-server not found; building..."
+    "$ROOT/scripts/build-pcg-server.sh"
+    if ! SERVER_BIN="$(find_pcg_server)"; then
+        echo "[pcg-web] ERROR: no executable pcg-server was produced by the build" >&2
+        exit 1
+    fi
+fi
+# A port can become busy while dependencies or native artifacts are built.
+check_ports
+
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
 echo "[pcg-web] starting pcg-server on http://127.0.0.1:${PCG_PORT}"
-"$ROOT/scripts/run-pcg-server.sh" &
+"$SERVER_BIN" --port "$PCG_PORT" &
 SERVER_PID=$!
 wait_http "$SERVER_PID" "$PCG_PORT" "http://127.0.0.1:${PCG_PORT}/v1/health" "pcg-server"
 

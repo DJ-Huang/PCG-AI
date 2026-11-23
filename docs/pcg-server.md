@@ -2,25 +2,33 @@
 
 Unity Editor talks to C++ only over HTTP. `PcgCore` / `PcgFbxExporter` dylib/dll are **not** loaded in Unity.
 
-## Quick start
+## Quick start (macOS/Linux)
+
+Start the API server in the foreground. The launcher builds it if needed:
 
 ```bash
-./scripts/build-pcg-server.sh
-./scripts/run-pcg-server.sh   # stops any old listener on :17890, then starts
+./scripts/run-pcg-server.sh
 ```
 
-Or together:
+Or start the API server and Web editor together. This launcher requires
+`lsof`, `curl`, and Node.js, plus `npm` if Vite needs to be installed:
 
 ```bash
-./scripts/build-pcg-server.sh --run
-./scripts/run-pcg-web.sh      # always replaces pcg-server; reuses Vite if already up
+./scripts/run-pcg-web.sh
 ```
 
-Stop server only:
+Start commands do not stop or reuse existing listeners. If the default API
+port (17890) or the combined launcher's editor port (5173) is busy, choose
+unused ports with `PCG_SERVER_PORT` and, for the editor, `VITE_PORT`:
 
 ```bash
-./scripts/stop-pcg-server.sh
+PCG_SERVER_PORT=17891 VITE_PORT=5174 ./scripts/run-pcg-web.sh
 ```
+
+Stop the foreground launcher with **Ctrl+C** in the terminal where you started
+it. The legacy `stop-pcg-server.sh` command signals the listener on
+`PCG_SERVER_PORT` by port, not by verified process ownership. Do not use it
+unless you have independently confirmed which process is listening there.
 
 Default: `http://127.0.0.1:17890`
 
