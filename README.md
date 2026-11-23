@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/index.html">Project homepage source</a>
+  <a href="https://dj-huang.github.io/PCG-AI/">Project website</a> · <a href="docs/index.html">Homepage source</a>
 </p>
 
 <p align="center">
