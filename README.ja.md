@@ -1,5 +1,5 @@
 <p align="right">
-  <a href="README.md">English</a> | <strong>日本語</strong>
+  <a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <strong>日本語</strong>
 </p>
 
 <h3 align="center"><a href="https://dj-huang.github.io/PCG-AI/">PICG 公式サイトを見る</a></h3>

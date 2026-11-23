@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Require repository Markdown documentation to be English.
 
-README.ja.md is the only translated document. README.md may contain the
-Japanese language-selector label, but no other CJK text.
+The root Japanese and Simplified Chinese READMEs are translated exceptions.
+The default README may contain only the exact localized selector links below.
 """
 
 from __future__ import annotations
@@ -13,8 +13,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXEMPT_FILES = {"README.ja.md"}
-README_ALLOWED_TEXT = "日本語"
+EXEMPT_FILES = {"README.ja.md", "README.zh-CN.md"}
+README_LANGUAGE_LINKS = (
+    '<a href="README.ja.md">日本語</a>',
+    '<a href="README.zh-CN.md">简体中文</a>',
+)
 
 
 def repository_markdown() -> list[str]:
@@ -53,12 +56,13 @@ def main() -> int:
         ):
             line = source_line
             if relative_path == "README.md":
-                line = line.replace(README_ALLOWED_TEXT, "")
+                for language_link in README_LANGUAGE_LINKS:
+                    line = line.replace(language_link, "")
             if any(is_cjk(character) for character in line):
                 failures.append(f"{relative_path}:{line_number}")
 
     if failures:
-        print("Non-English documentation found outside README.ja.md:")
+        print("Non-English documentation found outside the translated root READMEs:")
         for failure in failures:
             print(f"  {failure}")
         return 1
