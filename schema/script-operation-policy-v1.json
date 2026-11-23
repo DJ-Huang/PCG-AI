@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "description": "Fail-closed scripting policy layered on the ordinary node manifest. Operations not listed here remain host-bound and are not script-callable.",
+  "defaultPolicy": {
+    "capability": "host-bound",
+    "scriptCallable": false,
+    "cancellationSupported": false,
+    "resourceDependencies": []
+  },
+  "operations": {
+    "CreateBoxMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "CreateGridMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "CreateCylinderMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "TransformMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "MergeMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "PolyExtrude": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "BevelMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": true,
+      "resourceDependencies": []
+    },
+    "BooleanMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": true,
+      "resourceDependencies": []
+    },
+    "SubdivideMesh": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "AssignMaterial": {
+      "capability": "pure",
+      "scriptCallable": true,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "ImportMesh": {
+      "capability": "resource-read",
+      "scriptCallable": false,
+      "cancellationSupported": false,
+      "resourceDependencies": ["mesh-runtime"]
+    },
+    "Output": {
+      "capability": "graph-control",
+      "scriptCallable": false,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "ForEachBegin": {
+      "capability": "graph-control",
+      "scriptCallable": false,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "ForEachEnd": {
+      "capability": "graph-control",
+      "scriptCallable": false,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "CustomFunction": {
+      "capability": "graph-control",
+      "scriptCallable": false,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    },
+    "PlaceInScene": {
+      "capability": "side-effecting",
+      "scriptCallable": false,
+      "cancellationSupported": false,
+      "resourceDependencies": []
+    }
+  }
+}
