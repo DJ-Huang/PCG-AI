@@ -2,8 +2,10 @@
   <a href="README.md">English</a> | <strong>日本語</strong>
 </p>
 
+<h3 align="center"><a href="https://dj-huang.github.io/PCG-AI/">PICG 公式サイトを見る</a></h3>
+
 <p align="center">
-  <a href="https://dj-huang.github.io/PCG-AI/">プロジェクトサイト</a> · <a href="docs/index.html">紹介ページのソース</a>
+  <a href="docs/index.html">紹介ページのソース</a>
 </p>
 
 <p align="center">
