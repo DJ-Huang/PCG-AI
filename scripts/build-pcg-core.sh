@@ -71,20 +71,25 @@ if $RUN_TESTS; then
     ctest "${CTEST_ARGS[@]}"
 fi
 
-# Single-config generators (Ninja/Make) place artifacts directly in build/.
-# Multi-config would use build/Release — macOS Xcode is multi-config but we use default Unix Makefiles.
-if [[ -f "$BUILD_DIR/libPcgCore.dylib" ]]; then
-    DYLIB="$BUILD_DIR/libPcgCore.dylib"
-    STATIC_LIB="$BUILD_DIR/libPcgCore.a"
-elif [[ -f "$BUILD_DIR/$CONFIGURATION/libPcgCore.dylib" ]]; then
-    DYLIB="$BUILD_DIR/$CONFIGURATION/libPcgCore.dylib"
-    STATIC_LIB="$BUILD_DIR/$CONFIGURATION/libPcgCore.a"
+case "$(uname -s)" in
+    Linux) SHARED_LIB_NAME="libPcgCore.so" ;;
+    *)     SHARED_LIB_NAME="libPcgCore.dylib" ;;
+esac
+
+# Single-config generators place artifacts in build/; multi-config generators
+# put them in the selected configuration's subdirectory.
+if [[ -f "$BUILD_DIR/$SHARED_LIB_NAME" ]]; then
+    ARTIFACT_DIR="$BUILD_DIR"
+elif [[ -f "$BUILD_DIR/$CONFIGURATION/$SHARED_LIB_NAME" ]]; then
+    ARTIFACT_DIR="$BUILD_DIR/$CONFIGURATION"
 else
-    echo "ERROR: libPcgCore.dylib not found under $BUILD_DIR"
+    echo "ERROR: $SHARED_LIB_NAME not found under $BUILD_DIR"
     exit 1
 fi
 
-for artifact in "$DYLIB" "$STATIC_LIB"; do
+SHARED_LIB="$ARTIFACT_DIR/$SHARED_LIB_NAME"
+STATIC_LIB="$ARTIFACT_DIR/libPcgCore.a"
+for artifact in "$SHARED_LIB" "$STATIC_LIB"; do
     if [[ ! -f "$artifact" ]]; then
         echo "ERROR: Missing build artifact: $artifact"
         exit 1
@@ -92,7 +97,7 @@ for artifact in "$DYLIB" "$STATIC_LIB"; do
 done
 
 echo "==> Artifacts:"
-ls -la "$DYLIB" "$STATIC_LIB"
+ls -la "$SHARED_LIB" "$STATIC_LIB"
 
 if $COPY_TO_UNITY; then
     echo "WARN: --copy-to-unity is deprecated and ignored."
