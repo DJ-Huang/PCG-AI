@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <a href="docs/index.html">プロジェクト紹介ページのソース</a>
+</p>
+
+<p align="center">
   <img src="docs/picg-logo.png" alt="PICG — Procedural Intelligent Content Generation" width="400">
 </p>
 
@@ -65,8 +69,8 @@ Web / Unity / External MCP clients
 リポジトリをクローンし、サブモジュールを初期化します。
 
 ```bash
-git clone --recurse-submodules https://github.com/DJ-Huang/PICG.git
-cd PICG
+git clone --recurse-submodules https://github.com/DJ-Huang/PCG-AI.git
+cd PCG-AI
 ```
 
 macOS または Linux では、ネイティブサーバーと Web エディタをまとめて起動できます。

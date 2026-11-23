@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="PICG is a procedural authoring toolkit for building editable .pcg graphs, previewing assets in the Web editor, and using them in Unity.">
+  <meta name="theme-color" content="#101415">
+  <title>PICG · Procedural Intelligent Content Generation</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="wordmark" href="#main" aria-label="PICG home">
+      <svg width="27" height="27" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9 16 2l13 7v14l-13 7L3 23Z M3 9l13 7 13-7 M16 16v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 13-7m-13 7v6" stroke="currentColor" stroke-width="2" fill="none"/></svg>PICG
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="#workflow">Workflow</a>
+      <a href="#examples">Examples</a>
+      <a href="#start">Quickstart</a>
+    </nav>
+    <a class="repo" href="https://github.com/DJ-Huang/PCG-AI">GitHub</a>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="hero" aria-labelledby="intro">
+      <div class="hero-copy">
+        <p class="eyebrow"><span></span> PROCEDURAL INTELLIGENT CONTENT GENERATION</p>
+        <h1 id="intro">Build the graph.<br><em>Keep the asset editable.</em></h1>
+        <p class="lead">PICG is a procedural asset toolkit with a visual Web editor, a native C++ runtime and Unity integration. Author the graph yourself or let an AI client edit it through MCP. The <code>.pcg</code> file stays yours to inspect, change and run again.</p>
+        <div class="actions">
+          <a class="button" href="#start">Start from source</a>
+          <a class="button secondary" href="#examples">Explore the graphs</a>
+        </div>
+      </div>
+      <figure class="hero-shot">
+        <div class="frame-bar"><span><i></i> WEB EDITOR</span><code>lot-city-buildings-procedural.pcg</code></div>
+        <img src="showcase/lot-city-buildings-procedural.png" alt="PICG Web editor showing white procedural city buildings beside their editable node graph" width="3018" height="1726" fetchpriority="high">
+        <figcaption>Repository screenshot · Lot city buildings</figcaption>
+      </figure>
+    </section>
+
+    <div class="status-line" aria-label="Project status"><strong>In active development</strong><span>Web authoring and Unity integration available from source</span><span>Apache-2.0</span></div>
+
+    <section class="section" id="workflow" aria-labelledby="workflow-title">
+      <div class="section-head">
+        <div><p class="eyebrow">HOW IT WORKS</p><h2 id="workflow-title">One graph, from edit to export.</h2></div>
+        <p>Keep the construction rules, not just the resulting mesh.</p>
+      </div>
+      <ol class="pipeline">
+        <li><span>AUTHOR</span><h3>Start with a graph.</h3><p>Wire nodes visually, open an example, or connect an external AI client to edit the same graph through the local MCP server.</p></li>
+        <li><span>VALIDATE &amp; COOK</span><h3>See what changes.</h3><p>Run the graph with the C++ core, then inspect the result in the Three.js preview. Change a parameter or seed and cook it again.</p></li>
+        <li><span>USE THE RESULT</span><h3>Take it into a scene.</h3><p>Export GLB from the Web editor or work with graph assets, materials, terrain and splines in Unity.</p></li>
+      </ol>
+      <div class="note"><b>Working today:</b> local Web editor and Unity. The Unity Player path uses a same-machine <code>pcg-server</code> sidecar. Unreal, Blender, Godot and a standalone Three.js runtime are planned, not available integrations. <a href="https://github.com/DJ-Huang/PCG-AI/blob/main/ROADMAP.md">Read the roadmap</a>.</div>
+    </section>
+
+    <section class="section" id="examples" aria-labelledby="examples-title">
+      <div class="section-head">
+        <div><p class="eyebrow">GRAPH LIBRARY</p><h2 id="examples-title">Open the source, not just the render.</h2></div>
+        <p>Each example has an editable graph and a capture from the Web editor.</p>
+      </div>
+      <div class="examples">
+        <article>
+          <img src="showcase/wooden-cabin.png" alt="A wooden cabin and its wall, roof, and porch subgraphs in the Web editor" loading="lazy" width="3024" height="1728">
+          <div><p class="eyebrow">MODULAR BUILDINGS</p><h3>Wooden cabin</h3><p>Wall, roof and porch subgraphs assemble into a building.</p><a href="https://github.com/DJ-Huang/PCG-AI/blob/main/examples/showcases/wooden-cabin/wooden-cabin.pcg">View cabin graph</a></div>
+        </article>
+        <article>
+          <img src="showcase/spiral-staircase.png" alt="Spiral staircase preview alongside a node graph" loading="lazy" width="3022" height="1724">
+          <div><p class="eyebrow">SPLINES &amp; INSTANCING</p><h3>Spiral staircase</h3><p>Build around a spline with sweep and instancing operations.</p><a href="https://github.com/DJ-Huang/PCG-AI/blob/main/examples/graphs/spiral-staircase.pcg">View staircase graph</a></div>
+        </article>
+        <article>
+          <img src="showcase/terrain-demo.png" alt="Procedural terrain heightfield preview and its editable graph" loading="lazy" width="3024" height="1726">
+          <div><p class="eyebrow">HEIGHTFIELDS</p><h3>Terrain demo</h3><p>Combine terracing, blur, noise distortion and erosion.</p><a href="https://github.com/DJ-Huang/PCG-AI/blob/main/examples/graphs/terrain-demo.pcg">View terrain graph</a></div>
+        </article>
+      </div>
+      <a class="text-link" href="https://github.com/DJ-Huang/PCG-AI/tree/main/examples">Browse all examples</a>
+    </section>
+
+    <section class="section start" id="start" aria-labelledby="start-title">
+      <div>
+        <p class="eyebrow">LOCAL QUICKSTART</p>
+        <h2 id="start-title">Run your first graph.</h2>
+        <p>Start from source. You’ll need Node.js 20.19+ in the 20.x line or Node.js 22.12+, CMake 3.20+, and a C++17 compiler. On Linux, install libcurl development files if needed.</p>
+        <p>The editor and native server both run on your machine. After starting them, open <a href="http://127.0.0.1:5173/review?graph=examples/graphs/stone-arch-bridge.pcg">the local bridge example</a>. If it can’t connect, check the <a href="http://127.0.0.1:17890/v1/health">server health endpoint</a>.</p>
+        <div class="actions">
+          <a class="button" href="https://github.com/DJ-Huang/PCG-AI/blob/main/docs/getting-started.md">Installation guide</a>
+          <a class="button secondary" href="https://github.com/DJ-Huang/PCG-AI/blob/main/docs/pcg-server.md#external-mcp-clients">Connect an MCP client</a>
+        </div>
+      </div>
+      <div class="terminal-stack">
+        <details class="terminal" open>
+          <summary class="frame-bar"><span>Windows PowerShell</span></summary>
+          <pre tabindex="0"><code># Terminal 1 · clone and start the server
+git clone --recurse-submodules https://github.com/DJ-Huang/PCG-AI.git
+cd PCG-AI
+.\scripts\build-pcg-server.ps1 -Run
+
+# Terminal 2 · from the same repository
+cd web\pcg-editor
+npm ci
+npm run dev</code></pre>
+        </details>
+        <details class="terminal">
+          <summary class="frame-bar"><span>macOS / Linux</span></summary>
+          <pre tabindex="0"><code>git clone --recurse-submodules https://github.com/DJ-Huang/PCG-AI.git
+cd PCG-AI
+./scripts/run-pcg-web.sh</code></pre>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p><strong>PICG</strong> · Procedural Intelligent Content Generation</p>
+    <nav aria-label="Project links">
+      <a href="https://github.com/DJ-Huang/PCG-AI/blob/main/docs/README.md">Docs</a>
+      <a href="https://github.com/DJ-Huang/PCG-AI">Repository</a>
+      <a href="https://github.com/DJ-Huang/PCG-AI/blob/main/LICENSE">License</a>
+    </nav>
+  </footer>
+</body>
+</html>

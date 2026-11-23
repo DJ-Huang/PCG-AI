@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <a href="docs/index.html">Project homepage source</a>
+</p>
+
+<p align="center">
   <img src="docs/picg-logo.png" alt="PICG — Procedural Intelligent Content Generation" width="400">
 </p>
 
@@ -148,8 +152,8 @@ Future Unreal, Blender, Godot, and Three.js adapters are expected to reuse the s
 Clone the repository and initialize its submodule:
 
 ```bash
-git clone --recurse-submodules https://github.com/DJ-Huang/PICG.git
-cd PICG
+git clone --recurse-submodules https://github.com/DJ-Huang/PCG-AI.git
+cd PCG-AI
 ```
 
 On macOS or Linux, start the native server and Web editor together:
